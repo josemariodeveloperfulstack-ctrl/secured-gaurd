@@ -139,17 +139,16 @@ public class WhatsAppController {
             }
             
             if (qrcode) {
-                // Aguardar mais tempo para o QR Code ser gerado após inicialização
-                // O Baileys REST pode precisar de mais tempo para processar a inicialização
+                // Aguardar apenas o tempo mínimo necessário para o QR Code ser gerado
                 try {
-                    Thread.sleep(3000); // 3 segundos
+                    Thread.sleep(1000); // Tempo mínimo: 1 segundo
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
                 
-                // Tentar obter QR Code até 10 vezes com intervalo crescente
+                // Tentar obter QR Code rapidamente (menos tentativas, intervalos menores)
                 String qrCodeData = null;
-                int maxAttempts = 10;
+                int maxAttempts = 5; // Reduzido de 10 para 5 tentativas
                 for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                     try {
                         qrCodeData = baileysRestService.getQRCode();
@@ -165,11 +164,11 @@ public class WhatsAppController {
                     }
                     
                     if (qrCodeData == null || qrCodeData.isEmpty()) {
-                        log.info("⏳ Aguardando QR Code... Tentativa {}/{}", attempt, maxAttempts);
+                        log.debug("⏳ Aguardando QR Code... Tentativa {}/{}", attempt, maxAttempts);
                         if (attempt < maxAttempts) {
                             try {
-                                // Intervalo crescente: 1s, 2s, 3s, etc.
-                                Thread.sleep(attempt * 1000);
+                                // Intervalo curto: 500ms, 1s, 1.5s, etc. (mais rápido)
+                                Thread.sleep(500 * attempt);
                             } catch (InterruptedException e) {
                                 Thread.currentThread().interrupt();
                                 break;

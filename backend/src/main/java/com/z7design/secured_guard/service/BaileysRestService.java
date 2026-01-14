@@ -107,7 +107,7 @@ public class BaileysRestService {
     
     /**
      * Inicializa uma nova instância do Baileys REST API
-     * Se a conexão estiver fechada, deleta a instância antes de criar uma nova
+     * Apenas faz logout se a conexão estiver fechada para otimizar performance
      */
     public boolean initializeInstance() {
         try {
@@ -117,14 +117,14 @@ public class BaileysRestService {
                 return false;
             }
             
-            // Verificar se a conexão está fechada
+            // Verificar estado da conexão - só fazer logout se necessário (conexão fechada)
             String connectionState = checkConnectionState();
             if ("closed".equals(connectionState) || "close".equals(connectionState)) {
-                logger.info("🔄 Conexão está fechada. Resetando instância antes de recriar...");
+                logger.info("🔄 Conexão está fechada. Resetando instância...");
                 resetInstance();
-                // Aguardar um pouco para garantir que a sessão foi limpa
+                // Aguardar apenas o tempo mínimo necessário
                 try {
-                    Thread.sleep(2000);
+                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }

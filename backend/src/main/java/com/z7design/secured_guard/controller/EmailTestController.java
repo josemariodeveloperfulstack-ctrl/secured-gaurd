@@ -52,12 +52,17 @@ public class EmailTestController {
             String mailPortEnv = System.getenv("MAIL_PORT");
             String mailUsernameEnv = System.getenv("MAIL_USERNAME");
             String mailPasswordEnv = System.getenv("MAIL_PASSWORD");
-            boolean hasPassword = mailPasswordEnv != null && !mailPasswordEnv.isEmpty();
+            String mailPasswordProperty = environment.getProperty("spring.mail.password");
+            // Verificar se senha está configurada (variável de ambiente OU propriedade do Spring)
+            boolean hasPassword = (mailPasswordEnv != null && !mailPasswordEnv.isEmpty()) 
+                                || (mailPasswordProperty != null && !mailPasswordProperty.isEmpty());
             
             log.info("📧 Configuração SMTP - Host: {} (env: {}), Port: {} (env: {})", 
                     mailHost, mailHostEnv, mailPort, mailPortEnv);
-            log.info("📧 Username: {} (env: {}), Password configurado: {}", 
-                    environment.getProperty("spring.mail.username"), mailUsernameEnv, hasPassword);
+            log.info("📧 Username: {} (env: {}), Password configurado: {} (env: {}, property: {})", 
+                    environment.getProperty("spring.mail.username"), mailUsernameEnv, hasPassword,
+                    mailPasswordEnv != null ? "SIM" : "NÃO",
+                    mailPasswordProperty != null && !mailPasswordProperty.isEmpty() ? "SIM" : "NÃO");
             log.info("📧 SSL: {}, STARTTLS: {}", 
                     environment.getProperty("spring.mail.properties.mail.smtp.ssl.enable", "false"),
                     environment.getProperty("spring.mail.properties.mail.smtp.starttls.enable", "false"));

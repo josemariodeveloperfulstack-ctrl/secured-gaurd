@@ -91,6 +91,8 @@ public class MailConfig {
         props.put("mail.smtp.starttls.required", String.valueOf(starttlsRequired));
         props.put("mail.smtp.ssl.enable", String.valueOf(sslEnable));
         props.put("mail.smtp.ssl.trust", sslTrust);
+        // Confiar no certificado SSL (necessário para alguns servidores)
+        props.put("mail.smtp.ssl.checkserveridentity", "false");
         
         // SocketFactory apenas para porta 465 (SSL direto)
         // NÃO usar SocketFactory com porta 587 (STARTTLS)
@@ -114,6 +116,8 @@ public class MailConfig {
         props.put("mail.smtp.connectiontimeout", String.valueOf(connectionTimeout));
         props.put("mail.smtp.timeout", String.valueOf(timeout));
         props.put("mail.smtp.writetimeout", String.valueOf(writeTimeout));
+        // Propriedades adicionais para melhorar compatibilidade
+        props.put("mail.smtp.ssl.protocols", "TLSv1.2,TLSv1.3");
         props.put("mail.debug", String.valueOf(debug));
 
         log.info("✅ JavaMailSender configurado com sucesso");
