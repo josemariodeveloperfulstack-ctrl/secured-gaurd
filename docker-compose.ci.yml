@@ -77,13 +77,20 @@ services:
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
       # Email Configuration
       # As variáveis de email vêm do arquivo .env criado pelo workflow
-      # Se não estiverem no .env, o Spring Boot usará application-ci.properties
-      MAIL_HOST: ${MAIL_HOST}
-      MAIL_PORT: ${MAIL_PORT}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      # Se não estiverem no .env, usar valores padrão do servidor mail.z7design.com.br
+      MAIL_HOST: ${MAIL_HOST:-mail.z7design.com.br}
+      MAIL_PORT: ${MAIL_PORT:-465}
+      MAIL_USERNAME: ${MAIL_USERNAME:-securedguard@z7design.com.br}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-D8rKeqSFZfaS$(y7}
       MAIL_STARTTLS_ENABLE: ${MAIL_STARTTLS_ENABLE:-false}
+      MAIL_STARTTLS_REQUIRED: ${MAIL_STARTTLS_REQUIRED:-false}
       MAIL_SSL_ENABLE: ${MAIL_SSL_ENABLE:-true}
+      MAIL_SOCKET_FACTORY: ${MAIL_SOCKET_FACTORY:-javax.net.ssl.SSLSocketFactory}
+      MAIL_SOCKET_FACTORY_PORT: ${MAIL_SOCKET_FACTORY_PORT:-465}
+      MAIL_CONNECTION_TIMEOUT: ${MAIL_CONNECTION_TIMEOUT:-10000}
+      MAIL_TIMEOUT: ${MAIL_TIMEOUT:-10000}
+      MAIL_WRITE_TIMEOUT: ${MAIL_WRITE_TIMEOUT:-10000}
+      MAIL_DEBUG: ${MAIL_DEBUG:-false}
       # WhatsApp Configuration
       # Usar o serviço whatsapp-service-ci que está na mesma rede Docker
       BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://whatsapp-service-ci:3333}
