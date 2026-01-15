@@ -3736,6 +3736,7 @@ public class UnifiedDocumentService {
      * Organiza documentos unificados por Empresa/Setor/Ano/Mês
      * VERSÃO OTIMIZADA: Usa queries eficientes e evita carregar dados desnecessários
      */
+    @Transactional(readOnly = true)
     public PayslipOrganizationResponse organizeUnifiedDocumentsByCompany() {
         long startTime = System.currentTimeMillis();
         PayslipOrganizationResponse response = new PayslipOrganizationResponse();
@@ -3908,15 +3909,30 @@ public class UnifiedDocumentService {
                 try {
                     payslip = ud.getPayslip();
                     if (payslip != null) {
-                        // Verificar se o payslip realmente existe
+                        // Verificar se o payslip realmente existe e FORÇAR carregamento de todos os campos necessários
                         try {
-                            payslip.getCompanyName(); // Força o carregamento
+                            // Forçar carregamento de todos os campos dentro da transação
+                            payslip.getCompanyName();
+                            payslip.getFileName(); // Carregar fileName dentro da transação
+                            payslip.getCpf();
+                            payslip.getEmployeeName();
+                            payslip.getMonth();
+                            payslip.getYear();
+                            payslip.getCompanyCnpj();
+                            payslip.getCompanySigla();
+                            payslip.getWorkPostName();
                             foundPayslipCount++;
                         } catch (jakarta.persistence.EntityNotFoundException e) {
                             log.debug("⚠️ Payslip referenciado não existe mais: {}", e.getMessage());
                             payslip = null;
+                        } catch (org.hibernate.LazyInitializationException e) {
+                            log.debug("⚠️ Erro de lazy initialization ao acessar payslip: {}", e.getMessage());
+                            payslip = null;
                         }
                     }
+                } catch (org.hibernate.LazyInitializationException e) {
+                    log.debug("⚠️ Erro de lazy initialization ao acessar payslip: {}", e.getMessage());
+                    payslip = null;
                 } catch (Exception e) {
                     log.debug("⚠️ Erro ao acessar payslip: {}", e.getMessage());
                 }
@@ -3933,6 +3949,14 @@ public class UnifiedDocumentService {
                         if (p.getMonth() != null && p.getMonth().equals(ud.getMonth()) &&
                             p.getYear() != null && p.getYear().equals(ud.getYear()) &&
                             verifyEmployeeNames(ud.getEmployeeName(), p.getEmployeeName())) {
+                            // Garantir que todos os campos foram carregados
+                            try {
+                                p.getFileName();
+                                p.getCompanyName();
+                            } catch (org.hibernate.LazyInitializationException e) {
+                                log.debug("⚠️ Erro de lazy initialization em payslip adicional: {}", e.getMessage());
+                                continue;
+                            }
                             payslip = p;
                             foundPayslipCount++;
                             break;
@@ -3954,15 +3978,20 @@ public class UnifiedDocumentService {
                         Payslip relatedPayslip = ud.getPayslip();
                         if (relatedPayslip != null) {
                             try {
+                                // Tentar carregar todos os campos dentro da transação
                                 cpf = relatedPayslip.getCpf() != null ? relatedPayslip.getCpf() : "";
                                 companyName = relatedPayslip.getCompanyName() != null ? relatedPayslip.getCompanyName() : "";
                                 companyCnpj = relatedPayslip.getCompanyCnpj() != null ? relatedPayslip.getCompanyCnpj() : "";
                                 companySigla = relatedPayslip.getCompanySigla() != null ? relatedPayslip.getCompanySigla() : "";
                                 workPostName = relatedPayslip.getWorkPostName() != null ? relatedPayslip.getWorkPostName() : "";
+                            } catch (org.hibernate.LazyInitializationException e) {
+                                log.debug("⚠️ Erro de lazy initialization ao acessar dados do payslip relacionado: {}", e.getMessage());
                             } catch (Exception e) {
                                 log.debug("⚠️ Erro ao acessar dados do payslip relacionado: {}", e.getMessage());
                             }
                         }
+                    } catch (org.hibernate.LazyInitializationException e) {
+                        log.debug("⚠️ Erro de lazy initialization ao acessar payslip relacionado: {}", e.getMessage());
                     } catch (Exception e) {
                         log.debug("⚠️ Erro ao acessar payslip relacionado: {}", e.getMessage());
                     }
@@ -3979,9 +4008,21 @@ public class UnifiedDocumentService {
                         .workPostName(workPostName)
                         .build();
                 } else {
-                    // Garantir que o nome do arquivo está definido
-                    if (payslip.getFileName() == null || payslip.getFileName().isEmpty()) {
-                        payslip.setFileName(ud.getFileName() != null ? ud.getFileName() : "");
+                    // Garantir que o nome do arquivo está definido (já foi carregado acima)
+                    try {
+                        if (payslip.getFileName() == null || payslip.getFileName().isEmpty()) {
+                            payslip.setFileName(ud.getFileName() != null ? ud.getFileName() : "");
+                        }
+                    } catch (org.hibernate.LazyInitializationException e) {
+                        log.debug("⚠️ Erro de lazy initialization ao acessar fileName: {}", e.getMessage());
+                        // Usar fileName do unified document como fallback
+                        if (ud.getFileName() != null) {
+                            try {
+                                payslip.setFileName(ud.getFileName());
+                            } catch (Exception ex) {
+                                log.debug("⚠️ Não foi possível definir fileName: {}", ex.getMessage());
+                            }
+                        }
                     }
                 }
                 

@@ -52,9 +52,10 @@ public interface UnifiedDocumentRepository extends JpaRepository<UnifiedDocument
     
     /**
      * Query otimizada para buscar unified documents com payslips relacionados
-     * Usa paginação para evitar carregar muitos dados de uma vez
+     * Usa LEFT JOIN FETCH para carregar o payslip junto e evitar LazyInitializationException
      */
-    @Query("SELECT ud FROM UnifiedDocument ud " +
+    @Query("SELECT DISTINCT ud FROM UnifiedDocument ud " +
+           "LEFT JOIN FETCH ud.payslip p " +
            "WHERE ud.employeeName IS NOT NULL AND ud.month IS NOT NULL AND ud.year IS NOT NULL " +
            "ORDER BY ud.year DESC, ud.month DESC, ud.employeeName ASC")
     List<UnifiedDocument> findAllWithPayslipOptimized();

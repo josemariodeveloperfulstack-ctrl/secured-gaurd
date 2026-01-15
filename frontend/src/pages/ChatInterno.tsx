@@ -1330,19 +1330,19 @@ const ChatInterno: React.FC = () => {
                           </div>
                         </div>
                         <Input
-                          placeholder="Digite o nome do usuário..."
+                          placeholder="Digite o nome do usuário para filtrar..."
                           value={userSearchTerm}
                           onChange={(e) => setUserSearchTerm(e.target.value)}
                           className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                           autoComplete="off"
                         />
-                        {!shouldFilterUsers && (
-                          <p className="text-xs text-seguranca-gray">Digite pelo menos 3 caracteres para buscar.</p>
-                        )}
-                        <Select onValueChange={(value) => {
-                          const user = safeAvailableUsers.find(u => u.id === value);
-                          setSelectedUser(user || null);
-                        }}>
+                        <Select 
+                          value={selectedUser?.id || undefined}
+                          onValueChange={(value) => {
+                            const user = safeAvailableUsers.find(u => u.id === value);
+                            setSelectedUser(user || null);
+                          }}
+                        >
                           <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
                             <SelectValue placeholder="Escolha um usuário" />
                           </SelectTrigger>
@@ -1354,10 +1354,6 @@ const ChatInterno: React.FC = () => {
                                   Carregando usuários...
                                 </div>
                               </SelectItem>
-                          ) : !shouldFilterUsers ? (
-                            <SelectItem value="min-chars" disabled className="text-seguranca-gray">
-                              Digite pelo menos 3 caracteres para buscar
-                            </SelectItem>
                             ) : safeAvailableUsers.length === 0 ? (
                               <SelectItem value="no-users" disabled className="text-seguranca-gray">
                                 Nenhum usuário disponível
@@ -1365,8 +1361,12 @@ const ChatInterno: React.FC = () => {
                             ) : (
                               safeAvailableUsers
                                 .filter(user => user && user.id && user.name)
-                                .filter(user => user.name.toLowerCase().includes(userSearchTerm.toLowerCase()))
                                 .filter(user => !showOnlyOnline || user.isOnline)
+                                .filter(user => {
+                                  // Filtrar por termo de busca se fornecido (caso contrário, mostrar todos)
+                                  const searchLower = userSearchTerm.trim().toLowerCase();
+                                  return searchLower.length === 0 || user.name.toLowerCase().includes(searchLower);
+                                })
                                 .sort((a, b) => {
                                   // Ordenar: online primeiro, depois offline
                                   if (a.isOnline && !b.isOnline) return -1;
