@@ -162,7 +162,10 @@ jobs:
           
           # Build Backend
           echo "🔨 Construindo imagem do backend..."
-          docker build --no-cache -t z7design/secured-guard-backend:ci \
+          docker build --no-cache \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            --label org.opencontainers.image.source=https://github.com/zemarioramos/secured-guard \
+            -t z7design/secured-guard-backend:ci \
             -f backend/Dockerfile.prod ./backend || {
             echo "❌ Build do backend Docker falhou!"
             exit 1
@@ -171,7 +174,10 @@ jobs:
           
           # Build Frontend
           echo "🎨 Construindo imagem do frontend..."
-          docker build --no-cache -t z7design/secured-guard-frontend:ci \
+          docker build --no-cache \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            --label org.opencontainers.image.source=https://github.com/zemarioramos/secured-guard \
+            -t z7design/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
@@ -183,7 +189,10 @@ jobs:
           
           # Build WhatsApp Service
           echo "📱 Construindo imagem do WhatsApp service..."
-          docker build --no-cache -t z7design/secured-guard-whatsapp:ci \
+          docker build --no-cache \
+            --label org.opencontainers.image.revision=${{ github.sha }} \
+            --label org.opencontainers.image.source=https://github.com/zemarioramos/secured-guard \
+            -t z7design/secured-guard-whatsapp:ci \
             -f whatsapp-service/Dockerfile ./whatsapp-service || {
             echo "❌ Build do WhatsApp service Docker falhou!"
             exit 1
@@ -354,9 +363,17 @@ jobs:
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            # Remover imagens antigas para garantir atualização do código
+            docker image rm -f z7design/secured-guard-backend:ci 2>/dev/null || true
+            docker image rm -f z7design/secured-guard-frontend:ci 2>/dev/null || true
+            docker image rm -f z7design/secured-guard-whatsapp:ci 2>/dev/null || true
             docker pull z7design/secured-guard-backend:ci
             docker pull z7design/secured-guard-frontend:ci
             docker pull z7design/secured-guard-whatsapp:ci
+            # Mostrar commit aplicado nas imagens (label)
+            docker image inspect z7design/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' || true
+            docker image inspect z7design/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' || true
+            docker image inspect z7design/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' || true
           EOF
 
       # ============================================
