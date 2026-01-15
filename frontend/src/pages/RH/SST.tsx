@@ -240,18 +240,18 @@ const SST: React.FC = () => {
             </h1>
             <p className="text-gray-400 mt-1">Saúde e Segurança do Trabalho - Conformidade Legal</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button 
               variant="outline"
               onClick={() => navigate('/rh/sst/relatorios')}
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black w-full sm:w-auto"
             >
               <Download className="h-4 w-4 mr-2" />
               Relatórios
             </Button>
             <Button 
               onClick={() => navigate('/rh/sst/exames')}
-              className="bg-seguranca-red hover:bg-seguranca-darkred"
+              className="bg-seguranca-red hover:bg-seguranca-darkred w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Exame
@@ -261,17 +261,17 @@ const SST: React.FC = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite border-gray-600">
-            <TabsTrigger value="overview" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-2 bg-seguranca-graphite border-gray-600 p-1">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="compliance" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
+            <TabsTrigger value="compliance" className="text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Conformidade
             </TabsTrigger>
-            <TabsTrigger value="risks" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
+            <TabsTrigger value="risks" className="text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Riscos
             </TabsTrigger>
-            <TabsTrigger value="actions" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
+            <TabsTrigger value="actions" className="text-xs sm:text-sm text-seguranca-lightgray data-[state='active']:bg-seguranca-red">
               Ações
             </TabsTrigger>
           </TabsList>
@@ -279,7 +279,7 @@ const SST: React.FC = () => {
           {/* Visão Geral */}
           <TabsContent value="overview" className="space-y-6">
             {/* Cards de Estatísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card className="bg-seguranca-graphite border-gray-600">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-seguranca-lightgray">ASO em Dia</CardTitle>

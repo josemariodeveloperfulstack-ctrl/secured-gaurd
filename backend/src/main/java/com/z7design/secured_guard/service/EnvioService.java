@@ -346,6 +346,20 @@ public class EnvioService {
                 response.setMensagem("Nenhum destinatário encontrado para envio via " + request.getTipo());
                 return response;
             }
+
+            if (request.getMonth() != null && request.getYear() != null) {
+                int beforeFilter = cpfsParaEnvio.size();
+                Integer reqMonth = request.getMonth();
+                Integer reqYear = request.getYear();
+                cpfsParaEnvio = cpfsParaEnvio.stream()
+                        .filter(cpf -> resolvePayslipForRequest(cpf, reqMonth, reqYear).isPresent())
+                        .toList();
+                log.info("📅 Filtro por período aplicado ({}/{}): {} -> {}", reqMonth, reqYear, beforeFilter, cpfsParaEnvio.size());
+                if (cpfsParaEnvio.isEmpty()) {
+                    response.setMensagem("Nenhum holerite processado para o período selecionado.");
+                    return response;
+                }
+            }
             
             log.info("📋 Processando {} envios...", cpfsParaEnvio.size());
             
@@ -360,6 +374,8 @@ public class EnvioService {
                 individualRequest.setCpf(cpf);
                 individualRequest.setMensagem(request.getMensagem());
                 individualRequest.setAssunto(request.getAssunto());
+                individualRequest.setMonth(request.getMonth());
+                individualRequest.setYear(request.getYear());
                 
                 // Processar envio individual (já vai buscar na tabela users)
                 EnvioResponse individualResponse = enviarIndividual(individualRequest);
@@ -448,15 +464,21 @@ public class EnvioService {
                 if (employee.getEmail() == null || employee.getEmail().trim().isEmpty()) {
                     employee.setEmail(destinationEmail);
                 }
-                // Resolver último holerite disponível (maior ano/mes)
-                var ultimoRegistro = obterUltimoPayslip(employee.getDocument());
-                Optional<String> resolvedPathOpt = ultimoRegistro.map(p ->
-                        payslipService.resolvePayslipPathByCpfMonthYear(p.getCpf(), p.getMonth(), p.getYear()).orElse(null)
-                );
+                Integer reqMonth = request.getMonth();
+                Integer reqYear = request.getYear();
+                var registroSelecionado = resolvePayslipForRequest(employee.getDocument(), reqMonth, reqYear);
+                if (registroSelecionado.isEmpty()) {
+                    detalhe.setErro(buildPeriodoError(reqMonth, reqYear, "Nenhum holerite encontrado para o funcionário"));
+                    registrarLog(employee.getDocument(), reqMonth, reqYear, DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
+                    return detalhe;
+                }
+                var payslipSelecionado = registroSelecionado.get();
+                Optional<String> resolvedPathOpt = payslipService
+                        .resolvePayslipPathByCpfMonthYear(payslipSelecionado.getCpf(), payslipSelecionado.getMonth(), payslipSelecionado.getYear());
                 String filePath = resolvedPathOpt.orElse(null);
                 if (filePath == null || !Files.exists(Path.of(filePath))) {
                     detalhe.setErro("Arquivo de holerite não encontrado para envio por email");
-                    registrarLog(employee.getDocument(), ultimoRegistro.map(Payslip::getMonth).orElse(null), ultimoRegistro.map(Payslip::getYear).orElse(null), DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
+                    registrarLog(employee.getDocument(), payslipSelecionado.getMonth(), payslipSelecionado.getYear(), DeliveryChannel.EMAIL, false, 1, detalhe.getErro());
                     return detalhe;
                 }
 
@@ -471,7 +493,7 @@ public class EnvioService {
                 if (!emailOk) {
                     detalhe.setErro("Falha no envio de email");
                 }
-                registrarLog(employee.getDocument(), ultimoRegistro.map(Payslip::getMonth).orElse(null), ultimoRegistro.map(Payslip::getYear).orElse(null), DeliveryChannel.EMAIL, detalhe.isEnviado(), 1, detalhe.getErro());
+                registrarLog(employee.getDocument(), payslipSelecionado.getMonth(), payslipSelecionado.getYear(), DeliveryChannel.EMAIL, detalhe.isEnviado(), 1, detalhe.getErro());
                 
             } else if ("whatsapp".equals(request.getTipo())) {
                 // 🔍 VALIDAÇÃO: Verificar WhatsApp primeiro em users, depois em employees
@@ -561,16 +583,17 @@ public class EnvioService {
                     return detalhe;
                 }
 
-                var ultimoRegistro = obterUltimoPayslip(cpf);
-                
-                if (ultimoRegistro.isEmpty()) {
+                Integer reqMonth = request.getMonth();
+                Integer reqYear = request.getYear();
+                var registroSelecionado = resolvePayslipForRequest(cpf, reqMonth, reqYear);
+                if (registroSelecionado.isEmpty()) {
                     log.warn("⚠️ Nenhum holerite encontrado para CPF: {}", cpf);
-                    detalhe.setErro("Nenhum holerite encontrado para este funcionário");
-                    registrarLog(cpf, null, null, DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
+                    detalhe.setErro(buildPeriodoError(reqMonth, reqYear, "Nenhum holerite encontrado para este funcionário"));
+                    registrarLog(cpf, reqMonth, reqYear, DeliveryChannel.WHATSAPP, false, 1, detalhe.getErro());
                     return detalhe;
                 }
                 
-                Payslip payslip = ultimoRegistro.get();
+                Payslip payslip = registroSelecionado.get();
                 log.info("📋 Holerite encontrado: CPF={}, Mês={}, Ano={}, Arquivo={}", 
                         payslip.getCpf(), payslip.getMonth(), payslip.getYear(), payslip.getFileName());
                 
@@ -661,6 +684,20 @@ public class EnvioService {
                         .orElse(lista.get(0)));
     }
 
+    private Optional<Payslip> resolvePayslipForRequest(String cpf, Integer month, Integer year) {
+        if (month != null && year != null) {
+            return Optional.ofNullable(payslipRepository.findFirstByCpfAndMonthAndYear(cpf, month, year));
+        }
+        return obterUltimoPayslip(cpf);
+    }
+
+    private String buildPeriodoError(Integer month, Integer year, String fallbackMessage) {
+        if (month != null && year != null) {
+            return fallbackMessage + " para o período " + month + "/" + year;
+        }
+        return fallbackMessage;
+    }
+
     /**
      * Envia mensagem via WhatsApp usando Baileys REST API (com correção DDI 55)
      */
@@ -737,6 +774,8 @@ public class EnvioService {
             EnvioRequest req = new EnvioRequest();
             req.setTipo(log.getChannel() == DeliveryChannel.EMAIL ? "email" : "whatsapp");
             req.setFuncionarioId(employeeOpt.get().getId().toString());
+            req.setMonth(log.getMonth());
+            req.setYear(log.getYear());
             var det = processarEnvio(employeeOpt.get(), req);
             response.getDetalhes().add(det);
             if (det.isEnviado()) {

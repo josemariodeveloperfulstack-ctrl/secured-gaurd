@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -177,6 +177,16 @@ const Holerites: React.FC = () => {
   // Validação de contatos para envio em lote (holerites)
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationSendType, setValidationSendType] = useState<'email' | 'whatsapp' | 'both'>('whatsapp');
+  const [showPeriodoEnvioModal, setShowPeriodoEnvioModal] = useState(false);
+  const [periodoEnvioOptions, setPeriodoEnvioOptions] = useState<Array<{ value: string; month: number; year: number; label: string; count: number }>>([]);
+  const [periodoEnvioSelecionado, setPeriodoEnvioSelecionado] = useState('');
+  const [pendingEnvioContext, setPendingEnvioContext] = useState<{ ids: string[]; type: 'email' | 'whatsapp' } | null>(null);
+  const [selectedSendPeriod, setSelectedSendPeriod] = useState<{ month: number; year: number } | null>(null);
+  const [sendRecipientMode, setSendRecipientMode] = useState<'all' | 'selected'>('all');
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
+  const [recipientEmployeeMap, setRecipientEmployeeMap] = useState<Record<string, string>>({});
+  const [recipientValidationMap, setRecipientValidationMap] = useState<Record<string, ContactValidationDetail>>({});
+  const [loadingRecipientValidation, setLoadingRecipientValidation] = useState(false);
   const [resolvedEmployeeIds, setResolvedEmployeeIds] = useState<string[]>([]);
 
   // Visualização de PDF unificado
@@ -230,11 +240,26 @@ const Holerites: React.FC = () => {
       toast({ title: 'Sem destinatários prontos', description: 'Nenhum funcionário pronto para envio.', variant: 'destructive' });
       return;
     }
+    if (!selectedSendPeriod) {
+      toast({ title: 'Período não selecionado', description: 'Selecione o período antes de enviar.', variant: 'destructive' });
+      return;
+    }
     try {
       // Dispara envio via backend. Se 'both', faz duas chamadas sequenciais
       if (validationSendType === 'both') {
-        const emailRes = await api.post('/api/envio/massa', { tipo: 'email', funcionarioIds: validatedIds });
-        const waRes = await api.post('/api/envio/massa', { tipo: 'whatsapp', funcionarioIds: validatedIds, mensagem: whatsAppMessage });
+        const emailRes = await api.post('/api/envio/massa', { 
+          tipo: 'email', 
+          funcionarioIds: validatedIds, 
+          month: selectedSendPeriod.month, 
+          year: selectedSendPeriod.year 
+        });
+        const waRes = await api.post('/api/envio/massa', { 
+          tipo: 'whatsapp', 
+          funcionarioIds: validatedIds, 
+          mensagem: whatsAppMessage,
+          month: selectedSendPeriod.month, 
+          year: selectedSendPeriod.year 
+        });
         // combinar resultados simples
         const combined: EnvioResponse = {
           sucesso: emailRes.data?.sucesso && waRes.data?.sucesso,
@@ -248,7 +273,13 @@ const Holerites: React.FC = () => {
         setMassResult(combined);
         setShowMassResultModal(true);
       } else {
-        const { data } = await api.post('/api/envio/massa', { tipo: validationSendType, funcionarioIds: validatedIds, mensagem: validationSendType === 'whatsapp' ? whatsAppMessage : undefined });
+        const { data } = await api.post('/api/envio/massa', { 
+          tipo: validationSendType, 
+          funcionarioIds: validatedIds, 
+          mensagem: validationSendType === 'whatsapp' ? whatsAppMessage : undefined,
+          month: selectedSendPeriod.month, 
+          year: selectedSendPeriod.year
+        });
         setMassResult(data);
         setShowMassResultModal(true);
       }
@@ -4958,31 +4989,142 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     return Array.from(new Set(ids));
   }, []);
 
-  const handleBatchSendHoleritesForIds = useCallback(async (ids: string[], type: 'email' | 'whatsapp') => {
-    console.log('🚀 Iniciando envio em lote:', { ids, type, count: ids.length });
-    
-    if (!ids.length) {
-      toast({ title: 'Nenhum holerite selecionado', description: 'Selecione pelo menos um holerite para enviar.', variant: 'destructive' });
-      return;
-    }
+  const buildPeriodoEnvioOptions = useCallback((items: Holerite[]) => {
+    const map = new Map<string, { month: number; year: number; label: string; count: number }>();
+    items.forEach((item) => {
+      if (!item.month || !item.year) return;
+      const value = `${item.year}-${String(item.month).padStart(2, '0')}`;
+      const existing = map.get(value);
+      if (existing) {
+        existing.count += 1;
+        return;
+      }
+      map.set(value, {
+        month: item.month,
+        year: item.year,
+        label: `${String(item.month).padStart(2, '0')}/${item.year}`,
+        count: 1
+      });
+    });
+    return Array.from(map.entries())
+      .map(([value, data]) => ({ value, ...data }))
+      .sort((a, b) => (b.year - a.year) || (b.month - a.month));
+  }, []);
 
-    const holeritesToSend = getHoleritesByIds(ids);
-    console.log('📋 Holerites encontrados:', holeritesToSend.length, 'de', ids.length);
-    console.log('📋 Detalhes dos holerites:', holeritesToSend.map(h => ({
-      id: h.id,
-      cpf: h.cpf,
-      employeeName: h.employeeName,
-      fileName: h.fileName
-    })));
-    
-    if (holeritesToSend.length === 0) {
-      toast({ title: 'Holerites não encontrados', description: 'Não foi possível localizar os holerites selecionados.', variant: 'destructive' });
+  const getHoleritesForSelectedPeriod = useCallback(() => {
+    if (!pendingEnvioContext) return [];
+    const all = getHoleritesByIds(pendingEnvioContext.ids);
+    if (!periodoEnvioSelecionado) return all;
+    const selected = periodoEnvioOptions.find((p) => p.value === periodoEnvioSelecionado);
+    if (!selected) return all;
+    return all.filter((h) => h.month === selected.month && h.year === selected.year);
+  }, [pendingEnvioContext, getHoleritesByIds, periodoEnvioSelecionado, periodoEnvioOptions]);
+  const periodoHolerites = useMemo(() => getHoleritesForSelectedPeriod(), [getHoleritesForSelectedPeriod]);
+
+  const resolveEmployeeIdForHolerite = useCallback(async (holerite: Holerite): Promise<string | null> => {
+    const cpf = holerite.cpf?.replace(/\D/g, '');
+    if (cpf && cpf.length >= 11) {
+      try {
+        const exactMatch = await employeeService.searchEmployeeByCpf(cpf);
+        if (exactMatch) return exactMatch.id;
+        const byCpf = await employeeService.searchEmployees(cpf);
+        if (byCpf && byCpf.length > 0) {
+          const exact = byCpf.find((emp: any) => (emp.document || emp.cpf || '').replace(/\D/g, '') === cpf);
+          if (exact) return exact.id;
+          if (byCpf.length === 1) return byCpf[0].id;
+        }
+      } catch (error) {
+        console.error('Erro ao buscar funcionário por CPF:', cpf, error);
+      }
+    }
+    if (holerite.employeeName) {
+      try {
+        const byName = await employeeService.searchEmployeesByName(holerite.employeeName);
+        if (byName && byName.length > 0) {
+          const exact = byName.find((emp: any) => (emp.name || '').trim().toLowerCase() === holerite.employeeName.trim().toLowerCase());
+          if (exact) return exact.id;
+          if (byName.length === 1) return byName[0].id;
+        }
+      } catch (error) {
+        console.error('Erro ao buscar funcionário por nome:', holerite.employeeName, error);
+      }
+    }
+    return null;
+  }, []);
+
+  const loadRecipientValidation = useCallback(async (items: Holerite[]) => {
+    if (!items.length) {
+      setRecipientEmployeeMap({});
+      setRecipientValidationMap({});
       return;
     }
+    setLoadingRecipientValidation(true);
+    try {
+      const entries = await Promise.all(items.map(async (holerite) => {
+        const employeeId = await resolveEmployeeIdForHolerite(holerite);
+        return { holeriteId: holerite.id, employeeId };
+      }));
+      const map: Record<string, string> = {};
+      entries.forEach((entry) => {
+        if (entry.employeeId) {
+          map[entry.holeriteId] = entry.employeeId;
+        }
+      });
+      setRecipientEmployeeMap(map);
+      const employeeIds = Array.from(new Set(Object.values(map)));
+      if (employeeIds.length === 0) {
+        setRecipientValidationMap({});
+        return;
+      }
+      const validation = await contactValidationService.validateContacts({
+        employeeIds,
+        type: 'whatsapp'
+      });
+      const detailMap: Record<string, ContactValidationDetail> = {};
+      validation?.details?.forEach((detail) => {
+        detailMap[detail.employeeId] = detail;
+      });
+      setRecipientValidationMap(detailMap);
+    } catch (error) {
+      console.error('Erro ao validar WhatsApp dos destinatários:', error);
+      setRecipientValidationMap({});
+    } finally {
+      setLoadingRecipientValidation(false);
+    }
+  }, [resolveEmployeeIdForHolerite]);
+
+  const confirmPeriodoEnvio = useCallback(async () => {
+    if (!pendingEnvioContext) return;
+    const selected = periodoEnvioOptions.find((p) => p.value === periodoEnvioSelecionado);
+    if (!selected) {
+      toast({ title: 'Selecione o período', description: 'Escolha o período que deseja enviar.', variant: 'destructive' });
+      return;
+    }
+    const ids = pendingEnvioContext.ids;
+    const type = pendingEnvioContext.type;
+    let holeritesToSend = getHoleritesByIds(ids)
+      .filter((h) => h.month === selected.month && h.year === selected.year);
+    if (sendRecipientMode === 'selected') {
+      if (selectedRecipientIds.length === 0) {
+        toast({ title: 'Selecione usuários', description: 'Escolha ao menos um usuário para enviar.', variant: 'destructive' });
+        return;
+      }
+      holeritesToSend = holeritesToSend.filter((h) => selectedRecipientIds.includes(h.id));
+    }
+    if (holeritesToSend.length === 0) {
+      toast({ title: 'Período inválido', description: 'Nenhum holerite encontrado para o período selecionado.', variant: 'destructive' });
+      return;
+    }
+    const filteredIds = holeritesToSend.map((h) => h.id);
+    setSelectedSendPeriod({ month: selected.month, year: selected.year });
+    setShowPeriodoEnvioModal(false);
+    setPendingEnvioContext(null);
+
+    console.log('🚀 Iniciando envio em lote com período:', { filteredIds, type, period: selected });
 
     const employeeIds = await resolveEmployeeIdsForHolerites(holeritesToSend);
     console.log('👥 Funcionários resolvidos:', employeeIds.length, 'de', holeritesToSend.length);
-    
+
     if (employeeIds.length === 0) {
       const missingDetails = holeritesToSend.map(h => `- ${h.employeeName || 'Sem nome'} (CPF: ${h.cpf || 'Sem CPF'})`).join('\n');
       toast({ 
@@ -4997,7 +5139,117 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     setResolvedEmployeeIds(employeeIds);
     setValidationSendType(type);
     setShowValidationModal(true);
-  }, [getHoleritesByIds, resolveEmployeeIdsForHolerites, toast]);
+  }, [pendingEnvioContext, periodoEnvioOptions, periodoEnvioSelecionado, getHoleritesByIds, resolveEmployeeIdsForHolerites, toast]);
+
+  useEffect(() => {
+    if (!showPeriodoEnvioModal || sendRecipientMode !== 'selected') return;
+    const availableIds = getHoleritesForSelectedPeriod().map((h) => h.id);
+    setSelectedRecipientIds((prev) => {
+      const intersected = prev.filter((id) => availableIds.includes(id));
+      return intersected.length > 0 ? intersected : availableIds;
+    });
+  }, [showPeriodoEnvioModal, sendRecipientMode, getHoleritesForSelectedPeriod]);
+
+  useEffect(() => {
+    if (!showPeriodoEnvioModal || sendRecipientMode !== 'selected') return;
+    void loadRecipientValidation(getHoleritesForSelectedPeriod());
+  }, [showPeriodoEnvioModal, sendRecipientMode, periodoEnvioSelecionado, loadRecipientValidation, getHoleritesForSelectedPeriod]);
+
+  const refreshRecipientValidation = useCallback(async () => {
+    if (!showPeriodoEnvioModal || sendRecipientMode !== 'selected') return;
+    await loadRecipientValidation(getHoleritesForSelectedPeriod());
+  }, [showPeriodoEnvioModal, sendRecipientMode, loadRecipientValidation, getHoleritesForSelectedPeriod]);
+
+  // Função para tentar criar vínculo quando não há employeeId
+  const handleTryCreateLink = useCallback(async (holerite: Holerite) => {
+    try {
+      // Tentar buscar funcionário novamente
+      const employeeId = await resolveEmployeeIdForHolerite(holerite);
+      
+      if (employeeId) {
+        // Se encontrou, atualizar o mapa e recarregar validação
+        setRecipientEmployeeMap((prev) => ({
+          ...prev,
+          [holerite.id]: employeeId
+        }));
+        
+        // Buscar validação para este employee
+        const validation = await contactValidationService.validateContacts({
+          employeeIds: [employeeId],
+          type: 'whatsapp'
+        });
+        
+        if (validation?.details && validation.details.length > 0) {
+          const detail = validation.details[0];
+          setRecipientValidationMap((prev) => ({
+            ...prev,
+            [employeeId]: detail
+          }));
+          
+          toast({
+            title: '✅ Vínculo encontrado',
+            description: 'Funcionário vinculado com sucesso!',
+          });
+          
+          // Recarregar validação completa para atualizar a lista
+          await refreshRecipientValidation();
+        } else {
+          toast({
+            title: '⚠️ Vínculo encontrado, mas sem validação',
+            description: 'Funcionário encontrado, mas é necessário criar usuário ou atualizar WhatsApp.',
+            variant: 'destructive',
+          });
+          
+          // Recarregar validação mesmo assim
+          await refreshRecipientValidation();
+        }
+      } else {
+        // Não encontrou funcionário - precisa cadastrar
+        toast({
+          title: '⚠️ Funcionário não encontrado',
+          description: `Não foi possível encontrar funcionário com CPF ${holerite.cpf || 'N/A'} ou nome "${holerite.employeeName || 'N/A'}". É necessário cadastrar o funcionário primeiro no módulo de Gestão de Funcionários.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao tentar criar vínculo:', error);
+      toast({
+        title: '❌ Erro',
+        description: error.response?.data?.message || 'Erro ao tentar vincular funcionário',
+        variant: 'destructive',
+      });
+    }
+  }, [resolveEmployeeIdForHolerite, toast, refreshRecipientValidation]);
+
+  const handleBatchSendHoleritesForIds = useCallback(async (ids: string[], type: 'email' | 'whatsapp') => {
+    console.log('🚀 Iniciando envio em lote:', { ids, type, count: ids.length });
+    
+    if (!ids.length) {
+      toast({ title: 'Nenhum holerite selecionado', description: 'Selecione pelo menos um holerite para enviar.', variant: 'destructive' });
+      return;
+    }
+
+    const holeritesToSend = getHoleritesByIds(ids);
+    console.log('📋 Holerites encontrados:', holeritesToSend.length, 'de', ids.length);
+    
+    if (holeritesToSend.length === 0) {
+      toast({ title: 'Holerites não encontrados', description: 'Não foi possível localizar os holerites selecionados.', variant: 'destructive' });
+      return;
+    }
+
+    const periodos = buildPeriodoEnvioOptions(holeritesToSend);
+    if (periodos.length === 0) {
+      toast({ title: 'Períodos indisponíveis', description: 'Nenhum período processado encontrado para envio.', variant: 'destructive' });
+      return;
+    }
+
+    setPendingEnvioContext({ ids, type });
+    setPeriodoEnvioOptions(periodos);
+    setPeriodoEnvioSelecionado(periodos[0].value);
+    setSendRecipientMode('all');
+    setSelectedRecipientIds(ids);
+    setShowPeriodoEnvioModal(true);
+  }, [getHoleritesByIds, buildPeriodoEnvioOptions, toast]);
 
   const handleBatchDeleteHoleritesByIds = useCallback((ids: string[]) => {
     if (!ids.length) {
@@ -8402,6 +8654,228 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           onDownload={handleDownloadPaymentReceipt}
         />
 
+        <Dialog open={showPeriodoEnvioModal} onOpenChange={(open) => {
+          if (!open) {
+            setShowPeriodoEnvioModal(false);
+            setPendingEnvioContext(null);
+            setPeriodoEnvioSelecionado('');
+            setSendRecipientMode('all');
+            setSelectedRecipientIds([]);
+            setRecipientEmployeeMap({});
+            setRecipientValidationMap({});
+          } else {
+            setShowPeriodoEnvioModal(true);
+          }
+        }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+          <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
+            <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Calendar className="h-6 w-6" />
+              </div>
+              Selecionar período do holerite
+            </DialogTitle>
+            <DialogDescription className="text-white/80 text-sm">
+              Escolha o período processado que deseja enviar. Isso evita reenvio de períodos já enviados.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {periodoEnvioOptions.length === 0 ? (
+              <p className="text-sm text-red-400">Nenhum período disponível para os holerites selecionados.</p>
+            ) : (
+              <>
+                <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                      <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                        <Calendar className="h-5 w-5 text-seguranca-red" />
+                      </div>
+                      Período do holerite
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Label className="text-seguranca-lightgray text-sm">Período</Label>
+                    <Select value={periodoEnvioSelecionado} onValueChange={setPeriodoEnvioSelecionado}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o período" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        {periodoEnvioOptions.map((periodo) => (
+                          <SelectItem key={periodo.value} value={periodo.value} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                            {periodo.label} ({periodo.count})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                      <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                        <User className="h-5 w-5 text-seguranca-red" />
+                      </div>
+                      Destinatários
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <Label className="text-seguranca-lightgray text-sm">Enviar para</Label>
+                      <Select
+                        value={sendRecipientMode}
+                        onValueChange={(value) => {
+                          const mode = value as 'all' | 'selected';
+                          setSendRecipientMode(mode);
+                          if (mode === 'all') {
+                            setSelectedRecipientIds(periodoHolerites.map((h) => h.id));
+                          } else {
+                            setSelectedRecipientIds(periodoHolerites.map((h) => h.id));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                          <SelectValue placeholder="Selecione os destinatários" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600">
+                          <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Todos selecionados</SelectItem>
+                          <SelectItem value="selected" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Selecionar usuários</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {sendRecipientMode === 'selected' && (
+                      <div className="space-y-2 rounded-lg border border-gray-700/70 bg-seguranca-black p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">Selecionar usuários</span>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-gray-300"
+                              onClick={() => setSelectedRecipientIds(periodoHolerites.map((h) => h.id))}
+                            >
+                              Todos
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-gray-300"
+                              onClick={() => setSelectedRecipientIds([])}
+                            >
+                              Limpar
+                            </Button>
+                          </div>
+                        </div>
+                        {loadingRecipientValidation ? (
+                          <p className="text-xs text-gray-400">Verificando WhatsApp dos usuários...</p>
+                        ) : periodoHolerites.length === 0 ? (
+                          <p className="text-xs text-gray-400">Nenhum holerite encontrado para o período selecionado.</p>
+                        ) : (
+                          <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                            {periodoHolerites.map((holerite) => (
+                              (() => {
+                                const employeeId = recipientEmployeeMap[holerite.id];
+                                const detail = employeeId ? recipientValidationMap[employeeId] : undefined;
+                                const needsWhatsApp = detail ? (detail.needsWhatsAppUpdate || !detail.canSendWhatsApp) : false;
+                                const needsUserCreation = detail?.needsUserCreation;
+                                const canSendWhatsApp = detail?.canSendWhatsApp;
+                                return (
+                                  <label key={holerite.id} className="flex items-center justify-between gap-2 text-sm text-seguranca-lightgray">
+                                    <div className="flex items-center gap-2">
+                                      <Checkbox
+                                        checked={selectedRecipientIds.includes(holerite.id)}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedRecipientIds((prev) => {
+                                            if (checked) return Array.from(new Set([...prev, holerite.id]));
+                                            return prev.filter((id) => id !== holerite.id);
+                                          });
+                                        }}
+                                        className="border-gray-600"
+                                      />
+                                      <span className="truncate">
+                                        {holerite.employeeName || holerite.cpf || 'Funcionário'}
+                                      </span>
+                                    </div>
+                                    {!detail && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-yellow-300">Sem vínculo</span>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="text-xs text-blue-400 hover:text-blue-300 p-0 h-auto"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            void handleTryCreateLink(holerite);
+                                          }}
+                                          title="Tentar buscar funcionário e criar vínculo"
+                                        >
+                                          Buscar vínculo
+                                        </Button>
+                                      </div>
+                                    )}
+                                    {detail && !needsWhatsApp && canSendWhatsApp && (
+                                      <span className="text-xs text-emerald-300">WhatsApp OK</span>
+                                    )}
+                                    {detail && (needsWhatsApp || needsUserCreation) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="text-xs text-blue-400 hover:text-blue-300"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setSelectedValidationDetail(detail);
+                                          setPendingWhatsappContext(null);
+                                          if (detail.needsUserCreation) {
+                                            setShowSingleUserModal(true);
+                                          } else {
+                                            setShowSingleWhatsappModal(true);
+                                          }
+                                        }}
+                                      >
+                                        {detail.needsUserCreation ? 'Criar usuário' : 'Atualizar WhatsApp'}
+                                      </Button>
+                                    )}
+                                  </label>
+                                );
+                              })()
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+          <DialogFooter className="mt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPeriodoEnvioModal(false);
+                  setPendingEnvioContext(null);
+                  setPeriodoEnvioSelecionado('');
+                  setSendRecipientMode('all');
+                  setSelectedRecipientIds([]);
+                  setRecipientEmployeeMap({});
+                  setRecipientValidationMap({});
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={confirmPeriodoEnvio}
+                disabled={periodoEnvioOptions.length === 0 || !periodoEnvioSelecionado}
+                className="bg-seguranca-red hover:bg-seguranca-darkred"
+              >
+                Continuar envio
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Modal de Validação de Contatos */}
         {showValidationModal && (
           <ContactValidationModal
@@ -8433,6 +8907,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               } else {
                 setPendingWhatsappContext(null);
               }
+              await refreshRecipientValidation();
             }}
           />
         )}
@@ -8440,16 +8915,16 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
         {/* Modal de Formulário Rápido */}
         {showSingleUserModal && selectedValidationDetail && (
           <QuickUserFormModal
-            isOpen={showSingleUserModal}
+            open={showSingleUserModal}
             onClose={() => {
               setShowSingleUserModal(false);
               setSelectedValidationDetail(null);
             }}
-            employeeId={selectedValidationDetail.employeeId}
-            employeeName={selectedValidationDetail.employeeName}
+            employeeDetail={selectedValidationDetail}
             onSuccess={() => {
               setShowSingleUserModal(false);
               setSelectedValidationDetail(null);
+              void refreshRecipientValidation();
             }}
           />
         )}

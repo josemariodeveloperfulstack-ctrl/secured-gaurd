@@ -183,9 +183,15 @@ export const employeeService = {
       if (!normalizedCpf || normalizedCpf.length < 11) {
         return null;
       }
-      
-      const response = await api.get(`/api/employees/search/cpf/${normalizedCpf}`);
-      return response.data;
+
+      // Endpoint disponível no backend: /api/employees/search?q=
+      const response = await api.get(`/api/employees/search?q=${encodeURIComponent(normalizedCpf)}`);
+      const employees = Array.isArray(response.data) ? response.data : [];
+      const exact = employees.find((emp: any) => {
+        const empCpf = (emp.document || emp.cpf || '').replace(/\D/g, '');
+        return empCpf === normalizedCpf;
+      });
+      return exact || employees[0] || null;
     } catch (error: any) {
       if (error.response?.status === 404) {
         // Funcionário não encontrado - não é erro

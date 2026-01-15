@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download } from 'lucide-react';
 import fleetService from '@/services/fleetService';
 import { useToast } from '@/hooks/use-toast';
+import companyService from '@/services/companyService';
 
 interface VehicleReportModalProps {
   isOpen: boolean;
@@ -17,14 +18,45 @@ const VehicleReportModal: React.FC<VehicleReportModalProps> = ({
 }) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const loadCompanies = async () => {
+      try {
+        setLoadingCompanies(true);
+        const data = await companyService.getAllCompanies();
+        const normalized = Array.isArray(data) ? data.map((company: any) => ({
+          id: company.id,
+          name: company.name || company.companyName || 'Empresa'
+        })) : [];
+        setCompanies(normalized);
+        if (normalized.length > 0 && !selectedCompanyId) {
+          setSelectedCompanyId(normalized[0].id);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar empresas:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar as empresas.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+    loadCompanies();
+  }, [isOpen, selectedCompanyId, toast]);
 
   const handleExportPDF = async () => {
     try {
       setIsGenerating(true);
       
       const status = statusFilter === 'all' ? undefined : statusFilter;
-      const blob = await fleetService.exportVehiclesReportPDF(status);
+      const blob = await fleetService.exportVehiclesReportPDF(status, selectedCompanyId || undefined);
       
       // Criar URL para download
       const url = window.URL.createObjectURL(blob);
@@ -63,6 +95,11 @@ const VehicleReportModal: React.FC<VehicleReportModalProps> = ({
 
   const clearFilters = () => {
     setStatusFilter('all');
+    if (companies.length > 0) {
+      setSelectedCompanyId(companies[0].id);
+    } else {
+      setSelectedCompanyId('');
+    }
   };
 
   return (
@@ -79,6 +116,28 @@ const VehicleReportModal: React.FC<VehicleReportModalProps> = ({
           <div className="space-y-4">
             <h3 className="text-seguranca-lightgray font-semibold">Filtros</h3>
             
+            <div className="space-y-2">
+              <label className="text-sm text-gray-400">Empresa para o cabeçalho/rodapé</label>
+              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                  <SelectValue placeholder={loadingCompanies ? "Carregando empresas..." : "Selecione a empresa"} />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  {companies.length === 0 ? (
+                    <SelectItem value="no-company" disabled>
+                      Nenhuma empresa encontrada
+                    </SelectItem>
+                  ) : (
+                    companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm text-gray-400">Status do Veículo</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -116,7 +175,7 @@ const VehicleReportModal: React.FC<VehicleReportModalProps> = ({
                 variant="outline" 
                 size="sm" 
                 className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
-                disabled={isGenerating}
+                disabled={isGenerating || !selectedCompanyId}
               >
                 <FileText className="h-4 w-4 mr-2" /> 
                 {isGenerating ? 'Gerando...' : 'PDF'}

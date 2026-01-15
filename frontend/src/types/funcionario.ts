@@ -18,6 +18,8 @@ export interface EnvioRequest {
   funcionarioIds?: number[];
   mensagem?: string;
   assunto?: string;
+  month?: number;
+  year?: number;
 }
 
 export interface DetalheEnvio {

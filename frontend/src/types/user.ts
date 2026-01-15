@@ -174,6 +174,7 @@ export interface User {
   roles: Role[] | string[];
   groups: UserGroupData[];
   permissions: UserPermissions;
+  isOnline?: boolean;
   individualPermissions?: PermissionDTO[];
   customPermissions?: string[]; // Permissões customizadas concedidas pelo SUPER_ADMIN (para COLABORADOR)
   avatar?: string;

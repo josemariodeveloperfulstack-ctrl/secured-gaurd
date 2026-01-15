@@ -360,6 +360,86 @@ export const messageService = {
     }
   },
 
+  async getGroupMessages(groupId: string): Promise<ChatMessage[]> {
+    try {
+      const response = await api.get(`/v1/chat/group/${groupId}`, {
+        headers: getAuthHeaders()
+      });
+      
+      return (response.data || []).map((msg: any) => ({
+        id: msg.id,
+        content: msg.content || '',
+        sender: {
+          id: msg.sender.id,
+          name: msg.sender.name,
+          email: msg.sender.email
+        },
+        recipient: msg.recipient ? {
+          id: msg.recipient.id,
+          name: msg.recipient.name,
+          email: msg.recipient.email
+        } : undefined,
+        group: msg.group,
+        department: msg.department,
+        type: msg.type,
+        isRead: msg.isRead || false,
+        readAt: msg.readAt,
+        editedAt: msg.editedAt,
+        replyToId: msg.replyToId,
+        reactions: msg.reactions || [],
+        fileUrl: msg.fileUrl,
+        fileName: msg.fileName,
+        fileSize: msg.fileSize,
+        fileContentType: msg.fileContentType,
+        createdAt: msg.createdAt,
+        updatedAt: msg.updatedAt
+      }));
+    } catch (error) {
+      console.warn('[MessageService] Erro ao buscar mensagens do grupo:', error);
+      return [];
+    }
+  },
+
+  async getDepartmentMessages(departmentId: string): Promise<ChatMessage[]> {
+    try {
+      const response = await api.get(`/v1/chat/department/${departmentId}`, {
+        headers: getAuthHeaders()
+      });
+      
+      return (response.data || []).map((msg: any) => ({
+        id: msg.id,
+        content: msg.content || '',
+        sender: {
+          id: msg.sender.id,
+          name: msg.sender.name,
+          email: msg.sender.email
+        },
+        recipient: msg.recipient ? {
+          id: msg.recipient.id,
+          name: msg.recipient.name,
+          email: msg.recipient.email
+        } : undefined,
+        group: msg.group,
+        department: msg.department,
+        type: msg.type,
+        isRead: msg.isRead || false,
+        readAt: msg.readAt,
+        editedAt: msg.editedAt,
+        replyToId: msg.replyToId,
+        reactions: msg.reactions || [],
+        fileUrl: msg.fileUrl,
+        fileName: msg.fileName,
+        fileSize: msg.fileSize,
+        fileContentType: msg.fileContentType,
+        createdAt: msg.createdAt,
+        updatedAt: msg.updatedAt
+      }));
+    } catch (error) {
+      console.warn('[MessageService] Erro ao buscar mensagens do departamento:', error);
+      return [];
+    }
+  },
+
   async sendChatMessage(messageData: {
     content: string;
     recipientId?: string;

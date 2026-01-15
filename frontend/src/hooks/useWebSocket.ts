@@ -9,6 +9,7 @@ interface WebSocketConfig {
   username: string;
   onMessage?: (message: ChatMessage) => void;
   onTyping?: (typing: { userId: string; isTyping: boolean }) => void;
+  onUserStatus?: (event: { userId: string; isOnline: boolean; timestamp?: number }) => void;
   onError?: (error: any) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -211,6 +212,13 @@ export const useWebSocket = (config: WebSocketConfig) => {
             if (updateUserStatus && userStatusEvent.userId) {
               updateUserStatus(userStatusEvent.userId, userStatusEvent.isOnline);
             }
+            if (userStatusEvent?.userId) {
+              config.onUserStatus?.({
+                userId: userStatusEvent.userId,
+                isOnline: Boolean(userStatusEvent.isOnline),
+                timestamp: userStatusEvent.timestamp
+              });
+            }
           } catch (error) {
             console.error('[WebSocket] Erro ao processar evento de status de usuário:', error);
           }
@@ -225,6 +233,13 @@ export const useWebSocket = (config: WebSocketConfig) => {
             const { updateUserStatus } = useMessageStore.getState();
             if (updateUserStatus && userStatusEvent.userId) {
               updateUserStatus(userStatusEvent.userId, userStatusEvent.isOnline);
+            }
+            if (userStatusEvent?.userId) {
+              config.onUserStatus?.({
+                userId: userStatusEvent.userId,
+                isOnline: Boolean(userStatusEvent.isOnline),
+                timestamp: userStatusEvent.timestamp
+              });
             }
           } catch (error) {
             console.error('[WebSocket] Erro ao processar broadcast de status:', error);

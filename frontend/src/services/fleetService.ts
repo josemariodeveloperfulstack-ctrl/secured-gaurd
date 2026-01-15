@@ -304,9 +304,10 @@ class FleetService {
     return response.data;
   }
 
-  async exportVehiclesReportPDF(status?: string): Promise<Blob> {
+  async exportVehiclesReportPDF(status?: string, companyId?: string): Promise<Blob> {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
+    if (companyId) params.append('companyId', companyId);
 
     try {
       const response = await api.get(`/api/vehicles/report/pdf?${params.toString()}`, {

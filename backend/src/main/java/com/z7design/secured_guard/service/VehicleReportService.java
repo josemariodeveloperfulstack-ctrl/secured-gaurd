@@ -37,8 +37,8 @@ public class VehicleReportService {
     private final CompanyRepository companyRepository;
     
     @Transactional(readOnly = true)
-    public byte[] generateVehicleReportPDF(String statusFilter) throws IOException {
-        log.info("Gerando relatório PDF de veículos com layout padrão - Filtro: {}", statusFilter);
+    public byte[] generateVehicleReportPDF(String statusFilter, java.util.UUID companyIdOverride) throws IOException {
+        log.info("Gerando relatório PDF de veículos com layout padrão - Filtro: {}, Empresa: {}", statusFilter, companyIdOverride);
         
         try {
             // Buscar veículos com filtro de status
@@ -47,7 +47,7 @@ public class VehicleReportService {
             
             // Usar diretamente iText com layout padrão (não usar JasperReports)
             // O layout padrão inclui: gradiente, logo da empresa, cabeçalho, rodapé e marca d'água
-            return generateVehicleReportPDFWithIText(vehicles, statusFilter);
+            return generateVehicleReportPDFWithIText(vehicles, statusFilter, companyIdOverride);
             
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF de veículos", e);
@@ -56,18 +56,22 @@ public class VehicleReportService {
         }
     }
     
-    private byte[] generateVehicleReportPDFWithIText(List<Vehicle> vehicles, String statusFilter) throws IOException {
+    private byte[] generateVehicleReportPDFWithIText(List<Vehicle> vehicles, String statusFilter, java.util.UUID companyIdOverride) throws IOException {
         log.info("Gerando relatório PDF de veículos com iText - {} veículos", vehicles.size());
         
-        // Determinar companyId - tentar obter dos veículos primeiro
-        java.util.UUID companyId = null;
+        // Determinar companyId - usar seleção explícita se informada
+        java.util.UUID companyId = companyIdOverride;
         if (!vehicles.isEmpty()) {
             // Tentar encontrar um veículo com companyId não nulo
             for (Vehicle vehicle : vehicles) {
                 if (vehicle.getCompanyId() != null) {
-                    companyId = vehicle.getCompanyId();
-                    log.info("Usando empresa do veículo {}: {}", vehicle.getPlate(), companyId);
-                    break;
+                    if (companyId == null) {
+                        companyId = vehicle.getCompanyId();
+                        log.info("Usando empresa do veículo {}: {}", vehicle.getPlate(), companyId);
+                    }
+                    if (companyIdOverride != null) {
+                        break;
+                    }
                 }
             }
         }

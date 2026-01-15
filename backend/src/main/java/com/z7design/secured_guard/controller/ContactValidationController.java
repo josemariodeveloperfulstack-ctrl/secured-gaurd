@@ -127,6 +127,44 @@ public class ContactValidationController {
             ));
         }
     }
+
+    /**
+     * Atualiza email de um usuário
+     */
+    @PatchMapping("/users/{userId}/email")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'HR')")
+    public ResponseEntity<Map<String, Object>> updateUserEmail(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateEmailRequest request) {
+
+        log.info("📧 Recebida solicitação de atualização de email para usuário: {}", userId);
+
+        try {
+            User user = contactValidationService.updateUserEmail(userId, request);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Email atualizado com sucesso",
+                    "userId", user.getId().toString(),
+                    "username", user.getUsername(),
+                    "email", user.getEmail()
+            ));
+
+        } catch (IllegalArgumentException e) {
+            log.warn("⚠️ Erro de validação: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+
+        } catch (Exception e) {
+            log.error("❌ Erro ao atualizar email: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Erro interno ao atualizar email: " + e.getMessage()
+            ));
+        }
+    }
     
     /**
      * Endpoint de teste de conectividade

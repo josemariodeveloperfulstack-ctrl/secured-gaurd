@@ -26,12 +26,13 @@ public class VehicleReportController {
     
     @GetMapping("/pdf")
     public ResponseEntity<?> generateVehicleReportPDF(
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) java.util.UUID companyId) {
         
         try {
             log.info("Gerando relatório PDF de veículos - Status: {}", status);
             
-            byte[] pdfBytes = vehicleReportService.generateVehicleReportPDF(status);
+            byte[] pdfBytes = vehicleReportService.generateVehicleReportPDF(status, companyId);
             
             if (pdfBytes == null || pdfBytes.length == 0) {
                 log.warn("Relatório PDF gerado está vazio");

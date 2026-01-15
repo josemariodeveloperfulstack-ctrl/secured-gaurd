@@ -24,4 +24,8 @@ public class EnvioRequest {
     private String mensagem; // Mensagem personalizada
     
     private String assunto; // Para emails
+
+    // Período do holerite a enviar
+    private Integer month;
+    private Integer year;
 } 

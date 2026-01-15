@@ -625,7 +625,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           </Card>
 
           {/* Permissões Individuais (apenas SUPER_ADMIN) */}
-          {user && user.roles && user.roles.some(r => (typeof r === 'string' ? r : r.name) === 'SUPER_ADMIN') && (
+          {currentUser?.role === 'SUPER_ADMIN' && user && (
             <Card className="bg-seguranca-graphite border-gray-600">
               <CardHeader>
                 <CardTitle className="text-seguranca-lightgray flex items-center gap-2">

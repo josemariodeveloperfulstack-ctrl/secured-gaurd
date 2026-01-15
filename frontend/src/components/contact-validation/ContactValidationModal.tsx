@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { QuickUserFormModal } from './QuickUserFormModal';
 import { WhatsAppUpdateModal } from './WhatsAppUpdateModal';
 import { WhatsAppConsentConfirmationModal } from './WhatsAppConsentConfirmationModal';
+import { EmailUpdateModal } from './EmailUpdateModal';
 
 interface ContactValidationModalProps {
   open: boolean;
@@ -37,6 +38,7 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
   const [selectedForAction, setSelectedForAction] = useState<ContactValidationDetail | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [consentDetail, setConsentDetail] = useState<ContactValidationDetail | null>(null);
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [bulkConsentLoading, setBulkConsentLoading] = useState(false);
@@ -80,12 +82,21 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
     setShowWhatsAppModal(true);
   };
 
+  const handleAddEmail = (detail: ContactValidationDetail) => {
+    setSelectedForAction(detail);
+    setShowEmailModal(true);
+  };
+
   const handleEditOrCreateUser = (detail: ContactValidationDetail) => {
     // Se não tem usuário, abre modal de criação
     if (detail.needsUserCreation || !detail.hasUser) {
       handleCreateUser(detail);
     } else if (detail.hasUser) {
       // Se tem usuário mas precisa de atualização, verifica o que falta
+      if (detail.needsEmailUpdate && (sendType === 'email' || sendType === 'both')) {
+        handleAddEmail(detail);
+        return;
+      }
       if (detail.needsWhatsAppUpdate && (sendType === 'whatsapp' || sendType === 'both')) {
         handleAddWhatsApp(detail);
       } else {
@@ -114,6 +125,16 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
     toast({
       title: '✅ Sucesso',
       description: 'WhatsApp atualizado com sucesso',
+    });
+  };
+
+  const handleEmailUpdated = () => {
+    setShowEmailModal(false);
+    setSelectedForAction(null);
+    validateContacts();
+    toast({
+      title: '✅ Sucesso',
+      description: 'Email atualizado com sucesso',
     });
   };
 
@@ -466,6 +487,16 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
                               Adicionar WhatsApp
                             </Button>
                           )}
+                          {detail.needsEmailUpdate && detail.hasUser && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAddEmail(detail)}
+                              className="border-amber-500 text-amber-300 hover:bg-amber-500/10"
+                            >
+                              Atualizar Email
+                            </Button>
+                          )}
                           {isWhatsAppFlow && detail.hasUser && (detail.needsWhatsAppConsent || (detail.whatsappError || '').toLowerCase().includes('consent')) && (
                             <Button
                               size="sm"
@@ -514,6 +545,12 @@ export const ContactValidationModal: React.FC<ContactValidationModalProps> = ({
             onClose={() => setShowWhatsAppModal(false)}
             employeeDetail={selectedForAction}
             onSuccess={handleWhatsAppUpdated}
+          />
+          <EmailUpdateModal
+            open={showEmailModal}
+            onClose={() => setShowEmailModal(false)}
+            employeeDetail={selectedForAction}
+            onSuccess={handleEmailUpdated}
           />
         </>
       )}

@@ -304,6 +304,29 @@ public class ContactValidationService {
         
         return updated;
     }
+
+    /**
+     * Atualiza email de um usuário
+     */
+    @Transactional
+    public User updateUserEmail(UUID userId, UpdateEmailRequest request) {
+        log.info("📧 Atualizando email do usuário: {}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado"));
+
+        String email = request.getEmail() != null ? request.getEmail().trim() : "";
+        if (email.isEmpty() || !email.contains("@")) {
+            throw new IllegalArgumentException("Email inválido");
+        }
+
+        user.setEmail(email);
+        User updated = userRepository.save(user);
+
+        log.info("✅ Email atualizado: {} -> {}", user.getUsername(), email);
+
+        return updated;
+    }
     
     /**
      * Envia email de boas-vindas com credenciais

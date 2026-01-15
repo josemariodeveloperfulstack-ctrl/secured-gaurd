@@ -48,6 +48,8 @@ import {
   ThumbsUp,
   Smile,
   Plus,
+  Check,
+  CheckCheck,
   Paperclip,
   Image as ImageIcon,
   File,
@@ -70,6 +72,7 @@ import api from '@/lib/axios';
 import { getApiUrl, getChatFileUrl } from '@/config/environment';
 
 const ChatInterno: React.FC = () => {
+  const MIN_SEARCH_LENGTH = 3;
   // Estado local para UI
   const [newMessage, setNewMessage] = useState('');
   const [chatType, setChatType] = useState<'individual' | 'group' | 'department'>('individual');
@@ -85,7 +88,12 @@ const ChatInterno: React.FC = () => {
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [loadingModalUsers, setLoadingModalUsers] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<User[]>([]);
+  const [loadingGroupMembers, setLoadingGroupMembers] = useState(false);
   const [showOnlyOnline, setShowOnlyOnline] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [groupSearchTerm, setGroupSearchTerm] = useState('');
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState('');
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
   const [favoriteMessages, setFavoriteMessages] = useState<Set<string>>(new Set());
@@ -149,6 +157,23 @@ const ChatInterno: React.FC = () => {
   // Garantir que availableUsers, filteredConversations e chatMessages sejam sempre arrays
   const safeAvailableUsers = Array.isArray(availableUsers) ? availableUsers : [];
   const filteredConversations = Array.isArray(filteredConversationsRaw) ? filteredConversationsRaw : [];
+  const namedConversations = filteredConversations.filter((conversation) => (
+    conversation &&
+    conversation.id &&
+    conversation.name &&
+    conversation.name.trim() !== '' &&
+    conversation.name !== 'Conversa sem nome' &&
+    (conversation.type !== 'individual' || conversation.id !== currentUser?.id)
+  ));
+  const individualConversations = namedConversations.filter((conversation) => conversation.type === 'individual');
+  const groupConversations = namedConversations.filter((conversation) => conversation.type === 'group');
+  const departmentConversations = namedConversations.filter((conversation) => conversation.type === 'department');
+  const onlineGroupMembers = useMemo(() => (
+    groupMembers.filter(member => member?.isOnline)
+  ), [groupMembers]);
+  const shouldFilterUsers = userSearchTerm.trim().length >= MIN_SEARCH_LENGTH;
+  const shouldFilterGroups = groupSearchTerm.trim().length >= MIN_SEARCH_LENGTH;
+  const shouldFilterDepartments = departmentSearchTerm.trim().length >= MIN_SEARCH_LENGTH;
   
   // Filtrar mensagens apenas da conversa selecionada
   const safeChatMessages = useMemo(() => {
@@ -205,6 +230,10 @@ const ChatInterno: React.FC = () => {
       console.log('🔌 [CHAT] WebSocket desconectado');
       // Atualizar status offline do usuário atual
       updateUserOnlineStatus(currentUser?.id || '', false);
+    },
+    onUserStatus: (event) => {
+      updateUserOnlineStatus(event.userId, event.isOnline);
+      setGroupMembers((prev) => prev.map(member => member.id === event.userId ? { ...member, isOnline: event.isOnline } : member));
     }
   });
 
@@ -248,6 +277,14 @@ const ChatInterno: React.FC = () => {
       }
     };
   }, [safeChatMessages.length]); // Usar apenas o comprimento, não o array inteiro
+
+  useEffect(() => {
+    if (selectedConversation?.type === 'group' && selectedConversation.id) {
+      loadGroupMembers(selectedConversation.id);
+    } else {
+      setGroupMembers([]);
+    }
+  }, [selectedConversation?.id, selectedConversation?.type]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -312,6 +349,8 @@ const ChatInterno: React.FC = () => {
         messageService.getAvailableUsers()
       ]);
 
+      const onlineMap = new Map((Array.isArray(usersData) ? usersData : []).map((user: any) => [user.id, Boolean(user.isOnline)]));
+
       // Marcar usuários como online se tiverem WebSocket conectado (heurística temporária)
       // TODO: Substituir por status real do backend quando implementado
       const usersWithOnlineStatus = Array.isArray(usersData) ? usersData.map(user => {
@@ -326,35 +365,136 @@ const ChatInterno: React.FC = () => {
         };
       }) : [];
 
-      // Normalizar conversas: garantir que tenham nome e estrutura correta
-      const normalizedConversations = Array.isArray(conversationsData) ? conversationsData.map((conv: any) => {
-        // Garantir que a conversa tenha um nome adequado
-        let conversationName = conv.name || 'Conversa sem nome';
-        
-        // Se for conversa individual e não tiver nome, tentar pegar do recipient ou sender
-        if (conversationName === 'Conversa sem nome' && conv.type === 'individual') {
-          if (conv.recipient?.name) {
-            conversationName = conv.recipient.name;
-          } else if (conv.sender?.name) {
-            conversationName = conv.sender.name;
-          } else if (conv.participants && conv.participants.length > 0) {
-            const otherParticipant = conv.participants.find((p: any) => p.id !== currentUser?.id);
-            if (otherParticipant?.name) {
-              conversationName = otherParticipant.name;
+      const buildConversationsFromMessages = (messages: any[]): Conversation[] => {
+        const conversationMap = new Map<string, Conversation>();
+
+        messages.forEach((msg) => {
+          let type: Conversation['type'] = 'individual';
+          let id: string | undefined;
+          let name: string | undefined;
+          let isOnline = false;
+
+          if (msg.group?.id) {
+            type = 'group';
+            id = msg.group.id;
+            name = msg.group.name || msg.group.displayName || msg.group.groupName;
+          } else if (msg.department?.id) {
+            type = 'department';
+            id = msg.department.id;
+            name = msg.department.name;
+          } else {
+            const sender = msg.sender;
+            const recipient = msg.recipient;
+            const other = sender?.id === currentUser?.id ? recipient : sender;
+            if (!other || other.id === currentUser?.id) {
+              return;
             }
+            id = other?.id;
+            name = other?.name || other?.username || other?.email;
+            isOnline = Boolean(other?.id && onlineMap.get(other.id));
           }
-        }
-        
-        return {
-          ...conv,
-          name: conversationName,
-          // Garantir que campos obrigatórios existam
-          id: conv.id || conv.conversationId,
-          type: conv.type || 'individual',
-          unreadCount: conv.unreadCount || 0,
-          isOnline: conv.isOnline || false
-        };
-      }).filter((conv: any) => conv && conv.id) : [];
+
+          if (!id || !name || name.trim() === '' || name === 'Conversa sem nome') {
+            return;
+          }
+
+          const key = `${type}-${id}`;
+          const existing = conversationMap.get(key);
+          const messageCreatedAt = msg.createdAt ? new Date(msg.createdAt).getTime() : 0;
+          const existingCreatedAt = existing?.lastMessage?.createdAt ? new Date(existing.lastMessage.createdAt).getTime() : 0;
+
+          const normalizedMessage: ChatMessage = {
+            id: msg.id,
+            content: msg.content || (msg.fileName ? `📎 ${msg.fileName}` : ''),
+            sender: msg.sender,
+            recipient: msg.recipient || undefined,
+            group: msg.group || undefined,
+            department: msg.department || undefined,
+            type: msg.type,
+            isRead: msg.isRead || false,
+            readAt: msg.readAt,
+            editedAt: msg.editedAt,
+            replyToId: msg.replyToId,
+            reactions: msg.reactions || [],
+            fileUrl: msg.fileUrl,
+            fileName: msg.fileName,
+            fileSize: msg.fileSize,
+            fileContentType: msg.fileContentType,
+            createdAt: msg.createdAt,
+            updatedAt: msg.updatedAt
+          };
+
+          const unreadIncrement = msg.recipient?.id === currentUser?.id && !msg.isRead ? 1 : 0;
+
+          if (!existing) {
+            conversationMap.set(key, {
+              id,
+              name,
+              type,
+              lastMessage: normalizedMessage,
+              unreadCount: unreadIncrement,
+              isOnline
+            });
+          } else {
+            conversationMap.set(key, {
+              ...existing,
+              unreadCount: (existing.unreadCount || 0) + unreadIncrement,
+              lastMessage: messageCreatedAt > existingCreatedAt ? normalizedMessage : existing.lastMessage,
+              isOnline: existing.isOnline || isOnline
+            });
+          }
+        });
+
+        return Array.from(conversationMap.values()).sort((a, b) => {
+          const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+          const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+          return bTime - aTime;
+        });
+      };
+
+      const isMessageList = Array.isArray(conversationsData) && conversationsData.some(
+        (item: any) => item?.sender || item?.recipient || item?.group || item?.department
+      );
+
+      // Normalizar conversas: garantir que tenham nome e estrutura correta
+      const normalizedConversations = isMessageList
+        ? buildConversationsFromMessages(conversationsData)
+        : (Array.isArray(conversationsData) ? conversationsData.map((conv: any) => {
+            // Garantir que a conversa tenha um nome adequado
+            let conversationName = conv.name || 'Conversa sem nome';
+            
+            // Se for conversa individual e não tiver nome, tentar pegar do recipient ou sender
+            if (conversationName === 'Conversa sem nome' && conv.type === 'individual') {
+              if (conv.recipient?.name) {
+                conversationName = conv.recipient.name;
+              } else if (conv.sender?.name) {
+                conversationName = conv.sender.name;
+              } else if (conv.participants && conv.participants.length > 0) {
+                const otherParticipant = conv.participants.find((p: any) => p.id !== currentUser?.id);
+                if (otherParticipant?.name) {
+                  conversationName = otherParticipant.name;
+                }
+              }
+            }
+
+            if (conversationName === 'Conversa sem nome' && conv.type === 'group') {
+              conversationName = conv.group?.name || conv.group?.displayName || conv.groupName || conv.name || 'Conversa sem nome';
+            }
+
+            if (conversationName === 'Conversa sem nome' && conv.type === 'department') {
+              conversationName = conv.department?.name || conv.departmentName || conv.name || 'Conversa sem nome';
+            }
+            
+            return {
+              ...conv,
+              name: conversationName,
+              // Garantir que campos obrigatórios existam
+              id: conv.id || conv.conversationId,
+              type: conv.type || 'individual',
+              unreadCount: conv.unreadCount || 0,
+              isOnline: conv.isOnline || false
+            };
+          }).filter((conv: any) => conv && conv.id) : []);
 
       // Usar setConversations que já faz deduplicação
       setConversations(normalizedConversations);
@@ -380,14 +520,19 @@ const ChatInterno: React.FC = () => {
     }
   };
 
-  const loadConversation = async (conversationId: string) => {
+  const loadConversation = async (conversationId: string, conversationType?: Conversation['type']) => {
     if (!conversationId) return;
     
     setLoading(true);
     console.log('💬 [CHAT] Carregando conversa:', conversationId);
     
     try {
-      const messages = await messageService.getConversationMessages(conversationId);
+      const type = conversationType || selectedConversation?.type || 'individual';
+      const messages = type === 'group'
+        ? await messageService.getGroupMessages(conversationId)
+        : type === 'department'
+          ? await messageService.getDepartmentMessages(conversationId)
+          : await messageService.getConversationMessages(conversationId);
       setChatMessages(messages);
       console.log('✅ [CHAT] Mensagens carregadas:', messages.length);
       
@@ -425,6 +570,25 @@ const ChatInterno: React.FC = () => {
       setChatMessages([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGroupMembers = async (groupId: string) => {
+    if (!groupId) return;
+    setLoadingGroupMembers(true);
+    try {
+      const members = await groupService.getUsersByGroup(groupId);
+      setGroupMembers(Array.isArray(members) ? members : []);
+    } catch (error) {
+      console.error('❌ [CHAT] Erro ao carregar membros do grupo:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os membros do grupo.",
+        variant: "destructive"
+      });
+      setGroupMembers([]);
+    } finally {
+      setLoadingGroupMembers(false);
     }
   };
 
@@ -769,6 +933,50 @@ const ChatInterno: React.FC = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  const renderConversationItem = (conversation: Conversation) => (
+    <div
+      key={conversation.id}
+      className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
+        selectedConversation?.id === conversation.id ? 'bg-muted' : ''
+      }`}
+      onClick={() => {
+        setSelectedConversation(conversation);
+        loadConversation(conversation.id, conversation.type);
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <Avatar className="w-10 h-10">
+            <AvatarFallback>{getInitials(conversation.name)}</AvatarFallback>
+          </Avatar>
+          {conversation.isOnline && conversation.type === 'individual' && (
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-sm truncate">{conversation.name}</p>
+            {conversation.lastMessage && (
+              <span className="text-xs text-muted-foreground">
+                {format(new Date(conversation.lastMessage.createdAt), 'HH:mm')}
+              </span>
+            )}
+          </div>
+          {conversation.lastMessage && (
+            <p className="text-xs text-muted-foreground truncate">
+              {conversation.lastMessage.content}
+            </p>
+          )}
+        </div>
+        {conversation.unreadCount > 0 && (
+          <Badge variant="destructive" className="text-xs">
+            {conversation.unreadCount}
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+
   // Funções para ações do menu de contexto
   const handleCopyMessage = (message: ChatMessage) => {
     navigator.clipboard.writeText(message.content);
@@ -1008,7 +1216,7 @@ const ChatInterno: React.FC = () => {
     setSelectedUser(null);
     setSelectedGroup(null);
     setSelectedDepartment(null);
-    loadConversation(newConversation.id);
+    loadConversation(newConversation.id, newConversation.type);
   };
 
   // Detectar tamanho da tela para responsividade (padrão SST)
@@ -1121,6 +1329,16 @@ const ChatInterno: React.FC = () => {
                             </label>
                           </div>
                         </div>
+                        <Input
+                          placeholder="Digite o nome do usuário..."
+                          value={userSearchTerm}
+                          onChange={(e) => setUserSearchTerm(e.target.value)}
+                          className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                          autoComplete="off"
+                        />
+                        {!shouldFilterUsers && (
+                          <p className="text-xs text-seguranca-gray">Digite pelo menos 3 caracteres para buscar.</p>
+                        )}
                         <Select onValueChange={(value) => {
                           const user = safeAvailableUsers.find(u => u.id === value);
                           setSelectedUser(user || null);
@@ -1136,6 +1354,10 @@ const ChatInterno: React.FC = () => {
                                   Carregando usuários...
                                 </div>
                               </SelectItem>
+                          ) : !shouldFilterUsers ? (
+                            <SelectItem value="min-chars" disabled className="text-seguranca-gray">
+                              Digite pelo menos 3 caracteres para buscar
+                            </SelectItem>
                             ) : safeAvailableUsers.length === 0 ? (
                               <SelectItem value="no-users" disabled className="text-seguranca-gray">
                                 Nenhum usuário disponível
@@ -1143,6 +1365,7 @@ const ChatInterno: React.FC = () => {
                             ) : (
                               safeAvailableUsers
                                 .filter(user => user && user.id && user.name)
+                                .filter(user => user.name.toLowerCase().includes(userSearchTerm.toLowerCase()))
                                 .filter(user => !showOnlyOnline || user.isOnline)
                                 .sort((a, b) => {
                                   // Ordenar: online primeiro, depois offline
@@ -1185,6 +1408,16 @@ const ChatInterno: React.FC = () => {
                     {chatType === 'group' && (
                       <div className="space-y-2 pt-2">
                         <label className="text-sm font-medium text-seguranca-lightgray block">Selecionar Grupo</label>
+                        <Input
+                          placeholder="Digite o nome do grupo..."
+                          value={groupSearchTerm}
+                          onChange={(e) => setGroupSearchTerm(e.target.value)}
+                          className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                          autoComplete="off"
+                        />
+                        {!shouldFilterGroups && (
+                          <p className="text-xs text-seguranca-gray">Digite pelo menos 3 caracteres para buscar.</p>
+                        )}
                         <Select onValueChange={(value) => {
                           const group = groups.find(g => g.id === value);
                           setSelectedGroup(group || null);
@@ -1192,17 +1425,23 @@ const ChatInterno: React.FC = () => {
                           <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
                             <SelectValue placeholder={loadingGroups ? "Carregando grupos..." : "Escolha um grupo"} />
                           </SelectTrigger>
-                          <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
+                        <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
                             {loadingGroups ? (
                               <SelectItem value="loading" disabled className="text-seguranca-gray">
                                 Carregando...
+                              </SelectItem>
+                            ) : !shouldFilterGroups ? (
+                              <SelectItem value="min-chars" disabled className="text-seguranca-gray">
+                                Digite pelo menos 3 caracteres para buscar
                               </SelectItem>
                             ) : groups.length === 0 ? (
                               <SelectItem value="no-groups" disabled className="text-seguranca-gray">
                                 Nenhum grupo disponível
                               </SelectItem>
                             ) : (
-                              groups.map(group => (
+                              groups
+                                .filter(group => shouldFilterGroups && (group.name || group.groupName || '').toLowerCase().includes(groupSearchTerm.toLowerCase()))
+                                .map(group => (
                                 <SelectItem key={group.id} value={group.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
                                   {group.name || group.groupName || 'Grupo sem nome'}
                                 </SelectItem>
@@ -1216,6 +1455,16 @@ const ChatInterno: React.FC = () => {
                     {chatType === 'department' && (
                       <div className="space-y-2 pt-2">
                         <label className="text-sm font-medium text-seguranca-lightgray block">Selecionar Departamento</label>
+                        <Input
+                          placeholder="Digite o nome do departamento..."
+                          value={departmentSearchTerm}
+                          onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                          className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                          autoComplete="off"
+                        />
+                        {!shouldFilterDepartments && (
+                          <p className="text-xs text-seguranca-gray">Digite pelo menos 3 caracteres para buscar.</p>
+                        )}
                         <Select onValueChange={(value) => {
                           const dept = departments.find(d => d.id === value);
                           setSelectedDepartment(dept || null);
@@ -1223,17 +1472,23 @@ const ChatInterno: React.FC = () => {
                           <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
                             <SelectValue placeholder={loadingDepartments ? "Carregando departamentos..." : "Escolha um departamento"} />
                           </SelectTrigger>
-                          <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
+                        <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
                             {loadingDepartments ? (
                               <SelectItem value="loading" disabled className="text-seguranca-gray">
                                 Carregando...
+                              </SelectItem>
+                            ) : !shouldFilterDepartments ? (
+                              <SelectItem value="min-chars" disabled className="text-seguranca-gray">
+                                Digite pelo menos 3 caracteres para buscar
                               </SelectItem>
                             ) : departments.length === 0 ? (
                               <SelectItem value="no-departments" disabled className="text-seguranca-gray">
                                 Nenhum departamento disponível
                               </SelectItem>
                             ) : (
-                              departments.map(dept => (
+                              departments
+                                .filter(dept => shouldFilterDepartments && (dept.name || '').toLowerCase().includes(departmentSearchTerm.toLowerCase()))
+                                .map(dept => (
                                 <SelectItem key={dept.id} value={dept.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
                                   {dept.name || 'Departamento sem nome'}
                                 </SelectItem>
@@ -1300,58 +1555,35 @@ const ChatInterno: React.FC = () => {
                     <Loader2 className="w-6 h-6 animate-spin" />
                     <span className="ml-2">Carregando...</span>
                   </div>
-                ) : filteredConversations.length === 0 ? (
+                ) : namedConversations.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                     <p>Nenhuma conversa encontrada</p>
                     <p className="text-sm">Inicie uma nova conversa</p>
                   </div>
                 ) : (
-                  filteredConversations
-                    .filter(conversation => conversation && conversation.id) // Filtrar conversas válidas
-                    .map((conversation) => (
-                    <div
-                      key={conversation.id}
-                      className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
-                        selectedConversation?.id === conversation.id ? 'bg-muted' : ''
-                      }`}
-                      onClick={() => {
-                        setSelectedConversation(conversation);
-                        loadConversation(conversation.id);
-                      }}
-                    >
-                                              <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback>{getInitials(conversation.name)}</AvatarFallback>
-                            </Avatar>
-                            {conversation.isOnline && (
-                              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <p className="font-medium text-sm truncate">{conversation.name || 'Conversa sem nome'}</p>
-                            {conversation.lastMessage && (
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(conversation.lastMessage.createdAt), 'HH:mm')}
-                              </span>
-                            )}
-                          </div>
-                          {conversation.lastMessage && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {conversation.lastMessage.content}
-                            </p>
-                          )}
-                        </div>
-                        {conversation.unreadCount > 0 && (
-                          <Badge variant="destructive" className="text-xs">
-                            {conversation.unreadCount}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                  <div className="space-y-2 pb-2">
+                    <div className="px-4 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Pessoas</div>
+                    {individualConversations.length === 0 ? (
+                      <div className="px-4 py-2 text-xs text-muted-foreground">Nenhuma conversa individual</div>
+                    ) : (
+                      individualConversations.map(renderConversationItem)
+                    )}
+
+                    <div className="px-4 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Grupos</div>
+                    {groupConversations.length === 0 ? (
+                      <div className="px-4 py-2 text-xs text-muted-foreground">Nenhum grupo recente</div>
+                    ) : (
+                      groupConversations.map(renderConversationItem)
+                    )}
+
+                    {departmentConversations.length > 0 && (
+                      <>
+                        <div className="px-4 pt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Departamentos</div>
+                        {departmentConversations.map(renderConversationItem)}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1389,6 +1621,29 @@ const ChatInterno: React.FC = () => {
                           <span className="text-xs text-muted-foreground">digitando...</span>
                         )}
                       </div>
+                      {selectedConversation.type === 'group' && (
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          {loadingGroupMembers ? (
+                            <span>Carregando membros...</span>
+                          ) : onlineGroupMembers.length === 0 ? (
+                            <span>Nenhum membro online no momento</span>
+                          ) : (
+                            <>
+                              <span>Online no grupo:</span>
+                              <div className="flex items-center gap-1">
+                                {onlineGroupMembers.slice(0, 6).map((member) => (
+                                  <Avatar key={member.id} className="w-5 h-5">
+                                    <AvatarFallback className="text-[10px]">{getInitials(member.name)}</AvatarFallback>
+                                  </Avatar>
+                                ))}
+                                {onlineGroupMembers.length > 6 && (
+                                  <span className="text-[11px] text-muted-foreground">+{onlineGroupMembers.length - 6}</span>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <DropdownMenu>
@@ -1649,7 +1904,16 @@ const ChatInterno: React.FC = () => {
                                         {format(new Date(message.createdAt), 'HH:mm', { locale: ptBR })}
                                         {message.editedAt && ' (editada)'}
                                       </span>
-                                        </div>
+                                      {isCurrentUser && (
+                                        <span className="flex items-center gap-1 text-xs opacity-70">
+                                          {message.isRead ? (
+                                            <CheckCheck className="w-3 h-3 text-blue-400" />
+                                          ) : (
+                                            <Check className="w-3 h-3" />
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
                                       </div>
                                     )}
                                   </div>

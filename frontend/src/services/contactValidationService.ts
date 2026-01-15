@@ -54,6 +54,10 @@ export interface UpdateWhatsAppRequest {
   whatsapp: string;
 }
 
+export interface UpdateEmailRequest {
+  email: string;
+}
+
 export const contactValidationService = {
   /**
    * Registra consentimento WhatsApp para um usuário
@@ -88,6 +92,14 @@ export const contactValidationService = {
    */
   async updateUserWhatsApp(userId: string, whatsapp: string): Promise<any> {
     const response = await api.patch(`/contact-validation/users/${userId}/whatsapp`, { whatsapp });
+    return response.data;
+  },
+
+  /**
+   * Atualiza Email de um usuário
+   */
+  async updateUserEmail(userId: string, email: string): Promise<any> {
+    const response = await api.patch(`/contact-validation/users/${userId}/email`, { email });
     return response.data;
   },
 
