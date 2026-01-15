@@ -357,23 +357,37 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣5️⃣ PULL NEW IMAGES
+      # 1️⃣5️⃣ PULL NEW IMAGES (with retry and keepalive)
       # ============================================
       - name: 📥 Pull new images
         run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-            # Remover imagens antigas para garantir atualização do código
-            docker image rm -f z7design/secured-guard-backend:ci 2>/dev/null || true
-            docker image rm -f z7design/secured-guard-frontend:ci 2>/dev/null || true
-            docker image rm -f z7design/secured-guard-whatsapp:ci 2>/dev/null || true
-            docker pull z7design/secured-guard-backend:ci
-            docker pull z7design/secured-guard-frontend:ci
-            docker pull z7design/secured-guard-whatsapp:ci
-            # Mostrar commit aplicado nas imagens (label)
-            docker image inspect z7design/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' || true
-            docker image inspect z7design/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' || true
-            docker image inspect z7design/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' || true
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
+          
+          # Login no Docker Hub
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
+            "echo '${{ secrets.DOCKER_PASSWORD }}' | docker login -u '${{ secrets.DOCKER_USERNAME }}' --password-stdin"
+          
+          # Remover imagens antigas
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
+            "docker image rm -f z7design/secured-guard-backend:ci z7design/secured-guard-frontend:ci z7design/secured-guard-whatsapp:ci 2>/dev/null || true"
+          
+          # Pull backend com retry
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
+            "docker pull z7design/secured-guard-backend:ci || docker pull z7design/secured-guard-backend:ci || docker pull z7design/secured-guard-backend:ci"
+          
+          # Pull frontend com retry
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
+            "docker pull z7design/secured-guard-frontend:ci || docker pull z7design/secured-guard-frontend:ci || docker pull z7design/secured-guard-frontend:ci"
+          
+          # Pull whatsapp com retry
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
+            "docker pull z7design/secured-guard-whatsapp:ci || docker pull z7design/secured-guard-whatsapp:ci || docker pull z7design/secured-guard-whatsapp:ci"
+          
+          # Mostrar commit aplicado nas imagens (label)
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            docker image inspect z7design/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
+            docker image inspect z7design/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
+            docker image inspect z7design/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
           EOF
 
       # ============================================
