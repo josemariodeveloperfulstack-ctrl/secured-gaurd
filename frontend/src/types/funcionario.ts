@@ -16,6 +16,7 @@ export interface EnvioRequest {
   tipo: 'email' | 'whatsapp';
   funcionarioId?: number;
   funcionarioIds?: number[];
+  cpf?: string;
   mensagem?: string;
   assunto?: string;
   month?: number;

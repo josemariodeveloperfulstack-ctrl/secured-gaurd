@@ -229,6 +229,7 @@ Obrigado!`
 
       if (tipoEnvio === 'individual' && funcionarioSelecionado) {
         request.funcionarioId = funcionarioSelecionado.id;
+        request.cpf = normalizeCpf(funcionarioSelecionado.cpf);
         response = await envioService.enviarIndividual(request);
       } else if (tipoEnvio === 'massa') {
         request.funcionarioIds = funcionariosSelecionados;
@@ -253,9 +254,10 @@ Obrigado!`
       }
     } catch (error: any) {
       console.error('Erro ao enviar:', error);
+      const apiMessage = error.response?.data?.mensagem || error.response?.data?.message;
       toast({
         title: "Erro",
-        description: error.response?.data?.message || "Erro ao enviar holerites.",
+        description: apiMessage || "Erro ao enviar holerites.",
         variant: "destructive"
       });
     } finally {
