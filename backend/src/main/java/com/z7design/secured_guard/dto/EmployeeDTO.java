@@ -131,7 +131,11 @@ public class EmployeeDTO {
     private String nomePai;
     private String nomeMae;
     private String localNascimento;
+    private String municipioNascimento;
+    private String estadoNascimento;
+    private String sexo; // MASCULINO, FEMININO, OUTRO
     private String grauInstrucao;
+    private String matriculaEsocial;
     private String cbo;
     private String pis;
     private BigDecimal salario;

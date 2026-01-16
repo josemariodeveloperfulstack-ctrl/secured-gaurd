@@ -116,7 +116,11 @@ export interface Employee {
   nomePai?: string;
   nomeMae?: string;
   localNascimento?: string;
+  municipioNascimento?: string;
+  estadoNascimento?: string;
+  sexo?: string;
   grauInstrucao?: string;
+  matriculaEsocial?: string;
   
   // PIS
   pisDataCadastro?: string;
@@ -176,7 +180,11 @@ export interface Employee {
   nomePai?: string;
   nomeMae?: string;
   localNascimento?: string;
+  municipioNascimento?: string;
+  estadoNascimento?: string;
+  sexo?: string;
   grauInstrucao?: string;
+  matriculaEsocial?: string;
   cbo?: string;
   salario?: number;
   salarioPorExtenso?: string;
@@ -364,7 +372,11 @@ export interface CreateEmployeeDTO {
   nomePai?: string;
   nomeMae?: string;
   localNascimento?: string;
+  municipioNascimento?: string;
+  estadoNascimento?: string;
+  sexo?: string;
   grauInstrucao?: string;
+  matriculaEsocial?: string;
   
   // PIS
   pisDataCadastro?: string;
@@ -431,7 +443,11 @@ export interface CreateEmployeeDTO {
   nomePai?: string;
   nomeMae?: string;
   localNascimento?: string;
+  municipioNascimento?: string;
+  estadoNascimento?: string;
+  sexo?: string;
   grauInstrucao?: string;
+  matriculaEsocial?: string;
   cbo?: string;
   salario?: number;
   salarioPorExtenso?: string;

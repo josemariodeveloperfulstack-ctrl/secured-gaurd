@@ -132,6 +132,7 @@ const sstMenuItems = [
 const departamentoPessoalMenuItems = [
   // Gestão de Funcionários
   { icon: Users, text: 'Funcionários', to: '/rh/funcionarios', id: 'dp-funcionarios' },
+  { icon: FileSpreadsheet, text: 'Importar Funcionários Excel', to: '/rh/funcionarios?importar=excel', id: 'dp-funcionarios-importar-excel' },
   { icon: Banknote, text: 'Importar Dados Bancários', to: '/rh/funcionarios/importar-dados-bancarios', id: 'dp-funcionarios-importar-bancarios' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },

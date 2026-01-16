@@ -1866,6 +1866,92 @@ const Holerites: React.FC = () => {
     }
   };
 
+  // Função para envio individual iterativo (sem modal) - substitui botões de massa
+  const handleSendDocumentsIndividually = async (type: 'email' | 'whatsapp', indices: number[]) => {
+    if (indices.length === 0) {
+      toast({
+        title: "⚠️ Nenhum documento selecionado",
+        description: "Selecione pelo menos um documento para enviar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSendingDocuments(true);
+    const filteredDocs = getFilteredUnifiedDocuments();
+    const selected = indices.map(idx => filteredDocs[idx]).filter(Boolean);
+
+    try {
+      // Validar e enviar todos os documentos com validação rigorosa por CPF
+      const validations = await Promise.all(
+        selected.map(doc => validateUnifiedDocumentForSending(doc))
+      );
+
+      const validDocs = selected.filter((_, idx) => validations[idx].valid);
+      
+      let successCount = 0;
+      let failCount = 0;
+      const failedNames: string[] = [];
+
+      // Enviar um por vez para dar feedback individual
+      for (let i = 0; i < validDocs.length; i++) {
+        const doc = validDocs[i];
+        const globalIdx = selected.indexOf(doc);
+        const employeeId = validations[globalIdx].employeeId;
+
+        try {
+          const payload = {
+            tipo: type,
+            funcionarioId: employeeId,
+            mensagem: type === 'whatsapp' 
+              ? 'Olá! Seu documento unificado (holerite + comprovante) está disponível para download. Acesse o sistema SecuredGuard para visualizar.'
+              : undefined
+          };
+
+          const response = await api.post('/api/envio/individual', payload);
+          
+          if (response.data.sucesso) {
+            successCount++;
+          } else {
+            failCount++;
+            failedNames.push(doc.employeeName || 'N/A');
+          }
+        } catch (error: any) {
+          console.error(`Erro ao enviar documento para ${doc.employeeName}:`, error);
+          failCount++;
+          failedNames.push(doc.employeeName || 'N/A');
+        }
+      }
+
+      const invalidCount = selected.length - validDocs.length;
+      
+      // Mensagem de sucesso
+      if (successCount > 0 && failCount === 0 && invalidCount === 0) {
+        toast({
+          title: '✅ Envio concluído',
+          description: `${successCount} documento(s) enviado(s) com sucesso!`,
+        });
+      } else {
+        toast({
+          title: successCount > 0 ? '⚠️ Envio parcial' : '❌ Envio falhou',
+          description: `${successCount} enviado(s)${failCount > 0 ? `, ${failCount} falharam` : ''}${invalidCount > 0 ? `, ${invalidCount} inválido(s)` : ''}${failedNames.length > 0 ? `\nFalhas: ${failedNames.slice(0, 3).join(', ')}${failedNames.length > 3 ? '...' : ''}` : ''}`,
+          variant: failCount > 0 || invalidCount > 0 ? "destructive" : "default",
+        });
+      }
+      
+      setSelectedUnifiedDocuments(new Set());
+    } catch (error: any) {
+      console.error('Erro no envio individual:', error);
+      toast({
+        title: "❌ Erro no envio",
+        description: error.response?.data?.message || `Erro ao enviar documentos ${type === 'email' ? 'por email' : 'por WhatsApp'}.`,
+        variant: "destructive",
+      });
+    } finally {
+      setSendingDocuments(false);
+    }
+  };
+
   // Funções para exclusão de documentos
   const handleDeleteDocuments = (type: 'individual' | 'batch', index?: number) => {
     if (type === 'individual' && index !== undefined) {
@@ -7395,16 +7481,30 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                               size="sm"
                                                               onClick={() => {
                                                                   if (companyIndices.length > 0) {
-                                                                      setSelectedUnifiedDocuments(new Set(companyIndices));
-                                                                      handleSendDocuments('whatsapp');
+                                                                      handleSendDocumentsIndividually('whatsapp', companyIndices);
                                                                   }
                                                               }}
                                                               className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
-                                                              disabled={companyIndices.length === 0}
-                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos por WhatsApp'}
+                                                              disabled={companyIndices.length === 0 || sendingDocuments}
+                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos da empresa individualmente por WhatsApp'}
                                                           >
                                                               <MessageSquare className="h-4 w-4 mr-2" />
-                                                              <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                                              <span className="whitespace-nowrap">Enviar Individual</span>
+                                                          </Button>
+                                                          <Button
+                                                              variant="outline"
+                                                              size="sm"
+                                                              onClick={() => {
+                                                                  if (companyIndices.length > 0) {
+                                                                      handleSendDocumentsIndividually('email', companyIndices);
+                                                                  }
+                                                              }}
+                                                              className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
+                                                              disabled={companyIndices.length === 0 || sendingDocuments}
+                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos da empresa individualmente por Email'}
+                                                          >
+                                                              <Mail className="h-4 w-4 mr-2" />
+                                                              <span className="whitespace-nowrap">Enviar Individual</span>
                                                           </Button>
                                                           <Button
                                                               variant="outline"
@@ -7430,25 +7530,23 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                       size="sm"
                                                                       className="bg-green-600/90 text-white hover:bg-green-600"
                                                                       onClick={() => {
-                                                                          const selected = companySelectedIndices.map(idx => unifiedDocuments[idx]).filter(Boolean);
-                                                                          setSelectedUnifiedDocuments(new Set(companySelectedIndices));
-                                                                          handleSendDocuments('email');
+                                                                          handleSendDocumentsIndividually('email', companySelectedIndices);
                                                                       }}
+                                                                      disabled={sendingDocuments}
                                                                   >
                                                                       <Mail className="h-4 w-4 mr-1" />
-                                                                      Email ({companySelectedCount})
+                                                                      Enviar Individual ({companySelectedCount})
                                                                   </Button>
                                                                   <Button
                                                                       size="sm"
                                                                       className="bg-blue-600/90 text-white hover:bg-blue-600"
                                                                       onClick={() => {
-                                                                          const selected = companySelectedIndices.map(idx => unifiedDocuments[idx]).filter(Boolean);
-                                                                          setSelectedUnifiedDocuments(new Set(companySelectedIndices));
-                                                                          handleSendDocuments('whatsapp');
+                                                                          handleSendDocumentsIndividually('whatsapp', companySelectedIndices);
                                                                       }}
+                                                                      disabled={sendingDocuments}
                                                                   >
                                                                       <MessageSquare className="h-4 w-4 mr-1" />
-                                                                      WhatsApp ({companySelectedCount})
+                                                                      Enviar Individual ({companySelectedCount})
                                                                   </Button>
                                                                   <Button
                                                                       size="sm"
@@ -7534,16 +7632,30 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                       size="sm"
                                                                                       onClick={() => {
                                                                                           if (sectorIndices.length > 0) {
-                                                                                              setSelectedUnifiedDocuments(new Set(sectorIndices));
-                                                                                              handleSendDocuments('whatsapp');
+                                                                                              handleSendDocumentsIndividually('whatsapp', sectorIndices);
                                                                                           }
                                                                                       }}
                                                                                       className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
-                                                                                      disabled={sectorIndices.length === 0}
-                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor por WhatsApp'}
+                                                                                      disabled={sectorIndices.length === 0 || sendingDocuments}
+                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor individualmente por WhatsApp'}
                                                                                   >
                                                                                       <MessageSquare className="h-4 w-4 mr-2" />
-                                                                                      <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                                                                      <span className="whitespace-nowrap">Enviar Individual</span>
+                                                                                  </Button>
+                                                                                  <Button
+                                                                                      variant="outline"
+                                                                                      size="sm"
+                                                                                      onClick={() => {
+                                                                                          if (sectorIndices.length > 0) {
+                                                                                              handleSendDocumentsIndividually('email', sectorIndices);
+                                                                                          }
+                                                                                      }}
+                                                                                      className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
+                                                                                      disabled={sectorIndices.length === 0 || sendingDocuments}
+                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor individualmente por Email'}
+                                                                                  >
+                                                                                      <Mail className="h-4 w-4 mr-2" />
+                                                                                      <span className="whitespace-nowrap">Enviar Individual</span>
                                                                                   </Button>
                                                                                   <Button
                                                                                       variant="outline"
@@ -7569,23 +7681,23 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                           size="sm"
                                                                                           className="bg-green-600/90 text-white hover:bg-green-600"
                                                                                           onClick={() => {
-                                                                                              setSelectedUnifiedDocuments(new Set(sectorSelectedIndices));
-                                                                                              handleSendDocuments('email');
+                                                                                              handleSendDocumentsIndividually('email', sectorSelectedIndices);
                                                                                           }}
+                                                                                          disabled={sendingDocuments}
                                                                                       >
                                                                                           <Mail className="h-4 w-4 mr-1" />
-                                                                                          Email ({sectorSelectedCount})
+                                                                                          Enviar Individual ({sectorSelectedCount})
                                                                                       </Button>
                                                                                       <Button
                                                                                           size="sm"
                                                                                           className="bg-blue-600/90 text-white hover:bg-blue-600"
                                                                                           onClick={() => {
-                                                                                              setSelectedUnifiedDocuments(new Set(sectorSelectedIndices));
-                                                                                              handleSendDocuments('whatsapp');
+                                                                                              handleSendDocumentsIndividually('whatsapp', sectorSelectedIndices);
                                                                                           }}
+                                                                                          disabled={sendingDocuments}
                                                                                       >
                                                                                           <MessageSquare className="h-4 w-4 mr-1" />
-                                                                                          WhatsApp ({sectorSelectedCount})
+                                                                                          Enviar Individual ({sectorSelectedCount})
                                                                                       </Button>
                                                                                       <Button
                                                                                           size="sm"
@@ -7726,16 +7838,30 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                                                                                           size="sm"
                                                                                                           onClick={() => {
                                                                                                               if (periodIndices.length > 0) {
-                                                                                                                  setSelectedUnifiedDocuments(new Set(periodIndices));
-                                                                                                                  handleSendDocuments('whatsapp');
+                                                                                                                  handleSendDocumentsIndividually('whatsapp', periodIndices);
                                                                                                               }
                                                                                                           }}
                                                                                                           className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
-                                                                                                          disabled={periodIndices.length === 0}
-                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período por WhatsApp'}
+                                                                                                          disabled={periodIndices.length === 0 || sendingDocuments}
+                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período individualmente por WhatsApp'}
                                                                                                       >
                                                                                                           <MessageSquare className="h-4 w-4 mr-2" />
-                                                                                                          <span className="whitespace-nowrap">WhatsApp Todos</span>
+                                                                                                          <span className="whitespace-nowrap">Enviar Individual</span>
+                                                                                                      </Button>
+                                                                                                      <Button
+                                                                                                          variant="outline"
+                                                                                                          size="sm"
+                                                                                                          onClick={() => {
+                                                                                                              if (periodIndices.length > 0) {
+                                                                                                                  handleSendDocumentsIndividually('email', periodIndices);
+                                                                                                              }
+                                                                                                          }}
+                                                                                                          className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
+                                                                                                          disabled={periodIndices.length === 0 || sendingDocuments}
+                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período individualmente por Email'}
+                                                                                                      >
+                                                                                                          <Mail className="h-4 w-4 mr-2" />
+                                                                                                          <span className="whitespace-nowrap">Enviar Individual</span>
                                                                                                       </Button>
                                                                                                       <Button
                                                                                                           variant="outline"

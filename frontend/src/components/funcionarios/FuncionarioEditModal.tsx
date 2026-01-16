@@ -82,7 +82,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     nomePai: '',
     nomeMae: '',
     localNascimento: '',
+    municipioNascimento: '',
+    estadoNascimento: '',
+    sexo: '',
     grauInstrucao: '',
+    matriculaEsocial: '',
     cbo: '',
     salario: 0,
     salarioPorExtenso: '',
@@ -242,20 +246,37 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   // Preencher formulário quando funcionário for selecionado
   useEffect(() => {
-    if (funcionario && open) {
-      console.log('🔍 Carregando dados do funcionário para edição:', funcionario);
-      console.log('🔍 Dados bancários brutos:', {
-        bankData: funcionario.bankData,
-        bankInfo: (funcionario as any).bankInfo
-      });
-      
-      // Tratar address que pode ser string ou objeto
-      const addressValue = typeof funcionario.address === 'string' 
-        ? funcionario.address 
-        : funcionario.address?.street || '';
-      
-      // Tratar CPF que pode vir como cpf ou document
-      const cpfValue = funcionario.cpf || (funcionario as any).document || '';
+    const loadFullEmployeeData = async () => {
+      if (!funcionario || !open || !funcionario.id) {
+        return;
+      }
+
+      try {
+        // Buscar dados completos do funcionário do backend
+        console.log('🔍 Buscando dados completos do funcionário ID:', funcionario.id);
+        const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
+        
+        if (!fullEmployee) {
+          console.warn('⚠️ Funcionário não encontrado no backend');
+          return;
+        }
+
+        console.log('✅ Dados completos do funcionário carregados:', fullEmployee);
+        console.log('🔍 Dados bancários brutos:', {
+          bankData: fullEmployee.bankData,
+          bankInfo: (fullEmployee as any).bankInfo
+        });
+        
+        // Usar dados do funcionário completo buscado do backend
+        const employeeData = fullEmployee || funcionario;
+        
+        // Tratar address que pode ser string ou objeto
+        const addressValue = typeof employeeData.address === 'string' 
+          ? employeeData.address 
+          : employeeData.address?.street || '';
+        
+        // Tratar CPF que pode vir como cpf ou document
+        const cpfValue = employeeData.cpf || (employeeData as any).document || '';
       
       // Tratar dados bancários - verificar tanto bankData quanto bankInfo
       let bankData = {
@@ -264,142 +285,253 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         account: '',
         type: 'CORRENTE'
       };
-      
-      // Priorizar bankInfo (que vem do backend) sobre bankData
-      if ((funcionario as any).bankInfo) {
-        const bankInfo = (funcionario as any).bankInfo;
-        bankData = {
-          bank: bankInfo.bank || '',
-          agency: bankInfo.agency || '',
-          account: bankInfo.account || '',
-          type: bankInfo.accountType || 'CORRENTE'
-        };
-        console.log('💰 Dados bancários encontrados em bankInfo:', bankInfo);
-      } else if (funcionario.bankData) {
-        bankData = {
-          bank: funcionario.bankData.bank || '',
-          agency: funcionario.bankData.agency || '',
-          account: funcionario.bankData.account || '',
-          type: funcionario.bankData.type || 'CORRENTE'
-        };
-        console.log('💰 Dados bancários encontrados em bankData:', funcionario.bankData);
-      } else {
-        console.log('⚠️ Nenhum dado bancário encontrado no funcionário');
-      }
-      
-      console.log('💰 Dados bancários mapeados para o formulário:', bankData);
-      
-      setForm({
-        name: funcionario.name || '',
-        cpf: cpfValue,
-        rg: funcionario.rg || '',
-        email: funcionario.email || '',
-        phone: funcionario.phone || '',
-        telefoneContato: (funcionario as any).telefoneContato || '',
-        address: addressValue,
-        enderecoRua: (funcionario as any).enderecoRua || '',
-        enderecoNumero: (funcionario as any).enderecoNumero || '',
-        enderecoComplemento: (funcionario as any).enderecoComplemento || '',
-        enderecoBairro: (funcionario as any).enderecoBairro || '',
-        enderecoCidade: (funcionario as any).enderecoCidade || '',
-        enderecoEstado: (funcionario as any).enderecoEstado || '',
-        enderecoCep: (funcionario as any).enderecoCep || '',
-        birthDate: funcionario.birthDate || '',
-        maritalStatus: funcionario.maritalStatus || 'SINGLE',
-        nationality: funcionario.nationality || 'Brasileiro',
-        registrationNumber: funcionario.registrationNumber || '',
-        hireDate: funcionario.hireDate || '',
-        status: funcionario.status || 'ACTIVE',
-        notes: funcionario.notes || '',
-        position: { id: funcionario.position?.id ? String(funcionario.position.id) : '' },
-        unit: { id: funcionario.unit?.id ? String(funcionario.unit.id) : '' },
-        user: { id: funcionario.user?.id ? String(funcionario.user.id) : '' },
-        company: { id: funcionario.company?.id ? String(funcionario.company.id) : '' },
-        workPostId: (funcionario as any).workPost?.id || (funcionario as any).workPostId || '',
-        departmentId: (funcionario as any).department?.id || (funcionario as any).departmentId || '',
-        bankData: bankData,
-        // Campos do cônjuge
-        spouseName: funcionario.spouseName || '',
-        spouseCpf: funcionario.spouseCpf || '',
-        spouseRg: funcionario.spouseRg || '',
-        spouseBirthDate: funcionario.spouseBirthDate || '',
-        spousePhone: funcionario.spousePhone || '',
-        spouseEmail: funcionario.spouseEmail || '',
         
-        // Campos da ficha de registro
-        empresaNome: funcionario.empresaNome || '',
-        empresaEndereco: funcionario.empresaEndereco || '',
-        empresaCnpj: funcionario.empresaCnpj || '',
-        tituloEleitor: funcionario.tituloEleitor || '',
-        tituloEleitorZona: funcionario.tituloEleitorZona || '',
-        tituloEleitorSecao: funcionario.tituloEleitorSecao || '',
-        carteiraIdentidadeOrgaoEmissor: funcionario.carteiraIdentidadeOrgaoEmissor || '',
-        carteiraIdentidadeDataEmissao: funcionario.carteiraIdentidadeDataEmissao || '',
-        certificadoMilitar: funcionario.certificadoMilitar || '',
-        nomePai: funcionario.nomePai || '',
-        nomeMae: funcionario.nomeMae || '',
-        localNascimento: funcionario.localNascimento || '',
-        grauInstrucao: funcionario.grauInstrucao || '',
-        cbo: funcionario.cbo || '',
-        salario: funcionario.salario || 0,
-        salarioPorExtenso: funcionario.salarioPorExtenso || '',
-        periodoPagamento: funcionario.periodoPagamento || '',
-        horarioTrabalho: funcionario.horarioTrabalho || '',
-        folgaSemanal: funcionario.folgaSemanal || '',
-        fgtsOptante: funcionario.fgtsOptante || false,
-        fgtsDataOpcao: funcionario.fgtsDataOpcao || '',
-        fgtsBancoDepositario: funcionario.fgtsBancoDepositario || '',
-        fgtsDataRetratacao: funcionario.fgtsDataRetratacao || '',
-        pis: funcionario.pis || '',
-        pisDataCadastro: funcionario.pisDataCadastro || '',
-        pisBancoDepositario: funcionario.pisBancoDepositario || '',
-        pisEnderecoBanco: funcionario.pisEnderecoBanco || '',
-        pisCodigoBanco: funcionario.pisCodigoBanco || '',
-        pisCodigoAgencia: funcionario.pisCodigoAgencia || '',
-        cnhNumber: funcionario.cnhNumber || '',
-        cnhExpirationDate: funcionario.cnhExpirationDate || '',
-        cnhCategory: funcionario.cnhCategory || '',
-        ctps: funcionario.ctps || '',
-        ctpsRural: funcionario.ctpsRural || '',
-        ctpsSeries: funcionario.ctpsSeries || '',
-        ctpsIssueDate: funcionario.ctpsIssueDate || '',
-        ctpsIssuingAgency: funcionario.ctpsIssuingAgency || '',
-        carteiraModelo19: funcionario.carteiraModelo19 || '',
-        registroGeralEstrangeiro: funcionario.registroGeralEstrangeiro || '',
-        casadoBrasileiro: funcionario.casadoBrasileiro || false,
-        nomeConjugeEstrangeiro: funcionario.nomeConjugeEstrangeiro || '',
-        temFilhosBrasileiros: funcionario.temFilhosBrasileiros || false,
-        quantidadeFilhosBrasileiros: funcionario.quantidadeFilhosBrasileiros || 0,
-        dataChegadaBrasil: funcionario.dataChegadaBrasil || '',
-        naturalizado: funcionario.naturalizado || false,
-        decretoNaturalizacao: funcionario.decretoNaturalizacao || '',
-        vistoFiscalizacao: funcionario.vistoFiscalizacao || '',
-        assinaturaFuncionario: funcionario.assinaturaFuncionario || '',
-        dataRescisao: funcionario.dataRescisao || '',
-        gender: funcionario.gender || ''
-      });
-      
-      console.log('✅ Formulário preenchido com dados do funcionário');
-      console.log('📋 Dados principais:', {
-        name: funcionario.name,
-        cpf: cpfValue,
-        email: funcionario.email,
-        phone: funcionario.phone,
-        position: funcionario.position?.id,
-        positionName: funcionario.position?.name,
-        userId: funcionario.user?.id,
-        userName: funcionario.user?.name || funcionario.user?.email,
-        bankData: bankData,
-        address: addressValue
-      });
-      
-      // Nota: Os selects de usuário e cargo serão preenchidos no useEffect
-      // que monitora users e positions para garantir que as listas estejam carregadas
+        // Priorizar bankInfo (que vem do backend) sobre bankData
+        if ((employeeData as any).bankInfo) {
+          const bankInfo = (employeeData as any).bankInfo;
+          bankData = {
+            bank: bankInfo.bank || '',
+            agency: bankInfo.agency || '',
+            account: bankInfo.account || '',
+            type: bankInfo.accountType || 'CORRENTE'
+          };
+          console.log('💰 Dados bancários encontrados em bankInfo:', bankInfo);
+        } else if (employeeData.bankData) {
+          bankData = {
+            bank: employeeData.bankData.bank || '',
+            agency: employeeData.bankData.agency || '',
+            account: employeeData.bankData.account || '',
+            type: employeeData.bankData.type || 'CORRENTE'
+          };
+          console.log('💰 Dados bancários encontrados em bankData:', employeeData.bankData);
+        } else {
+          console.log('⚠️ Nenhum dado bancário encontrado no funcionário');
+        }
+        
+        console.log('💰 Dados bancários mapeados para o formulário:', bankData);
+        
+        // Inicialmente usar phone do funcionário
+        let initialPhone = employeeData.phone || '';
+        
+        // Se endereço vier como objeto AddressDTO, extrair campos separados
+        let enderecoRua = (employeeData as any).enderecoRua || '';
+        let enderecoNumero = (employeeData as any).enderecoNumero || '';
+        let enderecoComplemento = (employeeData as any).enderecoComplemento || '';
+        let enderecoBairro = (employeeData as any).enderecoBairro || '';
+        let enderecoCidade = (employeeData as any).enderecoCidade || '';
+        let enderecoEstado = (employeeData as any).enderecoEstado || '';
+        let enderecoCep = (employeeData as any).enderecoCep || '';
+        
+        // Se endereço vier como objeto address com campos separados
+        if (employeeData.address && typeof employeeData.address === 'object' && !addressValue) {
+          const addr = employeeData.address as any;
+          enderecoRua = addr.street || enderecoRua;
+          enderecoNumero = addr.number || enderecoNumero;
+          enderecoComplemento = addr.complement || enderecoComplemento;
+          enderecoBairro = addr.neighborhood || enderecoBairro;
+          enderecoCidade = addr.city || enderecoCidade;
+          enderecoEstado = addr.state || enderecoEstado;
+          enderecoCep = addr.zipCode || enderecoCep;
+        }
+        
+        setForm({
+          name: employeeData.name || '',
+          cpf: cpfValue,
+          rg: employeeData.rg || '',
+          email: employeeData.email || '',
+          phone: initialPhone,
+          telefoneContato: (employeeData as any).telefoneContato || '',
+          address: addressValue,
+          enderecoRua: enderecoRua,
+          enderecoNumero: enderecoNumero,
+          enderecoComplemento: enderecoComplemento,
+          enderecoBairro: enderecoBairro,
+          enderecoCidade: enderecoCidade,
+          enderecoEstado: enderecoEstado,
+          enderecoCep: enderecoCep,
+          birthDate: employeeData.birthDate || '',
+          maritalStatus: employeeData.maritalStatus || 'SINGLE',
+          nationality: employeeData.nationality || 'Brasileiro',
+          registrationNumber: employeeData.registrationNumber || '',
+          hireDate: employeeData.hireDate || '',
+          status: employeeData.status || 'ACTIVE',
+          notes: employeeData.notes || '',
+          position: { id: employeeData.position?.id ? String(employeeData.position.id) : '' },
+          unit: { id: employeeData.unit?.id ? String(employeeData.unit.id) : '' },
+          user: { id: employeeData.user?.id ? String(employeeData.user.id) : '' },
+          company: { id: employeeData.company?.id ? String(employeeData.company.id) : '' },
+          workPostId: (employeeData as any).workPost?.id || (employeeData as any).workPostId || '',
+          departmentId: (employeeData as any).department?.id || (employeeData as any).departmentId || '',
+          bankData: bankData,
+          // Campos do cônjuge
+          spouseName: employeeData.spouseName || '',
+          spouseCpf: employeeData.spouseCpf || '',
+          spouseRg: employeeData.spouseRg || '',
+          spouseBirthDate: employeeData.spouseBirthDate || '',
+          spousePhone: employeeData.spousePhone || '',
+          spouseEmail: employeeData.spouseEmail || '',
+          
+          // Campos da ficha de registro
+          empresaNome: employeeData.empresaNome || '',
+          empresaEndereco: employeeData.empresaEndereco || '',
+          empresaCnpj: employeeData.empresaCnpj || '',
+          tituloEleitor: employeeData.tituloEleitor || '',
+          tituloEleitorZona: employeeData.tituloEleitorZona || '',
+          tituloEleitorSecao: employeeData.tituloEleitorSecao || '',
+          carteiraIdentidadeOrgaoEmissor: employeeData.carteiraIdentidadeOrgaoEmissor || '',
+          carteiraIdentidadeDataEmissao: employeeData.carteiraIdentidadeDataEmissao || '',
+          certificadoMilitar: employeeData.certificadoMilitar || '',
+          nomePai: employeeData.nomePai || '',
+          nomeMae: employeeData.nomeMae || '',
+          localNascimento: employeeData.localNascimento || '',
+          municipioNascimento: employeeData.municipioNascimento || '',
+          estadoNascimento: employeeData.estadoNascimento || '',
+          sexo: employeeData.sexo || '',
+          grauInstrucao: employeeData.grauInstrucao || '',
+          matriculaEsocial: employeeData.matriculaEsocial || '',
+          cbo: employeeData.cbo || '',
+          salario: employeeData.salario || 0,
+          salarioPorExtenso: employeeData.salarioPorExtenso || '',
+          periodoPagamento: employeeData.periodoPagamento || '',
+          horarioTrabalho: employeeData.horarioTrabalho || '',
+          folgaSemanal: employeeData.folgaSemanal || '',
+          fgtsOptante: employeeData.fgtsOptante || false,
+          fgtsDataOpcao: employeeData.fgtsDataOpcao || '',
+          fgtsBancoDepositario: employeeData.fgtsBancoDepositario || '',
+          fgtsDataRetratacao: employeeData.fgtsDataRetratacao || '',
+          pis: employeeData.pis || '',
+          pisDataCadastro: employeeData.pisDataCadastro || '',
+          pisBancoDepositario: employeeData.pisBancoDepositario || '',
+          pisEnderecoBanco: employeeData.pisEnderecoBanco || '',
+          pisCodigoBanco: employeeData.pisCodigoBanco || '',
+          pisCodigoAgencia: employeeData.pisCodigoAgencia || '',
+          cnhNumber: employeeData.cnhNumber || '',
+          cnhExpirationDate: employeeData.cnhExpirationDate || '',
+          cnhCategory: employeeData.cnhCategory || '',
+          ctps: employeeData.ctps || '',
+          ctpsRural: employeeData.ctpsRural || '',
+          ctpsSeries: employeeData.ctpsSeries || '',
+          ctpsIssueDate: employeeData.ctpsIssueDate || '',
+          ctpsIssuingAgency: employeeData.ctpsIssuingAgency || '',
+          carteiraModelo19: employeeData.carteiraModelo19 || '',
+          registroGeralEstrangeiro: employeeData.registroGeralEstrangeiro || '',
+          casadoBrasileiro: employeeData.casadoBrasileiro || false,
+          nomeConjugeEstrangeiro: employeeData.nomeConjugeEstrangeiro || '',
+          temFilhosBrasileiros: employeeData.temFilhosBrasileiros || false,
+          quantidadeFilhosBrasileiros: employeeData.quantidadeFilhosBrasileiros || 0,
+          dataChegadaBrasil: employeeData.dataChegadaBrasil || '',
+          naturalizado: employeeData.naturalizado || false,
+          decretoNaturalizacao: employeeData.decretoNaturalizacao || '',
+          vistoFiscalizacao: employeeData.vistoFiscalizacao || '',
+          assinaturaFuncionario: employeeData.assinaturaFuncionario || '',
+          dataRescisao: employeeData.dataRescisao || '',
+          gender: employeeData.gender || ''
+        });
+        
+        console.log('✅ Formulário preenchido com dados completos do funcionário');
+        console.log('📋 Dados principais:', {
+          name: employeeData.name,
+          cpf: cpfValue,
+          email: employeeData.email,
+          phone: employeeData.phone,
+          whatsapp: initialPhone,
+          enderecoRua: enderecoRua,
+          enderecoCep: enderecoCep,
+          position: employeeData.position?.id,
+          positionName: employeeData.position?.name,
+          userId: employeeData.user?.id,
+          userName: employeeData.user?.name || employeeData.user?.email,
+          bankData: bankData,
+          address: addressValue
+        });
+        
+        // Buscar WhatsApp do usuário vinculado se existir
+        if (employeeData.user?.id) {
+          try {
+            const userId = String(employeeData.user.id);
+            // Primeiro tentar encontrar na lista já carregada
+            const linkedUser = users.find(u => String(u.id) === userId);
+            if (linkedUser?.whatsapp) {
+              setForm(prev => ({
+                ...prev,
+                phone: linkedUser.whatsapp || prev.phone
+              }));
+              console.log('✅ WhatsApp encontrado no usuário vinculado (da lista):', linkedUser.whatsapp);
+            } else {
+              // Se não encontrou na lista, buscar do backend
+              try {
+                const userData = await userService.getUserById(userId);
+                if (userData?.whatsapp) {
+                  setForm(prev => ({
+                    ...prev,
+                    phone: userData.whatsapp || prev.phone
+                  }));
+                  console.log('✅ WhatsApp encontrado após buscar usuário:', userData.whatsapp);
+                } else {
+                  console.log('ℹ️ Usuário vinculado não tem WhatsApp cadastrado');
+                }
+              } catch (userError) {
+                console.warn('⚠️ Erro ao buscar usuário para WhatsApp:', userError);
+              }
+            }
+          } catch (whatsappError) {
+            console.warn('⚠️ Erro ao buscar WhatsApp do usuário:', whatsappError);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar dados completos do funcionário:', error);
+        // Se falhar, usar dados do prop funcionario mesmo assim
+        console.log('⚠️ Usando dados parciais do funcionário passado como prop');
+      }
+    };
+
+    if (funcionario && open) {
+      loadFullEmployeeData();
     } else if (open && !funcionario) {
       // Resetar formulário quando modal abrir sem funcionário
       console.log('🔄 Resetando formulário - nenhum funcionário selecionado');
     }
   }, [funcionario, open]);
+
+  // Buscar WhatsApp do usuário vinculado quando o funcionário tiver usuário
+  useEffect(() => {
+    const loadWhatsAppFromUser = async () => {
+      if (!funcionario || !open || !funcionario.user?.id) {
+        return;
+      }
+
+      const userId = String(funcionario.user.id);
+
+      // Primeiro tentar encontrar na lista já carregada
+      const linkedUser = users.find(u => String(u.id) === userId);
+      if (linkedUser?.whatsapp) {
+        setForm(prev => ({
+          ...prev,
+          phone: linkedUser.whatsapp || prev.phone
+        }));
+        console.log('✅ WhatsApp encontrado no usuário vinculado (da lista):', linkedUser.whatsapp);
+        return;
+      }
+
+      // Se não encontrou na lista ou não tem WhatsApp, buscar do backend
+      try {
+        const userData = await userService.getUserById(userId);
+        if (userData?.whatsapp) {
+          setForm(prev => ({
+            ...prev,
+            phone: userData.whatsapp || prev.phone
+          }));
+          console.log('✅ WhatsApp encontrado após buscar usuário:', userData.whatsapp);
+        } else {
+          console.log('ℹ️ Usuário vinculado não tem WhatsApp cadastrado');
+        }
+      } catch (error) {
+        console.warn('⚠️ Erro ao buscar usuário para WhatsApp:', error);
+      }
+    };
+
+    loadWhatsAppFromUser();
+  }, [funcionario, open, users]);
 
   // Função para buscar CEP
   const buscarCep = async (cep: string) => {
@@ -951,6 +1083,103 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   value={form.birthDate} 
                   onChange={handleChange} 
                   required 
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Sexo</Label>
+                <Select 
+                  value={form.sexo || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, sexo: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o sexo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MASCULINO">Masculino</SelectItem>
+                    <SelectItem value="FEMININO">Feminino</SelectItem>
+                    <SelectItem value="OUTRO">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Município de Nascimento</Label>
+                <Input 
+                  name="municipioNascimento" 
+                  value={form.municipioNascimento || ''} 
+                  onChange={handleChange} 
+                  placeholder="Ex: Belo Horizonte"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Estado de Nascimento</Label>
+                <Select 
+                  value={form.estadoNascimento || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, estadoNascimento: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AC">Acre</SelectItem>
+                    <SelectItem value="AL">Alagoas</SelectItem>
+                    <SelectItem value="AP">Amapá</SelectItem>
+                    <SelectItem value="AM">Amazonas</SelectItem>
+                    <SelectItem value="BA">Bahia</SelectItem>
+                    <SelectItem value="CE">Ceará</SelectItem>
+                    <SelectItem value="DF">Distrito Federal</SelectItem>
+                    <SelectItem value="ES">Espírito Santo</SelectItem>
+                    <SelectItem value="GO">Goiás</SelectItem>
+                    <SelectItem value="MA">Maranhão</SelectItem>
+                    <SelectItem value="MT">Mato Grosso</SelectItem>
+                    <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
+                    <SelectItem value="MG">Minas Gerais</SelectItem>
+                    <SelectItem value="PA">Pará</SelectItem>
+                    <SelectItem value="PB">Paraíba</SelectItem>
+                    <SelectItem value="PR">Paraná</SelectItem>
+                    <SelectItem value="PE">Pernambuco</SelectItem>
+                    <SelectItem value="PI">Piauí</SelectItem>
+                    <SelectItem value="RJ">Rio de Janeiro</SelectItem>
+                    <SelectItem value="RN">Rio Grande do Norte</SelectItem>
+                    <SelectItem value="RS">Rio Grande do Sul</SelectItem>
+                    <SelectItem value="RO">Rondônia</SelectItem>
+                    <SelectItem value="RR">Roraima</SelectItem>
+                    <SelectItem value="SC">Santa Catarina</SelectItem>
+                    <SelectItem value="SP">São Paulo</SelectItem>
+                    <SelectItem value="SE">Sergipe</SelectItem>
+                    <SelectItem value="TO">Tocantins</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Grau de Instrução</Label>
+                <Select 
+                  value={form.grauInstrucao || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, grauInstrucao: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o grau de instrução" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ANALFABETO">Analfabeto</SelectItem>
+                    <SelectItem value="FUNDAMENTAL_INCOMPLETO">Ensino Fundamental Incompleto</SelectItem>
+                    <SelectItem value="FUNDAMENTAL_COMPLETO">Ensino Fundamental Completo</SelectItem>
+                    <SelectItem value="MEDIO_INCOMPLETO">Ensino Médio Incompleto</SelectItem>
+                    <SelectItem value="MEDIO_COMPLETO">Ensino Médio Completo</SelectItem>
+                    <SelectItem value="SUPERIOR_INCOMPLETO">Ensino Superior Incompleto</SelectItem>
+                    <SelectItem value="SUPERIOR_COMPLETO">Ensino Superior Completo</SelectItem>
+                    <SelectItem value="POS_GRADUACAO">Pós-Graduação</SelectItem>
+                    <SelectItem value="MESTRADO">Mestrado</SelectItem>
+                    <SelectItem value="DOUTORADO">Doutorado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Matrícula do eSocial</Label>
+                <Input 
+                  name="matriculaEsocial" 
+                  value={form.matriculaEsocial || ''} 
+                  onChange={handleChange} 
+                  placeholder="Matrícula do eSocial (opcional)"
                 />
               </div>
               <div>

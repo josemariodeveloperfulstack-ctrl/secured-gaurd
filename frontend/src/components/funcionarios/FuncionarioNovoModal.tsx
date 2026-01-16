@@ -58,6 +58,12 @@ const initialState: CreateEmployeeDTO = {
   nationality: 'Brasileiro',
   nomePai: '',
   nomeMae: '',
+  localNascimento: '',
+  municipioNascimento: '',
+  estadoNascimento: '',
+  sexo: '',
+  grauInstrucao: '',
+  matriculaEsocial: '',
   registrationNumber: '',
   hireDate: '',
   status: 'ACTIVE',
@@ -290,7 +296,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         nomePai: employeeToEdit.nomePai || '',
         nomeMae: employeeToEdit.nomeMae || '',
         localNascimento: employeeToEdit.localNascimento || '',
+        municipioNascimento: employeeToEdit.municipioNascimento || '',
+        estadoNascimento: employeeToEdit.estadoNascimento || '',
+        sexo: employeeToEdit.sexo || '',
         grauInstrucao: employeeToEdit.grauInstrucao || '',
+        matriculaEsocial: employeeToEdit.matriculaEsocial || '',
         cbo: employeeToEdit.cbo || '',
         salario: employeeToEdit.salario || 0,
         salarioPorExtenso: employeeToEdit.salarioPorExtenso || '',
@@ -1098,7 +1108,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       nomePai: combined.nomePai || prev.nomePai,
       nomeMae: combined.nomeMae || prev.nomeMae,
       localNascimento: data.localNascimento || prev.localNascimento,
+      municipioNascimento: data.municipioNascimento || prev.municipioNascimento,
+      estadoNascimento: data.estadoNascimento || prev.estadoNascimento,
+      sexo: data.sexo || prev.sexo,
       grauInstrucao: data.grauInstrucao || prev.grauInstrucao,
+      matriculaEsocial: data.matriculaEsocial || prev.matriculaEsocial,
       cbo: combined.cbo || prev.cbo,
       salario: combined.salary || prev.salario,
       salarioPorExtenso: data.salarioPorExtenso || prev.salarioPorExtenso,
@@ -1741,12 +1755,109 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                </div>
                <div>
                  <Label className="text-sm font-medium text-gray-200">Data de Nascimento *</Label>
+                 <Input
+                   name="birthDate"
+                   type="date"
+                   value={form.birthDate}
+                   onChange={handleChange}
+                   required
+                 />
+               </div>
+               <div>
+                 <Label className="text-sm font-medium text-gray-200">Sexo</Label>
+                 <Select 
+                   value={form.sexo || ''} 
+                   onValueChange={(value) => setForm(prev => ({ ...prev, sexo: value }))}
+                 >
+                   <SelectTrigger>
+                     <SelectValue placeholder="Selecione o sexo" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="MASCULINO">Masculino</SelectItem>
+                     <SelectItem value="FEMININO">Feminino</SelectItem>
+                     <SelectItem value="OUTRO">Outro</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div>
+                 <Label className="text-sm font-medium text-gray-200">Município de Nascimento</Label>
                  <Input 
-                   name="birthDate" 
-                   type="date" 
-                   value={form.birthDate} 
+                   name="municipioNascimento" 
+                   value={form.municipioNascimento || ''} 
                    onChange={handleChange} 
-                   required 
+                   placeholder="Ex: Belo Horizonte"
+                 />
+               </div>
+               <div>
+                 <Label className="text-sm font-medium text-gray-200">Estado de Nascimento</Label>
+                 <Select 
+                   value={form.estadoNascimento || ''} 
+                   onValueChange={(value) => setForm(prev => ({ ...prev, estadoNascimento: value }))}
+                 >
+                   <SelectTrigger>
+                     <SelectValue placeholder="Selecione o estado" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="AC">Acre</SelectItem>
+                     <SelectItem value="AL">Alagoas</SelectItem>
+                     <SelectItem value="AP">Amapá</SelectItem>
+                     <SelectItem value="AM">Amazonas</SelectItem>
+                     <SelectItem value="BA">Bahia</SelectItem>
+                     <SelectItem value="CE">Ceará</SelectItem>
+                     <SelectItem value="DF">Distrito Federal</SelectItem>
+                     <SelectItem value="ES">Espírito Santo</SelectItem>
+                     <SelectItem value="GO">Goiás</SelectItem>
+                     <SelectItem value="MA">Maranhão</SelectItem>
+                     <SelectItem value="MT">Mato Grosso</SelectItem>
+                     <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
+                     <SelectItem value="MG">Minas Gerais</SelectItem>
+                     <SelectItem value="PA">Pará</SelectItem>
+                     <SelectItem value="PB">Paraíba</SelectItem>
+                     <SelectItem value="PR">Paraná</SelectItem>
+                     <SelectItem value="PE">Pernambuco</SelectItem>
+                     <SelectItem value="PI">Piauí</SelectItem>
+                     <SelectItem value="RJ">Rio de Janeiro</SelectItem>
+                     <SelectItem value="RN">Rio Grande do Norte</SelectItem>
+                     <SelectItem value="RS">Rio Grande do Sul</SelectItem>
+                     <SelectItem value="RO">Rondônia</SelectItem>
+                     <SelectItem value="RR">Roraima</SelectItem>
+                     <SelectItem value="SC">Santa Catarina</SelectItem>
+                     <SelectItem value="SP">São Paulo</SelectItem>
+                     <SelectItem value="SE">Sergipe</SelectItem>
+                     <SelectItem value="TO">Tocantins</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div>
+                 <Label className="text-sm font-medium text-gray-200">Grau de Instrução</Label>
+                 <Select 
+                   value={form.grauInstrucao || ''} 
+                   onValueChange={(value) => setForm(prev => ({ ...prev, grauInstrucao: value }))}
+                 >
+                   <SelectTrigger>
+                     <SelectValue placeholder="Selecione o grau de instrução" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="ANALFABETO">Analfabeto</SelectItem>
+                     <SelectItem value="FUNDAMENTAL_INCOMPLETO">Ensino Fundamental Incompleto</SelectItem>
+                     <SelectItem value="FUNDAMENTAL_COMPLETO">Ensino Fundamental Completo</SelectItem>
+                     <SelectItem value="MEDIO_INCOMPLETO">Ensino Médio Incompleto</SelectItem>
+                     <SelectItem value="MEDIO_COMPLETO">Ensino Médio Completo</SelectItem>
+                     <SelectItem value="SUPERIOR_INCOMPLETO">Ensino Superior Incompleto</SelectItem>
+                     <SelectItem value="SUPERIOR_COMPLETO">Ensino Superior Completo</SelectItem>
+                     <SelectItem value="POS_GRADUACAO">Pós-Graduação</SelectItem>
+                     <SelectItem value="MESTRADO">Mestrado</SelectItem>
+                     <SelectItem value="DOUTORADO">Doutorado</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div>
+                 <Label className="text-sm font-medium text-gray-200">Matrícula do eSocial</Label>
+                 <Input 
+                   name="matriculaEsocial" 
+                   value={form.matriculaEsocial || ''} 
+                   onChange={handleChange} 
+                   placeholder="Matrícula do eSocial (opcional)"
                  />
                </div>
                <div>

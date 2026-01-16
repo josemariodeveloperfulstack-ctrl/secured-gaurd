@@ -293,6 +293,35 @@ export const employeeService = {
       console.error('Erro ao gerar PDF da ficha de registro:', error);
       throw new Error(error.response?.data?.message || 'Erro ao gerar PDF da ficha de registro');
     }
+  },
+
+  /**
+   * Importar funcionários de planilha Excel
+   */
+  async importEmployeesFromExcel(file: File): Promise<{
+    success: boolean;
+    created: number;
+    updated: number;
+    errors: string[];
+    warnings: string[];
+    message: string;
+  }> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post('/api/employees/import/excel', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 300000, // 5 minutos
+      });
+
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao importar funcionários:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao importar funcionários');
+    }
   }
 };
 

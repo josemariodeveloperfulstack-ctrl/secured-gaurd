@@ -424,10 +424,38 @@ public class EmployeeService {
         employeeRepository.delete(employee);
     }
     
+    @Transactional(readOnly = true)
     @Cacheable(value = "employees", key = "#id")
     public Employee findById(UUID id) {
-        return employeeRepository.findById(id)
+        Employee employee = employeeRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
+        
+        // Forçar inicialização de relacionamentos LAZY para evitar LazyInitializationException
+        try {
+            if (employee.getUser() != null) {
+                org.hibernate.Hibernate.initialize(employee.getUser());
+            }
+            if (employee.getPosition() != null) {
+                org.hibernate.Hibernate.initialize(employee.getPosition());
+            }
+            if (employee.getUnit() != null) {
+                org.hibernate.Hibernate.initialize(employee.getUnit());
+            }
+            if (employee.getCompany() != null) {
+                org.hibernate.Hibernate.initialize(employee.getCompany());
+            }
+            if (employee.getWorkPost() != null) {
+                org.hibernate.Hibernate.initialize(employee.getWorkPost());
+            }
+            if (employee.getDepartment() != null) {
+                org.hibernate.Hibernate.initialize(employee.getDepartment());
+            }
+        } catch (Exception e) {
+            System.err.println("[WARNING] Erro ao inicializar relacionamentos LAZY: " + e.getMessage());
+            // Continuar mesmo se houver erro na inicialização
+        }
+        
+        return employee;
     }
     
     public Optional<Employee> findByEmail(String email) {
@@ -788,7 +816,11 @@ public class EmployeeService {
             e.setNomePai(dto.getNomePai());
             e.setNomeMae(dto.getNomeMae());
             e.setLocalNascimento(dto.getLocalNascimento());
+            e.setMunicipioNascimento(dto.getMunicipioNascimento());
+            e.setEstadoNascimento(dto.getEstadoNascimento());
+            e.setSexo(dto.getSexo());
             e.setGrauInstrucao(dto.getGrauInstrucao());
+            e.setMatriculaEsocial(dto.getMatriculaEsocial());
             e.setCbo(dto.getCbo());
             e.setPis(dto.getPis());
             e.setSalario(dto.getSalario());
@@ -958,9 +990,14 @@ public class EmployeeService {
         }
     }
 
+    @Transactional(readOnly = true)
     public EmployeeDTO toDTO(Employee e) {
         try {
-            System.out.println("[DEBUG] Iniciando conversão Entity -> DTO para funcionário: " + e.getName());
+            System.out.println("[DEBUG] Iniciando conversão Entity -> DTO para funcionário: " + (e != null ? e.getName() : "null"));
+            
+            if (e == null) {
+                throw new IllegalArgumentException("Employee não pode ser null");
+            }
             
             EmployeeDTO dto = new EmployeeDTO();
             
@@ -1073,7 +1110,11 @@ public class EmployeeService {
             dto.setNomePai(e.getNomePai());
             dto.setNomeMae(e.getNomeMae());
             dto.setLocalNascimento(e.getLocalNascimento());
+            dto.setMunicipioNascimento(e.getMunicipioNascimento());
+            dto.setEstadoNascimento(e.getEstadoNascimento());
+            dto.setSexo(e.getSexo());
             dto.setGrauInstrucao(e.getGrauInstrucao());
+            dto.setMatriculaEsocial(e.getMatriculaEsocial());
             dto.setCbo(e.getCbo());
             dto.setPis(e.getPis());
             dto.setSalario(e.getSalario());

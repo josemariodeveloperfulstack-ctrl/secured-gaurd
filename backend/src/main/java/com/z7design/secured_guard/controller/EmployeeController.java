@@ -15,11 +15,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.z7design.secured_guard.service.EmployeeExcelImportService;
 
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/employees")
@@ -29,6 +34,7 @@ public class EmployeeController {
     
     private final EmployeeService employeeService;
     private final EmployeeRecordPdfService employeeRecordPdfService;
+    private final EmployeeExcelImportService employeeExcelImportService;
     
     @GetMapping("/count")
     @Operation(summary = "Contar funcionários", description = "Retorna o número total de funcionários")
@@ -630,6 +636,55 @@ public class EmployeeController {
             System.err.println("[ERROR] EmployeeController.generateEmployeeRecordPdf - Erro: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    /**
+     * 📥 Importar funcionários de planilha Excel
+     */
+    @PostMapping("/import/excel")
+    @Operation(summary = "Importar funcionários do Excel", description = "Importa funcionários de uma planilha Excel. A planilha deve conter uma coluna 'CNPJ Empresa' e os dados dos funcionários.")
+    @PreAuthorize("hasAnyAuthority('RH_FUNCIONARIOS_CREATE', 'SUPER_ADMIN')")
+    public ResponseEntity<Map<String, Object>> importEmployeesFromExcel(@RequestParam("file") MultipartFile file) {
+        try {
+            System.out.println("📥 EmployeeController.importEmployeesFromExcel - Arquivo recebido: " + file.getOriginalFilename());
+            
+            if (file.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Arquivo vazio");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Processar importação
+            EmployeeExcelImportService.ImportResult result = employeeExcelImportService.importEmployees(file);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", result.isSuccess());
+            response.put("created", result.getCreated());
+            response.put("updated", result.getUpdated());
+            response.put("errors", result.getErrors());
+            response.put("warnings", result.getWarnings());
+            response.put("message", result.getSummary());
+            
+            System.out.println("✅ EmployeeController.importEmployeesFromExcel - Importação concluída: " + result.getSummary());
+            
+            if (result.isSuccess()) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeController.importEmployeesFromExcel - Erro: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Erro ao processar importação: " + e.getMessage());
+            errorResponse.put("errors", List.of(e.getMessage()));
+            
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 } 

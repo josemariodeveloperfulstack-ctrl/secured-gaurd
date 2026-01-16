@@ -23,7 +23,51 @@ public class EnvioController {
      */
     @PostMapping("/individual")
     public ResponseEntity<EnvioResponse> enviarIndividual(@Valid @RequestBody EnvioRequest request) {
-        log.info("🚀 Recebida requisição de envio individual para funcionário: {}", request.getFuncionarioId());
+        log.info("🚀 Recebida requisição de envio individual - Tipo: {}, FuncionarioId: {}, CPF: {}", 
+                request.getTipo(), request.getFuncionarioId(), request.getCpf());
+        
+        // Validar se o tipo foi fornecido
+        if (request.getTipo() == null || request.getTipo().trim().isEmpty()) {
+            log.error("❌ Tipo de envio não fornecido!");
+            EnvioResponse errorResponse = EnvioResponse.builder()
+                    .sucesso(false)
+                    .mensagem("Tipo de envio é obrigatório (deve ser 'email' ou 'whatsapp')")
+                    .tipoEnvio(null)
+                    .totalEnviados(0)
+                    .totalFalhas(1)
+                    .detalhes(new java.util.ArrayList<>())
+                    .build();
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+        
+        // Validar se o tipo é válido
+        if (!request.getTipo().equalsIgnoreCase("email") && !request.getTipo().equalsIgnoreCase("whatsapp")) {
+            log.error("❌ Tipo de envio inválido: {}", request.getTipo());
+            EnvioResponse errorResponse = EnvioResponse.builder()
+                    .sucesso(false)
+                    .mensagem("Tipo de envio inválido. Deve ser 'email' ou 'whatsapp'")
+                    .tipoEnvio(request.getTipo())
+                    .totalEnviados(0)
+                    .totalFalhas(1)
+                    .detalhes(new java.util.ArrayList<>())
+                    .build();
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+        
+        // Validar se pelo menos um identificador foi fornecido
+        if ((request.getFuncionarioId() == null || request.getFuncionarioId().trim().isEmpty()) 
+                && (request.getCpf() == null || request.getCpf().trim().isEmpty())) {
+            log.error("❌ Nenhum identificador fornecido (funcionarioId ou CPF)!");
+            EnvioResponse errorResponse = EnvioResponse.builder()
+                    .sucesso(false)
+                    .mensagem("ID do funcionário ou CPF é obrigatório")
+                    .tipoEnvio(request.getTipo())
+                    .totalEnviados(0)
+                    .totalFalhas(1)
+                    .detalhes(new java.util.ArrayList<>())
+                    .build();
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
         
         EnvioResponse response = envioService.enviarIndividual(request);
         

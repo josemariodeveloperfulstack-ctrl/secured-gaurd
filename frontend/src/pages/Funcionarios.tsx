@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,8 @@ import EmployeeDocumentsPanel from '@/components/funcionarios/EmployeeDocumentsP
 import DocumentosGerarTab from '@/components/funcionarios/DocumentosGerarTab';
 import DependenteModal from '@/components/dependentes/DependenteModal';
 import { FuncionariosTable } from '@/components/funcionarios/FuncionariosTable';
+import ExcelImportModal from '@/components/funcionarios/ExcelImportModal';
+import { FileSpreadsheet } from 'lucide-react';
 
 const Funcionarios: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -64,9 +66,11 @@ const Funcionarios: React.FC = () => {
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
   const shouldOpenModal = params.get('novo') === '1';
+  const shouldOpenExcelImport = params.get('importar') === 'excel';
   const tabFromUrl = params.get('tab') || 'lista';
   const [activeTab, setActiveTab] = useState(tabFromUrl);
   const [modalOpen, setModalOpen] = useState(shouldOpenModal);
+  const [excelImportModalOpen, setExcelImportModalOpen] = useState(shouldOpenExcelImport);
   const [dependentSearchTerm, setDependentSearchTerm] = useState('');
   
   // Atualizar aba quando mudar na URL
@@ -135,6 +139,10 @@ const Funcionarios: React.FC = () => {
   useEffect(() => {
     if (shouldOpenModal) setModalOpen(true);
   }, [shouldOpenModal]);
+
+  useEffect(() => {
+    if (shouldOpenExcelImport) setExcelImportModalOpen(true);
+  }, [shouldOpenExcelImport]);
 
   const handleOpenModal = () => {
     setModalOpen(true);
@@ -608,7 +616,15 @@ Confirma a exclusão?`)) {
                   <RefreshCw size={20} className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                   Atualizar
                 </Button>
-                <Button 
+                <Button
+                  variant="outline"
+                  className="border-blue-600/50 text-blue-400 hover:bg-blue-900/20"
+                  onClick={() => setExcelImportModalOpen(true)}
+                >
+                  <FileSpreadsheet size={20} className="mr-2" />
+                  Importar Excel
+                </Button>
+                <Button
                   className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20"
                   onClick={handleOpenModal}
                 >
@@ -758,16 +774,34 @@ Confirma a exclusão?`)) {
         </DialogContent>
       </Dialog>
 
+      {/* Modal de Importação Excel */}
+      <ExcelImportModal
+        open={excelImportModalOpen}
+        onOpenChange={(open) => {
+          setExcelImportModalOpen(open);
+          if (!open && shouldOpenExcelImport) {
+            navigate('/rh/funcionarios', { replace: true });
+          }
+        }}
+        onSuccess={() => {
+          loadEmployeesWithFilters();
+          setExcelImportModalOpen(false);
+          if (shouldOpenExcelImport) {
+            navigate('/rh/funcionarios', { replace: true });
+          }
+        }}
+      />
+
       {/* Modal de Criação/Edição de Funcionário */}
-      <FuncionarioNovoModal 
-        open={modalOpen || editModalOpen} 
+      <FuncionarioNovoModal
+        open={modalOpen || editModalOpen}
         onClose={() => {
           if (editModalOpen) {
             handleCloseEditModal();
           } else {
             handleCloseModal();
           }
-        }} 
+        }}
         onCreated={() => {
           if (editModalOpen) {
             handleEmployeeEdited();

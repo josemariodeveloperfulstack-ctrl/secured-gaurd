@@ -383,8 +383,20 @@ public class Employee {
     @Column(name = "local_nascimento", length = 100)
     private String localNascimento;
 
+    @Column(name = "municipio_nascimento", length = 100)
+    private String municipioNascimento;
+
+    @Column(name = "estado_nascimento", length = 2)
+    private String estadoNascimento;
+
+    @Column(name = "sexo", length = 20)
+    private String sexo; // MASCULINO, FEMININO, OUTRO
+
     @Column(name = "grau_instrucao", length = 50)
     private String grauInstrucao;
+
+    @Column(name = "matricula_esocial", length = 50)
+    private String matriculaEsocial;
 
     // PIS
     @Column(name = "pis_data_cadastro")
