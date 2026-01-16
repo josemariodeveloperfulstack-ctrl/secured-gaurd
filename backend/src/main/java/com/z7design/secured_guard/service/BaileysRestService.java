@@ -5,12 +5,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.util.Objects;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 @Service
 public class BaileysRestService {
@@ -505,29 +510,32 @@ public class BaileysRestService {
             // CORREÇÃO: Normalizar número com DDI 55
             String normalizedNumber = normalizePhoneNumber(phoneNumber);
             
-            // Converter caminho local para caminho Docker (que o serviço WhatsApp pode acessar)
-            String dockerFilePath = convertToDockerPath(filePath);
-            logger.info("📂 Caminho Docker (WhatsApp): {}", dockerFilePath);
-            
             String url = baileysRestUrl + "/message/document?key=" + instanceKey;
             
-            // Criar headers para JSON
+            // Enviar arquivo via multipart para evitar dependência de volume compartilhado
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            
-            // Criar JSON body com os parâmetros esperados pela API Baileys
-            ObjectNode body = objectMapper.createObjectNode();
-            body.put("id", normalizedNumber);  // ← NÚMERO NORMALIZADO COM DDI
-            body.put("filepath", dockerFilePath);
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("id", normalizedNumber);  // ← NÚMERO NORMALIZADO COM DDI
             if (message != null && !message.isEmpty()) {
-                body.put("message", message);
+                body.add("message", message);
             }
-            
-            HttpEntity<String> request = new HttpEntity<>(body.toString(), headers);
+
+            byte[] fileBytes = Files.readAllBytes(file.toPath());
+            ByteArrayResource fileResource = new ByteArrayResource(fileBytes) {
+                @Override
+                public String getFilename() {
+                    return file.getName();
+                }
+            };
+            body.add("file", fileResource);
+
+            HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
             
             logger.info("📤 Enviando arquivo via Baileys REST para: {}", normalizedNumber);
             logger.info("🔗 URL: {}", url);
-            logger.info("📄 Filepath Docker: {}", dockerFilePath);
+            logger.info("📄 Envio via multipart: {}", file.getName());
             
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             

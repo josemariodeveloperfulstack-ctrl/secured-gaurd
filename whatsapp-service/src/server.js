@@ -1,5 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const multer = require('multer');
 const QRCode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
@@ -9,6 +10,7 @@ const P = require('pino');
 const app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Config
 const PORT = process.env.PORT || 3333;
@@ -229,23 +231,39 @@ app.post('/message/text', async (req, res) => {
 });
 
 // Send document/file
-app.post('/message/document', async (req, res) => {
+app.post('/message/document', upload.single('file'), async (req, res) => {
   try {
     const id = (req.body.id || '').trim();
     const message = (req.body.message || '').trim();
     const filepath = (req.body.filepath || '').trim();
+    const uploadedFile = req.file;
     
     if (!ready || !sock) {
       return res.status(503).json({ success: false, error: 'Client not ready' });
     }
     
-    if (!id || !filepath) {
-      return res.status(400).json({ success: false, error: 'id and filepath required' });
+    if (!id || (!filepath && !uploadedFile)) {
+      return res.status(400).json({ success: false, error: 'id and filepath or file required' });
     }
     
       const jid = id.includes('@s.whatsapp.net') ? id : `${id.replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-      console.log('[SEND DOC] id:', id, '-> jid:', jid, 'file:', filepath);
+      console.log('[SEND DOC] id:', id, '-> jid:', jid, 'file:', filepath || (uploadedFile ? uploadedFile.originalname : ''));
     
+    if (uploadedFile) {
+      const fileBuffer = uploadedFile.buffer;
+      const fileName = uploadedFile.originalname || 'document.pdf';
+      const mimeType = uploadedFile.mimetype || 'application/pdf';
+
+      await sock.sendMessage(jid, {
+        document: fileBuffer,
+        fileName: fileName,
+        mimetype: mimeType,
+        caption: message || undefined
+      });
+
+      return res.json({ success: true, jid });
+    }
+
     if (!fs.existsSync(filepath)) {
       return res.status(404).json({ success: false, error: 'file not found' });
     }
