@@ -425,7 +425,8 @@ public class EmployeeService {
     }
     
     @Transactional(readOnly = true)
-    @Cacheable(value = "employees", key = "#id")
+    // Removido @Cacheable - entidade Employee tem relacionamentos circulares que causam problemas no Redis
+    // O cache será aplicado apenas nos métodos que retornam DTOs
     public Employee findById(UUID id) {
         Employee employee = employeeRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
@@ -439,7 +440,10 @@ public class EmployeeService {
                 org.hibernate.Hibernate.initialize(employee.getPosition());
             }
             if (employee.getUnit() != null) {
+                // Inicializar Unit mas evitar inicializar a coleção employees (evita referência circular no cache Redis)
                 org.hibernate.Hibernate.initialize(employee.getUnit());
+                // Não inicializar a coleção employees do Unit para evitar referência circular
+                // A coleção employees já está marcada com @JsonIgnoreProperties no model
             }
             if (employee.getCompany() != null) {
                 org.hibernate.Hibernate.initialize(employee.getCompany());

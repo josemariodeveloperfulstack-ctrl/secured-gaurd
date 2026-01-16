@@ -145,6 +145,11 @@ const Funcionarios: React.FC = () => {
   }, [shouldOpenExcelImport]);
 
   const handleOpenModal = () => {
+    // Fechar modal de edição se estiver aberto
+    if (editModalOpen) {
+      setEditModalOpen(false);
+      setEmployeeToEdit(null);
+    }
     setModalOpen(true);
     navigate('/rh/funcionarios?novo=1', { replace: true });
   };
@@ -159,25 +164,52 @@ const Funcionarios: React.FC = () => {
     console.log('🔍 handleEditEmployee chamado com:', employee);
     console.log('🔍 Estado atual editModalOpen:', editModalOpen);
     console.log('🔍 Estado atual employeeToEdit:', employeeToEdit);
+    console.log('🔍 Estado atual modalOpen:', modalOpen);
     
     try {
+      // Fechar modal de criação se estiver aberto (primeiro, antes de tudo)
+      if (modalOpen) {
+        setModalOpen(false);
+        // Limpar parâmetro da URL se existir
+        if (shouldOpenModal) {
+          navigate('/rh/funcionarios', { replace: true });
+        }
+      }
+      
+      // Garantir que editModalOpen está false antes de buscar dados
+      setEditModalOpen(false);
+      setEmployeeToEdit(null);
+      
       // Buscar dados completos do funcionário do backend
       console.log('🔍 Buscando dados completos do funcionário:', employee.id);
       const fullEmployeeData = await employeeService.getEmployeeById(employee.id);
       console.log('🔍 Dados completos recebidos:', fullEmployeeData);
       
+      // Verificar se os dados foram recebidos corretamente
+      if (!fullEmployeeData || !fullEmployeeData.id) {
+        throw new Error('Dados do funcionário não foram retornados corretamente');
+      }
+      
+      // Definir dados primeiro, depois abrir modal
+      // IMPORTANTE: Garantir que modalOpen está false antes de abrir editModalOpen
+      setModalOpen(false);
       setEmployeeToEdit(fullEmployeeData);
       setEditModalOpen(true);
       
-      console.log('🔍 Estado após setEmployeeToEdit:', fullEmployeeData);
       console.log('🔍 Estado após setEditModalOpen:', true);
+      
+      console.log('🔍 Estado após setEmployeeToEdit:', fullEmployeeData);
     } catch (error) {
       console.error('❌ Erro ao buscar dados do funcionário:', error);
       toast({
         title: 'Erro ao carregar dados do funcionário',
-        description: 'Não foi possível carregar os dados completos do funcionário.',
+        description: 'Não foi possível carregar os dados completos do funcionário. Tente novamente.',
         variant: 'destructive',
       });
+      // Garantir que os estados estão limpos em caso de erro
+      setEditModalOpen(false);
+      setEmployeeToEdit(null);
+      setModalOpen(false);
     }
   };
 
@@ -793,23 +825,32 @@ Confirma a exclusão?`)) {
       />
 
       {/* Modal de Criação/Edição de Funcionário */}
+      {/* 
+        Prioridade: Se editModalOpen estiver true E employeeToEdit existir, abre em modo EDICIÃO
+        Caso contrário, abre em modo CRIAÇÃO se modalOpen estiver true
+      */}
       <FuncionarioNovoModal
-        open={modalOpen || editModalOpen}
+        open={(editModalOpen && !!employeeToEdit) || modalOpen}
         onClose={() => {
-          if (editModalOpen) {
+          // Se estiver em modo de edição, usar handleCloseEditModal
+          if (editModalOpen && employeeToEdit) {
             handleCloseEditModal();
           } else {
+            // Caso contrário, usar handleCloseModal (modo criação)
             handleCloseModal();
           }
         }}
         onCreated={() => {
-          if (editModalOpen) {
+          // Se estiver em modo de edição, usar handleEmployeeEdited
+          if (editModalOpen && employeeToEdit) {
             handleEmployeeEdited();
           } else {
+            // Caso contrário, recarregar e fechar modal de criação
             loadEmployeesWithFilters();
+            handleCloseModal();
           }
         }}
-        employeeToEdit={editModalOpen ? employeeToEdit : null}
+        employeeToEdit={editModalOpen && employeeToEdit ? employeeToEdit : null}
       />
     </StandardLayout>
   );
