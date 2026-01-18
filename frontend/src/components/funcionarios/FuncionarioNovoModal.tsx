@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
 import { employeeService } from '@/services/employeeService';
 import { CreateEmployeeDTO } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
@@ -14,7 +15,7 @@ import { userService } from '@/services/userService';
 import { User } from '@/types/user';
 import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
-import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
@@ -23,13 +24,14 @@ import { DependentFormModal } from '@/components/dependentes/DependentFormModal'
 import dependentService from '@/services/dependentService';
 import { Dependent, DependentCreateRequest } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
-import { AccountingFormButton } from '@/components/funcionarios/AccountingFormButton';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
+import accountingFormService from '@/services/accountingFormService';
 import { doctorService } from '@/services/doctorService';
 import { Doctor } from '@/types/doctor';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -763,6 +765,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           [field]: value
         }
       }));
+    } else if (name === 'cbo') {
+      const normalized = value.replace(/\D/g, '');
+      const matched = positions.find(p => (p.cbo || '').replace(/\D/g, '') === normalized);
+      if (matched) {
+        setSelectedPosition(matched);
+        setPositionSearchTerm(matched.name);
+        setForm(prev => ({
+          ...prev,
+          cbo: value,
+          position: { id: matched.id }
+        }));
+      } else {
+        setForm((prev) => ({ ...prev, [name]: value }));
+      }
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
     }
@@ -1192,6 +1208,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     const value = e.target.value;
     setPositionSearchTerm(value);
     setShowPositionDropdown(true);
+
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      setSelectedPosition(null);
+      setForm(prev => ({ ...prev, position: { id: '' } }));
+      return;
+    }
+
+    const matched = positions.find(p => (p.name || '').trim().toLowerCase() === normalized);
+    if (matched) {
+      setSelectedPosition(matched);
+      setForm(prev => ({
+        ...prev,
+        position: { id: matched.id },
+        cbo: matched.cbo || prev.cbo || ''
+      }));
+    }
   };
 
   const handlePositionSelect = (position: Position) => {
@@ -1257,6 +1290,275 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       selectedPosition.name.toLowerCase().includes(cargo.toLowerCase())
     );
 
+  const employeeIdValue = currentEmployeeId || employeeToEdit?.id || '';
+  const employeeDisplayName = form.name || employeeToEdit?.name || 'Funcionário';
+  const canGenerateReports = Boolean(employeeIdValue);
+
+  const openBlobInNewTab = (blob: Blob) => {
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => window.URL.revokeObjectURL(url), 100);
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleEmployeeRecordPdf = async (mode: 'download' | 'preview') => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para gerar a ficha.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const blob = await employeeService.generateEmployeeRecordPdf(employeeIdValue);
+      if (mode === 'preview') {
+        openBlobInNewTab(blob);
+      } else {
+        downloadBlob(blob, `ficha-registro-funcionario-${employeeIdValue}.pdf`);
+      }
+      toast({
+        title: "Sucesso",
+        description: "Ficha de registro gerada com sucesso!",
+        variant: "default"
+      });
+    } catch (error: any) {
+      console.error('❌ Erro ao gerar ficha:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível gerar a ficha.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmployeeRecordExcel = async () => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para gerar a ficha.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const blob = await employeeService.generateEmployeeRecordExcel(employeeIdValue);
+      downloadBlob(blob, `ficha-registro-funcionario-${employeeIdValue}.xlsx`);
+      toast({
+        title: "Sucesso",
+        description: "Ficha de registro em Excel gerada com sucesso!",
+        variant: "default"
+      });
+    } catch (error: any) {
+      console.error('❌ Erro ao gerar ficha em Excel:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível gerar a ficha em Excel.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEpiPdf = async (mode: 'download' | 'preview') => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para gerar a ficha de EPI.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const employee = await employeeService.getEmployeeById(employeeIdValue);
+      if (!employee) {
+        throw new Error('Funcionário não encontrado');
+      }
+
+      if (!employee.company || !employee.company.id) {
+        toast({
+          title: "Atenção",
+          description: "O funcionário precisa ter uma empresa cadastrada para gerar a ficha de EPI.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const epiFormData = {
+        employeeId: employeeIdValue,
+        companyId: employee.company.id,
+        deliveryDate: new Date().toISOString().split('T')[0],
+        items: []
+      };
+
+      const blob = await epiDeliveryFormService.generateAndSavePdf(epiFormData);
+      if (mode === 'preview') {
+        openBlobInNewTab(blob);
+      } else {
+        downloadBlob(blob, `ficha-entrega-epi-${employeeIdValue}.pdf`);
+      }
+      toast({
+        title: "Sucesso",
+        description: "Ficha de entrega de EPI gerada com sucesso!",
+        variant: "default"
+      });
+    } catch (error: any) {
+      console.error('❌ Erro ao gerar ficha de EPI:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível gerar a ficha de EPI.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEpiExcel = async () => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para gerar a ficha de EPI.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const employee = await employeeService.getEmployeeById(employeeIdValue);
+      if (!employee) {
+        throw new Error('Funcionário não encontrado');
+      }
+
+      if (!employee.company || !employee.company.id) {
+        toast({
+          title: "Atenção",
+          description: "O funcionário precisa ter uma empresa cadastrada para gerar a ficha de EPI.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const epiFormData = {
+        employeeId: employeeIdValue,
+        companyId: employee.company.id,
+        deliveryDate: new Date().toISOString().split('T')[0],
+        items: []
+      };
+
+      const blob = await epiDeliveryFormService.generateAndSaveExcel(epiFormData);
+      downloadBlob(blob, `ficha-entrega-epi-${employeeIdValue}.xlsx`);
+      toast({
+        title: "Sucesso",
+        description: "Ficha de entrega de EPI em Excel gerada com sucesso!",
+        variant: "default"
+      });
+    } catch (error: any) {
+      console.error('❌ Erro ao gerar ficha de EPI em Excel:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível gerar a ficha de EPI em Excel.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAccountingPdf = async () => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para gerar a ficha.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await accountingFormService.downloadPdf(employeeIdValue, employeeDisplayName);
+      toast({
+        title: "✅ Ficha Gerada",
+        description: "Ficha de contabilidade gerada e baixada com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao gerar ficha de contabilidade:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao gerar ficha de contabilidade. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAccountingExcel = async () => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para gerar a ficha.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await accountingFormService.downloadExcel(employeeIdValue, employeeDisplayName);
+      toast({
+        title: "✅ Ficha Gerada",
+        description: "Ficha de contabilidade em Excel gerada com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao gerar ficha de contabilidade em Excel:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao gerar ficha de contabilidade em Excel. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAccountingPreview = async () => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para visualizar a ficha.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await accountingFormService.generateHtml(employeeIdValue);
+    } catch (error) {
+      console.error('Erro ao visualizar ficha de contabilidade:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Erro ao visualizar ficha de contabilidade. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <TooltipProvider>
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -1269,18 +1571,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         }
       }
     }}>
-      <DialogContent className="max-w-4xl w-[95vw] sm:w-full p-3 sm:p-4 md:p-6 overflow-y-auto max-h-[90vh] bg-seguranca-graphite border-gray-600">
-        <DialogHeader className="pb-3 sm:pb-4">
-          <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-seguranca-lightgray">
-            {isEditMode ? 'Editar Funcionário' : 'Novo Funcionário'}
+      <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto p-0 mx-4 sm:mx-0 bg-seguranca-graphite border-gray-600">
+        <DialogHeader className="bg-gradient-to-r from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white sticky top-0 z-10">
+          <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold">
+            <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg">
+              <UserIcon className="h-4 w-4 sm:h-6 sm:w-6" />
+            </div>
+            <span className="truncate">{isEditMode ? 'Editar Funcionário' : 'Novo Funcionário'}</span>
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm text-gray-400">
+          <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
             {isEditMode 
               ? 'Edite os dados do funcionário. Campos marcados com * são obrigatórios.'
               : 'Preencha os dados do funcionário. Campos marcados com * são obrigatórios.'
             }
           </DialogDescription>
-          
+        </DialogHeader>
+        
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Botão de Importação de PDF */}
           <div className="flex justify-end mt-4">
             <Button
@@ -1296,7 +1603,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           
           {/* Seção de Importação de PDF */}
           {showPDFImport && (
-            <div className="mt-4 p-4 bg-seguranca-darkgray rounded-lg border border-seguranca-lightgray/20">
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <div className="p-4">
               <h4 className="text-lg font-semibold text-seguranca-yellow mb-3 flex items-center">
                 <FileCheck className="mr-2" size={20} />
                 Importar FICHA DE REGISTRO DOS EMPREGADOS
@@ -1524,17 +1832,29 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   </Button>
                 </div>
               </div>
-            </div>
+              </div>
+            </Card>
           )}
-        </DialogHeader>
         
-                 <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                  <Tabs defaultValue="cadastro" className="space-y-4 sm:space-y-6">
+                    <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border border-gray-600">
+                      <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+                      <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
+                      <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="cadastro" className="space-y-4 sm:space-y-6">
            {/* Seção: Relacionamentos Obrigatórios */}
-           <div className="space-y-3 sm:space-y-4 bg-[#363636] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-600">
-             <h3 className="text-base sm:text-lg md:text-xl font-semibold flex items-center text-white">
-               <UserIcon className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-               Relacionamentos Obrigatórios
-             </h3>
+           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+             <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+             <div className="flex items-center gap-2 sm:gap-3">
+               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                 <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+               </div>
+               <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">
+                 Relacionamentos Obrigatórios
+               </h3>
+             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                {/* Seleção de Usuário */}
                <div className="space-y-2">
@@ -1630,101 +1950,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  </div>
                </div>
 
-               {/* Seleção de Cargo */}
-               <div className="space-y-2">
-                 <Label className="text-sm font-medium text-gray-200">
-                   Cargo
-                 </Label>
-                 <div className="relative">
-                   <div className="flex gap-2">
-                     <div className="relative flex-1">
-                       <Input
-                         type="text"
-                         value={positionSearchTerm}
-                         onChange={handlePositionSearch}
-                         onFocus={handlePositionInputFocus}
-                         onBlur={handlePositionInputBlur}
-                         placeholder="Digite para buscar cargo..."
-                         className="pr-10"
-                       />
-                       <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                       
-                       {/* Dropdown de cargos */}
-                       {showPositionDropdown && (
-                         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                           {filteredPositions.length > 0 ? (
-                             filteredPositions.map((position) => (
-                               <div
-                                 key={position.id}
-                                 className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center"
-                                 onClick={() => handlePositionSelect(position)}
-                               >
-                                 <Briefcase className="mr-2" size={16} />
-                                 <div className="flex-1">
-                                   <div className="font-medium">{position.name}</div>
-                                   {position.description && (
-                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                       {position.description}
-                                     </div>
-                                   )}
-                                 </div>
-                               </div>
-                             ))
-                           ) : (
-                             <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
-                               Nenhum cargo encontrado
-                             </div>
-                           )}
-                         </div>
-                       )}
-                     </div>
-                     <Button
-                       type="button"
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setNovoCargoModalOpen(true)}
-                       className="px-3 flex-shrink-0"
-                       title="Criar novo cargo"
-                     >
-                       <Plus size={16} />
-                     </Button>
-                   </div>
-                   
-                   {/* Cargo selecionado */}
-                   {selectedPosition && (
-                     <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md flex items-center justify-between">
-                       <div className="flex items-center">
-                         <Briefcase className="mr-2 text-blue-600 dark:text-blue-400" size={16} />
-                         <span className="text-sm text-blue-800 dark:text-blue-200">
-                           {selectedPosition.name}
-                         </span>
-                       </div>
-                       <Button
-                         type="button"
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => {
-                           setSelectedPosition(null);
-                           setPositionSearchTerm('');
-                           setForm(prev => ({ ...prev, position: { id: '' } }));
-                         }}
-                         className="text-red-400 hover:text-red-300"
-                       >
-                         <X className="h-4 w-4" />
-                       </Button>
-                     </div>
-                   )}
-                 </div>
-                 <p className="text-xs text-gray-300">
-                   Digite para buscar cargos existentes ou clique no botão + para criar um novo.
-                 </p>
-               </div>
              </div>
-           </div>
+             </div>
+           </Card>
 
            {/* Seção: Informações Pessoais */}
-           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-             <h3 className="text-lg font-semibold text-white">Informações Pessoais</h3>
+           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+             <div className="p-4 space-y-4">
+             <div className="flex items-center gap-2 sm:gap-3">
+               <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
+                 <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
+               </div>
+               <h3 className="text-lg font-semibold text-white">Informações Pessoais</h3>
+             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div>
                  <Label className="text-sm font-medium text-gray-200">Nome Completo *</Label>
@@ -2231,11 +2469,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
              )}
              
             {/* Seção de dependentes removida do formulário de criação. A gestão de dependentes permanece no modo de edição via modal dedicado. */}
-           </div>
+             </div>
+           </Card>
 
            {/* Seção: Informações de Contato */}
-           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-             <h3 className="text-lg font-semibold text-white">Informações de Contato</h3>
+           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+             <div className="p-4 space-y-4">
+             <div className="flex items-center gap-2 sm:gap-3">
+               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                 <Link className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+               </div>
+               <h3 className="text-lg font-semibold text-white">Informações de Contato</h3>
+             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-gray-200">Email</Label>
@@ -2274,12 +2519,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    maxLength={15}
                  />
                </div>
-            </div>
+             </div>
+             </div>
+           </Card>
             
-            {/* Seção: Endereço Separado */}
-            <div className="mt-4 pt-4 border-t border-gray-600">
-              <h4 className="text-md font-semibold text-seguranca-yellow mb-4">Endereço</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           {/* Seção: Endereço Separado */}
+           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+             <div className="p-4 space-y-4">
+               <div className="flex items-center gap-2 sm:gap-3">
+                 <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                   <Building className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                 </div>
+                 <h4 className="text-md font-semibold text-seguranca-yellow">Endereço</h4>
+               </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
                   <div className="flex gap-2">
@@ -2376,45 +2629,58 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 </div>
               </div>
             </div>
-          </div>
+           </Card>
 
           {/* Seção: Dados Bancários */}
-          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-white">Dados Bancários</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Banco</Label>
-                <Input 
-                  name="bankData.bank" 
-                  value={form.bankData?.bank || ''} 
-                  onChange={handleChange} 
-                  placeholder="Nome do banco"
-                />
+          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+            <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Dados Bancários</h3>
               </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Agência</Label>
-                <Input 
-                  name="bankData.agency" 
-                  value={form.bankData?.agency || ''} 
-                  onChange={handleChange} 
-                  placeholder="0000"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
-                <Input 
-                  name="bankData.account" 
-                  value={form.bankData?.account || ''} 
-                  onChange={handleChange} 
-                  placeholder="00000-0"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Banco</Label>
+                  <Input 
+                    name="bankData.bank" 
+                    value={form.bankData?.bank || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome do banco"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Agência</Label>
+                  <Input 
+                    name="bankData.agency" 
+                    value={form.bankData?.agency || ''} 
+                    onChange={handleChange} 
+                    placeholder="0000"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
+                  <Input 
+                    name="bankData.account" 
+                    value={form.bankData?.account || ''} 
+                    onChange={handleChange} 
+                    placeholder="00000-0"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          </Card>
 
           {/* Seção: Dados do Exame Médico (ASO) */}
-          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-white">Dados do Exame Médico (ASO)</h3>
+          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+            <div className="p-4 space-y-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Dados do Exame Médico (ASO)</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-gray-200">Data do Exame Médico (ASO)</Label>
@@ -2588,11 +2854,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 </RadioGroup>
               </div>
             </div>
-          </div>
+            </div>
+           </Card>
 
           {/* Seção: Para Estrangeiro */}
-          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-white">Para Estrangeiro</h3>
+          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+            <div className="p-4 space-y-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Para Estrangeiro</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-gray-200">RNE nº</Label>
@@ -2692,11 +2965,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 />
               </div>
             </div>
-          </div>
+            </div>
+          </Card>
 
           {/* Seção: Dados do Cadastro / Admissão */}
-          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-white">Dados do Cadastro / Admissão</h3>
+          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+            <div className="p-4 space-y-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
+                <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Dados do Cadastro / Admissão</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-gray-200">PIS</Label>
@@ -2746,50 +3026,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Função</Label>
-                <div className="relative">
-                  <Input 
-                    value={positionSearchTerm} 
-                    onChange={(e) => {
-                      setPositionSearchTerm(e.target.value);
-                      setShowPositionDropdown(true);
-                      if (e.target.value.length > 0) {
-                        handlePositionSearch(e.target.value);
-                      } else {
-                        loadPositions();
-                      }
-                    }}
-                    onFocus={() => {
-                      setShowPositionDropdown(true);
-                      if (positions.length === 0) {
-                        loadPositions();
-                      }
-                    }}
-                    placeholder="Digite para buscar cargo..."
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
-                  {showPositionDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {loadingData ? (
-                        <div className="p-2 text-sm text-gray-400">Carregando...</div>
-                      ) : positions.length > 0 ? (
-                        positions.map((position) => (
-                          <div
-                            key={position.id}
-                            className="p-2 hover:bg-gray-700 cursor-pointer text-seguranca-lightgray text-xs sm:text-sm"
-                            onClick={() => handlePositionSelect(position)}
-                          >
-                            {position.name}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-2 text-sm text-gray-400">Nenhum cargo encontrado</div>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-200">Salário (R$)</Label>
@@ -2895,14 +3131,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 />
               </div>
             </div>
-          </div>
+            </div>
+          </Card>
 
           {/* Seção: Informações Profissionais */}
-           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-             <h3 className="text-lg font-semibold flex items-center text-white">
-               <Building className="mr-2" size={20} />
-               Informações Profissionais
-             </h3>
+           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+             <div className="p-4 space-y-4">
+             <div className="flex items-center gap-2 sm:gap-3">
+               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                 <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+               </div>
+               <h3 className="text-lg font-semibold text-white">Informações Profissionais</h3>
+             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div>
                  <Label className="text-sm font-medium text-gray-200">Número de Registro</Label>
@@ -2914,12 +3154,101 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    className="text-xs sm:text-sm h-9 sm:h-10"
                  />
                </div>
+              {/* Cargo */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-200">
+                  Cargo
+                </Label>
+                <div className="relative">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type="text"
+                        value={positionSearchTerm}
+                        onChange={handlePositionSearch}
+                        onFocus={handlePositionInputFocus}
+                        onBlur={handlePositionInputBlur}
+                        placeholder="Digite para buscar cargo..."
+                        className="pr-10"
+                      />
+                      <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                      
+                      {/* Dropdown de cargos */}
+                      {showPositionDropdown && (
+                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {filteredPositions.length > 0 ? (
+                            filteredPositions.map((position) => (
+                              <div
+                                key={position.id}
+                                className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center"
+                                onClick={() => handlePositionSelect(position)}
+                              >
+                                <Briefcase className="mr-2" size={16} />
+                                <div className="flex-1">
+                                  <div className="font-medium">{position.name}</div>
+                                  {position.description && (
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {position.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
+                              Nenhum cargo encontrado
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNovoCargoModalOpen(true)}
+                      className="px-3 flex-shrink-0"
+                      title="Criar novo cargo"
+                    >
+                      <Plus size={16} />
+                    </Button>
+                  </div>
+                  
+                  {/* Cargo selecionado */}
+                  {selectedPosition && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Briefcase className="mr-2 text-blue-600 dark:text-blue-400" size={16} />
+                        <span className="text-sm text-blue-800 dark:text-blue-200">
+                          {selectedPosition.name}
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPosition(null);
+                          setPositionSearchTerm('');
+                          setForm(prev => ({ ...prev, position: { id: '' } }));
+                        }}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-300">
+                  Digite para buscar cargos existentes ou clique no botão + para criar um novo.
+                </p>
+              </div>
                <div>
                  <Label className="text-sm font-medium text-gray-200">Status *</Label>
-                 <Select 
-                   value={form.status} 
-                   onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}
-                 >
+                <Select 
+                  value={form.status} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}
+                >
                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
                      <SelectValue placeholder="Selecione o status" />
                    </SelectTrigger>
@@ -2931,6 +3260,24 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    </SelectContent>
                  </Select>
                </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200">Data de Demissão</Label>
+                <Input 
+                  name="dataRescisao" 
+                  type="date" 
+                  value={form.dataRescisao || ''} 
+                  onChange={handleChange} 
+                  className="text-xs sm:text-sm h-9 sm:h-10"
+                />
+              </div>
+              {form.status === 'TERMINATED' && (
+                <div className="md:col-span-2 bg-red-900/20 border border-red-500/40 rounded-lg p-3">
+                  <p className="text-red-300 text-xs sm:text-sm flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    Ao definir o status como Demitido, é obrigatório informar a Data de Demissão.
+                  </p>
+                </div>
+              )}
               <div>
                 <Label className="text-sm font-medium text-gray-200">CBO</Label>
                 <Input 
@@ -3006,11 +3353,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  </Select>
                </div>
              </div>
-           </div>
+             </div>
+           </Card>
 
           {/* Seção: FGTS */}
-          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-white">FGTS</h3>
+          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+            <div className="p-4 space-y-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">FGTS</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-gray-200">Optante pelo FGTS?</Label>
@@ -3055,11 +3409,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 />
               </div>
             </div>
-          </div>
+            </div>
+          </Card>
 
           {/* Seção: PIS/PASEP */}
-          <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-white">PIS / PASEP</h3>
+          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+            <div className="p-4 space-y-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">PIS / PASEP</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-gray-200">Número do PIS</Label>
@@ -3089,13 +3450,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 />
               </div>
             </div>
-          </div>
+            </div>
+          </Card>
 
           {/* Seção: Dados da Empresa (Ficha) - opcional */}
 
            {/* Seção: Foto e Observações */}
-           <div className="space-y-4 bg-[#363636] p-4 rounded-lg">
-             <h3 className="text-lg font-semibold text-white">Documentos e Observações</h3>
+           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+             <div className="p-4 space-y-4">
+             <div className="flex items-center gap-2 sm:gap-3">
+               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                 <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+               </div>
+               <h3 className="text-lg font-semibold text-white">Documentos e Observações</h3>
+             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div>
                  <Label className="text-sm font-medium text-gray-200">Foto 3x4</Label>
@@ -3124,15 +3492,21 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  />
                </div>
              </div>
-           </div>
+             </div>
+           </Card>
 
-           {/* Seção: Dependentes */}
-           <div className="space-y-4 bg-gradient-to-br from-purple-900/20 to-blue-900/20 p-6 rounded-lg border border-purple-500/30">
-             <div className="flex items-center justify-between">
-               <h3 className="text-lg font-semibold flex items-center text-white">
-                 <UsersIcon className="mr-2" size={20} />
-                 Dependentes
-               </h3>
+          </TabsContent>
+          <TabsContent value="dependentes" className="space-y-4 sm:space-y-6">
+          {/* Seção: Dependentes */}
+           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+             <div className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                  <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Dependentes</h3>
+              </div>
                <Button
                  type="button"
                  onClick={handleAddDependent}
@@ -3239,224 +3613,199 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  )}
                </div>
              )}
-           </div>
-          
-                     {error && (
+             </div>
+           </Card>
+
+          </TabsContent>
+          <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Relatório Resumido</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleEmployeeRecordPdf('download')}
+                  disabled={!canGenerateReports || loading}
+                  className="border-blue-500 text-blue-400 hover:bg-blue-500/10 h-9 sm:h-10 text-xs sm:text-sm"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Gerar PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleEmployeeRecordPdf('preview')}
+                  disabled={!canGenerateReports || loading}
+                  className="border-gray-500 text-gray-300 hover:bg-gray-500/10 h-9 sm:h-10 text-xs sm:text-sm"
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Visualizar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleEmployeeRecordExcel}
+                  disabled={!canGenerateReports || loading}
+                  className="border-emerald-500 text-emerald-400 h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Gerar Excel
+                </Button>
+              </div>
+              </div>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                  <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Ficha de Registro de Funcionário</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleEmployeeRecordPdf('download')}
+                  disabled={!canGenerateReports || loading}
+                  className="border-blue-500 text-blue-400 hover:bg-blue-500/10 h-9 sm:h-10 text-xs sm:text-sm"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Gerar PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleEmployeeRecordPdf('preview')}
+                  disabled={!canGenerateReports || loading}
+                  className="border-gray-500 text-gray-300 hover:bg-gray-500/10 h-9 sm:h-10 text-xs sm:text-sm"
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Visualizar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleEmployeeRecordExcel}
+                  disabled={!canGenerateReports || loading}
+                  className="border-emerald-500 text-emerald-400 h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Gerar Excel
+                </Button>
+              </div>
+              </div>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Ficha de Entrega de EPI</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleEpiPdf('download')}
+                    disabled={!canGenerateReports || loading}
+                    className="border-green-500 text-green-400 hover:bg-green-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
+                  >
+                    <Shield className="mr-2 h-4 w-4" />
+                    Gerar PDF
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleEpiPdf('preview')}
+                    disabled={!canGenerateReports || loading}
+                    className="border-gray-500 text-gray-300 hover:bg-gray-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Visualizar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleEpiExcel}
+                    disabled={!canGenerateReports || loading}
+                    className="border-emerald-500 text-emerald-400 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Gerar Excel
+                  </Button>
+                </div>
+                <div className="rounded-lg border border-gray-600 bg-seguranca-black/40 p-3 text-xs text-gray-400">
+                  A visualização abre em nova aba para pré-visualizar o PDF gerado.
+                </div>
+              </div>
+              </div>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <div className="p-4 space-y-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Dados para Contabilidade</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAccountingPdf}
+                  disabled={!canGenerateReports || loading}
+                  className="border-red-500 text-red-400 hover:bg-red-500/10 h-9 sm:h-10 text-xs sm:text-sm"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Gerar PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAccountingPreview}
+                  disabled={!canGenerateReports || loading}
+                  className="border-gray-500 text-gray-300 hover:bg-gray-500/10 h-9 sm:h-10 text-xs sm:text-sm"
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Visualizar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAccountingExcel}
+                  disabled={!canGenerateReports || loading}
+                  className="border-emerald-500 text-emerald-400 h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Gerar Excel
+                </Button>
+              </div>
+              </div>
+            </Card>
+          </TabsContent>
+          </Tabs>
+
+          {error && (
              <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
                <p className="text-destructive text-sm">{error}</p>
              </div>
            )}
           
           <DialogFooter className="flex flex-col gap-2 sm:gap-2 pt-3 sm:pt-4 border-t border-gray-600 overflow-x-hidden">
-            {/* Botões de geração de fichas - sempre visíveis, habilitados após salvar */}
-            <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 order-1">
-              <div className="w-full min-w-0">
-                {(!currentEmployeeId && !employeeToEdit?.id) ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="w-full">
-                        <AccountingFormButton
-                          employeeId={currentEmployeeId || employeeToEdit?.id || ''}
-                          employeeName={form.name || employeeToEdit?.name || 'Funcionário'}
-                          variant="outline"
-                          className="border-red-500 text-red-400 hover:bg-red-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
-                          disabled={true}
-                        />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="font-semibold">Ficha Contabilidade</p>
-                      <p className="text-xs text-gray-400 mt-1">Será habilitado após salvar o registro</p>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <AccountingFormButton
-                    employeeId={currentEmployeeId || employeeToEdit?.id || ''}
-                    employeeName={form.name || employeeToEdit?.name || 'Funcionário'}
-                    variant="outline"
-                    className="border-red-500 text-red-400 hover:bg-red-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
-                    disabled={false}
-                  />
-                )}
-              </div>
-              {(!currentEmployeeId && !employeeToEdit?.id) ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="w-full">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={true}
-                        className="border-blue-500 text-blue-400 hover:bg-blue-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
-                      >
-                        <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        <span className="truncate">Gerar Ficha do Funcionário</span>
-                      </Button>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="font-semibold">Gerar Ficha do Funcionário</p>
-                    <p className="text-xs text-gray-400 mt-1">Será habilitado após salvar o registro</p>
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={async () => {
-                    const employeeId = currentEmployeeId || employeeToEdit?.id;
-                    console.log('🔍 Gerar Ficha - employeeId:', employeeId);
-                    
-                    if (!employeeId) {
-                      toast({
-                        title: "Atenção",
-                        description: "É necessário salvar o funcionário primeiro para gerar a ficha.",
-                        variant: "destructive"
-                      });
-                      return;
-                    }
-                    
-                    setLoading(true);
-                    try {
-                      // Gerar PDF diretamente
-                      const blob = await employeeService.generateEmployeeRecordPdf(employeeId);
-                      
-                      // Criar URL do blob e fazer download
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `ficha-registro-funcionario-${employeeId}.pdf`;
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      window.URL.revokeObjectURL(url);
-                      
-                      toast({
-                        title: "Sucesso",
-                        description: "Ficha de registro gerada e baixada com sucesso!",
-                        variant: "default"
-                      });
-                    } catch (error: any) {
-                      console.error('❌ Erro ao gerar ficha:', error);
-                      toast({
-                        title: "Erro",
-                        description: error.message || "Não foi possível gerar a ficha.",
-                        variant: "destructive"
-                      });
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                  className="border-blue-500 text-blue-400 hover:bg-blue-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
-                >
-                  <FileText className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="truncate">Gerar Ficha do Funcionário</span>
-                </Button>
-              )}
-              {(!currentEmployeeId && !employeeToEdit?.id) ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="w-full">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={true}
-                        className="border-green-500 text-green-400 hover:bg-green-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
-                      >
-                        <Shield className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                        <span className="truncate">Gerar Ficha de Entrega de EPI</span>
-                      </Button>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="font-semibold">Gerar Ficha de Entrega de EPI</p>
-                    <p className="text-xs text-gray-400 mt-1">Será habilitado após salvar o registro</p>
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={async () => {
-                    const employeeId = currentEmployeeId || employeeToEdit?.id;
-                    console.log('🔍 Gerar Ficha EPI - employeeId:', employeeId);
-                    
-                    if (!employeeId) {
-                      toast({
-                        title: "Atenção",
-                        description: "É necessário salvar o funcionário primeiro para gerar a ficha de EPI.",
-                        variant: "destructive"
-                      });
-                      return;
-                    }
-                    
-                    setLoading(true);
-                    try {
-                      // Buscar dados completos do funcionário
-                      const employee = await employeeService.getEmployeeById(employeeId);
-                      if (!employee) {
-                        throw new Error('Funcionário não encontrado');
-                      }
-                      
-                      // Verificar se o funcionário tem empresa
-                      if (!employee.company || !employee.company.id) {
-                        toast({
-                          title: "Atenção",
-                          description: "O funcionário precisa ter uma empresa cadastrada para gerar a ficha de EPI.",
-                          variant: "destructive"
-                        });
-                        return;
-                      }
-                      
-                      // Criar ficha básica de EPI (primeira entrega)
-                      const epiFormData = {
-                        employeeId: employeeId,
-                        companyId: employee.company.id,
-                        deliveryDate: new Date().toISOString().split('T')[0], // Data atual
-                        items: [] // Lista vazia - pode ser preenchida depois na área de EPI
-                      };
-                      
-                      // Gerar PDF e salvar no banco
-                      const blob = await epiDeliveryFormService.generateAndSavePdf(epiFormData);
-                      
-                      // Criar URL do blob e fazer download
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `ficha-entrega-epi-${employeeId}.pdf`;
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      window.URL.revokeObjectURL(url);
-                      
-                      toast({
-                        title: "Sucesso",
-                        description: "Ficha de entrega de EPI gerada, salva e baixada com sucesso!",
-                        variant: "default"
-                      });
-                    } catch (error: any) {
-                      console.error('❌ Erro ao gerar ficha de EPI:', error);
-                      toast({
-                        title: "Erro",
-                        description: error.message || "Não foi possível gerar a ficha de EPI.",
-                        variant: "destructive"
-                      });
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                  className="border-green-500 text-green-400 hover:bg-green-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed truncate"
-                >
-                  <Shield className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="truncate">Gerar Ficha de Entrega de EPI</span>
-                </Button>
-              )}
-            </div>
-            
             {/* Botões de ação */}
-            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2 order-2">
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Button 
                 type="button" 
                 variant="outline" 
@@ -3483,6 +3832,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             </div>
           </DialogFooter>
          </form>
+        </div>
        </DialogContent>
        
        {/* Modal de Novo Cargo */}
