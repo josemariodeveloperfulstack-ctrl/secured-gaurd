@@ -57,22 +57,31 @@ public class DashboardController {
             
             DashboardSummaryDTO summary = dashboardService.getDashboardSummary();
             
-            // Retorna apenas os dados principais para widgets
-            return ResponseEntity.ok(Map.of(
-                "totalUsers", summary.getTotalUsers(),
-                "activeUsers", summary.getActiveUsers(),
-                "activeContracts", summary.getActiveContracts(),
-                "monthlyRevenue", summary.getMonthlyRevenue(),
-                "totalEquipment", summary.getTotalEquipment(),
-                "pendingTasks", summary.getPendingTasks(),
-                "totalAlerts", summary.getTotalAlerts(),
-                "unreadAlerts", summary.getUnreadAlerts(),
-                "lastUpdate", summary.getLastUpdate()
-            ));
+            Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("totalUsers", summary.getTotalUsers());
+            payload.put("activeUsers", summary.getActiveUsers());
+            payload.put("activeContracts", summary.getActiveContracts());
+            payload.put("monthlyRevenue", summary.getMonthlyRevenue());
+            payload.put("totalEquipment", summary.getTotalEquipment());
+            payload.put("pendingTasks", summary.getPendingTasks());
+            payload.put("totalAlerts", summary.getTotalAlerts());
+            payload.put("unreadAlerts", summary.getUnreadAlerts());
+            payload.put("lastUpdate", summary.getLastUpdate());
+            return ResponseEntity.ok(payload);
             
         } catch (Exception e) {
             log.error("Erro ao gerar estatísticas rápidas", e);
-            return ResponseEntity.internalServerError().build();
+            Map<String, Object> fallback = new java.util.HashMap<>();
+            fallback.put("totalUsers", 0L);
+            fallback.put("activeUsers", 0L);
+            fallback.put("activeContracts", 0L);
+            fallback.put("monthlyRevenue", java.math.BigDecimal.ZERO);
+            fallback.put("totalEquipment", 0L);
+            fallback.put("pendingTasks", 0L);
+            fallback.put("totalAlerts", 0L);
+            fallback.put("unreadAlerts", 0L);
+            fallback.put("lastUpdate", java.time.LocalDateTime.now());
+            return ResponseEntity.ok(fallback);
         }
     }
 
