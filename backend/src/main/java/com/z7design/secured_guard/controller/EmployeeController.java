@@ -671,7 +671,7 @@ public class EmployeeController {
      */
     @PostMapping("/import/excel")
     @Operation(summary = "Importar funcionários do Excel", description = "Importa funcionários de uma planilha Excel. A planilha deve conter uma coluna 'CNPJ Empresa' e os dados dos funcionários.")
-    @PreAuthorize("hasAnyAuthority('RH_FUNCIONARIOS_CREATE', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('RH_FUNCIONARIOS_CREATE', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<Map<String, Object>> importEmployeesFromExcel(@RequestParam("file") MultipartFile file) {
         try {
             System.out.println("📥 EmployeeController.importEmployeesFromExcel - Arquivo recebido: " + file.getOriginalFilename());
