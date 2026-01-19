@@ -274,11 +274,16 @@ public class StandardReportLayoutService {
             // Barra gradiente tem ~30pt de altura
             // Título fica FORA da barra, abaixo dela, com margin top de 55pt
             float titleY = headerTop - 30f - 55f; // Fora da barra gradiente, 55pt abaixo da base
-            Paragraph title = new Paragraph(config.getReportTitle())
-                .setFontSize(14) // Fonte reduzida
+            String reportTitle = config.getReportTitle().trim();
+            int titleLength = reportTitle.length();
+            float titleFontSize = titleLength > 55 ? 10f : titleLength > 40 ? 11f : 14f;
+            
+            Paragraph title = new Paragraph(reportTitle)
+                .setFontSize(titleFontSize)
                 .setBold()
                 .setTextAlignment(TextAlignment.CENTER)
                 .setFontColor(new DeviceRgb(0, 0, 0)) // Texto preto (fora da barra gradiente)
+                .setMultipliedLeading(1.1f)
                 .setMarginTop(55f) // Margin top de 55pt
                 .setMarginBottom(45f); // Margin bottom de 45pt
             canvas.add(title.setFixedPosition(0, titleY, pageWidth));
