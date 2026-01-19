@@ -3,18 +3,16 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.EmployeeDTO;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Employee;
-import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -60,6 +58,8 @@ public class EmployeeExcelImportService {
         COLUMN_MAPPING.put("escolaridade", "grauInstrucao");
         COLUMN_MAPPING.put("matricula esocial", "matriculaEsocial");
         COLUMN_MAPPING.put("matrícula esocial", "matriculaEsocial");
+        COLUMN_MAPPING.put("matricula e social", "matriculaEsocial");
+        COLUMN_MAPPING.put("matrícula e social", "matriculaEsocial");
         COLUMN_MAPPING.put("matricula", "matriculaEsocial");
         
         // Endereço
@@ -118,7 +118,7 @@ public class EmployeeExcelImportService {
             }
             
             // Ler planilha
-            Workbook workbook = new XSSFWorkbook(file.getInputStream());
+            Workbook workbook = WorkbookFactory.create(file.getInputStream());
             Sheet sheet = workbook.getSheetAt(0); // Primeira aba
             
             if (sheet == null || sheet.getPhysicalNumberOfRows() < 2) {
@@ -127,8 +127,15 @@ public class EmployeeExcelImportService {
                 return result;
             }
             
-            // Ler primeira linha (cabeçalho) para identificar colunas
-            Row headerRow = sheet.getRow(0);
+            // Encontrar linha do cabeçalho (nem sempre é a primeira linha)
+            int headerRowIndex = findHeaderRow(sheet);
+            if (headerRowIndex < 0) {
+                result.addError("Cabeçalho não encontrado na planilha. Verifique se a linha contém os nomes das colunas.");
+                workbook.close();
+                return result;
+            }
+
+            Row headerRow = sheet.getRow(headerRowIndex);
             if (headerRow == null) {
                 result.addError("Cabeçalho não encontrado na planilha");
                 workbook.close();
@@ -137,7 +144,7 @@ public class EmployeeExcelImportService {
             
             Map<String, Integer> columnIndexMap = new HashMap<>();
             int companyCnpjColumnIndex = -1;
-            int companyNameColumnIndex = -1;
+            String fixedCompanyCnpj = null;
             
             // Mapear colunas do cabeçalho
             for (int i = 0; i < headerRow.getLastCellNum(); i++) {
@@ -149,11 +156,8 @@ public class EmployeeExcelImportService {
                     if (columnName.contains("cnpj") && columnName.contains("empresa")) {
                         companyCnpjColumnIndex = i;
                         log.info("📋 Coluna CNPJ da empresa encontrada na coluna: {}", i);
-                    } else if ((columnName.contains("empresa") || columnName.contains("company")) 
-                               && !columnName.contains("cnpj")) {
-                        companyNameColumnIndex = i;
                     }
-                    
+
                     // Mapear colunas de funcionário
                     for (Map.Entry<String, String> entry : COLUMN_MAPPING.entrySet()) {
                         if (columnName.contains(entry.getKey())) {
@@ -167,21 +171,30 @@ public class EmployeeExcelImportService {
             
             // Validar se encontrou CNPJ da empresa
             if (companyCnpjColumnIndex == -1) {
-                result.addError("Coluna 'CNPJ Empresa' não encontrada na planilha. É necessário uma coluna contendo o CNPJ da empresa.");
-                workbook.close();
-                return result;
+                fixedCompanyCnpj = findCompanyCnpjInSheet(sheet, headerRowIndex);
+                if (fixedCompanyCnpj == null || fixedCompanyCnpj.isEmpty()) {
+                    result.addError("Coluna 'CNPJ Empresa' não encontrada na planilha. É necessário uma coluna contendo o CNPJ da empresa.");
+                    workbook.close();
+                    return result;
+                }
+                log.info("📋 CNPJ da empresa encontrado no cabeçalho: {}", fixedCompanyCnpj);
             }
             
             // Buscar empresa do primeiro registro (todos devem ser da mesma empresa)
-            Row firstDataRow = sheet.getRow(1);
+            Row firstDataRow = sheet.getRow(headerRowIndex + 1);
             if (firstDataRow == null) {
                 result.addError("Nenhum dado encontrado na planilha");
                 workbook.close();
                 return result;
             }
             
-            Cell cnpjCell = firstDataRow.getCell(companyCnpjColumnIndex);
-            String companyCnpj = getCellValueAsString(cnpjCell);
+            String companyCnpj;
+            if (fixedCompanyCnpj != null) {
+                companyCnpj = fixedCompanyCnpj;
+            } else {
+                Cell cnpjCell = firstDataRow.getCell(companyCnpjColumnIndex);
+                companyCnpj = getCellValueAsString(cnpjCell);
+            }
             
             if (companyCnpj == null || companyCnpj.trim().isEmpty()) {
                 result.addError("CNPJ da empresa não encontrado na primeira linha de dados");
@@ -208,9 +221,9 @@ public class EmployeeExcelImportService {
             
             // Processar linhas de dados
             int totalRows = sheet.getPhysicalNumberOfRows();
-            log.info("📊 Processando {} linhas de dados", totalRows - 1);
+            log.info("📊 Processando {} linhas de dados", totalRows - (headerRowIndex + 1));
             
-            for (int rowIndex = 1; rowIndex < totalRows; rowIndex++) {
+            for (int rowIndex = headerRowIndex + 1; rowIndex < totalRows; rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
                 if (row == null) continue;
                 
@@ -218,15 +231,17 @@ public class EmployeeExcelImportService {
                     // Verificar se a linha tem dados
                     if (isRowEmpty(row)) continue;
                     
-                    // Validar se o CNPJ da empresa é o mesmo
-                    Cell rowCnpjCell = row.getCell(companyCnpjColumnIndex);
-                    String rowCnpj = getCellValueAsString(rowCnpjCell);
-                    String rowNormalizedCnpj = rowCnpj != null ? rowCnpj.replaceAll("[^0-9]", "") : "";
-                    
-                    if (!rowNormalizedCnpj.equals(normalizedCnpj)) {
-                        result.addWarning("Linha " + (rowIndex + 1) + 
-                                ": CNPJ diferente do esperado. Ignorando linha.");
-                        continue;
+                    // Validar se o CNPJ da empresa é o mesmo (quando existe coluna de CNPJ)
+                    if (companyCnpjColumnIndex != -1) {
+                        Cell rowCnpjCell = row.getCell(companyCnpjColumnIndex);
+                        String rowCnpj = getCellValueAsString(rowCnpjCell);
+                        String rowNormalizedCnpj = rowCnpj != null ? rowCnpj.replaceAll("[^0-9]", "") : "";
+                        
+                        if (!rowNormalizedCnpj.equals(normalizedCnpj)) {
+                            result.addWarning("Linha " + (rowIndex + 1) + 
+                                    ": CNPJ diferente do esperado. Ignorando linha.");
+                            continue;
+                        }
                     }
                     
                     // Criar DTO do funcionário a partir da linha
@@ -523,6 +538,77 @@ public class EmployeeExcelImportService {
             }
         }
         return true;
+    }
+
+    private int findHeaderRow(Sheet sheet) {
+        int maxRow = Math.min(20, sheet.getLastRowNum());
+        int bestRow = -1;
+        int bestScore = 0;
+        for (int rowIndex = 0; rowIndex <= maxRow; rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null || isRowEmpty(row)) continue;
+            int score = countHeaderMatches(row);
+            if (score > bestScore) {
+                bestScore = score;
+                bestRow = rowIndex;
+            }
+        }
+        return bestScore >= 2 ? bestRow : -1;
+    }
+
+    private int countHeaderMatches(Row row) {
+        int score = 0;
+        for (int i = 0; i < row.getLastCellNum(); i++) {
+            Cell cell = row.getCell(i);
+            if (cell == null) continue;
+            String columnName = getCellValueAsString(cell);
+            if (columnName == null) continue;
+            String normalized = columnName.toLowerCase().trim();
+            if (normalized.contains("cnpj") && normalized.contains("empresa")) {
+                score += 2;
+                continue;
+            }
+            for (String key : COLUMN_MAPPING.keySet()) {
+                if (normalized.contains(key)) {
+                    score += 1;
+                    break;
+                }
+            }
+        }
+        return score;
+    }
+
+    private String findCompanyCnpjInSheet(Sheet sheet, int headerRowIndex) {
+        int maxRow = Math.min(headerRowIndex, sheet.getLastRowNum());
+        for (int rowIndex = 0; rowIndex <= maxRow; rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (row == null) continue;
+            for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
+                Cell cell = row.getCell(cellIndex);
+                if (cell == null) continue;
+                String value = getCellValueAsString(cell);
+                if (value == null) continue;
+                String normalized = value.toLowerCase();
+                if (normalized.contains("cnpj")) {
+                    String extracted = extractDigits(value);
+                    if (extracted.length() >= 14) {
+                        return extracted;
+                    }
+                    Cell nextCell = row.getCell(cellIndex + 1);
+                    String nextValue = getCellValueAsString(nextCell);
+                    String nextDigits = extractDigits(nextValue);
+                    if (nextDigits.length() >= 14) {
+                        return nextDigits;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private String extractDigits(String value) {
+        if (value == null) return "";
+        return value.replaceAll("[^0-9]", "");
     }
     
     public static class ImportResult {
