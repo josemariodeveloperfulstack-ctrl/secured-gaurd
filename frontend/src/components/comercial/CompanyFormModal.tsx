@@ -23,6 +23,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
+  const isEditMode = Boolean((initialData as any)?.id);
   const [form, setForm] = useState<CreateCompanyRequest>({
     name: '',
     cnpj: '',
@@ -45,14 +46,28 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
 
   React.useEffect(() => {
     if (open && initialData) {
+      const normalizedLogoUrl = (() => {
+        if (!initialData.logoUrl) return '';
+        if (initialData.logoUrl.startsWith('http://') || initialData.logoUrl.startsWith('https://')) {
+          try {
+            const url = new URL(initialData.logoUrl);
+            return url.pathname;
+          } catch {
+            return initialData.logoUrl;
+          }
+        }
+        return initialData.logoUrl;
+      })();
+
       setForm(prev => ({
         ...prev,
-        ...initialData
+        ...initialData,
+        logoUrl: normalizedLogoUrl
       } as CreateCompanyRequest));
       if (initialData.logoUrl) {
         // Se for uma URL relativa, construir URL completa
         const baseUrl = getApiUrl().replace('/api', '');
-        let logoUrl = initialData.logoUrl;
+        let logoUrl = normalizedLogoUrl || initialData.logoUrl;
         let finalUrl = '';
         
         // Se já for URL completa (http/https), usar como está
@@ -269,6 +284,10 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
       toast({ title: 'Campos obrigatórios', description: 'Preencha Nome e CNPJ.', variant: 'destructive' });
       return;
     }
+    if (uploadingLogo) {
+      toast({ title: 'Aguarde o upload', description: 'Finalize o envio da logomarca antes de salvar.', variant: 'destructive' });
+      return;
+    }
     setLoading(true);
     try {
       const formData = {
@@ -281,7 +300,10 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
       } else {
         saved = await companyService.createCompany(formData);
       }
-      toast({ title: 'Empresa criada', description: 'Cadastro realizado com sucesso.' });
+      toast({
+        title: isEditMode ? 'Empresa atualizada' : 'Empresa criada',
+        description: isEditMode ? 'Alterações salvas com sucesso.' : 'Cadastro realizado com sucesso.'
+      });
       onSuccess?.(saved);
       onOpenChange(false);
     } catch (err: any) {
@@ -295,8 +317,14 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full p-3 sm:p-4 md:p-6 overflow-y-auto max-h-[90vh] bg-seguranca-graphite border-gray-600 text-white">
         <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl font-bold text-seguranca-yellow">Nova Empresa</DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm text-gray-300">Preencha os dados mínimos: Nome e CNPJ. Campos adicionais são opcionais.</DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl font-bold text-seguranca-yellow">
+            {isEditMode ? 'Editar Empresa' : 'Nova Empresa'}
+          </DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm text-gray-300">
+            {isEditMode
+              ? 'Atualize os dados da empresa e salve as alterações.'
+              : 'Preencha os dados mínimos: Nome e CNPJ. Campos adicionais são opcionais.'}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Seção: Dados Básicos */}
@@ -510,7 +538,13 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({ open, onOpen
 
           <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-gray-600">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base border-gray-600 text-white hover:bg-seguranca-black">Cancelar</Button>
-            <Button type="submit" disabled={loading} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base bg-seguranca-red hover:bg-seguranca-darkred">{loading ? 'Salvando...' : 'Salvar Empresa'}</Button>
+            <Button
+              type="submit"
+              disabled={loading || uploadingLogo}
+              className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base bg-seguranca-red hover:bg-seguranca-darkred"
+            >
+              {loading ? 'Salvando...' : isEditMode ? 'Salvar Alterações' : 'Salvar Empresa'}
+            </Button>
           </div>
         </form>
       </DialogContent>
