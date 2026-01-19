@@ -20,13 +20,16 @@ export const CompanyViewModal: React.FC<CompanyViewModalProps> = ({ open, onOpen
     
     const baseUrl = getApiUrl().replace('/api', '');
     let logoUrl = company.logoUrl;
+    const normalizedLogo = logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`;
     
     if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
       return logoUrl;
-    } else if (logoUrl.startsWith('/api/uploads/')) {
-      return `${baseUrl}${logoUrl}`;
-    } else if (logoUrl.startsWith('/uploads/')) {
-      return `${baseUrl}/api${logoUrl}`;
+    } else if (normalizedLogo.startsWith('/api/uploads/')) {
+      return `${baseUrl}${normalizedLogo}`;
+    } else if (normalizedLogo.startsWith('/uploads/')) {
+      return `${baseUrl}/api${normalizedLogo}`;
+    } else if (normalizedLogo.includes('/uploads/companies/logos/')) {
+      return `${baseUrl}/api${normalizedLogo}`;
     } else {
       return `${baseUrl}/api/uploads/companies/logos/${logoUrl}`;
     }

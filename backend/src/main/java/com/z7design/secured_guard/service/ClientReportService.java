@@ -8,8 +8,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 // Placeholder for PDF generation library (e.g., iText, Apache PDFBox)
@@ -26,35 +35,68 @@ public class ClientReportService {
         log.info("Gerando relatório PDF para clientes com filtros: {}", filters);
         List<Client> clients = findClientsByFilters(filters);
 
-        // TODO: Implement PDF generation logic here
-        // This is a placeholder. You would use a library like iText or Apache PDFBox.
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            // Example: Add some text to the PDF
-            String content = "Relatório de Clientes\n\n";
-            content += "Filtros Aplicados:\n";
-            content += "Nome: " + (filters.getName() != null ? filters.getName() : "Todos") + "\n";
-            content += "CNPJ: " + (filters.getCnpj() != null ? filters.getCnpj() : "Todos") + "\n";
-            content += "Status: " + (filters.getStatus() != null ? filters.getStatus() : "Todos") + "\n";
-            content += "Data Início: " + (filters.getStartDate() != null ? filters.getStartDate() : "N/A") + "\n";
-            content += "Data Fim: " + (filters.getEndDate() != null ? filters.getEndDate() : "N/A") + "\n\n";
-            content += "Total de Clientes Encontrados: " + clients.size() + "\n\n";
-            
+            PdfWriter writer = new PdfWriter(baos);
+            PdfDocument pdfDoc = new PdfDocument(writer);
+            Document document = new Document(pdfDoc);
+
+            document.add(new Paragraph("RELATÓRIO DE CLIENTES")
+                    .setBold()
+                    .setFontSize(14)
+                    .setTextAlignment(TextAlignment.CENTER));
+
+            document.add(new Paragraph("Filtros aplicados:")
+                    .setBold()
+                    .setFontSize(10));
+
+            document.add(new Paragraph(String.format("Nome: %s",
+                    filters.getName() != null ? filters.getName() : "Todos")).setFontSize(9));
+            document.add(new Paragraph(String.format("CNPJ: %s",
+                    filters.getCnpj() != null ? filters.getCnpj() : "Todos")).setFontSize(9));
+            document.add(new Paragraph(String.format("Status: %s",
+                    filters.getStatus() != null ? filters.getStatus() : "Todos")).setFontSize(9));
+            document.add(new Paragraph(String.format("Data Início: %s",
+                    filters.getStartDate() != null ? filters.getStartDate() : "N/A")).setFontSize(9));
+            document.add(new Paragraph(String.format("Data Fim: %s",
+                    filters.getEndDate() != null ? filters.getEndDate() : "N/A")).setFontSize(9));
+
+            document.add(new Paragraph(String.format("Total de clientes: %d", clients.size()))
+                    .setFontSize(9)
+                    .setMarginTop(8));
+
+            float[] columnWidths = {4, 3, 4, 3, 3};
+            Table table = new Table(columnWidths).useAllAvailableWidth().setMarginTop(10);
+            addHeaderCell(table, "Nome");
+            addHeaderCell(table, "CNPJ");
+            addHeaderCell(table, "Email");
+            addHeaderCell(table, "Status");
+            addHeaderCell(table, "Criado em");
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
             for (Client client : clients) {
-                content += "ID: " + client.getId() + "\n";
-                content += "Nome: " + client.getName() + "\n";
-                content += "CNPJ: " + client.getCnpj() + "\n";
-                content += "Email: " + client.getEmail() + "\n";
-                content += "Status: " + client.getStatus() + "\n";
-                content += "-----------------------------------\n";
+                table.addCell(createCell(client.getName()));
+                table.addCell(createCell(client.getCnpj()));
+                table.addCell(createCell(client.getEmail()));
+                table.addCell(createCell(client.getStatus() != null ? client.getStatus().toString() : ""));
+                table.addCell(createCell(client.getCreatedAt() != null ? client.getCreatedAt().toLocalDate().format(formatter) : ""));
             }
-            
-            // In a real implementation, you'd use a PDF library to write this content
-            baos.write(content.getBytes());
+
+            document.add(table);
+            document.close();
+
             return baos.toByteArray();
         } catch (Exception e) {
             log.error("Erro na geração do PDF: {}", e.getMessage(), e);
             throw new RuntimeException("Erro ao gerar relatório PDF", e);
         }
+    }
+
+    private void addHeaderCell(Table table, String text) {
+        table.addCell(new Cell().add(new Paragraph(text).setBold()).setTextAlignment(TextAlignment.CENTER));
+    }
+
+    private Cell createCell(String text) {
+        return new Cell().add(new Paragraph(text != null ? text : "")).setTextAlignment(TextAlignment.LEFT);
     }
 
     public byte[] generateClientExcelReport(ClientReportFilterDTO filters) {
