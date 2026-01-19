@@ -50,6 +50,9 @@ public class StandardReportLayoutService {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
     
+    @Value("${app.url:http://localhost:3000}")
+    private String appUrl;
+    
     // Cores padrão do gradiente (amarelo → laranja → vermelho) conforme modelo
     private static final DeviceRgb COLOR_YELLOW_DEFAULT = new DeviceRgb(255, 204, 0);      // #FFCC00 - Amarelo brilhante
     private static final DeviceRgb COLOR_ORANGE_DEFAULT = new DeviceRgb(255, 153, 0);      // #FF9900 - Laranja
@@ -497,11 +500,17 @@ public class StandardReportLayoutService {
                     String logoPath = resolveLogoPath(logoUrl);
 
                     if (logoPath == null || !Files.exists(Paths.get(logoPath))) {
-                        log.warn("Logo não encontrado no caminho: {}", logoPath);
-                        return null;
+                        log.warn("Logo não encontrado no caminho: {}. Tentando URL pública...", logoPath);
+                        String publicLogoUrl = buildPublicLogoUrl(logoUrl);
+                        if (publicLogoUrl != null) {
+                            log.info("🔗 Carregando logo via URL pública: {}", publicLogoUrl);
+                            imageData = ImageDataFactory.create(publicLogoUrl);
+                        } else {
+                            return null;
+                        }
+                    } else {
+                        imageData = ImageDataFactory.create(logoPath);
                     }
-
-                    imageData = ImageDataFactory.create(logoPath);
                 }
                 
                 // Adicionar ImageData ao cache (com limite de tamanho)
@@ -626,6 +635,23 @@ public class StandardReportLayoutService {
             log.debug("Não foi possível extrair path de logo URL {}: {}", logoUrl, e.getMessage());
         }
         return null;
+    }
+    
+    private String buildPublicLogoUrl(String logoUrl) {
+        if (logoUrl == null || logoUrl.isEmpty()) {
+            return null;
+        }
+        if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+            return logoUrl;
+        }
+        String base = appUrl == null ? "" : appUrl.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (logoUrl.startsWith("/")) {
+            return base + logoUrl;
+        }
+        return base + "/" + logoUrl;
     }
     
 }
