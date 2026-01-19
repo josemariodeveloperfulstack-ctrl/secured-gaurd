@@ -157,7 +157,7 @@ public class EPIDeliveryFormService {
     }
 
     public EPIDeliveryForm findByIdEntity(UUID id) {
-        return epiDeliveryFormRepository.findById(id)
+        return epiDeliveryFormRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
     }
 

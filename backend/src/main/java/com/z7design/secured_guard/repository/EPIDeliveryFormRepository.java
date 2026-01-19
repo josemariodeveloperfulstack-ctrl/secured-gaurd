@@ -85,6 +85,16 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
         @Param("endDate") LocalDate endDate,
         Pageable pageable
     );
+
+    @Query("""
+        SELECT f FROM EPIDeliveryForm f
+        LEFT JOIN FETCH f.employee
+        LEFT JOIN FETCH f.company
+        LEFT JOIN FETCH f.responsibleEmployee
+        LEFT JOIN FETCH f.items
+        WHERE f.id = :id
+        """)
+    java.util.Optional<EPIDeliveryForm> findByIdWithDetails(@Param("id") UUID id);
 }
 
 

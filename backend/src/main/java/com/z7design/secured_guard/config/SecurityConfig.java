@@ -283,8 +283,19 @@ public class SecurityConfig {
                 .requestMatchers("/api/documentos-gerados/**").permitAll()
                 // Endpoints de assinaturas de documentos - temporariamente público para teste
                 .requestMatchers("/api/assinaturas-documentos/**").permitAll()
-                // Endpoints de dependentes - leitura requer apenas autenticação, escrita requer permissões específicas
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/dependents/**").authenticated()
+                // Endpoints de dependentes - leitura requer permissões básicas, escrita requer permissões específicas
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/dependents/**").hasAnyAuthority(
+                    "SUPER_ADMIN",
+                    "ADMIN",
+                    "GESTOR",
+                    "RH",
+                    "ROLE_SUPER_ADMIN",
+                    "ROLE_ADMIN",
+                    "ROLE_GESTOR",
+                    "ROLE_RH",
+                    "EMPLOYEES_READ",
+                    "EMPLOYEES_WRITE"
+                )
                 .requestMatchers("/api/dependents/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN", "GESTOR", "RH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_RH", "EMPLOYEES_READ", "EMPLOYEES_WRITE")
                 // Endpoints de folha de ponto (time-sheets)
                 .requestMatchers("/api/time-sheets/**").hasAnyAuthority(
