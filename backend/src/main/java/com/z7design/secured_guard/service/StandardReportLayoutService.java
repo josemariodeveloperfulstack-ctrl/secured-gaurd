@@ -561,9 +561,23 @@ public class StandardReportLayoutService {
             return logoDir.resolve(filename).toAbsolutePath().toString();
         }
 
+        // Se começa com api/uploads/companies/logos/ sem barra inicial
+        if (logoUrl.startsWith("api/uploads/companies/logos/")) {
+            String filename = logoUrl.replace("api/uploads/companies/logos/", "");
+            Path logoDir = Paths.get(uploadDir, "companies", "logos");
+            return logoDir.resolve(filename).toAbsolutePath().toString();
+        }
+
         // Se começa com /uploads/companies/logos/, remover o prefixo
         if (logoUrl.startsWith("/uploads/companies/logos/")) {
             String filename = logoUrl.replace("/uploads/companies/logos/", "");
+            Path logoDir = Paths.get(uploadDir, "companies", "logos");
+            return logoDir.resolve(filename).toAbsolutePath().toString();
+        }
+
+        // Se começa com uploads/companies/logos/ sem barra inicial
+        if (logoUrl.startsWith("uploads/companies/logos/")) {
+            String filename = logoUrl.replace("uploads/companies/logos/", "");
             Path logoDir = Paths.get(uploadDir, "companies", "logos");
             return logoDir.resolve(filename).toAbsolutePath().toString();
         }
@@ -575,6 +589,13 @@ public class StandardReportLayoutService {
             return logoPath.toAbsolutePath().toString();
         }
         
+        // Se começa com uploads/ sem barra inicial
+        if (logoUrl.startsWith("uploads/")) {
+            String relativePath = logoUrl.replace("uploads/", "");
+            Path logoPath = Paths.get(uploadDir, relativePath);
+            return logoPath.toAbsolutePath().toString();
+        }
+
         // Se é apenas o nome do arquivo, construir caminho completo
         if (!logoUrl.contains("/")) {
             Path logoDir = Paths.get(uploadDir, "companies", "logos");
