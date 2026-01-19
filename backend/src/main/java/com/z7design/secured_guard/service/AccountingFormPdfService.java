@@ -1,20 +1,36 @@
 package com.z7design.secured_guard.service;
 
-import com.lowagie.text.*;
-import com.lowagie.text.pdf.*;
+import com.itextpdf.kernel.colors.DeviceRgb;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +39,8 @@ public class AccountingFormPdfService {
 
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final ExcelReportLayoutService excelReportLayoutService;
 
     public byte[] generateAccountingFormPdf(UUID employeeId) throws Exception {
         log.info("📄 Gerando ficha de contabilidade em PDF para funcionário ID: {}", employeeId);
@@ -36,171 +54,326 @@ public class AccountingFormPdfService {
         }
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document document = new Document(PageSize.A4);
-        PdfWriter.getInstance(document, baos);
-        
-        document.open();
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
 
-        // Configurar fontes
-        Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, Color.BLACK);
-        Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, Color.BLACK);
-        Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 10, Color.BLACK);
-        Font smallFont = FontFactory.getFont(FontFactory.HELVETICA, 9, Color.BLACK);
+        try {
+            UUID companyId = resolveCompanyId(company);
+            PdfWriter writer = new PdfWriter(baos);
 
-        // Título
-        Paragraph title = new Paragraph("FICHA DE CADASTRO DE FUNCIONÁRIO", titleFont);
-        title.setAlignment(Element.ALIGN_CENTER);
-        title.setSpacingAfter(5);
-        document.add(title);
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("FICHA DE CADASTRO DE FUNCIONÁRIO")
+                .topMargin(120f)
+                .bottomMargin(80f)
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
 
-        Paragraph subtitle = new Paragraph("Para Departamento de Contabilidade", headerFont);
-        subtitle.setAlignment(Element.ALIGN_CENTER);
-        subtitle.setSpacingAfter(15);
-        document.add(subtitle);
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
 
-        // Data de geração
-        Paragraph date = new Paragraph("Data de Geração: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), smallFont);
-        date.setAlignment(Element.ALIGN_RIGHT);
-        date.setSpacingAfter(20);
-        document.add(date);
+            Paragraph subtitle = new Paragraph("Para Departamento de Contabilidade")
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBold()
+                .setFontSize(12)
+                .setMarginBottom(10);
+            document.add(subtitle);
 
-        // Dados Pessoais
-        Paragraph section1 = new Paragraph("1. DADOS PESSOAIS", headerFont);
-        section1.setSpacingBefore(10);
-        section1.setSpacingAfter(10);
-        document.add(section1);
+            Paragraph date = new Paragraph("Data de Geração: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                .setFontSize(9)
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setMarginBottom(20);
+            document.add(date);
 
-        PdfPTable personalTable = new PdfPTable(2);
-        personalTable.setWidthPercentage(100);
-        personalTable.setWidths(new float[]{40f, 60f});
-        personalTable.setSpacingAfter(15);
+            Paragraph section1 = new Paragraph("1. DADOS PESSOAIS")
+                .setBold()
+                .setFontSize(12)
+                .setMarginTop(10)
+                .setMarginBottom(10);
+            document.add(section1);
 
-        addTableRow(personalTable, "Nome Completo:", employee.getName() != null ? employee.getName() : "", headerFont, normalFont);
-        addTableRow(personalTable, "CPF:", employee.getDocument() != null ? employee.getDocument() : "", headerFont, normalFont);
-        
-        String rg = "";
-        if (employee.getCinNumero() != null && !employee.getCinNumero().trim().isEmpty()) {
-            rg = employee.getCinNumero();
-            if (employee.getCinOrgaoEmissor() != null && !employee.getCinOrgaoEmissor().trim().isEmpty()) {
-                rg = employee.getCinOrgaoEmissor() + "-" + rg;
+            Table personalTable = new Table(UnitValue.createPercentArray(new float[]{40f, 60f}))
+                .useAllAvailableWidth()
+                .setMarginBottom(15);
+
+            addTableRow(personalTable, "Nome Completo:", employee.getName());
+            addTableRow(personalTable, "CPF:", employee.getDocument());
+
+            String rg = "";
+            if (employee.getCinNumero() != null && !employee.getCinNumero().trim().isEmpty()) {
+                rg = employee.getCinNumero();
+                if (employee.getCinOrgaoEmissor() != null && !employee.getCinOrgaoEmissor().trim().isEmpty()) {
+                    rg = employee.getCinOrgaoEmissor() + "-" + rg;
+                }
+            } else if (employee.getCarteiraIdentidadeOrgaoEmissor() != null && !employee.getCarteiraIdentidadeOrgaoEmissor().trim().isEmpty()) {
+                rg = employee.getCarteiraIdentidadeOrgaoEmissor();
             }
-        } else if (employee.getCarteiraIdentidadeOrgaoEmissor() != null && !employee.getCarteiraIdentidadeOrgaoEmissor().trim().isEmpty()) {
-            rg = employee.getCarteiraIdentidadeOrgaoEmissor();
+            addTableRow(personalTable, "RG:", rg);
+            addTableRow(personalTable, "Data de Nascimento:", formatDate(employee.getBirthDate()));
+            addTableRow(personalTable, "Estado Civil:", employee.getMaritalStatus());
+            addTableRow(personalTable, "Nacionalidade:", employee.getNationality());
+            document.add(personalTable);
+
+            Paragraph section2 = new Paragraph("2. DOCUMENTOS")
+                .setBold()
+                .setFontSize(12)
+                .setMarginTop(10)
+                .setMarginBottom(10);
+            document.add(section2);
+
+            Table documentsTable = new Table(UnitValue.createPercentArray(new float[]{40f, 60f}))
+                .useAllAvailableWidth()
+                .setMarginBottom(15);
+
+            addTableRow(documentsTable, "PIS/PASEP:", employee.getPis());
+            addTableRow(documentsTable, "Título de Eleitor:", employee.getTituloEleitor());
+            String zonaSecao = "";
+            if (employee.getTituloEleitorZona() != null || employee.getTituloEleitorSecao() != null) {
+                zonaSecao = (employee.getTituloEleitorZona() != null ? employee.getTituloEleitorZona() : "") +
+                            " / " + (employee.getTituloEleitorSecao() != null ? employee.getTituloEleitorSecao() : "");
+            }
+            addTableRow(documentsTable, "Zona/Seção Eleitoral:", zonaSecao);
+            addTableRow(documentsTable, "CTPS:", employee.getCtps());
+            addTableRow(documentsTable, "Série CTPS:", employee.getCtpsSeries());
+            addTableRow(documentsTable, "CNH:", employee.getCnhNumber());
+            addTableRow(documentsTable, "Categoria CNH:", employee.getCnhCategory());
+            addTableRow(documentsTable, "Validade CNH:", formatDate(employee.getCnhExpirationDate()));
+            addTableRow(documentsTable, "Certificado Militar:", employee.getCertificadoMilitar());
+            document.add(documentsTable);
+
+            Paragraph section3 = new Paragraph("3. ENDEREÇO E CONTATO")
+                .setBold()
+                .setFontSize(12)
+                .setMarginTop(10)
+                .setMarginBottom(10);
+            document.add(section3);
+
+            Table contactTable = new Table(UnitValue.createPercentArray(new float[]{40f, 60f}))
+                .useAllAvailableWidth()
+                .setMarginBottom(15);
+
+            addTableRow(contactTable, "Endereço:", buildAddress(employee));
+            addTableRow(contactTable, "Telefone:", employee.getPhone());
+            addTableRow(contactTable, "E-mail:", employee.getEmail());
+            document.add(contactTable);
+
+            Paragraph section4 = new Paragraph("4. DADOS PROFISSIONAIS")
+                .setBold()
+                .setFontSize(12)
+                .setMarginTop(10)
+                .setMarginBottom(10);
+            document.add(section4);
+
+            Table professionalTable = new Table(UnitValue.createPercentArray(new float[]{40f, 60f}))
+                .useAllAvailableWidth()
+                .setMarginBottom(15);
+
+            addTableRow(professionalTable, "Número de Registro:", employee.getRegistrationNumber());
+            addTableRow(professionalTable, "Data de Admissão:", formatDate(employee.getHireDate()));
+            addTableRow(professionalTable, "Cargo:", employee.getPosition() != null ? employee.getPosition().getName() : "");
+            addTableRow(professionalTable, "CBO:", employee.getCbo());
+            addTableRow(professionalTable, "Salário Base:", employee.getSalario() != null ? "R$ " + String.format("%.2f", employee.getSalario()) : "");
+            addTableRow(professionalTable, "Status:", formatStatus(employee.getStatus()));
+            addTableRow(professionalTable, "Setor:", employee.getUnit() != null ? employee.getUnit().getName() : "");
+            if (company != null) {
+                addTableRow(professionalTable, "Empresa:", company.getName());
+                addTableRow(professionalTable, "CNPJ:", company.getCnpj());
+            }
+            document.add(professionalTable);
+
+            if (employee.getBanco() != null || employee.getAgencia() != null || employee.getContaCorrente() != null) {
+                Paragraph section5 = new Paragraph("5. DADOS BANCÁRIOS")
+                    .setBold()
+                    .setFontSize(12)
+                    .setMarginTop(10)
+                    .setMarginBottom(10);
+                document.add(section5);
+
+                Table bankTable = new Table(UnitValue.createPercentArray(new float[]{40f, 60f}))
+                    .useAllAvailableWidth()
+                    .setMarginBottom(15);
+
+                addTableRow(bankTable, "Banco:", employee.getBanco());
+                addTableRow(bankTable, "Agência:", employee.getAgencia());
+                addTableRow(bankTable, "Conta Corrente:", employee.getContaCorrente());
+                document.add(bankTable);
+            }
+
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            document.close();
+        } catch (Exception e) {
+            log.error("Erro ao gerar ficha de contabilidade com layout padrão", e);
+            throw e;
         }
-        addTableRow(personalTable, "RG:", rg, headerFont, normalFont);
-        addTableRow(personalTable, "Data de Nascimento:", formatDate(employee.getBirthDate()), headerFont, normalFont);
-        addTableRow(personalTable, "Estado Civil:", employee.getMaritalStatus() != null ? employee.getMaritalStatus() : "", headerFont, normalFont);
-        addTableRow(personalTable, "Nacionalidade:", employee.getNationality() != null ? employee.getNationality() : "", headerFont, normalFont);
-
-        document.add(personalTable);
-
-        // Documentos
-        Paragraph section2 = new Paragraph("2. DOCUMENTOS", headerFont);
-        section2.setSpacingBefore(10);
-        section2.setSpacingAfter(10);
-        document.add(section2);
-
-        PdfPTable documentsTable = new PdfPTable(2);
-        documentsTable.setWidthPercentage(100);
-        documentsTable.setWidths(new float[]{40f, 60f});
-        documentsTable.setSpacingAfter(15);
-
-        addTableRow(documentsTable, "PIS/PASEP:", employee.getPis() != null ? employee.getPis() : "", headerFont, normalFont);
-        addTableRow(documentsTable, "Título de Eleitor:", employee.getTituloEleitor() != null ? employee.getTituloEleitor() : "", headerFont, normalFont);
-        String zonaSecao = "";
-        if (employee.getTituloEleitorZona() != null || employee.getTituloEleitorSecao() != null) {
-            zonaSecao = (employee.getTituloEleitorZona() != null ? employee.getTituloEleitorZona() : "") + 
-                        " / " + (employee.getTituloEleitorSecao() != null ? employee.getTituloEleitorSecao() : "");
-        }
-        addTableRow(documentsTable, "Zona/Seção Eleitoral:", zonaSecao, headerFont, normalFont);
-        addTableRow(documentsTable, "CTPS:", employee.getCtps() != null ? employee.getCtps() : "", headerFont, normalFont);
-        addTableRow(documentsTable, "Série CTPS:", employee.getCtpsSeries() != null ? employee.getCtpsSeries() : "", headerFont, normalFont);
-        addTableRow(documentsTable, "CNH:", employee.getCnhNumber() != null ? employee.getCnhNumber() : "", headerFont, normalFont);
-        addTableRow(documentsTable, "Categoria CNH:", employee.getCnhCategory() != null ? employee.getCnhCategory() : "", headerFont, normalFont);
-        addTableRow(documentsTable, "Validade CNH:", formatDate(employee.getCnhExpirationDate()), headerFont, normalFont);
-        addTableRow(documentsTable, "Certificado Militar:", employee.getCertificadoMilitar() != null ? employee.getCertificadoMilitar() : "", headerFont, normalFont);
-
-        document.add(documentsTable);
-
-        // Endereço e Contato
-        Paragraph section3 = new Paragraph("3. ENDEREÇO E CONTATO", headerFont);
-        section3.setSpacingBefore(10);
-        section3.setSpacingAfter(10);
-        document.add(section3);
-
-        PdfPTable contactTable = new PdfPTable(2);
-        contactTable.setWidthPercentage(100);
-        contactTable.setWidths(new float[]{40f, 60f});
-        contactTable.setSpacingAfter(15);
-
-        String endereco = buildAddress(employee);
-        addTableRow(contactTable, "Endereço:", endereco, headerFont, normalFont);
-        addTableRow(contactTable, "Telefone:", employee.getPhone() != null ? employee.getPhone() : "", headerFont, normalFont);
-        addTableRow(contactTable, "E-mail:", employee.getEmail() != null ? employee.getEmail() : "", headerFont, normalFont);
-
-        document.add(contactTable);
-
-        // Dados Profissionais
-        Paragraph section4 = new Paragraph("4. DADOS PROFISSIONAIS", headerFont);
-        section4.setSpacingBefore(10);
-        section4.setSpacingAfter(10);
-        document.add(section4);
-
-        PdfPTable professionalTable = new PdfPTable(2);
-        professionalTable.setWidthPercentage(100);
-        professionalTable.setWidths(new float[]{40f, 60f});
-        professionalTable.setSpacingAfter(15);
-
-        addTableRow(professionalTable, "Número de Registro:", employee.getRegistrationNumber() != null ? employee.getRegistrationNumber() : "", headerFont, normalFont);
-        addTableRow(professionalTable, "Data de Admissão:", formatDate(employee.getHireDate()), headerFont, normalFont);
-        addTableRow(professionalTable, "Cargo:", employee.getPosition() != null ? employee.getPosition().getName() : "", headerFont, normalFont);
-        addTableRow(professionalTable, "CBO:", employee.getCbo() != null ? employee.getCbo() : "", headerFont, normalFont);
-        addTableRow(professionalTable, "Salário Base:", employee.getSalario() != null ? "R$ " + String.format("%.2f", employee.getSalario()) : "", headerFont, normalFont);
-        addTableRow(professionalTable, "Status:", formatStatus(employee.getStatus()), headerFont, normalFont);
-        addTableRow(professionalTable, "Setor:", employee.getUnit() != null ? employee.getUnit().getName() : "", headerFont, normalFont);
-        if (company != null) {
-            addTableRow(professionalTable, "Empresa:", company.getName() != null ? company.getName() : "", headerFont, normalFont);
-            addTableRow(professionalTable, "CNPJ:", company.getCnpj() != null ? company.getCnpj() : "", headerFont, normalFont);
-        }
-
-        document.add(professionalTable);
-
-        // Dados Bancários
-        if (employee.getBanco() != null || employee.getAgencia() != null || employee.getContaCorrente() != null) {
-            Paragraph section5 = new Paragraph("5. DADOS BANCÁRIOS", headerFont);
-            section5.setSpacingBefore(10);
-            section5.setSpacingAfter(10);
-            document.add(section5);
-
-            PdfPTable bankTable = new PdfPTable(2);
-            bankTable.setWidthPercentage(100);
-            bankTable.setWidths(new float[]{40f, 60f});
-            bankTable.setSpacingAfter(15);
-
-            addTableRow(bankTable, "Banco:", employee.getBanco() != null ? employee.getBanco() : "", headerFont, normalFont);
-            addTableRow(bankTable, "Agência:", employee.getAgencia() != null ? employee.getAgencia() : "", headerFont, normalFont);
-            addTableRow(bankTable, "Conta Corrente:", employee.getContaCorrente() != null ? employee.getContaCorrente() : "", headerFont, normalFont);
-
-            document.add(bankTable);
-        }
-
-        document.close();
 
         log.info("✅ Ficha de contabilidade gerada com sucesso. Tamanho: {} bytes", baos.size());
         return baos.toByteArray();
     }
 
-    private void addTableRow(PdfPTable table, String label, String value, Font labelFont, Font valueFont) {
-        PdfPCell labelCell = new PdfPCell(new Phrase(label, labelFont));
-        labelCell.setBackgroundColor(new Color(240, 240, 240));
-        labelCell.setPadding(8);
-        labelCell.setBorder(Rectangle.BOX);
-        table.addCell(labelCell);
+    public byte[] generateAccountingFormExcel(UUID employeeId) throws Exception {
+        log.info("📊 Gerando ficha de contabilidade (Excel) para funcionário ID: {}", employeeId);
 
-        PdfPCell valueCell = new PdfPCell(new Phrase(value != null ? value : "", valueFont));
-        valueCell.setPadding(8);
-        valueCell.setBorder(Rectangle.BOX);
-        table.addCell(valueCell);
+        Employee employee = employeeRepository.findById(employeeId)
+            .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+
+        Company company = null;
+        if (employee.getCompany() != null) {
+            company = companyRepository.findById(employee.getCompany().getId()).orElse(null);
+        }
+        Company reportCompany = resolveCompany(company);
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Ficha Contabilidade");
+            int lastColumn = 1;
+            int rowIndex = excelReportLayoutService.addHeader(sheet, workbook, reportCompany, "FICHA DE CADASTRO DE FUNCIONÁRIO", lastColumn);
+
+            CellStyle labelStyle = createLabelStyle(workbook);
+            CellStyle valueStyle = createValueStyle(workbook);
+
+            rowIndex = addSection(sheet, rowIndex, "Para Departamento de Contabilidade", lastColumn, workbook);
+            rowIndex = addRow(sheet, rowIndex, "Data de Geração:", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), labelStyle, valueStyle);
+
+            rowIndex = addSection(sheet, rowIndex, "1. DADOS PESSOAIS", lastColumn, workbook);
+            rowIndex = addRow(sheet, rowIndex, "Nome Completo:", employee.getName(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "CPF:", employee.getDocument(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "RG:", buildRg(employee), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Data de Nascimento:", formatDate(employee.getBirthDate()), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Estado Civil:", employee.getMaritalStatus(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Nacionalidade:", employee.getNationality(), labelStyle, valueStyle);
+
+            rowIndex = addSection(sheet, rowIndex, "2. DOCUMENTOS", lastColumn, workbook);
+            rowIndex = addRow(sheet, rowIndex, "PIS/PASEP:", employee.getPis(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Título de Eleitor:", employee.getTituloEleitor(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Zona/Seção Eleitoral:", buildZonaSecao(employee), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "CTPS:", employee.getCtps(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Série CTPS:", employee.getCtpsSeries(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "CNH:", employee.getCnhNumber(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Categoria CNH:", employee.getCnhCategory(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Validade CNH:", formatDate(employee.getCnhExpirationDate()), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Certificado Militar:", employee.getCertificadoMilitar(), labelStyle, valueStyle);
+
+            rowIndex = addSection(sheet, rowIndex, "3. ENDEREÇO E CONTATO", lastColumn, workbook);
+            rowIndex = addRow(sheet, rowIndex, "Endereço:", buildAddress(employee), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Telefone:", employee.getPhone(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "E-mail:", employee.getEmail(), labelStyle, valueStyle);
+
+            rowIndex = addSection(sheet, rowIndex, "4. DADOS PROFISSIONAIS", lastColumn, workbook);
+            rowIndex = addRow(sheet, rowIndex, "Número de Registro:", employee.getRegistrationNumber(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Data de Admissão:", formatDate(employee.getHireDate()), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Cargo:", employee.getPosition() != null ? employee.getPosition().getName() : "", labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "CBO:", employee.getCbo(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Salário Base:", employee.getSalario() != null ? "R$ " + String.format("%.2f", employee.getSalario()) : "", labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Status:", formatStatus(employee.getStatus()), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "Setor:", employee.getUnit() != null ? employee.getUnit().getName() : "", labelStyle, valueStyle);
+            if (company != null) {
+                rowIndex = addRow(sheet, rowIndex, "Empresa:", company.getName(), labelStyle, valueStyle);
+                rowIndex = addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(), labelStyle, valueStyle);
+            }
+
+            if (employee.getBanco() != null || employee.getAgencia() != null || employee.getContaCorrente() != null) {
+                rowIndex = addSection(sheet, rowIndex, "5. DADOS BANCÁRIOS", lastColumn, workbook);
+                rowIndex = addRow(sheet, rowIndex, "Banco:", employee.getBanco(), labelStyle, valueStyle);
+                rowIndex = addRow(sheet, rowIndex, "Agência:", employee.getAgencia(), labelStyle, valueStyle);
+                rowIndex = addRow(sheet, rowIndex, "Conta Corrente:", employee.getContaCorrente(), labelStyle, valueStyle);
+            }
+
+            sheet.autoSizeColumn(0);
+            sheet.autoSizeColumn(1);
+
+            excelReportLayoutService.addFooter(sheet, workbook, reportCompany, lastColumn);
+
+            workbook.write(out);
+            log.info("✅ Ficha de contabilidade (Excel) gerada com sucesso. Tamanho: {} bytes", out.size());
+            return out.toByteArray();
+        }
+    }
+
+    private void addTableRow(Table table, String label, String value) {
+        table.addCell(createLabelCell(label));
+        table.addCell(createValueCell(value));
+    }
+
+    private int addRow(Sheet sheet, int rowIndex, String label, String value, CellStyle labelStyle, CellStyle valueStyle) {
+        Row row = sheet.createRow(rowIndex++);
+        org.apache.poi.ss.usermodel.Cell labelCell = row.createCell(0);
+        labelCell.setCellValue(label != null ? label : "");
+        labelCell.setCellStyle(labelStyle);
+
+        org.apache.poi.ss.usermodel.Cell valueCell = row.createCell(1);
+        valueCell.setCellValue(value != null ? value : "");
+        valueCell.setCellStyle(valueStyle);
+        return rowIndex;
+    }
+
+    private int addSection(Sheet sheet, int rowIndex, String title, int lastColumn, Workbook workbook) {
+        Row row = sheet.createRow(rowIndex++);
+        org.apache.poi.ss.usermodel.Cell cell = row.createCell(0);
+        cell.setCellValue(title);
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        cell.setCellStyle(style);
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(row.getRowNum(), row.getRowNum(), 0, lastColumn));
+        return rowIndex;
+    }
+
+    private CellStyle createLabelStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        style.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        style.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        style.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        return style;
+    }
+
+    private CellStyle createValueStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setWrapText(true);
+        style.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        style.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        style.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        style.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+        return style;
+    }
+
+    private Cell createLabelCell(String text) {
+        return new Cell()
+            .add(new Paragraph(text != null ? text : "")
+                .setBold()
+                .setFontSize(10))
+            .setBackgroundColor(new DeviceRgb(240, 240, 240))
+            .setPadding(6);
+    }
+
+    private Cell createValueCell(String text) {
+        return new Cell()
+            .add(new Paragraph(text != null ? text : "")
+                .setFontSize(10))
+            .setPadding(6);
+    }
+
+    private UUID resolveCompanyId(Company company) {
+        if (company != null) {
+            return company.getId();
+        }
+
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            return activeCompanies.get(0).getId();
+        }
+
+        List<Company> allCompanies = companyRepository.findAll();
+        if (allCompanies != null && !allCompanies.isEmpty()) {
+            return allCompanies.get(0).getId();
+        }
+
+        throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
     }
 
     private String buildAddress(Employee employee) {
@@ -254,6 +427,45 @@ public class AccountingFormPdfService {
             case TERMINATED: return "Demitido";
             default: return status.toString();
         }
+    }
+
+    private String buildRg(Employee employee) {
+        String rg = "";
+        if (employee.getCinNumero() != null && !employee.getCinNumero().trim().isEmpty()) {
+            rg = employee.getCinNumero();
+            if (employee.getCinOrgaoEmissor() != null && !employee.getCinOrgaoEmissor().trim().isEmpty()) {
+                rg = employee.getCinOrgaoEmissor() + "-" + rg;
+            }
+        } else if (employee.getCarteiraIdentidadeOrgaoEmissor() != null && !employee.getCarteiraIdentidadeOrgaoEmissor().trim().isEmpty()) {
+            rg = employee.getCarteiraIdentidadeOrgaoEmissor();
+        }
+        return rg;
+    }
+
+    private String buildZonaSecao(Employee employee) {
+        if (employee.getTituloEleitorZona() != null || employee.getTituloEleitorSecao() != null) {
+            return (employee.getTituloEleitorZona() != null ? employee.getTituloEleitorZona() : "") +
+                " / " + (employee.getTituloEleitorSecao() != null ? employee.getTituloEleitorSecao() : "");
+        }
+        return "";
+    }
+
+    private Company resolveCompany(Company company) {
+        if (company != null) {
+            return company;
+        }
+
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            return activeCompanies.get(0);
+        }
+
+        List<Company> allCompanies = companyRepository.findAll();
+        if (allCompanies != null && !allCompanies.isEmpty()) {
+            return allCompanies.get(0);
+        }
+
+        throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
     }
 }
 

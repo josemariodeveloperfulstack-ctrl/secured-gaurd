@@ -68,5 +68,29 @@ public class AccountingFormController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    /**
+     * Gera ficha de contabilidade em Excel para um funcionário
+     */
+    @GetMapping("/{employeeId}/excel")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'EMPLOYEES_READ')")
+    public ResponseEntity<byte[]> generateAccountingFormExcel(@PathVariable UUID employeeId) {
+        try {
+            log.info("📊 Gerando ficha de contabilidade Excel para funcionário: {}", employeeId);
+
+            byte[] excel = accountingFormPdfService.generateAccountingFormExcel(employeeId);
+
+            String fileName = "ficha_contabilidade_" + employeeId + ".xlsx";
+
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(excel);
+
+        } catch (Exception e) {
+            log.error("❌ Erro ao gerar ficha de contabilidade Excel: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
 }
 

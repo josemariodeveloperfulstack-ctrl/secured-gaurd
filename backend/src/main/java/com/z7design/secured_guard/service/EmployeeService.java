@@ -14,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.EmploymentStatus;
+import com.z7design.secured_guard.model.enums.UserStatus;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.PositionRepository;
@@ -66,6 +68,7 @@ public class EmployeeService {
             
             System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
             Employee employee = toEntity(dto);
+            applyTerminationRules(employee, dto);
             System.out.println("[DEBUG] Entity criada, salvando no banco");
             Employee saved = employeeRepository.save(employee);
             System.out.println("[DEBUG] Funcionário salvo com ID: " + saved.getId());
@@ -387,6 +390,8 @@ public class EmployeeService {
                 existingEmployee.setEscalaTrabalho(dto.getEscalaTrabalho());
             }
             
+            applyTerminationRules(existingEmployee, dto);
+
             // Atualizar timestamp
             existingEmployee.setUpdatedAt(LocalDateTime.now());
             
@@ -422,6 +427,39 @@ public class EmployeeService {
             throw new RuntimeException("Apenas funcionários demitidos podem ser excluídos");
         }
         employeeRepository.delete(employee);
+    }
+
+    private void applyTerminationRules(Employee employee, EmployeeDTO dto) {
+        if (employee == null || dto == null) {
+            return;
+        }
+
+        if (employee.getTerminationDate() == null && dto.getDataRescisao() != null) {
+            employee.setTerminationDate(dto.getDataRescisao());
+        }
+
+        if (employee.getTerminationDate() == null) {
+            return;
+        }
+
+        employee.setStatus(EmploymentStatus.INACTIVE);
+
+        String cpf = dto.getCpf() != null ? dto.getCpf() : employee.getDocument();
+        if (cpf == null || cpf.trim().isEmpty()) {
+            return;
+        }
+
+        String normalizedCpf = cpf.replaceAll("[^0-9]", "");
+        Optional<User> userOpt = userRepository.findByUsername(normalizedCpf);
+        if (userOpt.isEmpty()) {
+            userOpt = userRepository.findByUsername(cpf);
+        }
+
+        userOpt.ifPresent(user -> {
+            user.setStatus(UserStatus.INACTIVE);
+            user.setActive(false);
+            userRepository.save(user);
+        });
     }
     
     @Transactional(readOnly = true)

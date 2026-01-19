@@ -187,7 +187,24 @@ export const epiDeliveryFormService = {
       console.error('Erro ao gerar PDF da ficha de entrega de EPI:', error);
       throw error;
     }
-  }
+  },
+
+  /**
+   * Gerar Excel da ficha de entrega de EPI e salvar no banco
+   */
+  async generateAndSaveExcel(data: CreateEPIDeliveryForm): Promise<Blob> {
+    try {
+      const response = await api.post('/api/epi-delivery-forms/generate-excel', data, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar Excel da ficha de entrega de EPI:', error);
+      throw error;
+    }
+  },
+
+  
 };
 
 

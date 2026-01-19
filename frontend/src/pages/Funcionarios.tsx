@@ -222,18 +222,31 @@ const Funcionarios: React.FC = () => {
   // Funcionário editado com sucesso
   const handleEmployeeEdited = () => {
     loadEmployeesWithFilters(); // Recarregar lista
-    handleCloseEditModal();
   };
 
-  // Filtrar funcionários por departamento e status (filtro local)
+  // Filtrar funcionários por departamento, status e busca (filtro local)
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const searchDigits = searchTerm.replace(/\D/g, '');
   const filteredEmployees = employees.filter(employee => {
     const matchesDepartment = departmentFilter === 'all' || 
       employee.unit?.id === departmentFilter || 
       employee.position?.id === departmentFilter;
     
     const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
+
+    const matchesSearch = !normalizedSearch || (() => {
+      const nameMatch = (employee.name || '').toLowerCase().includes(normalizedSearch);
+      const emailMatch = (employee.email || '').toLowerCase().includes(normalizedSearch);
+      const registrationMatch = (employee.registrationNumber || '').toLowerCase().includes(normalizedSearch);
+      const documentDigits = (employee.document || employee.cpf || '').replace(/\D/g, '');
+      const cpfMatch = searchDigits
+        ? documentDigits.includes(searchDigits)
+        : (employee.document || employee.cpf || '').toLowerCase().includes(normalizedSearch);
+
+      return nameMatch || emailMatch || registrationMatch || cpfMatch;
+    })();
     
-    return matchesDepartment && matchesStatus;
+    return matchesDepartment && matchesStatus && matchesSearch;
   });
 
   // Limpar filtros
@@ -845,9 +858,8 @@ Confirma a exclusão?`)) {
           if (editModalOpen && employeeToEdit) {
             handleEmployeeEdited();
           } else {
-            // Caso contrário, recarregar e fechar modal de criação
+            // Caso contrário, apenas recarregar (sem fechar o modal)
             loadEmployeesWithFilters();
-            handleCloseModal();
           }
         }}
         employeeToEdit={editModalOpen && employeeToEdit ? employeeToEdit : null}

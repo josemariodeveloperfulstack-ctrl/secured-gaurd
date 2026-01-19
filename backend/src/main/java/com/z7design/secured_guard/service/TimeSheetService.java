@@ -3,6 +3,9 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.TimeRecord;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
@@ -42,6 +45,8 @@ public class TimeSheetService {
 
     private final TimeRecordService timeRecordService;
     private final EmployeeRepository employeeRepository;
+    private final CompanyRepository companyRepository;
+    private final ExcelReportLayoutService excelReportLayoutService;
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -65,12 +70,15 @@ public class TimeSheetService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Folha de Ponto");
 
+            Company company = resolveCompany(employee);
+            int lastColumn = 6;
+            int rowIndex = excelReportLayoutService.addHeader(sheet, workbook, company, "FOLHA DE PONTO", lastColumn);
+
             // Estilos simples
             CellStyle headerStyle = workbook.createCellStyle();
             headerStyle.setWrapText(true);
 
             // Cabeçalho com informações do funcionário/período
-            int rowIndex = 0;
             Row infoRow = sheet.createRow(rowIndex++);
             infoRow.createCell(0).setCellValue("Funcionário:");
             infoRow.createCell(1).setCellValue(employee.getName() != null ? employee.getName() : employee.getId().toString());
@@ -112,13 +120,13 @@ public class TimeSheetService {
                 List<TimeRecord> dayRecords = recordsByDay.getOrDefault(date, List.of())
                         .stream()
                         .sorted(Comparator.comparing(TimeRecord::getRecordedAt))
-                        .collect(Collectors.toList());
+                        .toList();
 
                 // Mapear por tipo de registro
                 Map<TimeRecord.RecordType, LocalDateTime> byType = new EnumMap<>(TimeRecord.RecordType.class);
-                for (TimeRecord record : dayRecords) {
+                for (TimeRecord timeRecord : dayRecords) {
                     // Guarda o primeiro registro de cada tipo
-                    byType.putIfAbsent(record.getRecordType(), record.getRecordedAt());
+                    byType.putIfAbsent(timeRecord.getRecordType(), timeRecord.getRecordedAt());
                 }
 
                 // Preencher colunas básicas
@@ -139,6 +147,8 @@ public class TimeSheetService {
             for (int i = 0; i < 7; i++) {
                 sheet.autoSizeColumn(i);
             }
+
+            excelReportLayoutService.addFooter(sheet, workbook, company, lastColumn);
 
             workbook.write(out);
             return out.toByteArray();
@@ -171,6 +181,24 @@ public class TimeSheetService {
             return text;
         }
         return text.substring(0, 1).toUpperCase() + text.substring(1);
+    }
+
+    private Company resolveCompany(Employee employee) {
+        if (employee.getCompany() != null) {
+            return employee.getCompany();
+        }
+
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (!activeCompanies.isEmpty()) {
+            return activeCompanies.get(0);
+        }
+
+        List<Company> allCompanies = companyRepository.findAll();
+        if (!allCompanies.isEmpty()) {
+            return allCompanies.get(0);
+        }
+
+        throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
     }
 }
 

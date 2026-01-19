@@ -3,8 +3,11 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.FeriasReportDTO;
 import com.z7design.secured_guard.model.Absence;
 import com.z7design.secured_guard.model.Vacation;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.repository.AbsenceRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.VacationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +29,8 @@ public class FeriasReportService {
 
     private final VacationRepository vacationRepository;
     private final AbsenceRepository absenceRepository;
+    private final CompanyRepository companyRepository;
+    private final ExcelReportLayoutService excelReportLayoutService;
 
     public Map<String, Object> getStats() {
         Map<String, Object> stats = new HashMap<>();
@@ -96,20 +101,25 @@ public class FeriasReportService {
     public byte[] generateFeriasExcelReport(FeriasReportDTO filters) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Relatório de Férias");
+            Company company = resolveCompany();
+            int lastColumn = 7;
+            int rowIndex = excelReportLayoutService.addHeader(sheet, workbook, company, "RELATÓRIO DE FÉRIAS", lastColumn);
             
             // Cabeçalho
-            createFeriasHeader(sheet, workbook);
+            int dataStartRow = createFeriasHeader(sheet, workbook, rowIndex);
             
             // Buscar dados
             List<Vacation> vacations = getFeriasData(filters);
             
             // Preencher dados
-            fillFeriasData(sheet, workbook, vacations);
+            fillFeriasData(sheet, workbook, vacations, dataStartRow);
             
             // Auto-size columns
             for (int i = 0; i < 8; i++) {
                 sheet.autoSizeColumn(i);
             }
+
+            excelReportLayoutService.addFooter(sheet, workbook, company, lastColumn);
             
             // Converter para bytes
             try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -122,20 +132,25 @@ public class FeriasReportService {
     public byte[] generateAfastamentosExcelReport(FeriasReportDTO filters) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Relatório de Afastamentos");
+            Company company = resolveCompany();
+            int lastColumn = 6;
+            int rowIndex = excelReportLayoutService.addHeader(sheet, workbook, company, "RELATÓRIO DE AFASTAMENTOS", lastColumn);
             
             // Cabeçalho
-            createAfastamentosHeader(sheet, workbook);
+            int dataStartRow = createAfastamentosHeader(sheet, workbook, rowIndex);
             
             // Buscar dados
             List<Absence> absences = getAfastamentosData(filters);
             
             // Preencher dados
-            fillAfastamentosData(sheet, workbook, absences);
+            fillAfastamentosData(sheet, workbook, absences, dataStartRow);
             
             // Auto-size columns
             for (int i = 0; i < 7; i++) {
                 sheet.autoSizeColumn(i);
             }
+
+            excelReportLayoutService.addFooter(sheet, workbook, company, lastColumn);
             
             // Converter para bytes
             try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -147,21 +162,32 @@ public class FeriasReportService {
 
     public byte[] generateConsolidadoExcelReport(FeriasReportDTO filters) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
+            Company company = resolveCompany();
+
             // Aba de Férias
             Sheet feriasSheet = workbook.createSheet("Férias");
-            createFeriasHeader(feriasSheet, workbook);
+            int feriasLastColumn = 7;
+            int feriasRowIndex = excelReportLayoutService.addHeader(feriasSheet, workbook, company, "RELATÓRIO DE FÉRIAS", feriasLastColumn);
+            int feriasDataStart = createFeriasHeader(feriasSheet, workbook, feriasRowIndex);
             List<Vacation> vacations = getFeriasData(filters);
-            fillFeriasData(feriasSheet, workbook, vacations);
+            fillFeriasData(feriasSheet, workbook, vacations, feriasDataStart);
+            excelReportLayoutService.addFooter(feriasSheet, workbook, company, feriasLastColumn);
             
             // Aba de Afastamentos
             Sheet afastamentosSheet = workbook.createSheet("Afastamentos");
-            createAfastamentosHeader(afastamentosSheet, workbook);
+            int afastLastColumn = 6;
+            int afastRowIndex = excelReportLayoutService.addHeader(afastamentosSheet, workbook, company, "RELATÓRIO DE AFASTAMENTOS", afastLastColumn);
+            int afastDataStart = createAfastamentosHeader(afastamentosSheet, workbook, afastRowIndex);
             List<Absence> absences = getAfastamentosData(filters);
-            fillAfastamentosData(afastamentosSheet, workbook, absences);
+            fillAfastamentosData(afastamentosSheet, workbook, absences, afastDataStart);
+            excelReportLayoutService.addFooter(afastamentosSheet, workbook, company, afastLastColumn);
             
             // Aba de Estatísticas
             Sheet statsSheet = workbook.createSheet("Estatísticas");
-            createStatsSheet(statsSheet, workbook, filters);
+            int statsLastColumn = 1;
+            int statsRowIndex = excelReportLayoutService.addHeader(statsSheet, workbook, company, "ESTATÍSTICAS", statsLastColumn);
+            createStatsSheet(statsSheet, workbook, filters, statsRowIndex);
+            excelReportLayoutService.addFooter(statsSheet, workbook, company, statsLastColumn);
             
             // Auto-size columns
             for (Sheet sheet : workbook) {
@@ -178,8 +204,8 @@ public class FeriasReportService {
         }
     }
 
-    private void createFeriasHeader(Sheet sheet, Workbook workbook) {
-        Row headerRow = sheet.createRow(0);
+    private int createFeriasHeader(Sheet sheet, Workbook workbook, int startRow) {
+        Row headerRow = sheet.createRow(startRow);
         
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
@@ -195,10 +221,11 @@ public class FeriasReportService {
             cell.setCellValue(headers[i]);
             cell.setCellStyle(headerStyle);
         }
+        return startRow + 1;
     }
 
-    private void createAfastamentosHeader(Sheet sheet, Workbook workbook) {
-        Row headerRow = sheet.createRow(0);
+    private int createAfastamentosHeader(Sheet sheet, Workbook workbook, int startRow) {
+        Row headerRow = sheet.createRow(startRow);
         
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
@@ -214,14 +241,15 @@ public class FeriasReportService {
             cell.setCellValue(headers[i]);
             cell.setCellStyle(headerStyle);
         }
+        return startRow + 1;
     }
 
-    private void fillFeriasData(Sheet sheet, Workbook workbook, List<Vacation> vacations) {
+    private void fillFeriasData(Sheet sheet, Workbook workbook, List<Vacation> vacations, int startRow) {
         CellStyle dateStyle = workbook.createCellStyle();
         CreationHelper createHelper = workbook.getCreationHelper();
         dateStyle.setDataFormat(createHelper.createDataFormat().getFormat("dd/mm/yyyy"));
         
-        int rowNum = 1;
+        int rowNum = startRow;
         for (Vacation vacation : vacations) {
             Row row = sheet.createRow(rowNum++);
             
@@ -244,12 +272,12 @@ public class FeriasReportService {
         }
     }
 
-    private void fillAfastamentosData(Sheet sheet, Workbook workbook, List<Absence> absences) {
+    private void fillAfastamentosData(Sheet sheet, Workbook workbook, List<Absence> absences, int startRow) {
         CellStyle dateStyle = workbook.createCellStyle();
         CreationHelper createHelper = workbook.getCreationHelper();
         dateStyle.setDataFormat(createHelper.createDataFormat().getFormat("dd/mm/yyyy"));
         
-        int rowNum = 1;
+        int rowNum = startRow;
         for (Absence absence : absences) {
             Row row = sheet.createRow(rowNum++);
             
@@ -267,21 +295,22 @@ public class FeriasReportService {
         }
     }
 
-    private void createStatsSheet(Sheet sheet, Workbook workbook, FeriasReportDTO filters) {
+    private void createStatsSheet(Sheet sheet, Workbook workbook, FeriasReportDTO filters, int startRow) {
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
         headerFont.setBold(true);
         headerStyle.setFont(headerFont);
         
         // Título
-        Row titleRow = sheet.createRow(0);
+        int rowNum = startRow;
+        Row titleRow = sheet.createRow(rowNum++);
         Cell titleCell = titleRow.createCell(0);
         titleCell.setCellValue("Estatísticas de Férias e Afastamentos");
         titleCell.setCellStyle(headerStyle);
         
         // Estatísticas de férias
         Map<String, Object> feriasStats = getFeriasStats();
-        int rowNum = 2;
+        rowNum++;
         
         Row feriasHeaderRow = sheet.createRow(rowNum++);
         Cell feriasHeaderCell = feriasHeaderRow.createCell(0);
@@ -308,6 +337,20 @@ public class FeriasReportService {
             row.createCell(0).setCellValue(entry.getKey());
             row.createCell(1).setCellValue(entry.getValue().toString());
         }
+    }
+
+    private Company resolveCompany() {
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (!activeCompanies.isEmpty()) {
+            return activeCompanies.get(0);
+        }
+
+        List<Company> allCompanies = companyRepository.findAll();
+        if (!allCompanies.isEmpty()) {
+            return allCompanies.get(0);
+        }
+
+        throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
     }
 
     private List<Vacation> getFeriasData(FeriasReportDTO filters) {

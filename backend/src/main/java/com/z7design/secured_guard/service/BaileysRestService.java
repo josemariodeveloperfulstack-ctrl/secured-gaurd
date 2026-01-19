@@ -484,6 +484,18 @@ public class BaileysRestService {
     public boolean sendFileMessage(String phoneNumber, String message, String filePath) {
         lastErrorMessage = null; // Limpar erro anterior
         
+        if (!baileysEnabled) {
+            lastErrorMessage = "WhatsApp não está habilitado. Verifique a configuração baileys.enabled.";
+            logger.error("❌ Baileys desabilitado - envio cancelado");
+            return false;
+        }
+
+        if (!checkConnection()) {
+            lastErrorMessage = "WhatsApp não está conectado. Verifique a conexão e tente novamente.";
+            logger.error("❌ Tentativa de envio com WhatsApp desconectado");
+            return false;
+        }
+
         // ⚠️ PROTEÇÃO: Verificar limite de envios (modo teste Baileys)
         if (!testConfig.canSendMessage(phoneNumber)) {
             lastErrorMessage = "Limite de testes atingido. Migre para WhatsApp Cloud API oficial.";
@@ -500,6 +512,13 @@ public class BaileysRestService {
                 lastErrorMessage = "Arquivo não encontrado no backend: " + filePath;
                 logger.error("❌ Arquivo não existe no backend: {}", filePath);
                 logger.info("💡 O arquivo precisa existir no backend antes de ser enviado ao WhatsApp");
+                return false;
+            }
+
+            long maxFileSizeBytes = 10L * 1024L * 1024L;
+            if (file.length() > maxFileSizeBytes) {
+                lastErrorMessage = "Arquivo muito grande para envio (máximo 10MB).";
+                logger.error("❌ Arquivo excede o limite: {} bytes", file.length());
                 return false;
             }
             

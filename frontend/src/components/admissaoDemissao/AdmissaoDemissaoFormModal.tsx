@@ -321,7 +321,6 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
   };
 
   const handleFuncionarioCreated = () => {
-    setShowFuncionarioModal(false); // Fecha o modal de funcionário
     // Recarregar a lista de funcionários após criar um novo
     loadFuncionarios();
   };

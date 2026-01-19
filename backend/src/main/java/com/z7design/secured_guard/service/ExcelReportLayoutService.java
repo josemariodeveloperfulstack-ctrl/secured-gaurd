@@ -59,16 +59,28 @@ public class ExcelReportLayoutService {
         Company company = companyRepository.findById(companyId)
             .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + companyId));
         
-        return addHeader(sheet, workbook, company, reportTitle);
+        return addHeader(sheet, workbook, company, reportTitle, 5);
+    }
+
+    public int addHeader(Sheet sheet, Workbook workbook, java.util.UUID companyId, String reportTitle, int lastColumn) {
+        Company company = companyRepository.findById(companyId)
+            .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com ID: " + companyId));
+        
+        return addHeader(sheet, workbook, company, reportTitle, lastColumn);
     }
     
     /**
      * Adiciona cabeçalho padronizado ao Excel
      */
     public int addHeader(Sheet sheet, Workbook workbook, Company company, String reportTitle) {
+        return addHeader(sheet, workbook, company, reportTitle, 5);
+    }
+
+    public int addHeader(Sheet sheet, Workbook workbook, Company company, String reportTitle, int lastColumn) {
         log.info("Adicionando cabeçalho Excel - Empresa: {}, Título: {}", company.getName(), reportTitle);
         
         int currentRow = 0;
+        int safeLastColumn = Math.max(0, lastColumn);
         
         // Linha 1: Logo (altura 120px)
         Row logoRow = sheet.createRow(currentRow++);
@@ -78,7 +90,7 @@ public class ExcelReportLayoutService {
         // Linha 2: Barra gradiente (altura 20px)
         Row gradientRow = sheet.createRow(currentRow++);
         gradientRow.setHeightInPoints(20);
-        addGradientBar(sheet, workbook, gradientRow);
+        addGradientBar(workbook, gradientRow, safeLastColumn);
         
         // Linha 3: Título do relatório (altura 30px)
         Row titleRow = sheet.createRow(currentRow++);
@@ -87,7 +99,7 @@ public class ExcelReportLayoutService {
         titleCell.setCellValue(reportTitle != null ? reportTitle : "Relatório");
         CellStyle titleStyle = createTitleStyle(workbook);
         titleCell.setCellStyle(titleStyle);
-        sheet.addMergedRegion(new CellRangeAddress(currentRow - 1, currentRow - 1, 0, 5));
+        sheet.addMergedRegion(new CellRangeAddress(currentRow - 1, currentRow - 1, 0, safeLastColumn));
         
         // Linha 4: Nome da empresa (altura 20px)
         Row companyRow = sheet.createRow(currentRow++);
@@ -96,7 +108,7 @@ public class ExcelReportLayoutService {
         companyCell.setCellValue(company.getName());
         CellStyle companyStyle = createCompanyNameStyle(workbook);
         companyCell.setCellStyle(companyStyle);
-        sheet.addMergedRegion(new CellRangeAddress(currentRow - 1, currentRow - 1, 0, 5));
+        sheet.addMergedRegion(new CellRangeAddress(currentRow - 1, currentRow - 1, 0, safeLastColumn));
         
         // Linha 5: CNPJ (altura 15px)
         String cnpjText = CompanyDataFormatter.formatCnpjForHeader(company);
@@ -107,7 +119,7 @@ public class ExcelReportLayoutService {
             cnpjCell.setCellValue(cnpjText);
             CellStyle cnpjStyle = createCnpjStyle(workbook);
             cnpjCell.setCellStyle(cnpjStyle);
-            sheet.addMergedRegion(new CellRangeAddress(currentRow - 1, currentRow - 1, 0, 5));
+            sheet.addMergedRegion(new CellRangeAddress(currentRow - 1, currentRow - 1, 0, safeLastColumn));
         }
         
         // Linha 6: Linha em branco (altura 10px)
@@ -126,10 +138,15 @@ public class ExcelReportLayoutService {
      * - Última linha: Data de geração + linha gradiente
      */
     public void addFooter(Sheet sheet, Workbook workbook, Company company) {
+        addFooter(sheet, workbook, company, 5);
+    }
+
+    public void addFooter(Sheet sheet, Workbook workbook, Company company, int lastColumn) {
         log.info("Adicionando rodapé Excel - Empresa: {}", company.getName());
         
         int lastRowNum = sheet.getLastRowNum();
         int footerStartRow = lastRowNum + 1;
+        int safeLastColumn = Math.max(0, lastColumn);
         
         // Antepenúltima linha: Linha em branco
         Row blankRow = sheet.createRow(footerStartRow++);
@@ -143,7 +160,7 @@ public class ExcelReportLayoutService {
         infoCell.setCellValue(footerText);
         CellStyle footerStyle = createFooterStyle(workbook);
         infoCell.setCellStyle(footerStyle);
-        sheet.addMergedRegion(new CellRangeAddress(footerStartRow - 1, footerStartRow - 1, 0, 5));
+        sheet.addMergedRegion(new CellRangeAddress(footerStartRow - 1, footerStartRow - 1, 0, safeLastColumn));
         
         // Última linha: Data de geração + linha gradiente
         Row dateRow = sheet.createRow(footerStartRow);
@@ -153,10 +170,10 @@ public class ExcelReportLayoutService {
         dateCell.setCellValue("Gerado em: " + generatedAt);
         CellStyle dateStyle = createDateStyle(workbook);
         dateCell.setCellStyle(dateStyle);
-        sheet.addMergedRegion(new CellRangeAddress(footerStartRow, footerStartRow, 0, 5));
+        sheet.addMergedRegion(new CellRangeAddress(footerStartRow, footerStartRow, 0, safeLastColumn));
         
         // Adicionar linha gradiente na parte inferior (3px)
-        addGradientBarAtBottom(sheet, workbook, dateRow);
+        addGradientBarAtBottom(workbook, dateRow, safeLastColumn);
         
         log.info("Rodapé Excel adicionado");
     }
@@ -172,7 +189,7 @@ public class ExcelReportLayoutService {
         
         try {
             byte[] imageBytes = loadLogoImage(company.getLogoUrl());
-            if (imageBytes == null) {
+            if (imageBytes == null || imageBytes.length == 0) {
                 log.warn("Não foi possível carregar logo da empresa {}", company.getName());
                 return;
             }
@@ -219,7 +236,7 @@ public class ExcelReportLayoutService {
         } catch (Exception e) {
             log.error("Erro ao carregar logo de {}: {}", logoUrl, e.getMessage());
         }
-        return null;
+        return new byte[0];
     }
     
     /**
@@ -239,22 +256,25 @@ public class ExcelReportLayoutService {
     /**
      * Adiciona barra gradiente (simulada com cores sólidas)
      */
-    private void addGradientBar(Sheet sheet, Workbook workbook, Row row) {
-        // Dividir em 3 células para simular gradiente
-        int numCells = 6; // Usar 6 colunas para gradiente suave
+    private void addGradientBar(Workbook workbook, Row row, int lastColumn) {
+        int numCells = Math.max(1, lastColumn + 1);
         
         for (int i = 0; i < numCells; i++) {
             Cell cell = row.createCell(i);
             CellStyle style = workbook.createCellStyle();
             
-            // Calcular cor baseada na posição
             String colorHex;
-            if (i < numCells / 3) {
-                colorHex = COLOR_YELLOW_HEX; // Amarelo
-            } else if (i < (numCells * 2) / 3) {
-                colorHex = COLOR_ORANGE_HEX; // Laranja
+            if (numCells == 1) {
+                colorHex = COLOR_ORANGE_HEX;
             } else {
-                colorHex = COLOR_RED_HEX; // Vermelho
+                double progress = (double) i / (double) (numCells - 1);
+                if (progress <= 0.33) {
+                    colorHex = COLOR_YELLOW_HEX;
+                } else if (progress <= 0.66) {
+                    colorHex = COLOR_ORANGE_HEX;
+                } else {
+                    colorHex = COLOR_RED_HEX;
+                }
             }
             
             XSSFCellStyle xssfStyle = (XSSFCellStyle) style;
@@ -268,27 +288,8 @@ public class ExcelReportLayoutService {
     /**
      * Adiciona linha gradiente na parte inferior do rodapé
      */
-    private void addGradientBarAtBottom(Sheet sheet, Workbook workbook, Row row) {
-        // Adicionar linha gradiente nas últimas 3 células da linha
-        for (int i = 3; i < 6; i++) {
-            Cell cell = row.createCell(i);
-            CellStyle style = workbook.createCellStyle();
-            
-            String colorHex;
-            if (i == 3) {
-                colorHex = COLOR_YELLOW_HEX;
-            } else if (i == 4) {
-                colorHex = COLOR_ORANGE_HEX;
-            } else {
-                colorHex = COLOR_RED_HEX;
-            }
-            
-            XSSFCellStyle xssfStyle = (XSSFCellStyle) style;
-            xssfStyle.setFillForegroundColor(new XSSFColor(hexToRgb(colorHex), null));
-            xssfStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            
-            cell.setCellStyle(style);
-        }
+    private void addGradientBarAtBottom(Workbook workbook, Row row, int lastColumn) {
+        addGradientBar(workbook, row, lastColumn);
     }
     
     /**

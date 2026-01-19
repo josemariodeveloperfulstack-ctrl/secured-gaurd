@@ -51,6 +51,31 @@ export const accountingFormService = {
   },
 
   /**
+   * Gera ficha de contabilidade em Excel para download
+   */
+  async downloadExcel(employeeId: string, employeeName: string): Promise<void> {
+    try {
+      const response = await api.get(`/api/accounting-forms/${employeeId}/excel`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ficha_contabilidade_${employeeName.replace(/\s+/g, '_')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (error) {
+      console.error('Erro ao baixar ficha de contabilidade em Excel:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Imprime ficha de contabilidade
    */
   async print(employeeId: string): Promise<void> {

@@ -645,8 +645,7 @@ const RH: React.FC = () => {
         open={novoFuncionarioOpen}
         onClose={() => setNovoFuncionarioOpen(false)}
         onCreated={() => {
-          setNovoFuncionarioOpen(false);
-          navigate('/rh/funcionarios');
+          // Manter modal aberto após salvar
         }}
         employeeToEdit={null}
       />

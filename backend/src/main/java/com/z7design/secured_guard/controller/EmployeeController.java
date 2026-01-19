@@ -638,6 +638,33 @@ public class EmployeeController {
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @GetMapping("/{id}/generate-record-excel")
+    @Operation(summary = "Gerar Excel da ficha de registro do funcionário", description = "Gera e retorna o Excel da ficha de registro do funcionário")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Excel gerado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar Excel")
+    })
+    public ResponseEntity<byte[]> generateEmployeeRecordExcel(@PathVariable String id) {
+        try {
+            System.out.println("[DEBUG] EmployeeController.generateEmployeeRecordExcel - ID: " + id);
+
+            UUID employeeId = UUID.fromString(id);
+            byte[] excel = employeeRecordPdfService.generateEmployeeRecordExcel(employeeId);
+
+            String fileName = "ficha-registro-funcionario-" + id + ".xlsx";
+
+            return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .body(excel);
+        } catch (Exception e) {
+            System.err.println("[ERROR] EmployeeController.generateEmployeeRecordExcel - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
     
     /**
      * 📥 Importar funcionários de planilha Excel

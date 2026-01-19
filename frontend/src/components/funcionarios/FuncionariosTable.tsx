@@ -111,6 +111,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
               <TableHead className="text-seguranca-yellow font-semibold">Empresa</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Posto de Trabalho</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Admissão</TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">Demissão</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Status</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold w-[70px]">Ações</TableHead>
             </TableRow>
@@ -197,6 +198,12 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
                     <Calendar className="h-4 w-4 text-gray-400" />
                     {formatDate(employee.hireDate)}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    {formatDate(employee.terminationDate)}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -330,6 +337,12 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   <div className="flex items-center gap-2 text-gray-400">
                     <Calendar className="h-4 w-4 flex-shrink-0" />
                     <span>Admissão: {formatDate(employee.hireDate)}</span>
+                  </div>
+                )}
+                {employee.terminationDate && (
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Calendar className="h-4 w-4 flex-shrink-0" />
+                    <span>Demissão: {formatDate(employee.terminationDate)}</span>
                   </div>
                 )}
               </div>

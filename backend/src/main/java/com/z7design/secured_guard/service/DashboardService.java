@@ -32,7 +32,6 @@ public class DashboardService {
     private final UserActivityLogRepository userActivityLogRepository;
     private final NotificationRepository notificationRepository;
 
-    @Cacheable(value = "dashboard-summary", key = "'summary'")
     public DashboardSummaryDTO getDashboardSummary() {
         log.info("Gerando resumo do dashboard (não encontrado no cache)");
         

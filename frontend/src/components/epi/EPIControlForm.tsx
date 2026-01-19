@@ -602,8 +602,6 @@ const EPIControlForm: React.FC<EPIControlFormProps> = ({
               console.error('Erro ao recarregar dados do funcionário:', error);
             }
           }
-          setEditEmployeeModalOpen(false);
-          setEmployeeToEdit(null);
         }}
         employeeToEdit={employeeToEdit}
       />

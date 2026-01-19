@@ -153,6 +153,41 @@ public class EPIDeliveryFormController {
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @Operation(summary = "Gerar Excel da ficha de entrega de EPI e salvar no banco",
+               description = "Gera o Excel da ficha de entrega de EPI, salva o registro no banco e retorna o arquivo")
+    @PostMapping("/generate-excel")
+    public ResponseEntity<byte[]> generateAndSaveEPIDeliveryExcel(
+            @RequestBody CreateEPIDeliveryFormDTO dto,
+            Authentication authentication) {
+        try {
+            log.info("📊 Gerando Excel de ficha de entrega de EPI para funcionário: {}", dto.getEmployeeId());
+
+            UUID createdByUserId = null;
+            if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
+                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+                // Buscar UUID do usuário pelo username se necessário
+            }
+
+            EPIDeliveryFormDTO savedForm = epiDeliveryFormService.create(dto, createdByUserId);
+            log.info("✅ Ficha de entrega de EPI salva no banco com ID: {}", savedForm.getId());
+
+            com.z7design.secured_guard.model.EPIDeliveryForm form =
+                epiDeliveryFormService.findByIdEntity(savedForm.getId());
+
+            byte[] excel = epiDeliveryPdfService.generateEPIDeliveryExcelFromForm(form);
+
+            String fileName = "ficha-entrega-epi-" + savedForm.getId() + ".xlsx";
+
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .body(excel);
+        } catch (Exception e) {
+            log.error("❌ Erro ao gerar Excel de ficha de entrega de EPI: {}", e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
 
 

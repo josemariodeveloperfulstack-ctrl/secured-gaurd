@@ -296,6 +296,21 @@ export const employeeService = {
   },
 
   /**
+   * Gerar Excel da ficha de registro do funcionário
+   */
+  async generateEmployeeRecordExcel(id: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/employees/${id}/generate-record-excel`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao gerar Excel da ficha de registro:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao gerar Excel da ficha de registro');
+    }
+  },
+
+  /**
    * Importar funcionários de planilha Excel
    */
   async importEmployeesFromExcel(file: File): Promise<{
