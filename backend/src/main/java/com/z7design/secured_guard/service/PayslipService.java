@@ -1950,8 +1950,8 @@ public class PayslipService {
         int proximaVersao = determinarProximaVersao(pastaCompleta, payslip);
         payslip.setVersao(proximaVersao);
         
-        // 6. Nome do arquivo conforme PRD: holerite_v1.pdf, holerite_v2.pdf, etc.
-        String nomeArquivo = String.format("holerite_v%d.pdf", proximaVersao);
+        // 6. Nome do arquivo conforme PRD atualizado: NOME_CPF_V1.pdf, NOME_CPF_V2.pdf, etc.
+        String nomeArquivo = String.format("%s_V%d.pdf", pastaFuncionario, proximaVersao);
         Path caminhoCompleto = pastaCompleta.resolve(nomeArquivo);
         
         // 7. Calcular hash do arquivo PDF antes de salvar (usar hash do PDF, não do texto)
@@ -2001,16 +2001,27 @@ public class PayslipService {
             
             // Buscar todos os arquivos holerite_v*.pdf no diretório
             // IMPORTANTE: Apenas LÊ os arquivos - não os exclui ou modifica
-            Pattern versaoPattern = Pattern.compile("holerite_v(\\d+)\\.pdf");
+            Pattern versaoPattern = Pattern.compile(".*_V(\\d+)\\.pdf", Pattern.CASE_INSENSITIVE);
+            Pattern versaoFallbackPattern = Pattern.compile("holerite_v(\\d+)\\.pdf", Pattern.CASE_INSENSITIVE);
             int versaoMaxima = 0;
             
             try (var stream = Files.list(pastaCompleta)) {
                 versaoMaxima = stream
                     .filter(Files::isRegularFile)
                     .map(path -> path.getFileName().toString())
-                    .map(versaoPattern::matcher)
-                    .filter(Matcher::matches)
-                    .mapToInt(matcher -> Integer.parseInt(matcher.group(1)))
+                    .map(path -> {
+                        Matcher matcher = versaoPattern.matcher(path);
+                        if (matcher.matches()) {
+                            return matcher.group(1);
+                        }
+                        Matcher fallbackMatcher = versaoFallbackPattern.matcher(path);
+                        if (fallbackMatcher.matches()) {
+                            return fallbackMatcher.group(1);
+                        }
+                        return null;
+                    })
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::parseInt)
                     .max()
                     .orElse(0);
             }
