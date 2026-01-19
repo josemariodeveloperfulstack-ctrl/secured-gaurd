@@ -76,6 +76,10 @@ public class EPIDeliveryFormService {
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
                 String epiName = itemDto.getEpiName();
+                if (epiName == null || epiName.trim().isEmpty()) {
+                    log.warn("⚠️ Item de EPI sem nome informado. Usando valor padrão.");
+                    epiName = "EPI";
+                }
                 Integer quantity = itemDto.getQuantity() != null ? itemDto.getQuantity() : 1;
                 
                 // Buscar EPI pelo nome no estoque
@@ -100,28 +104,25 @@ public class EPIDeliveryFormService {
                 
                 // Se encontrou o EPI no estoque, verificar e dar baixa
                 if (epi != null) {
-                    // Verificar estoque disponível
                     Integer availableStock = epi.getCurrentStock();
-                    
-                    if (availableStock < quantity) {
-                        throw new IllegalArgumentException(
-                            String.format("Estoque insuficiente para o EPI '%s'. Disponível: %d, Solicitado: %d", 
-                                epiName, availableStock, quantity)
-                        );
-                    }
-                    
-                    // Dar baixa no estoque
-                    Integer newStock = availableStock - quantity;
-                    epi.setCurrentStock(newStock);
-                    epiRepository.save(epi);
-                    
-                    log.info("📦 Baixa no estoque: EPI '{}' - Quantidade: {} - Estoque anterior: {} - Estoque atual: {}", 
-                        epiName, quantity, availableStock, newStock);
-                    
-                    // Verificar se o estoque está baixo e criar alerta se necessário
-                    if (newStock <= epi.getMinimumStock()) {
-                        log.warn("⚠️ Estoque baixo para o EPI '{}': {} unidades (mínimo: {})", 
-                            epiName, newStock, epi.getMinimumStock());
+
+                    if (availableStock == null) {
+                        log.warn("⚠️ Estoque atual do EPI '{}' está indefinido. Entrega registrada sem baixa.", epiName);
+                    } else if (availableStock < quantity) {
+                        log.warn("⚠️ Estoque insuficiente para o EPI '{}'. Disponível: {}, Solicitado: {}. Entrega registrada sem baixa.",
+                            epiName, availableStock, quantity);
+                    } else {
+                        Integer newStock = availableStock - quantity;
+                        epi.setCurrentStock(newStock);
+                        epiRepository.save(epi);
+
+                        log.info("📦 Baixa no estoque: EPI '{}' - Quantidade: {} - Estoque anterior: {} - Estoque atual: {}",
+                            epiName, quantity, availableStock, newStock);
+
+                        if (epi.getMinimumStock() != null && newStock <= epi.getMinimumStock()) {
+                            log.warn("⚠️ Estoque baixo para o EPI '{}': {} unidades (mínimo: {})",
+                                epiName, newStock, epi.getMinimumStock());
+                        }
                     }
                 } else {
                     log.warn("⚠️ EPI '{}' não encontrado no estoque. Entrega registrada sem baixa no estoque.", epiName);

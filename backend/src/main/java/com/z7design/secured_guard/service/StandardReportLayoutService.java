@@ -482,19 +482,25 @@ public class StandardReportLayoutService {
                 log.debug("Logo da empresa {} carregado do cache (ImageData)", company.getName());
                 imageData = logoDataCache.get(cacheKey);
             } else {
-                // Se for uma URL HTTP/HTTPS, usar diretamente
+                // Se for URL HTTP/HTTPS, tentar resolver para arquivo local quando apontar para /uploads
+                if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+                    String pathFromUrl = extractUploadPathFromUrl(logoUrl);
+                    if (pathFromUrl != null) {
+                        logoUrl = pathFromUrl;
+                    }
+                }
+
                 if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
                     log.debug("Carregando logo de URL: {}", logoUrl);
                     imageData = ImageDataFactory.create(logoUrl);
                 } else {
-                    // Se for caminho relativo, resolver para caminho absoluto
                     String logoPath = resolveLogoPath(logoUrl);
-                    
-                    if (!Files.exists(Paths.get(logoPath))) {
+
+                    if (logoPath == null || !Files.exists(Paths.get(logoPath))) {
                         log.warn("Logo não encontrado no caminho: {}", logoPath);
                         return null;
                     }
-                    
+
                     imageData = ImageDataFactory.create(logoPath);
                 }
                 
@@ -578,6 +584,27 @@ public class StandardReportLayoutService {
         // Caso contrário, assumir que é um caminho relativo
         Path logoPath = Paths.get(uploadDir, logoUrl);
         return logoPath.toAbsolutePath().toString();
+    }
+
+    /**
+     * Extrai caminho local de URLs que apontam para /uploads.
+     */
+    private String extractUploadPathFromUrl(String logoUrl) {
+        try {
+            java.net.URI uri = new java.net.URI(logoUrl);
+            String path = uri.getPath();
+            if (path == null) {
+                return null;
+            }
+            if (path.startsWith("/api/uploads/companies/logos/") ||
+                path.startsWith("/uploads/companies/logos/") ||
+                path.startsWith("/uploads/")) {
+                return path;
+            }
+        } catch (Exception e) {
+            log.debug("Não foi possível extrair path de logo URL {}: {}", logoUrl, e.getMessage());
+        }
+        return null;
     }
     
 }
