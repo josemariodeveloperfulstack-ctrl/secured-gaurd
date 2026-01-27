@@ -28,7 +28,8 @@ public class EmailService {
     /**
      * Envia documento unificado por email
      */
-    public boolean sendUnifiedDocument(String toEmail, String employeeName, String month, String year, String filePath) {
+    public boolean sendUnifiedDocument(String toEmail, String employeeName, String month, String year,
+            String filePath) {
         try {
             log.info("📧 Enviando documento unificado por email para: {}", toEmail);
             log.info("Funcionário: {} - {}/{}", employeeName, month, year);
@@ -46,7 +47,7 @@ public class EmailService {
             emailMessage.setFrom(fromEmail);
             emailMessage.setTo(toEmail);
             emailMessage.setSubject(String.format("Documento Unificado - %s - %s/%s", employeeName, month, year));
-            
+
             // Corpo do email
             String emailBody = createEmailBody(employeeName, month, year);
             emailMessage.setText(emailBody);
@@ -90,26 +91,32 @@ public class EmailService {
     /**
      * Envia email com anexo em bytes (PDF)
      */
-    public boolean sendEmailWithAttachment(String toEmail, String subject, String htmlBody, byte[] attachmentBytes, String attachmentFileName) {
+    public boolean sendEmailWithAttachment(String toEmail, String subject, String htmlBody, byte[] attachmentBytes,
+            String attachmentFileName) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             // Se não há anexo, não precisa de multipart
-            boolean hasAttachment = attachmentBytes != null && attachmentBytes.length > 0 && attachmentFileName != null && !attachmentFileName.trim().isEmpty();
+            boolean hasAttachment = attachmentBytes != null && attachmentBytes.length > 0 && attachmentFileName != null
+                    && !attachmentFileName.trim().isEmpty();
             MimeMessageHelper helper = new MimeMessageHelper(message, hasAttachment, "UTF-8");
             helper.setFrom(fromEmail);
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
-            
+
             // Adicionar anexo apenas se fornecido
             if (hasAttachment && attachmentBytes != null && attachmentFileName != null) {
-                helper.addAttachment(attachmentFileName, new org.springframework.core.io.ByteArrayResource(attachmentBytes));
+                helper.addAttachment(attachmentFileName,
+                        new org.springframework.core.io.ByteArrayResource(attachmentBytes));
+            }
+
+            mailSender.send(message);
+
+            if (hasAttachment && attachmentBytes != null && attachmentFileName != null) {
                 log.info("✅ Email com anexo enviado para {} ({} bytes)", toEmail, attachmentBytes.length);
             } else {
                 log.info("✅ Email enviado para {} (sem anexo)", toEmail);
             }
-            
-            mailSender.send(message);
             return true;
         } catch (MailException e) {
             Throwable cause = e.getCause();
@@ -152,55 +159,57 @@ public class EmailService {
      * Cria corpo do email em HTML
      */
     private String createEmailBody(String employeeName, String month, String year) {
-        return String.format("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
-                    .content { padding: 20px; }
-                    .footer { background: #ecf0f1; padding: 15px; text-align: center; font-size: 12px; }
-                    .button { background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <h1>🏢 SecuredGuard</h1>
-                    <h2>Documento Unificado</h2>
-                </div>
-                
-                <div class="content">
-                    <h3>Olá!</h3>
-                    <p>O documento unificado para <strong>%s</strong> referente ao período <strong>%s/%s</strong> foi gerado com sucesso.</p>
-                    
-                    <p>Este documento contém:</p>
-                    <ul>
-                        <li>📄 <strong>Holerite</strong> com informações salariais</li>
-                        <li>💰 <strong>Recibo de Pagamento</strong> com comprovante bancário</li>
-                    </ul>
-                    
-                    <p>O arquivo está anexado a este email para sua conveniência.</p>
-                    
-                    <p style="margin-top: 30px;">
-                        <strong>Informações importantes:</strong>
-                    </p>
-                    <ul>
-                        <li>Guarde este documento para seus registros</li>
-                        <li>Use para declaração de imposto de renda</li>
-                        <li>Comprovante oficial de recebimento</li>
-                    </ul>
-                </div>
-                
-                <div class="footer">
-                    <p>Este é um email automático do sistema SecuredGuard.</p>
-                    <p>Em caso de dúvidas, entre em contato com o departamento de RH.</p>
-                    <p>© 2025 SecuredGuard - Todos os direitos reservados</p>
-                </div>
-            </body>
-            </html>
-            """, employeeName, month, year);
+        return String.format(
+                """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="UTF-8">
+                            <style>
+                                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                                .header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+                                .content { padding: 20px; }
+                                .footer { background: #ecf0f1; padding: 15px; text-align: center; font-size: 12px; }
+                                .button { background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h1>🏢 SecuredGuard</h1>
+                                <h2>Documento Unificado</h2>
+                            </div>
+
+                            <div class="content">
+                                <h3>Olá!</h3>
+                                <p>O documento unificado para <strong>%s</strong> referente ao período <strong>%s/%s</strong> foi gerado com sucesso.</p>
+
+                                <p>Este documento contém:</p>
+                                <ul>
+                                    <li>📄 <strong>Holerite</strong> com informações salariais</li>
+                                    <li>💰 <strong>Recibo de Pagamento</strong> com comprovante bancário</li>
+                                </ul>
+
+                                <p>O arquivo está anexado a este email para sua conveniência.</p>
+
+                                <p style="margin-top: 30px;">
+                                    <strong>Informações importantes:</strong>
+                                </p>
+                                <ul>
+                                    <li>Guarde este documento para seus registros</li>
+                                    <li>Use para declaração de imposto de renda</li>
+                                    <li>Comprovante oficial de recebimento</li>
+                                </ul>
+                            </div>
+
+                            <div class="footer">
+                                <p>Este é um email automático do sistema SecuredGuard.</p>
+                                <p>Em caso de dúvidas, entre em contato com o departamento de RH.</p>
+                                <p>© 2025 SecuredGuard - Todos os direitos reservados</p>
+                            </div>
+                        </body>
+                        </html>
+                        """,
+                employeeName, month, year);
     }
 
     /**
@@ -211,17 +220,17 @@ public class EmailService {
             log.info("🧪 Testando configuração de email...");
             log.info("📧 Host: {}", mailSender);
             log.info("📧 From: {}", fromEmail);
-            
+
             SimpleMailMessage testMessage = new SimpleMailMessage();
             testMessage.setFrom(fromEmail);
             testMessage.setTo("test@example.com");
             testMessage.setSubject("Teste de Configuração - SecuredGuard");
             testMessage.setText("Este é um email de teste para verificar a configuração do sistema.");
-            
+
             mailSender.send(testMessage);
             log.info("✅ Configuração de email funcionando");
             return true;
-            
+
         } catch (MailException e) {
             Throwable cause = e.getCause();
             if (cause instanceof jakarta.mail.AuthenticationFailedException) {
@@ -258,4 +267,4 @@ public class EmailService {
             return false;
         }
     }
-} 
+}
