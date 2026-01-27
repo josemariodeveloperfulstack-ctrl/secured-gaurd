@@ -3,7 +3,6 @@ package com.z7design.secured_guard.dto;
 import com.z7design.secured_guard.model.EmployeeCertification;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 import lombok.Builder;
-import org.hibernate.Hibernate;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -25,88 +24,72 @@ public record EmployeeCertificationResponse(
         LocalDate issueDate,
         LocalDate expirationDate,
         CertificationStatus status,
-        String documentUrl
-) {
+        String documentUrl) {
     public static EmployeeCertificationResponse fromEntity(EmployeeCertification certification) {
         if (certification == null) {
             return null;
         }
-        
-        try {
-            String positionName = null;
-            String departmentName = null;
-            
-            if (certification.getEmployee() != null) {
-                // Obter nome do cargo (position) - inicializar explicitamente se necessário
+
+        String employeeName = null;
+        String employeeDocument = null;
+        String positionName = null;
+        String departmentName = null;
+
+        var employee = certification.getEmployee();
+        if (employee != null) {
+            employeeName = employee.getName();
+            employeeDocument = employee.getDocument();
+
+            // Tentar obter o cargo (Position)
+            var position = employee.getPosition();
+            if (position != null) {
                 try {
-                    var employee = certification.getEmployee();
-                    // Garantir que o Employee e seus relacionamentos foram inicializados
-                    Hibernate.initialize(employee);
-                    
-                    if (employee.getPosition() != null) {
-                        // Garantir que o Position foi inicializado (pode ser um proxy lazy)
-                        Hibernate.initialize(employee.getPosition());
-                        
-                        // Tentar acessar o nome do position
-                        try {
-                            positionName = employee.getPosition().getName();
-                            System.out.println("✅ EmployeeCertificationResponse - Position encontrado: " + positionName + 
-                                " para employee: " + employee.getName() + " (ID: " + employee.getId() + ")");
-                        } catch (org.hibernate.LazyInitializationException e) {
-                            System.err.println("⚠️ EmployeeCertificationResponse - LazyInitializationException ao acessar position.getName()");
-                            // Tentar buscar o position novamente do banco
-                            positionName = null;
-                        }
-                    } else {
-                        System.out.println("⚠️ EmployeeCertificationResponse - Position é null para employee: " + 
-                            employee.getName() + " (ID: " + employee.getId() + ")");
-                    }
+                    positionName = position.getName();
                 } catch (Exception e) {
-                    System.err.println("❌ EmployeeCertificationResponse - Erro ao obter position: " + e.getMessage());
-                    if (e instanceof org.hibernate.LazyInitializationException) {
-                        System.err.println("   -> LazyInitializationException: o relacionamento não foi carregado pelo EntityGraph");
-                    }
-                    e.printStackTrace();
-                }
-                
-                // Obter nome do setor (unit ou workPost)
-                try {
-                    // Priorizar workPost se existir
-                    if (certification.getWorkPost() != null) {
-                        Hibernate.initialize(certification.getWorkPost());
-                        departmentName = certification.getWorkPost().getName();
-                    } else if (certification.getEmployee().getUnit() != null) {
-                        Hibernate.initialize(certification.getEmployee().getUnit());
-                        departmentName = certification.getEmployee().getUnit().getName();
-                    }
-                } catch (Exception e) {
-                    System.err.println("❌ EmployeeCertificationResponse - Erro ao obter department/unit: " + e.getMessage());
-                    e.printStackTrace();
+                    System.err.println("⚠️ Erro ao acessar nome do cargo para: " + employeeName);
                 }
             }
-            
-            return EmployeeCertificationResponse.builder()
-                    .id(certification.getId())
-                    .employeeId(certification.getEmployee() != null ? certification.getEmployee().getId() : null)
-                    .employeeName(certification.getEmployee() != null ? certification.getEmployee().getName() : null)
-                    .employeeDocument(certification.getEmployee() != null ? certification.getEmployee().getDocument() : null)
-                    .employeePosition(positionName)
-                    .employeeDepartment(departmentName)
-                    .trainingId(certification.getTraining() != null ? certification.getTraining().getId() : null)
-                    .trainingName(certification.getTraining() != null ? certification.getTraining().getName() : null)
-                    .renewalPeriodMonths(certification.getTraining() != null ? certification.getTraining().getRenewalPeriodMonths() : null)
-                    .workPostId(certification.getWorkPost() != null ? certification.getWorkPost().getId() : null)
-                    .workPostName(certification.getWorkPost() != null ? certification.getWorkPost().getName() : null)
-                    .certificationNumber(certification.getCertificationNumber())
-                    .issueDate(certification.getIssueDate())
-                    .expirationDate(certification.getExpirationDate())
-                    .status(certification.getStatus())
-                    .documentUrl(certification.getDocumentUrl())
-                    .build();
-        } catch (Exception e) {
-            // Log do erro e retornar null será filtrado no controller
-            throw new RuntimeException("Erro ao converter EmployeeCertification para DTO: " + e.getMessage(), e);
+
+            // Tentar obter o setor (Unit/WorkPost)
+            // 1. Prioridade para o WorkPost da certificação (onde o treinamento ocorreu ou
+            // se aplica)
+            if (certification.getWorkPost() != null) {
+                try {
+                    departmentName = certification.getWorkPost().getName();
+                } catch (Exception e) {
+                }
+            }
+
+            // 2. Fallback para o Setor/Unidade do funcionário
+            if (departmentName == null || departmentName.isEmpty()) {
+                if (employee.getUnit() != null) {
+                    try {
+                        departmentName = employee.getUnit().getName();
+                    } catch (Exception e) {
+                    }
+                }
+            }
         }
+
+        return EmployeeCertificationResponse.builder()
+                .id(certification.getId())
+                .employeeId(employee != null ? employee.getId() : null)
+                .employeeName(employeeName)
+                .employeeDocument(employeeDocument)
+                .employeePosition(positionName)
+                .employeeDepartment(departmentName)
+                .trainingId(certification.getTraining() != null ? certification.getTraining().getId() : null)
+                .trainingName(certification.getTraining() != null ? certification.getTraining().getName() : null)
+                .renewalPeriodMonths(
+                        certification.getTraining() != null ? certification.getTraining().getRenewalPeriodMonths()
+                                : null)
+                .workPostId(certification.getWorkPost() != null ? certification.getWorkPost().getId() : null)
+                .workPostName(certification.getWorkPost() != null ? certification.getWorkPost().getName() : null)
+                .certificationNumber(certification.getCertificationNumber())
+                .issueDate(certification.getIssueDate())
+                .expirationDate(certification.getExpirationDate())
+                .status(certification.getStatus())
+                .documentUrl(certification.getDocumentUrl())
+                .build();
     }
 }
-

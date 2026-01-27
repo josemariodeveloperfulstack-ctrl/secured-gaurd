@@ -16,9 +16,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-@Slf4j
 @Service
 public class JwtService {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtService.class);
 
     private final JwtConfig jwtConfig;
 
@@ -61,7 +62,8 @@ public class JwtService {
         return generateToken(extraClaims, user, jwtConfig.getExpiration());
     }
 
-    // Overloads to support generating tokens without a User entity (e.g., supervisors)
+    // Overloads to support generating tokens without a User entity (e.g.,
+    // supervisors)
     public String generateToken(String subject) {
         return generateToken(new HashMap<>(), subject, jwtConfig.getExpiration());
     }
@@ -81,14 +83,14 @@ public class JwtService {
     public String generateToken(
             Map<String, Object> extraClaims,
             User user,
-            long expirationTime
-    ) {
+            long expirationTime) {
         try {
             Date now = new Date();
             Date expiryDate = new Date(now.getTime() + expirationTime);
-            
-            log.info("Gerando token para usuário: {}, expira em: {} ({} ms)", user.getUsername(), expiryDate, expirationTime);
-            
+
+            log.info("Gerando token para usuário: {}, expira em: {} ({} ms)", user.getUsername(), expiryDate,
+                    expirationTime);
+
             String token = Jwts.builder()
                     .setClaims(extraClaims)
                     .setSubject(user.getUsername())
@@ -96,7 +98,7 @@ public class JwtService {
                     .setExpiration(expiryDate)
                     .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                     .compact();
-                    
+
             log.info("Token gerado com sucesso para usuário: {}", user.getUsername());
             return token;
         } catch (Exception e) {
@@ -109,8 +111,7 @@ public class JwtService {
     private String generateToken(
             Map<String, Object> extraClaims,
             String subject,
-            long expirationTime
-    ) {
+            long expirationTime) {
         try {
             Date now = new Date();
             Date expiryDate = new Date(now.getTime() + expirationTime);
@@ -138,10 +139,10 @@ public class JwtService {
             final String username = extractUsername(token);
             boolean isExpired = isTokenExpired(token);
             boolean isUsernameValid = username.equals(userDetails.getUsername());
-            
-            log.info("Validação do token para usuário {}: username válido: {}, token expirado: {}", 
-                username, isUsernameValid, isExpired);
-            
+
+            log.info("Validação do token para usuário {}: username válido: {}, token expirado: {}",
+                    username, isUsernameValid, isExpired);
+
             return isUsernameValid && !isExpired;
         } catch (Exception e) {
             log.error("Erro ao validar token: {}", e.getMessage());
@@ -152,8 +153,8 @@ public class JwtService {
     private boolean isTokenExpired(String token) {
         Date expiration = extractExpiration(token);
         boolean isExpired = expiration.before(new Date());
-        log.info("Verificação de expiração do token: data de expiração: {}, está expirado: {}", 
-            expiration, isExpired);
+        log.info("Verificação de expiração do token: data de expiração: {}, está expirado: {}",
+                expiration, isExpired);
         return isExpired;
     }
 
@@ -184,24 +185,25 @@ public class JwtService {
             }
             String secret = jwtConfig.getSecret().trim();
             byte[] keyBytes = secret.getBytes();
-            
+
             // Log do tamanho da chave (sem mostrar o valor completo por segurança)
-            log.info("🔑 Configurando chave JWT: tamanho = {} bytes (primeiros 10 caracteres: {}...)", 
-                keyBytes.length, secret.substring(0, Math.min(10, secret.length())));
-            
+            log.info("🔑 Configurando chave JWT: tamanho = {} bytes (primeiros 10 caracteres: {}...)",
+                    keyBytes.length, secret.substring(0, Math.min(10, secret.length())));
+
             // HS512 requires at least 64 bytes (512 bits)
             if (keyBytes.length < 64) {
-                log.error("❌ Chave JWT muito curta: {} bytes. HS512 requer pelo menos 64 bytes (512 bits).", keyBytes.length);
-                log.error("❌ Valor da chave (primeiros 20 caracteres): {}", 
-                    secret.substring(0, Math.min(20, secret.length())));
-                log.error("❌ Por favor, verifique a variável de ambiente JWT_SECRET no docker-compose.ci.yml ou no host");
+                log.error("❌ Chave JWT muito curta: {} bytes. HS512 requer pelo menos 64 bytes (512 bits).",
+                        keyBytes.length);
+                log.error("❌ Valor da chave (primeiros 20 caracteres): {}",
+                        secret.substring(0, Math.min(20, secret.length())));
+                log.error(
+                        "❌ Por favor, verifique a variável de ambiente JWT_SECRET no docker-compose.ci.yml ou no host");
                 throw new IllegalStateException(
-                    String.format("Chave JWT muito curta: %d bytes. HS512 requer pelo menos 64 bytes (512 bits). " +
+                        String.format("Chave JWT muito curta: %d bytes. HS512 requer pelo menos 64 bytes (512 bits). " +
                                 "Por favor, configure uma chave com pelo menos 64 caracteres ASCII. " +
-                                "Verifique a variável de ambiente JWT_SECRET.", keyBytes.length)
-                );
+                                "Verifique a variável de ambiente JWT_SECRET.", keyBytes.length));
             }
-            
+
             log.debug("✅ Criando chave de assinatura JWT com {} bytes", keyBytes.length);
             return Keys.hmacShaKeyFor(keyBytes);
         } catch (IllegalStateException e) {
@@ -212,4 +214,4 @@ public class JwtService {
             throw new RuntimeException("Erro ao criar chave de assinatura: " + e.getMessage(), e);
         }
     }
-} 
+}

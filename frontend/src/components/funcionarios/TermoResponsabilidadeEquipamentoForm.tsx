@@ -88,14 +88,59 @@ const TermoResponsabilidadeEquipamentoForm = () => {
     'Defeituoso',
   ];
 
-  const handlePreview = () => {
-    // TODO: Implementar preview do termo
-    console.log('Preview do termo:', form);
+  const handlePreview = async () => {
+    if (!funcionario || !empresa || !form.equipamento) {
+      alert('Selecione funcionário, empresa e pelo menos um equipamento!');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        companyId: empresa.id,
+        employeeName: funcionario.name,
+        employeeCpf: funcionario.cpf || funcionario.document || '',
+        employeePosition: (funcionario as any).position?.name || '',
+        equipments: [
+          {
+            name: form.equipamento,
+            description: `${form.marca} ${form.modelo}`.trim(),
+            identifier: form.numeroSerie || form.patrimonio,
+            state: form.estadoEquipamento,
+            value: 0.0
+          }
+        ],
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        documentDate: form.dataEntrega
+      };
+
+      // No preview endpoint exists for this one yet in the grep results, using generate-pdf with window.open
+      const response = await fetch('/api/equipment-responsibility/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error('Erro ao gerar preview');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      console.error('Erro ao gerar preview:', err);
+      alert('Erro ao gerar preview. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGerarPDF = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!funcionario || !empresa || !form.equipamento || !form.numeroSerie || !form.dataEntrega) {
       alert('Preencha todos os campos obrigatórios!');
       return;
@@ -104,49 +149,26 @@ const TermoResponsabilidadeEquipamentoForm = () => {
     setLoading(true);
     try {
       const payload = {
-        templateName: 'termo-responsabilidade-equipamento.html',
-        // Dados do Funcionário
-        funcionario: funcionario.name,
-        cpf: funcionario.cpf || funcionario.document || '',
-        cargo: funcionario.position?.name || '',
-        setor: funcionario.unit?.name || '', // Buscar o Posto de Trabalho (unit)
-        telefone: funcionario.phone,
-        email: funcionario.email,
-        endereco: typeof funcionario.address === 'string' 
-          ? funcionario.address 
-          : funcionario.address 
-            ? `${funcionario.address.street}, ${funcionario.address.number || ''}, ${funcionario.address.neighborhood || ''}, ${funcionario.address.city || ''}/${funcionario.address.state || ''}` 
-            : '',
-        // Dados da Empresa
-        empresa: empresa.name,
-        cnpj: empresa.cnpj,
-        enderecoEmpresa: empresa.address && empresa.address.street
-          ? [
-              empresa.address.street,
-              empresa.address.number,
-              empresa.address.neighborhood,
-              `${empresa.address.city || ''}/${empresa.address.state || ''}`
-            ].filter(Boolean).join(', ')
-          : '',
-        // Dados do Equipamento
-        equipamento: form.equipamento,
-        marca: form.marca,
-        modelo: form.modelo,
-        numeroSerie: form.numeroSerie,
-        patrimonio: form.patrimonio,
-        estadoEquipamento: form.estadoEquipamento,
-        // Dados da Entrega
-        dataEntrega: form.dataEntrega,
-        dataDevolucao: form.dataDevolucao,
-        responsavelEntrega: responsavel?.name || '',
-        condicoes: form.condicoes,
-        observacoes: form.observacoes,
-        dataAtual: new Date().toLocaleDateString('pt-BR')
+        companyId: empresa.id,
+        employeeName: funcionario.name,
+        employeeCpf: funcionario.cpf || funcionario.document || '',
+        employeePosition: (funcionario as any).position?.name || '',
+        equipments: [
+          {
+            name: form.equipamento,
+            description: `${form.marca} ${form.modelo}`.trim(),
+            identifier: form.numeroSerie || form.patrimonio,
+            state: form.estadoEquipamento,
+            value: 0.0
+          }
+        ],
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        documentDate: form.dataEntrega
       };
 
-      const response = await fetch('/api/documents/generate-pdf', {
+      const response = await fetch('/api/equipment-responsibility/generate-pdf', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
@@ -195,19 +217,19 @@ const TermoResponsabilidadeEquipamentoForm = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Identificação */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário</Label>
-                <Select 
-                  value={form.funcionarioId} 
+                <Select
+                  value={form.funcionarioId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   disabled={loadingData}
                 >
@@ -234,11 +256,11 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa</Label>
-                <Select 
-                  value={form.empresaId} 
+                <Select
+                  value={form.empresaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
                   disabled={loadingData}
                 >
@@ -282,13 +304,13 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.name}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {funcionario.cpf || funcionario.document || '-'}
@@ -297,34 +319,34 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.position?.name || '-'}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor (Posto de Trabalho)</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                         {funcionario.unit?.name || '-'}
+                        {funcionario.unit?.name || '-'}
                       </div>
                     </div>
                   </div>
 
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                       {typeof funcionario.address === 'string' 
-                          ? funcionario.address 
-                          : funcionario.address 
-                            ? `${funcionario.address.street}, ${funcionario.address.number || ''}` 
-                            : '-'}
+                      {typeof funcionario.address === 'string'
+                        ? funcionario.address
+                        : funcionario.address
+                          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
+                          : '-'}
                     </div>
                   </div>
                 </div>
               </div>
             )}
-  
+
             {/* Informações da Empresa */}
             {empresa && (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-100">
@@ -335,35 +357,35 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                       {empresa.name}
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {empresa.cnpj}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                         {empresa.sigla || '-'}
+                        {empresa.sigla || '-'}
                       </div>
                     </div>
                   </div>
 
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                       {empresa.address && empresa.address.street
                         ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
-                            .filter(Boolean)
-                            .join(', ')
+                          .filter(Boolean)
+                          .join(', ')
                         : '-'}
                     </div>
                   </div>
@@ -371,7 +393,7 @@ const TermoResponsabilidadeEquipamentoForm = () => {
               </div>
             )}
           </div>
-          
+
           {(funcionario || empresa) && <Separator />}
 
           {/* Informações do Equipamento */}
@@ -395,47 +417,47 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Marca</Label>
-                <Input 
-                  value={form.marca} 
+                <Input
+                  value={form.marca}
                   onChange={(e) => setForm(prev => ({ ...prev, marca: e.target.value }))}
                   placeholder="Ex: Dell, Motorola, Toyota"
                   className="bg-background h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Modelo</Label>
-                <Input 
-                  value={form.modelo} 
+                <Input
+                  value={form.modelo}
                   onChange={(e) => setForm(prev => ({ ...prev, modelo: e.target.value }))}
                   placeholder="Ex: Latitude 5520"
                   className="bg-background h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Número de Série</Label>
-                <Input 
-                  value={form.numeroSerie} 
+                <Input
+                  value={form.numeroSerie}
                   onChange={(e) => setForm(prev => ({ ...prev, numeroSerie: e.target.value }))}
                   placeholder="Ex: SN123456789"
                   className="bg-background h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Patrimônio</Label>
-                <Input 
-                  value={form.patrimonio} 
+                <Input
+                  value={form.patrimonio}
                   onChange={(e) => setForm(prev => ({ ...prev, patrimonio: e.target.value }))}
                   placeholder="Ex: PAT001234"
                   className="bg-background h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Estado do Equipamento</Label>
                 <Select value={form.estadoEquipamento} onValueChange={(value) => setForm(prev => ({ ...prev, estadoEquipamento: value }))}>
@@ -461,31 +483,31 @@ const TermoResponsabilidadeEquipamentoForm = () => {
               <span>Datas e Responsável</span>
             </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
                 <Label className="text-base font-semibold">Data de Entrega</Label>
-              <Input 
-                type="date" 
-                value={form.dataEntrega} 
-                onChange={(e) => setForm(prev => ({ ...prev, dataEntrega: e.target.value }))}
-                className="bg-background h-11"
-              />
-            </div>
-            
-            <div className="space-y-2">
+                <Input
+                  type="date"
+                  value={form.dataEntrega}
+                  onChange={(e) => setForm(prev => ({ ...prev, dataEntrega: e.target.value }))}
+                  className="bg-background h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-base font-semibold">Data de Devolução</Label>
-              <Input 
-                type="date" 
-                value={form.dataDevolucao} 
-                onChange={(e) => setForm(prev => ({ ...prev, dataDevolucao: e.target.value }))}
-                className="bg-background h-11"
-              />
-            </div>
-            
-            <div className="space-y-2">
+                <Input
+                  type="date"
+                  value={form.dataDevolucao}
+                  onChange={(e) => setForm(prev => ({ ...prev, dataDevolucao: e.target.value }))}
+                  className="bg-background h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pela Entrega</Label>
-                <Select 
-                  value={form.responsavelEntregaId} 
+                <Select
+                  value={form.responsavelEntregaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
                   disabled={loadingData}
                 >
@@ -545,8 +567,8 @@ const TermoResponsabilidadeEquipamentoForm = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Condições de Uso</Label>
-              <Textarea 
-                value={form.condicoes} 
+              <Textarea
+                value={form.condicoes}
                 onChange={(e) => setForm(prev => ({ ...prev, condicoes: e.target.value }))}
                 placeholder="Descreva as condições de uso e responsabilidades..."
                 rows={4}
@@ -556,8 +578,8 @@ const TermoResponsabilidadeEquipamentoForm = () => {
 
             <div className="space-y-2">
               <Label>Observações</Label>
-              <Textarea 
-                value={form.observacoes} 
+              <Textarea
+                value={form.observacoes}
                 onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
                 placeholder="Observações adicionais sobre o equipamento..."
                 rows={4}
@@ -570,17 +592,17 @@ const TermoResponsabilidadeEquipamentoForm = () => {
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button 
-              onClick={handlePreview} 
-              variant="outline" 
+            <Button
+              onClick={handlePreview}
+              variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
             >
               <Eye className="h-4 w-4" />
               Visualizar Termo
             </Button>
-            <Button 
-              onClick={handleGerarPDF} 
-              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all" 
+            <Button
+              onClick={handleGerarPDF}
+              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading}
             >
               {loading ? (

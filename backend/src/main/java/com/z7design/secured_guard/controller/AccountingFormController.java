@@ -1,7 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.service.AccountingFormService;
-import com.z7design.secured_guard.service.AccountingFormPdfService;
+import com.z7design.secured_guard.service.AccountingFormStandardPdfService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -20,7 +20,7 @@ import java.util.UUID;
 public class AccountingFormController {
 
     private final AccountingFormService accountingFormService;
-    private final AccountingFormPdfService accountingFormPdfService;
+    private final AccountingFormStandardPdfService accountingFormPdfService;
 
     /**
      * Gera ficha de contabilidade em HTML para um funcionário
@@ -30,18 +30,19 @@ public class AccountingFormController {
     public ResponseEntity<String> generateAccountingFormHtml(@PathVariable UUID employeeId) {
         try {
             log.info("📄 Gerando ficha de contabilidade HTML para funcionário: {}", employeeId);
-            
+
             String html = accountingFormService.generateAccountingFormHtml(employeeId);
-            
+
             return ResponseEntity.ok()
-                .contentType(MediaType.TEXT_HTML)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=ficha_contabilidade_" + employeeId + ".html")
-                .body(html);
-                
+                    .contentType(MediaType.TEXT_HTML)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=ficha_contabilidade_" + employeeId + ".html")
+                    .body(html);
+
         } catch (Exception e) {
             log.error("❌ Erro ao gerar ficha de contabilidade: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()
-                .body("<html><body><h1>Erro ao gerar ficha</h1><p>" + e.getMessage() + "</p></body></html>");
+                    .body("<html><body><h1>Erro ao gerar ficha</h1><p>" + e.getMessage() + "</p></body></html>");
         }
     }
 
@@ -53,16 +54,16 @@ public class AccountingFormController {
     public ResponseEntity<byte[]> generateAccountingFormPdf(@PathVariable UUID employeeId) {
         try {
             log.info("📄 Gerando ficha de contabilidade PDF para funcionário: {}", employeeId);
-            
+
             byte[] pdf = accountingFormPdfService.generateAccountingFormPdf(employeeId);
-            
+
             String fileName = "ficha_contabilidade_" + employeeId + ".pdf";
-            
+
             return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_PDF)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-                .body(pdf);
-                
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdf);
+
         } catch (Exception e) {
             log.error("❌ Erro ao gerar ficha de contabilidade PDF: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
@@ -83,9 +84,10 @@ public class AccountingFormController {
             String fileName = "ficha_contabilidade_" + employeeId + ".xlsx";
 
             return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-                .body(excel);
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(excel);
 
         } catch (Exception e) {
             log.error("❌ Erro ao gerar ficha de contabilidade Excel: {}", e.getMessage(), e);
@@ -93,4 +95,3 @@ public class AccountingFormController {
         }
     }
 }
-

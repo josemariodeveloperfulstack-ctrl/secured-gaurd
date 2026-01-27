@@ -7,13 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  FileText,
+  Download,
+  Eye,
+  Plus,
+  Edit,
+  Trash2,
   Search,
   Building,
   Users,
@@ -124,7 +124,7 @@ const OrdemServicoForm = () => {
   const [selectedOrdem, setSelectedOrdem] = useState<OrdemServico | null>(null);
   const [isEditing, setIsEditing] = useState(true); // Sempre permitir edição no modal de criação
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
+
   // Estados do formulário
   const [form, setForm] = useState<OrdemServico>({
     numero: `OS-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
@@ -160,7 +160,7 @@ const OrdemServicoForm = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      
+
       // Carregar cargos
       try {
         const positionsResponse = await fetch('/api/positions', {
@@ -289,7 +289,7 @@ const OrdemServicoForm = () => {
 
   const handleUpdate = async () => {
     if (!selectedOrdem?.id) return;
-    
+
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -380,39 +380,40 @@ const OrdemServicoForm = () => {
         return;
       }
 
-      const pdfData = {
-        ordem: {
-          numero: ordem.numero,
-          dataInicio: ordem.dataInicio,
-          dataFim: ordem.dataFim,
-          observacoes: ordem.observacoes,
-          modelo: ordem.modelo,
-          status: ordem.status,
-        },
-        funcionario: {
-          name: funcionario.name,
-          document: funcionario.document,
-          position: funcionario.position,
-          unit: funcionario.unit,
-        },
-        cliente: {
-          name: cliente.name,
-          document: cliente.document,
-        },
-        empresa: {
-          name: empresa.name,
-          document: empresa.document,
-        },
-        unidade: {
-          name: unidade.name,
-          code: unidade.code,
-        },
-        cargo: {
-          name: cargo.name,
-        },
+      const payload = {
+        companyId: ordem.empresaId,
+        employeeName: funcionario.name,
+        employeeCpf: funcionario.document,
+        employeePosition: cargo.name,
+        sector: unidade.name,
+        descriptionOfActivities: ordem.observacoes, // Using observations as activities for standard models
+        startDate: ordem.dataInicio,
+        endDate: ordem.dataFim,
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        documentDate: new Date().toISOString().split('T')[0]
       };
 
-      await ordemServicoPDFGenerator.generatePDF(pdfData);
+      const modeloPath = ordem.modelo.toLowerCase();
+      const response = await fetch(`/api/service-orders/${modeloPath}/generate-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error('Erro ao gerar PDF no servidor');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `os-${ordem.numero.toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar PDF. Verifique o console para mais detalhes.');
@@ -425,7 +426,7 @@ const OrdemServicoForm = () => {
       'CONCLUIDA': 'secondary',
       'CANCELADA': 'destructive'
     } as const;
-    
+
     return <Badge variant={variants[status as keyof typeof variants] || 'default'}>{status}</Badge>;
   };
 
@@ -441,7 +442,7 @@ const OrdemServicoForm = () => {
           </CardContent>
         </Card>
       )}
-      
+
       {!loading && dataLoaded && (
         <>
           {/* Lista de Ordens de Serviço */}
@@ -456,7 +457,7 @@ const OrdemServicoForm = () => {
                       Nova Ordem de Serviço
                     </Button>
                   </DialogTrigger>
-                  <DialogContent 
+                  <DialogContent
                     className="max-w-4xl max-h-[90vh] overflow-y-auto"
                     onPointerDownOutside={(e) => {
                       // Permitir fechar clicando fora do modal
@@ -474,13 +475,13 @@ const OrdemServicoForm = () => {
                         💡 Dica: Você pode fechar este modal clicando no X, pressionando ESC ou clicando fora da área do formulário
                       </DialogDescription>
                     </DialogHeader>
-                    
+
                     <div className="grid gap-4">
                       {/* Botão de fechar mais visível */}
                       <div className="flex justify-end">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setIsDialogOpen(false)}
                           className="text-muted-foreground hover:text-foreground"
                         >
@@ -488,306 +489,306 @@ const OrdemServicoForm = () => {
                           Fechar
                         </Button>
                       </div>
-                  {/* Informações Básicas */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="numero">Número da Ordem</Label>
-                      <Input
-                        id="numero"
-                        value={form.numero}
-                        onChange={(e) => setForm(prev => ({ ...prev, numero: e.target.value }))}
-                        placeholder="Ex: OS-2024-001"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="modelo">Modelo</Label>
-                      <Select 
-                        value={form.modelo} 
-                        onValueChange={(value) => setForm(prev => ({ ...prev, modelo: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o modelo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {modelosOrdemServico.map(modelo => (
-                            <SelectItem key={modelo.key} value={modelo.key}>
-                              {modelo.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                      {/* Informações Básicas */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="numero">Número da Ordem</Label>
+                          <Input
+                            id="numero"
+                            value={form.numero}
+                            onChange={(e) => setForm(prev => ({ ...prev, numero: e.target.value }))}
+                            placeholder="Ex: OS-2024-001"
+                          />
+                        </div>
 
-                  {/* Seleção de Funcionário e Cargo */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="funcionario">Funcionário</Label>
-                      <Select 
-                        value={form.funcionarioId} 
-                        onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o funcionário" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(employees) && employees.length > 0 ? employees.map(emp => (
-                            <SelectItem key={emp.id} value={emp.id}>
-                              {emp.name} - {emp.position?.name || 'Sem cargo'}
-                            </SelectItem>
-                          )) : (
-                            <SelectItem value="no-data" disabled>
-                              Nenhum funcionário encontrado
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="cargo">Cargo</Label>
-                      <Select 
-                        value={form.cargoId} 
-                        onValueChange={(value) => setForm(prev => ({ ...prev, cargoId: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o cargo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(positions) && positions.length > 0 ? positions.map(pos => (
-                            <SelectItem key={pos.id} value={pos.id}>
-                              {pos.name}
-                            </SelectItem>
-                          )) : (
-                            <SelectItem value="no-data" disabled>
-                              Nenhum cargo encontrado
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="modelo">Modelo</Label>
+                          <Select
+                            value={form.modelo}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, modelo: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o modelo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {modelosOrdemServico.map(modelo => (
+                                <SelectItem key={modelo.key} value={modelo.key}>
+                                  {modelo.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-                  {/* Seleção de Cliente, Empresa e Unidade */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="cliente">Cliente</Label>
-                      <Select 
-                        value={form.clienteId} 
-                        onValueChange={(value) => setForm(prev => ({ ...prev, clienteId: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o cliente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(clients) && clients.length > 0 ? clients.map(client => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}
-                            </SelectItem>
-                          )) : (
-                            <SelectItem value="no-data" disabled>
-                              Nenhum cliente encontrado
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="empresa">Empresa</Label>
-                      <Select 
-                        value={form.empresaId} 
-                        onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a empresa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(companies) && companies.length > 0 ? companies.map(company => (
-                            <SelectItem key={company.id} value={company.id}>
-                              {company.name}
-                            </SelectItem>
-                          )) : (
-                            <SelectItem value="no-data" disabled>
-                              Nenhuma empresa encontrada
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="unidade">Unidade</Label>
-                      <Select 
-                        value={form.unidadeId} 
-                        onValueChange={(value) => setForm(prev => ({ ...prev, unidadeId: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a unidade" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(units) && units.length > 0 ? units.map(unit => (
-                            <SelectItem key={unit.id} value={unit.id}>
-                              {unit.name} ({unit.code})
-                            </SelectItem>
-                          )) : (
-                            <SelectItem value="no-data" disabled>
-                              Nenhuma unidade encontrada
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                      {/* Seleção de Funcionário e Cargo */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="funcionario">Funcionário</Label>
+                          <Select
+                            value={form.funcionarioId}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o funcionário" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(employees) && employees.length > 0 ? employees.map(emp => (
+                                <SelectItem key={emp.id} value={emp.id}>
+                                  {emp.name} - {emp.position?.name || 'Sem cargo'}
+                                </SelectItem>
+                              )) : (
+                                <SelectItem value="no-data" disabled>
+                                  Nenhum funcionário encontrado
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                  {/* Datas */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dataInicio">Data de Início</Label>
-                      <Input
-                        id="dataInicio"
-                        type="date"
-                        value={form.dataInicio}
-                        onChange={(e) => setForm(prev => ({ ...prev, dataInicio: e.target.value }))}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="dataFim">Data de Fim</Label>
-                      <Input
-                        id="dataFim"
-                        type="date"
-                        value={form.dataFim}
-                        onChange={(e) => setForm(prev => ({ ...prev, dataFim: e.target.value }))}
-                      />
-                    </div>
-                  </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cargo">Cargo</Label>
+                          <Select
+                            value={form.cargoId}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, cargoId: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o cargo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(positions) && positions.length > 0 ? positions.map(pos => (
+                                <SelectItem key={pos.id} value={pos.id}>
+                                  {pos.name}
+                                </SelectItem>
+                              )) : (
+                                <SelectItem value="no-data" disabled>
+                                  Nenhum cargo encontrado
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-                  {/* Observações */}
-                  <div className="space-y-2">
-                    <Label htmlFor="observacoes">Observações</Label>
-                    <Textarea
-                      id="observacoes"
-                      value={form.observacoes}
-                      onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
-                      placeholder="Observações adicionais..."
-                      rows={3}
-                    />
-                  </div>
+                      {/* Seleção de Cliente, Empresa e Unidade */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="cliente">Cliente</Label>
+                          <Select
+                            value={form.clienteId}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, clienteId: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o cliente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(clients) && clients.length > 0 ? clients.map(client => (
+                                <SelectItem key={client.id} value={client.id}>
+                                  {client.name}
+                                </SelectItem>
+                              )) : (
+                                <SelectItem value="no-data" disabled>
+                                  Nenhum cliente encontrado
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                  {/* Ações */}
-                  <div className="flex gap-2 pt-4 border-t">
-                    <Button onClick={selectedOrdem ? handleUpdate : handleCreate} disabled={loading} className="flex-1">
-                      <Save className="h-4 w-4 mr-2" />
-                      {loading ? (selectedOrdem ? 'Salvando...' : 'Criando...') : (selectedOrdem ? 'Salvar Alterações' : 'Criar Ordem de Serviço')}
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
-                      <X className="h-4 w-4 mr-2" />
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="empresa">Empresa</Label>
+                          <Select
+                            value={form.empresaId}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a empresa" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(companies) && companies.length > 0 ? companies.map(company => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              )) : (
+                                <SelectItem value="no-data" disabled>
+                                  Nenhuma empresa encontrada
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="unidade">Unidade</Label>
+                          <Select
+                            value={form.unidadeId}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, unidadeId: value }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a unidade" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.isArray(units) && units.length > 0 ? units.map(unit => (
+                                <SelectItem key={unit.id} value={unit.id}>
+                                  {unit.name} ({unit.code})
+                                </SelectItem>
+                              )) : (
+                                <SelectItem value="no-data" disabled>
+                                  Nenhuma unidade encontrada
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* Datas */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="dataInicio">Data de Início</Label>
+                          <Input
+                            id="dataInicio"
+                            type="date"
+                            value={form.dataInicio}
+                            onChange={(e) => setForm(prev => ({ ...prev, dataInicio: e.target.value }))}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="dataFim">Data de Fim</Label>
+                          <Input
+                            id="dataFim"
+                            type="date"
+                            value={form.dataFim}
+                            onChange={(e) => setForm(prev => ({ ...prev, dataFim: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Observações */}
+                      <div className="space-y-2">
+                        <Label htmlFor="observacoes">Observações</Label>
+                        <Textarea
+                          id="observacoes"
+                          value={form.observacoes}
+                          onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
+                          placeholder="Observações adicionais..."
+                          rows={3}
+                        />
+                      </div>
+
+                      {/* Ações */}
+                      <div className="flex gap-2 pt-4 border-t">
+                        <Button onClick={selectedOrdem ? handleUpdate : handleCreate} disabled={loading} className="flex-1">
+                          <Save className="h-4 w-4 mr-2" />
+                          {loading ? (selectedOrdem ? 'Salvando...' : 'Criando...') : (selectedOrdem ? 'Salvar Alterações' : 'Criar Ordem de Serviço')}
+                        </Button>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+                          <X className="h-4 w-4 mr-2" />
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               {ordensServico.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhuma ordem de serviço cadastrada</p>
-              <p className="text-sm">Clique em "Nova Ordem de Serviço" para começar</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {Array.isArray(ordensServico) && ordensServico.map((ordem) => {
-                const funcionario = Array.isArray(employees) ? employees.find(e => e.id === ordem.funcionarioId) : null;
-                const cliente = Array.isArray(clients) ? clients.find(c => c.id === ordem.clienteId) : null;
-                const empresa = Array.isArray(companies) ? companies.find(c => c.id === ordem.empresaId) : null;
-                const unidade = Array.isArray(units) ? units.find(u => u.id === ordem.unidadeId) : null;
-                const cargo = Array.isArray(positions) ? positions.find(p => p.id === ordem.cargoId) : null;
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma ordem de serviço cadastrada</p>
+                  <p className="text-sm">Clique em "Nova Ordem de Serviço" para começar</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Array.isArray(ordensServico) && ordensServico.map((ordem) => {
+                    const funcionario = Array.isArray(employees) ? employees.find(e => e.id === ordem.funcionarioId) : null;
+                    const cliente = Array.isArray(clients) ? clients.find(c => c.id === ordem.clienteId) : null;
+                    const empresa = Array.isArray(companies) ? companies.find(c => c.id === ordem.empresaId) : null;
+                    const unidade = Array.isArray(units) ? units.find(u => u.id === ordem.unidadeId) : null;
+                    const cargo = Array.isArray(positions) ? positions.find(p => p.id === ordem.cargoId) : null;
 
-                return (
-                  <div key={ordem.id} className="border rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold">Ordem de Serviço {ordem.numero}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Modelo: {ordem.modelo} | Status: {getStatusBadge(ordem.status)}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleView(ordem)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(ordem)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleGerarPDF(ordem)}>
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Trash2 className="h-4 w-4" />
+                    return (
+                      <div key={ordem.id} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-semibold">Ordem de Serviço {ordem.numero}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Modelo: {ordem.modelo} | Status: {getStatusBadge(ordem.status)}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => handleView(ordem)}>
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Tem certeza que deseja excluir a Ordem de Serviço {ordem.numero}?
-                                Esta ação não pode ser desfeita.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => ordem.id && handleDelete(ordem.id)}>
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                            <Button variant="outline" size="sm" onClick={() => handleEdit(ordem)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleGerarPDF(ordem)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja excluir a Ordem de Serviço {ordem.numero}?
+                                    Esta ação não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => ordem.id && handleDelete(ordem.id)}>
+                                    Excluir
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <Label className="text-xs font-medium text-muted-foreground">Funcionário</Label>
+                            <p>{funcionario?.name || 'N/A'}</p>
+                            <p className="text-xs text-muted-foreground">{cargo?.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-medium text-muted-foreground">Cliente</Label>
+                            <p>{cliente?.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-medium text-muted-foreground">Empresa</Label>
+                            <p>{empresa?.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-medium text-muted-foreground">Unidade</Label>
+                            <p>{unidade?.name || 'N/A'}</p>
+                            <p className="text-xs text-muted-foreground">{unidade?.code || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs font-medium text-muted-foreground">Período</Label>
+                            <p>{ordem.dataInicio} até {ordem.dataFim}</p>
+                          </div>
+                        </div>
+
+                        {ordem.observacoes && (
+                          <div>
+                            <Label className="text-xs font-medium text-muted-foreground">Observações</Label>
+                            <p className="text-sm">{ordem.observacoes}</p>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Funcionário</Label>
-                        <p>{funcionario?.name || 'N/A'}</p>
-                        <p className="text-xs text-muted-foreground">{cargo?.name || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Cliente</Label>
-                        <p>{cliente?.name || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Empresa</Label>
-                        <p>{empresa?.name || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Unidade</Label>
-                        <p>{unidade?.name || 'N/A'}</p>
-                        <p className="text-xs text-muted-foreground">{unidade?.code || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Período</Label>
-                        <p>{ordem.dataInicio} até {ordem.dataFim}</p>
-                      </div>
-                    </div>
-                    
-                    {ordem.observacoes && (
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground">Observações</Label>
-                        <p className="text-sm">{ordem.observacoes}</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </>

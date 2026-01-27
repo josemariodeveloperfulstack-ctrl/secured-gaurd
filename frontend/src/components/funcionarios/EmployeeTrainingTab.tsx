@@ -6,16 +6,16 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import EmployeeTrainingFormModal from './EmployeeTrainingFormModal';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
-  User, 
-  Building, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  User,
+  Building,
   FileText,
   Download,
   Eye,
@@ -24,7 +24,8 @@ import {
   RefreshCw,
   TrendingUp,
   Users,
-  Shield
+  Shield,
+  Loader2
 } from 'lucide-react';
 import { trainingService, EmployeeCertification } from '@/services/trainingService';
 import { useToast } from '@/hooks/use-toast';
@@ -145,11 +146,11 @@ const EmployeeTrainingTab = () => {
       try {
         // Buscar certificações de funcionários (histórico de treinamentos concluídos)
         const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
-        
+
         const rows: TrainingRow[] = certs.map(c => {
           const validUntil = c.expirationDate || '';
           const status = getTrainingStatus(validUntil);
-          
+
           // Priorizar workPostName da certificação, senão usar employeeDepartment
           let sectorName = '';
           if (c.workPostName) {
@@ -157,7 +158,7 @@ const EmployeeTrainingTab = () => {
           } else if (c.employeeDepartment) {
             sectorName = c.employeeDepartment;
           }
-          
+
           // Debug: verificar se os dados estão chegando
           console.log('📋 Certificação:', {
             id: c.id,
@@ -167,7 +168,7 @@ const EmployeeTrainingTab = () => {
             workPostName: c.workPostName,
             employeeId: c.employeeId
           });
-          
+
           // Verificar se employeePosition está vazio/null
           if (!c.employeePosition && c.employeeName) {
             console.warn('⚠️ Certificação sem cargo (position):', {
@@ -176,7 +177,7 @@ const EmployeeTrainingTab = () => {
               employeeId: c.employeeId
             });
           }
-          
+
           return {
             id: c.id,
             employeeId: c.employeeId, // ID do funcionário para edição
@@ -207,7 +208,7 @@ const EmployeeTrainingTab = () => {
     const valid = trainings.filter(t => t.status === 'valid').length;
     const expiring = trainings.filter(t => t.status === 'expiring').length;
     const expired = trainings.filter(t => t.status === 'expired').length;
-    
+
     return { total, valid, expiring, expired };
   };
 
@@ -216,7 +217,7 @@ const EmployeeTrainingTab = () => {
     const today = new Date();
     const validDate = new Date(validUntil);
     const daysUntilExpiry = Math.ceil((validDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (daysUntilExpiry < 0) return 'expired';
     if (daysUntilExpiry <= 30) return 'expiring';
     return 'valid';
@@ -225,13 +226,13 @@ const EmployeeTrainingTab = () => {
   // Filtrar treinamentos
   const filteredTrainings = trainings.filter(training => {
     const matchesSearch = training.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         training.cpf.includes(searchTerm) ||
-                         training.position.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      training.cpf.includes(searchTerm) ||
+      training.position.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesStatus = statusFilter === 'all' || training.status === statusFilter;
     const matchesPosition = positionFilter === 'all' || training.position === positionFilter;
     const matchesTrainingType = trainingTypeFilter === 'all' || training.trainingType === trainingTypeFilter;
-    
+
     return matchesSearch && matchesStatus && matchesPosition && matchesTrainingType;
   });
 
@@ -252,43 +253,94 @@ const EmployeeTrainingTab = () => {
 
     try {
       console.log('🗑️ Excluindo certificação:', id);
-      
+
       // Chamar API para excluir do banco
       await trainingService.deleteEmployeeCertification(id);
-      
+
       console.log('✅ Certificação excluída com sucesso');
-      
+
       // Atualizar lista local
       setTrainings(trainings.filter(t => t.id !== id));
-      
-      toast({ 
-        title: 'Sucesso', 
-        description: 'Treinamento excluído com sucesso!' 
+
+      toast({
+        title: 'Sucesso',
+        description: 'Treinamento excluído com sucesso!'
       });
     } catch (error) {
       console.error('❌ Erro ao excluir certificação:', error);
-      toast({ 
-        title: 'Erro', 
-        description: 'Falha ao excluir treinamento. Tente novamente.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Erro',
+        description: 'Falha ao excluir treinamento. Tente novamente.',
+        variant: 'destructive'
       });
+    }
+  };
+
+  const handleGeneratePdf = async () => {
+    if (filteredTrainings.length === 0) {
+      toast({ title: 'Aviso', description: 'Não há dados para gerar o PDF.', variant: 'default' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        companyId: (trainings[0] as any)?.companyId || null,
+        rows: filteredTrainings.map(t => ({
+          employeeName: t.employee,
+          employeeCpf: t.cpf,
+          employeePosition: t.position,
+          sector: t.sector,
+          trainingName: t.trainingType,
+          expirationDate: new Date(t.validUntil).toLocaleDateString('pt-BR'),
+          status: t.status === 'valid' ? 'Em dia' : t.status === 'expiring' ? 'Atenção' : 'Expirado'
+        }))
+      };
+
+      const response = await fetch('/api/employee-certifications/list/pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error('Erro ao gerar PDF');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lista-treinamentos-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({ title: 'Sucesso', description: 'PDF gerado com sucesso!' });
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+      toast({ title: 'Erro', description: 'Não foi possível gerar o PDF.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
   // Salvar novo ou editar
   const handleSave = async (data: any) => {
     console.log('📝 handleSave chamado com:', data);
-    
+
     // Recarregar lista completa do backend
     setLoading(true);
     try {
       // Buscar certificações de funcionários (histórico de treinamentos concluídos)
       const certs: EmployeeCertification[] = await trainingService.getEmployeeCertifications();
-      
+
       const rows: TrainingRow[] = certs.map(c => {
         const validUntil = c.expirationDate || '';
         const status = getTrainingStatus(validUntil);
-        
+
         // Priorizar workPostName da certificação, senão usar employeeDepartment
         let sectorName = '';
         if (c.workPostName) {
@@ -296,7 +348,7 @@ const EmployeeTrainingTab = () => {
         } else if (c.employeeDepartment) {
           sectorName = c.employeeDepartment;
         }
-        
+
         return {
           id: c.id,
           employeeId: c.employeeId, // ID do funcionário para edição
@@ -310,7 +362,7 @@ const EmployeeTrainingTab = () => {
           hours: c.renewalPeriodMonths ? c.renewalPeriodMonths * 8 : undefined, // Estimativa: 8h por mês
         };
       });
-      
+
       console.log('✅ Lista de treinamentos recarregada:', rows.length);
       setTrainings(rows);
       toast({ title: 'Sucesso', description: 'Lista atualizada com sucesso!' });
@@ -319,7 +371,7 @@ const EmployeeTrainingTab = () => {
       toast({ title: 'Erro', description: 'Falha ao recarregar lista.', variant: 'destructive' });
     } finally {
       setLoading(false);
-    setOpen(false);
+      setOpen(false);
     }
   };
 
@@ -366,7 +418,7 @@ const EmployeeTrainingTab = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -378,7 +430,7 @@ const EmployeeTrainingTab = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -390,7 +442,7 @@ const EmployeeTrainingTab = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -412,10 +464,21 @@ const EmployeeTrainingTab = () => {
               <Filter className="h-5 w-5" />
               Filtros e Busca
             </div>
-            <Button onClick={handleAdd} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Treinamento
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleGeneratePdf}
+                disabled={loading}
+                className="flex items-center gap-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Gerar PDF
+              </Button>
+              <Button onClick={handleAdd} className="flex items-center gap-2 bg-seguranca-red hover:bg-seguranca-darkred">
+                <Plus className="h-4 w-4" />
+                Novo Treinamento
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -432,7 +495,7 @@ const EmployeeTrainingTab = () => {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label className="text-seguranca-lightgray">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -447,7 +510,7 @@ const EmployeeTrainingTab = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label className="text-seguranca-lightgray">Cargo</Label>
               <Select value={positionFilter} onValueChange={setPositionFilter}>
@@ -462,7 +525,7 @@ const EmployeeTrainingTab = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label className="text-seguranca-lightgray">Tipo de Treinamento</Label>
               <Select value={trainingTypeFilter} onValueChange={setTrainingTypeFilter}>
@@ -588,7 +651,7 @@ const EmployeeTrainingTab = () => {
                         {getStatusBadge(t.status)}
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                       <div className="text-seguranca-lightgray"><span className="font-medium">Cargo:</span> {t.position || 'N/A'}</div>
                       <div className="text-seguranca-lightgray"><span className="font-medium">Setor:</span> {t.sector || 'N/A'}</div>
@@ -596,7 +659,7 @@ const EmployeeTrainingTab = () => {
                       <div className="text-seguranca-lightgray"><span className="font-medium">Validade:</span> {new Date(t.validUntil).toLocaleDateString('pt-BR')}</div>
                       <div className="text-seguranca-lightgray"><span className="font-medium">Carga Horária:</span> {t.hours || 0}h</div>
                     </div>
-                    
+
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => handleEdit(t)}>
                         <Edit className="h-3 w-3 mr-1" />

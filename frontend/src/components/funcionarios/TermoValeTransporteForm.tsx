@@ -98,41 +98,39 @@ const TermoValeTransporteForm = () => {
         return;
       }
 
-      const addressValue = typeof fullEmployee.address === 'string' 
-        ? fullEmployee.address 
+      const addressValue = typeof fullEmployee.address === 'string'
+        ? fullEmployee.address
         : fullEmployee.address?.street || '';
-      
+
       const payload = {
-        templateName: 'termo-vale-transporte.html',
-        nome: fullEmployee.name,
-        cpf: fullEmployee.cpf || fullEmployee.document || '',
-        cargo: (fullEmployee as any).position?.name || '',
-        empresa: empresa.name,
-        dataAdmissao: fullEmployee.hireDate || '',
-        enderecoFuncionario: addressValue,
-        cnpjEmpresa: empresa.cnpj || '',
-        enderecoEmpresa: empresa.address || '',
-        valorVale: form.valorVale,
-        tipoVale: form.tipoVale,
-        dataInicio: form.dataInicio,
-        dataFim: form.dataFim || '',
-        observacoes: form.observacoes || '',
-        dataAtual: new Date().toLocaleDateString('pt-BR')
+        companyId: empresa.id,
+        employeeName: fullEmployee.name,
+        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
+        employeePosition: (fullEmployee as any).position?.name || '',
+        hireDate: fullEmployee.hireDate || '',
+        employeeAddress: addressValue,
+        voucherType: form.tipoVale,
+        voucherValue: form.valorVale,
+        startDate: form.dataInicio,
+        endDate: form.dataFim || null,
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        documentDate: new Date().toISOString().split('T')[0],
+        observations: form.observacoes || ''
       };
-      
+
       // Gerar PDF para visualização
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+      const response = await api.post('/api/transport-voucher/preview-pdf', payload, {
         responseType: 'blob'
       });
-      
+
       // Abrir PDF em nova aba para visualização
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-      
+
       // Limpar URL após um tempo
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
-      
+
     } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
       toast({
@@ -155,7 +153,7 @@ const TermoValeTransporteForm = () => {
       });
       return;
     }
-    
+
     if (!form.tipoVale || !form.valorVale || !form.dataInicio) {
       toast({
         title: 'Atenção',
@@ -164,7 +162,7 @@ const TermoValeTransporteForm = () => {
       });
       return;
     }
-    
+
     setLoading(true);
     try {
       // Buscar dados completos do funcionário
@@ -174,33 +172,31 @@ const TermoValeTransporteForm = () => {
       }
 
       // Preparar dados para o template
-      const addressValue = typeof fullEmployee.address === 'string' 
-        ? fullEmployee.address 
+      const addressValue = typeof fullEmployee.address === 'string'
+        ? fullEmployee.address
         : fullEmployee.address?.street || '';
-      
+
       const payload = {
-        templateName: 'termo-vale-transporte.html',
-        nome: fullEmployee.name,
-        cpf: fullEmployee.cpf || fullEmployee.document || '',
-        cargo: (fullEmployee as any).position?.name || '',
-        empresa: empresa.name,
-        dataAdmissao: fullEmployee.hireDate || '',
-        enderecoFuncionario: addressValue,
-        cnpjEmpresa: empresa.cnpj || '',
-        enderecoEmpresa: empresa.address || '',
-        valorVale: form.valorVale,
-        tipoVale: form.tipoVale,
-        dataInicio: form.dataInicio,
-        dataFim: form.dataFim || '',
-        observacoes: form.observacoes || '',
-        dataAtual: new Date().toLocaleDateString('pt-BR')
+        companyId: empresa.id,
+        employeeName: fullEmployee.name,
+        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
+        employeePosition: (fullEmployee as any).position?.name || '',
+        hireDate: fullEmployee.hireDate || '',
+        employeeAddress: addressValue,
+        voucherType: form.tipoVale,
+        voucherValue: form.valorVale,
+        startDate: form.dataInicio,
+        endDate: form.dataFim || null,
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        documentDate: new Date().toISOString().split('T')[0],
+        observations: form.observacoes || ''
       };
-      
+
       // Gerar PDF
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+      const response = await api.post('/api/transport-voucher/generate-pdf', payload, {
         responseType: 'blob'
       });
-      
+
       // Fazer download do PDF
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
@@ -211,15 +207,15 @@ const TermoValeTransporteForm = () => {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: 'Sucesso',
         description: 'Termo de Vale-Transporte gerado com sucesso!',
       });
-      
+
       // TODO: Integrar com /api/documentos-gerados/gerar para salvar no banco
       // Isso requer ter um modelo de documento cadastrado no banco
-      
+
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
       toast({
@@ -255,19 +251,19 @@ const TermoValeTransporteForm = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Seleção Principal */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário</Label>
-                <Select 
-                  value={form.funcionarioId} 
+                <Select
+                  value={form.funcionarioId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   disabled={loadingData}
                 >
@@ -294,11 +290,11 @@ const TermoValeTransporteForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa</Label>
-                <Select 
-                  value={form.empresaId} 
+                <Select
+                  value={form.empresaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
                   disabled={loadingData}
                 >
@@ -355,7 +351,7 @@ const TermoValeTransporteForm = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
@@ -374,7 +370,7 @@ const TermoValeTransporteForm = () => {
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                       {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
+                      {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
                     </div>
                   </div>
                 </div>
@@ -384,7 +380,7 @@ const TermoValeTransporteForm = () => {
             {/* Detalhes da Empresa */}
             {empresa && (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-100">
-                 <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center justify-between border-b pb-2">
                   <div className="flex items-center gap-2 font-medium">
                     <Building className="h-4 w-4 text-primary" />
                     Dados da Empresa
@@ -397,7 +393,7 @@ const TermoValeTransporteForm = () => {
                       {empresa.name}
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
@@ -423,7 +419,7 @@ const TermoValeTransporteForm = () => {
               </div>
             )}
           </div>
-          
+
           {(funcionario || empresa) && <Separator />}
 
           {/* Configuração do Vale */}
@@ -447,11 +443,11 @@ const TermoValeTransporteForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2 lg:col-span-1">
                 <Label>Valor do Vale</Label>
-                <Input 
-                  value={form.valorVale} 
+                <Input
+                  value={form.valorVale}
                   onChange={(e) => setForm(prev => ({ ...prev, valorVale: e.target.value }))}
                   placeholder="Ex: R$ 250,00"
                   className="bg-background"
@@ -460,19 +456,19 @@ const TermoValeTransporteForm = () => {
 
               <div className="space-y-2 lg:col-span-1">
                 <Label>Data de Início</Label>
-                <Input 
-                  type="date" 
-                  value={form.dataInicio} 
+                <Input
+                  type="date"
+                  value={form.dataInicio}
                   onChange={(e) => setForm(prev => ({ ...prev, dataInicio: e.target.value }))}
                   className="bg-background"
                 />
               </div>
-              
+
               <div className="space-y-2 lg:col-span-1">
                 <Label>Data de Término</Label>
-                <Input 
-                  type="date" 
-                  value={form.dataFim} 
+                <Input
+                  type="date"
+                  value={form.dataFim}
                   onChange={(e) => setForm(prev => ({ ...prev, dataFim: e.target.value }))}
                   className="bg-background"
                 />
@@ -481,8 +477,8 @@ const TermoValeTransporteForm = () => {
 
             <div className="space-y-2">
               <Label>Observações Adicionais</Label>
-              <Textarea 
-                value={form.observacoes} 
+              <Textarea
+                value={form.observacoes}
                 onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
                 placeholder="Insira aqui observações relevantes sobre a concessão do benefício..."
                 rows={3}
@@ -495,10 +491,10 @@ const TermoValeTransporteForm = () => {
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button 
-              onClick={handlePreview} 
-              variant="outline" 
-              className="flex items-center gap-2 w-full sm:w-auto h-11" 
+            <Button
+              onClick={handlePreview}
+              variant="outline"
+              className="flex items-center gap-2 w-full sm:w-auto h-11"
               disabled={loading || loadingData || !funcionario || !empresa || !form.tipoVale || !form.valorVale || !form.dataInicio}
             >
               {loading ? (
@@ -513,9 +509,9 @@ const TermoValeTransporteForm = () => {
                 </>
               )}
             </Button>
-            <Button 
-              onClick={handleGerarPDF} 
-              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all" 
+            <Button
+              onClick={handleGerarPDF}
+              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || loadingData || !funcionario || !empresa}
             >
               {loading ? (

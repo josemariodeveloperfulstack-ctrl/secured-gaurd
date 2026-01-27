@@ -43,10 +43,23 @@ public class UserController {
     @Operation(summary = "Listar usuários", description = "Retorna uma lista de todos os usuários. Permite acesso para usuários autenticados (necessário para chat)")
     public ResponseEntity<List<UserListResponseDTO>> getAllUsers() {
         List<User> users = userService.findAll();
+        
+        // Log de debug: verificar quantos usuários online existem no serviço
+        int onlineCount = userOnlineStatusService.getOnlineUserCount();
+        log.info("📊 [UserController] Total de usuários online no serviço: {}", onlineCount);
+        if (onlineCount > 0) {
+            log.info("📊 [UserController] IDs dos usuários online: {}", userOnlineStatusService.getOnlineUserIds());
+        }
+        
         List<UserListResponseDTO> dtos = users.stream()
             .map(this::convertToDTO)
             .filter(dto -> dto != null)
             .collect(java.util.stream.Collectors.toList());
+        
+        // Log de debug: verificar quantos DTOs têm isOnline = true
+        long onlineInResponse = dtos.stream().filter(dto -> Boolean.TRUE.equals(dto.getIsOnline())).count();
+        log.info("📊 [UserController] Total de usuários retornados: {} | Usuários online na resposta: {}", dtos.size(), onlineInResponse);
+        
         return ResponseEntity.ok(dtos);
     }
     
@@ -331,7 +344,11 @@ public class UserController {
         // Status online/offline
         try {
             UUID userId = UUID.fromString(dto.getId());
-            dto.setIsOnline(userOnlineStatusService.isUserOnline(userId));
+            boolean isOnline = userOnlineStatusService.isUserOnline(userId);
+            dto.setIsOnline(isOnline);
+            if (isOnline) {
+                log.debug("Usuário {} ({}) está online", userId, dto.getName());
+            }
         } catch (Exception e) {
             log.warn("Erro ao verificar status online do usuário {}: {}", user.getId(), e.getMessage());
             dto.setIsOnline(false);

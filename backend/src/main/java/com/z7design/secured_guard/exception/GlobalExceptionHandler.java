@@ -177,7 +177,18 @@ public class GlobalExceptionHandler {
         
         // Log específico para debugging
         String requestPath = request.getDescription(false);
-        if (requestPath.contains("/auth/login")) {
+        if (requestPath.contains("/ws/") || requestPath.contains("/websocket")) {
+            log.error("❌ [WebSocket] ERRO NO WEBSOCKET - Path: {}", requestPath);
+            log.error("❌ [WebSocket] Classe da exceção: {}", ex.getClass().getName());
+            log.error("❌ [WebSocket] Mensagem: {}", ex.getMessage());
+            log.error("❌ [WebSocket] Stack trace completo: ", ex);
+            if (ex.getCause() != null) {
+                log.error("❌ [WebSocket] Causa raiz: {}", ex.getCause().getMessage());
+                if (ex.getCause().getCause() != null) {
+                    log.error("❌ [WebSocket] Causa da causa: {}", ex.getCause().getCause().getMessage());
+                }
+            }
+        } else if (requestPath.contains("/auth/login")) {
             log.error("ERRO NO LOGIN - Classe da exceção: {}", ex.getClass().getName());
             log.error("ERRO NO LOGIN - Stack trace completo: ", ex);
             if (ex.getCause() != null) {

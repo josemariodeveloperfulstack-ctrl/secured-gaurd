@@ -13,6 +13,7 @@ import { employeeService } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import api from '@/lib/axios';
 
 const DeclaracaoForm = () => {
   const [form, setForm] = useState({
@@ -91,14 +92,40 @@ const DeclaracaoForm = () => {
     }
   };
 
-  const handlePreview = () => {
+  const handlePreview = async () => {
     if (!funcionario || !empresa) {
       alert('Selecione funcionário e empresa!');
       return;
     }
-    
-    // TODO: Implementar preview da declaração
-    console.log('Preview da declaração:', form);
+
+    setLoading(true);
+    try {
+      const payload = {
+        companyId: empresa.id,
+        personName: funcionario.name,
+        personCpf: funcionario.cpf || funcionario.document || '',
+        personPosition: (funcionario as any).position?.name || '',
+        title: form.tipoDeclaracao === 'CIPA_TRANSPES' ? 'Declaração CIPA' : 'Declaração para Fins Escolares',
+        content: form.observacoes || (form.tipoDeclaracao === 'CIPA_TRANSPES'
+          ? `Declaramos para os devidos fins que o colaborador supra citado participou do treinamento de CIPA.`
+          : `Declaramos para os devidos fins que o colaborador supra citado encontra-se devidamente registrado nesta empresa.`),
+        city: form.cidadeEmissao,
+        documentDate: form.dataEmissao
+      };
+
+      const response = await api.post('/api/declaration/preview-pdf', payload, {
+        responseType: 'blob'
+      });
+      const blob = response.data;
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      console.error('Erro ao gerar preview:', err);
+      alert('Erro ao gerar preview. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGerarPDF = async (e: React.FormEvent) => {
@@ -107,36 +134,37 @@ const DeclaracaoForm = () => {
       alert('Selecione funcionário e empresa!');
       return;
     }
-    
+
     setLoading(true);
     try {
-      const declaracaoData = {
-        funcionario: {
-          nome: funcionario.name,
-          cpf: funcionario.cpf || '',
-          rg: funcionario.rg || '',
-          cargo: (funcionario as any).position?.name || '',
-          genero: funcionario.gender || 'M',
-        },
-        empresa: {
-          nome: empresa.name,
-          cnpj: empresa.cnpj
-        },
-        declaracao: {
-          dataInicio: form.dataInicio ? formatDateToBrazilian(form.dataInicio) : (funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : ''),
-          dataFim: form.dataFim ? formatDateToBrazilian(form.dataFim) : (funcionario.terminationDate ? formatDateToBrazilian(funcionario.terminationDate) : ''),
-          ultimoDiaTrabalho: form.ultimoDiaTrabalho ? formatDateToBrazilianExtended(form.ultimoDiaTrabalho) : (form.dataFim || funcionario.terminationDate || ''),
-          cidadeEmissao: form.cidadeEmissao,
-          dataEmissao: formatDateToBrazilian(form.dataEmissao),
-          observacoes: form.observacoes,
-        }
+      const payload = {
+        companyId: empresa.id,
+        personName: funcionario.name,
+        personCpf: funcionario.cpf || funcionario.document || '',
+        personPosition: (funcionario as any).position?.name || '',
+        title: form.tipoDeclaracao === 'CIPA_TRANSPES' ? 'Declaração CIPA' : 'Declaração para Fins Escolares',
+        content: form.observacoes || (form.tipoDeclaracao === 'CIPA_TRANSPES'
+          ? `Declaramos para os devidos fins que o colaborador supra citado participou do treinamento de CIPA.`
+          : `Declaramos para os devidos fins que o colaborador supra citado encontra-se devidamente registrado nesta empresa.`),
+        city: form.cidadeEmissao,
+        documentDate: form.dataEmissao
       };
 
-      if (form.tipoDeclaracao === 'CIPA_TRANSPES') {
-        await declaracaoCipaTranspesGenerator.generatePDF(declaracaoData);
-      } else if (form.tipoDeclaracao === 'FINS_ESCOLARES') {
-        await declaracaoFinsEscolaresGenerator.generatePDF(declaracaoData);
-      }
+      const response = await api.post('/api/declaration/generate-pdf', payload, {
+        responseType: 'blob'
+      });
+
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `declaracao-${funcionario.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert('Declaração gerada com sucesso!');
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert('Erro ao gerar PDF. Tente novamente.');
@@ -168,19 +196,19 @@ const DeclaracaoForm = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Identificação */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário</Label>
-                <Select 
-                  value={form.funcionarioId} 
+                <Select
+                  value={form.funcionarioId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   disabled={loadingData}
                 >
@@ -207,11 +235,11 @@ const DeclaracaoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa</Label>
-                <Select 
-                  value={form.empresaId} 
+                <Select
+                  value={form.empresaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
                   disabled={loadingData}
                 >
@@ -255,50 +283,50 @@ const DeclaracaoForm = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.name}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {funcionario.cpf || '-'}
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">RG</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.rg || '-'}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                         {(funcionario as any).position?.name || '-'}
+                        {(funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : '-'}
                       </div>
                     </div>
-                     {funcionario.terminationDate && (
-                       <div className="space-y-1.5">
+                    {funcionario.terminationDate && (
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Demissão</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                           {formatDateToBrazilian(funcionario.terminationDate)}
+                          {formatDateToBrazilian(funcionario.terminationDate)}
                         </div>
                       </div>
-                     )}
+                    )}
                   </div>
                 </div>
               </div>
@@ -314,24 +342,24 @@ const DeclaracaoForm = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                       {empresa.name}
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {empresa.cnpj}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                         {empresa.sigla || '-'}
+                        {empresa.sigla || '-'}
                       </div>
                     </div>
                   </div>
@@ -339,7 +367,7 @@ const DeclaracaoForm = () => {
               </div>
             )}
           </div>
-          
+
           {(funcionario || empresa) && <Separator />}
 
           {/* Dados da Declaração */}
@@ -352,9 +380,9 @@ const DeclaracaoForm = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label>Data de Início do Período</Label>
-                <Input 
+                <Input
                   type="date"
-                  value={form.dataInicio} 
+                  value={form.dataInicio}
                   onChange={(e) => setForm(prev => ({ ...prev, dataInicio: e.target.value }))}
                   className="bg-background h-11"
                 />
@@ -362,12 +390,12 @@ const DeclaracaoForm = () => {
                   {funcionario?.hireDate ? `Padrão: ${formatDateToBrazilian(funcionario.hireDate)}` : 'Selecione um funcionário'}
                 </p>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Data de Fim do Período</Label>
-                <Input 
+                <Input
                   type="date"
-                  value={form.dataFim} 
+                  value={form.dataFim}
                   onChange={(e) => setForm(prev => ({ ...prev, dataFim: e.target.value }))}
                   className="bg-background h-11"
                 />
@@ -379,9 +407,9 @@ const DeclaracaoForm = () => {
 
             <div className="space-y-2">
               <Label>Último Dia de Trabalho</Label>
-              <Input 
+              <Input
                 type="date"
-                value={form.ultimoDiaTrabalho} 
+                value={form.ultimoDiaTrabalho}
                 onChange={(e) => setForm(prev => ({ ...prev, ultimoDiaTrabalho: e.target.value }))}
                 className="bg-background h-11"
               />
@@ -395,20 +423,20 @@ const DeclaracaoForm = () => {
                 <Label>Cidade de Emissão</Label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                    value={form.cidadeEmissao} 
+                  <Input
+                    value={form.cidadeEmissao}
                     onChange={(e) => setForm(prev => ({ ...prev, cidadeEmissao: e.target.value }))}
                     placeholder="Ex: Contagem"
                     className="bg-background h-11 pl-10"
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Data de Emissão</Label>
-                <Input 
+                <Input
                   type="date"
-                  value={form.dataEmissao} 
+                  value={form.dataEmissao}
                   onChange={(e) => setForm(prev => ({ ...prev, dataEmissao: e.target.value }))}
                   className="bg-background h-11"
                 />
@@ -417,8 +445,8 @@ const DeclaracaoForm = () => {
 
             <div className="space-y-2">
               <Label>Observações Adicionais</Label>
-              <Textarea 
-                value={form.observacoes} 
+              <Textarea
+                value={form.observacoes}
                 onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
                 placeholder="Observações adicionais sobre a declaração..."
                 rows={3}
@@ -431,9 +459,9 @@ const DeclaracaoForm = () => {
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button 
-              onClick={handlePreview} 
-              variant="outline" 
+            <Button
+              onClick={handlePreview}
+              variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
               disabled={loading || !funcionario || !empresa}
             >
@@ -449,9 +477,9 @@ const DeclaracaoForm = () => {
                 </>
               )}
             </Button>
-            <Button 
-              onClick={handleGerarPDF} 
-              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all" 
+            <Button
+              onClick={handleGerarPDF}
+              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || !funcionario || !empresa}
             >
               {loading ? (

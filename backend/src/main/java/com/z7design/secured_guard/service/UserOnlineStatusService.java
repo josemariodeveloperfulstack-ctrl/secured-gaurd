@@ -82,7 +82,12 @@ public class UserOnlineStatusService {
      * @return número de usuários online
      */
     public int getOnlineUserCount() {
-        return onlineUsers.size();
+        int count = onlineUsers.size();
+        log.debug("Total de usuários online: {}", count);
+        if (count > 0) {
+            log.debug("IDs dos usuários online: {}", onlineUsers.keySet());
+        }
+        return count;
     }
 
     /**
@@ -90,7 +95,9 @@ public class UserOnlineStatusService {
      * @return Set de IDs de usuários online
      */
     public Set<UUID> getOnlineUserIds() {
-        return Set.copyOf(onlineUsers.keySet());
+        Set<UUID> ids = Set.copyOf(onlineUsers.keySet());
+        log.debug("Retornando {} IDs de usuários online: {}", ids.size(), ids);
+        return ids;
     }
 
     /**

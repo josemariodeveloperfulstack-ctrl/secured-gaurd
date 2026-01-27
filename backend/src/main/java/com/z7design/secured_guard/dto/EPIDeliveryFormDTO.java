@@ -1,72 +1,214 @@
 package com.z7design.secured_guard.dto;
 
 import com.z7design.secured_guard.model.EPIDeliveryForm;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class EPIDeliveryFormDTO {
-    private UUID id;
-    private UUID employeeId;
-    private String employeeName;
-    private String employeeCpf;
-    private UUID companyId;
-    private String companyName;
-    private String companyCnpj;
-    private LocalDate deliveryDate;
-    private UUID responsibleEmployeeId;
-    private String responsibleEmployeeName;
-    private String observations;
-    private String pdfUrl;
-    private UUID createdById;
-    private String createdByName;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private List<EPIDeliveryFormItemDTO> items;
+        private UUID id;
+        private UUID employeeId;
+        private String employeeName;
+        private String employeeCpf;
+        private UUID companyId;
+        private String companyName;
+        private String companyCnpj;
+        private LocalDate deliveryDate;
+        private UUID responsibleEmployeeId;
+        private String responsibleEmployeeName;
+        private String observations;
+        private String pdfUrl;
+        private UUID createdById;
+        private String createdByName;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private List<EPIDeliveryFormItemDTO> items;
 
-    public static EPIDeliveryFormDTO fromEntity(EPIDeliveryForm form) {
-        return EPIDeliveryFormDTO.builder()
-                .id(form.getId())
-                .employeeId(form.getEmployee().getId())
-                .employeeName(form.getEmployee().getName())
-                .employeeCpf(form.getEmployee().getDocument() != null ? form.getEmployee().getDocument() : null)
-                .companyId(form.getCompany().getId())
-                .companyName(form.getCompany().getName())
-                .companyCnpj(form.getCompany().getCnpj())
-                .deliveryDate(form.getDeliveryDate())
-                .responsibleEmployeeId(form.getResponsibleEmployee() != null ? form.getResponsibleEmployee().getId() : null)
-                .responsibleEmployeeName(form.getResponsibleEmployee() != null ? form.getResponsibleEmployee().getName() : null)
-                .observations(form.getObservations())
-                .pdfUrl(form.getPdfUrl())
-                .createdById(form.getCreatedBy() != null ? form.getCreatedBy().getId() : null)
-                .createdByName(form.getCreatedBy() != null ? form.getCreatedBy().getName() : null)
-                .createdAt(form.getCreatedAt())
-                .updatedAt(form.getUpdatedAt())
-                .items(form.getItems() != null ? form.getItems().stream()
-                        .map(item -> EPIDeliveryFormItemDTO.builder()
-                                .id(item.getId())
-                                .epiName(item.getEpiName())
-                                .quantity(item.getQuantity())
-                                .ca(item.getCa())
-                                .caName(item.getCaName())
-                                .validityDate(item.getValidityDate())
-                                .uniformType(item.getUniformType())
-                                .uniformPiece(item.getUniformPiece())
-                                .observations(item.getObservations())
-                                .build())
-                        .collect(Collectors.toList()) : null)
-                .build();
-    }
+        public EPIDeliveryFormDTO() {
+        }
+
+        // Manual Getters and Setters
+        public UUID getId() {
+                return id;
+        }
+
+        public void setId(UUID id) {
+                this.id = id;
+        }
+
+        public UUID getEmployeeId() {
+                return employeeId;
+        }
+
+        public void setEmployeeId(UUID employeeId) {
+                this.employeeId = employeeId;
+        }
+
+        public String getEmployeeName() {
+                return employeeName;
+        }
+
+        public void setEmployeeName(String employeeName) {
+                this.employeeName = employeeName;
+        }
+
+        public String getEmployeeCpf() {
+                return employeeCpf;
+        }
+
+        public void setEmployeeCpf(String employeeCpf) {
+                this.employeeCpf = employeeCpf;
+        }
+
+        public UUID getCompanyId() {
+                return companyId;
+        }
+
+        public void setCompanyId(UUID companyId) {
+                this.companyId = companyId;
+        }
+
+        public String getCompanyName() {
+                return companyName;
+        }
+
+        public void setCompanyName(String companyName) {
+                this.companyName = companyName;
+        }
+
+        public String getCompanyCnpj() {
+                return companyCnpj;
+        }
+
+        public void setCompanyCnpj(String companyCnpj) {
+                this.companyCnpj = companyCnpj;
+        }
+
+        public LocalDate getDeliveryDate() {
+                return deliveryDate;
+        }
+
+        public void setDeliveryDate(LocalDate deliveryDate) {
+                this.deliveryDate = deliveryDate;
+        }
+
+        public UUID getResponsibleEmployeeId() {
+                return responsibleEmployeeId;
+        }
+
+        public void setResponsibleEmployeeId(UUID responsibleEmployeeId) {
+                this.responsibleEmployeeId = responsibleEmployeeId;
+        }
+
+        public String getResponsibleEmployeeName() {
+                return responsibleEmployeeName;
+        }
+
+        public void setResponsibleEmployeeName(String responsibleEmployeeName) {
+                this.responsibleEmployeeName = responsibleEmployeeName;
+        }
+
+        public String getObservations() {
+                return observations;
+        }
+
+        public void setObservations(String observations) {
+                this.observations = observations;
+        }
+
+        public String getPdfUrl() {
+                return pdfUrl;
+        }
+
+        public void setPdfUrl(String pdfUrl) {
+                this.pdfUrl = pdfUrl;
+        }
+
+        public UUID getCreatedById() {
+                return createdById;
+        }
+
+        public void setCreatedById(UUID createdById) {
+                this.createdById = createdById;
+        }
+
+        public String getCreatedByName() {
+                return createdByName;
+        }
+
+        public void setCreatedByName(String createdByName) {
+                this.createdByName = createdByName;
+        }
+
+        public LocalDateTime getCreatedAt() {
+                return createdAt;
+        }
+
+        public void setCreatedAt(LocalDateTime createdAt) {
+                this.createdAt = createdAt;
+        }
+
+        public LocalDateTime getUpdatedAt() {
+                return updatedAt;
+        }
+
+        public void setUpdatedAt(LocalDateTime updatedAt) {
+                this.updatedAt = updatedAt;
+        }
+
+        public List<EPIDeliveryFormItemDTO> getItems() {
+                return items;
+        }
+
+        public void setItems(List<EPIDeliveryFormItemDTO> items) {
+                this.items = items;
+        }
+
+        public static EPIDeliveryFormDTO fromEntity(EPIDeliveryForm form) {
+                EPIDeliveryFormDTO dto = new EPIDeliveryFormDTO();
+                dto.setId(form.getId());
+                if (form.getEmployee() != null) {
+                        dto.setEmployeeId(form.getEmployee().getId());
+                        dto.setEmployeeName(form.getEmployee().getName());
+                        dto.setEmployeeCpf(form.getEmployee().getDocument());
+                }
+                if (form.getCompany() != null) {
+                        dto.setCompanyId(form.getCompany().getId());
+                        dto.setCompanyName(form.getCompany().getName());
+                        dto.setCompanyCnpj(form.getCompany().getCnpj());
+                }
+                dto.setDeliveryDate(form.getDeliveryDate());
+                if (form.getResponsibleEmployee() != null) {
+                        dto.setResponsibleEmployeeId(form.getResponsibleEmployee().getId());
+                        dto.setResponsibleEmployeeName(form.getResponsibleEmployee().getName());
+                }
+                dto.setObservations(form.getObservations());
+                dto.setPdfUrl(form.getPdfUrl());
+                if (form.getCreatedBy() != null) {
+                        dto.setCreatedById(form.getCreatedBy().getId());
+                        dto.setCreatedByName(form.getCreatedBy().getName());
+                }
+                dto.setCreatedAt(form.getCreatedAt());
+                dto.setUpdatedAt(form.getUpdatedAt());
+                if (form.getItems() != null) {
+                        dto.setItems(form.getItems().stream()
+                                        .map(item -> {
+                                                EPIDeliveryFormItemDTO itemDto = new EPIDeliveryFormItemDTO();
+                                                itemDto.setId(item.getId());
+                                                itemDto.setEpiName(item.getEpiName());
+                                                itemDto.setQuantity(item.getQuantity());
+                                                itemDto.setCa(item.getCa());
+                                                itemDto.setCaName(item.getCaName());
+                                                itemDto.setValidityDate(item.getValidityDate());
+                                                itemDto.setUniformType(item.getUniformType());
+                                                itemDto.setUniformPiece(item.getUniformPiece());
+                                                itemDto.setObservations(item.getObservations());
+                                                return itemDto;
+                                        })
+                                        .collect(Collectors.toList()));
+                }
+                return dto;
+        }
 }
-

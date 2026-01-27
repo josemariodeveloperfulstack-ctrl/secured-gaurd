@@ -29,6 +29,7 @@ import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import accountingFormService from '@/services/accountingFormService';
 import { doctorService } from '@/services/doctorService';
 import { Doctor } from '@/types/doctor';
+import FichaEntregaEPIForm from './FichaEntregaEPIForm';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -587,6 +588,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   
   // Estados para modal de novo cargo
   const [novoCargoModalOpen, setNovoCargoModalOpen] = useState(false);
+  const [epiModalOpen, setEpiModalOpen] = useState(false);
   
   // Estados para modal de novo médico
   const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
@@ -1433,6 +1435,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     }
   };
 
+  const handleOpenEpiManagement = () => {
+    if (!employeeIdValue) {
+      toast({
+        title: "Atenção",
+        description: "É necessário salvar o funcionário primeiro para gerenciar os EPIs.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setEpiModalOpen(true);
+  };
+
   const handleEpiExcel = async () => {
     if (!employeeIdValue) {
       toast({
@@ -1572,7 +1587,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       }
     }}>
       <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto p-0 mx-4 sm:mx-0 bg-seguranca-graphite border-gray-600">
-        <DialogHeader className="bg-gradient-to-r from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white sticky top-0 z-10">
+        <DialogHeader className="bg-gradient-to-r from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white">
           <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold">
             <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg">
               <UserIcon className="h-4 w-4 sm:h-6 sm:w-6" />
@@ -3722,7 +3737,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                     className="border-green-500 text-green-400 hover:bg-green-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
                   >
                     <Shield className="mr-2 h-4 w-4" />
-                    Gerar PDF
+                    Gerar Ficha Manual
                   </Button>
                   <Button
                     type="button"
@@ -3745,8 +3760,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                     Gerar Excel
                   </Button>
                 </div>
-                <div className="rounded-lg border border-gray-600 bg-seguranca-black/40 p-3 text-xs text-gray-400">
-                  A visualização abre em nova aba para pré-visualizar o PDF gerado.
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleOpenEpiManagement}
+                    className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
+                  >
+                    Cadastrar / Gerenciar EPIs do Funcionário
+                  </Button>
+                  <p className="text-xs text-gray-400">
+                    Abra a gestão de EPIs para cadastrar ou revisar os equipamentos entregues antes de gerar o PDF completo.
+                  </p>
                 </div>
               </div>
               </div>
@@ -3891,6 +3916,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
            }
          }}
        />
+
+       {/* Modal de Ficha de Entrega de EPI */}
+       <Dialog open={epiModalOpen} onOpenChange={setEpiModalOpen}>
+         <DialogContent className="max-w-5xl w-full max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+           <DialogHeader className="pb-3 sm:pb-4">
+             <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-seguranca-lightgray">
+               Ficha de Entrega de EPI
+             </DialogTitle>
+             <DialogDescription className="text-xs sm:text-sm text-gray-400">
+               Cadastre e gerencie os EPIs entregues para este funcionário. Após salvar, gere o PDF completo na seção de relatórios.
+             </DialogDescription>
+           </DialogHeader>
+           <div className="pt-2">
+             <FichaEntregaEPIForm employeeId={employeeIdValue || undefined} />
+           </div>
+         </DialogContent>
+       </Dialog>
      </Dialog>
      </TooltipProvider>
    );

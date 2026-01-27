@@ -13,13 +13,15 @@ import DeclaracaoForm from './DeclaracaoForm';
 import TermoCienciaPrestadorForm from './TermoCienciaPrestadorForm';
 import OrdemServicoForm from './OrdemServicoForm';
 import ModelosDocumentosForm from './ModelosDocumentosForm';
-import { FileText, Shield, FileSignature, FileCheck, UserX, File, ClipboardList } from 'lucide-react';
+import TermoResponsabilidadeEspecíficoForm from './TermoResponsabilidadeEspecíficoForm';
+import { FileText, Shield, FileSignature, FileCheck, UserX, File, ClipboardList, CreditCard } from 'lucide-react';
 
 const tipos = [
   { key: 'modelos', label: 'Modelos de Documentos', icon: FileText, shortLabel: 'Modelos' },
   { key: 'vt', label: 'Termo de Compromisso de Vale-Transporte', icon: FileText, shortLabel: 'Vale-Transporte' },
   { key: 'epi', label: 'Ficha de Entrega de EPI', icon: Shield, shortLabel: 'EPI' },
   { key: 'registro', label: 'Ficha de Registro do Funcionário', icon: ClipboardList, shortLabel: 'Registro' },
+  { key: 'termo-responsabilidade-especifico', label: 'Termo de Responsabilidade (VT/Celular)', icon: CreditCard, shortLabel: 'Vale/Celular' },
   { key: 'equipamento', label: 'Termo de Responsabilidade de Equipamento', icon: Shield, shortLabel: 'Equipamento' },
   { key: 'lgpd', label: 'Termo de Consentimento LGPD', icon: FileCheck, shortLabel: 'LGPD' },
   { key: 'contratos', label: 'Contratos de Trabalho', icon: FileSignature, shortLabel: 'Contratos' },
@@ -35,7 +37,7 @@ const DocumentosGerarTab = () => {
   const params = new URLSearchParams(location.search);
   const tipoFromUrl = params.get('tipo');
   const [tipo, setTipo] = useState(tipoFromUrl || 'modelos');
-  
+
   // Atualizar tipo quando mudar na URL
   useEffect(() => {
     if (tipoFromUrl) {
@@ -75,8 +77,8 @@ const DocumentosGerarTab = () => {
                   h-10 
                   whitespace-nowrap
                   transition-all duration-200
-                  ${isActive 
-                    ? 'bg-seguranca-red hover:bg-seguranca-red/90 text-white border-seguranca-red shadow-lg shadow-seguranca-red/20' 
+                  ${isActive
+                    ? 'bg-seguranca-red hover:bg-seguranca-red/90 text-white border-seguranca-red shadow-lg shadow-seguranca-red/20'
                     : 'bg-seguranca-black border-gray-600 text-gray-400 hover:text-seguranca-lightgray hover:border-gray-500'
                   }
                   flex-shrink-0
@@ -97,6 +99,7 @@ const DocumentosGerarTab = () => {
         {tipo === 'vt' && <TermoValeTransporteForm />}
         {tipo === 'epi' && <FichaEntregaEPIForm employeeId={params.get('employeeId') || undefined} />}
         {tipo === 'registro' && <FichaRegistroFuncionarioForm employeeId={params.get('employeeId') || undefined} />}
+        {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecíficoForm />}
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm />}
         {tipo === 'lgpd' && <TermoLGPDForm />}
         {tipo === 'contratos' && <ContratosTrabalhoForm />}

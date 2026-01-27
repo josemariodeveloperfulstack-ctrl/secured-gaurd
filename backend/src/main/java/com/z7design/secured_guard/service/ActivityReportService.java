@@ -1,7 +1,10 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.*;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.*;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.enums.ActivityReportStatus;
 import com.z7design.secured_guard.repository.*;
 import jakarta.persistence.EntityNotFoundException;
@@ -12,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
@@ -39,19 +41,25 @@ public class ActivityReportService {
     private final EmployeeRepository employeeRepository;
     private final ClientRepository clientRepository;
     private final WorkPostRepository workPostRepository;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
     // private final FileStorageService fileStorageService; // Adicionar se houver um serviço de armazenamento de arquivos genérico
 
     public ActivityReportService(
             ActivityReportRepository activityReportRepository,
             EmployeeRepository employeeRepository,
             ClientRepository clientRepository,
-            WorkPostRepository workPostRepository
+            WorkPostRepository workPostRepository,
+            StandardReportLayoutService standardReportLayoutService,
+            CompanyRepository companyRepository
             // FileStorageService fileStorageService
     ) {
         this.activityReportRepository = activityReportRepository;
         this.employeeRepository = employeeRepository;
         this.clientRepository = clientRepository;
         this.workPostRepository = workPostRepository;
+        this.standardReportLayoutService = standardReportLayoutService;
+        this.companyRepository = companyRepository;
         // this.fileStorageService = fileStorageService;
     }
 
@@ -371,54 +379,41 @@ public class ActivityReportService {
         log.info("Gerando relatório PDF de atividades - EmployeeId: {}, ClientId: {}, StartDate: {}, EndDate: {}",
                 employeeId, clientId, startDate, endDate);
 
+        // Buscar relatórios com os filtros
+        ActivityReportStatus status = null; // Buscar todos os status
+        UUID workPostId = null;
+        UUID supervisorId = null;
+        
+        List<ActivityReportDTO> reports;
+        try {
+            reports = getActivityReports(employeeId, clientId, workPostId, startDate, endDate, status, supervisorId);
+            log.info("Total de relatórios encontrados para o PDF: {}", reports.size());
+        } catch (Exception e) {
+            log.error("Erro ao buscar relatórios para PDF: {}", e.getMessage(), e);
+            throw new RuntimeException("Erro ao buscar relatórios: " + e.getMessage(), e);
+        }
+
+        // Determinar companyId
+        UUID companyId = resolveCompanyId(reports, employeeId, clientId);
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer = null;
-        PdfDocument pdfDoc = null;
-        Document document = null;
-        boolean resourcesClosed = false;
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
 
         try {
-            // Buscar relatórios com os filtros
-            ActivityReportStatus status = null; // Buscar todos os status
-            UUID workPostId = null;
-            UUID supervisorId = null;
+            PdfWriter writer = new PdfWriter(baos);
             
-            List<ActivityReportDTO> reports;
-            try {
-                reports = getActivityReports(employeeId, clientId, workPostId, startDate, endDate, status, supervisorId);
-                log.info("Total de relatórios encontrados para o PDF: {}", reports.size());
-            } catch (Exception e) {
-                log.error("Erro ao buscar relatórios para PDF: {}", e.getMessage(), e);
-                throw new RuntimeException("Erro ao buscar relatórios: " + e.getMessage(), e);
-            }
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE ATIVIDADES")
+                .topMargin(120f)
+                .bottomMargin(80f)
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
             
-            writer = new PdfWriter(baos);
-            pdfDoc = new PdfDocument(writer);
-            document = new Document(pdfDoc);
-            document.setMargins(50, 50, 50, 50);
-
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold()
-                    .setMarginBottom(5);
-            document.add(companyHeader);
-
-            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginBottom(20);
-            document.add(companyInfo);
-
-            // Título
-            Paragraph title = new Paragraph("RELATÓRIO DE ATIVIDADES")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(10)
-                    .setMarginBottom(20);
-            document.add(title);
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
 
             // Informações do relatório
             Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -516,11 +511,8 @@ public class ActivityReportService {
                 document.add(table);
             }
 
-            // Fechar documento para finalizar o PDF
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
             document.close();
-            resourcesClosed = true;
-            
-            // PdfDoc e writer são fechados automaticamente quando document é fechado
 
             byte[] pdfBytes = baos.toByteArray();
             log.info("PDF gerado com sucesso. Tamanho: {} bytes", pdfBytes.length);
@@ -529,38 +521,32 @@ public class ActivityReportService {
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de relatórios de atividade: {}", e.getMessage(), e);
             e.printStackTrace();
-            
-            // Fechar recursos apenas se ainda não foram fechados
-            if (!resourcesClosed) {
-                try {
-                    if (document != null) {
-                        try {
-                            document.close();
-                        } catch (Exception ignored) {
-                            // Já fechado ou erro ao fechar, ignorar
-                        }
-                    }
-                    if (pdfDoc != null) {
-                        try {
-                            pdfDoc.close();
-                        } catch (Exception ignored) {
-                            // Já fechado ou erro ao fechar, ignorar
-                        }
-                    }
-                    if (writer != null) {
-                        try {
-                            writer.close();
-                        } catch (Exception ignored) {
-                            // Já fechado ou erro ao fechar, ignorar
-                        }
-                    }
-                } catch (Exception closeException) {
-                    log.error("Erro ao fechar recursos do PDF após exceção: {}", closeException.getMessage());
-                }
-            }
-            
             throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
         }
+    }
+
+    private UUID resolveCompanyId(List<ActivityReportDTO> reports, UUID employeeId, UUID clientId) {
+        // Tentar encontrar companyId a partir dos relatórios
+        if (!reports.isEmpty() && employeeId != null) {
+            Employee employee = employeeRepository.findById(employeeId).orElse(null);
+            if (employee != null && employee.getCompany() != null) {
+                return employee.getCompany().getId();
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            return activeCompanies.get(0).getId();
+        }
+        
+        // Último recurso: usar qualquer empresa
+        List<Company> allCompanies = companyRepository.findAll();
+        if (allCompanies != null && !allCompanies.isEmpty()) {
+            return allCompanies.get(0).getId();
+        }
+        
+        throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
     }
 
     private com.itextpdf.layout.element.Cell createHeaderCell(String text) {

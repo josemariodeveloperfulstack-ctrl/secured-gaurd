@@ -1,169 +1,161 @@
 package com.z7design.secured_guard.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itextpdf.kernel.colors.DeviceGray;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.dto.VisitControlReportDTO;
+import com.z7design.secured_guard.dto.VisitControlRequest;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.VisitControlReport;
-import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.enums.VisitControlStatus;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.VisitControlReportRepository;
-import com.z7design.secured_guard.repository.WorkPostRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
-import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class VisitControlReportService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(VisitControlReportService.class);
+    private final StandardReportLayoutService pdfLayoutService;
+    private final ExcelReportLayoutService excelLayoutService;
+    private final CompanyRepository companyRepository;
     private final VisitControlReportRepository reportRepository;
     private final UserRepository userRepository;
-    private final WorkPostRepository workPostRepository;
-    private final ObjectMapper objectMapper;
-    private static final String REPORTS_DIR = "reports/visit-controls/";
+    private final FileSystemService fileSystemService;
+
+    private static final String REPORT_TITLE = "Controle de Visitas";
+
+    public VisitControlReportService(StandardReportLayoutService pdfLayoutService,
+            ExcelReportLayoutService excelLayoutService,
+            CompanyRepository companyRepository,
+            VisitControlReportRepository reportRepository,
+            UserRepository userRepository,
+            FileSystemService fileSystemService) {
+        this.pdfLayoutService = pdfLayoutService;
+        this.excelLayoutService = excelLayoutService;
+        this.companyRepository = companyRepository;
+        this.reportRepository = reportRepository;
+        this.userRepository = userRepository;
+        this.fileSystemService = fileSystemService;
+    }
+
+    public byte[] generatePdf(VisitControlRequest request) {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            PdfWriter writer = new PdfWriter(outputStream);
+
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .companyId(request.getCompanyId())
+                    .reportTitle(REPORT_TITLE)
+                    .includeEmailInFooter(true)
+                    .leftMargin(20f)
+                    .rightMargin(20f)
+                    .build();
+
+            DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+            Company company = docWithPdf.getCompany();
+
+            addContent(document, request, company);
+
+            document.close();
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de Controle de Visitas", e);
+            throw new RuntimeException("Erro ao gerar PDF de Controle de Visitas", e);
+        }
+    }
 
     @Transactional
-    public VisitControlReportDTO saveReport(byte[] pdfBytes, UUID workPostId, VisitControlStatus status, 
-                                            LocalDate startDate, LocalDate endDate, int totalVisits, UUID createdBy) {
+    public VisitControlReportDTO saveReport(byte[] pdfBytes, UUID workPostId, VisitControlStatus status,
+            LocalDate startDate, LocalDate endDate, int totalVisits, UUID createdById) {
         try {
-            // Criar diretório se não existir
-            Path reportsPath = Paths.get(REPORTS_DIR);
-            if (!Files.exists(reportsPath)) {
-                Files.createDirectories(reportsPath);
-            }
+            String fileName = "relatorio-visitas-"
+                    + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".pdf";
+            String filePath = fileSystemService.saveFile("reports/visits", fileName, pdfBytes);
 
-            // Gerar nome do arquivo
-            String fileName = "relatorio-visitas-" + UUID.randomUUID().toString() + ".pdf";
-            Path filePath = reportsPath.resolve(fileName);
-
-            // Salvar arquivo
-            Files.write(filePath, pdfBytes);
-
-            // Preparar filtros JSON
-            Map<String, Object> filtersMap = new HashMap<>();
-            if (workPostId != null) {
-                filtersMap.put("workPostId", workPostId.toString());
-                WorkPost workPost = workPostRepository.findById(workPostId).orElse(null);
-                if (workPost != null) {
-                    filtersMap.put("workPostName", workPost.getName());
-                }
-            }
-            if (status != null) {
-                filtersMap.put("status", status.name());
-            }
-            if (startDate != null) {
-                filtersMap.put("startDate", startDate.toString());
-            }
-            if (endDate != null) {
-                filtersMap.put("endDate", endDate.toString());
-            }
-            String filtersJson = objectMapper.writeValueAsString(filtersMap);
-
-            // Criar entidade
             VisitControlReport report = new VisitControlReport();
             report.setFileName(fileName);
-            report.setFilePath(filePath.toString());
+            report.setFilePath(filePath);
             report.setFileSize((long) pdfBytes.length);
-            report.setFilters(filtersJson);
             report.setWorkPostId(workPostId);
-            if (workPostId != null) {
-                WorkPost workPost = workPostRepository.findById(workPostId).orElse(null);
-                if (workPost != null) {
-                    report.setWorkPostName(workPost.getName());
-                }
-            }
             report.setStatus(status != null ? status.name() : null);
             report.setStartDate(startDate);
             report.setEndDate(endDate);
             report.setTotalVisits(totalVisits);
-            if (createdBy != null) {
-                User user = userRepository.findById(createdBy).orElse(null);
-                report.setCreatedBy(user);
+
+            if (createdById != null) {
+                userRepository.findById(createdById).ifPresent(report::setCreatedBy);
             }
 
             VisitControlReport saved = reportRepository.save(report);
-            log.info("Relatório salvo com ID: {}", saved.getId());
-
             return convertToDTO(saved);
-        } catch (IOException e) {
-            log.error("Erro ao salvar relatório: {}", e.getMessage(), e);
-            throw new RuntimeException("Erro ao salvar relatório", e);
+        } catch (Exception e) {
+            log.error("Erro ao salvar relatório de visitas", e);
+            throw new RuntimeException("Erro ao salvar relatório de visitas", e);
         }
     }
 
-    @Transactional(readOnly = true)
     public List<VisitControlReportDTO> getAllReports() {
-        return reportRepository.findAllByOrderByCreatedAtDesc().stream()
+        return reportRepository.findAll().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
-    public List<VisitControlReportDTO> getReportsByUser(UUID userId) {
-        return reportRepository.findByCreatedByIdOrderByCreatedAtDesc(userId).stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
     public Optional<VisitControlReportDTO> getReportById(UUID id) {
         return reportRepository.findById(id)
                 .map(this::convertToDTO);
     }
 
-    @Transactional(readOnly = true)
-    public Resource getReportFile(UUID id) throws IOException {
+    public Resource getReportFile(UUID id) {
         VisitControlReport report = reportRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Relatório não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Relatório não encontrado"));
 
-        Path filePath = Paths.get(report.getFilePath());
-        if (!Files.exists(filePath)) {
-            throw new IOException("Arquivo do relatório não encontrado: " + report.getFilePath());
+        try {
+            byte[] content = fileSystemService.getFile(report.getFilePath());
+            return new ByteArrayResource(content);
+        } catch (Exception e) {
+            log.error("Erro ao buscar arquivo do relatório", e);
+            throw new RuntimeException("Erro ao buscar arquivo do relatório", e);
         }
-
-        Resource resource = new UrlResource(filePath.toUri());
-        if (!resource.exists() || !resource.isReadable()) {
-            throw new IOException("Arquivo não pode ser lido: " + report.getFilePath());
-        }
-
-        return resource;
     }
 
     @Transactional
     public void deleteReport(UUID id) {
         VisitControlReport report = reportRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Relatório não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Relatório não encontrado"));
 
-        try {
-            // Deletar arquivo
-            Path filePath = Paths.get(report.getFilePath());
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-            }
-        } catch (IOException e) {
-            log.warn("Erro ao deletar arquivo do relatório: {}", e.getMessage());
-        }
-
-        // Deletar registro
-        reportRepository.deleteById(id);
-        log.info("Relatório deletado: {}", id);
+        fileSystemService.deleteFile(report.getFilePath());
+        reportRepository.delete(report);
     }
 
     private VisitControlReportDTO convertToDTO(VisitControlReport entity) {
@@ -179,22 +171,120 @@ public class VisitControlReportService {
         dto.setStartDate(entity.getStartDate());
         dto.setEndDate(entity.getEndDate());
         dto.setTotalVisits(entity.getTotalVisits());
-        dto.setCreatedAt(entity.getCreatedAt());
-        dto.setUpdatedAt(entity.getUpdatedAt());
-
         if (entity.getCreatedBy() != null) {
             dto.setCreatedBy(entity.getCreatedBy().getId());
-            // Usar getName() se disponível, senão usar username
-            String userName = entity.getCreatedBy().getName();
-            if (userName == null || userName.trim().isEmpty()) {
-                userName = entity.getCreatedBy().getUsername();
-            }
-            dto.setCreatedByName(userName);
-        } else {
-            dto.setCreatedByName("Sistema");
+            dto.setCreatedByName(entity.getCreatedBy().getUsername());
         }
-
+        dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
     }
-}
 
+    public byte[] generateExcel(VisitControlRequest request) {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Visitas");
+            Company company = companyRepository.findById(request.getCompanyId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+
+            int startRow = excelLayoutService.addHeader(sheet, workbook, company, REPORT_TITLE);
+
+            Row filterRow = sheet.createRow(startRow++);
+            filterRow.createCell(0).setCellValue("Período:");
+            filterRow.createCell(1).setCellValue(formatPeriod(request.getStartDate(), request.getEndDate()));
+
+            if (request.getUnitName() != null) {
+                Row unitRow = sheet.createRow(startRow++);
+                unitRow.createCell(0).setCellValue("Unidade:");
+                unitRow.createCell(1).setCellValue(request.getUnitName());
+            }
+
+            startRow++;
+
+            Row headerRow = sheet.createRow(startRow++);
+            String[] headers = { "Data/Hora Entrada", "Visitante", "Documento", "Empresa", "Visitado", "Motivo",
+                    "Crachá", "Saída" };
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+            }
+
+            if (request.getVisits() != null) {
+                for (VisitControlRequest.VisitItem item : request.getVisits()) {
+                    Row row = sheet.createRow(startRow++);
+                    row.createCell(0).setCellValue(formatDateTime(item.getEntryTime()));
+                    row.createCell(1).setCellValue(item.getVisitorName());
+                    row.createCell(2).setCellValue(item.getDocument());
+                    row.createCell(3).setCellValue(item.getCompany());
+                    row.createCell(4).setCellValue(item.getPersonVisited());
+                    row.createCell(5).setCellValue(item.getReason());
+                    row.createCell(6).setCellValue(item.getBadgeNumber());
+                    row.createCell(7).setCellValue(formatDateTime(item.getExitTime()));
+                }
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            excelLayoutService.addFooter(sheet, workbook, company);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao gerar Excel de Controle de Visitas", e);
+            throw new RuntimeException("Erro ao gerar Excel de Controle de Visitas", e);
+        }
+    }
+
+    private void addContent(Document document, VisitControlRequest request, Company company) {
+        Paragraph info = new Paragraph().setFontSize(10f).setMarginBottom(10f);
+        info.add("Período: " + formatPeriod(request.getStartDate(), request.getEndDate()));
+        if (request.getUnitName() != null) {
+            info.add("\nUnidade: " + request.getUnitName());
+        }
+        document.add(info);
+
+        if (request.getVisits() != null && !request.getVisits().isEmpty()) {
+            float[] columnWidths = { 12, 18, 10, 15, 15, 12, 8, 10 };
+            Table table = new Table(UnitValue.createPercentArray(columnWidths)).useAllAvailableWidth();
+
+            String[] headers = { "Entrada", "Visitante", "Doc.", "Empresa", "Visitado", "Motivo", "Crachá", "Saída" };
+            for (String h : headers) {
+                table.addHeaderCell(new Cell().add(new Paragraph(h).setBold().setFontSize(8f))
+                        .setBackgroundColor(DeviceGray.WHITE));
+            }
+
+            for (VisitControlRequest.VisitItem item : request.getVisits()) {
+                table.addCell(createCell(formatDateTime(item.getEntryTime())));
+                table.addCell(createCell(item.getVisitorName()));
+                table.addCell(createCell(item.getDocument()));
+                table.addCell(createCell(item.getCompany()));
+                table.addCell(createCell(item.getPersonVisited()));
+                table.addCell(createCell(item.getReason()));
+                table.addCell(createCell(item.getBadgeNumber()));
+                table.addCell(createCell(formatDateTime(item.getExitTime())));
+            }
+
+            document.add(table);
+        } else {
+            document.add(new Paragraph("Nenhum registro encontrado no período.").setItalic()
+                    .setTextAlignment(TextAlignment.CENTER));
+        }
+    }
+
+    private Cell createCell(String text) {
+        return new Cell().add(new Paragraph(text != null ? text : "-").setFontSize(8f));
+    }
+
+    private String formatDateTime(LocalDateTime dt) {
+        if (dt == null)
+            return "-";
+        return dt.format(DateTimeFormatter.ofPattern("dd/MM HH:mm"));
+    }
+
+    private String formatPeriod(LocalDateTime start, LocalDateTime end) {
+        String s = start != null ? start.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "Início";
+        String e = end != null ? end.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")) : "Fim";
+        return s + " até " + e;
+    }
+}

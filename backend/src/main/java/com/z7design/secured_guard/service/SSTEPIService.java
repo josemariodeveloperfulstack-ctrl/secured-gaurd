@@ -134,15 +134,14 @@ public class SSTEPIService {
         epiRepository.findById(epiId).ifPresent(epi -> {
             epi.setCurrentStock(newStock);
             epiRepository.save(epi);
-            
+
             // Verifica se o estoque está baixo e cria alerta se necessário
             if (newStock <= epi.getMinimumStock()) {
                 alertService.createNonConformityAlert(
-                    null, // TODO: Definir funcionário responsável
-                    "Estoque baixo de EPI",
-                    String.format("O EPI %s está com estoque baixo (%d unidades)", epi.getName(), newStock),
-                    LocalDate.now().plusDays(7)
-                );
+                        null, // TODO: Definir funcionário responsável
+                        "Estoque baixo de EPI",
+                        String.format("O EPI %s está com estoque baixo (%d unidades)", epi.getName(), newStock),
+                        LocalDate.now().plusDays(7));
             }
         });
     }
@@ -152,23 +151,24 @@ public class SSTEPIService {
     /**
      * Registra entrega de EPI
      */
-    public EPIDelivery deliverEPI(UUID employeeId, UUID epiId, Integer quantity, String reason, UUID deliveredByUserId, String notes, LocalDate deliveryDate) {
+    public EPIDelivery deliverEPI(UUID employeeId, UUID epiId, Integer quantity, String reason, UUID deliveredByUserId,
+            String notes, LocalDate deliveryDate) {
         log.info("Registrando entrega de EPI {} para funcionário {} na data {}", epiId, employeeId, deliveryDate);
-        
+
         // Busca o funcionário
         Employee employee = employeeRepository.findById(employeeId)
-            .orElseThrow(() -> new IllegalArgumentException("Funcionário não encontrado"));
-        
+                .orElseThrow(() -> new IllegalArgumentException("Funcionário não encontrado"));
+
         // Verifica se há estoque suficiente
         PersonalProtectiveEquipment epi = getEPIById(epiId);
         if (epi == null) {
             throw new IllegalArgumentException("EPI não encontrado");
         }
-        
+
         if (epi.getCurrentStock() < quantity) {
             throw new IllegalArgumentException("Estoque insuficiente");
         }
-        
+
         // Converte o motivo da entrega (string) para enum
         EPIDeliveryReason deliveryReason;
         try {
@@ -176,14 +176,14 @@ public class SSTEPIService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Motivo de entrega inválido: " + reason);
         }
-        
+
         // Busca o usuário que está fazendo a entrega (se fornecido)
         User deliveredByUser = null;
         if (deliveredByUserId != null) {
             deliveredByUser = userRepository.findById(deliveredByUserId)
-                .orElse(null); // Não é obrigatório, pode ser null
+                    .orElse(null); // Não é obrigatório, pode ser null
         }
-        
+
         // Cria registro de entrega
         EPIDelivery delivery = new EPIDelivery();
         delivery.setEmployee(employee);
@@ -194,12 +194,12 @@ public class SSTEPIService {
         delivery.setDeliveredByUser(deliveredByUser);
         delivery.setReceivedByEmployee(false);
         delivery.setNotes(notes);
-        
+
         EPIDelivery savedDelivery = deliveryRepository.save(delivery);
-        
+
         // Atualiza estoque
         updateEPIStock(epiId, epi.getCurrentStock() - quantity);
-        
+
         return savedDelivery;
     }
 
@@ -268,14 +268,14 @@ public class SSTEPIService {
     @Transactional(readOnly = true)
     public boolean needsEPIReplacement(UUID employeeId, UUID epiId, int daysSinceLastDelivery) {
         List<EPIDelivery> deliveries = getLatestDeliveryByEmployeeAndEPI(employeeId, epiId);
-        
+
         if (deliveries.isEmpty()) {
             return true; // Nunca recebeu este EPI
         }
-        
+
         EPIDelivery lastDelivery = deliveries.get(0);
         LocalDate lastDeliveryDate = lastDelivery.getDeliveryDate();
-        
+
         // TODO: Implementar lógica baseada na frequência de reposição do EPI
         // Por enquanto, considera 30 dias como padrão
         return lastDeliveryDate.plusDays(30).isBefore(LocalDate.now());
@@ -286,7 +286,8 @@ public class SSTEPIService {
      */
     @Transactional(readOnly = true)
     public List<EPIDelivery> generateEmployeeEPIReport(UUID employeeId, LocalDate startDate, LocalDate endDate) {
-        // TODO: Implementar quando o método findByEmployeeAndDeliveryDateBetween estiver disponível
+        // TODO: Implementar quando o método findByEmployeeAndDeliveryDateBetween
+        // estiver disponível
         return deliveryRepository.findByDeliveryDateBetween(startDate, endDate);
     }
 
@@ -307,15 +308,15 @@ public class SSTEPIService {
     public List<EPIStockDTO> getEPIStockInventory() {
         List<PersonalProtectiveEquipment> epis = getAllEPIs();
         log.info("📦 Buscando estoque de EPIs. Total encontrado no banco: {}", epis.size());
-        
+
         if (epis.isEmpty()) {
             log.warn("⚠️ Nenhum EPI encontrado no banco de dados. Retornando lista vazia.");
         }
-        
+
         List<EPIStockDTO> stock = epis.stream()
                 .map(this::convertToEPIStockDTO)
                 .collect(Collectors.toList());
-        
+
         log.info("✅ Convertidos {} EPIs para EPIStockDTO", stock.size());
         return stock;
     }
@@ -344,7 +345,7 @@ public class SSTEPIService {
 
         // Mapear status
         String status = epi.getIsActive() ? "ACTIVE" : "INACTIVE";
-        
+
         // Verificar se está expirado (baseado no CA)
         if (epi.getCaValidity() != null && epi.getCaValidity().isBefore(LocalDate.now())) {
             status = "EXPIRED";
@@ -352,30 +353,30 @@ public class SSTEPIService {
 
         DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
 
-        return EPIStockDTO.builder()
-                .id(epi.getId())
-                .name(epi.getName())
-                .description(epi.getDescription())
-                .type(type)
-                .brand(epi.getManufacturer() != null ? epi.getManufacturer() : "N/A")
-                .model(epi.getModel() != null ? epi.getModel() : "N/A")
-                .size(null) // Não disponível no modelo atual
-                .color(null) // Não disponível no modelo atual
-                .certification(epi.getCaNumber() != null ? epi.getCaNumber() : "")
-                .status(status)
-                .quantity(epi.getCurrentStock())
-                .availableQuantity(availableQuantity)
-                .unitPrice(epi.getUnitCost() != null ? epi.getUnitCost() : java.math.BigDecimal.ZERO)
-                .supplier(epi.getManufacturer() != null ? epi.getManufacturer() : "N/A")
-                .purchaseDate(null) // Não disponível no modelo atual
-                .expiryDate(epi.getCaValidity() != null ? epi.getCaValidity().toString() : null)
-                .lastMaintenanceDate(null) // Não disponível no modelo atual
-                .nextMaintenanceDate(null) // Não disponível no modelo atual
-                .location("Almoxarifado") // Valor padrão, pode ser expandido no futuro
-                .notes(epi.getDescription())
-                .createdAt(epi.getCreatedAt() != null ? epi.getCreatedAt().format(formatter) : null)
-                .updatedAt(epi.getUpdatedAt() != null ? epi.getUpdatedAt().format(formatter) : null)
-                .build();
+        EPIStockDTO dto = new EPIStockDTO();
+        dto.setId(epi.getId());
+        dto.setName(epi.getName());
+        dto.setDescription(epi.getDescription());
+        dto.setType(type);
+        dto.setBrand(epi.getManufacturer() != null ? epi.getManufacturer() : "N/A");
+        dto.setModel(epi.getModel() != null ? epi.getModel() : "N/A");
+        dto.setSize(null);
+        dto.setColor(null);
+        dto.setCertification(epi.getCaNumber() != null ? epi.getCaNumber() : "");
+        dto.setStatus(status);
+        dto.setQuantity(epi.getCurrentStock());
+        dto.setAvailableQuantity(availableQuantity);
+        dto.setUnitPrice(epi.getUnitCost() != null ? epi.getUnitCost() : java.math.BigDecimal.ZERO);
+        dto.setSupplier(epi.getManufacturer() != null ? epi.getManufacturer() : "N/A");
+        dto.setPurchaseDate(null);
+        dto.setExpiryDate(epi.getCaValidity() != null ? epi.getCaValidity().toString() : null);
+        dto.setLastMaintenanceDate(null);
+        dto.setNextMaintenanceDate(null);
+        dto.setLocation("Almoxarifado");
+        dto.setNotes(epi.getDescription());
+        dto.setCreatedAt(epi.getCreatedAt() != null ? epi.getCreatedAt().format(formatter) : null);
+        dto.setUpdatedAt(epi.getUpdatedAt() != null ? epi.getUpdatedAt().format(formatter) : null);
+        return dto;
     }
 
     /**
@@ -390,9 +391,10 @@ public class SSTEPIService {
             }
 
             // Buscar todas as entregas deste EPI
-            // Por enquanto, vamos somar todas as entregas (assumindo que não há sistema de retorno)
+            // Por enquanto, vamos somar todas as entregas (assumindo que não há sistema de
+            // retorno)
             List<EPIDelivery> deliveries = deliveryRepository.findByEpi(epi);
-            
+
             if (deliveries == null || deliveries.isEmpty()) {
                 return 0;
             }
@@ -415,7 +417,7 @@ public class SSTEPIService {
         if (category == null) {
             return "OTHER";
         }
-        
+
         switch (category) {
             case CABECA:
                 return "HELMET";

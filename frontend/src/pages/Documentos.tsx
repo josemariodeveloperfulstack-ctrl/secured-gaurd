@@ -8,12 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  Plus, 
-  Search, 
+import {
+  FileText,
+  Download,
+  Eye,
+  Plus,
+  Search,
   Filter,
   Loader2,
   AlertTriangle,
@@ -51,6 +51,7 @@ import { Document, DocumentType } from '@/services/documentService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatDateSafe } from '@/utils/dateUtils';
+import { MigrationStatusCard } from '@/components/dashboard/MigrationStatusCard';
 
 const Documentos: React.FC = () => {
   const { toast } = useToast();
@@ -59,7 +60,7 @@ const Documentos: React.FC = () => {
   const [selectedType, setSelectedType] = useState<DocumentType | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'VALID' | 'EXPIRING' | 'EXPIRED'>('ALL');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'type'>('date');
-  
+
   // Estados para o modal de criação
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -72,11 +73,11 @@ const Documentos: React.FC = () => {
   });
 
   // Buscar documentos
-  const { 
-    data: documents, 
-    isLoading: documentsLoading, 
+  const {
+    data: documents,
+    isLoading: documentsLoading,
     error: documentsError,
-    refetch: refetchDocuments 
+    refetch: refetchDocuments
   } = useQuery({
     queryKey: ['documents'],
     queryFn: () => documentService.getAllDocuments()
@@ -138,21 +139,21 @@ const Documentos: React.FC = () => {
   // Calcular estatísticas
   const stats = useMemo(() => {
     if (!documents) return { total: 0, valid: 0, expiring: 0, expired: 0, byType: {} };
-    
+
     const today = new Date();
     const valid = documents.filter(doc => {
       if (!doc.expirationDate) return true;
       const expDate = new Date(doc.expirationDate);
       return expDate > today;
     }).length;
-    
+
     const expiring = documents.filter(doc => {
       if (!doc.expirationDate) return false;
       const expDate = new Date(doc.expirationDate);
       const daysUntilExpiry = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
     }).length;
-    
+
     const expired = documents.filter(doc => {
       if (!doc.expirationDate) return false;
       const expDate = new Date(doc.expirationDate);
@@ -164,10 +165,10 @@ const Documentos: React.FC = () => {
       return acc;
     }, {} as Record<string, number>);
 
-    return { 
-      total: documents.length, 
-      valid, 
-      expiring, 
+    return {
+      total: documents.length,
+      valid,
+      expiring,
       expired,
       byType
     };
@@ -176,31 +177,31 @@ const Documentos: React.FC = () => {
   // Filtrar e ordenar documentos
   const filteredDocuments = useMemo(() => {
     if (!documents) return [];
-    
+
     let filtered = documents.filter(doc => {
       const matchesSearch = (
         doc.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (doc.description && doc.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (doc.fileName && doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()))
       );
-      
+
       const matchesType = selectedType === 'ALL' || doc.type === selectedType;
-      
+
       // Filtro por status
       const matchesStatus = (() => {
         if (statusFilter === 'ALL') return true;
         if (!doc.expirationDate) return statusFilter === 'VALID';
-        
+
         const today = new Date();
         const expDate = new Date(doc.expirationDate);
         const daysUntilExpiry = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        
+
         if (statusFilter === 'EXPIRED') return daysUntilExpiry < 0;
         if (statusFilter === 'EXPIRING') return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
         if (statusFilter === 'VALID') return daysUntilExpiry > 30;
         return true;
       })();
-      
+
       return matchesSearch && matchesType && matchesStatus;
     });
 
@@ -229,41 +230,41 @@ const Documentos: React.FC = () => {
     if (!doc.expirationDate || doc.expirationDate === 'null' || doc.expirationDate === 'undefined' || doc.expirationDate === '0') {
       return { status: 'valid', label: 'Válido', icon: <CheckCircle className="h-4 w-4 text-green-600" />, badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> };
     }
-    
+
     try {
       const today = new Date();
       const expDate = new Date(doc.expirationDate);
-      
+
       // Verificar se a data é válida
       if (isNaN(expDate.getTime()) || expDate.getFullYear() < 1900) {
         return { status: 'valid', label: 'Válido', icon: <CheckCircle className="h-4 w-4 text-green-600" />, badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> };
       }
-      
+
       const daysUntilExpiry = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (daysUntilExpiry < 0) {
-        return { 
-          status: 'expired', 
-          label: 'Expirado', 
-          icon: <FileX className="h-4 w-4 text-red-600" />, 
-          badge: <Badge className="bg-red-100 text-red-800">Expirado</Badge> 
+        return {
+          status: 'expired',
+          label: 'Expirado',
+          icon: <FileX className="h-4 w-4 text-red-600" />,
+          badge: <Badge className="bg-red-100 text-red-800">Expirado</Badge>
         };
       }
-      
+
       if (daysUntilExpiry <= 30) {
-        return { 
-          status: 'expiring', 
-          label: `Expira em ${daysUntilExpiry} dias`, 
-          icon: <FileClock className="h-4 w-4 text-yellow-600" />, 
-          badge: <Badge className="bg-yellow-100 text-yellow-800">Expirando</Badge> 
+        return {
+          status: 'expiring',
+          label: `Expira em ${daysUntilExpiry} dias`,
+          icon: <FileClock className="h-4 w-4 text-yellow-600" />,
+          badge: <Badge className="bg-yellow-100 text-yellow-800">Expirando</Badge>
         };
       }
-      
-      return { 
-        status: 'valid', 
-        label: 'Válido', 
-        icon: <FileCheck className="h-4 w-4 text-green-600" />, 
-        badge: <Badge className="bg-green-100 text-green-800">Válido</Badge> 
+
+      return {
+        status: 'valid',
+        label: 'Válido',
+        icon: <FileCheck className="h-4 w-4 text-green-600" />,
+        badge: <Badge className="bg-green-100 text-green-800">Válido</Badge>
       };
     } catch (error) {
       console.error('Erro ao calcular status do documento:', error);
@@ -354,7 +355,7 @@ const Documentos: React.FC = () => {
           <div className="text-center">
             <AlertTriangle className="h-8 w-8 text-seguranca-red mx-auto mb-2" />
             <p className="text-seguranca-lightgray">Erro ao carregar documentos</p>
-            <Button 
+            <Button
               onClick={() => refetchDocuments()}
               className="mt-2 bg-seguranca-red hover:bg-seguranca-darkred"
             >
@@ -403,7 +404,7 @@ const Documentos: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="number">Número do Documento *</Label>
                   <Input
@@ -413,7 +414,7 @@ const Documentos: React.FC = () => {
                     placeholder="Ex: 123.456.789-00"
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="issueDate">Data de Emissão *</Label>
                   <Input
@@ -423,7 +424,7 @@ const Documentos: React.FC = () => {
                     onChange={(e) => setCreateForm({ ...createForm, issueDate: e.target.value })}
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="expirationDate">Data de Expiração</Label>
                   <Input
@@ -433,7 +434,7 @@ const Documentos: React.FC = () => {
                     onChange={(e) => setCreateForm({ ...createForm, expirationDate: e.target.value })}
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="description">Descrição</Label>
                   <Textarea
@@ -443,7 +444,7 @@ const Documentos: React.FC = () => {
                     placeholder="Descrição opcional do documento..."
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="file">Arquivo (Opcional)</Label>
                   <Input
@@ -456,13 +457,13 @@ const Documentos: React.FC = () => {
                     Formatos aceitos: PDF, JPG, PNG
                   </p>
                 </div>
-                
+
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setShowCreateModal(false)}>
                     Cancelar
                   </Button>
-                  <Button 
-                    onClick={handleCreateDocument} 
+                  <Button
+                    onClick={handleCreateDocument}
                     disabled={createDocumentMutation.isPending}
                     className="bg-seguranca-red hover:bg-seguranca-darkred"
                   >
@@ -481,6 +482,11 @@ const Documentos: React.FC = () => {
           </Dialog>
         </div>
 
+        {/* Status da Migração */}
+        <div className="mb-6">
+          <MigrationStatusCard />
+        </div>
+
         {/* Dashboard de Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-seguranca-graphite border-gray-600">
@@ -494,7 +500,7 @@ const Documentos: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-seguranca-graphite border-gray-600">
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
@@ -506,7 +512,7 @@ const Documentos: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-seguranca-graphite border-gray-600">
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
@@ -518,7 +524,7 @@ const Documentos: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-seguranca-graphite border-gray-600">
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
@@ -590,8 +596,8 @@ const Documentos: React.FC = () => {
 
             <div className="flex justify-between items-center mt-4">
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setSearchTerm('');
                     setSelectedType('ALL');
@@ -602,7 +608,7 @@ const Documentos: React.FC = () => {
                   Limpar Filtros
                 </Button>
               </div>
-              
+
               <div className="text-sm text-gray-400">
                 {filteredDocuments.length} de {documents?.length || 0} documentos
               </div>
@@ -627,7 +633,7 @@ const Documentos: React.FC = () => {
                 </h3>
                 <p className="text-gray-400">
                   {searchTerm || selectedType !== 'ALL' || statusFilter !== 'ALL'
-                    ? 'Tente ajustar os filtros de busca.' 
+                    ? 'Tente ajustar os filtros de busca.'
                     : 'Não há documentos cadastrados no sistema.'}
                 </p>
               </div>
@@ -668,14 +674,14 @@ const Documentos: React.FC = () => {
                             {docStatus.icon}
                             {docStatus.badge}
                           </div>
-                          
+
                           {doc.expirationDate && (
                             <div className="flex items-center space-x-1 text-xs text-gray-400 mb-1">
                               <Calendar size={12} />
                               <span>Expira: {formatDate(doc.expirationDate)}</span>
                             </div>
                           )}
-                          
+
                           <div className="text-xs text-gray-500">
                             Criado em: {formatDate(doc.createdAt)}
                           </div>

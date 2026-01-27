@@ -75,10 +75,10 @@ const ContratosTrabalhoForm = () => {
     if (funcionario) {
       // Try to find cost center by unit name
       const unitName = (funcionario as any).unit?.name;
-      const matchingCostCenter = unitName 
+      const matchingCostCenter = unitName
         ? costCenters.find(cc => cc.name.toLowerCase() === unitName.toLowerCase())
         : null;
-      
+
       setForm(prev => ({
         ...prev,
         position: (funcionario as any).position?.name || prev.position,
@@ -93,11 +93,11 @@ const ContratosTrabalhoForm = () => {
     if (form.contractType === 'Contrato de Experiência' && form.startDate && form.experienceDuration) {
       const startDate = new Date(form.startDate);
       const durationDays = parseInt(form.experienceDuration);
-      
+
       if (!isNaN(startDate.getTime()) && !isNaN(durationDays)) {
         const endDate = new Date(startDate);
         endDate.setDate(endDate.getDate() + durationDays);
-        
+
         setForm(prev => ({
           ...prev,
           endDate: endDate.toISOString().split('T')[0]
@@ -177,42 +177,26 @@ const ContratosTrabalhoForm = () => {
     const fullEmployee = await employeeService.getEmployeeById(funcionario!.id);
     if (!fullEmployee) throw new Error('Funcionário não encontrado');
 
-    const addressValue = typeof fullEmployee.address === 'string' 
-      ? fullEmployee.address 
+    const addressValue = typeof fullEmployee.address === 'string'
+      ? fullEmployee.address
       : fullEmployee.address?.street || '';
 
     return {
-      templateName: 'contrato-trabalho.html',
-      // Dados do Funcionário
-      funcionario: fullEmployee.name,
-      cpf: fullEmployee.cpf || fullEmployee.document || '',
-      rg: fullEmployee.rg || '',
-      ctps: fullEmployee.ctps || '',
-      endereco: addressValue,
-      estadoCivil: fullEmployee.maritalStatus || '',
-      nacionalidade: fullEmployee.nationality || 'Brasileira',
-      
-      // Dados da Empresa
-      empresa: empresa!.name,
-      cnpj: empresa!.cnpj,
-      enderecoEmpresa: empresa!.address || '',
-      
-      // Dados do Contrato
-      cargo: form.position,
-      tipoContrato: form.contractType,
-      dataInicio: new Date(form.startDate).toLocaleDateString('pt-BR'),
-      dataFim: form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : 'Indeterminado',
-      salario: form.salary,
-      jornada: form.workSchedule || '44 horas semanais',
-      departamento: costCenter?.name || form.department || '',
-      departamentoCode: costCenter?.code || '',
-      supervisor: form.supervisor,
-      beneficios: form.benefits.join(', '),
-      observacoes: form.observations,
-      dataAtual: new Date().toLocaleDateString('pt-BR'),
-      // Dados do Contrato de Experiência
-      isExperienceContract: form.contractType === 'Contrato de Experiência',
-      experienceDuration: form.experienceDuration ? `${form.experienceDuration} dias` : ''
+      companyId: empresa!.id,
+      employeeName: fullEmployee.name,
+      employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
+      employeeRg: fullEmployee.rg || '',
+      employeeAddress: addressValue,
+      employeeCtps: (fullEmployee as any).ctps || '',
+      employeeCtpsSeries: (fullEmployee as any).ctpsSeries || '',
+      position: form.position,
+      department: costCenter?.name || form.department || '',
+      salary: form.salary ? parseFloat(form.salary.replace(/\./g, '').replace(',', '.')) : 0,
+      admissionDate: form.startDate || null,
+      workHoursDescription: '44 horas semanais', // Placeholder or add form field if exists
+      workSchedule: form.workSchedule || 'a definir',
+      city: empresa!.address && typeof empresa!.address === 'string' ? empresa!.address.split(',')[0] : '',
+      contractDate: new Date().toISOString().split('T')[0]
     };
   };
 
@@ -223,11 +207,11 @@ const ContratosTrabalhoForm = () => {
     setLoading(true);
     try {
       const payload = await preparePayload();
-      
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+
+      const response = await api.post('/api/employment-contract/generate-pdf', payload, {
         responseType: 'blob'
       });
-      
+
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -237,7 +221,7 @@ const ContratosTrabalhoForm = () => {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: 'Sucesso',
         description: 'Contrato de Trabalho gerado com sucesso!',
@@ -260,15 +244,15 @@ const ContratosTrabalhoForm = () => {
     setLoading(true);
     try {
       const payload = await preparePayload();
-      
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+
+      const response = await api.post('/api/employment-contract/preview-pdf', payload, {
         responseType: 'blob'
       });
-      
+
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-      
+
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
     } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
@@ -305,19 +289,19 @@ const ContratosTrabalhoForm = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Identificação */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação das Partes</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário</Label>
-                <Select 
-                  value={form.employeeId} 
+                <Select
+                  value={form.employeeId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                   disabled={loadingData}
                 >
@@ -344,11 +328,11 @@ const ContratosTrabalhoForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa</Label>
-                <Select 
-                  value={form.companyId} 
+                <Select
+                  value={form.companyId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
                   disabled={loadingData}
                 >
@@ -380,13 +364,12 @@ const ContratosTrabalhoForm = () => {
             </div>
           </div>
 
-          <div className={`grid grid-cols-1 gap-6 ${
-            funcionario && empresa && costCenter 
-              ? 'lg:grid-cols-3' 
-              : funcionario && empresa 
-                ? 'lg:grid-cols-2' 
-                : 'lg:grid-cols-1'
-          }`}>
+          <div className={`grid grid-cols-1 gap-6 ${funcionario && empresa && costCenter
+            ? 'lg:grid-cols-3'
+            : funcionario && empresa
+              ? 'lg:grid-cols-2'
+              : 'lg:grid-cols-1'
+            }`}>
             {/* Detalhes do Funcionário */}
             {funcionario && (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
@@ -398,13 +381,13 @@ const ContratosTrabalhoForm = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.name}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {funcionario.cpf || funcionario.document || '-'}
@@ -414,7 +397,7 @@ const ContratosTrabalhoForm = () => {
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                       {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
+                      {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
                     </div>
                   </div>
                 </div>
@@ -431,23 +414,23 @@ const ContratosTrabalhoForm = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                       {empresa.name}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {empresa.cnpj}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                         {empresa.sigla || '-'}
+                        {empresa.sigla || '-'}
                       </div>
                     </div>
                   </div>
@@ -466,13 +449,13 @@ const ContratosTrabalhoForm = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {costCenter.name}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Código</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {costCenter.code || '-'}
@@ -491,7 +474,7 @@ const ContratosTrabalhoForm = () => {
               </div>
             )}
           </div>
-          
+
           {(funcionario || empresa || costCenter) && <Separator />}
 
           {/* Detalhes do Contrato */}
@@ -504,8 +487,8 @@ const ContratosTrabalhoForm = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2 lg:col-span-2">
                 <Label>Cargo</Label>
-                <Input 
-                  value={form.position} 
+                <Input
+                  value={form.position}
                   onChange={(e) => setForm(prev => ({ ...prev, position: e.target.value }))}
                   placeholder="Ex: Vigilante Patrimonial"
                   className="bg-background h-11"
@@ -541,8 +524,8 @@ const ContratosTrabalhoForm = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-orange-700 font-semibold">Duração da Experiência *</Label>
-                  <Select 
-                    value={form.experienceDuration} 
+                  <Select
+                    value={form.experienceDuration}
                     onValueChange={(value) => setForm(prev => ({ ...prev, experienceDuration: value }))}
                   >
                     <SelectTrigger className="bg-white h-12 border-orange-400 focus:border-orange-600 text-base font-semibold">
@@ -575,19 +558,19 @@ const ContratosTrabalhoForm = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <Label>Data de Início</Label>
-                <Input 
-                  type="date" 
-                  value={form.startDate} 
+                <Input
+                  type="date"
+                  value={form.startDate}
                   onChange={(e) => setForm(prev => ({ ...prev, startDate: e.target.value }))}
                   className="bg-background h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Data de Término (Opcional)</Label>
-                <Input 
-                  type="date" 
-                  value={form.endDate} 
+                <Input
+                  type="date"
+                  value={form.endDate}
                   onChange={(e) => setForm(prev => ({ ...prev, endDate: e.target.value }))}
                   className="bg-background h-11"
                 />
@@ -597,8 +580,8 @@ const ContratosTrabalhoForm = () => {
                 <Label>Salário Base</Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                    value={form.salary} 
+                  <Input
+                    value={form.salary}
                     onChange={(e) => setForm(prev => ({ ...prev, salary: e.target.value }))}
                     placeholder="0,00"
                     className="bg-background h-11 pl-10"
@@ -610,8 +593,8 @@ const ContratosTrabalhoForm = () => {
                 <Label>Jornada de Trabalho</Label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                    value={form.workSchedule} 
+                  <Input
+                    value={form.workSchedule}
                     onChange={(e) => setForm(prev => ({ ...prev, workSchedule: e.target.value }))}
                     placeholder="Ex: 44h semanais, escala 12x36"
                     className="bg-background h-11 pl-10"
@@ -621,8 +604,8 @@ const ContratosTrabalhoForm = () => {
 
               <div className="space-y-2">
                 <Label>Departamento (Centro de Custo)</Label>
-                <Select 
-                  value={form.department} 
+                <Select
+                  value={form.department}
                   onValueChange={(value) => setForm(prev => ({ ...prev, department: value }))}
                   disabled={loadingData}
                 >
@@ -668,15 +651,13 @@ const ContratosTrabalhoForm = () => {
                   variant={form.benefits.includes(benefit) ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleBenefitToggle(benefit)}
-                  className={`justify-start h-10 transition-all ${
-                    form.benefits.includes(benefit) 
-                      ? 'border-primary' 
-                      : 'hover:border-primary/50 text-muted-foreground'
-                  }`}
+                  className={`justify-start h-10 transition-all ${form.benefits.includes(benefit)
+                    ? 'border-primary'
+                    : 'hover:border-primary/50 text-muted-foreground'
+                    }`}
                 >
-                  <div className={`mr-2 h-4 w-4 rounded-full border flex items-center justify-center ${
-                     form.benefits.includes(benefit) ? 'border-primary-foreground bg-primary-foreground text-primary' : 'border-muted-foreground'
-                  }`}>
+                  <div className={`mr-2 h-4 w-4 rounded-full border flex items-center justify-center ${form.benefits.includes(benefit) ? 'border-primary-foreground bg-primary-foreground text-primary' : 'border-muted-foreground'
+                    }`}>
                     {form.benefits.includes(benefit) && <CheckCircle2 className="h-3 w-3" />}
                   </div>
                   <span className="truncate">{benefit}</span>
@@ -687,8 +668,8 @@ const ContratosTrabalhoForm = () => {
 
           <div className="space-y-2">
             <Label>Observações Adicionais</Label>
-            <Textarea 
-              value={form.observations} 
+            <Textarea
+              value={form.observations}
               onChange={(e) => setForm(prev => ({ ...prev, observations: e.target.value }))}
               placeholder="Cláusulas extras ou observações sobre o contrato..."
               rows={3}
@@ -700,9 +681,9 @@ const ContratosTrabalhoForm = () => {
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button 
-              onClick={handlePreviewContract} 
-              variant="outline" 
+            <Button
+              onClick={handlePreviewContract}
+              variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
               disabled={loading || loadingData || !funcionario || !empresa}
             >
@@ -718,9 +699,9 @@ const ContratosTrabalhoForm = () => {
                 </>
               )}
             </Button>
-            <Button 
-              onClick={handleGenerateContract} 
-              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all" 
+            <Button
+              onClick={handleGenerateContract}
+              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || loadingData || !funcionario || !empresa}
             >
               {loading ? (

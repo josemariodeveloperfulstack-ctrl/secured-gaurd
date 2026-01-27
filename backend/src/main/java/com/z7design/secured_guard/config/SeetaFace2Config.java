@@ -11,22 +11,23 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
-@Configuration
-@Slf4j
+@org.springframework.context.annotation.Configuration
 public class SeetaFace2Config {
-    
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SeetaFace2Config.class);
+
     @Bean
     public String seetaFace2ModelPath() {
         try {
             // Carregar modelos do classpath
             Resource resource = new ClassPathResource("seetaface2/models/");
             File modelDir = resource.getFile();
-            
+
             log.info("SeetaFace2 models path: {}", modelDir.getAbsolutePath());
-            
+
             // Carregar biblioteca nativa
             loadNativeLibrary();
-            
+
             return modelDir.getAbsolutePath();
         } catch (IOException e) {
             log.warn("Erro ao carregar modelos do SeetaFace2: {}", e.getMessage());
@@ -34,12 +35,12 @@ public class SeetaFace2Config {
             return System.getProperty("user.dir") + "/src/main/resources/seetaface2/models/";
         }
     }
-    
+
     private void loadNativeLibrary() {
         try {
             String osName = System.getProperty("os.name").toLowerCase();
             String libraryName;
-            
+
             if (osName.contains("win")) {
                 libraryName = "seetaface2.dll";
             } else if (osName.contains("linux")) {
@@ -50,19 +51,19 @@ public class SeetaFace2Config {
                 log.warn("Sistema operacional não suportado: {}", osName);
                 return;
             }
-            
+
             log.info("Tentando carregar biblioteca nativa: {}", libraryName);
-            
+
             // Carregar biblioteca nativa
             System.loadLibrary("seetaface2");
             log.info("Biblioteca nativa do SeetaFace2 carregada com sucesso");
-            
+
         } catch (UnsatisfiedLinkError e) {
             log.warn("Erro ao carregar biblioteca nativa do SeetaFace2: {}", e.getMessage());
             log.warn("Continuando com implementação simulada para desenvolvimento");
         }
     }
-    
+
     @Bean
     public boolean seetaFace2Available() {
         try {

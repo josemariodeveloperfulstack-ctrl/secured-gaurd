@@ -19,7 +19,7 @@ interface FichaRegistroFuncionarioFormProps {
 
 const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> = ({ employeeId }) => {
   const { toast } = useToast();
-  
+
   // Função auxiliar para formatar data ISO para BR
   const formatDateToBR = (isoDate: string | null | undefined): string => {
     if (!isoDate) return '';
@@ -38,7 +38,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
     observacoes: '',
     documentosEntregues: [] as string[],
   });
-  
+
   // Atualizar funcionarioId quando employeeId mudar
   useEffect(() => {
     if (employeeId) {
@@ -162,8 +162,8 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
     try {
       setLoading(true);
 
-      const addressValue = typeof fullEmployee.address === 'string' 
-        ? fullEmployee.address 
+      const addressValue = typeof fullEmployee.address === 'string'
+        ? fullEmployee.address
         : fullEmployee.address?.street || '';
 
       const payload = {
@@ -198,7 +198,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       };
 
       // Gerar PDF para visualização
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+      const response = await api.get(`/api/employees/${fullEmployee.id}/generate-record-pdf`, {
         responseType: 'blob'
       });
 
@@ -206,10 +206,10 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-      
+
       // Limpar URL após um tempo
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
-      
+
     } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
       toast({
@@ -224,7 +224,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
 
   const handleGerarPDF = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!funcionario || !empresa) {
       toast({
         title: 'Atenção',
@@ -251,8 +251,8 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
         throw new Error('Funcionário não encontrado');
       }
 
-      const addressValue = typeof fullEmployee.address === 'string' 
-        ? fullEmployee.address 
+      const addressValue = typeof fullEmployee.address === 'string'
+        ? fullEmployee.address
         : fullEmployee.address?.street || '';
 
       const payload = {
@@ -287,7 +287,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       };
 
       // Gerar PDF
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+      const response = await api.get(`/api/employees/${fullEmployee.id}/generate-record-pdf`, {
         responseType: 'blob'
       });
 
@@ -301,7 +301,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: 'Sucesso',
         description: 'Ficha de Registro gerada com sucesso!',
@@ -341,19 +341,19 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Identificação */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário</Label>
-                <Select 
-                  value={form.funcionarioId} 
+                <Select
+                  value={form.funcionarioId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   disabled={loadingData}
                 >
@@ -380,11 +380,11 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa</Label>
-                <Select 
-                  value={form.empresaId} 
+                <Select
+                  value={form.empresaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
                   disabled={loadingData}
                 >
@@ -427,7 +427,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                     {loadingEmployee && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                   </div>
                 </div>
-                
+
                 {fullEmployee ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -444,33 +444,33 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">RG</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                           {fullEmployee.rg || '-'}
                         </div>
                       </div>
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nascimento</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                           {fullEmployee.birthDate ? new Date(fullEmployee.birthDate).toLocaleDateString('pt-BR') : '-'}
+                          {fullEmployee.birthDate ? new Date(fullEmployee.birthDate).toLocaleDateString('pt-BR') : '-'}
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Telefone</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                           {fullEmployee.phone || '-'}
                         </div>
                       </div>
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">E-mail</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                           {fullEmployee.email || '-'}
+                          {fullEmployee.email || '-'}
                         </div>
                       </div>
                     </div>
@@ -502,31 +502,31 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                   </div>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                           {(fullEmployee as any).position?.name || '-'}
                         </div>
                       </div>
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                           {fullEmployee.hireDate ? new Date(fullEmployee.hireDate).toLocaleDateString('pt-BR') : '-'}
+                          {fullEmployee.hireDate ? new Date(fullEmployee.hireDate).toLocaleDateString('pt-BR') : '-'}
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">PIS/PASEP</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                           {fullEmployee.pis || '-'}
                         </div>
                       </div>
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">CTPS</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                           {fullEmployee.ctps || '-'}
+                          {fullEmployee.ctps || '-'}
                         </div>
                       </div>
                     </div>
@@ -544,23 +544,23 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                     </div>
                   </div>
                   <div className="space-y-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {empresa.name}
                       </div>
                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="space-y-1.5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                           {empresa.cnpj}
                         </div>
                       </div>
-                       <div className="space-y-1.5">
+                      <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                           {empresa.sigla || '-'}
+                          {empresa.sigla || '-'}
                         </div>
                       </div>
                     </div>
@@ -574,26 +574,26 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
 
           {/* Dados do Registro */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
-             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <Calendar className="h-4 w-4" />
               <span>Dados do Registro</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Data do Registro</Label>
-                <Input 
-                  type="date" 
-                  value={form.dataRegistro} 
+                <Input
+                  type="date"
+                  value={form.dataRegistro}
                   onChange={(e) => setForm(prev => ({ ...prev, dataRegistro: e.target.value }))}
                   className="bg-background h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pelo Registro</Label>
-                <Select 
-                  value={form.responsavelRegistroId} 
+                <Select
+                  value={form.responsavelRegistroId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, responsavelRegistroId: value }))}
                   disabled={loadingData}
                 >
@@ -651,7 +651,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
 
           {/* Documentos Entregues */}
           <div className="space-y-4">
-             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <IdCard className="h-4 w-4" />
               <span>Checklist de Documentos Entregues</span>
             </div>
@@ -663,15 +663,13 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                   variant={form.documentosEntregues.includes(documento) ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleDocumentoToggle(documento)}
-                  className={`justify-start h-10 transition-all ${
-                    form.documentosEntregues.includes(documento) 
-                      ? 'border-primary' 
+                  className={`justify-start h-10 transition-all ${form.documentosEntregues.includes(documento)
+                      ? 'border-primary'
                       : 'hover:border-primary/50 text-muted-foreground'
-                  }`}
+                    }`}
                 >
-                  <div className={`mr-2 h-4 w-4 rounded-full border flex items-center justify-center ${
-                     form.documentosEntregues.includes(documento) ? 'border-primary-foreground bg-primary-foreground text-primary' : 'border-muted-foreground'
-                  }`}>
+                  <div className={`mr-2 h-4 w-4 rounded-full border flex items-center justify-center ${form.documentosEntregues.includes(documento) ? 'border-primary-foreground bg-primary-foreground text-primary' : 'border-muted-foreground'
+                    }`}>
                     {form.documentosEntregues.includes(documento) && <CheckCircle2 className="h-3 w-3" />}
                   </div>
                   <span className="truncate">{documento}</span>
@@ -682,8 +680,8 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
 
           <div className="space-y-2">
             <Label>Observações Gerais</Label>
-            <Textarea 
-              value={form.observacoes} 
+            <Textarea
+              value={form.observacoes}
               onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
               placeholder="Observações adicionais sobre o registro do funcionário..."
               rows={3}
@@ -695,9 +693,9 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button 
-              onClick={handlePreview} 
-              variant="outline" 
+            <Button
+              onClick={handlePreview}
+              variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
               disabled={loading || loadingData || !funcionario || !empresa || !fullEmployee || !form.dataRegistro}
             >
@@ -713,9 +711,9 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                 </>
               )}
             </Button>
-            <Button 
-              onClick={handleGerarPDF} 
-              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all" 
+            <Button
+              onClick={handleGerarPDF}
+              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || loadingData || !funcionario || !empresa || !fullEmployee}
             >
               {loading ? (

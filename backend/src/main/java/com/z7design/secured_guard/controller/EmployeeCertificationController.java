@@ -23,6 +23,10 @@ import com.z7design.secured_guard.dto.EmployeeCertificationResponse;
 import com.z7design.secured_guard.model.EmployeeCertification;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 import com.z7design.secured_guard.service.EmployeeCertificationService;
+import com.z7design.secured_guard.service.TrainingListStandardPdfService;
+import com.z7design.secured_guard.dto.TrainingListReportRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 import jakarta.validation.Valid;
 
@@ -39,67 +43,45 @@ import lombok.RequiredArgsConstructor;
 public class EmployeeCertificationController {
 
     private final EmployeeCertificationService certificationService;
+    private final TrainingListStandardPdfService trainingListPdfService;
 
     @Operation(summary = "Lista certificações com filtros")
     @GetMapping
-    // @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')") // Temporariamente removido para debug
+    // @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or
+    // hasRole('ADMIN')") // Temporariamente removido para debug
     public ResponseEntity<List<EmployeeCertificationResponse>> find(
             @RequestParam(value = "employeeId", required = false) UUID employeeId,
             @RequestParam(value = "trainingId", required = false) UUID trainingId,
             @RequestParam(value = "status", required = false) CertificationStatus status,
-            @RequestParam(value = "expiringBefore", required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiringBefore) {
-        List<EmployeeCertification> results;
-        if (employeeId != null && status != null) {
-            results = certificationService.findByEmployeeIdAndStatus(employeeId, status);
-        } else if (employeeId != null) {
-            results = certificationService.findByEmployeeId(employeeId);
-        } else if (trainingId != null) {
-            results = certificationService.findByTrainingId(trainingId);
-        } else if (expiringBefore != null) {
-            results = certificationService.findExpiringSoon(expiringBefore);
-        } else {
-            results = certificationService.findAll();
+            @RequestParam(value = "expiringBefore", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiringBefore) {
+
+        if (employeeId == null && trainingId == null && status == null && expiringBefore == null) {
+            return ResponseEntity.ok(certificationService.findAll());
         }
 
-        System.out.println("📋 EmployeeCertificationController.find - Total de certificações encontradas: " + results.size());
-        results.forEach(cert -> {
-            String employeeName = cert.getEmployee() != null ? cert.getEmployee().getName() : "null";
-            String positionName = null;
-            if (cert.getEmployee() != null && cert.getEmployee().getPosition() != null) {
-                try {
-                    positionName = cert.getEmployee().getPosition().getName();
-                } catch (Exception e) {
-                    System.err.println("⚠️ Erro ao acessar position.getName() para employee: " + employeeName);
-                }
-            }
-            System.out.println("  - ID: " + cert.getId() + 
-                ", Employee: " + employeeName +
-                ", Position: " + (positionName != null ? positionName : "null") +
-                ", Training: " + (cert.getTraining() != null ? cert.getTraining().getName() : "null"));
-        });
+        List<EmployeeCertificationResponse> payload;
+        if (employeeId != null && status != null) {
+            payload = certificationService.findByEmployeeIdAndStatus(employeeId, status);
+        } else if (employeeId != null) {
+            payload = certificationService.findByEmployeeId(employeeId);
+        } else if (trainingId != null) {
+            payload = certificationService.findByTrainingId(trainingId);
+        } else if (expiringBefore != null) {
+            payload = certificationService.findExpiringSoon(expiringBefore);
+        } else if (status != null) {
+            payload = certificationService.findByStatus(status);
+        } else {
+            payload = certificationService.findAll();
+        }
 
-        List<EmployeeCertificationResponse> payload = results.stream()
-                .map(cert -> {
-                    try {
-                        return EmployeeCertificationResponse.fromEntity(cert);
-                    } catch (Exception e) {
-                        System.err.println("❌ Erro ao converter certificação " + (cert != null ? cert.getId() : "null") + " para DTO: " + e.getMessage());
-                        e.printStackTrace();
-                        return null;
-                    }
-                })
-                .filter(response -> response != null)
-                .toList();
-        
-        System.out.println("📋 EmployeeCertificationController.find - Total de responses criadas: " + payload.size());
         return ResponseEntity.ok(payload);
     }
 
     @Operation(summary = "Cria certificação")
     @PostMapping
     @PreAuthorize("hasAuthority('HR_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<EmployeeCertificationResponse> create(@Valid @RequestBody CreateEmployeeCertificationRequest request) {
+    public ResponseEntity<EmployeeCertificationResponse> create(
+            @Valid @RequestBody CreateEmployeeCertificationRequest request) {
         EmployeeCertification created = certificationService.create(request);
         EmployeeCertification loaded = certificationService.findById(created.getId());
         return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
@@ -108,7 +90,8 @@ public class EmployeeCertificationController {
     @Operation(summary = "Atualiza certificação")
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('HR_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<EmployeeCertificationResponse> update(@PathVariable UUID id, @Valid @RequestBody UpdateEmployeeCertificationRequest request) {
+    public ResponseEntity<EmployeeCertificationResponse> update(@PathVariable UUID id,
+            @Valid @RequestBody UpdateEmployeeCertificationRequest request) {
         EmployeeCertification updated = certificationService.update(id, request);
         EmployeeCertification loaded = certificationService.findById(updated.getId());
         return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
@@ -124,6 +107,20 @@ public class EmployeeCertificationController {
         return ResponseEntity.ok(EmployeeCertificationResponse.fromEntity(loaded));
     }
 
+    @Operation(summary = "Gera PDF da lista de treinamentos")
+    @PostMapping("/list/pdf")
+    public ResponseEntity<byte[]> generateListPdf(@RequestBody TrainingListReportRequest request) {
+        byte[] pdf = trainingListPdfService.generatePdf(request);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "lista-treinamentos.pdf");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdf);
+    }
+
     @Operation(summary = "Cancela certificação")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('HR_DELETE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
@@ -132,5 +129,3 @@ public class EmployeeCertificationController {
         return ResponseEntity.noContent().build();
     }
 }
-
-

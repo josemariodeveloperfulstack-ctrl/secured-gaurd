@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '@/lib/axios';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -20,6 +21,8 @@ const TermoCienciaPrestadorForm = () => {
     empresaId: '',
     cidadeEmissao: 'Contagem/MG',
     dataEmissao: new Date().toISOString().split('T')[0],
+    contractNumber: '',
+    representativeName: '',
     observacoes: '',
   });
 
@@ -65,14 +68,38 @@ const TermoCienciaPrestadorForm = () => {
     }
   };
 
-  const handlePreview = () => {
+  const handlePreview = async () => {
     if (!funcionario || !empresa) {
       alert('Selecione funcionário e empresa!');
       return;
     }
-    
-    // TODO: Implementar preview do termo de ciência
-    console.log('Preview do termo de ciência:', form);
+
+    setLoading(true);
+    try {
+      const payload = {
+        companyId: empresa.id,
+        providerName: funcionario.name,
+        providerCnpjCpf: funcionario.cpf || funcionario.document || '',
+        representativeName: form.representativeName,
+        serviceDescription: form.observacoes || 'Prestação de serviços diversos',
+        contractNumber: form.contractNumber,
+        city: form.cidadeEmissao,
+        documentDate: form.dataEmissao
+      };
+
+      const response = await api.post('/api/service-provider-awareness/preview-pdf', payload, {
+        responseType: 'blob'
+      });
+      const blob = response.data;
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      console.error('Erro ao gerar preview:', err);
+      alert('Erro ao gerar preview. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGerarPDF = async (e: React.FormEvent) => {
@@ -81,32 +108,35 @@ const TermoCienciaPrestadorForm = () => {
       alert('Selecione funcionário e empresa!');
       return;
     }
-    
+
     setLoading(true);
     try {
-      const termoCienciaData = {
-        funcionario: {
-          nome: funcionario.name,
-          cpf: funcionario.cpf || '',
-          cargo: (funcionario as any).position?.name || '',
-          endereco: typeof funcionario.address === 'string' 
-            ? funcionario.address 
-            : funcionario.address 
-              ? `${funcionario.address.street}, ${funcionario.address.number || ''}` 
-              : '',
-        },
-        empresa: {
-          nome: empresa.name,
-          cnpj: empresa.cnpj
-        },
-        termo: {
-          cidadeEmissao: form.cidadeEmissao,
-          dataEmissao: formatDateToBrazilian(form.dataEmissao),
-          observacoes: form.observacoes,
-        }
+      const payload = {
+        companyId: empresa.id,
+        providerName: funcionario.name,
+        providerCnpjCpf: funcionario.cpf || funcionario.document || '',
+        representativeName: form.representativeName,
+        serviceDescription: form.observacoes || 'Prestação de serviços diversos',
+        contractNumber: form.contractNumber,
+        city: form.cidadeEmissao,
+        documentDate: form.dataEmissao
       };
 
-      await termoCienciaPrestadorGenerator.generatePDF(termoCienciaData);
+      const response = await api.post('/api/service-provider-awareness/generate-pdf', payload, {
+        responseType: 'blob'
+      });
+
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `termo-ciencia-${funcionario.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert('Termo de ciência gerado com sucesso!');
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert('Erro ao gerar PDF. Tente novamente.');
@@ -138,19 +168,19 @@ const TermoCienciaPrestadorForm = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Identificação */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Prestador de Serviços</Label>
-                <Select 
-                  value={form.funcionarioId} 
+                <Select
+                  value={form.funcionarioId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   disabled={loadingData}
                 >
@@ -177,11 +207,11 @@ const TermoCienciaPrestadorForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa</Label>
-                <Select 
-                  value={form.empresaId} 
+                <Select
+                  value={form.empresaId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
                   disabled={loadingData}
                 >
@@ -225,42 +255,42 @@ const TermoCienciaPrestadorForm = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.name}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {funcionario.cpf || '-'}
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {(funcionario as any).position?.name || '-'}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                         {funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : '-'}
+                        {funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : '-'}
                       </div>
                     </div>
                   </div>
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                       {typeof funcionario.address === 'string' 
-                          ? funcionario.address 
-                          : funcionario.address 
-                            ? `${funcionario.address.street}, ${funcionario.address.number || ''}` 
-                            : '-'}
+                      {typeof funcionario.address === 'string'
+                        ? funcionario.address
+                        : funcionario.address
+                          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
+                          : '-'}
                     </div>
                   </div>
                 </div>
@@ -277,23 +307,23 @@ const TermoCienciaPrestadorForm = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                       {empresa.name}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {empresa.cnpj}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                         {empresa.sigla || '-'}
+                        {empresa.sigla || '-'}
                       </div>
                     </div>
                   </div>
@@ -301,7 +331,7 @@ const TermoCienciaPrestadorForm = () => {
               </div>
             )}
           </div>
-          
+
           {(funcionario || empresa) && <Separator />}
 
           {/* Detalhes do Documento */}
@@ -316,21 +346,41 @@ const TermoCienciaPrestadorForm = () => {
                 <Label>Cidade de Emissão</Label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                    value={form.cidadeEmissao} 
+                  <Input
+                    value={form.cidadeEmissao}
                     onChange={(e) => setForm(prev => ({ ...prev, cidadeEmissao: e.target.value }))}
                     placeholder="Ex: Contagem/MG"
                     className="bg-background h-11 pl-10"
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Data de Emissão</Label>
-                <Input 
-                  type="date" 
-                  value={form.dataEmissao} 
+                <Input
+                  type="date"
+                  value={form.dataEmissao}
                   onChange={(e) => setForm(prev => ({ ...prev, dataEmissao: e.target.value }))}
+                  className="bg-background h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Número do Contrato</Label>
+                <Input
+                  value={form.contractNumber}
+                  onChange={(e) => setForm(prev => ({ ...prev, contractNumber: e.target.value }))}
+                  placeholder="Ex: 123/2026"
+                  className="bg-background h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Representante Legal (Opcional)</Label>
+                <Input
+                  value={form.representativeName}
+                  onChange={(e) => setForm(prev => ({ ...prev, representativeName: e.target.value }))}
+                  placeholder="Nome do representante"
                   className="bg-background h-11"
                 />
               </div>
@@ -338,8 +388,8 @@ const TermoCienciaPrestadorForm = () => {
 
             <div className="space-y-2">
               <Label>Observações Adicionais</Label>
-              <Textarea 
-                value={form.observacoes} 
+              <Textarea
+                value={form.observacoes}
                 onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
                 placeholder="Observações adicionais sobre o termo de ciência..."
                 rows={3}
@@ -354,8 +404,8 @@ const TermoCienciaPrestadorForm = () => {
             <div className="space-y-1">
               <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300">Sobre este Documento</h4>
               <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
-                Este termo de ciência confirma que o prestador de serviços está ciente da Diretriz de Prevenção 
-                e Controle do Uso Indevido de Álcool e/ou de Outras Drogas, cuja finalidade é a preservação 
+                Este termo de ciência confirma que o prestador de serviços está ciente da Diretriz de Prevenção
+                e Controle do Uso Indevido de Álcool e/ou de Outras Drogas, cuja finalidade é a preservação
                 da saúde e segurança de todos os colaboradores e prestadores de serviços.
               </p>
             </div>
@@ -365,9 +415,9 @@ const TermoCienciaPrestadorForm = () => {
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button 
-              onClick={handlePreview} 
-              variant="outline" 
+            <Button
+              onClick={handlePreview}
+              variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
               disabled={loading || !funcionario || !empresa}
             >
@@ -383,9 +433,9 @@ const TermoCienciaPrestadorForm = () => {
                 </>
               )}
             </Button>
-            <Button 
-              onClick={handleGerarPDF} 
-              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all" 
+            <Button
+              onClick={handleGerarPDF}
+              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || !funcionario || !empresa}
             >
               {loading ? (

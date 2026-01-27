@@ -44,6 +44,8 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
                 
                 if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+                    log.debug("Tentando autenticar conexão WebSocket - sessionId: {}", accessor.getSessionId());
+                    
                     // Extrair token do header Authorization
                     List<String> authHeaders = accessor.getNativeHeader("Authorization");
                     
@@ -56,6 +58,7 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                             try {
                                 // Extrair username do token
                                 String username = jwtService.extractUsername(token);
+                                log.debug("Username extraído do token: {}", username);
                                 
                                 if (username != null) {
                                     // Carregar UserDetails
@@ -73,24 +76,26 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                                         // Definir o principal na sessão
                                         accessor.setUser(authentication);
                                         
-                                        log.info("WebSocket autenticado para usuário: {}", username);
+                                        log.info("✅ WebSocket autenticado para usuário: {} (sessionId: {})", username, accessor.getSessionId());
                                     } else {
-                                        log.warn("Token JWT inválido para conexão WebSocket");
+                                        log.warn("⚠️ Token JWT inválido para conexão WebSocket (username: {})", username);
                                     }
                                 } else {
-                                    log.warn("Não foi possível extrair username do token JWT");
+                                    log.warn("⚠️ Não foi possível extrair username do token JWT");
                                 }
                             } catch (Exception e) {
-                                log.error("Erro ao autenticar conexão WebSocket: {}", e.getMessage(), e);
+                                log.error("❌ Erro ao autenticar conexão WebSocket: {}", e.getMessage(), e);
+                                // Não bloquear a conexão, apenas logar o erro
                             }
                         } else {
-                            log.warn("Header Authorization não encontrado ou formato inválido na conexão WebSocket");
+                            log.warn("⚠️ Header Authorization não encontrado ou formato inválido na conexão WebSocket");
                         }
                     } else {
                         // Tentar extrair do header X-Username (fallback)
                         List<String> usernameHeaders = accessor.getNativeHeader("X-Username");
                         if (usernameHeaders != null && !usernameHeaders.isEmpty()) {
                             String username = usernameHeaders.get(0);
+                            log.debug("Tentando autenticar via X-Username: {}", username);
                             try {
                                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                                 Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -99,12 +104,12 @@ public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer
                                     userDetails.getAuthorities()
                                 );
                                 accessor.setUser(authentication);
-                                log.info("WebSocket autenticado via X-Username para usuário: {}", username);
+                                log.info("✅ WebSocket autenticado via X-Username para usuário: {} (sessionId: {})", username, accessor.getSessionId());
                             } catch (Exception e) {
-                                log.error("Erro ao autenticar via X-Username: {}", e.getMessage(), e);
+                                log.error("❌ Erro ao autenticar via X-Username (username: {}): {}", username, e.getMessage(), e);
                             }
                         } else {
-                            log.warn("Nenhum método de autenticação encontrado para conexão WebSocket");
+                            log.warn("⚠️ Nenhum método de autenticação encontrado para conexão WebSocket (sessionId: {})", accessor.getSessionId());
                         }
                     }
                 }

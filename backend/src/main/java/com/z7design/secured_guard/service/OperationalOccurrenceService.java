@@ -1,13 +1,16 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.CreateOccurrenceDTO;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.OperationalOccurrence;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.OperationalOccurrenceRepository;
-import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
@@ -36,6 +39,8 @@ public class OperationalOccurrenceService {
     
     private final OperationalOccurrenceRepository occurrenceRepository;
     private final EmployeeRepository employeeRepository;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
     
     /**
      * Criar nova ocorrência operacional a partir de DTO
@@ -453,35 +458,27 @@ public class OperationalOccurrenceService {
 
         log.info("Total de ocorrências encontradas para o relatório: {}", filteredOccurrences.size());
 
+        // Determinar companyId
+        UUID companyId = resolveCompanyId(filteredOccurrences);
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
         
-        try (PdfWriter writer = new PdfWriter(baos);
-             PdfDocument pdfDoc = new PdfDocument(writer);
-             Document document = new Document(pdfDoc)) {
-            document.setMargins(50, 50, 50, 50);
-
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold()
-                    .setMarginBottom(5);
-            document.add(companyHeader);
-
-            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginBottom(20);
-            document.add(companyInfo);
-
-            // Título
-            Paragraph title = new Paragraph("RELATÓRIO DE OCORRÊNCIAS")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(10)
-                    .setMarginBottom(20);
-            document.add(title);
+        try {
+            PdfWriter writer = new PdfWriter(baos);
+            
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE OCORRÊNCIAS")
+                .topMargin(120f)
+                .bottomMargin(80f)
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
+            
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
 
             // Informações do relatório
             Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -578,13 +575,8 @@ public class OperationalOccurrenceService {
                 document.add(table);
             }
 
-            // Rodapé
-            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8)
-                    .setMarginTop(30);
-            document.add(footer);
-
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            document.close();
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de ocorrências: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
@@ -593,6 +585,29 @@ public class OperationalOccurrenceService {
         byte[] result = baos.toByteArray();
         log.info("PDF de ocorrências gerado com sucesso, tamanho: {} bytes", result.length);
         return result;
+    }
+
+    private UUID resolveCompanyId(List<OperationalOccurrence> occurrences) {
+        // Tentar encontrar companyId a partir das ocorrências
+        for (OperationalOccurrence occurrence : occurrences) {
+            if (occurrence.getEmployee() != null && occurrence.getEmployee().getCompany() != null) {
+                return occurrence.getEmployee().getCompany().getId();
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            return activeCompanies.get(0).getId();
+        }
+        
+        // Último recurso: usar qualquer empresa
+        List<Company> allCompanies = companyRepository.findAll();
+        if (allCompanies != null && !allCompanies.isEmpty()) {
+            return allCompanies.get(0).getId();
+        }
+        
+        throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
     }
 
     private String getTypeLabel(OperationalOccurrence.OccurrenceType type) {

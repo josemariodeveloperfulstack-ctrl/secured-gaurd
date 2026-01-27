@@ -10,16 +10,16 @@ import paymentReceiptService, { type PaymentReceipt, type ReceiptProcessingRespo
 import holeriteService, { Holerite, HoleriteOrganizationResponse, HoleriteOrganizedEntry, HoleriteCompanyGroup, HoleriteSectorGroup, HoleritePeriodGroup, CompanyTypeOrganizationResponse, CompanyTypeGroup } from '@/services/holeriteService';
 import { getApiUrl } from '@/config/environment';
 import { PaymentReceiptViewModal } from '@/components/paymentReceipts/PaymentReceiptViewModal';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Eye, 
-  FileText, 
-  Mail, 
-  Download, 
-  RefreshCw, 
-  Loader2, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Eye,
+  FileText,
+  Mail,
+  Download,
+  RefreshCw,
+  Loader2,
   AlertCircle,
   Trash2,
   MoreHorizontal,
@@ -68,7 +68,7 @@ const Holerites: React.FC = () => {
   const { user } = useAuth();
   const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '').toUpperCase();
   const isCollaborator = normalizedRole === 'COLABORADOR' && !!user;
-  
+
   // Detecção de tamanho de tela para responsividade (padrão SST)
   const [windowSize, setWindowSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1024,
@@ -90,7 +90,7 @@ const Holerites: React.FC = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHolerite, setSelectedHolerite] = useState<Holerite | null>(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -134,7 +134,7 @@ const Holerites: React.FC = () => {
       title: "Sucesso",
       description: `Documentos unidos com sucesso! Arquivo: ${result.fileName}`,
     });
-    
+
     // Opcionalmente, adicionar o resultado à lista de documentos unificados
     // ou atualizar alguma lista existente
   };
@@ -159,7 +159,7 @@ const Holerites: React.FC = () => {
   const [unifiedSearchTerm, setUnifiedSearchTerm] = useState('');
   const [unifiedMonthFilter, setUnifiedMonthFilter] = useState<string>('');
   const [unifiedYearFilter, setUnifiedYearFilter] = useState<string>('');
-  
+
   // Estados para organização de documentos unificados por empresa/setor
   const [unifiedOrganizationData, setUnifiedOrganizationData] = useState<HoleriteOrganizationResponse | null>(null);
   const [loadingUnifiedOrganization, setLoadingUnifiedOrganization] = useState(false);
@@ -167,7 +167,7 @@ const Holerites: React.FC = () => {
   const [expandedUnifiedCompanies, setExpandedUnifiedCompanies] = useState<Record<string, boolean>>({});
   const [expandedUnifiedSectors, setExpandedUnifiedSectors] = useState<Record<string, boolean>>({});
   const [expandedUnifiedPeriods, setExpandedUnifiedPeriods] = useState<Record<string, boolean>>({});
-  
+
   // Estados para seleção de documentos
   const [selectedUnifiedDocuments, setSelectedUnifiedDocuments] = useState<Set<number>>(new Set());
   const [showSendModal, setShowSendModal] = useState(false);
@@ -195,7 +195,7 @@ const Holerites: React.FC = () => {
   const [viewerDocument, setViewerDocument] = useState<any>(null);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const viewerUrlRef = useRef<string | null>(null);
-  
+
   // Estados para exclusão de documentos unificados
   const [showUnifiedDeleteModal, setShowUnifiedDeleteModal] = useState(false);
   const [deleteType, setDeleteType] = useState<'individual' | 'batch'>('individual');
@@ -215,7 +215,7 @@ const Holerites: React.FC = () => {
   const [pendingWhatsappContext, setPendingWhatsappContext] = useState<{ payslip: Holerite; employeeId?: string } | null>(null);
   const [showSingleUserModal, setShowSingleUserModal] = useState(false);
   const [showSingleWhatsappModal, setShowSingleWhatsappModal] = useState(false);
-  
+
   // Logs de envio
   const [logs, setLogs] = useState<any[]>([]);
   const [logsCpf, setLogsCpf] = useState('');
@@ -247,18 +247,18 @@ const Holerites: React.FC = () => {
     try {
       // Dispara envio via backend. Se 'both', faz duas chamadas sequenciais
       if (validationSendType === 'both') {
-        const emailRes = await api.post('/api/envio/massa', { 
-          tipo: 'email', 
-          funcionarioIds: validatedIds, 
-          month: selectedSendPeriod.month, 
-          year: selectedSendPeriod.year 
+        const emailRes = await api.post('/api/envio/massa', {
+          tipo: 'email',
+          funcionarioIds: validatedIds,
+          month: selectedSendPeriod.month,
+          year: selectedSendPeriod.year
         });
-        const waRes = await api.post('/api/envio/massa', { 
-          tipo: 'whatsapp', 
-          funcionarioIds: validatedIds, 
+        const waRes = await api.post('/api/envio/massa', {
+          tipo: 'whatsapp',
+          funcionarioIds: validatedIds,
           mensagem: whatsAppMessage,
-          month: selectedSendPeriod.month, 
-          year: selectedSendPeriod.year 
+          month: selectedSendPeriod.month,
+          year: selectedSendPeriod.year
         });
         // combinar resultados simples
         const combined: EnvioResponse = {
@@ -268,16 +268,16 @@ const Holerites: React.FC = () => {
           tipoEnvio: 'both',
           totalEnviados: (emailRes.data?.totalEnviados || 0) + (waRes.data?.totalEnviados || 0),
           totalFalhas: (emailRes.data?.totalFalhas || 0) + (waRes.data?.totalFalhas || 0),
-          detalhes: [ ...(emailRes.data?.detalhes || []), ...(waRes.data?.detalhes || []) ],
+          detalhes: [...(emailRes.data?.detalhes || []), ...(waRes.data?.detalhes || [])],
         } as EnvioResponse;
         setMassResult(combined);
         setShowMassResultModal(true);
       } else {
-        const { data } = await api.post('/api/envio/massa', { 
-          tipo: validationSendType, 
-          funcionarioIds: validatedIds, 
+        const { data } = await api.post('/api/envio/massa', {
+          tipo: validationSendType,
+          funcionarioIds: validatedIds,
           mensagem: validationSendType === 'whatsapp' ? whatsAppMessage : undefined,
-          month: selectedSendPeriod.month, 
+          month: selectedSendPeriod.month,
           year: selectedSendPeriod.year
         });
         setMassResult(data);
@@ -348,12 +348,12 @@ const Holerites: React.FC = () => {
     try {
       setLoading(true);
       const url = `/api/unified-documents/download/company`;
-      const response = await api.get(url, { 
+      const response = await api.get(url, {
         params: { name: companyName },
         responseType: 'blob',
         timeout: 300000 // 5 minutos para downloads grandes
       });
-      
+
       const blob = new Blob([response.data], { type: 'application/zip' });
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
@@ -362,16 +362,16 @@ const Holerites: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(link.href);
-      
-      toast({ 
-        title: '✅ Download iniciado', 
+
+      toast({
+        title: '✅ Download iniciado',
         description: `Baixando documentos da empresa ${companyName}. O ZIP está organizado por Empresa/Setor/Período/Funcionário.`,
         duration: 5000,
       });
     } catch (error: any) {
       console.error('Erro ao baixar holerites da empresa:', error);
-      toast({ 
-        title: '❌ Erro no download', 
+      toast({
+        title: '❌ Erro no download',
         description: error.response?.data?.message || error.message || 'Erro ao baixar documentos da empresa. Verifique se todos os arquivos existem.',
         variant: 'destructive',
         duration: 5000,
@@ -431,13 +431,13 @@ const Holerites: React.FC = () => {
     try {
       const month = logsMonth ? parseInt(logsMonth) : undefined;
       const year = logsYear ? parseInt(logsYear) : undefined;
-      
+
       // Permitir busca sem CPF para listar todos os logs
       const cpfFilter = logsCpf || undefined;
-      
+
       const data = await holeriteService.listSendLogs(cpfFilter, month, year);
       setLogs(Array.isArray(data) ? data : []);
-      
+
       if (!Array.isArray(data) || data.length === 0) {
         toast({
           title: "Nenhum log encontrado",
@@ -504,7 +504,7 @@ const Holerites: React.FC = () => {
   const [loadingOrganization, setLoadingOrganization] = useState(false);
   const [organizationError, setOrganizationError] = useState<string | null>(null);
   const [expandedCompanies, setExpandedCompanies] = useState<Record<string, boolean>>({});
-  
+
   // Estados para organização por tipo de empresa (TASK 04)
   const [companyTypeOrganizationData, setCompanyTypeOrganizationData] = useState<CompanyTypeOrganizationResponse | null>(null);
   const [loadingCompanyTypeOrganization, setLoadingCompanyTypeOrganization] = useState(false);
@@ -536,7 +536,7 @@ const Holerites: React.FC = () => {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<any>(null);
   const [jobProgressInterval, setJobProgressInterval] = useState<NodeJS.Timeout | null>(null);
-  
+
   // Estados para job de exclusão assíncrona
   const [currentDeletionJobId, setCurrentDeletionJobId] = useState<string | null>(null);
   const [deletionJobStatus, setDeletionJobStatus] = useState<any>(null);
@@ -547,7 +547,7 @@ const Holerites: React.FC = () => {
   const [holeriteActiveMonth, setHoleriteActiveMonth] = useState<string>('6');
   const [holeriteAvailableYears, setHoleriteAvailableYears] = useState<string[]>(['2025']);
   const [holeriteAvailableMonths, setHoleriteAvailableMonths] = useState<number[]>([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-  
+
   // Estados para sistema de abas hierárquico
   const [activePeriodTab, setActivePeriodTab] = useState<'ano' | 'mes' | 'conteudo'>('ano');
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -691,7 +691,7 @@ const Holerites: React.FC = () => {
     }
 
     const normalizedSearch = searchTerm.toLowerCase().trim();
-    
+
     // Buscar por CPF (remove formatação para comparação)
     const cpfNormalized = entry.cpf?.replace(/\D/g, '').toLowerCase() || '';
     const searchCpfNormalized = normalizedSearch.replace(/\D/g, '');
@@ -716,11 +716,11 @@ const Holerites: React.FC = () => {
     }
 
     // Buscar por mês (ex: "01", "1", "janeiro", etc.)
-    const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
-                        'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+      'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
     const monthNumber = entry.month;
-    if (String(monthNumber).includes(normalizedSearch) || 
-        monthNames[monthNumber - 1]?.includes(normalizedSearch)) {
+    if (String(monthNumber).includes(normalizedSearch) ||
+      monthNames[monthNumber - 1]?.includes(normalizedSearch)) {
       return true;
     }
 
@@ -739,7 +739,7 @@ const Holerites: React.FC = () => {
     }
 
     const allEntries: HoleriteOrganizedEntry[] = [];
-    
+
     organizationData.companies.forEach(company => {
       company.sectors?.forEach(sector => {
         sector.periods?.forEach(period => {
@@ -789,7 +789,7 @@ const Holerites: React.FC = () => {
 
     const allHolerites = getAllHoleritesFromOrganization();
     const filtered = allHolerites.filter(entry => matchesSearchTerm(entry, searchTerm));
-    
+
     // Adicionar informações de localização para cada resultado
     return filtered.map(entry => ({
       ...entry,
@@ -852,25 +852,25 @@ const Holerites: React.FC = () => {
   // Função para navegar até um holerite específico na estrutura organizada
   const navigateToHolerite = useCallback((location: ReturnType<typeof findHoleriteLocation>) => {
     if (!location) return;
-    
+
     // Expandir empresa
     setExpandedCompanies(prev => ({
       ...prev,
       [location.companyKey]: true
     }));
-    
+
     // Expandir setor
     setExpandedSectors(prev => ({
       ...prev,
       [location.sectorKey]: true
     }));
-    
+
     // Expandir período
     setExpandedPeriods(prev => ({
       ...prev,
       [location.periodKey]: true
     }));
-    
+
     // Scroll até o elemento após um pequeno delay para garantir que a estrutura foi expandida
     setTimeout(() => {
       const element = document.querySelector(`[data-period-key="${location.periodKey}"]`);
@@ -980,7 +980,7 @@ const Holerites: React.FC = () => {
   // Função para obter holerites filtrados pelo período selecionado
   const getFilteredHoleritesByPeriod = () => {
     if (!selectedYear) return [];
-    
+
     return holerites.filter(holerite => {
       const matchesYear = holerite.year.toString() === selectedYear;
       const matchesMonth = !selectedMonth || holerite.month.toString() === selectedMonth;
@@ -991,13 +991,13 @@ const Holerites: React.FC = () => {
   // Função para obter meses disponíveis para o ano selecionado
   const getAvailableMonthsForYear = (year: string) => {
     if (!year) return [];
-    
+
     const monthsInYear = holerites
       .filter(holerite => holerite.year.toString() === year)
       .map(holerite => holerite.month)
       .filter((month, index, array) => array.indexOf(month) === index)
       .sort((a, b) => a - b);
-    
+
     return monthsInYear;
   };
 
@@ -1005,41 +1005,41 @@ const Holerites: React.FC = () => {
   const handleBatchUnification = async () => {
     setProcessingBatchUnification(true);
     setBatchUnificationResult(null);
-    
+
     try {
       console.log('🎯 Iniciando unificação em lote');
       console.log('🔧 Configuração da API:', {
         baseURL: api.defaults.baseURL,
         timeout: 120000
       });
-      console.log('📋 Filtros aplicados:', { 
-        month: batchUnificationMonth || 'todos', 
+      console.log('📋 Filtros aplicados:', {
+        month: batchUnificationMonth || 'todos',
         year: batchUnificationYear || 'todos',
-        force: batchUnificationForce 
+        force: batchUnificationForce
       });
-      
+
       const params: any = {
         forceUnification: batchUnificationForce
       };
-      
+
       if (batchUnificationMonth) {
         params.month = parseInt(batchUnificationMonth);
       }
-      
+
       if (batchUnificationYear) {
         params.year = parseInt(batchUnificationYear);
       }
-      
+
       console.log('🌐 Enviando requisição para:', '/api/unified-documents/create-batch');
       console.log('📤 Parâmetros:', params);
-      
-      const response = await api.post('/api/unified-documents/create-batch', null, { 
+
+      const response = await api.post('/api/unified-documents/create-batch', null, {
         params,
         timeout: 600000 // 10 minutos de timeout para processamento em lote (pode processar muitos documentos)
       });
-      
+
       console.log('✅ Resposta do servidor:', response.data);
-      
+
       // Normalizar resposta para garantir que successList e failureList sejam arrays
       const normalizedResult = {
         ...response.data,
@@ -1049,12 +1049,12 @@ const Holerites: React.FC = () => {
         totalSuccess: response.data.totalSuccess || 0,
         totalFailed: response.data.totalFailed || 0
       };
-      
+
       if (response.data.sucesso || response.data.totalSuccess > 0 || response.data.jobId) {
         setBatchUnificationResult(normalizedResult);
         setShowBatchUnificationModal(false);
         setShowBatchResultModal(true);
-        
+
         // ✅ RECARREGAR lista de documentos unificados e organização
         console.log('🔄 Recarregando lista de documentos unificados após unificação em massa...');
         try {
@@ -1074,7 +1074,7 @@ const Holerites: React.FC = () => {
             }
           }, 2000);
         }
-        
+
         toast({
           title: "✅ Unificação concluída",
           description: `${response.data.totalSuccess} documentos unificados com sucesso`,
@@ -1086,7 +1086,7 @@ const Holerites: React.FC = () => {
           variant: "destructive"
         });
       }
-      
+
     } catch (error: any) {
       console.error('💥 Erro na unificação em lote:', error);
       console.error('💥 Detalhes do erro:', {
@@ -1102,10 +1102,10 @@ const Holerites: React.FC = () => {
         causa: error.response?.data?.causa,
         causaTipo: error.response?.data?.causaTipo
       });
-      
+
       // Tratamento mais específico de erros
       let errorMessage = "Erro desconhecido";
-      
+
       if (error.code === 'ECONNABORTED') {
         errorMessage = "Timeout: O processamento demorou muito. Tente com um período menor.";
       } else if (error.code === 'ERR_CONNECTION_RESET' || error.message?.includes('ERR_CONNECTION_RESET')) {
@@ -1119,12 +1119,12 @@ const Holerites: React.FC = () => {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       // Se for erro de migration pendente, mostrar mensagem específica
       if (error.response?.data?.tipoErro === 'MIGRATION_PENDENTE') {
         errorMessage = "ERRO: A tabela 'unification_jobs' não existe no banco de dados. Por favor, execute a migration V338 ou reinicie a aplicação para que o Flyway execute as migrations pendentes.";
       }
-      
+
       toast({
         title: "âŒ Erro na unificação",
         description: errorMessage,
@@ -1138,72 +1138,21 @@ const Holerites: React.FC = () => {
   // Funções para filtrar documentos nas listas de unificação individual
   const getFilteredHolerites = () => {
     if (!holeriteSearchTerm) return processedHolerites;
-    return processedHolerites.filter(holerite => 
-        holerite.employeeName.toLowerCase().includes(holeriteSearchTerm.toLowerCase()) ||
-        holerite.cpf.includes(holeriteSearchTerm) ||
-        holerite.name.toLowerCase().includes(holeriteSearchTerm.toLowerCase())
+    return processedHolerites.filter(holerite =>
+      holerite.employeeName.toLowerCase().includes(holeriteSearchTerm.toLowerCase()) ||
+      holerite.cpf.includes(holeriteSearchTerm) ||
+      holerite.name.toLowerCase().includes(holeriteSearchTerm.toLowerCase())
     );
   };
 
   const getFilteredRecibos = () => {
     if (!reciboSearchTerm) return processedRecibos;
-    return processedRecibos.filter(recibo => 
-        recibo.employeeName.toLowerCase().includes(reciboSearchTerm.toLowerCase()) ||
-        recibo.name.toLowerCase().includes(reciboSearchTerm.toLowerCase())
+    return processedRecibos.filter(recibo =>
+      recibo.employeeName.toLowerCase().includes(reciboSearchTerm.toLowerCase()) ||
+      recibo.name.toLowerCase().includes(reciboSearchTerm.toLowerCase())
     );
   };
 
-
-  // Função para carregar comprovantes de pagamento
-  const loadPaymentReceipts = async (searchTerm?: string) => {
-    try {
-      setLoadingPaymentReceipts(true);
-      console.log('📊 Carregando comprovantes de pagamento...');
-      
-      // Carregar dados reais do backend (com busca se fornecido)
-      const receipts = await paymentReceiptService.getAllPaymentReceipts(searchTerm);
-      console.log('✅ Comprovantes carregados do backend:', receipts);
-      
-      if (receipts && Array.isArray(receipts)) {
-        setPaymentReceipts(receipts);
-      } else {
-        console.log('📊 Nenhum comprovante encontrado no backend');
-        setPaymentReceipts([]);
-      }
-    } catch (error) {
-      console.error('âŒ Erro ao carregar comprovantes de pagamento:', error);
-      setPaymentReceipts([]);
-    } finally {
-      setLoadingPaymentReceipts(false);
-    }
-  };
-
-  // Função para lidar com mudanças no termo de busca (com debounce)
-  const handlePaymentReceiptSearchChange = (value: string) => {
-    setPaymentReceiptSearchTerm(value);
-    
-    // Limpar timer anterior
-    if (searchDebounceTimer) {
-      clearTimeout(searchDebounceTimer);
-    }
-    
-    // Se tiver menos de 4 caracteres, limpar busca
-    if (value.trim().length < 4) {
-      if (value.trim().length === 0) {
-        // Se estiver vazio, recarregar todos
-        loadPaymentReceipts();
-      }
-      return;
-    }
-    
-    // Aguardar 500ms antes de buscar (debounce)
-    const timer = setTimeout(() => {
-      console.log('🔍 Buscando comprovantes com termo:', value);
-      loadPaymentReceipts(value.trim());
-    }, 500);
-    
-    setSearchDebounceTimer(timer);
-  };
 
   // Utilitário: obter mês/ano a partir da data de transferência (MM/AAAA ou DD/MM/AAAA ou DD.MM.AAAA)
   const getReceiptPeriod = (receipt: any): { month: number; year: number } => {
@@ -1226,6 +1175,83 @@ const Holerites: React.FC = () => {
     return { month, year };
   };
 
+  // Função para carregar comprovantes de pagamento
+  const loadPaymentReceipts = async (searchTerm?: string) => {
+    try {
+      setLoadingPaymentReceipts(true);
+      console.log('📊  Carregando comprovantes de pagamento...');
+
+      // Carregar dados reais do backend (com busca se fornecido)
+      const receipts = await paymentReceiptService.getAllPaymentReceipts(searchTerm);
+      console.log('✅ Comprovantes carregados do backend:', receipts);
+
+      if (receipts && Array.isArray(receipts)) {
+        setPaymentReceipts(receipts);
+
+        // Auto-selecionar o período mais recente se houver dados e não houver busca ativa
+        if (receipts.length > 0 && (!searchTerm || searchTerm.trim().length < 4)) {
+          // Calcular anos disponíveis
+          const years = [...new Set(receipts.map(r => getReceiptPeriod(r).year))].sort();
+          const latestYear = years[years.length - 1];
+
+          if (latestYear) {
+            // Só atualizar se o ano atual não tiver dados (opcional, mas aqui vamos forçar para o mais recente para garantir visibilidade)
+            // Ou atualizar APENAS se o ano atual for o default "2025" e não tiver dados? 
+            // Melhor: sempre autoselecionar o mais recente ao carregar, pois é o comportamento esperado de "ver o último holerite"
+            setActiveYear(latestYear.toString());
+
+            // Calcular meses para esse ano
+            const months = [...new Set(receipts
+              .filter(r => getReceiptPeriod(r).year === latestYear)
+              .map(r => getReceiptPeriod(r).month)
+            )].sort((a, b) => a - b);
+
+            const latestMonth = months[months.length - 1];
+            if (latestMonth) {
+              setActiveMonth(latestMonth.toString());
+            }
+          }
+        }
+
+      } else {
+        console.log('📊  Nenhum comprovante encontrado no backend');
+        setPaymentReceipts([]);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar comprovantes de pagamento:', error);
+      setPaymentReceipts([]);
+    } finally {
+      setLoadingPaymentReceipts(false);
+    }
+  };
+
+  // Função para lidar com mudanças no termo de busca (com debounce)
+  const handlePaymentReceiptSearchChange = (value: string) => {
+    setPaymentReceiptSearchTerm(value);
+
+    // Limpar timer anterior
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+
+    // Se tiver menos de 4 caracteres, limpar busca
+    if (value.trim().length < 4) {
+      if (value.trim().length === 0) {
+        // Se estiver vazio, recarregar todos
+        loadPaymentReceipts();
+      }
+      return;
+    }
+
+    // Aguardar 500ms antes de buscar (debounce)
+    const timer = setTimeout(() => {
+      console.log('🔍 Buscando comprovantes com termo:', value);
+      loadPaymentReceipts(value.trim());
+    }, 500);
+
+    setSearchDebounceTimer(timer);
+  };
+
   // Função para filtrar comprovantes por ano e mês (com base na data de transferência)
   const getFilteredPaymentReceipts = () => {
     // Se houver busca ativa (4+ caracteres), retornar todos os resultados da busca
@@ -1233,7 +1259,7 @@ const Holerites: React.FC = () => {
     if (paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4) {
       return paymentReceipts;
     }
-    
+
     // Caso contrário, filtrar por período selecionado
     return paymentReceipts.filter(r => {
       const p = getReceiptPeriod(r);
@@ -1306,7 +1332,7 @@ const Holerites: React.FC = () => {
   const getHoleritesProcessedToday = (): number => {
     const today = new Date();
     const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD
-    
+
     return holerites.filter(holerite => {
       if (!holerite.processedAt) return false;
       const processedDate = new Date(holerite.processedAt);
@@ -1359,7 +1385,7 @@ const Holerites: React.FC = () => {
   const confirmBatchDeleteHolerites = async () => {
     try {
       setIsDeleting(true);
-      
+
       const idsToDelete = pendingDeleteIds ?? selectedHolerites;
 
       if (idsToDelete.length === 0) {
@@ -1371,18 +1397,18 @@ const Holerites: React.FC = () => {
       console.log('🗑️ Iniciando exclusão em lote de holerites');
       console.log('📋 IDs selecionados:', idsToDelete);
       console.log('📊 Quantidade selecionada:', idsToDelete.length);
-      
+
       const result = await holeriteService.deleteMultipleHolerites(idsToDelete);
-      
+
       console.log('✅ Resultado da exclusão:', result);
-      
+
       if (result.deleted > 0) {
         toast({
           title: "Sucesso",
           description: `${result.deleted} holerite(s) excluído(s) com sucesso!`,
         });
       }
-      
+
       if (result.failed > 0) {
         toast({
           title: "Atenção",
@@ -1390,18 +1416,18 @@ const Holerites: React.FC = () => {
           variant: "destructive"
         });
       }
-      
+
       // Limpar seleção
       setSelectedHolerites(prev => prev.filter(id => !idsToDelete.includes(id)));
       setPendingDeleteIds(null);
-      
+
       // Recarregar lista e organização
       await loadHolerites();
       await fetchOrganizationData(true);
-      
+
       // Fechar modal
       setShowBatchDeleteModal(false);
-      
+
     } catch (error) {
       console.error('❌ Erro ao excluir holerites em lote:', error);
       console.error('❌ Detalhes do erro:', {
@@ -1409,7 +1435,7 @@ const Holerites: React.FC = () => {
         response: error.response?.data,
         status: error.response?.status
       });
-      
+
       toast({
         title: "Erro",
         description: `Erro ao excluir holerites: ${error.message}`,
@@ -1425,30 +1451,30 @@ const Holerites: React.FC = () => {
     try {
       setLoadingUnifiedDocuments(true);
       console.log('📊‹ Buscando documentos unificados...', forceRefresh ? '(forÃ§ando refresh)' : '');
-      
+
       let endpoint = '/api/unified-documents/list';
       const params: any = {};
-      
+
       // Se houver filtros de período, usar endpoint específico
       if (unifiedMonthFilter || unifiedYearFilter) {
         endpoint = '/api/unified-documents/list-by-period';
         if (unifiedMonthFilter) params.month = parseInt(unifiedMonthFilter);
         if (unifiedYearFilter) params.year = parseInt(unifiedYearFilter);
       }
-      
+
       // Adicionar timestamp para forÃ§ar refresh quando necessário
       if (forceRefresh) {
         params._t = Date.now();
       }
-      
+
       let response;
       let documents: any[] = [];
-      
+
       try {
         // Tentar primeiro o endpoint protegido
         response = await api.get(endpoint, { params });
         console.log('📥 Resposta do endpoint protegido:', response.data);
-        
+
         if (response.data && (response.data.sucesso || response.data.documents)) {
           documents = response.data.documents || response.data || [];
           if (Array.isArray(documents)) {
@@ -1467,13 +1493,13 @@ const Holerites: React.FC = () => {
         }
       } catch (protectedError: any) {
         console.warn('⚠️ Endpoint protegido falhou, tentando público:', protectedError.message);
-        
+
         // Fallback para endpoint público
         try {
           const publicEndpoint = endpoint.replace('/api/unified-documents/', '/api/unified-documents/public/');
           response = await api.get(publicEndpoint, { params });
           console.log('📥 Resposta do endpoint público:', response.data);
-          
+
           if (response.data && (response.data.sucesso || response.data.documents)) {
             documents = response.data.documents || response.data || [];
             if (Array.isArray(documents)) {
@@ -1495,7 +1521,7 @@ const Holerites: React.FC = () => {
           throw publicError;
         }
       }
-      
+
       // Limpar seleções se não há documentos ou se a lista mudou significativamente
       if (documents.length === 0) {
         setSelectedUnifiedDocuments(new Set());
@@ -1504,13 +1530,13 @@ const Holerites: React.FC = () => {
         // Verificar se os índices selecionados ainda são válidos
         const filteredDocs = documents;
         const validSelections = new Set<number>();
-        
+
         selectedUnifiedDocuments.forEach(index => {
           if (index < filteredDocs.length) {
             validSelections.add(index);
           }
         });
-        
+
         if (validSelections.size !== selectedUnifiedDocuments.size) {
           setSelectedUnifiedDocuments(validSelections);
           console.log(`🧹 Seleções ajustadas: ${selectedUnifiedDocuments.size} → ${validSelections.size}`);
@@ -1640,17 +1666,17 @@ const Holerites: React.FC = () => {
   const downloadBySector = async (sectorName: string) => {
     try {
       const url = `/api/unified-documents/download/sector`;
-      const response = await api.get(url, { 
+      const response = await api.get(url, {
         params: { name: sectorName },
-        responseType: 'blob' 
+        responseType: 'blob'
       });
-      
+
       const blob = new Blob([response.data], { type: 'application/zip' });
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
       link.download = `${sectorName.replace(/[^a-zA-Z0-9]/g, '_')}_documentos_unificados.zip`;
       link.click();
-      
+
       toast({
         title: '✅ Download iniciado',
         description: `Baixando documentos do setor ${sectorName}...`,
@@ -1686,12 +1712,12 @@ const Holerites: React.FC = () => {
     }
 
     const cpf = doc.cpf.replace(/\D/g, '');
-    
+
     // 2. Buscar funcionário pelo CPF
     try {
       const employees = await employeeService.searchEmployees(cpf);
       const employee = employees?.find((e: any) => (e.document || e.cpf || '').replace(/\D/g, '') === cpf);
-      
+
       if (!employee) {
         return { valid: false, reason: 'CPF não encontrado na tabela de funcionários' };
       }
@@ -1703,7 +1729,7 @@ const Holerites: React.FC = () => {
       });
 
       const detail = validation?.details?.[0];
-      
+
       if (!detail) {
         return { valid: false, reason: 'Erro ao validar contatos do funcionário' };
       }
@@ -1720,7 +1746,7 @@ const Holerites: React.FC = () => {
       }
 
       return { valid: true, employeeId: employee.id };
-      
+
     } catch (error) {
       console.error('Erro ao validar documento unificado:', error);
       return { valid: false, reason: 'Erro ao buscar informações do funcionário' };
@@ -1731,13 +1757,13 @@ const Holerites: React.FC = () => {
   const sendSingleDocument = async (type: 'email' | 'whatsapp', index: number) => {
     const filteredDocs = getFilteredUnifiedDocuments();
     const doc = filteredDocs[index];
-    
+
     if (!doc) return;
 
     try {
       // Validar rigorosamente antes de enviar
       const validation = await validateUnifiedDocumentForSending(doc);
-      
+
       if (!validation.valid) {
         toast({
           title: "⚠️ Não é possível enviar",
@@ -1751,13 +1777,13 @@ const Holerites: React.FC = () => {
       const payload = {
         tipo: type,
         funcionarioId: validation.employeeId,
-        mensagem: type === 'whatsapp' 
+        mensagem: type === 'whatsapp'
           ? 'Olá! Seu documento unificado (holerite + comprovante) está disponível para download. Acesse o sistema SecuredGuard para visualizar.'
           : undefined
       };
 
       const response = await api.post('/api/envio/individual', payload);
-      
+
       if (response.data.sucesso) {
         toast({
           title: '✅ Sucesso',
@@ -1815,7 +1841,7 @@ const Holerites: React.FC = () => {
       );
 
       const validDocs = selected.filter((_, idx) => validations[idx].valid);
-      
+
       let successCount = 0;
       let failCount = 0;
 
@@ -1828,13 +1854,13 @@ const Holerites: React.FC = () => {
           const payload = {
             tipo: sendType,
             funcionarioId: employeeId,
-            mensagem: sendType === 'whatsapp' 
+            mensagem: sendType === 'whatsapp'
               ? 'Olá! Seu documento unificado (holerite + comprovante) está disponível para download. Acesse o sistema SecuredGuard para visualizar.'
               : undefined
           };
 
           const response = await api.post('/api/envio/individual', payload);
-          
+
           if (response.data.sucesso) {
             successCount++;
           } else {
@@ -1847,12 +1873,12 @@ const Holerites: React.FC = () => {
       }
 
       const invalidCount = selected.length - validDocs.length;
-      
+
       toast({
         title: '✅ Envio concluído',
         description: `${successCount} enviado(s)${failCount > 0 ? `, ${failCount} falharam` : ''}${invalidCount > 0 ? `, ${invalidCount} inválido(s)` : ''}`,
       });
-      
+
       setShowSendModal(false);
       setSelectedUnifiedDocuments(new Set());
     } catch (error) {
@@ -1888,7 +1914,7 @@ const Holerites: React.FC = () => {
       );
 
       const validDocs = selected.filter((_, idx) => validations[idx].valid);
-      
+
       let successCount = 0;
       let failCount = 0;
       const failedNames: string[] = [];
@@ -1903,13 +1929,13 @@ const Holerites: React.FC = () => {
           const payload = {
             tipo: type,
             funcionarioId: employeeId,
-            mensagem: type === 'whatsapp' 
+            mensagem: type === 'whatsapp'
               ? 'Olá! Seu documento unificado (holerite + comprovante) está disponível para download. Acesse o sistema SecuredGuard para visualizar.'
               : undefined
           };
 
           const response = await api.post('/api/envio/individual', payload);
-          
+
           if (response.data.sucesso) {
             successCount++;
           } else {
@@ -1924,7 +1950,7 @@ const Holerites: React.FC = () => {
       }
 
       const invalidCount = selected.length - validDocs.length;
-      
+
       // Mensagem de sucesso
       if (successCount > 0 && failCount === 0 && invalidCount === 0) {
         toast({
@@ -1938,7 +1964,7 @@ const Holerites: React.FC = () => {
           variant: failCount > 0 || invalidCount > 0 ? "destructive" : "default",
         });
       }
-      
+
       setSelectedUnifiedDocuments(new Set());
     } catch (error: any) {
       console.error('Erro no envio individual:', error);
@@ -1960,7 +1986,7 @@ const Holerites: React.FC = () => {
       setShowUnifiedDeleteModal(true);
     } else if (type === 'batch') {
       const selected = getSelectedDocuments();
-      
+
       // ValidaÃ§Ãµes mais robustas
       if (selected.length === 0) {
         toast({
@@ -1970,23 +1996,23 @@ const Holerites: React.FC = () => {
         });
         return;
       }
-      
+
       // Removido limite de 50 documentos - agora permite qualquer quantidade
-      
+
       // Mostrar preview dos documentos selecionados
       const preview = selected.slice(0, 3).map(doc => doc.employeeName || 'N/A').join(', ');
       const remaining = selected.length > 3 ? ` e mais ${selected.length - 3} documento(s)` : '';
-      
+
       // Calcular tamanho total estimado
       const totalSize = selected.reduce((sum, doc) => sum + (doc.fileSize || 0), 0);
       const sizeText = totalSize > 0 ? ` (~${(totalSize / 1024).toFixed(1)} KB)` : '';
-      
+
       toast({
         title: `🗑️ Confirmar exclusão de ${selected.length} documento(s)`,
         description: `${preview}${remaining}${sizeText}`,
         duration: 4000,
       });
-      
+
       setDeleteType('batch');
       setShowUnifiedDeleteModal(true);
     }
@@ -1999,21 +2025,21 @@ const Holerites: React.FC = () => {
     try {
       if (deleteType === 'individual' && deleteDocumentIndex !== null) {
         const doc = getFilteredUnifiedDocuments()[deleteDocumentIndex];
-        
-        setDeleteProgress({ 
-          total: 1, 
-          completed: 0, 
-          failed: 0, 
-          current: `Excluindo ${doc.fileName}...` 
+
+        setDeleteProgress({
+          total: 1,
+          completed: 0,
+          failed: 0,
+          current: `Excluindo ${doc.fileName}...`
         });
-        
+
         // Exclusão real via API
         console.log(`🗑️ Excluindo documento individual: ${doc.fileName}`);
         const deleteResponse = await api.delete(`/api/unified-documents/delete/${encodeURIComponent(doc.fileName)}`);
-        
+
         if (deleteResponse.data.sucesso) {
           console.log('✅ Documento excluído com sucesso no backend');
-          
+
           // Remover da lista local
           setUnifiedDocuments(prev => {
             const updatedList = prev.filter(d => d.fileName !== doc.fileName);
@@ -2023,55 +2049,55 @@ const Holerites: React.FC = () => {
         } else {
           throw new Error(deleteResponse.data.mensagem || 'Erro ao excluir documento');
         }
-        
-        setDeleteProgress({ 
-          total: 1, 
-          completed: 1, 
-          failed: 0, 
-          current: 'Concluído!' 
+
+        setDeleteProgress({
+          total: 1,
+          completed: 1,
+          failed: 0,
+          current: 'Concluído!'
         });
-        
+
         await new Promise(resolve => setTimeout(resolve, 500));
-        
+
         toast({
           title: "✅ Documento excluído",
           description: `Documento "${doc.fileName}" excluído com sucesso!`,
         });
-        
+
         // Recarregar a lista de documentos unificados para garantir sincronização
         await fetchUnifiedDocuments(true);
         await loadUnifiedOrganization();
-        
+
       } else if (deleteType === 'batch') {
         const selected = getSelectedDocuments();
-        setDeleteProgress({ 
-          total: selected.length, 
-          completed: 0, 
-          failed: 0, 
-          current: 'Iniciando exclusão em lote...' 
+        setDeleteProgress({
+          total: selected.length,
+          completed: 0,
+          failed: 0,
+          current: 'Iniciando exclusão em lote...'
         });
-        
+
         const selectedFileNames = selected.map(doc => doc.fileName);
         let completed = 0;
         let failed = 0;
-        
+
         // Exclusão em lote real via API
         console.log(`🗑️ Excluindo ${selected.length} documentos em lote`);
         const fileNames = selected.map(doc => doc.fileName);
-        
-        const deleteResponse = await api.delete('/api/unified-documents/delete-multiple', { 
-          data: fileNames 
+
+        const deleteResponse = await api.delete('/api/unified-documents/delete-multiple', {
+          data: fileNames
         });
-        
+
         if (deleteResponse.data.sucesso) {
           completed = deleteResponse.data.deletedCount || 0;
           failed = deleteResponse.data.failedCount || 0;
-          
+
           console.log(`✅ Exclusão em lote concluída: ${completed} sucessos, ${failed} falhas`);
-          
+
           // Remover da lista local apenas os sucessos
           const successfulDeletions = deleteResponse.data.deletedFiles || [];
-          
+
           if (successfulDeletions.length > 0) {
             setUnifiedDocuments(prev => {
               const updatedList = prev.filter(d => !successfulDeletions.includes(d.fileName));
@@ -2079,15 +2105,15 @@ const Holerites: React.FC = () => {
               return updatedList;
             });
           }
-          
+
           // Atualizar progresso final
-          setDeleteProgress({ 
-            total: selected.length, 
-            completed, 
-            failed, 
-            current: 'Exclusão em lote concluída!' 
+          setDeleteProgress({
+            total: selected.length,
+            completed,
+            failed,
+            current: 'Exclusão em lote concluída!'
           });
-          
+
           // Log de arquivos que falharam
           if (failed > 0 && deleteResponse.data.failedFiles) {
             console.warn('⚠️ Arquivos que falharam na exclusão:', deleteResponse.data.failedFiles);
@@ -2095,9 +2121,9 @@ const Holerites: React.FC = () => {
         } else {
           throw new Error(deleteResponse.data.mensagem || 'Erro ao excluir documentos em lote');
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         if (failed === 0) {
           toast({
             title: "✅ Exclusão em lote concluída",
@@ -2110,10 +2136,10 @@ const Holerites: React.FC = () => {
             variant: "destructive",
           });
         }
-        
+
         setSelectedUnifiedDocuments(new Set());
       }
-      
+
       // Recarregar a lista de documentos unificados para garantir sincronização
       // Aguardar um pouco para garantir que o backend processou a exclusão
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -2122,9 +2148,9 @@ const Holerites: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
       await fetchUnifiedDocuments(true);
       await loadUnifiedOrganization();
-      
+
       setShowUnifiedDeleteModal(false);
-      
+
     } catch (error) {
       toast({
         title: "âŒ Erro na exclusão",
@@ -2153,21 +2179,64 @@ const Holerites: React.FC = () => {
       console.log('📊¤ Iniciando processamento automático do comprovante:', file.name);
       console.log('📊 Token no localStorage:', localStorage.getItem('token') ? 'Token encontrado' : 'Token não encontrado');
       console.log('📊 Usuário atual:', user);
-      
+
+      // Merge helper: evita duplicidade e garante que dados mais novos sobrescrevem os antigos
+      const mergeReceiptsById = (prev: PaymentReceipt[], incoming: PaymentReceipt[]) => {
+        const map = new Map<string, PaymentReceipt>();
+        (Array.isArray(prev) ? prev : []).forEach(r => map.set(String(r.id), r));
+        (Array.isArray(incoming) ? incoming : []).forEach(r => map.set(String(r.id), r));
+        return Array.from(map.values());
+      };
+
+      // Refresh com retry: garante que campos "enriquecidos" (ex: conta creditada) apareçam sem precisar recarregar a página
+      const refreshReceiptsUntilEnriched = async (targetIds: string[]) => {
+        if (!targetIds || targetIds.length === 0) return;
+
+        // Se houver busca ativa (>=4 chars), respeitar o termo atual; caso contrário, trazer tudo
+        const currentSearch = (paymentReceiptSearchTerm || '').trim();
+        const searchParam = currentSearch.length >= 4 ? currentSearch : undefined;
+
+        const maxAttempts = 10; // ~20s
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            // Pequeno delay antes de buscar, para dar tempo do backend persistir/atualizar
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const latest = await paymentReceiptService.getAllPaymentReceipts(searchParam);
+            if (Array.isArray(latest)) {
+              setPaymentReceipts(latest);
+
+              // Checar se os itens recém-processados já têm conta creditada
+              const allEnriched = targetIds.every(id => {
+                const r = latest.find(x => String(x.id) === id);
+                return !!(r && (r.creditedAccount || r.creditedAgency || r.creditedName));
+              });
+
+              if (allEnriched) {
+                console.log('✅ Comprovantes atualizados e enriquecidos no frontend (sem refresh manual).');
+                break;
+              }
+            }
+          } catch (e) {
+            console.warn(`⚠️ Falha ao atualizar comprovantes (tentativa ${attempt}/${maxAttempts})`, e);
+          }
+        }
+      };
+
       // Usar o novo endpoint de processamento automático
       try {
         const formData = new FormData();
         formData.append('file', file);
-        
+
         const response = await api.post('/api/receipts/process-automatic', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
           timeout: 60000, // 60 segundos para processamento
         });
-        
+
         const responseData: ReceiptProcessingResponse = response.data;
-        
+
         // Garantir que receipts seja sempre um array válido
         let processedReceipts: PaymentReceipt[] = [];
         if (responseData && responseData.receipts) {
@@ -2178,13 +2247,13 @@ const Holerites: React.FC = () => {
             processedReceipts = [];
           }
         }
-        
+
         const summary = responseData?.summary;
-        
+
         console.log('✅ Comprovantes processados automaticamente:', responseData);
         console.log('📋 Processed receipts (array):', processedReceipts);
         console.log('📊 Total de comprovantes:', processedReceipts.length);
-        
+
         // Se for sobrescrita, remover do estado (e do backend) os existentes que
         // colidirem com os novos por (empresa quando disponível) + funcionário + período
         if (options?.overwriteExisting && Array.isArray(processedReceipts) && processedReceipts.length > 0) {
@@ -2212,38 +2281,43 @@ const Holerites: React.FC = () => {
           }
         }
 
-        // Adicionar todos os comprovantes processados ao estado
+        // Adicionar/atualizar todos os comprovantes processados no estado (sem duplicar)
         if (Array.isArray(processedReceipts) && processedReceipts.length > 0) {
           setPaymentReceipts(prev => {
             // Garantir que prev seja sempre um array válido
             const prevArray = Array.isArray(prev) ? prev : [];
-            return [...prevArray, ...processedReceipts];
+            return mergeReceiptsById(prevArray, processedReceipts);
           });
+
+          // 🔄 Atualizar automaticamente a lista após finalizar o processamento
+          // (muitos campos como "conta creditada" podem ser preenchidos logo após a persistência)
+          const newIds = processedReceipts.map(r => String(r.id)).filter(Boolean);
+          void refreshReceiptsUntilEnriched(newIds);
         }
-        
+
         // Mensagem de sucesso com informações do resumo
-        const successMessage = summary?.validationOk 
+        const successMessage = summary?.validationOk
           ? `${processedReceipts.length} comprovante(s) processado(s) automaticamente! ${summary.validationMessage || ''}`
           : `${processedReceipts.length} comprovante(s) processado(s) automaticamente. ${summary?.validationMessage || ''}`;
-        
+
         toast({
           title: "Sucesso",
           description: successMessage,
         });
-        
+
       } catch (backendError) {
         console.error('âŒ Erro no processamento automático:', backendError);
-        
+
         toast({
           title: "Erro",
           description: "Erro ao processar comprovante automaticamente. Verifique se o arquivo está no formato correto.",
           variant: "destructive"
         });
-        
+
         // Não usar fallback - deixar o usuário tentar novamente
         return;
       }
-      
+
       setShowPaymentReceiptUploadModal(false);
     } catch (error) {
       console.error('Erro ao processar comprovante:', error);
@@ -2294,7 +2368,7 @@ const Holerites: React.FC = () => {
     }
 
     try {
-      const selectedReceipts = getFilteredPaymentReceipts().filter(receipt => 
+      const selectedReceipts = getFilteredPaymentReceipts().filter(receipt =>
         selectedPaymentReceipts.includes(receipt.id)
       );
 
@@ -2308,12 +2382,12 @@ const Holerites: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         console.log(`Enviando email para: ${receipt.employeeName}`);
       }
-      
+
       toast({
         title: "Sucesso",
         description: `${selectedReceipts.length} email(s) enviado(s) com sucesso!`,
       });
-      
+
       // Limpar seleção após envio
       setSelectedPaymentReceipts([]);
     } catch (error) {
@@ -2337,7 +2411,7 @@ const Holerites: React.FC = () => {
     }
 
     try {
-      const selectedReceipts = getFilteredPaymentReceipts().filter(receipt => 
+      const selectedReceipts = getFilteredPaymentReceipts().filter(receipt =>
         selectedPaymentReceipts.includes(receipt.id)
       );
 
@@ -2352,7 +2426,7 @@ const Holerites: React.FC = () => {
         console.log(`Enviando WhatsApp para: ${receipt.employeeName}`);
       }
 
-        toast({
+      toast({
         title: "Sucesso",
         description: `${selectedReceipts.length} mensagem(ns) WhatsApp enviada(s) com sucesso!`,
       });
@@ -2376,7 +2450,7 @@ const Holerites: React.FC = () => {
   // Excluir comprovante individual
   const handleDeletePaymentReceipt = async (receiptId: string) => {
     const idStr = String(receiptId).trim();
-    
+
     if (!idStr) {
       toast({
         title: "Erro",
@@ -2389,16 +2463,16 @@ const Holerites: React.FC = () => {
     try {
       console.log('🗑️ Excluindo comprovante individual:', idStr);
       await paymentReceiptService.deletePaymentReceipt(idStr);
-      
+
       // Remover da seleção se estiver selecionado
       setSelectedPaymentReceipts(selectedPaymentReceipts.filter(id => String(id) !== idStr));
-      
+
       // Exibir mensagem de sucesso ANTES de recarregar a lista
       toast({
         title: "Comprovante excluído",
         description: "Comprovante excluído com sucesso.",
       });
-      
+
       // Recarregar lista de comprovantes de pagamento (silenciosamente, sem exibir erros)
       try {
         await loadPaymentReceipts();
@@ -2413,7 +2487,7 @@ const Holerites: React.FC = () => {
         response: error.response?.data,
         status: error.response?.status
       });
-      
+
       // Verificar se é realmente um erro ou se a exclusão foi bem-sucedida mas houve erro na resposta
       if (error.response?.status === 200 || error.response?.status === 204) {
         // Se o status é 200/204, a exclusão foi bem-sucedida, apenas recarregar
@@ -2429,7 +2503,7 @@ const Holerites: React.FC = () => {
         }
         return;
       }
-      
+
       const errorMessage = error.response?.data?.error || error.message || "Erro ao excluir comprovante. Tente novamente.";
       toast({
         title: "Erro",
@@ -2481,7 +2555,7 @@ const Holerites: React.FC = () => {
       });
 
       await paymentReceiptService.downloadBatch(selectedPaymentReceipts);
-      
+
       toast({
         title: "Download concluído",
         description: `${selectedPaymentReceipts.length} comprovante(s) baixado(s) com sucesso.`,
@@ -2530,9 +2604,9 @@ const Holerites: React.FC = () => {
 
     try {
       const result = await paymentReceiptService.deleteMultiplePaymentReceipts(idsToDelete);
-      
+
       console.log('✅ Resultado da exclusão:', result);
-      
+
       // Exibir mensagens de sucesso/erro ANTES de recarregar a lista
       if (result.deleted > 0) {
         toast({
@@ -2540,7 +2614,7 @@ const Holerites: React.FC = () => {
           description: `${result.deleted} comprovante${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''} com sucesso.`,
         });
       }
-      
+
       if (result.failed > 0) {
         toast({
           title: "Alguns comprovantes não foram excluídos",
@@ -2548,9 +2622,9 @@ const Holerites: React.FC = () => {
           variant: "destructive"
         });
       }
-      
+
       setSelectedPaymentReceipts([]);
-      
+
       // Recarregar lista de comprovantes (silenciosamente, sem exibir erros)
       try {
         await loadPaymentReceipts();
@@ -2565,7 +2639,7 @@ const Holerites: React.FC = () => {
         response: error.response?.data,
         status: error.response?.status
       });
-      
+
       // Se o backend retornou dados mesmo com erro, tentar processar
       if (error.response?.data && error.response.data.deleted !== undefined) {
         const result = error.response.data;
@@ -2583,7 +2657,7 @@ const Holerites: React.FC = () => {
           return;
         }
       }
-      
+
       // Se o status é 200, a exclusão foi bem-sucedida, apenas processar resultado
       if (error.response?.status === 200 && error.response?.data) {
         const result = error.response.data;
@@ -2610,14 +2684,14 @@ const Holerites: React.FC = () => {
           return;
         }
       }
-      
-      const errorMessage = error.response?.data?.error || 
-                          (error.response?.data?.errors && Array.isArray(error.response.data.errors) 
-                            ? error.response.data.errors.join(', ') 
-                            : null) ||
-                          error.message || 
-                          "Erro ao excluir comprovantes. Tente novamente.";
-      
+
+      const errorMessage = error.response?.data?.error ||
+        (error.response?.data?.errors && Array.isArray(error.response.data.errors)
+          ? error.response.data.errors.join(', ')
+          : null) ||
+        error.message ||
+        "Erro ao excluir comprovantes. Tente novamente.";
+
       toast({
         title: "Erro",
         description: errorMessage,
@@ -2628,8 +2702,8 @@ const Holerites: React.FC = () => {
 
   const areAllPaymentReceiptsSelected = () => {
     const filteredReceipts = getFilteredPaymentReceipts();
-    return filteredReceipts.length > 0 && 
-           selectedPaymentReceipts.length === filteredReceipts.length;
+    return filteredReceipts.length > 0 &&
+      selectedPaymentReceipts.length === filteredReceipts.length;
   };
 
   const hasSelectedPaymentReceipts = () => {
@@ -2641,12 +2715,12 @@ const Holerites: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log('📊 Iniciando carregamento de holerites...');
       console.log('📊 Usuário atual:', user);
       console.log('📊 Permissões do usuÃ¡rio:', user?.permissions);
       console.log('📊 Token no localStorage:', localStorage.getItem('token'));
-      
+
       try {
         console.log('📊 Filtros aplicados:', filters);
         const data = await holeriteService.getAllHolerites();
@@ -2654,7 +2728,7 @@ const Holerites: React.FC = () => {
         console.log('📊 Tipo dos dados:', typeof data);
         console.log('📊 É array?', Array.isArray(data));
         console.log('📊 Tamanho do array:', data?.length);
-        
+
         if (data && Array.isArray(data)) {
           console.log('✅ Usando dados do backend:', data.length, 'holerites');
           console.log('📋 Estrutura dos primeiros holerites:', data.slice(0, 3).map(h => ({
@@ -2664,12 +2738,12 @@ const Holerites: React.FC = () => {
             fileName: h.fileName
           })));
           setHolerites(data);
-          
+
           // Atualizar anos disponíveis baseado nos dados reais
           const availableYears = [...new Set(data.map(h => h.year.toString()))].sort((a, b) => b.localeCompare(a));
           console.log('📊… Anos disponíveis baseado nos holerites:', availableYears);
           setHoleriteAvailableYears(availableYears);
-          
+
           // Se o ano ativo não estiver mais disponível, mudar para o primeiro disponível
           if (availableYears.length > 0 && !availableYears.includes(holeriteActiveYear)) {
             setHoleriteActiveYear(availableYears[0]);
@@ -2690,11 +2764,11 @@ const Holerites: React.FC = () => {
       console.error('âŒ Erro ao carregar holerites:', err);
       console.error('📊 Detalhes do erro:', err.response?.data, err.response?.status);
       setError('Erro ao carregar holerites. Tente novamente.');
-        toast({
-          title: "Erro",
+      toast({
+        title: "Erro",
         description: "Não foi possível carregar os holerites.",
-          variant: "destructive"
-        });
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -2703,11 +2777,11 @@ const Holerites: React.FC = () => {
   // Carregar holerites com filtros
   const loadHoleritesWithFilters = async () => {
     const newFilters: any = { ...filters };
-    
+
     if (searchTerm) {
       newFilters.employeeName = searchTerm;
     }
-    
+
     await loadHolerites(newFilters);
   };
 
@@ -2770,12 +2844,12 @@ const Holerites: React.FC = () => {
 
   // Funções para unificação individual
   const handleDragStart = (e: React.DragEvent, item: any, type: 'holerite' | 'recibo') => {
-            console.log('🚀 Iniciando drag:', { type, item: item.employeeName || 'N/A' });
-    
+    console.log('🚀 Iniciando drag:', { type, item: item.employeeName || 'N/A' });
+
     // Definir dados para transferência
     e.dataTransfer.setData('application/json', JSON.stringify({ item, type }));
     e.dataTransfer.effectAllowed = 'copy';
-    
+
     // Não definir o estado aqui, apenas quando soltar
     console.log('📋 Dados de transferência definidos');
   };
@@ -2789,16 +2863,16 @@ const Holerites: React.FC = () => {
     e.currentTarget.classList.remove('border-seguranca-yellow', 'bg-seguranca-yellow/50');
   };
 
-    const handleDrop = (e: React.DragEvent, targetType: 'unificacao') => {
+  const handleDrop = (e: React.DragEvent, targetType: 'unificacao') => {
     e.preventDefault();
     e.currentTarget.classList.remove('border-seguranca-yellow', 'bg-seguranca-yellow/10');
-    
+
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
       const { item, type } = data;
-      
+
       console.log('📊„ Item solto:', { type, item: item.employeeName || 'N/A' });
-      
+
       // Função auxiliar para normalizar nomes (case-insensitive)
       const normalizeName = (name: string) => {
         if (!name) return '';
@@ -2809,7 +2883,7 @@ const Holerites: React.FC = () => {
           .replace(/empregado/g, '')
           .replace(/colaborador/g, '');
       };
-      
+
       // Adicionar item ao estado correspondente
       if (type === 'holerite') {
         setDraggedHolerite(item);
@@ -2818,12 +2892,12 @@ const Holerites: React.FC = () => {
         setDraggedRecibo(item);
         console.log('✅ Recibo definido:', item.employeeName || 'N/A');
       }
-      
+
       // Verificar se jÃ¡ temos ambos os itens para validação (case-insensitive)
       if (draggedHolerite && type === 'recibo') {
         const holeriteName = normalizeName(draggedHolerite.employeeName || '');
         const reciboName = normalizeName(item.employeeName || '');
-        
+
         if (holeriteName !== reciboName) {
           toast({
             title: "âŒ Nomes diferentes",
@@ -2837,7 +2911,7 @@ const Holerites: React.FC = () => {
       } else if (draggedRecibo && type === 'holerite') {
         const holeriteName = normalizeName(item.employeeName || '');
         const reciboName = normalizeName(draggedRecibo.employeeName || '');
-        
+
         if (holeriteName !== reciboName) {
           toast({
             title: "âŒ Nomes diferentes",
@@ -2849,19 +2923,19 @@ const Holerites: React.FC = () => {
           return;
         }
       }
-      
+
       // Mostrar toast de confirmação
       toast({
         title: `${type === 'holerite' ? 'Holerite' : 'Recibo'} adicionado`,
         description: `${item.employeeName || 'Nome não disponível'} foi adicionado à área de unificação.`,
       });
-      
-                    // Se temos ambos os itens com nomes iguais, mostrar confirmação (case-insensitive)
-      if (draggedHolerite && draggedRecibo && 
-          draggedHolerite.employeeName && draggedRecibo.employeeName) {
+
+      // Se temos ambos os itens com nomes iguais, mostrar confirmação (case-insensitive)
+      if (draggedHolerite && draggedRecibo &&
+        draggedHolerite.employeeName && draggedRecibo.employeeName) {
         const holeriteName = normalizeName(draggedHolerite.employeeName);
         const reciboName = normalizeName(draggedRecibo.employeeName);
-        
+
         if (holeriteName === reciboName) {
           toast({
             title: "✅ Nomes compatíveis",
@@ -2869,7 +2943,7 @@ const Holerites: React.FC = () => {
           });
         }
       }
-      
+
     } catch (error) {
       console.error('âŒ Erro ao processar drop:', error);
       toast({
@@ -2915,9 +2989,9 @@ const Holerites: React.FC = () => {
     // ValidaÃ§Ã£o flexÃ­vel: verificar se os nomes normalizados são iguais
     if (normalizedHoleriteName !== normalizedReciboName) {
       // Tentar verificaÃ§Ã£o adicional por contenção
-      const containsMatch = normalizedHoleriteName.includes(normalizedReciboName) || 
-                           normalizedReciboName.includes(normalizedHoleriteName);
-      
+      const containsMatch = normalizedHoleriteName.includes(normalizedReciboName) ||
+        normalizedReciboName.includes(normalizedHoleriteName);
+
       if (!containsMatch) {
         toast({
           title: "âŒ ValidaÃ§Ã£o falhou",
@@ -2941,7 +3015,7 @@ const Holerites: React.FC = () => {
     }
 
     console.log('✅ ValidaÃ§Ã£o aprovada - Criando unificação para:', holerite.employeeName || 'N/A');
-    
+
     // Criar nova unificação individual
     const newUnification = {
       id: `unif_${Date.now()}_${Math.random()}`,
@@ -2951,17 +3025,17 @@ const Holerites: React.FC = () => {
       status: 'pending' as const,
       progress: 0
     };
-    
+
     setIndividualUnifications(prev => [...prev, newUnification]);
-    
+
     // Limpar estados de drag
     setDraggedHolerite(null);
     setDraggedRecibo(null);
-    
-            toast({
-          title: "✅ Unificação criada",
-          description: `Documento unificado criado para ${holerite.employeeName || 'N/A'}!`,
-        });
+
+    toast({
+      title: "✅ Unificação criada",
+      description: `Documento unificado criado para ${holerite.employeeName || 'N/A'}!`,
+    });
 
     // Iniciar processamento automaticamente
     setTimeout(() => {
@@ -2971,52 +3045,52 @@ const Holerites: React.FC = () => {
 
   const processIndividualUnification = async (unification: any) => {
     setProcessingIndividualUnification(true);
-    
+
     try {
-        // Simular progresso inicial
-        const progressInterval = setInterval(() => {
-            setIndividualUnifications(prev => prev.map(u => 
-                u.id === unification.id 
-                    ? { ...u, progress: Math.min(u.progress + 10, 30) }
-                    : u
-            ));
-        }, 200);
+      // Simular progresso inicial
+      const progressInterval = setInterval(() => {
+        setIndividualUnifications(prev => prev.map(u =>
+          u.id === unification.id
+            ? { ...u, progress: Math.min(u.progress + 10, 30) }
+            : u
+        ));
+      }, 200);
 
-        // Simular chamada para o backend para unificar documentos
-        const unifiedPdfUrl = await generateUnifiedPdf(unification);
-        
-        clearInterval(progressInterval);
+      // Simular chamada para o backend para unificar documentos
+      const unifiedPdfUrl = await generateUnifiedPdf(unification);
 
-        // Simular progresso final
-        const finalProgressInterval = setInterval(() => {
-            setIndividualUnifications(prev => prev.map(u => 
-                u.id === unification.id 
-                    ? { ...u, progress: Math.min(u.progress + 15, 100) }
-                    : u
-            ));
-        }, 150);
+      clearInterval(progressInterval);
 
-        setTimeout(() => {
-            clearInterval(finalProgressInterval);
-            
-            // Atualizar unificação com URL do PDF e status completo
-            setIndividualUnifications(prev => prev.map(u => 
-                u.id === unification.id 
-                    ? { ...u, status: 'completed', progress: 100, unifiedPdfUrl }
-                    : u
-            ));
-            
-            setProcessingIndividualUnification(false);
-        }, 2000);
+      // Simular progresso final
+      const finalProgressInterval = setInterval(() => {
+        setIndividualUnifications(prev => prev.map(u =>
+          u.id === unification.id
+            ? { ...u, progress: Math.min(u.progress + 15, 100) }
+            : u
+        ));
+      }, 150);
+
+      setTimeout(() => {
+        clearInterval(finalProgressInterval);
+
+        // Atualizar unificação com URL do PDF e status completo
+        setIndividualUnifications(prev => prev.map(u =>
+          u.id === unification.id
+            ? { ...u, status: 'completed', progress: 100, unifiedPdfUrl }
+            : u
+        ));
+
+        setProcessingIndividualUnification(false);
+      }, 2000);
 
     } catch (error) {
-        console.error('Erro ao processar unificação:', error);
-        setIndividualUnifications(prev => prev.map(u => 
-            u.id === unification.id 
-                ? { ...u, status: 'error', error: 'Erro ao gerar PDF unificado' }
-                : u
-        ));
-        setProcessingIndividualUnification(false);
+      console.error('Erro ao processar unificação:', error);
+      setIndividualUnifications(prev => prev.map(u =>
+        u.id === unification.id
+          ? { ...u, status: 'error', error: 'Erro ao gerar PDF unificado' }
+          : u
+      ));
+      setProcessingIndividualUnification(false);
     }
   };
 
@@ -3045,18 +3119,18 @@ const Holerites: React.FC = () => {
         title: "Download iniciado",
         description: "Documento unificado sendo baixado...",
       });
-      
+
       // Criar um link temporÃ¡rio para download
       const link = document.createElement('a');
       link.href = unification.unifiedPdfUrl;
       link.download = `unificado_${unification.holerite.employeeName.replace(/\s+/g, '_')}_${unification.holerite.month}_${unification.holerite.year}.pdf`;
       link.target = '_blank';
-      
+
       // Adicionar o link ao DOM e clicar nele
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast({
         title: "Sucesso",
         description: "Documento unificado baixado com sucesso!",
@@ -3078,10 +3152,10 @@ const Holerites: React.FC = () => {
         title: "Enviando email",
         description: "Documento unificado sendo enviado por email...",
       });
-      
+
       // Aqui vocÃª pode implementar a lÃ³gica real de envio por email
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       toast({
         title: "Sucesso",
         description: "Documento unificado enviado por email com sucesso!",
@@ -3103,10 +3177,10 @@ const Holerites: React.FC = () => {
         title: "Enviando WhatsApp",
         description: "Documento unificado sendo enviado por WhatsApp...",
       });
-      
+
       // Aqui vocÃª pode implementar a lÃ³gica real de envio por WhatsApp
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       toast({
         title: "Sucesso",
         description: "Documento unificado enviado por WhatsApp com sucesso!",
@@ -3125,7 +3199,7 @@ const Holerites: React.FC = () => {
   const handleViewIndividualUnified = async (unification: any) => {
     setSelectedUnifiedDocument(unification);
     setShowIndividualUnifiedViewModal(true);
-    
+
     // Gerar PDF automaticamente se ainda não foi gerado
     if (!unification.unifiedPdfUrl) {
       console.log('📊„ Gerando PDF automaticamente para visualizaÃ§Ã£o...');
@@ -3134,14 +3208,14 @@ const Holerites: React.FC = () => {
         if (url) {
           // Atualizar o estado para mostrar o PDF unificado
           setSelectedUnifiedDocument(prev => ({ ...prev, unifiedPdfUrl: url }));
-          
+
           // Atualizar tambÃ©m na lista de unificaÃ§Ãµes
-          setIndividualUnifications(prev => prev.map(u => 
-            u.id === unification.id 
+          setIndividualUnifications(prev => prev.map(u =>
+            u.id === unification.id
               ? { ...u, unifiedPdfUrl: url, status: 'completed' }
               : u
           ));
-          
+
           toast({
             title: "PDF Gerado",
             description: "PDF unificado foi gerado automaticamente para visualizaÃ§Ã£o.",
@@ -3163,12 +3237,12 @@ const Holerites: React.FC = () => {
     if (unification?.holerite?.fileName && unification?.recibo?.fileName) {
       // Aqui vocÃª pode implementar a lÃ³gica real para gerar o PDF unificado
       // Por enquanto, vamos tentar carregar os PDFs individuais para demonstraÃ§Ã£o
-      
+
       // Tentar carregar o holerite primeiro
       const apiUrl = getApiUrl().replace('/api', '');
       const holeriteUrl = `${apiUrl}/api/files/holerites/${encodeURIComponent(unification.holerite.fileName)}`;
       const reciboUrl = `${apiUrl}/api/files/receipts/${encodeURIComponent(unification.recibo.fileName)}`;
-      
+
       // Retorna a URL do holerite como exemplo (primeira pÃ¡gina)
       return holeriteUrl;
     }
@@ -3179,12 +3253,12 @@ const Holerites: React.FC = () => {
   const generateUnifiedPdf = async (unification: any) => {
     try {
       console.log('📊„ Iniciando geraÃ§Ã£o de PDF unificado:', unification);
-      
+
       toast({
         title: "Gerando PDF",
         description: "Criando documento unificado com holerite e recibo...",
       });
-      
+
       // Chamar backend para criar documento unificado a partir de nome/mês/ano
       const employeeName = unification?.holerite?.employeeName || unification?.recibo?.employeeName;
       const month = unification?.holerite?.month || unification?.recibo?.month;
@@ -3207,22 +3281,22 @@ const Holerites: React.FC = () => {
             month,
             year
           };
-          
+
           const payslipId = unification?.holerite?.id;
           const receiptId = unification?.recibo?.id;
-          
+
           if (payslipId && receiptId) {
             // Remover prefixos "hol-" e "rec-" se existirem
             const cleanPayslipId = typeof payslipId === 'string' ? payslipId.replace(/^hol-/, '') : payslipId;
             const cleanReceiptId = typeof receiptId === 'string' ? receiptId.replace(/^rec-/, '') : receiptId;
-            
+
             params.payslipId = cleanPayslipId;
             params.receiptId = cleanReceiptId;
             console.log('✅ Usando IDs específicos para garantir documentos corretos:', { payslipId: cleanPayslipId, receiptId: cleanReceiptId });
           } else {
             console.warn('⚠️ IDs não disponíveis, usando busca por nome/mês/ano (pode encontrar documentos incorretos)');
           }
-          
+
           return params;
         })(),
         timeout: 60000 // 1 minuto de timeout
@@ -3246,7 +3320,7 @@ const Holerites: React.FC = () => {
       const unifiedPdfUrl = `${baseURL}/unified-documents/public/file/${encodeURIComponent(fileName)}`;
 
       console.log('✅ PDF unificado criado:', { filePath, fileName, unifiedPdfUrl });
-      
+
       // ✅ RECARREGAR lista de documentos unificados e organização após unificação individual
       console.log('🔄 Recarregando lista de documentos unificados após unificação individual...');
       try {
@@ -3258,22 +3332,22 @@ const Holerites: React.FC = () => {
       } catch (error) {
         console.error('⚠️ Erro ao recarregar organização:', error);
       }
-      
+
       toast({
         title: "✅ PDF Criado",
         description: `Documento unificado criado com sucesso!`,
       });
-      
+
       // Atualizar lista de documentos unificados
       await fetchUnifiedDocuments(true);
       await loadUnifiedOrganization();
-      
+
       return unifiedPdfUrl;
     } catch (error: any) {
       console.error('âŒ Erro ao gerar PDF unificado (backend):', error);
-      
+
       let errorMessage = 'Erro ao unificar documentos';
-      
+
       if (error?.response?.status === 500) {
         errorMessage = 'Erro interno do servidor. Verifique se os arquivos PDF existem no sistema.';
       } else if (error?.response?.data?.mensagem) {
@@ -3288,18 +3362,18 @@ const Holerites: React.FC = () => {
       } else if (error?.message) {
         errorMessage = error.message;
       }
-      
+
       console.error('💥 Detalhes do erro:', {
         status: error?.response?.status,
         data: error?.response?.data,
         message: error?.message
       });
-      
+
       // Log completo da resposta do backend para debug
       if (error?.response?.data) {
         console.error('📋 Resposta completa do backend:', JSON.stringify(error.response.data, null, 2));
       }
-      
+
       toast({
         title: "âŒ Erro na Unificação",
         description: errorMessage,
@@ -3341,61 +3415,61 @@ const Holerites: React.FC = () => {
     }
 
     setIsDeleting(true);
-      try {
-        const result = await holeriteService.deleteMultipleHolerites(selectedHolerites);
-        
-        // Verificar se há IDs inválidos
-        if (result.invalidCount && result.invalidCount > 0) {
-          toast({
-            title: "Aviso",
-            description: `${result.invalidCount} holerite${result.invalidCount > 1 ? 's' : ''} com ID${result.invalidCount > 1 ? 's' : ''} inválido${result.invalidCount > 1 ? 's' : ''}.`,
-            variant: "destructive"
-          });
-        }
-        
-        if (result.deleted === 0 && result.failed === 0) {
-          toast({
-            title: "Informação",
-            description: "Nenhum holerite foi excluído. Verifique se os holerites ainda existem.",
-            variant: "default"
-          });
-        } else if (result.failed > 0) {
-          toast({
-            title: "Aviso",
+    try {
+      const result = await holeriteService.deleteMultipleHolerites(selectedHolerites);
+
+      // Verificar se há IDs inválidos
+      if (result.invalidCount && result.invalidCount > 0) {
+        toast({
+          title: "Aviso",
+          description: `${result.invalidCount} holerite${result.invalidCount > 1 ? 's' : ''} com ID${result.invalidCount > 1 ? 's' : ''} inválido${result.invalidCount > 1 ? 's' : ''}.`,
+          variant: "destructive"
+        });
+      }
+
+      if (result.deleted === 0 && result.failed === 0) {
+        toast({
+          title: "Informação",
+          description: "Nenhum holerite foi excluído. Verifique se os holerites ainda existem.",
+          variant: "default"
+        });
+      } else if (result.failed > 0) {
+        toast({
+          title: "Aviso",
           description: `${result.deleted} holerite${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''} com sucesso. ${result.failed} falha${result.failed > 1 ? 's' : ''}.`,
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Sucesso",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Sucesso",
           description: `${result.deleted} holerite${result.deleted > 1 ? 's' : ''} excluído${result.deleted > 1 ? 's' : ''} com sucesso.`,
-          });
-        }
-        
-        setSelectedHolerites([]);
-        await loadHolerites();
+        });
+      }
+
+      setSelectedHolerites([]);
+      await loadHolerites();
       setShowUnifiedDeleteModal(false);
-      } catch (error: any) {
+    } catch (error: any) {
       console.error('Erro ao excluir holerites:', error);
-      
+
       // Melhorar mensagem de erro baseada no tipo de erro
       let errorMessage = "Erro ao excluir holerites. Tente novamente.";
-      
+
       if (error.response?.status === 400 && error.response?.data?.errors) {
         const errors = error.response.data.errors;
         if (errors.length > 0) {
           errorMessage = errors[0]; // Usar a primeira mensagem de erro do backend
         }
       }
-      
-        toast({
-          title: "Erro",
-          description: errorMessage,
-          variant: "destructive"
-        });
-      } finally {
-        setIsDeleting(false);
-      }
+
+      toast({
+        title: "Erro",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleViewHolerite = (payslip: Holerite) => {
@@ -3420,7 +3494,7 @@ const Holerites: React.FC = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
       toast({
         title: "Download iniciado",
         description: `Holerite de ${payslip.employeeName} baixado com sucesso.`,
@@ -3444,33 +3518,33 @@ const Holerites: React.FC = () => {
   // Confirmar exclusão individual de holerite
   const confirmDeleteHolerite = async () => {
     if (!selectedHolerite) return;
-    
+
     setIsDeleting(true);
-    
-      try {
+
+    try {
       await holeriteService.deleteHolerite(selectedHolerite.id);
-        
-        toast({
-          title: "Sucesso",
+
+      toast({
+        title: "Sucesso",
         description: `Holerite de ${selectedHolerite.employeeName} excluído com sucesso.`,
-        });
-        
-        // Remover da seleção se estiver selecionado
+      });
+
+      // Remover da seleção se estiver selecionado
       setSelectedHolerites(selectedHolerites.filter(id => id !== selectedHolerite.id));
-        
-        // Recarregar lista
-        await loadHolerites();
-      
+
+      // Recarregar lista
+      await loadHolerites();
+
       // Fechar modal
       setShowDeleteModal(false);
       setSelectedHolerite(null);
-      } catch (error) {
+    } catch (error) {
       console.error('Erro ao excluir holerite:', error);
-        toast({
-          title: "Erro",
+      toast({
+        title: "Erro",
         description: "Erro ao excluir holerite. Tente novamente.",
-          variant: "destructive"
-        });
+        variant: "destructive"
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -3488,15 +3562,15 @@ const Holerites: React.FC = () => {
     if (!dateString) {
       return 'Data não disponível';
     }
-    
+
     try {
       const date = new Date(dateString);
-      
+
       // Check if the date is valid
       if (isNaN(date.getTime())) {
         return 'Data inválida';
       }
-      
+
       return new Intl.DateTimeFormat('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -3550,14 +3624,14 @@ const Holerites: React.FC = () => {
     return consentKeywords.some(keyword => normalized.includes(keyword));
   };
 
-const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => {
-  if (!detail) return false;
-  const whatsappError = (detail.whatsappError || '').toLowerCase();
-  return (
-    detail.needsWhatsAppConsent === true ||
-    (!detail.canSendWhatsApp && whatsappError.includes('consent'))
-  );
-};
+  const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => {
+    if (!detail) return false;
+    const whatsappError = (detail.whatsappError || '').toLowerCase();
+    return (
+      detail.needsWhatsAppConsent === true ||
+      (!detail.canSendWhatsApp && whatsappError.includes('consent'))
+    );
+  };
 
   const buildConsentDetailFromUserValidation = (
     validation: UserValidationResult | null,
@@ -3641,14 +3715,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     // Declarar variáveis no escopo da função para serem acessíveis no catch
     let funcionarioId: string | undefined;
     let cpf: string = '';
-    
+
     try {
       console.log('🚀 Iniciando envio WhatsApp individual para:', payslip);
-      
+
       // Normaliza CPF e tenta resolver employeeId antes de enviar
       const rawCpf = (payslip.cpf || '').toString();
       cpf = rawCpf.replace(/\D/g, '');
-      
+
       console.log('📋 CPF normalizado:', cpf);
       try {
         const matches = await employeeService.searchEmployees(cpf);
@@ -3672,7 +3746,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           type: 'whatsapp'
         });
         console.log('📊 Resultado da validação:', validation);
-        
+
         const detail = validation?.details?.[0];
         if (detail) {
           console.log('📋 Detalhe da validação:', detail);
@@ -3684,7 +3758,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             openConsentModalForDetail(detail, payslip, funcionarioId);
             return;
           }
-          
+
           if (detail.status === 'ready') {
             // Pode enviar agora
             console.log('✅ Status READY - Enviando para backend...');
@@ -3694,11 +3768,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               mensagem: 'Olá! Seu holerite está disponível para download. Acesse o sistema SecuredGuard para visualizar. Em caso de dúvidas, entre em contato com o RH.'
             };
             console.log('📤 Payload:', payload);
-            
+
             const response = await api.post('/api/envio/individual', payload);
             const data = response.data;
             console.log('📥 Resposta do backend:', data);
-            
+
             if (data.sucesso) {
               toast({ title: 'Sucesso', description: data.mensagem });
               return;
@@ -3736,13 +3810,13 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
         mensagem: 'Olá! Seu holerite está disponível para download. Acesse o sistema SecuredGuard para visualizar. Em caso de dúvidas, entre em contato com o RH.'
       };
       console.log('📤 Payload (por CPF):', payload);
-      
+
       const response = await api.post('/api/envio/individual', payload);
       const data = response.data;
       console.log('📥 Resposta do backend:', data);
       const detail = Array.isArray(data?.detalhes) && data.detalhes.length > 0 ? data.detalhes[0] : undefined;
       const destino = detail?.destinoNormalizado || detail?.telefone || 'destino não informado';
-      
+
       if (data.sucesso) {
         toast({ title: 'Sucesso', description: `${data.mensagem} (Destino: ${destino})` });
       } else {
@@ -3756,12 +3830,12 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       console.error('Erro ao enviar WhatsApp individual:', error);
       console.error('Mensagem do backend:', backendMsg);
       console.error('Status HTTP:', error?.response?.status);
-      
+
       // Detectar se é erro de WhatsApp não cadastrado
-      const isWhatsAppNotRegistered = lowerMsg.includes('whatsapp não cadastrado') || 
-                                      lowerMsg.includes('whatsapp não encontrado') ||
-                                      (error?.response?.status === 400 && lowerMsg.includes('whatsapp'));
-      
+      const isWhatsAppNotRegistered = lowerMsg.includes('whatsapp não cadastrado') ||
+        lowerMsg.includes('whatsapp não encontrado') ||
+        (error?.response?.status === 400 && lowerMsg.includes('whatsapp'));
+
       // Tentar abrir automaticamente o modal correto baseado na mensagem do backend
       try {
         // Reutiliza cpf/funcionarioId calculados acima
@@ -3778,39 +3852,39 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             console.error('Erro ao buscar funcionário após erro de envio:', searchErr);
           }
         }
-        
+
         // Se detectou que WhatsApp não está cadastrado, tentar buscar validação e abrir modal
         if (isWhatsAppNotRegistered || lowerMsg.includes('whatsapp')) {
           console.log('📱 WhatsApp não cadastrado detectado - tentando abrir modal de atualização...');
           console.log('   CPF:', cpf);
           console.log('   EmployeeId:', employeeIdToValidate);
-          
+
           // Primeiro tentar com employeeId se disponível
           if (employeeIdToValidate) {
             try {
-              const validation = await contactValidationService.validateContacts({ 
-                employeeIds: [employeeIdToValidate], 
-                type: 'whatsapp' 
+              const validation = await contactValidationService.validateContacts({
+                employeeIds: [employeeIdToValidate],
+                type: 'whatsapp'
               });
               const detail = validation?.details?.[0];
-              
+
               if (detail) {
                 setSelectedValidationDetail(detail);
                 console.log('📋 Detalhe de validação encontrado (via employeeId):', detail);
-                
+
                 const requiresConsent = detailNeedsWhatsAppConsent(detail);
                 if (requiresConsent && detail.hasUser && detail.userId) {
                   console.log('🛑 Consentimento pendente - abrindo modal de confirmação.');
                   openConsentModalForDetail(detail, payslip, employeeIdToValidate);
                   return;
                 }
-                
+
                 if (detail.needsUserCreation || (!detail.hasUser && lowerMsg.includes('usuário não encontrado'))) {
                   console.log('👤 Usuário não encontrado - abrindo modal de criação.');
                   setShowSingleUserModal(true);
                   return;
                 }
-                
+
                 if (detail.needsWhatsAppUpdate || !detail.hasWhatsApp) {
                   console.log('📱 WhatsApp precisa ser atualizado/cadastrado - abrindo modal.');
                   openWhatsappUpdateModal(detail, payslip, employeeIdToValidate);
@@ -3821,7 +3895,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               console.error('Erro ao validar contatos após erro (via employeeId):', validationErr);
             }
           }
-          
+
           // Se não conseguiu com employeeId, tentar buscar por CPF diretamente
           if (cpf) {
             console.log('🔍 Tentando buscar validação por CPF para abrir modal...');
@@ -3832,7 +3906,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 console.log('✅ Modal aberto via CPF');
                 return;
               }
-              
+
               // Se não conseguiu abrir modal de consentimento, tentar buscar validação de usuário
               if (!opened) {
                 console.log('🔍 Tentando buscar validação de usuário por CPF...');
@@ -3842,19 +3916,19 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   const detail = buildConsentDetailFromUserValidation(userValidation, cpf, payslip.employeeName);
                   if (detail) {
                     setSelectedValidationDetail(detail);
-                    
+
                     if (detail.needsUserCreation) {
                       console.log('👤 Abrindo modal de criação de usuário');
                       setShowSingleUserModal(true);
                       return;
                     }
-                    
+
                     if (detail.needsWhatsAppUpdate || !detail.hasWhatsApp) {
                       console.log('📱 Abrindo modal de atualização de WhatsApp');
                       openWhatsappUpdateModal(detail, payslip, employeeIdToValidate);
                       return;
                     }
-                    
+
                     if (detailNeedsWhatsAppConsent(detail) && detail.hasUser && detail.userId) {
                       console.log('🛑 Abrindo modal de consentimento de WhatsApp');
                       openConsentModalForDetail(detail, payslip, employeeIdToValidate);
@@ -3868,12 +3942,12 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             }
           }
         }
-        
+
         // Exibir toast com a mensagem específica do backend
         if (isWhatsAppNotRegistered) {
-          toast({ 
-            title: 'WhatsApp não cadastrado', 
-            description: 'É necessário cadastrar o WhatsApp antes de enviar. Verifique os modais abertos.', 
+          toast({
+            title: 'WhatsApp não cadastrado',
+            description: 'É necessário cadastrar o WhatsApp antes de enviar. Verifique os modais abertos.',
             variant: 'destructive',
             duration: 5000
           });
@@ -3916,10 +3990,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       console.log('📊 Usuário atual:', user);
       console.log('📊 Permissões do usuÃ¡rio:', user?.permissions);
       console.log('📊 Token no localStorage:', localStorage.getItem('token'));
-      
+
       const response = await api.get('/api/receipts');
       console.log('📊 Resposta da API de recibos:', response);
-      
+
       let receipts = [];
       if (response.data && Array.isArray(response.data)) {
         receipts = response.data;
@@ -3928,7 +4002,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       } else if (response.data && response.data.receipts && Array.isArray(response.data.receipts)) {
         receipts = response.data.receipts;
       }
-      
+
       console.log('✅ Comprovantes carregados com sucesso:', receipts);
       setReceipts(receipts);
     } catch (error) {
@@ -3969,7 +4043,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       console.log('🎯 Carregando arquivos processados para unificação individual');
       // Aguardar um pouco para garantir que os holerites e recibos foram carregados
       setTimeout(() => {
-      loadProcessedFiles();
+        loadProcessedFiles();
       }, 100);
     }
   }, [activeTab, user, holerites.length, receipts.length]);
@@ -4020,14 +4094,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
   // Criado apenas uma vez quando unifiedDocuments muda
   const unifiedDocumentsIndexMap = useMemo(() => {
     const map = new Map<string, number>();
-    
+
     unifiedDocuments.forEach((doc, index) => {
       if (!doc) return;
-      
+
       const docNameNormalized = normalizeNameForMatching(doc.employeeName || '');
       const docMonth = normalizeNumber(doc.month);
       const docYear = normalizeNumber(doc.year);
-      
+
       // Chave primária: nome normalizado + mês + ano
       if (docNameNormalized && docMonth !== null && docYear !== null) {
         const primaryKey = `${docNameNormalized}|${docMonth}|${docYear}`;
@@ -4035,7 +4109,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           map.set(primaryKey, index);
         }
       }
-      
+
       // Chave secundária: fileName (se disponível)
       if (doc.fileName) {
         const fileNameKey = doc.fileName.toLowerCase().trim();
@@ -4043,7 +4117,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           map.set(fileNameKey, index);
         }
       }
-      
+
       // Chave alternativa: nome parcial (primeiro e último nome) + mês + ano
       if (docNameNormalized && docMonth !== null && docYear !== null) {
         const nameParts = docNameNormalized.split(/\s+/).filter(p => p.length > 0);
@@ -4055,7 +4129,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
         }
       }
     });
-    
+
     return map;
   }, [unifiedDocuments, normalizeNameForMatching, normalizeNumber]);
 
@@ -4109,12 +4183,12 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       const docMonth = normalizeNumber(doc.month);
       const docYear = normalizeNumber(doc.year);
 
-      if (entryNameNormalized && docNameNormalized && 
-          entryMonth !== null && docMonth !== null && entryMonth === docMonth &&
-          entryYear !== null && docYear !== null && entryYear === docYear) {
+      if (entryNameNormalized && docNameNormalized &&
+        entryMonth !== null && docMonth !== null && entryMonth === docMonth &&
+        entryYear !== null && docYear !== null && entryYear === docYear) {
         // Verificar correspondência parcial de nome
-        if (docNameNormalized.includes(entryNameNormalized) || 
-            entryNameNormalized.includes(docNameNormalized)) {
+        if (docNameNormalized.includes(entryNameNormalized) ||
+          entryNameNormalized.includes(docNameNormalized)) {
           return i;
         }
       }
@@ -4155,10 +4229,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
           period.payslips.forEach(entry => {
             // Criar chave única para o entry
-            const entryKey = entry.id 
-              ? `entry-${entry.id}` 
+            const entryKey = entry.id
+              ? `entry-${entry.id}`
               : `entry-${entry.employeeName}-${entry.month}-${entry.year}`;
-            
+
             // Buscar índice apenas uma vez por entry
             let docIndex = map.entries.get(entryKey);
             if (docIndex === undefined) {
@@ -4227,7 +4301,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
     // Filtrar empresas que não têm documentos unificados correspondentes
     let companiesToFilter = unifiedOrganizationData.companies;
-    
+
     // Filtrar empresas sem documentos unificados usando unifiedIndicesMap
     companiesToFilter = companiesToFilter.filter(company => {
       const companyKey = getUnifiedCompanyKey(company);
@@ -4253,7 +4327,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     const filteredCompanies: HoleriteCompanyGroup[] = companiesToFilter
       .map(company => {
         // Verificar se a empresa corresponde ao termo de busca
-        const companyMatches = 
+        const companyMatches =
           company.companyName?.toLowerCase().includes(searchLower) ||
           company.companyCnpj?.toLowerCase().includes(searchLower) ||
           company.companySigla?.toLowerCase().includes(searchLower);
@@ -4268,7 +4342,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             const filteredPeriods: HoleritePeriodGroup[] = (sector.periods || [])
               .map(period => {
                 // Verificar se o período corresponde ao termo de busca
-                const periodMatches = 
+                const periodMatches =
                   `${period.month}/${period.year}`.includes(searchLower) ||
                   period.year?.toString().includes(searchLower) ||
                   period.month?.toString().includes(searchLower);
@@ -4341,7 +4415,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       console.log('📊 Total de documentos:', data?.totalPayslips || 0);
       console.log('📊 Empresas:', data?.companies?.length || 0);
       setUnifiedOrganizationData(data);
-      
+
       if (!data || !data.companies || data.companies.length === 0) {
         console.warn('⚠️ Nenhum documento unificado encontrado na organização');
       }
@@ -4352,7 +4426,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
         response: error.response?.data,
         status: error.response?.status
       });
-      
+
       // Mensagem de erro mais específica para timeouts
       let errorMessage = error.message || 'Erro ao carregar organização';
       if (error.message?.includes('timeout') || error.message?.includes('demorou muito')) {
@@ -4360,7 +4434,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       } else if (error.response?.status === 504) {
         errorMessage = 'O servidor demorou muito para processar a requisição. Tente novamente mais tarde.';
       }
-      
+
       setUnifiedOrganizationError(errorMessage);
       setUnifiedOrganizationData(null);
       toast({
@@ -4436,10 +4510,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
   // Função auxiliar para obter índice de um entry específico (OTIMIZADA)
   const getUnifiedEntryIndex = useCallback((entry: HoleriteOrganizedEntry): number => {
-    const entryKey = entry.id 
-      ? `entry-${entry.id}` 
+    const entryKey = entry.id
+      ? `entry-${entry.id}`
       : `entry-${entry.employeeName}-${entry.month}-${entry.year}`;
-    
+
     const cachedIndex = unifiedIndicesMap.entries.get(entryKey);
     if (cachedIndex !== undefined) {
       return cachedIndex;
@@ -4461,19 +4535,19 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
   const handleSelectUnifiedDocuments = useCallback((indices: number[], checked: boolean) => {
     setSelectedUnifiedDocuments(prev => {
       const newSelected = new Set(prev);
-      
-    if (checked) {
-      indices.forEach(idx => {
-        if (idx >= 0 && idx < unifiedDocuments.length) {
-          newSelected.add(idx);
-        }
-      });
-    } else {
-      indices.forEach(idx => {
-        newSelected.delete(idx);
+
+      if (checked) {
+        indices.forEach(idx => {
+          if (idx >= 0 && idx < unifiedDocuments.length) {
+            newSelected.add(idx);
+          }
+        });
+      } else {
+        indices.forEach(idx => {
+          newSelected.delete(idx);
         });
       }
-      
+
       return newSelected;
     });
   }, [unifiedDocuments.length]);
@@ -4506,20 +4580,20 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
     try {
       setProcessingReceipts(true);
-      
+
       // ValidaÃ§Ãµes bÃ¡sicas
       if (!file) {
         throw new Error('Nenhum arquivo selecionado');
       }
-      
+
       if (file.type !== 'application/pdf') {
         throw new Error('Apenas arquivos PDF são aceitos');
       }
-      
+
       if (file.size === 0) {
         throw new Error('Arquivo está vazio');
       }
-      
+
       if (file.size > 50 * 1024 * 1024) { // 50MB
         throw new Error('Arquivo muito grande (mÃ¡ximo 50MB)');
       }
@@ -4543,14 +4617,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
       if (response.status === 200) {
         const receiptsCount = response.data.receipts?.length || response.data.count || 0;
-        
+
         toast({
           title: "Sucesso",
           description: `Comprovantes processados com sucesso! ${receiptsCount} comprovantes extraídos.`,
         });
-        
+
         setShowReceiptUploadModal(false);
-        
+
         // Recarregar a lista de comprovantes de pagamento após o upload
         console.log('📊„ Recarregando lista de comprovantes de pagamento...');
         await loadPaymentReceipts();
@@ -4559,9 +4633,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       }
     } catch (error: any) {
       console.error('âŒ Erro ao processar recibos:', error);
-      
+
       let errorMessage = 'Erro desconhecido ao processar recibos';
-      
+
       if (error.response) {
         // Erro de resposta HTTP
         console.error('Erro HTTP:', {
@@ -4569,7 +4643,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           statusText: error.response.statusText,
           data: error.response.data
         });
-        
+
         if (error.response.status === 400) {
           errorMessage = error.response.data?.message || 'Arquivo inválido ou dados incorretos';
         } else if (error.response.status === 401) {
@@ -4607,9 +4681,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
   const handleDeleteReceipt = async (receiptId: string) => {
     try {
       setDeletingReceipts(true);
-      
+
       const response = await api.delete(`/receipts/${receiptId}`);
-      
+
       if (response.status === 200 || response.status === 204) {
         toast({
           title: "Sucesso",
@@ -4651,11 +4725,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
     try {
       setDeletingReceipts(true);
-      
+
       const response = await api.delete('/receipts/batch', {
         data: selectedReceipts
       });
-      
+
       if (response.status === 200) {
         toast({
           title: "Sucesso",
@@ -4697,7 +4771,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
   // Função para visualizar recibo com template
   const handleViewReceipt = async (receiptId: string) => {
     console.log('📊 handleViewReceipt chamado com ID:', receiptId);
-    
+
     if (!receiptId) {
       console.error('📊 ID do recibo Ã© undefined ou null');
       toast({
@@ -4707,7 +4781,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       });
       return;
     }
-    
+
     // Verificar se o recibo existe na lista local
     const receipt = Array.isArray(receipts) ? receipts.find(r => r.id === receiptId) : undefined;
     if (!receipt) {
@@ -4719,9 +4793,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       });
       return;
     }
-    
+
     console.log('📊 Dados do recibo encontrado:', receipt);
-    
+
     // Abrir modal do template de recibo
     setSelectedReceiptForTemplate(receipt);
     setShowReceiptTemplateModal(true);
@@ -4730,7 +4804,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
   // Função para baixar recibo
   const handleDownloadReceipt = async (receiptId: string, fileName: string) => {
     console.log('📊 handleDownloadReceipt chamado com ID:', receiptId, 'e fileName:', fileName);
-    
+
     if (!receiptId) {
       console.error('📊 ID do recibo Ã© undefined ou null');
       toast({
@@ -4740,11 +4814,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       });
       return;
     }
-    
+
     try {
       // Tentar fazer download via service
       const blob = await paymentReceiptService.downloadReceipt(receiptId);
-      
+
       // Criar link de download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -4754,136 +4828,136 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: "Sucesso",
         description: "Download iniciado com sucesso!",
       });
     } catch (error) {
       console.error('âŒ Erro ao fazer download:', error);
-        toast({
-          title: "Erro",
+      toast({
+        title: "Erro",
         description: "Erro ao fazer download do comprovante.",
-          variant: "destructive"
-        });
+        variant: "destructive"
+      });
     }
   };
 
   // Carregar arquivos processados do sistema
   const loadProcessedFiles = async () => {
-      setLoadingProcessedFiles(true);
+    setLoadingProcessedFiles(true);
+    try {
+      console.log('🎯 Iniciando carregamento de arquivos processados');
+
+      // Limpar estados primeiro para garantir que não há dados antigos
+      setProcessedHolerites([]);
+      setProcessedRecibos([]);
+
+      // Carregar holerites processados via API (sempre buscar do backend, não usar cache)
       try {
-          console.log('🎯 Iniciando carregamento de arquivos processados');
-          
-          // Limpar estados primeiro para garantir que não há dados antigos
+        console.log('🔄 Tentando carregar holerites processados via API...');
+        const holeritesResponse = await api.get('/api/payslips/processed-files');
+        console.log('📥 Resposta da API de holerites:', holeritesResponse.data);
+
+        if (holeritesResponse.data && holeritesResponse.data.success) {
+          const files = holeritesResponse.data.files || [];
+          const holeritesProcessados = files.map((file: any) => ({
+            id: `hol-${file.id || Math.random()}`,
+            name: file.fileName || file.name || '',
+            employeeName: file.employeeName || '',
+            cpf: file.cpf || '',
+            month: file.month?.toString() || '',
+            year: file.year?.toString() || '',
+            path: file.filePath || file.path || ''
+          }));
+          setProcessedHolerites(holeritesProcessados);
+          console.log('✅ Holerites carregados via API:', holeritesProcessados.length);
+        } else {
+          console.warn('⚠️ Resposta da API não contém success=true ou files vazio');
+          console.warn('   Resposta completa:', holeritesResponse.data);
           setProcessedHolerites([]);
-          setProcessedRecibos([]);
-          
-          // Carregar holerites processados via API (sempre buscar do backend, não usar cache)
-          try {
-              console.log('🔄 Tentando carregar holerites processados via API...');
-              const holeritesResponse = await api.get('/api/payslips/processed-files');
-              console.log('📥 Resposta da API de holerites:', holeritesResponse.data);
-              
-              if (holeritesResponse.data && holeritesResponse.data.success) {
-                  const files = holeritesResponse.data.files || [];
-                  const holeritesProcessados = files.map((file: any) => ({
-                      id: `hol-${file.id || Math.random()}`,
-                      name: file.fileName || file.name || '',
-                      employeeName: file.employeeName || '',
-                      cpf: file.cpf || '',
-                      month: file.month?.toString() || '',
-                      year: file.year?.toString() || '',
-                      path: file.filePath || file.path || ''
-                  }));
-                  setProcessedHolerites(holeritesProcessados);
-                  console.log('✅ Holerites carregados via API:', holeritesProcessados.length);
-              } else {
-                  console.warn('⚠️ Resposta da API não contém success=true ou files vazio');
-                  console.warn('   Resposta completa:', holeritesResponse.data);
-                  setProcessedHolerites([]);
-              }
-          } catch (apiError: any) {
-              console.error('❌ Erro ao carregar holerites via API:', apiError);
-              console.error('   Status:', apiError?.response?.status);
-              console.error('   Mensagem:', apiError?.message);
-              console.error('   Dados:', apiError?.response?.data);
-              setProcessedHolerites([]);
-          }
-
-          // Carregar comprovantes processados do backend
-          try {
-              const processedReceipts = await paymentReceiptService.getProcessedFiles();
-              console.log('✅ Comprovantes processados carregados do backend:', processedReceipts);
-              
-              if (processedReceipts && Array.isArray(processedReceipts) && processedReceipts.length > 0) {
-                  const comprovantesProcessados = processedReceipts.map((receipt: any) => ({
-                      id: `rec-${receipt.id || Math.random()}`,
-                      name: receipt.fileName || '',
-                      employeeName: receipt.employeeName || '',
-                      month: receipt.month?.toString() || '',
-                      year: receipt.year?.toString() || '',
-                      path: receipt.filePath || `uploads/payment-receipts/${receipt.year}/${receipt.month}/${receipt.fileName}`
-                  }));
-                  setProcessedRecibos(comprovantesProcessados);
-                  console.log('✅ Comprovantes processados carregados:', comprovantesProcessados.length);
-              } else {
-                  console.log('⚠️ Nenhum comprovante encontrado');
-                  setProcessedRecibos([]);
-              }
-          } catch (backendError) {
-              console.warn('⚠️ Erro ao carregar comprovantes do backend, usando dados locais:', backendError);
-          }
-
-          // Carregar recibos dos dados já disponíveis
-              // REMOVIDO: Código que usava dados em cache - sempre buscar do backend
-              if (false && Array.isArray(receipts) && receipts.length > 0) {
-      const recibosProcessados = receipts.map(receipt => ({
-                  id: `rec-${receipt.id || Math.random()}`,
-                  name: receipt.fileName || `recibo_${receipt.employeeName}_${receipt.month}_${receipt.year}.pdf`,
-                  employeeName: receipt.employeeName,
-                  month: receipt.month.toString(),
-                  year: receipt.year.toString(),
-                  path: `uploads/receipts/${receipt.month}_${receipt.year}/${receipt.fileName}`
-              }));
-              setProcessedRecibos(recibosProcessados);
-              console.log('✅ Comprovantes carregados dos dados existentes:', recibosProcessados.length);
-          } else {
-              console.log('⚠️ Nenhum recibo disponível nos dados existentes');
-          }
-
-          // REMOVIDO: Código duplicado - já carregamos via API acima
-          if (false && holerites.length === 0) {
-              try {
-                  const holeritesResponse = await api.get('/api/payslips/processed-files');
-                  if (holeritesResponse.data.success) {
-                      setProcessedHolerites(holeritesResponse.data.files || []);
-                      console.log('✅ Holerites carregados via API:', holeritesResponse.data.files?.length || 0);
-                  }
-              } catch (apiError) {
-                  console.log('⚠️ Erro ao carregar holerites via API, usando dados simulados');
-              }
-          }
-
-          if (!Array.isArray(receipts) || receipts.length === 0) {
-              try {
-                  const recibosResponse = await api.get('/api/payment-receipts/processed-files');
-                  if (recibosResponse.data.success) {
-                      setProcessedRecibos(recibosResponse.data.files || []);
-                      console.log('✅ Comprovantes carregados via API:', recibosResponse.data.files?.length || 0);
-                  }
-              } catch (apiError) {
-                  console.log('⚠️ Erro ao carregar comprovantes via API, usando dados simulados');
-              }
-          }
-      } catch (error) {
-          console.error('❌ Erro ao carregar arquivos processados:', error);
-          // Garantir que as listas ficam vazias em caso de erro
-          setProcessedHolerites([]);
-          setProcessedRecibos([]);
-      } finally {
-          setLoadingProcessedFiles(false);
+        }
+      } catch (apiError: any) {
+        console.error('❌ Erro ao carregar holerites via API:', apiError);
+        console.error('   Status:', apiError?.response?.status);
+        console.error('   Mensagem:', apiError?.message);
+        console.error('   Dados:', apiError?.response?.data);
+        setProcessedHolerites([]);
       }
+
+      // Carregar comprovantes processados do backend
+      try {
+        const processedReceipts = await paymentReceiptService.getProcessedFiles();
+        console.log('✅ Comprovantes processados carregados do backend:', processedReceipts);
+
+        if (processedReceipts && Array.isArray(processedReceipts) && processedReceipts.length > 0) {
+          const comprovantesProcessados = processedReceipts.map((receipt: any) => ({
+            id: `rec-${receipt.id || Math.random()}`,
+            name: receipt.fileName || '',
+            employeeName: receipt.employeeName || '',
+            month: receipt.month?.toString() || '',
+            year: receipt.year?.toString() || '',
+            path: receipt.filePath || `uploads/payment-receipts/${receipt.year}/${receipt.month}/${receipt.fileName}`
+          }));
+          setProcessedRecibos(comprovantesProcessados);
+          console.log('✅ Comprovantes processados carregados:', comprovantesProcessados.length);
+        } else {
+          console.log('⚠️ Nenhum comprovante encontrado');
+          setProcessedRecibos([]);
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Erro ao carregar comprovantes do backend, usando dados locais:', backendError);
+      }
+
+      // Carregar recibos dos dados já disponíveis
+      // REMOVIDO: Código que usava dados em cache - sempre buscar do backend
+      if (false && Array.isArray(receipts) && receipts.length > 0) {
+        const recibosProcessados = receipts.map(receipt => ({
+          id: `rec-${receipt.id || Math.random()}`,
+          name: receipt.fileName || `recibo_${receipt.employeeName}_${receipt.month}_${receipt.year}.pdf`,
+          employeeName: receipt.employeeName,
+          month: receipt.month.toString(),
+          year: receipt.year.toString(),
+          path: `uploads/receipts/${receipt.month}_${receipt.year}/${receipt.fileName}`
+        }));
+        setProcessedRecibos(recibosProcessados);
+        console.log('✅ Comprovantes carregados dos dados existentes:', recibosProcessados.length);
+      } else {
+        console.log('⚠️ Nenhum recibo disponível nos dados existentes');
+      }
+
+      // REMOVIDO: Código duplicado - já carregamos via API acima
+      if (false && holerites.length === 0) {
+        try {
+          const holeritesResponse = await api.get('/api/payslips/processed-files');
+          if (holeritesResponse.data.success) {
+            setProcessedHolerites(holeritesResponse.data.files || []);
+            console.log('✅ Holerites carregados via API:', holeritesResponse.data.files?.length || 0);
+          }
+        } catch (apiError) {
+          console.log('⚠️ Erro ao carregar holerites via API, usando dados simulados');
+        }
+      }
+
+      if (!Array.isArray(receipts) || receipts.length === 0) {
+        try {
+          const recibosResponse = await api.get('/api/payment-receipts/processed-files');
+          if (recibosResponse.data.success) {
+            setProcessedRecibos(recibosResponse.data.files || []);
+            console.log('✅ Comprovantes carregados via API:', recibosResponse.data.files?.length || 0);
+          }
+        } catch (apiError) {
+          console.log('⚠️ Erro ao carregar comprovantes via API, usando dados simulados');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar arquivos processados:', error);
+      // Garantir que as listas ficam vazias em caso de erro
+      setProcessedHolerites([]);
+      setProcessedRecibos([]);
+    } finally {
+      setLoadingProcessedFiles(false);
+    }
   };
 
 
@@ -4908,7 +4982,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
       // Remover da lista
       setIndividualUnifications(prev => prev.filter(u => u.id !== unification.id));
-      
+
 
       toast({
         title: "Sucesso",
@@ -4954,10 +5028,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
         employeeName: holerite.employeeName,
         fileName: holerite.fileName
       });
-      
+
       const cpf = holerite.cpf?.replace(/\D/g, '');
       let found = false;
-      
+
       // PASSO 1: Buscar por CPF exato (normalizado) usando endpoint específico
       if (cpf && cpf.length >= 11) {
         console.log(`🔍 Buscando funcionário por CPF: ${cpf}`);
@@ -4970,26 +5044,26 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             found = true;
             continue;
           }
-          
+
           console.log(`⚠️ Busca exata por CPF não retornou resultado, tentando busca parcial...`);
           // Se não encontrou, tentar busca parcial como fallback
           const byCpf = await employeeService.searchEmployees(cpf);
           console.log(`📊 Resultados da busca parcial por CPF:`, byCpf?.length || 0);
-          
+
           if (byCpf && byCpf.length > 0) {
             // Filtrar para encontrar correspondência exata do CPF normalizado
             const exactMatchPartial = byCpf.find((emp: any) => {
               const empCpf = (emp.document || emp.cpf || '').replace(/\D/g, '');
               return empCpf === cpf;
             });
-            
+
             if (exactMatchPartial) {
               ids.push(exactMatchPartial.id);
               console.log(`✅ Funcionário encontrado por CPF exato (busca parcial): ${exactMatchPartial.name} (CPF: ${cpf}, ID: ${exactMatchPartial.id})`);
               found = true;
               continue;
             }
-            
+
             // Se houver apenas 1 resultado e o CPF corresponder parcialmente, aceitar
             if (byCpf.length === 1) {
               const empCpf = (byCpf[0].document || byCpf[0].cpf || '').replace(/\D/g, '');
@@ -5000,7 +5074,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 continue;
               }
             }
-            
+
             // Log dos resultados encontrados para debug
             console.log('📊 Resultados encontrados (mas sem match exato):', byCpf.map((emp: any) => ({
               name: emp.name,
@@ -5022,7 +5096,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
         try {
           const byName = await employeeService.searchEmployeesByName(holerite.employeeName);
           console.log(`📊 Resultados da busca por nome:`, byName?.length || 0);
-          
+
           if (byName && byName.length > 0) {
             // Filtrar para encontrar correspondência exata do nome
             const exactNameMatch = byName.find((emp: any) => {
@@ -5030,14 +5104,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               const holeriteName = holerite.employeeName?.trim().toLowerCase() || '';
               return empName === holeriteName;
             });
-            
+
             if (exactNameMatch) {
               ids.push(exactNameMatch.id);
               console.log(`✅ Funcionário encontrado por nome exato: ${exactNameMatch.name} (ID: ${exactNameMatch.id})`);
               found = true;
               continue;
             }
-            
+
             // Se houver apenas 1 resultado, aceitar
             if (byName.length === 1) {
               ids.push(byName[0].id);
@@ -5045,7 +5119,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               found = true;
               continue;
             }
-            
+
             // Log dos resultados encontrados para debug
             console.log('📊 Resultados encontrados por nome (mas sem match exato):', byName.map((emp: any) => ({
               name: emp.name,
@@ -5060,7 +5134,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
       } else if (!found) {
         console.warn(`⚠️ Nome do funcionário ausente no holerite`);
       }
-      
+
       if (!found) {
         console.error(`❌ Funcionário NÃO encontrado para holerite:`, {
           id: holerite.id,
@@ -5213,9 +5287,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
     if (employeeIds.length === 0) {
       const missingDetails = holeritesToSend.map(h => `- ${h.employeeName || 'Sem nome'} (CPF: ${h.cpf || 'Sem CPF'})`).join('\n');
-      toast({ 
-        title: 'Funcionários não encontrados', 
-        description: `Não foi possível identificar funcionários para os holerites selecionados.\n\nDetalhes:\n${missingDetails}\n\nVerifique se os funcionários estão cadastrados no sistema. Abra o console do navegador (F12) para mais detalhes.`, 
+      toast({
+        title: 'Funcionários não encontrados',
+        description: `Não foi possível identificar funcionários para os holerites selecionados.\n\nDetalhes:\n${missingDetails}\n\nVerifique se os funcionários estão cadastrados no sistema. Abra o console do navegador (F12) para mais detalhes.`,
         variant: 'destructive',
         duration: 10000
       });
@@ -5251,32 +5325,32 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
     try {
       // Tentar buscar funcionário novamente
       const employeeId = await resolveEmployeeIdForHolerite(holerite);
-      
+
       if (employeeId) {
         // Se encontrou, atualizar o mapa e recarregar validação
         setRecipientEmployeeMap((prev) => ({
           ...prev,
           [holerite.id]: employeeId
         }));
-        
+
         // Buscar validação para este employee
         const validation = await contactValidationService.validateContacts({
           employeeIds: [employeeId],
           type: 'whatsapp'
         });
-        
+
         if (validation?.details && validation.details.length > 0) {
           const detail = validation.details[0];
           setRecipientValidationMap((prev) => ({
             ...prev,
             [employeeId]: detail
           }));
-          
+
           toast({
             title: '✅ Vínculo encontrado',
             description: 'Funcionário vinculado com sucesso!',
           });
-          
+
           // Recarregar validação completa para atualizar a lista
           await refreshRecipientValidation();
         } else {
@@ -5285,7 +5359,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             description: 'Funcionário encontrado, mas é necessário criar usuário ou atualizar WhatsApp.',
             variant: 'destructive',
           });
-          
+
           // Recarregar validação mesmo assim
           await refreshRecipientValidation();
         }
@@ -5309,7 +5383,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
   const handleBatchSendHoleritesForIds = useCallback(async (ids: string[], type: 'email' | 'whatsapp') => {
     console.log('🚀 Iniciando envio em lote:', { ids, type, count: ids.length });
-    
+
     if (!ids.length) {
       toast({ title: 'Nenhum holerite selecionado', description: 'Selecione pelo menos um holerite para enviar.', variant: 'destructive' });
       return;
@@ -5317,7 +5391,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
     const holeritesToSend = getHoleritesByIds(ids);
     console.log('📋 Holerites encontrados:', holeritesToSend.length, 'de', ids.length);
-    
+
     if (holeritesToSend.length === 0) {
       toast({ title: 'Holerites não encontrados', description: 'Não foi possível localizar os holerites selecionados.', variant: 'destructive' });
       return;
@@ -5350,28 +5424,28 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
   const renderOrganizationCompanies = () => {
     if (!organizationData?.companies?.length) {
-  return (
+      return (
         <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
           Nenhum dado organizado encontrado. Importe holerites para visualizar as empresas.
-                </div>
+        </div>
       );
     }
 
     return organizationData.companies.map(company => {
-                        const companyKey = getCompanyKey(company);
-                        const companyExpanded = !!expandedCompanies[companyKey];
-                        const companyIds = collectCompanyEntryIds(company);
-                        const companySelectedIds = getSelectedSubset(companyIds);
-                        const companySelectedCount = companySelectedIds.length;
-                        const companyCheckboxState: boolean | 'indeterminate' = companyIds.length === 0
-                          ? false
-                          : areIdsFullySelected(companyIds)
-                            ? true
-                            : companySelectedCount > 0
-                              ? 'indeterminate'
-                              : false;
+      const companyKey = getCompanyKey(company);
+      const companyExpanded = !!expandedCompanies[companyKey];
+      const companyIds = collectCompanyEntryIds(company);
+      const companySelectedIds = getSelectedSubset(companyIds);
+      const companySelectedCount = companySelectedIds.length;
+      const companyCheckboxState: boolean | 'indeterminate' = companyIds.length === 0
+        ? false
+        : areIdsFullySelected(companyIds)
+          ? true
+          : companySelectedCount > 0
+            ? 'indeterminate'
+            : false;
 
-                         return (
+      return (
         <div
           key={companyKey}
           className="rounded-2xl border border-gray-700/60 bg-gray-900/60 backdrop-blur-sm overflow-hidden shadow-[0_30px_60px_-50px_rgba(0,0,0,0.9)]"
@@ -5381,17 +5455,17 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge className="bg-seguranca-black/60 text-seguranca-yellow border border-yellow-500/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-                                     {company.companySigla}
-                                   </Badge>
+                    {company.companySigla}
+                  </Badge>
                   <p className="text-lg font-semibold text-white leading-tight">
-                                     {company.companyName}
-                                   </p>
-                                 </div>
+                    {company.companyName}
+                  </p>
+                </div>
                 <p className="text-xs sm:text-sm text-gray-400 flex flex-wrap items-center gap-2">
                   <Building2 className="h-4 w-4 text-seguranca-yellow" />
-                                   CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} holerite(s) · {company.sectors.length} setor(es)
-                                 </p>
-                               </div>
+                  CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} holerite(s) · {company.sectors.length} setor(es)
+                </p>
+              </div>
               <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
                 {/* Checkbox "Selecionar empresa" - sempre visível */}
                 <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
@@ -5460,33 +5534,33 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   </Button>
                 </div>
               </div>
-                             </div>
-                             {companyExpanded && (
+            </div>
+            {companyExpanded && (
               <div className="space-y-4">
-                                 {company.sectors && company.sectors.length > 0 ? (
-                                   company.sectors.map(sector => {
-                                     const sectorKey = getSectorKey(companyKey, sector);
-                                     const sectorExpanded = !!expandedSectors[sectorKey];
-                                     const sectorIds = collectSectorEntryIds(sector);
-                                     const sectorSelectedIds = getSelectedSubset(sectorIds);
-                                     const sectorSelectedCount = sectorSelectedIds.length;
-                                     const sectorCheckboxState: boolean | 'indeterminate' = sectorIds.length === 0
-                                       ? false
-                                       : areIdsFullySelected(sectorIds)
-                                         ? true
-                                         : sectorSelectedCount > 0
-                                           ? 'indeterminate'
-                                           : false;
+                {company.sectors && company.sectors.length > 0 ? (
+                  company.sectors.map(sector => {
+                    const sectorKey = getSectorKey(companyKey, sector);
+                    const sectorExpanded = !!expandedSectors[sectorKey];
+                    const sectorIds = collectSectorEntryIds(sector);
+                    const sectorSelectedIds = getSelectedSubset(sectorIds);
+                    const sectorSelectedCount = sectorSelectedIds.length;
+                    const sectorCheckboxState: boolean | 'indeterminate' = sectorIds.length === 0
+                      ? false
+                      : areIdsFullySelected(sectorIds)
+                        ? true
+                        : sectorSelectedCount > 0
+                          ? 'indeterminate'
+                          : false;
 
-                                     return (
+                    return (
                       <div key={sectorKey} className="rounded-xl border border-gray-800/60 bg-gray-900/50 overflow-hidden">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
-                                           <div>
-                                             <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
-                                             <p className="text-xs text-gray-400">
-                                               {sector.totalPayslips} holerite(s) · {sector.periods?.length ?? 0} período(s)
-                                             </p>
-                                           </div>
+                          <div>
+                            <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
+                            <p className="text-xs text-gray-400">
+                              {sector.totalPayslips} holerite(s) · {sector.periods?.length ?? 0} período(s)
+                            </p>
+                          </div>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             {/* Checkbox "Selecionar setor" - sempre visível */}
                             <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
@@ -5536,172 +5610,172 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                 </Button>
                               </div>
                             )}
-                                             <Button
-                                               variant="ghost"
-                                               size="sm"
-                                               onClick={() => toggleSectorExpansion(sectorKey)}
-                                               className="text-seguranca-lightgray hover:text-white"
-                                             >
-                                               {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                               {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
-                                             </Button>
-                                           </div>
-                                         </div>
-                                         {sectorExpanded && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleSectorExpansion(sectorKey)}
+                              className="text-seguranca-lightgray hover:text-white"
+                            >
+                              {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                              {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
+                            </Button>
+                          </div>
+                        </div>
+                        {sectorExpanded && (
                           <div className="space-y-3 px-4 py-4 bg-gray-900/70">
-                                             {sector.periods && sector.periods.length > 0 ? (
-                                               sector.periods.map(period => {
-                                                 const periodKey = getPeriodKey(sectorKey, period);
-                                                 const periodExpanded = !!expandedPeriods[periodKey];
+                            {sector.periods && sector.periods.length > 0 ? (
+                              sector.periods.map(period => {
+                                const periodKey = getPeriodKey(sectorKey, period);
+                                const periodExpanded = !!expandedPeriods[periodKey];
 
-                                                 return (
+                                return (
                                   <div key={periodKey} data-period-key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
-                                                       <div>
-                                                         <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
-                                                         <p className="text-xs text-gray-400">
-                                                           {searchTerm 
-                                                             ? `${period.payslips.filter(entry => matchesSearchTerm(entry, searchTerm)).length} de ${period.totalPayslips} holerite(s)`
-                                                             : `${period.totalPayslips} holerite(s)`
-                                                           }
-                                                         </p>
-                                                       </div>
-                                                       <div className="flex flex-wrap gap-2 items-center">
-                                                         <Button
-                                                           size="sm"
-                                                           className="bg-blue-600/90 text-white hover:bg-blue-600"
-                                                           onClick={() => handleDownloadByPeriod(sector.sectorName, period.month, period.year)}
-                                                           disabled={loading}
-                                                         >
-                                                           <Download className="h-4 w-4 mr-1" />
-                                                           Download ({period.totalPayslips})
-                                                         </Button>
-                                                         <Button
-                                                           variant="ghost"
-                                                           size="sm"
-                                                           onClick={() => togglePeriodExpansion(periodKey)}
-                                                           className="text-seguranca-lightgray hover:text-white"
-                                                         >
-                                                           {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                           {periodExpanded ? 'Ocultar holerites' : 'Ver holerites'}
-                                                         </Button>
-                                                       </div>
-                                                     </div>
-                                                     {periodExpanded && (
+                                      <div>
+                                        <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
+                                        <p className="text-xs text-gray-400">
+                                          {searchTerm
+                                            ? `${period.payslips.filter(entry => matchesSearchTerm(entry, searchTerm)).length} de ${period.totalPayslips} holerite(s)`
+                                            : `${period.totalPayslips} holerite(s)`
+                                          }
+                                        </p>
+                                      </div>
+                                      <div className="flex flex-wrap gap-2 items-center">
+                                        <Button
+                                          size="sm"
+                                          className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                          onClick={() => handleDownloadByPeriod(sector.sectorName, period.month, period.year)}
+                                          disabled={loading}
+                                        >
+                                          <Download className="h-4 w-4 mr-1" />
+                                          Download ({period.totalPayslips})
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => togglePeriodExpansion(periodKey)}
+                                          className="text-seguranca-lightgray hover:text-white"
+                                        >
+                                          {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                          {periodExpanded ? 'Ocultar holerites' : 'Ver holerites'}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    {periodExpanded && (
                                       <div className="divide-y divide-gray-800 bg-gray-950/60">
-                                                         {(() => {
-                                                           const filteredPayslips = period.payslips.filter(entry => matchesSearchTerm(entry, searchTerm));
-                                                           
-                                                           if (filteredPayslips.length === 0 && searchTerm) {
-                                                             return (
-                                                               <div className="px-4 py-6 text-center text-gray-400">
-                                                                 <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                                                 <p className="text-sm">Nenhum holerite encontrado para "{searchTerm}" neste período.</p>
-                                                               </div>
-                                                             );
-                                                           }
-                                                           
-                                                           return filteredPayslips.map(entry => {
-                                                           const holeriteData = resolveHoleriteFromEntry(entry);
+                                        {(() => {
+                                          const filteredPayslips = period.payslips.filter(entry => matchesSearchTerm(entry, searchTerm));
 
-                                                           return (
-                                            <div
-                                              key={entry.id}
-                                              className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-4"
-                                            >
-                                                               <div className="flex items-start gap-3 flex-1 min-w-0">
-                                                                 <Checkbox
-                                                                   checked={selectedHolerites.includes(entry.id)}
-                                                                   onCheckedChange={(checked) => handleSelectHolerite(entry.id, checked)}
-                                                                   className="border-blue-400 mt-1"
-                                                                 />
-                                                                 <div className="flex-1 min-w-0">
-                                                                   <p className="text-sm font-semibold text-white">{entry.employeeName}</p>
-                                                                   <p className="text-xs text-gray-400">
-                                                                     CPF: {formatCpf(entry.cpf)} · Arquivo: {entry.fileName}
-                                                                   </p>
-                                                                 </div>
-                                                               </div>
-                                                               {/* Botões individuais - só aparecem se NÃO houver seleção em massa ativa (setor/empresa não selecionados) */}
-                                                               {!areIdsFullySelected(sectorIds) && !areIdsFullySelected(companyIds) && (
-                                                                 <div className="flex flex-wrap gap-2">
-                                                                   <Button
-                                                                     size="sm"
-                                                                     variant="outline"
-                                                                     className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                                                                     onClick={() => handleViewHolerite(holeriteData)}
-                                                                   >
-                                                                     <Eye className="h-4 w-4 mr-1" />
-                                                                     Visualizar
-                                                                   </Button>
-                                                                   <Button
-                                                                     size="sm"
-                                                                     variant="outline"
-                                                                     className="border-blue-600 text-blue-400 hover:bg-blue-600/20"
-                                                                     onClick={() => handleDownloadIndividualHolerite(holeriteData)}
-                                                                     disabled={loading}
-                                                                   >
-                                                                     <Download className="h-4 w-4 mr-1" />
-                                                                     Download
-                                                                   </Button>
-                                                                   <Button
-                                                                     size="sm"
-                                                                     variant="outline"
-                                                                     className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                                                                     onClick={() => handleEmailHolerite(holeriteData)}
-                                                                   >
-                                                                     <Mail className="h-4 w-4 mr-1" />
-                                                                     E-mail
-                                                                   </Button>
-                                                                   <Button
-                                                                     size="sm"
-                                                                     variant="outline"
-                                                                     className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                                                                     onClick={() => handleSendWhatsAppIndividual(holeriteData)}
-                                                                   >
-                                                                     <MessageSquare className="h-4 w-4 mr-1" />
-                                                                     WhatsApp
-                                                                   </Button>
-                                                                   <Button
-                                                                     size="sm"
-                                                                     variant="destructive"
-                                                                     className="bg-red-600/90 hover:bg-red-700 border-red-700"
-                                                                     onClick={() => handleDeleteHolerite(holeriteData)}
-                                                                   >
-                                                                     <Trash2 className="h-4 w-4 mr-1" />
-                                                                     Excluir
-                                                                   </Button>
-                                                                 </div>
-                                                               )}
-                                                             </div>
-                                                           );
-                                                           });
-                                                         })()}
-                                                       </div>
-                                                     )}
-                                                   </div>
-                                                 );
-                                               })
-                                             ) : (
+                                          if (filteredPayslips.length === 0 && searchTerm) {
+                                            return (
+                                              <div className="px-4 py-6 text-center text-gray-400">
+                                                <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                                <p className="text-sm">Nenhum holerite encontrado para "{searchTerm}" neste período.</p>
+                                              </div>
+                                            );
+                                          }
+
+                                          return filteredPayslips.map(entry => {
+                                            const holeriteData = resolveHoleriteFromEntry(entry);
+
+                                            return (
+                                              <div
+                                                key={entry.id}
+                                                className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-4"
+                                              >
+                                                <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                  <Checkbox
+                                                    checked={selectedHolerites.includes(entry.id)}
+                                                    onCheckedChange={(checked) => handleSelectHolerite(entry.id, checked)}
+                                                    className="border-blue-400 mt-1"
+                                                  />
+                                                  <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-white">{entry.employeeName}</p>
+                                                    <p className="text-xs text-gray-400">
+                                                      CPF: {formatCpf(entry.cpf)} · Arquivo: {entry.fileName}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                                {/* Botões individuais - só aparecem se NÃO houver seleção em massa ativa (setor/empresa não selecionados) */}
+                                                {!areIdsFullySelected(sectorIds) && !areIdsFullySelected(companyIds) && (
+                                                  <div className="flex flex-wrap gap-2">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                      onClick={() => handleViewHolerite(holeriteData)}
+                                                    >
+                                                      <Eye className="h-4 w-4 mr-1" />
+                                                      Visualizar
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="border-blue-600 text-blue-400 hover:bg-blue-600/20"
+                                                      onClick={() => handleDownloadIndividualHolerite(holeriteData)}
+                                                      disabled={loading}
+                                                    >
+                                                      <Download className="h-4 w-4 mr-1" />
+                                                      Download
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                      onClick={() => handleEmailHolerite(holeriteData)}
+                                                    >
+                                                      <Mail className="h-4 w-4 mr-1" />
+                                                      E-mail
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                      onClick={() => handleSendWhatsAppIndividual(holeriteData)}
+                                                    >
+                                                      <MessageSquare className="h-4 w-4 mr-1" />
+                                                      WhatsApp
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="destructive"
+                                                      className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                      onClick={() => handleDeleteHolerite(holeriteData)}
+                                                    >
+                                                      <Trash2 className="h-4 w-4 mr-1" />
+                                                      Excluir
+                                                    </Button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          });
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : (
                               <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
-                                                 Nenhum período encontrado para este setor.
-                                               </div>
-                                             )}
-                                           </div>
-                                         )}
-                                       </div>
-                                     );
-                                   })
-                                 ) : (
+                                Nenhum período encontrado para este setor.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
                   <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
-                                     Nenhum setor encontrado para esta empresa.
-                                   </div>
-                                 )}
-                               </div>
-                             )}
+                    Nenhum setor encontrado para esta empresa.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-                           </div>
-                        );
+        </div>
+      );
     });
   };
 
@@ -5996,11 +6070,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             <h1 className="text-xl sm:text-2xl font-bold text-seguranca-lightgray flex items-center gap-2">
               <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-seguranca-yellow" />
               Gestão de Holerites
-                  </h1>
+            </h1>
             <p className="text-xs sm:text-sm text-gray-400 mt-1">Sistema de gerenciamento de documentos financeiros</p>
-                </div>
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
-            <Button 
+            <Button
               variant="outline"
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               className="group relative overflow-hidden border-2 border-gray-500/50 bg-gradient-to-br from-gray-800/50 to-gray-900/50 text-seguranca-lightgray hover:border-gray-400/70 hover:bg-gradient-to-br hover:from-gray-700/60 hover:to-gray-800/60 text-xs sm:text-sm font-medium w-full sm:w-auto px-4 sm:px-5 py-2.5 sm:py-3 transition-all duration-300 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-gray-900/30 active:scale-[0.98]"
@@ -6009,7 +6083,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 relative z-10 group-hover:rotate-180 transition-transform duration-300" />
               <span className="relative z-10">Filtros</span>
             </Button>
-            <Button 
+            <Button
               onClick={() => setShowUploadModal(true)}
               className="group relative overflow-hidden bg-gradient-to-r from-seguranca-red via-red-600 to-seguranca-red hover:from-red-600 hover:via-red-700 hover:to-red-600 text-white text-xs sm:text-sm font-semibold w-full sm:w-auto px-5 sm:px-6 py-2.5 sm:py-3 transition-all duration-300 shadow-lg shadow-red-900/40 hover:shadow-xl hover:shadow-red-900/50 active:scale-[0.98] border-0"
             >
@@ -6042,7 +6116,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               Por Setor
             </TabsTrigger>
           </TabsList>
-            
+
           <TabsContent value="processados" className="space-y-6 mt-6">
             <div className={`grid ${isMobile ? 'grid-cols-1' : isTablet ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'} gap-3 sm:gap-4 lg:gap-6`}>
               <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl border border-yellow-500/30 bg-gradient-to-br from-seguranca-yellow/20 via-yellow-500/5 to-transparent p-4 sm:p-5 shadow-[0_20px_45px_-35px_rgba(251,191,36,0.75)] transition-all duration-300 hover:border-yellow-400/60 hover:shadow-[0_25px_60px_-30px_rgba(251,191,36,0.65)]">
@@ -6137,7 +6211,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     </>
                   )}
                 </Button>
-                      </div>
+              </div>
             </div>
 
             <div className="bg-gradient-to-br from-black/70 via-gray-900/80 to-gray-900/60 border border-gray-700/60 rounded-3xl p-4 sm:p-6 lg:p-8 space-y-6 shadow-[0_30px_65px_-50px_rgba(15,23,42,0.9)]">
@@ -6174,10 +6248,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                       <>
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Recarregar dados
-                  </>
-                )}
+                      </>
+                    )}
                   </Button>
-              </div>
+                </div>
               </div>
 
               {organizationError && (
@@ -6227,7 +6301,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               {searchTerm && !loadingOrganization && organizationData?.companies && (() => {
                 const searchResults = getSearchResults();
                 const totalHolerites = getAllHoleritesFromOrganization().length;
-                
+
                 console.log('🔍 Debug busca:', {
                   searchTerm,
                   totalHolerites,
@@ -6235,7 +6309,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   organizationDataCompanies: organizationData.companies.length,
                   resultados: searchResults.slice(0, 3) // Mostrar apenas os 3 primeiros para não poluir o console
                 });
-                
+
                 if (searchResults.length > 0) {
                   return (
                     <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
@@ -6282,7 +6356,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                       </>
                                     )}
                                   </div>
-                                  
+
                                   {/* Localização na estrutura organizada */}
                                   {location && (
                                     <div className="bg-seguranca-graphite/50 border border-gray-600 rounded p-2 mt-2">
@@ -6399,16 +6473,16 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   <p className="text-xs text-gray-400 mt-1">Neste dia</p>
                 </CardContent>
               </Card>
-                    </div>
-                    
+            </div>
+
             {/* Botão de Upload - PADRÃO SST */}
             <div className="mt-6">
-                      <Button 
-                      onClick={() => setShowPaymentReceiptUploadModal(true)}
-                      disabled={processingPaymentReceipts}
+              <Button
+                onClick={() => setShowPaymentReceiptUploadModal(true)}
+                disabled={processingPaymentReceipts}
                 className="bg-seguranca-red hover:bg-seguranca-darkred w-full sm:w-auto"
-                    >
-                        {processingPaymentReceipts ? (
+              >
+                {processingPaymentReceipts ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Processando...
@@ -6419,296 +6493,294 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     Importar Comprovante
                   </>
                 )}
-                      </Button>
-                  </div>
+              </Button>
+            </div>
 
             {/* Abas por Ano e Mês */}
             <Card className="bg-seguranca-graphite border-gray-600 rounded-lg p-6">
-                <div className="space-y-8">
-                  <div className="text-center">
-                    <h4 className="text-2xl font-bold text-white mb-2">Comprovantes por Período</h4>
-                    <p className="text-gray-400">Navegue pelos anos e meses para visualizar os comprovantes</p>
-                  </div>
+              <div className="space-y-8">
+                <div className="text-center">
+                  <h4 className="text-2xl font-bold text-white mb-2">Comprovantes por Período</h4>
+                  <p className="text-gray-400">Navegue pelos anos e meses para visualizar os comprovantes</p>
+                </div>
 
-                  {/* Barra de Pesquisa - Layout similar ao Holerite */}
-                  <div className="w-full">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <Input
-                        type="text"
-                        placeholder="Buscar por Nome, Empresa, Conta Corrente Debitada ou Data (ex: João Silva, 01/2024, 12345-6)..."
-                        value={paymentReceiptSearchTerm}
-                        onChange={(e) => handlePaymentReceiptSearchChange(e.target.value)}
-                        className="pl-10 bg-seguranca-black border-gray-600 text-white placeholder-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                      />
-                      {paymentReceiptSearchTerm && (
-                        <button
-                          onClick={() => {
-                            setPaymentReceiptSearchTerm('');
-                            loadPaymentReceipts();
-                            if (searchDebounceTimer) {
-                              clearTimeout(searchDebounceTimer);
-                            }
-                          }}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white flex items-center gap-1"
-                        >
-                          <X className="h-5 w-5" />
-                          <span className="text-xs">Limpar</span>
-                        </button>
-                      )}
-                    </div>
-                    {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length > 0 && paymentReceiptSearchTerm.trim().length < 4 && (
-                      <p className="text-xs text-yellow-400 mt-2 ml-1">
-                        Digite pelo menos 4 caracteres para buscar
-                      </p>
-                    )}
-                    {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4 && (
-                      <p className="text-xs text-gray-400 mt-2 ml-7">
-                        Pesquisando por: <span className="text-seguranca-yellow font-semibold">{paymentReceiptSearchTerm}</span>
-                      </p>
+                {/* Barra de Pesquisa - Layout similar ao Holerite */}
+                <div className="w-full">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <Input
+                      type="text"
+                      placeholder="Buscar por Nome, Empresa, Conta Corrente Debitada ou Data (ex: João Silva, 01/2024, 12345-6)..."
+                      value={paymentReceiptSearchTerm}
+                      onChange={(e) => handlePaymentReceiptSearchChange(e.target.value)}
+                      className="pl-10 bg-seguranca-black border-gray-600 text-white placeholder-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    />
+                    {paymentReceiptSearchTerm && (
+                      <button
+                        onClick={() => {
+                          setPaymentReceiptSearchTerm('');
+                          loadPaymentReceipts();
+                          if (searchDebounceTimer) {
+                            clearTimeout(searchDebounceTimer);
+                          }
+                        }}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white flex items-center gap-1"
+                      >
+                        <X className="h-5 w-5" />
+                        <span className="text-xs">Limpar</span>
+                      </button>
                     )}
                   </div>
+                  {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length > 0 && paymentReceiptSearchTerm.trim().length < 4 && (
+                    <p className="text-xs text-yellow-400 mt-2 ml-1">
+                      Digite pelo menos 4 caracteres para buscar
+                    </p>
+                  )}
+                  {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4 && (
+                    <p className="text-xs text-gray-400 mt-2 ml-7">
+                      Pesquisando por: <span className="text-seguranca-yellow font-semibold">{paymentReceiptSearchTerm}</span>
+                    </p>
+                  )}
+                </div>
 
-                  {/* Resultados da busca - Comprovantes encontrados diretamente (similar ao Holerite) */}
-                  {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4 && !loadingPaymentReceipts && (() => {
-                    const searchResults = getFilteredPaymentReceipts();
-                    
-                    if (searchResults.length > 0) {
-                      return (
-                        <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
-                          <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-seguranca-lightgray font-semibold flex items-center gap-2">
-                              <Search className="h-5 w-5 text-seguranca-yellow" />
-                              Comprovantes encontrados ({searchResults.length})
-                            </h3>
-                          </div>
-                          <div className="space-y-2 max-h-96 overflow-y-auto">
-                            {searchResults.map((receipt) => {
-                              const period = getReceiptPeriod(receipt);
-                              return (
-                                <div
-                                  key={receipt.id}
-                                  className="bg-seguranca-black border border-gray-700 rounded-lg p-3 hover:border-seguranca-yellow transition-colors"
-                                >
-                                  <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-3 mb-2">
-                                        <div className="font-semibold text-seguranca-lightgray text-lg">
-                                          {receipt.employeeName || 'Nome não informado'}
-                                        </div>
-                                        {receipt.companySigla && (
-                                          <span className="px-2 py-1 text-xs font-semibold rounded bg-seguranca-yellow/20 text-seguranca-yellow">
-                                            {receipt.companySigla}
-                                          </span>
+                {/* Resultados da busca - Comprovantes encontrados diretamente (similar ao Holerite) */}
+                {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4 && !loadingPaymentReceipts && (() => {
+                  const searchResults = getFilteredPaymentReceipts();
+
+                  if (searchResults.length > 0) {
+                    return (
+                      <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-seguranca-lightgray font-semibold flex items-center gap-2">
+                            <Search className="h-5 w-5 text-seguranca-yellow" />
+                            Comprovantes encontrados ({searchResults.length})
+                          </h3>
+                        </div>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {searchResults.map((receipt) => {
+                            const period = getReceiptPeriod(receipt);
+                            return (
+                              <div
+                                key={receipt.id}
+                                className="bg-seguranca-black border border-gray-700 rounded-lg p-3 hover:border-seguranca-yellow transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <div className="font-semibold text-seguranca-lightgray text-lg">
+                                        {receipt.employeeName || 'Nome não informado'}
+                                      </div>
+                                      {receipt.companySigla && (
+                                        <span className="px-2 py-1 text-xs font-semibold rounded bg-seguranca-yellow/20 text-seguranca-yellow">
+                                          {receipt.companySigla}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-gray-400 mb-2 space-y-1">
+                                      <div>
+                                        <span className="font-semibold text-seguranca-red">Período:</span>{' '}
+                                        <span className="font-mono text-white">
+                                          {String(period.month || 0).padStart(2, '0')}/{period.year || 0}
+                                        </span>
+                                        {receipt.transferDate && (
+                                          <>
+                                            {' | '}
+                                            <span className="font-semibold text-seguranca-red">Data Transferência:</span>{' '}
+                                            <span className="font-mono text-white">{receipt.transferDate}</span>
+                                          </>
                                         )}
                                       </div>
-                                      <div className="text-sm text-gray-400 mb-2 space-y-1">
+                                      {receipt.companyName && (
                                         <div>
-                                          <span className="font-semibold text-seguranca-red">Período:</span>{' '}
-                                          <span className="font-mono text-white">
-                                            {String(period.month || 0).padStart(2, '0')}/{period.year || 0}
-                                          </span>
-                                          {receipt.transferDate && (
-                                            <>
-                                              {' | '}
-                                              <span className="font-semibold text-seguranca-red">Data Transferência:</span>{' '}
-                                              <span className="font-mono text-white">{receipt.transferDate}</span>
-                                            </>
-                                          )}
+                                          <span className="font-semibold text-seguranca-red">Empresa:</span>{' '}
+                                          <span className="text-white">{receipt.companyName}</span>
                                         </div>
+                                      )}
+                                      {receipt.debitedAccount && (
+                                        <div>
+                                          <span className="font-semibold text-seguranca-red">Conta Debitada:</span>{' '}
+                                          <span className="font-mono text-white">{receipt.debitedAccount}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Localização na estrutura */}
+                                    <div className="bg-seguranca-graphite/50 border border-gray-600 rounded p-2 mt-2">
+                                      <div className="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                                        <Building2 className="h-3 w-3" />
+                                        <span className="font-semibold">Informações:</span>
+                                      </div>
+                                      <div className="text-xs text-gray-300 space-y-1">
                                         {receipt.companyName && (
                                           <div>
-                                            <span className="font-semibold text-seguranca-red">Empresa:</span>{' '}
+                                            <span className="text-seguranca-yellow">Empresa:</span>{' '}
                                             <span className="text-white">{receipt.companyName}</span>
                                           </div>
                                         )}
+                                        <div>
+                                          <span className="text-seguranca-yellow">Período:</span>{' '}
+                                          <span className="text-white">
+                                            {String(period.month).padStart(2, '0')}/{period.year}
+                                          </span>
+                                        </div>
                                         {receipt.debitedAccount && (
                                           <div>
-                                            <span className="font-semibold text-seguranca-red">Conta Debitada:</span>{' '}
-                                            <span className="font-mono text-white">{receipt.debitedAccount}</span>
+                                            <span className="text-seguranca-yellow">Conta Debitada:</span>{' '}
+                                            <span className="text-white">{receipt.debitedAccount}</span>
                                           </div>
                                         )}
                                       </div>
-                                      
-                                      {/* Localização na estrutura */}
-                                      <div className="bg-seguranca-graphite/50 border border-gray-600 rounded p-2 mt-2">
-                                        <div className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                                          <Building2 className="h-3 w-3" />
-                                          <span className="font-semibold">Informações:</span>
-                                        </div>
-                                        <div className="text-xs text-gray-300 space-y-1">
-                                          {receipt.companyName && (
-                                            <div>
-                                              <span className="text-seguranca-yellow">Empresa:</span>{' '}
-                                              <span className="text-white">{receipt.companyName}</span>
-                                            </div>
-                                          )}
-                                          <div>
-                                            <span className="text-seguranca-yellow">Período:</span>{' '}
-                                            <span className="text-white">
-                                              {String(period.month).padStart(2, '0')}/{period.year}
-                                            </span>
-                                          </div>
-                                          {receipt.debitedAccount && (
-                                            <div>
-                                              <span className="text-seguranca-yellow">Conta Debitada:</span>{' '}
-                                              <span className="text-white">{receipt.debitedAccount}</span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2">
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleViewPaymentReceipt(receipt)}
-                                        className="bg-seguranca-red hover:bg-seguranca-darkred"
-                                      >
-                                        <FileText className="h-4 w-4 mr-1" />
-                                        Visualizar
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleDownloadPaymentReceipt(String(receipt.id), receipt.fileName)}
-                                        className="bg-green-600 hover:bg-green-700 text-white"
-                                      >
-                                        <Download className="h-4 w-4 mr-1" />
-                                        Download
-                                      </Button>
                                     </div>
                                   </div>
+                                  <div className="flex flex-col items-end gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleViewPaymentReceipt(receipt)}
+                                      className="bg-seguranca-red hover:bg-seguranca-darkred"
+                                    >
+                                      <FileText className="h-4 w-4 mr-1" />
+                                      Visualizar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleDownloadPaymentReceipt(String(receipt.id), receipt.fileName)}
+                                      className="bg-green-600 hover:bg-green-700 text-white"
+                                    >
+                                      <Download className="h-4 w-4 mr-1" />
+                                      Download
+                                    </Button>
+                                  </div>
                                 </div>
-                              );
-                            })}
-                          </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    } else if (paymentReceipts.length > 0) {
-                      // Se há comprovantes mas nenhum resultado, mostrar mensagem
-                      return (
-                        <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
-                          <div className="flex items-center gap-2 text-gray-400">
-                            <Search className="h-5 w-5" />
-                            <p>Nenhum comprovante encontrado para "{paymentReceiptSearchTerm}"</p>
-                          </div>
+                      </div>
+                    );
+                  } else if (paymentReceipts.length > 0) {
+                    // Se há comprovantes mas nenhum resultado, mostrar mensagem
+                    return (
+                      <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 mb-6">
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <Search className="h-5 w-5" />
+                          <p>Nenhum comprovante encontrado para "{paymentReceiptSearchTerm}"</p>
                         </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
-                  {/* Abas de Ano e Mês - Ocultar quando há busca ativa */}
-                  {(!paymentReceiptSearchTerm || paymentReceiptSearchTerm.trim().length < 4) && (
-                    <div className="space-y-6">
-                      <div className="text-center">
-                        <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Ano</h5>
-                        <div className="flex flex-wrap justify-center gap-3">
-                          {getAvailableYears().map((year) => (
+                {/* Abas de Ano e Mês - Ocultar quando há busca ativa */}
+                {(!paymentReceiptSearchTerm || paymentReceiptSearchTerm.trim().length < 4) && (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Ano</h5>
+                      <div className="flex flex-wrap justify-center gap-3">
+                        {getAvailableYears().map((year) => (
                           <Button
-                              key={year}
-                              variant={activeYear === year.toString() ? "default" : "outline"}
-                              onClick={() => {
-                                setActiveYear(year.toString());
-                                const months = getAvailableMonths(year.toString());
-                                if (months.length > 0) {
-                                  setActiveMonth(months[0].toString());
-                                }
-                              }}
-                              className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                                activeYear === year.toString() 
-                                  ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105' 
-                                  : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
+                            key={year}
+                            variant={activeYear === year.toString() ? "default" : "outline"}
+                            onClick={() => {
+                              setActiveYear(year.toString());
+                              const months = getAvailableMonths(year.toString());
+                              if (months.length > 0) {
+                                setActiveMonth(months[0].toString());
+                              }
+                            }}
+                            className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${activeYear === year.toString()
+                                ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105'
+                                : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
                               }`}
-                            >
-                              {activeYear === year.toString() && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-yellow-500/20 rounded-xl blur opacity-50"></div>
-                              )}
-                              <span className="relative text-lg font-bold">{year}</span>
+                          >
+                            {activeYear === year.toString() && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-yellow-500/20 rounded-xl blur opacity-50"></div>
+                            )}
+                            <span className="relative text-lg font-bold">{year}</span>
                           </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Abas de Mês Melhoradas */}
+                    {activeYear && (
+                      <div className="text-center">
+                        <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Mês</h5>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                          {getAvailableMonths(activeYear).map((month) => (
+                            <Button
+                              key={month}
+                              variant={activeMonth === month.toString() ? "default" : "outline"}
+                              onClick={() => setActiveMonth(month.toString())}
+                              className={`group relative px-4 py-3 rounded-xl font-medium transition-all duration-300 ${activeMonth === month.toString()
+                                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105'
+                                  : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400'
+                                }`}
+                            >
+                              {activeMonth === month.toString() && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-blue-500/20 rounded-xl blur opacity-50"></div>
+                              )}
+                              <span className="relative text-sm font-semibold">
+                                {getMonthName(month)}
+                              </span>
+                            </Button>
                           ))}
                         </div>
                       </div>
+                    )}
+                  </div>
+                )}
 
-                      {/* Abas de Mês Melhoradas */}
-                      {activeYear && (
-                        <div className="text-center">
-                          <h5 className="text-lg font-semibold text-seguranca-lightgray mb-4">Selecione o Mês</h5>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                            {getAvailableMonths(activeYear).map((month) => (
-                        <Button
-                                key={month}
-                                variant={activeMonth === month.toString() ? "default" : "outline"}
-                                onClick={() => setActiveMonth(month.toString())}
-                                className={`group relative px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
-                                  activeMonth === month.toString() 
-                                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105' 
-                                    : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400'
-                                }`}
-                              >
-                                {activeMonth === month.toString() && (
-                                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 to-blue-500/20 rounded-xl blur opacity-50"></div>
-                                )}
-                                <span className="relative text-sm font-semibold">
-                                  {getMonthName(month)}
-                                </span>
-                        </Button>
-                            ))}
+                {/* Lista de Comprovantes do Período Selecionado - Só mostrar quando não há busca ativa */}
+                {(!paymentReceiptSearchTerm || paymentReceiptSearchTerm.trim().length < 4) && (
+                  <div className="space-y-6">
+                    {/* Header responsivo melhorado */}
+                    <div className="bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
+
+                      {/* Layout principal: empilhado em mobile, lado a lado em desktop */}
+                      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 xl:gap-6">
+
+                        {/* Seção de informações - sempre visível */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                            <FileText size={20} className="sm:w-6 sm:h-6 text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h5 className="text-lg sm:text-xl xl:text-2xl font-bold text-white leading-tight">
+                              Comprovantes de {getMonthName(parseInt(activeMonth))} de {activeYear}
+                            </h5>
+                            <p className="text-blue-300/90 text-xs sm:text-sm font-medium mt-1">
+                              Documentos processados e organizados
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Badge de contagem - responsivo */}
+                        <div className="flex justify-center xl:justify-end">
+                          <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-lg font-bold shadow-xl rounded-xl sm:rounded-2xl">
+                            {getFilteredPaymentReceipts().length} comprovante{getFilteredPaymentReceipts().length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
                       </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
-                  {/* Lista de Comprovantes do Período Selecionado - Só mostrar quando não há busca ativa */}
-                  {(!paymentReceiptSearchTerm || paymentReceiptSearchTerm.trim().length < 4) && (
-                    <div className="space-y-6">
-                      {/* Header responsivo melhorado */}
-                      <div className="bg-gradient-to-r from-blue-500/15 to-purple-500/15 border border-blue-500/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 backdrop-blur-sm">
-                        
-                        {/* Layout principal: empilhado em mobile, lado a lado em desktop */}
-                        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 xl:gap-6">
-                          
-                          {/* Seção de informações - sempre visível */}
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                              <FileText size={20} className="sm:w-6 sm:h-6 text-white" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h5 className="text-lg sm:text-xl xl:text-2xl font-bold text-white leading-tight">
-                                Comprovantes de {getMonthName(parseInt(activeMonth))} de {activeYear}
-                              </h5>
-                              <p className="text-blue-300/90 text-xs sm:text-sm font-medium mt-1">
-                                Documentos processados e organizados
-                              </p>
-                            </div>
+                      {/* Botões de Ação - PADRÃO SST SIMPLIFICADO */}
+                      {getFilteredPaymentReceipts().length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-600">
+                          {/* Checkbox Selecionar Todos */}
+                          <div className="mb-3 flex items-center gap-2 bg-gray-700 p-3 rounded">
+                            <Checkbox
+                              id="select-all-payment-receipts"
+                              checked={areAllPaymentReceiptsSelected()}
+                              onCheckedChange={handleSelectAllPaymentReceipts}
+                              className="border-blue-400"
+                            />
+                            <label htmlFor="select-all-payment-receipts" className="text-white text-sm font-medium cursor-pointer">
+                              Selecionar Todos
+                            </label>
                           </div>
-                          
-                          {/* Badge de contagem - responsivo */}
-                          <div className="flex justify-center xl:justify-end">
-                            <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-lg font-bold shadow-xl rounded-xl sm:rounded-2xl">
-                              {getFilteredPaymentReceipts().length} comprovante{getFilteredPaymentReceipts().length !== 1 ? 's' : ''}
-                            </Badge>
-                          </div>
-                        </div>
-                        
-                        {/* Botões de Ação - PADRÃO SST SIMPLIFICADO */}
-                        {getFilteredPaymentReceipts().length > 0 && (
-                          <div className="mt-4 pt-4 border-t border-gray-600">
-                            {/* Checkbox Selecionar Todos */}
-                            <div className="mb-3 flex items-center gap-2 bg-gray-700 p-3 rounded">
-                              <Checkbox
-                                id="select-all-payment-receipts"
-                                checked={areAllPaymentReceiptsSelected()}
-                                onCheckedChange={handleSelectAllPaymentReceipts}
-                                className="border-blue-400"
-                              />
-                              <label htmlFor="select-all-payment-receipts" className="text-white text-sm font-medium cursor-pointer">
-                                Selecionar Todos
-                              </label>
-                            </div>
-                            
-                            {/* Botão de ação em massa - Excluir - só aparece quando "Selecionar todos" está marcado */}
-                            {areAllPaymentReceiptsSelected() && (
+
+                          {/* Botão de ação em massa - Excluir - só aparece quando "Selecionar todos" está marcado */}
+                          {areAllPaymentReceiptsSelected() && (
                             <div className="flex flex-col sm:flex-row gap-2">
                               <Button
                                 onClick={handleDeleteMultiplePaymentReceipts}
@@ -6725,1299 +6797,1299 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                                 Download ({selectedPaymentReceipts.length})
                               </Button>
                             </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                
-                    {loadingPaymentReceipts ? (
-                      <div className="text-center py-12">
-                        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mb-4">
-                          <Loader2 className="h-8 w-8 animate-spin text-white" />
-                      </div>
-                        <p className="text-white text-lg font-medium">Carregando comprovantes...</p>
-                        <p className="text-gray-400 text-sm">Aguarde um momento</p>
-                      </div>
-                    ) : getFilteredPaymentReceipts().length === 0 ? (
-                      <div className="text-center py-16 px-4">
-                        <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-3xl mb-6">
-                          <FileText size={40} className="text-blue-400" />
-                    </div>
-                        <h3 className="text-xl font-bold text-white mb-3">
-                          Nenhum comprovante encontrado
-                        </h3>
-                        <p className="text-gray-400 text-base mb-6">
-                          {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4
-                            ? `Nenhum comprovante encontrado para "${paymentReceiptSearchTerm}"`
-                            : `Não há comprovantes para ${getMonthName(parseInt(activeMonth))} de ${activeYear}`
-                          }
-                      </p>
-                      <Button
-                          onClick={() => setShowPaymentReceiptUploadModal(true)}
-                          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold"
-                        >
-                          <Plus size={20} className="mr-2" />
-                          Importar Primeiro Comprovante
-                      </Button>
-                    </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {getFilteredPaymentReceipts().map((receipt, index) => (
-                          <div key={receipt.id} className="bg-gray-700 p-3 rounded">
-                            <div className="flex items-start gap-3">
-                              <Checkbox
-                                id={`payment-receipt-${receipt.id}`}
-                                checked={selectedPaymentReceipts.includes(String(receipt.id))}
-                                onCheckedChange={(checked) => handleSelectPaymentReceipt(String(receipt.id), checked as boolean)}
-                                className="border-blue-400 mt-1"
-                              />
-                              <div className="flex-1">
-                                <p className="text-white font-medium">{receipt.employeeName}</p>
-                                <p className="text-gray-400 text-sm">CPF: {(receipt as any).cpf || 'Não informado'}</p>
-                                {receipt.creditedAccount && (
-                                  <p className="text-gray-300 text-sm">
-                                    Conta creditada: <span className="font-semibold">{receipt.creditedAccount}</span>
-                                  </p>
-                                )}
-                                <p className="text-gray-400 text-sm">Período: {receipt.month}/{receipt.year}</p>
-                                <p className="text-green-400 text-sm">Transferência: {formatDate(receipt.processedAt || receipt.updatedAt)}</p>
-                              </div>
-                            </div>
-                            
-                            {/* Botões de ação individual */}
-                            <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
-                              {/* Botão Ver - sempre disponível */}
-                              <Button
-                                size="sm"
-                                onClick={() => handleViewPaymentReceipt(receipt)}
-                                className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
-                              >
-                                <Eye size={14} className="mr-1" />
-                                Ver
-                              </Button>
-                              
-                              {/* Botão Download Individual */}
-                              <Button
-                                size="sm"
-                                onClick={() => handleDownloadPaymentReceipt(String(receipt.id), receipt.fileName)}
-                                className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
-                              >
-                                <Download size={14} className="mr-1" />
-                                Download
-                              </Button>
-                              
-                              {/* Botão Excluir */}
-                              <Button
-                                size="sm"
-                                onClick={() => handleDeletePaymentReceipt(String(receipt.id))}
-                                className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
-                              >
-                                <Trash2 size={14} className="mr-1" />
-                                Excluir
-                              </Button>
-                            </div>
-                          </div>
-                      ))}
-                    </div>
-                  )}
                   </div>
-              </Card>
+                )}
+
+                {loadingPaymentReceipts ? (
+                  <div className="text-center py-12">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mb-4">
+                      <Loader2 className="h-8 w-8 animate-spin text-white" />
+                    </div>
+                    <p className="text-white text-lg font-medium">Carregando comprovantes...</p>
+                    <p className="text-gray-400 text-sm">Aguarde um momento</p>
+                  </div>
+                ) : getFilteredPaymentReceipts().length === 0 ? (
+                  <div className="text-center py-16 px-4">
+                    <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-3xl mb-6">
+                      <FileText size={40} className="text-blue-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-3">
+                      Nenhum comprovante encontrado
+                    </h3>
+                    <p className="text-gray-400 text-base mb-6">
+                      {paymentReceiptSearchTerm && paymentReceiptSearchTerm.trim().length >= 4
+                        ? `Nenhum comprovante encontrado para "${paymentReceiptSearchTerm}"`
+                        : `Não há comprovantes para ${getMonthName(parseInt(activeMonth))} de ${activeYear}`
+                      }
+                    </p>
+                    <Button
+                      onClick={() => setShowPaymentReceiptUploadModal(true)}
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-semibold"
+                    >
+                      <Plus size={20} className="mr-2" />
+                      Importar Primeiro Comprovante
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {getFilteredPaymentReceipts().map((receipt, index) => (
+                      <div key={receipt.id} className="bg-gray-700 p-3 rounded">
+                        <div className="flex items-start gap-3">
+                          <Checkbox
+                            id={`payment-receipt-${receipt.id}`}
+                            checked={selectedPaymentReceipts.includes(String(receipt.id))}
+                            onCheckedChange={(checked) => handleSelectPaymentReceipt(String(receipt.id), checked as boolean)}
+                            className="border-blue-400 mt-1"
+                          />
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{receipt.employeeName}</p>
+                            <p className="text-gray-400 text-sm">CPF: {(receipt as any).cpf || 'Não informado'}</p>
+                            {receipt.creditedAccount && (
+                              <p className="text-gray-300 text-sm">
+                                Conta creditada: <span className="font-semibold">{receipt.creditedAccount}</span>
+                              </p>
+                            )}
+                            <p className="text-gray-400 text-sm">Período: {receipt.month}/{receipt.year}</p>
+                            <p className="text-green-400 text-sm">Transferência: {formatDate(receipt.processedAt || receipt.updatedAt)}</p>
+                          </div>
+                        </div>
+
+                        {/* Botões de ação individual */}
+                        <div className="mt-3 pt-3 border-t border-gray-600 flex flex-col sm:flex-row gap-2">
+                          {/* Botão Ver - sempre disponível */}
+                          <Button
+                            size="sm"
+                            onClick={() => handleViewPaymentReceipt(receipt)}
+                            className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            <Eye size={14} className="mr-1" />
+                            Ver
+                          </Button>
+
+                          {/* Botão Download Individual */}
+                          <Button
+                            size="sm"
+                            onClick={() => handleDownloadPaymentReceipt(String(receipt.id), receipt.fileName)}
+                            className="w-full sm:flex-1 bg-green-600 text-white hover:bg-green-700"
+                          >
+                            <Download size={14} className="mr-1" />
+                            Download
+                          </Button>
+
+                          {/* Botão Excluir */}
+                          <Button
+                            size="sm"
+                            onClick={() => handleDeletePaymentReceipt(String(receipt.id))}
+                            className="w-full sm:flex-1 bg-red-600 text-white hover:bg-red-700"
+                          >
+                            <Trash2 size={14} className="mr-1" />
+                            Excluir
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
           </TabsContent>
 
 
           {/* Nova Aba: Unificação Individual */}
           <TabsContent value="unificacao-individual" className="space-y-6 mt-6">
-              {/* Botões de Ação - SIMPLIFICADO */}
-              <div className="flex flex-col sm:flex-row justify-between gap-2 mb-4">
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => loadProcessedFiles()}
-                    variant="outline"
-                    className="border-blue-500 text-blue-500 hover:bg-blue-50"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Atualizar Listas
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        console.log('🧪 Testando conexão com o backend...');
-                        const response = await api.get('/unified-documents/test');
-                        console.log('✅ Backend respondendo:', response.data);
-                        toast({
-                          title: "✅ Backend OK",
-                          description: response.data.mensagem || "Conexão com o backend funcionando corretamente",
-                        });
-                      } catch (error: any) {
-                        console.error('❌ Erro de conexão:', error);
-                        toast({
-                          title: "❌ Erro de Conexão",
-                          description: `Não foi possível conectar ao backend: ${error.message}`,
-                          variant: "destructive"
-                        });
-                      }
-                    }}
-                    variant="outline"
-                    className="border-green-500 text-green-500 hover:bg-green-50"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Testar Backend
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        console.log('🔍 Analisando dados para debug...');
-                        const response = await api.get('/unified-documents/debug-data', {
-                          params: {
-                            month: batchUnificationMonth ? parseInt(batchUnificationMonth) : null,
-                            year: batchUnificationYear ? parseInt(batchUnificationYear) : null
-                          }
-                        });
-                        console.log('📊 Dados de debug:', response.data);
-                        
-                        const data = response.data;
-                        toast({
-                          title: "📊 Análise de Dados",
-                          description: `Holerites: ${data.totalHolerites}, Comprovantes: ${data.totalReceipts}, Nomes em comum: ${data.commonNamesCount}`,
-                        });
-                        
-                        // Mostrar detalhes no console
-                        console.log('📋 Nomes únicos em holerites:', data.payslipNames);
-                        console.log('📋 Nomes únicos em comprovantes:', data.receiptNames);
-                        console.log('📋 Nomes em comum:', data.commonNames);
-                        
-                      } catch (error: any) {
-                        console.error('❌ Erro na análise:', error);
-                        toast({
-                          title: "❌ Erro na Análise",
-                          description: `Erro ao analisar dados: ${error.message}`,
-                          variant: "destructive"
-                        });
-                      }
-                    }}
-                    variant="outline"
-                    className="border-purple-500 text-purple-500 hover:bg-purple-50"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Analisar Dados
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      try {
-                        console.log('🧪 Testando criação de documento unificado com dados existentes...');
-                        const response = await api.post('/unified-documents/test-create');
-                        console.log('✅ Resposta do teste:', response.data);
-                        
-                        if (response.data.sucesso) {
-                          toast({
-                            title: "✅ Teste de Criação",
-                            description: `${response.data.mensagem} - Funcionário: ${response.data.employeeName} (${response.data.month}/${response.data.year})`,
-                          });
-                        } else {
-                          // Verificar se é erro de comprovante não encontrado
-                          if (response.data.tipoErro === 'COMPROVANTE_NAO_ENCONTRADO') {
-                            toast({
-                              title: "📄 Comprovante Não Encontrado",
-                              description: (
-                                <div className="space-y-2">
-                                  <div className="font-semibold">Funcionário: {response.data.funcionario}</div>
-                                  <div className="text-sm space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-green-400">✓</span>
-                                      <span>Holerite: {response.data.periodoHolerite} (já importado)</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-red-400">✗</span>
-                                      <span>Comprovante: {response.data.periodoComprovante} (não encontrado)</span>
-                                    </div>
-                                  </div>
-                                  <div className="pt-2 border-t border-gray-600">
-                                    <div className="font-medium text-yellow-400 mb-1">📥 Ação Necessária:</div>
-                                    <div className="text-sm">
-                                      Importe apenas o comprovante de pagamento para o funcionário <strong>{response.data.funcionario}</strong> referente ao período <strong>{response.data.periodoComprovante}</strong>.
-                                    </div>
-                                  </div>
-                                </div>
-                              ),
-                              variant: "destructive",
-                              duration: 12000
-                            });
-                          } else {
-                            toast({
-                              title: "⚠️ Teste de Criação",
-                              description: response.data.mensagem + (response.data.sugestao ? ` - ${response.data.sugestao}` : ''),
-                              variant: "destructive"
-                            });
-                          }
+            {/* Botões de Ação - SIMPLIFICADO */}
+            <div className="flex flex-col sm:flex-row justify-between gap-2 mb-4">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => loadProcessedFiles()}
+                  variant="outline"
+                  className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Atualizar Listas
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      console.log('🧪 Testando conexão com o backend...');
+                      const response = await api.get('/unified-documents/test');
+                      console.log('✅ Backend respondendo:', response.data);
+                      toast({
+                        title: "✅ Backend OK",
+                        description: response.data.mensagem || "Conexão com o backend funcionando corretamente",
+                      });
+                    } catch (error: any) {
+                      console.error('❌ Erro de conexão:', error);
+                      toast({
+                        title: "❌ Erro de Conexão",
+                        description: `Não foi possível conectar ao backend: ${error.message}`,
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  variant="outline"
+                  className="border-green-500 text-green-500 hover:bg-green-50"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Testar Backend
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      console.log('🔍 Analisando dados para debug...');
+                      const response = await api.get('/unified-documents/debug-data', {
+                        params: {
+                          month: batchUnificationMonth ? parseInt(batchUnificationMonth) : null,
+                          year: batchUnificationYear ? parseInt(batchUnificationYear) : null
                         }
-                      } catch (error: any) {
-                        console.error('❌ Erro no teste de criação:', error);
-                        
+                      });
+                      console.log('📊 Dados de debug:', response.data);
+
+                      const data = response.data;
+                      toast({
+                        title: "📊 Análise de Dados",
+                        description: `Holerites: ${data.totalHolerites}, Comprovantes: ${data.totalReceipts}, Nomes em comum: ${data.commonNamesCount}`,
+                      });
+
+                      // Mostrar detalhes no console
+                      console.log('📋 Nomes únicos em holerites:', data.payslipNames);
+                      console.log('📋 Nomes únicos em comprovantes:', data.receiptNames);
+                      console.log('📋 Nomes em comum:', data.commonNames);
+
+                    } catch (error: any) {
+                      console.error('❌ Erro na análise:', error);
+                      toast({
+                        title: "❌ Erro na Análise",
+                        description: `Erro ao analisar dados: ${error.message}`,
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  variant="outline"
+                  className="border-purple-500 text-purple-500 hover:bg-purple-50"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Analisar Dados
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      console.log('🧪 Testando criação de documento unificado com dados existentes...');
+                      const response = await api.post('/unified-documents/test-create');
+                      console.log('✅ Resposta do teste:', response.data);
+
+                      if (response.data.sucesso) {
+                        toast({
+                          title: "✅ Teste de Criação",
+                          description: `${response.data.mensagem} - Funcionário: ${response.data.employeeName} (${response.data.month}/${response.data.year})`,
+                        });
+                      } else {
                         // Verificar se é erro de comprovante não encontrado
-                        const errorData = error?.response?.data;
-                        if (errorData?.tipoErro === 'COMPROVANTE_NAO_ENCONTRADO') {
+                        if (response.data.tipoErro === 'COMPROVANTE_NAO_ENCONTRADO') {
                           toast({
                             title: "📄 Comprovante Não Encontrado",
                             description: (
                               <div className="space-y-2">
-                                <div className="font-semibold">Funcionário: {errorData.funcionario}</div>
-                                <div className="text-sm">
-                                  <div>📋 Holerite: {errorData.periodoHolerite} ✓</div>
-                                  <div className="text-red-400">❌ Comprovante: {errorData.periodoComprovante} (faltando)</div>
+                                <div className="font-semibold">Funcionário: {response.data.funcionario}</div>
+                                <div className="text-sm space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-green-400">✓</span>
+                                    <span>Holerite: {response.data.periodoHolerite} (já importado)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-red-400">✗</span>
+                                    <span>Comprovante: {response.data.periodoComprovante} (não encontrado)</span>
+                                  </div>
                                 </div>
                                 <div className="pt-2 border-t border-gray-600">
-                                  <div className="font-medium text-yellow-400">Ação Necessária:</div>
-                                  <div className="text-sm mt-1">
-                                    Por favor, importe apenas o comprovante de pagamento para o período {errorData.periodoComprovante}.
+                                  <div className="font-medium text-yellow-400 mb-1">📥 Ação Necessária:</div>
+                                  <div className="text-sm">
+                                    Importe apenas o comprovante de pagamento para o funcionário <strong>{response.data.funcionario}</strong> referente ao período <strong>{response.data.periodoComprovante}</strong>.
                                   </div>
                                 </div>
                               </div>
                             ),
                             variant: "destructive",
-                            duration: 10000
+                            duration: 12000
                           });
                         } else {
                           toast({
-                            title: "❌ Erro no Teste",
-                            description: errorData?.mensagem || error?.message || "Erro ao testar criação",
+                            title: "⚠️ Teste de Criação",
+                            description: response.data.mensagem + (response.data.sugestao ? ` - ${response.data.sugestao}` : ''),
                             variant: "destructive"
                           });
                         }
                       }
-                    }}
-                    variant="outline"
-                    className="border-orange-500 text-orange-500 hover:bg-orange-50"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Testar Criação
-                  </Button>
-                </div>
-                <Button
-                  onClick={() => setShowBatchUnificationModal(true)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                    } catch (error: any) {
+                      console.error('❌ Erro no teste de criação:', error);
+
+                      // Verificar se é erro de comprovante não encontrado
+                      const errorData = error?.response?.data;
+                      if (errorData?.tipoErro === 'COMPROVANTE_NAO_ENCONTRADO') {
+                        toast({
+                          title: "📄 Comprovante Não Encontrado",
+                          description: (
+                            <div className="space-y-2">
+                              <div className="font-semibold">Funcionário: {errorData.funcionario}</div>
+                              <div className="text-sm">
+                                <div>📋 Holerite: {errorData.periodoHolerite} ✓</div>
+                                <div className="text-red-400">❌ Comprovante: {errorData.periodoComprovante} (faltando)</div>
+                              </div>
+                              <div className="pt-2 border-t border-gray-600">
+                                <div className="font-medium text-yellow-400">Ação Necessária:</div>
+                                <div className="text-sm mt-1">
+                                  Por favor, importe apenas o comprovante de pagamento para o período {errorData.periodoComprovante}.
+                                </div>
+                              </div>
+                            </div>
+                          ),
+                          variant: "destructive",
+                          duration: 10000
+                        });
+                      } else {
+                        toast({
+                          title: "❌ Erro no Teste",
+                          description: errorData?.mensagem || error?.message || "Erro ao testar criação",
+                          variant: "destructive"
+                        });
+                      }
+                    }
+                  }}
+                  variant="outline"
+                  className="border-orange-500 text-orange-500 hover:bg-orange-50"
                 >
-                  <FileText className="mr-2 h-4 w-4" />
-                  🎯 Unificação em Lote/Massa
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Testar Criação
                 </Button>
               </div>
-
-              {/* Informações de Debug */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <h4 className="text-sm font-semibold text-blue-800 mb-2">Informações de Debug:</h4>
-                  <div className="grid grid-cols-2 gap-4 text-xs text-blue-700">
-                      <div>
-                          <strong>Holerites:</strong> {holerites.length} carregados, {processedHolerites.length} processados
-                      </div>
-                      <div>
-                          <strong>Recibos:</strong> {receipts.length} carregados, {processedRecibos.length} processados
-                      </div>
-                  </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Lista de Holerites Processados - PADRÃO SST */}
-                  <Card className="bg-seguranca-graphite border-gray-600">
-                      <CardHeader>
-                          <CardTitle className="flex items-center justify-between text-seguranca-lightgray">
-                              <div className="flex items-center gap-2">
-                                  <FileText className="h-5 w-5 text-seguranca-yellow" />
-                                  <span className="text-base md:text-lg">Holerites</span>
-                              </div>
-                              <Badge variant="secondary" className="bg-seguranca-black text-seguranca-yellow">
-                                  {getFilteredHolerites().length}
-                              </Badge>
-                          </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                          {/* Busca */}
-                              <Input
-                              placeholder="Buscar..."
-                                  value={holeriteSearchTerm}
-                                  onChange={(e) => setHoleriteSearchTerm(e.target.value)}
-                              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                          />
-
-                          {/* Lista */}
-                          <div className="space-y-2 max-h-96 overflow-y-auto">
-                              {loadingProcessedFiles ? (
-                                  <div className="flex items-center justify-center py-6">
-                                      <Loader2 className="h-5 w-5 animate-spin text-seguranca-yellow" />
-                                  </div>
-                              ) : getFilteredHolerites().length === 0 ? (
-                                  <div className="text-center py-6 text-gray-400">
-                                      <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                                      <p className="text-sm">Nenhum holerite</p>
-                                  </div>
-                              ) : (
-                                  getFilteredHolerites().map((holerite) => (
-                                      <div
-                                          key={holerite.id}
-                                          draggable
-                                          onDragStart={(e) => handleDragStart(e, holerite, 'holerite')}
-                                          className="p-3 bg-seguranca-black border border-gray-600 rounded-lg cursor-move hover:border-seguranca-yellow transition-colors"
-                                      >
-                                          <div className="flex items-center gap-2">
-                                              <GripVertical className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                              <div className="flex-1 min-w-0">
-                                                  <p className="text-white text-sm font-medium truncate">
-                                                      {holerite.employeeName || 'Nome não disponível'}
-                                                  </p>
-                                                  <div className="flex items-center gap-2 mt-1">
-                                                      <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
-                                                          {holerite.month}/{holerite.year}
-                                                      </Badge>
-                                                  </div>
-                                              </div>
-                                              <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      // Converter para o formato esperado pelo modal
-                                                      const holeriteId = holerite.id.replace('hol-', '') || holerite.name || String(Math.random());
-                                                      const holeriteFormatted: Holerite = {
-                                                          id: holeriteId,
-                                                          employeeName: holerite.employeeName || '',
-                                                          cpf: holerite.cpf || '',
-                                                          month: parseInt(holerite.month) || 0,
-                                                          year: parseInt(holerite.year) || 0,
-                                                          fileName: holerite.name || '',
-                                                          status: 'PROCESSED',
-                                                          processedAt: new Date().toISOString(),
-                                                          companyName: '',
-                                                          workPostName: ''
-                                                      };
-                                                      setSelectedHolerite(holeriteFormatted);
-                                                      setShowViewModal(true);
-                                                  }}
-                                                  className="h-8 w-8 p-0 text-seguranca-yellow hover:text-seguranca-yellow hover:bg-seguranca-yellow/10 flex-shrink-0"
-                                                  title="Visualizar Holerite"
-                                              >
-                                                  <FileText size={16} />
-                                              </Button>
-                                          </div>
-                                      </div>
-                                  ))
-                              )}
-                          </div>
-                      </CardContent>
-                  </Card>
-
-                  {/* Lista de Comprovantes Processados - PADRÃO SST */}
-                  <Card className="bg-seguranca-graphite border-gray-600">
-                      <CardHeader>
-                          <CardTitle className="flex items-center justify-between text-seguranca-lightgray">
-                              <div className="flex items-center gap-2">
-                                  <Receipt className="h-5 w-5 text-green-500" />
-                                  <span className="text-base md:text-lg">Comprovantes</span>
-                              </div>
-                              <Badge variant="secondary" className="bg-seguranca-black text-green-400">
-                                  {getFilteredRecibos().length}
-                              </Badge>
-                          </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                          {/* Busca */}
-                              <Input
-                              placeholder="Buscar..."
-                                  value={reciboSearchTerm}
-                                  onChange={(e) => setReciboSearchTerm(e.target.value)}
-                              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                          />
-
-                          {/* Lista */}
-                          <div className="space-y-2 max-h-96 overflow-y-auto">
-                              {loadingProcessedFiles ? (
-                                  <div className="flex items-center justify-center py-6">
-                                      <Loader2 className="h-5 w-5 animate-spin text-green-500" />
-                                  </div>
-                              ) : getFilteredRecibos().length === 0 ? (
-                                  <div className="text-center py-6 text-gray-400">
-                                      <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                                      <p className="text-sm">Nenhum comprovante</p>
-                                  </div>
-                              ) : (
-                                  getFilteredRecibos().map((recibo) => (
-                                      <div
-                                          key={recibo.id}
-                                          draggable
-                                          onDragStart={(e) => handleDragStart(e, recibo, 'recibo')}
-                                          className="p-3 bg-seguranca-black border border-gray-600 rounded-lg cursor-move hover:border-green-500 transition-colors"
-                                      >
-                                          <div className="flex items-center gap-2">
-                                              <GripVertical className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                              <div className="flex-1 min-w-0">
-                                                  <p className="text-white text-sm font-medium truncate">
-                                                      {recibo.employeeName || 'Nome não disponível'}
-                                                  </p>
-                                                  <div className="flex items-center gap-2 mt-1">
-                                                      <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
-                                                          {recibo.month}/{recibo.year}
-                                                      </Badge>
-                                                  </div>
-                                              </div>
-                                              <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      // Converter para o formato esperado pelo modal
-                                                      const receiptId = recibo.id.replace('rec-', '') || recibo.name || String(Math.random());
-                                                      const now = new Date().toISOString();
-                                                      const receiptFormatted: PaymentReceipt = {
-                                                          id: receiptId,
-                                                          employeeName: recibo.employeeName || '',
-                                                          month: parseInt(recibo.month) || 0,
-                                                          year: parseInt(recibo.year) || 0,
-                                                          fileName: recibo.name || '',
-                                                          processedAt: now,
-                                                          updatedAt: now,
-                                                          createdAt: now,
-                                                          status: 'PROCESSED'
-                                                      };
-                                                      handleViewPaymentReceipt(receiptFormatted);
-                                                  }}
-                                                  className="h-8 w-8 p-0 text-green-400 hover:text-green-400 hover:bg-green-500/10 flex-shrink-0"
-                                                  title="Visualizar Comprovante"
-                                              >
-                                                  <Receipt size={16} />
-                                              </Button>
-                                          </div>
-                                      </div>
-                                  ))
-                              )}
-                          </div>
-                      </CardContent>
-                  </Card>
-              </div>
-
-              {/* Ãrea de Unificação */}
-              <Card 
-                  className="border-2 border-dashed border-yellow-300 bg-yellow-50/30 transition-all duration-200 hover:border-yellow-400 hover:bg-yellow-50/50"
-                  onDrop={(e) => handleDrop(e, 'unificacao')}
-                  onDragOver={handleDragOver}
+              <Button
+                onClick={() => setShowBatchUnificationModal(true)}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
               >
-                  <CardHeader>
-                      <CardTitle className="flex items-center text-lg text-yellow-800">
-                          <FileText className="w-5 h-5 mr-2" />
-                          Ãrea de Unificação Individual
+                <FileText className="mr-2 h-4 w-4" />
+                🎯 Unificação em Lote/Massa
+              </Button>
+            </div>
+
+            {/* Informações de Debug */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h4 className="text-sm font-semibold text-blue-800 mb-2">Informações de Debug:</h4>
+              <div className="grid grid-cols-2 gap-4 text-xs text-blue-700">
+                <div>
+                  <strong>Holerites:</strong> {holerites.length} carregados, {processedHolerites.length} processados
+                </div>
+                <div>
+                  <strong>Recibos:</strong> {receipts.length} carregados, {processedRecibos.length} processados
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Lista de Holerites Processados - PADRÃO SST */}
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-seguranca-lightgray">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-seguranca-yellow" />
+                      <span className="text-base md:text-lg">Holerites</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-seguranca-black text-seguranca-yellow">
+                      {getFilteredHolerites().length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Busca */}
+                  <Input
+                    placeholder="Buscar..."
+                    value={holeriteSearchTerm}
+                    onChange={(e) => setHoleriteSearchTerm(e.target.value)}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  />
+
+                  {/* Lista */}
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {loadingProcessedFiles ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-seguranca-yellow" />
+                      </div>
+                    ) : getFilteredHolerites().length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Nenhum holerite</p>
+                      </div>
+                    ) : (
+                      getFilteredHolerites().map((holerite) => (
+                        <div
+                          key={holerite.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, holerite, 'holerite')}
+                          className="p-3 bg-seguranca-black border border-gray-600 rounded-lg cursor-move hover:border-seguranca-yellow transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <GripVertical className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-sm font-medium truncate">
+                                {holerite.employeeName || 'Nome não disponível'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
+                                  {holerite.month}/{holerite.year}
+                                </Badge>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Converter para o formato esperado pelo modal
+                                const holeriteId = holerite.id.replace('hol-', '') || holerite.name || String(Math.random());
+                                const holeriteFormatted: Holerite = {
+                                  id: holeriteId,
+                                  employeeName: holerite.employeeName || '',
+                                  cpf: holerite.cpf || '',
+                                  month: parseInt(holerite.month) || 0,
+                                  year: parseInt(holerite.year) || 0,
+                                  fileName: holerite.name || '',
+                                  status: 'PROCESSED',
+                                  processedAt: new Date().toISOString(),
+                                  companyName: '',
+                                  workPostName: ''
+                                };
+                                setSelectedHolerite(holeriteFormatted);
+                                setShowViewModal(true);
+                              }}
+                              className="h-8 w-8 p-0 text-seguranca-yellow hover:text-seguranca-yellow hover:bg-seguranca-yellow/10 flex-shrink-0"
+                              title="Visualizar Holerite"
+                            >
+                              <FileText size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Lista de Comprovantes Processados - PADRÃO SST */}
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-seguranca-lightgray">
+                    <div className="flex items-center gap-2">
+                      <Receipt className="h-5 w-5 text-green-500" />
+                      <span className="text-base md:text-lg">Comprovantes</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-seguranca-black text-green-400">
+                      {getFilteredRecibos().length}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* Busca */}
+                  <Input
+                    placeholder="Buscar..."
+                    value={reciboSearchTerm}
+                    onChange={(e) => setReciboSearchTerm(e.target.value)}
+                    className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  />
+
+                  {/* Lista */}
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {loadingProcessedFiles ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-green-500" />
+                      </div>
+                    ) : getFilteredRecibos().length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Nenhum comprovante</p>
+                      </div>
+                    ) : (
+                      getFilteredRecibos().map((recibo) => (
+                        <div
+                          key={recibo.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, recibo, 'recibo')}
+                          className="p-3 bg-seguranca-black border border-gray-600 rounded-lg cursor-move hover:border-green-500 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <GripVertical className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white text-sm font-medium truncate">
+                                {recibo.employeeName || 'Nome não disponível'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs bg-seguranca-graphite border-gray-600 text-gray-300">
+                                  {recibo.month}/{recibo.year}
+                                </Badge>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Converter para o formato esperado pelo modal
+                                const receiptId = recibo.id.replace('rec-', '') || recibo.name || String(Math.random());
+                                const now = new Date().toISOString();
+                                const receiptFormatted: PaymentReceipt = {
+                                  id: receiptId,
+                                  employeeName: recibo.employeeName || '',
+                                  month: parseInt(recibo.month) || 0,
+                                  year: parseInt(recibo.year) || 0,
+                                  fileName: recibo.name || '',
+                                  processedAt: now,
+                                  updatedAt: now,
+                                  createdAt: now,
+                                  status: 'PROCESSED'
+                                };
+                                handleViewPaymentReceipt(receiptFormatted);
+                              }}
+                              className="h-8 w-8 p-0 text-green-400 hover:text-green-400 hover:bg-green-500/10 flex-shrink-0"
+                              title="Visualizar Comprovante"
+                            >
+                              <Receipt size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Ãrea de Unificação */}
+            <Card
+              className="border-2 border-dashed border-yellow-300 bg-yellow-50/30 transition-all duration-200 hover:border-yellow-400 hover:bg-yellow-50/50"
+              onDrop={(e) => handleDrop(e, 'unificacao')}
+              onDragOver={handleDragOver}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center text-lg text-yellow-800">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Ãrea de Unificação Individual
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!draggedHolerite && !draggedRecibo ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 rounded-full flex items-center justify-center">
+                      <FileText className="w-8 h-8 text-yellow-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+                      Arraste um Holerite e um Recibo
+                    </h3>
+                    <p className="text-yellow-700">
+                      Arraste um holerite da lista esquerda e um recibo da lista direita para criar um documento unificado
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Holerite selecionado */}
+                      {draggedHolerite && (
+                        <div className="p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-yellow-800">Holerite Selecionado</h4>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDraggedHolerite(null)}
+                              className="border-yellow-400 text-yellow-700 hover:bg-yellow-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <p className="text-sm text-yellow-700 truncate">
+                            {draggedHolerite.employeeName || 'Nome não disponível'}
+                          </p>
+                          <p className="text-xs text-yellow-600 truncate">
+                            {draggedHolerite.name}
+                          </p>
+                          <Badge variant="outline" className="mt-2 text-xs border-yellow-400 text-yellow-700">
+                            {draggedHolerite.month}/{draggedHolerite.year}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Recibo selecionado */}
+                      {draggedRecibo && (
+                        <div className="p-4 bg-green-100 border border-green-300 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-green-800">Recibo Selecionado</h4>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDraggedRecibo(null)}
+                              className="border-green-400 text-green-700 hover:bg-green-200"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <p className="text-sm text-green-700 truncate">
+                            {draggedRecibo.employeeName || 'Nome não disponível'}
+                          </p>
+                          <p className="text-xs text-green-600 truncate">
+                            {draggedRecibo.name}
+                          </p>
+                          <Badge variant="outline" className="mt-2 text-xs border-green-400 text-green-700">
+                            {draggedRecibo.month}/{draggedRecibo.year}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BotÃ£o de unificação */}
+                    {draggedHolerite && draggedRecibo && (
+                      <div className="text-center">
+                        <Button
+                          onClick={() => createUnification(draggedHolerite, draggedRecibo)}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Unificar Documentos
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Documentos Unificados Organizados por Empresa/Setor/Período */}
+            <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-xl">
+                        Documentos Unificados
                       </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                      {!draggedHolerite && !draggedRecibo ? (
-                          <div className="text-center py-12">
-                              <div className="w-16 h-16 mx-auto mb-4 bg-yellow-100 rounded-full flex items-center justify-center">
-                                  <FileText className="w-8 h-8 text-yellow-600" />
-                              </div>
-                              <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-                                  Arraste um Holerite e um Recibo
-                              </h3>
-                              <p className="text-yellow-700">
-                                  Arraste um holerite da lista esquerda e um recibo da lista direita para criar um documento unificado
-                              </p>
-                          </div>
+                      <p className="text-gray-400 text-sm mt-1">
+                        Documentos organizados por Empresa/Setor/Período
+                      </p>
+                      <p className="text-yellow-400/70 text-xs mt-1">
+                        ⚡ Otimizado: máximo de 2000 documentos para melhor performance
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        console.log('🔄 Recarregando documentos unificados e organização...');
+                        await fetchUnifiedDocuments(true);
+                        await loadUnifiedOrganization();
+                      }}
+                      disabled={loadingUnifiedDocuments || loadingUnifiedOrganization}
+                      className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50"
+                    >
+                      {loadingUnifiedDocuments || loadingUnifiedOrganization ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Atualizando
+                        </>
                       ) : (
-                          <div className="space-y-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {/* Holerite selecionado */}
-                                  {draggedHolerite && (
-                                      <div className="p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
-                                          <div className="flex items-center justify-between mb-2">
-                                              <h4 className="font-semibold text-yellow-800">Holerite Selecionado</h4>
-                                                  <Button
-                                                      size="sm"
-                                                  variant="outline"
-                                                      onClick={() => setDraggedHolerite(null)}
-                                                  className="border-yellow-400 text-yellow-700 hover:bg-yellow-200"
-                                                  >
-                                                      <X className="w-4 h-4" />
-                                                  </Button>
-                                              </div>
-                                          <p className="text-sm text-yellow-700 truncate">
-                                              {draggedHolerite.employeeName || 'Nome não disponível'}
-                                          </p>
-                                          <p className="text-xs text-yellow-600 truncate">
-                                              {draggedHolerite.name}
-                                          </p>
-                                          <Badge variant="outline" className="mt-2 text-xs border-yellow-400 text-yellow-700">
-                                              {draggedHolerite.month}/{draggedHolerite.year}
-                                          </Badge>
-                                      </div>
-                                  )}
-
-                                  {/* Recibo selecionado */}
-                                  {draggedRecibo && (
-                                      <div className="p-4 bg-green-100 border border-green-300 rounded-lg">
-                                          <div className="flex items-center justify-between mb-2">
-                                                      <h4 className="font-semibold text-green-800">Recibo Selecionado</h4>
-                                                  <Button
-                                                      size="sm"
-                                                  variant="outline"
-                                                      onClick={() => setDraggedRecibo(null)}
-                                                  className="border-green-400 text-green-700 hover:bg-green-200"
-                                                  >
-                                                      <X className="w-4 h-4" />
-                                                  </Button>
-                                              </div>
-                                          <p className="text-sm text-green-700 truncate">
-                                              {draggedRecibo.employeeName || 'Nome não disponível'}
-                                          </p>
-                                          <p className="text-xs text-green-600 truncate">
-                                              {draggedRecibo.name}
-                                          </p>
-                                          <Badge variant="outline" className="mt-2 text-xs border-green-400 text-green-700">
-                                              {draggedRecibo.month}/{draggedRecibo.year}
-                                          </Badge>
-                                      </div>
-                                  )}
-                              </div>
-
-                              {/* BotÃ£o de unificação */}
-                              {draggedHolerite && draggedRecibo && (
-                                  <div className="text-center">
-                                      <Button
-                                          onClick={() => createUnification(draggedHolerite, draggedRecibo)}
-                                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
-                                      >
-                                          <FileText className="mr-2 h-4 w-4" />
-                                          Unificar Documentos
-                                      </Button>
-                                  </div>
-                              )}
-                          </div>
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Recarregar Lista
+                        </>
                       )}
-                  </CardContent>
-              </Card>
-
-              {/* Documentos Unificados Organizados por Empresa/Setor/Período */}
-              <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
-                  <CardHeader className="pb-4">
-                      <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
-                                  <FileText className="w-5 h-5 text-white" />
-                              </div>
-                              <div>
-                                  <CardTitle className="text-white text-xl">
-                                      Documentos Unificados
-                                  </CardTitle>
-                                  <p className="text-gray-400 text-sm mt-1">
-                                      Documentos organizados por Empresa/Setor/Período
-                                  </p>
-                                  <p className="text-yellow-400/70 text-xs mt-1">
-                                      ⚡ Otimizado: máximo de 2000 documentos para melhor performance
-                                  </p>
-                              </div>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                              <Button
-                                  variant="outline"
-                                  onClick={async () => {
-                                    console.log('🔄 Recarregando documentos unificados e organização...');
-                                    await fetchUnifiedDocuments(true);
-                                    await loadUnifiedOrganization();
-                                  }}
-                                  disabled={loadingUnifiedDocuments || loadingUnifiedOrganization}
-                                  className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50"
-                              >
-                                  {loadingUnifiedDocuments || loadingUnifiedOrganization ? (
-                                      <>
-                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                          Atualizando
-                                      </>
-                                  ) : (
-                                      <>
-                                          <RefreshCw className="h-4 w-4 mr-2" />
-                                          Recarregar Lista
-                                      </>
-                                  )}
-                              </Button>
-                              <Button
-                                  variant="outline"
-                                  onClick={loadUnifiedOrganization}
-                                  disabled={loadingUnifiedOrganization}
-                                  className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50"
-                              >
-                                  {loadingUnifiedOrganization ? (
-                                      <>
-                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                          Atualizando
-                                      </>
-                                  ) : (
-                                      <>
-                                          <RefreshCw className="h-4 w-4 mr-2" />
-                                          Recarregar Organização
-                                      </>
-                                  )}
-                              </Button>
-                              <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1">
-                                  {unifiedDocuments?.length || 0} documento(s) | {unifiedOrganizationData?.totalPayslips || 0} organizado(s)
-                              </Badge>
-                          </div>
-                      </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                      {/* Barra de Pesquisa */}
-                      <div className="mb-4">
-                          <div className="relative">
-                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <Input
-                                  placeholder="Buscar por nome do funcionário, empresa ou período (mínimo 4 caracteres)..."
-                                  value={unifiedSearchTerm}
-                                  onChange={(e) => setUnifiedSearchTerm(e.target.value)}
-                                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray pl-10 pr-4 py-2"
-                              />
-                          </div>
-                          {unifiedSearchTerm && unifiedSearchTerm.trim().length > 0 && unifiedSearchTerm.trim().length < 4 && (
-                              <p className="text-sm text-gray-400 mt-2 ml-1">
-                                  Digite no mínimo 4 caracteres para iniciar a busca.
-                              </p>
-                          )}
-                          {unifiedSearchTerm && unifiedSearchTerm.trim().length >= 4 && (
-                              <p className="text-sm text-gray-400 mt-2 ml-1">
-                                  Buscando por: <span className="font-semibold">{unifiedSearchTerm}</span>
-                              </p>
-                          )}
-                      </div>
-
-                      {unifiedOrganizationError && (
-                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border border-red-500/30 bg-red-500/10 text-red-100 px-4 py-4 rounded-2xl">
-                              <div className="flex items-center gap-2 text-red-200">
-                                  <AlertTriangle className="h-5 w-5" />
-                                  <p className="text-sm font-semibold">Não foi possível carregar a organização</p>
-                              </div>
-                              <p className="text-sm">{unifiedOrganizationError}</p>
-                          </div>
-                      )}
-
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={loadUnifiedOrganization}
+                      disabled={loadingUnifiedOrganization}
+                      className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50"
+                    >
                       {loadingUnifiedOrganization ? (
-                          <div className="flex items-center justify-center py-16">
-                              <Loader2 className="h-10 w-10 animate-spin text-purple-400" />
-                          </div>
-                      ) : !unifiedOrganizationData?.companies?.length ? (
-                          <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
-                              Nenhum documento unificado encontrado. Crie documentos unificados para visualizar a organização.
-                          </div>
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Atualizando
+                        </>
                       ) : (
-                          <div className="space-y-4">
-                              {getFilteredUnifiedOrganizationData().companies.map(company => {
-                                  const companyKey = getUnifiedCompanyKey(company);
-                                  const companyExpanded = !!expandedUnifiedCompanies[companyKey];
-                                  const companyIndices = collectUnifiedCompanyDocumentIndices(company);
-                                  const companySelectedIndices = getSelectedUnifiedIndices(companyIndices);
-                                  const companySelectedCount = companySelectedIndices.length;
-                                  const companyCheckboxState: boolean | 'indeterminate' = companyIndices.length === 0
-                                    ? false
-                                    : areUnifiedIndicesFullySelected(companyIndices)
-                                      ? true
-                                      : companySelectedCount > 0
-                                        ? 'indeterminate'
-                                        : false;
-
-                                  return (
-                                      <div
-                                          key={companyKey}
-                                          className="rounded-2xl border border-gray-700/60 bg-gray-900/60 backdrop-blur-sm overflow-hidden shadow-[0_30px_60px_-50px_rgba(0,0,0,0.9)]"
-                                      >
-                                          <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 sm:py-6">
-                                              {/* Cabeçalho da empresa */}
-                                              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                                                  <div className="space-y-2 flex-1">
-                                                      <div className="flex flex-wrap items-center gap-3">
-                                                          <Badge className="bg-seguranca-black/60 text-seguranca-yellow border border-yellow-500/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-                                                              {company.companySigla}
-                                                          </Badge>
-                                                          <p className="text-lg font-semibold text-white leading-tight">
-                                                              {company.companyName}
-                                                          </p>
-                                                      </div>
-                                                      <p className="text-xs sm:text-sm text-gray-400 flex flex-wrap items-center gap-2">
-                                                          <Building2 className="h-4 w-4 text-seguranca-yellow" />
-                                                          CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} documento(s) · {company.sectors.length} setor(es)
-                                                      </p>
-                                                  </div>
-                                                  
-                                                  {/* Área de ações da empresa - sempre visível */}
-                                                  <div className="flex flex-col gap-3 w-full lg:w-auto">
-                                                      {/* Primeira linha: Checkbox e botão Ver setores */}
-                                                      <div className="flex flex-wrap items-center gap-3">
-                                                      <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
-                                                          <Checkbox
-                                                              checked={companyCheckboxState}
-                                                              onCheckedChange={(checked) => handleSelectUnifiedDocuments(companyIndices, checked === true)}
-                                                              className="border-blue-400"
-                                                          />
-                                                          <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
-                                                      </div>
-                                                          <Button
-                                                              variant="ghost"
-                                                              size="sm"
-                                                              onClick={() => toggleUnifiedCompanyExpansion(companyKey)}
-                                                              className="text-seguranca-lightgray hover:text-white"
-                                                          >
-                                                              {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                              {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
-                                                          </Button>
-                                                      </div>
-                                                      
-                                                      {/* Segunda linha: Botões de ação sempre visíveis */}
-                                                      <div className="flex flex-wrap gap-2 items-center">
-                                                          {/* Botões sempre visíveis para empresa */}
-                                                          <Button
-                                                              variant="outline"
-                                                              size="sm"
-                                                              onClick={() => handleDownloadByCompany(company.companyName || company.companyCnpj || '')}
-                                                              className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
-                                                              disabled={loading || companyIndices.length === 0}
-                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos da empresa'}
-                                                          >
-                                                              <Download className="h-4 w-4 mr-2" />
-                                                              <span className="whitespace-nowrap">Download Lote</span>
-                                                          </Button>
-                                                          <Button
-                                                              variant="outline"
-                                                              size="sm"
-                                                              onClick={() => {
-                                                                  if (companyIndices.length > 0) {
-                                                                      handleSendDocumentsIndividually('whatsapp', companyIndices);
-                                                                  }
-                                                              }}
-                                                              className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
-                                                              disabled={companyIndices.length === 0 || sendingDocuments}
-                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos da empresa individualmente por WhatsApp'}
-                                                          >
-                                                              <MessageSquare className="h-4 w-4 mr-2" />
-                                                              <span className="whitespace-nowrap">Enviar Individual</span>
-                                                          </Button>
-                                                          <Button
-                                                              variant="outline"
-                                                              size="sm"
-                                                              onClick={() => {
-                                                                  if (companyIndices.length > 0) {
-                                                                      handleSendDocumentsIndividually('email', companyIndices);
-                                                                  }
-                                                              }}
-                                                              className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
-                                                              disabled={companyIndices.length === 0 || sendingDocuments}
-                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos da empresa individualmente por Email'}
-                                                          >
-                                                              <Mail className="h-4 w-4 mr-2" />
-                                                              <span className="whitespace-nowrap">Enviar Individual</span>
-                                                          </Button>
-                                                          <Button
-                                                              variant="outline"
-                                                              size="sm"
-                                                              onClick={() => {
-                                                                  if (companyIndices.length > 0) {
-                                                                      setSelectedUnifiedDocuments(new Set(companyIndices));
-                                                                      handleDeleteDocuments('batch');
-                                                                  }
-                                                              }}
-                                                              className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
-                                                              disabled={companyIndices.length === 0}
-                                                              title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos da empresa'}
-                                                          >
-                                                              <Trash2 className="h-4 w-4 mr-2" />
-                                                              <span className="whitespace-nowrap">Excluir Todos</span>
-                                                          </Button>
-                                                          
-                                                          {/* Botões de ação em massa - aparecem quando "Selecionar empresa" está marcado */}
-                                                          {companySelectedCount > 0 && (
-                                                              <>
-                                                                  <Button
-                                                                      size="sm"
-                                                                      className="bg-green-600/90 text-white hover:bg-green-600"
-                                                                      onClick={() => {
-                                                                          handleSendDocumentsIndividually('email', companySelectedIndices);
-                                                                      }}
-                                                                      disabled={sendingDocuments}
-                                                                  >
-                                                                      <Mail className="h-4 w-4 mr-1" />
-                                                                      Enviar Individual ({companySelectedCount})
-                                                                  </Button>
-                                                                  <Button
-                                                                      size="sm"
-                                                                      className="bg-blue-600/90 text-white hover:bg-blue-600"
-                                                                      onClick={() => {
-                                                                          handleSendDocumentsIndividually('whatsapp', companySelectedIndices);
-                                                                      }}
-                                                                      disabled={sendingDocuments}
-                                                                  >
-                                                                      <MessageSquare className="h-4 w-4 mr-1" />
-                                                                      Enviar Individual ({companySelectedCount})
-                                                                  </Button>
-                                                                  <Button
-                                                                      size="sm"
-                                                                      variant="destructive"
-                                                                      className="bg-red-600/90 hover:bg-red-700 border-red-700"
-                                                                      onClick={() => {
-                                                                          setSelectedUnifiedDocuments(new Set(companySelectedIndices));
-                                                                          handleDeleteDocuments('batch');
-                                                                      }}
-                                                                  >
-                                                                      <Trash2 className="h-4 w-4 mr-1" />
-                                                                      Excluir ({companySelectedCount})
-                                                                  </Button>
-                                                              </>
-                                                          )}
-                                                      </div>
-                                                  </div>
-                                              </div>
-                                              {companyExpanded && (
-                                                  <div className="space-y-4">
-                                                      {company.sectors && company.sectors.length > 0 ? (
-                                                          company.sectors.map(sector => {
-                                                              const sectorKey = getUnifiedSectorKey(companyKey, sector);
-                                                              const sectorExpanded = !!expandedUnifiedSectors[sectorKey];
-                                                              const sectorIndices = collectUnifiedSectorDocumentIndices(sector, companyKey);
-                                                              const sectorSelectedIndices = getSelectedUnifiedIndices(sectorIndices);
-                                                              const sectorSelectedCount = sectorSelectedIndices.length;
-                                                              const sectorCheckboxState: boolean | 'indeterminate' = sectorIndices.length === 0
-                                                                ? false
-                                                                : areUnifiedIndicesFullySelected(sectorIndices)
-                                                                  ? true
-                                                                  : sectorSelectedCount > 0
-                                                                    ? 'indeterminate'
-                                                                    : false;
-
-                                                              return (
-                                                                  <div key={sectorKey} className="rounded-xl border border-gray-800/60 bg-gray-900/50 overflow-hidden">
-                                                                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
-                                                                          <div>
-                                                                              <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
-                                                                              <p className="text-xs text-gray-400">
-                                                                                  {sector.totalPayslips} documento(s) · {sector.periods?.length ?? 0} período(s)
-                                                                              </p>
-                                                                          </div>
-                                                                          <div className="flex flex-col gap-2">
-                                                                              {/* Primeira linha: Checkbox e botão Ver períodos */}
-                                                                              <div className="flex flex-wrap items-center gap-2">
-                                                                              <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
-                                                                                  <Checkbox
-                                                                                      checked={sectorCheckboxState}
-                                                                                      onCheckedChange={(checked) => handleSelectUnifiedDocuments(sectorIndices, checked === true)}
-                                                                                      className="border-blue-400"
-                                                                                  />
-                                                                                  <span className="text-xs text-gray-300">Selecionar setor</span>
-                                                                              </div>
-                                                                                  <Button
-                                                                                      variant="ghost"
-                                                                                      size="sm"
-                                                                                      onClick={() => toggleUnifiedSectorExpansion(sectorKey)}
-                                                                                      className="text-seguranca-lightgray hover:text-white"
-                                                                                  >
-                                                                                      {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                                                      {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
-                                                                                  </Button>
-                                                                              </div>
-                                                                              
-                                                                              {/* Segunda linha: Botões de ação sempre visíveis */}
-                                                                              <div className="flex flex-wrap gap-2 items-center">
-                                                                                  {/* Botões sempre visíveis para setor */}
-                                                                                  <Button
-                                                                                      variant="outline"
-                                                                                      size="sm"
-                                                                                      onClick={() => downloadBySector(sector.sectorName || '')}
-                                                                                      className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
-                                                                                      disabled={sectorIndices.length === 0}
-                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos do setor'}
-                                                                                  >
-                                                                                      <Download className="h-4 w-4 mr-2" />
-                                                                                      <span className="whitespace-nowrap">Download Setor</span>
-                                                                                  </Button>
-                                                                                  <Button
-                                                                                      variant="outline"
-                                                                                      size="sm"
-                                                                                      onClick={() => {
-                                                                                          if (sectorIndices.length > 0) {
-                                                                                              handleSendDocumentsIndividually('whatsapp', sectorIndices);
-                                                                                          }
-                                                                                      }}
-                                                                                      className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
-                                                                                      disabled={sectorIndices.length === 0 || sendingDocuments}
-                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor individualmente por WhatsApp'}
-                                                                                  >
-                                                                                      <MessageSquare className="h-4 w-4 mr-2" />
-                                                                                      <span className="whitespace-nowrap">Enviar Individual</span>
-                                                                                  </Button>
-                                                                                  <Button
-                                                                                      variant="outline"
-                                                                                      size="sm"
-                                                                                      onClick={() => {
-                                                                                          if (sectorIndices.length > 0) {
-                                                                                              handleSendDocumentsIndividually('email', sectorIndices);
-                                                                                          }
-                                                                                      }}
-                                                                                      className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
-                                                                                      disabled={sectorIndices.length === 0 || sendingDocuments}
-                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor individualmente por Email'}
-                                                                                  >
-                                                                                      <Mail className="h-4 w-4 mr-2" />
-                                                                                      <span className="whitespace-nowrap">Enviar Individual</span>
-                                                                                  </Button>
-                                                                                  <Button
-                                                                                      variant="outline"
-                                                                                      size="sm"
-                                                                                      onClick={() => {
-                                                                                          if (sectorIndices.length > 0) {
-                                                                                              setSelectedUnifiedDocuments(new Set(sectorIndices));
-                                                                                              handleDeleteDocuments('batch');
-                                                                                          }
-                                                                                      }}
-                                                                                      className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
-                                                                                      disabled={sectorIndices.length === 0}
-                                                                                      title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos do setor'}
-                                                                                  >
-                                                                                      <Trash2 className="h-4 w-4 mr-2" />
-                                                                                      <span className="whitespace-nowrap">Excluir Todos</span>
-                                                                                  </Button>
-                                                                                  
-                                                                              {/* Botões de ação em massa - aparecem quando "Selecionar setor" está marcado */}
-                                                                              {sectorSelectedCount > 0 && (
-                                                                                      <>
-                                                                                      <Button
-                                                                                          size="sm"
-                                                                                          className="bg-green-600/90 text-white hover:bg-green-600"
-                                                                                          onClick={() => {
-                                                                                              handleSendDocumentsIndividually('email', sectorSelectedIndices);
-                                                                                          }}
-                                                                                          disabled={sendingDocuments}
-                                                                                      >
-                                                                                          <Mail className="h-4 w-4 mr-1" />
-                                                                                          Enviar Individual ({sectorSelectedCount})
-                                                                                      </Button>
-                                                                                      <Button
-                                                                                          size="sm"
-                                                                                          className="bg-blue-600/90 text-white hover:bg-blue-600"
-                                                                                          onClick={() => {
-                                                                                              handleSendDocumentsIndividually('whatsapp', sectorSelectedIndices);
-                                                                                          }}
-                                                                                          disabled={sendingDocuments}
-                                                                                      >
-                                                                                          <MessageSquare className="h-4 w-4 mr-1" />
-                                                                                          Enviar Individual ({sectorSelectedCount})
-                                                                                      </Button>
-                                                                                      <Button
-                                                                                          size="sm"
-                                                                                          variant="destructive"
-                                                                                          className="bg-red-600/90 hover:bg-red-700 border-red-700"
-                                                                                          onClick={() => {
-                                                                                              setSelectedUnifiedDocuments(new Set(sectorSelectedIndices));
-                                                                                              handleDeleteDocuments('batch');
-                                                                                          }}
-                                                                                      >
-                                                                                          <Trash2 className="h-4 w-4 mr-1" />
-                                                                                          Excluir ({sectorSelectedCount})
-                                                                                      </Button>
-                                                                                      </>
-                                                                                  )}
-                                                                              </div>
-                                                                          </div>
-                                                                      </div>
-                                                                      {sectorExpanded && (
-                                                                          <div className="space-y-3 px-4 py-4 bg-gray-900/70">
-                                                                              {sector.periods && sector.periods.length > 0 ? (
-                                                                                  sector.periods.map(period => {
-                                                                                      const periodKey = getUnifiedPeriodKey(sectorKey, period);
-                                                                                      const periodExpanded = !!expandedUnifiedPeriods[periodKey];
-                                                                                      const periodIndices = collectUnifiedPeriodDocumentIndices(period, sectorKey);
-                                                                                      const periodSelectedIndices = getSelectedUnifiedIndices(periodIndices);
-                                                                                      const periodSelectedCount = periodSelectedIndices.length;
-                                                                                      const periodCheckboxState: boolean | 'indeterminate' = periodIndices.length === 0
-                                                                                        ? false
-                                                                                        : areUnifiedIndicesFullySelected(periodIndices)
-                                                                                          ? true
-                                                                                          : periodSelectedCount > 0
-                                                                                            ? 'indeterminate'
-                                                                                            : false;
-
-                                                                                      return (
-                                                                                          <div key={periodKey} data-period-key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
-                                                                                              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 px-4 py-3">
-                                                                                                  <div className="flex-1">
-                                                                                                      <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
-                                                                                                      <p className="text-xs text-gray-400">{period.totalPayslips} documento(s)</p>
-                                                                                                  </div>
-                                                                                                  <div className="flex flex-col gap-2 min-w-0 lg:min-w-[350px]">
-                                                                                                      {/* Primeira linha: Checkbox e botão Ver documentos */}
-                                                                                                      <div className="flex flex-wrap items-center gap-2">
-                                                                                                      <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
-                                                                                                          <Checkbox
-                                                                                                              checked={periodCheckboxState}
-                                                                                                              onCheckedChange={(checked) => handleSelectUnifiedDocuments(periodIndices, checked === true)}
-                                                                                                              className="border-blue-400"
-                                                                                                          />
-                                                                                                          <span className="text-xs text-gray-300">Selecionar período</span>
-                                                                                                      </div>
-                                                                                                              <Button
-                                                                                                              variant="ghost"
-                                                                                                                  size="sm"
-                                                                                                              onClick={() => toggleUnifiedPeriodExpansion(periodKey)}
-                                                                                                              className="text-seguranca-lightgray hover:text-white"
-                                                                                                          >
-                                                                                                              {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
-                                                                                                              {periodExpanded ? 'Ocultar documentos' : 'Ver documentos'}
-                                                                                                          </Button>
-                                                                                                      </div>
-                                                                                                      
-                                                                                                      {/* Segunda linha: Botões de ação sempre visíveis */}
-                                                                                                      <div className="flex flex-wrap gap-2 items-center">
-                                                                                                          {/* Botões sempre visíveis para período */}
-                                                                                                      <Button
-                                                                                                          variant="outline"
-                                                                                                          size="sm"
-                                                                                                          onClick={async () => {
-                                                                                                              // Download de todos os documentos do período
-                                                                                                              const periodDocs = periodIndices.map(idx => unifiedDocuments[idx]).filter(Boolean);
-                                                                                                              if (periodDocs.length === 0) {
-                                                                                                                  toast({
-                                                                                                                      title: 'Nenhum documento',
-                                                                                                                      description: 'Não há documentos para baixar neste período.',
-                                                                                                                      variant: 'destructive'
-                                                                                                                  });
-                                                                                                                  return;
-                                                                                                              }
-                                                                                                              
-                                                                                                              // Criar ZIP com todos os documentos do período
-                                                                                                              try {
-                                                                                                                  setLoading(true);
-                                                                                                                  const JSZip = (await import('jszip')).default;
-                                                                                                                  const zip = new JSZip();
-                                                                                                                  
-                                                                                                                  for (const doc of periodDocs) {
-                                                                                                                      if (doc?.fileName) {
-                                                                                                                          try {
-                                                                                                                              const response = await api.get(`/api/unified-documents/download/${doc.fileName}`, { 
-                                                                                                                                  responseType: 'blob',
-                                                                                                                                  timeout: 30000
-                                                                                                                              });
-                                                                                                                              zip.file(doc.fileName, response.data);
-                                                                                                                          } catch (err) {
-                                                                                                                              console.error(`Erro ao baixar ${doc.fileName}:`, err);
-                                                                                                                          }
-                                                                                                                      }
-                                                                                                                  }
-                                                                                                                  
-                                                                                                                  const blob = await zip.generateAsync({ type: 'blob' });
-                                                                                                                  const url = window.URL.createObjectURL(blob);
-                                                                                                                  const a = document.createElement('a');
-                                                                                                                  a.href = url;
-                                                                                                                  const periodStr = `${String(period.month).padStart(2, '0')}_${period.year}`;
-                                                                                                                  a.download = `Periodo_${periodStr}_documentos_unificados.zip`;
-                                                                                                                  document.body.appendChild(a);
-                                                                                                                  a.click();
-                                                                                                                  document.body.removeChild(a);
-                                                                                                                  window.URL.revokeObjectURL(url);
-                                                                                                                  
-                                                                                                                  toast({
-                                                                                                                      title: '✅ Download iniciado',
-                                                                                                                      description: `Baixando ${periodDocs.length} documento(s) do período ${period.month}/${period.year}...`
-                                                                                                                  });
-                                                                                                              } catch (error: any) {
-                                                                                                                  console.error('Erro ao criar ZIP:', error);
-                                                                                                                  toast({
-                                                                                                                      title: '❌ Erro no download',
-                                                                                                                      description: 'Erro ao criar arquivo ZIP.',
-                                                                                                                      variant: 'destructive'
-                                                                                                                  });
-                                                                                                              } finally {
-                                                                                                                  setLoading(false);
-                                                                                                              }
-                                                                                                          }}
-                                                                                                          className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
-                                                                                                          disabled={loading || periodIndices.length === 0}
-                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos do período'}
-                                                                                                      >
-                                                                                                          <Download className="h-4 w-4 mr-2" />
-                                                                                                          <span className="whitespace-nowrap">Download Período</span>
-                                                                                                      </Button>
-                                                                                                      <Button
-                                                                                                          variant="outline"
-                                                                                                          size="sm"
-                                                                                                          onClick={() => {
-                                                                                                              if (periodIndices.length > 0) {
-                                                                                                                  handleSendDocumentsIndividually('whatsapp', periodIndices);
-                                                                                                              }
-                                                                                                          }}
-                                                                                                          className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
-                                                                                                          disabled={periodIndices.length === 0 || sendingDocuments}
-                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período individualmente por WhatsApp'}
-                                                                                                      >
-                                                                                                          <MessageSquare className="h-4 w-4 mr-2" />
-                                                                                                          <span className="whitespace-nowrap">Enviar Individual</span>
-                                                                                                      </Button>
-                                                                                                      <Button
-                                                                                                          variant="outline"
-                                                                                                          size="sm"
-                                                                                                          onClick={() => {
-                                                                                                              if (periodIndices.length > 0) {
-                                                                                                                  handleSendDocumentsIndividually('email', periodIndices);
-                                                                                                              }
-                                                                                                          }}
-                                                                                                          className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
-                                                                                                          disabled={periodIndices.length === 0 || sendingDocuments}
-                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período individualmente por Email'}
-                                                                                                      >
-                                                                                                          <Mail className="h-4 w-4 mr-2" />
-                                                                                                          <span className="whitespace-nowrap">Enviar Individual</span>
-                                                                                                      </Button>
-                                                                                                      <Button
-                                                                                                          variant="outline"
-                                                                                                          size="sm"
-                                                                                                          onClick={() => {
-                                                                                                              if (periodIndices.length > 0) {
-                                                                                                                  setSelectedUnifiedDocuments(new Set(periodIndices));
-                                                                                                                  handleDeleteDocuments('batch');
-                                                                                                              }
-                                                                                                          }}
-                                                                                                          className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
-                                                                                                          disabled={periodIndices.length === 0}
-                                                                                                          title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos do período'}
-                                                                                                      >
-                                                                                                          <Trash2 className="h-4 w-4 mr-2" />
-                                                                                                          <span className="whitespace-nowrap">Excluir Todos</span>
-                                                                                                      </Button>
-                                                                                                          </div>
-                                                                                                  </div>
-                                                                                              </div>
-                                                                                              {periodExpanded && (
-                                                                                                  <div className="divide-y divide-gray-800 bg-gray-950/60">
-                                                                                                      {period.payslips.map((entry, entryIndex) => {
-                                                                                                          // Buscar índice usando função otimizada (usa cache pré-computado)
-                                                                                                          const docIndex = getUnifiedEntryIndex(entry);
-                                                                                                          const isSelected = docIndex !== -1 && selectedUnifiedDocuments.has(docIndex);
-                                                                                                          const doc = docIndex !== -1 ? unifiedDocuments[docIndex] : null;
-
-                                                                                                          // Criar chave única combinando ID do entry com índice para evitar duplicatas
-                                                                                                          const uniqueKey = entry.id ? `${entry.id}-${entryIndex}` : `entry-${entryIndex}-${entry.employeeName}-${entry.month}-${entry.year}`;
-
-                                                                                                          return (
-                                                                                                              <div
-                                                                                                                  key={uniqueKey}
-                                                                                                                  className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-4"
-                                                                                                              >
-                                                                                                                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                                                                                                                      <Checkbox
-                                                                                                                          checked={isSelected}
-                                                                                                                          onCheckedChange={(checked) => {
-                                                                                                                              // Usar índice já calculado ou buscar novamente se necessário
-                                                                                                                              const finalIndex = docIndex !== -1 ? docIndex : getUnifiedEntryIndex(entry);
-                                                                                                                              
-                                                                                                                              if (finalIndex !== -1) {
-                                                                                                                                handleSelectUnifiedDocuments([finalIndex], checked === true);
-                                                                                                                              } else {
-                                                                                                                                  toast({
-                                                                                                                                      title: '⚠️ Documento não encontrado',
-                                                                                                                                      description: `Não foi possível encontrar o documento de ${entry.employeeName} (${entry.month}/${entry.year}) na lista de documentos unificados.`,
-                                                                                                                                      variant: 'destructive'
-                                                                                                                                  });
-                                                                                                                              }
-                                                                                                                          }}
-                                                                                                                          className="border-blue-400 mt-1"
-                                                                                                                      />
-                                                                                                                      <div className="flex-1 min-w-0">
-                                                                                                                          <p className="text-sm font-semibold text-white">{entry.employeeName}</p>
-                                                                                                                          <p className="text-xs text-gray-400">
-                                                                                                                              CPF: {entry.cpf ? entry.cpf.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : 'Não informado'} · Arquivo: {entry.fileName?.replace(/^UNIFICADO_/, '') || entry.fileName}
-                                                                                                                          </p>
-                                                                                                                      </div>
-                                                                                                                  </div>
-                                                                                                                  <div className="flex flex-wrap gap-2">
-                                                                                                                      {doc && (
-                                                                                                                          <>
-                                                                                                                              <Button
-                                                                                                                                  size="sm"
-                                                                                                                                  variant="outline"
-                                                                                                                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                                                                                                                                  onClick={() => openUnifiedViewer(doc, docIndex)}
-                                                                                                                              >
-                                                                                                                                  <Eye className="h-4 w-4 mr-1" />
-                                                                                                                                  Visualizar
-                                                                                                                              </Button>
-                                                                                                                              <Button
-                                                                                                                                  size="sm"
-                                                                                                                                  variant="outline"
-                                                                                                                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                                                                                                                                  onClick={() => downloadUnifiedDocument(doc)}
-                                                                                                                              >
-                                                                                                                                  <Download className="h-4 w-4 mr-1" />
-                                                                                                                                  Download
-                                                                                                                              </Button>
-                                                                                                                                      <Button
-                                                                                                                                          size="sm"
-                                                                                                                                          variant="outline"
-                                                                                                                                          className="border-green-600 text-green-300 hover:bg-green-600/20"
-                                                                                                                                          onClick={() => {
-                                                                                                                                              setSelectedUnifiedDocuments(new Set([docIndex]));
-                                                                                                                                              handleSendDocuments('email');
-                                                                                                                                          }}
-                                                                                                                                      >
-                                                                                                                                          <Mail className="h-4 w-4 mr-1" />
-                                                                                                                                          Email
-                                                                                                                                      </Button>
-                                                                                                                                      <Button
-                                                                                                                                          size="sm"
-                                                                                                                                          variant="outline"
-                                                                                                                                          className="border-blue-600 text-blue-300 hover:bg-blue-600/20"
-                                                                                                                                          onClick={() => {
-                                                                                                                                              setSelectedUnifiedDocuments(new Set([docIndex]));
-                                                                                                                                              handleSendDocuments('whatsapp');
-                                                                                                                                          }}
-                                                                                                                                      >
-                                                                                                                                          <MessageSquare className="h-4 w-4 mr-1" />
-                                                                                                                                          WhatsApp
-                                                                                                                                      </Button>
-                                                                                                                              <Button
-                                                                                                                                  size="sm"
-                                                                                                                                  variant="outline"
-                                                                                                                                  className="border-red-600 text-red-300 hover:bg-red-600/20"
-                                                                                                                                  onClick={() => {
-                                                                                                                                      if (docIndex !== -1) {
-                                                                                                                                          handleDeleteDocuments('individual', docIndex);
-                                                                                                                                      }
-                                                                                                                                  }}
-                                                                                                                              >
-                                                                                                                                  <Trash2 className="h-4 w-4 mr-1" />
-                                                                                                                                  Excluir
-                                                                                                                              </Button>
-                                                                                                                          </>
-                                                                                                                      )}
-                                                                                                                  </div>
-                                                                                                              </div>
-                                                                                                          );
-                                                                                                      })}
-                                                                                                  </div>
-                                                                                              )}
-                                                                                          </div>
-                                                                                      );
-                                                                                  })
-                                                                              ) : (
-                                                                                  <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
-                                                                                      Nenhum período encontrado para este setor.
-                                                                                  </div>
-                                                                              )}
-                                                                          </div>
-                                                                      )}
-                                                                  </div>
-                                                              );
-                                                          })
-                                                      ) : (
-                                                          <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
-                                                              Nenhum setor encontrado para esta empresa.
-                                                          </div>
-                                                      )}
-                                                  </div>
-                                              )}
-                                          </div>
-                                      </div>
-                                  );
-                              })}
-                          </div>
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Recarregar Organização
+                        </>
                       )}
-                  </CardContent>
-              </Card>
+                    </Button>
+                    <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 py-1">
+                      {unifiedDocuments?.length || 0} documento(s) | {unifiedOrganizationData?.totalPayslips || 0} organizado(s)
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Barra de Pesquisa */}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar por nome do funcionário, empresa ou período (mínimo 4 caracteres)..."
+                      value={unifiedSearchTerm}
+                      onChange={(e) => setUnifiedSearchTerm(e.target.value)}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray pl-10 pr-4 py-2"
+                    />
+                  </div>
+                  {unifiedSearchTerm && unifiedSearchTerm.trim().length > 0 && unifiedSearchTerm.trim().length < 4 && (
+                    <p className="text-sm text-gray-400 mt-2 ml-1">
+                      Digite no mínimo 4 caracteres para iniciar a busca.
+                    </p>
+                  )}
+                  {unifiedSearchTerm && unifiedSearchTerm.trim().length >= 4 && (
+                    <p className="text-sm text-gray-400 mt-2 ml-1">
+                      Buscando por: <span className="font-semibold">{unifiedSearchTerm}</span>
+                    </p>
+                  )}
+                </div>
+
+                {unifiedOrganizationError && (
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border border-red-500/30 bg-red-500/10 text-red-100 px-4 py-4 rounded-2xl">
+                    <div className="flex items-center gap-2 text-red-200">
+                      <AlertTriangle className="h-5 w-5" />
+                      <p className="text-sm font-semibold">Não foi possível carregar a organização</p>
+                    </div>
+                    <p className="text-sm">{unifiedOrganizationError}</p>
+                  </div>
+                )}
+
+                {loadingUnifiedOrganization ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-10 w-10 animate-spin text-purple-400" />
+                  </div>
+                ) : !unifiedOrganizationData?.companies?.length ? (
+                  <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
+                    Nenhum documento unificado encontrado. Crie documentos unificados para visualizar a organização.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {getFilteredUnifiedOrganizationData().companies.map(company => {
+                      const companyKey = getUnifiedCompanyKey(company);
+                      const companyExpanded = !!expandedUnifiedCompanies[companyKey];
+                      const companyIndices = collectUnifiedCompanyDocumentIndices(company);
+                      const companySelectedIndices = getSelectedUnifiedIndices(companyIndices);
+                      const companySelectedCount = companySelectedIndices.length;
+                      const companyCheckboxState: boolean | 'indeterminate' = companyIndices.length === 0
+                        ? false
+                        : areUnifiedIndicesFullySelected(companyIndices)
+                          ? true
+                          : companySelectedCount > 0
+                            ? 'indeterminate'
+                            : false;
+
+                      return (
+                        <div
+                          key={companyKey}
+                          className="rounded-2xl border border-gray-700/60 bg-gray-900/60 backdrop-blur-sm overflow-hidden shadow-[0_30px_60px_-50px_rgba(0,0,0,0.9)]"
+                        >
+                          <div className="flex flex-col gap-4 px-5 py-5 sm:px-6 sm:py-6">
+                            {/* Cabeçalho da empresa */}
+                            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                              <div className="space-y-2 flex-1">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <Badge className="bg-seguranca-black/60 text-seguranca-yellow border border-yellow-500/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                                    {company.companySigla}
+                                  </Badge>
+                                  <p className="text-lg font-semibold text-white leading-tight">
+                                    {company.companyName}
+                                  </p>
+                                </div>
+                                <p className="text-xs sm:text-sm text-gray-400 flex flex-wrap items-center gap-2">
+                                  <Building2 className="h-4 w-4 text-seguranca-yellow" />
+                                  CNPJ: {company.companyCnpj || 'Não informado'} · {company.totalPayslips} documento(s) · {company.sectors.length} setor(es)
+                                </p>
+                              </div>
+
+                              {/* Área de ações da empresa - sempre visível */}
+                              <div className="flex flex-col gap-3 w-full lg:w-auto">
+                                {/* Primeira linha: Checkbox e botão Ver setores */}
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <div className="flex items-center gap-2 bg-gray-800/60 rounded-xl px-3 py-2">
+                                    <Checkbox
+                                      checked={companyCheckboxState}
+                                      onCheckedChange={(checked) => handleSelectUnifiedDocuments(companyIndices, checked === true)}
+                                      className="border-blue-400"
+                                    />
+                                    <span className="text-xs sm:text-sm text-gray-300">Selecionar empresa</span>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleUnifiedCompanyExpansion(companyKey)}
+                                    className="text-seguranca-lightgray hover:text-white"
+                                  >
+                                    {companyExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                    {companyExpanded ? 'Ocultar setores' : 'Ver setores'}
+                                  </Button>
+                                </div>
+
+                                {/* Segunda linha: Botões de ação sempre visíveis */}
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  {/* Botões sempre visíveis para empresa */}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDownloadByCompany(company.companyName || company.companyCnpj || '')}
+                                    className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                    disabled={loading || companyIndices.length === 0}
+                                    title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos da empresa'}
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    <span className="whitespace-nowrap">Download Lote</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (companyIndices.length > 0) {
+                                        handleSendDocumentsIndividually('whatsapp', companyIndices);
+                                      }
+                                    }}
+                                    className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                    disabled={companyIndices.length === 0 || sendingDocuments}
+                                    title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos da empresa individualmente por WhatsApp'}
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    <span className="whitespace-nowrap">Enviar Individual</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (companyIndices.length > 0) {
+                                        handleSendDocumentsIndividually('email', companyIndices);
+                                      }
+                                    }}
+                                    className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
+                                    disabled={companyIndices.length === 0 || sendingDocuments}
+                                    title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos da empresa individualmente por Email'}
+                                  >
+                                    <Mail className="h-4 w-4 mr-2" />
+                                    <span className="whitespace-nowrap">Enviar Individual</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (companyIndices.length > 0) {
+                                        setSelectedUnifiedDocuments(new Set(companyIndices));
+                                        handleDeleteDocuments('batch');
+                                      }
+                                    }}
+                                    className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                    disabled={companyIndices.length === 0}
+                                    title={companyIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos da empresa'}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    <span className="whitespace-nowrap">Excluir Todos</span>
+                                  </Button>
+
+                                  {/* Botões de ação em massa - aparecem quando "Selecionar empresa" está marcado */}
+                                  {companySelectedCount > 0 && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        className="bg-green-600/90 text-white hover:bg-green-600"
+                                        onClick={() => {
+                                          handleSendDocumentsIndividually('email', companySelectedIndices);
+                                        }}
+                                        disabled={sendingDocuments}
+                                      >
+                                        <Mail className="h-4 w-4 mr-1" />
+                                        Enviar Individual ({companySelectedCount})
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                        onClick={() => {
+                                          handleSendDocumentsIndividually('whatsapp', companySelectedIndices);
+                                        }}
+                                        disabled={sendingDocuments}
+                                      >
+                                        <MessageSquare className="h-4 w-4 mr-1" />
+                                        Enviar Individual ({companySelectedCount})
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                        onClick={() => {
+                                          setSelectedUnifiedDocuments(new Set(companySelectedIndices));
+                                          handleDeleteDocuments('batch');
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Excluir ({companySelectedCount})
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            {companyExpanded && (
+                              <div className="space-y-4">
+                                {company.sectors && company.sectors.length > 0 ? (
+                                  company.sectors.map(sector => {
+                                    const sectorKey = getUnifiedSectorKey(companyKey, sector);
+                                    const sectorExpanded = !!expandedUnifiedSectors[sectorKey];
+                                    const sectorIndices = collectUnifiedSectorDocumentIndices(sector, companyKey);
+                                    const sectorSelectedIndices = getSelectedUnifiedIndices(sectorIndices);
+                                    const sectorSelectedCount = sectorSelectedIndices.length;
+                                    const sectorCheckboxState: boolean | 'indeterminate' = sectorIndices.length === 0
+                                      ? false
+                                      : areUnifiedIndicesFullySelected(sectorIndices)
+                                        ? true
+                                        : sectorSelectedCount > 0
+                                          ? 'indeterminate'
+                                          : false;
+
+                                    return (
+                                      <div key={sectorKey} className="rounded-xl border border-gray-800/60 bg-gray-900/50 overflow-hidden">
+                                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3">
+                                          <div>
+                                            <p className="text-sm font-semibold text-white">{sector.sectorName}</p>
+                                            <p className="text-xs text-gray-400">
+                                              {sector.totalPayslips} documento(s) · {sector.periods?.length ?? 0} período(s)
+                                            </p>
+                                          </div>
+                                          <div className="flex flex-col gap-2">
+                                            {/* Primeira linha: Checkbox e botão Ver períodos */}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                                                <Checkbox
+                                                  checked={sectorCheckboxState}
+                                                  onCheckedChange={(checked) => handleSelectUnifiedDocuments(sectorIndices, checked === true)}
+                                                  className="border-blue-400"
+                                                />
+                                                <span className="text-xs text-gray-300">Selecionar setor</span>
+                                              </div>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => toggleUnifiedSectorExpansion(sectorKey)}
+                                                className="text-seguranca-lightgray hover:text-white"
+                                              >
+                                                {sectorExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                {sectorExpanded ? 'Ocultar períodos' : 'Ver períodos'}
+                                              </Button>
+                                            </div>
+
+                                            {/* Segunda linha: Botões de ação sempre visíveis */}
+                                            <div className="flex flex-wrap gap-2 items-center">
+                                              {/* Botões sempre visíveis para setor */}
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => downloadBySector(sector.sectorName || '')}
+                                                className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                                disabled={sectorIndices.length === 0}
+                                                title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos do setor'}
+                                              >
+                                                <Download className="h-4 w-4 mr-2" />
+                                                <span className="whitespace-nowrap">Download Setor</span>
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                  if (sectorIndices.length > 0) {
+                                                    handleSendDocumentsIndividually('whatsapp', sectorIndices);
+                                                  }
+                                                }}
+                                                className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                                disabled={sectorIndices.length === 0 || sendingDocuments}
+                                                title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor individualmente por WhatsApp'}
+                                              >
+                                                <MessageSquare className="h-4 w-4 mr-2" />
+                                                <span className="whitespace-nowrap">Enviar Individual</span>
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                  if (sectorIndices.length > 0) {
+                                                    handleSendDocumentsIndividually('email', sectorIndices);
+                                                  }
+                                                }}
+                                                className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
+                                                disabled={sectorIndices.length === 0 || sendingDocuments}
+                                                title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do setor individualmente por Email'}
+                                              >
+                                                <Mail className="h-4 w-4 mr-2" />
+                                                <span className="whitespace-nowrap">Enviar Individual</span>
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                  if (sectorIndices.length > 0) {
+                                                    setSelectedUnifiedDocuments(new Set(sectorIndices));
+                                                    handleDeleteDocuments('batch');
+                                                  }
+                                                }}
+                                                className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                                disabled={sectorIndices.length === 0}
+                                                title={sectorIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos do setor'}
+                                              >
+                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                <span className="whitespace-nowrap">Excluir Todos</span>
+                                              </Button>
+
+                                              {/* Botões de ação em massa - aparecem quando "Selecionar setor" está marcado */}
+                                              {sectorSelectedCount > 0 && (
+                                                <>
+                                                  <Button
+                                                    size="sm"
+                                                    className="bg-green-600/90 text-white hover:bg-green-600"
+                                                    onClick={() => {
+                                                      handleSendDocumentsIndividually('email', sectorSelectedIndices);
+                                                    }}
+                                                    disabled={sendingDocuments}
+                                                  >
+                                                    <Mail className="h-4 w-4 mr-1" />
+                                                    Enviar Individual ({sectorSelectedCount})
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    className="bg-blue-600/90 text-white hover:bg-blue-600"
+                                                    onClick={() => {
+                                                      handleSendDocumentsIndividually('whatsapp', sectorSelectedIndices);
+                                                    }}
+                                                    disabled={sendingDocuments}
+                                                  >
+                                                    <MessageSquare className="h-4 w-4 mr-1" />
+                                                    Enviar Individual ({sectorSelectedCount})
+                                                  </Button>
+                                                  <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    className="bg-red-600/90 hover:bg-red-700 border-red-700"
+                                                    onClick={() => {
+                                                      setSelectedUnifiedDocuments(new Set(sectorSelectedIndices));
+                                                      handleDeleteDocuments('batch');
+                                                    }}
+                                                  >
+                                                    <Trash2 className="h-4 w-4 mr-1" />
+                                                    Excluir ({sectorSelectedCount})
+                                                  </Button>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        {sectorExpanded && (
+                                          <div className="space-y-3 px-4 py-4 bg-gray-900/70">
+                                            {sector.periods && sector.periods.length > 0 ? (
+                                              sector.periods.map(period => {
+                                                const periodKey = getUnifiedPeriodKey(sectorKey, period);
+                                                const periodExpanded = !!expandedUnifiedPeriods[periodKey];
+                                                const periodIndices = collectUnifiedPeriodDocumentIndices(period, sectorKey);
+                                                const periodSelectedIndices = getSelectedUnifiedIndices(periodIndices);
+                                                const periodSelectedCount = periodSelectedIndices.length;
+                                                const periodCheckboxState: boolean | 'indeterminate' = periodIndices.length === 0
+                                                  ? false
+                                                  : areUnifiedIndicesFullySelected(periodIndices)
+                                                    ? true
+                                                    : periodSelectedCount > 0
+                                                      ? 'indeterminate'
+                                                      : false;
+
+                                                return (
+                                                  <div key={periodKey} data-period-key={periodKey} className="rounded-xl border border-gray-800/60 bg-gray-900/60 overflow-hidden">
+                                                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 px-4 py-3">
+                                                      <div className="flex-1">
+                                                        <p className="text-sm font-semibold text-white">{period.formattedPeriod}</p>
+                                                        <p className="text-xs text-gray-400">{period.totalPayslips} documento(s)</p>
+                                                      </div>
+                                                      <div className="flex flex-col gap-2 min-w-0 lg:min-w-[350px]">
+                                                        {/* Primeira linha: Checkbox e botão Ver documentos */}
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                          <div className="flex items-center gap-2 bg-gray-800/70 rounded-lg px-3 py-2">
+                                                            <Checkbox
+                                                              checked={periodCheckboxState}
+                                                              onCheckedChange={(checked) => handleSelectUnifiedDocuments(periodIndices, checked === true)}
+                                                              className="border-blue-400"
+                                                            />
+                                                            <span className="text-xs text-gray-300">Selecionar período</span>
+                                                          </div>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => toggleUnifiedPeriodExpansion(periodKey)}
+                                                            className="text-seguranca-lightgray hover:text-white"
+                                                          >
+                                                            {periodExpanded ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                            {periodExpanded ? 'Ocultar documentos' : 'Ver documentos'}
+                                                          </Button>
+                                                        </div>
+
+                                                        {/* Segunda linha: Botões de ação sempre visíveis */}
+                                                        <div className="flex flex-wrap gap-2 items-center">
+                                                          {/* Botões sempre visíveis para período */}
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={async () => {
+                                                              // Download de todos os documentos do período
+                                                              const periodDocs = periodIndices.map(idx => unifiedDocuments[idx]).filter(Boolean);
+                                                              if (periodDocs.length === 0) {
+                                                                toast({
+                                                                  title: 'Nenhum documento',
+                                                                  description: 'Não há documentos para baixar neste período.',
+                                                                  variant: 'destructive'
+                                                                });
+                                                                return;
+                                                              }
+
+                                                              // Criar ZIP com todos os documentos do período
+                                                              try {
+                                                                setLoading(true);
+                                                                const JSZip = (await import('jszip')).default;
+                                                                const zip = new JSZip();
+
+                                                                for (const doc of periodDocs) {
+                                                                  if (doc?.fileName) {
+                                                                    try {
+                                                                      const response = await api.get(`/api/unified-documents/download/${doc.fileName}`, {
+                                                                        responseType: 'blob',
+                                                                        timeout: 30000
+                                                                      });
+                                                                      zip.file(doc.fileName, response.data);
+                                                                    } catch (err) {
+                                                                      console.error(`Erro ao baixar ${doc.fileName}:`, err);
+                                                                    }
+                                                                  }
+                                                                }
+
+                                                                const blob = await zip.generateAsync({ type: 'blob' });
+                                                                const url = window.URL.createObjectURL(blob);
+                                                                const a = document.createElement('a');
+                                                                a.href = url;
+                                                                const periodStr = `${String(period.month).padStart(2, '0')}_${period.year}`;
+                                                                a.download = `Periodo_${periodStr}_documentos_unificados.zip`;
+                                                                document.body.appendChild(a);
+                                                                a.click();
+                                                                document.body.removeChild(a);
+                                                                window.URL.revokeObjectURL(url);
+
+                                                                toast({
+                                                                  title: '✅ Download iniciado',
+                                                                  description: `Baixando ${periodDocs.length} documento(s) do período ${period.month}/${period.year}...`
+                                                                });
+                                                              } catch (error: any) {
+                                                                console.error('Erro ao criar ZIP:', error);
+                                                                toast({
+                                                                  title: '❌ Erro no download',
+                                                                  description: 'Erro ao criar arquivo ZIP.',
+                                                                  variant: 'destructive'
+                                                                });
+                                                              } finally {
+                                                                setLoading(false);
+                                                              }
+                                                            }}
+                                                            className="border-purple-500/50 text-purple-300 hover:bg-purple-800/50 hover:text-white bg-purple-500/10"
+                                                            disabled={loading || periodIndices.length === 0}
+                                                            title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Baixar todos os documentos do período'}
+                                                          >
+                                                            <Download className="h-4 w-4 mr-2" />
+                                                            <span className="whitespace-nowrap">Download Período</span>
+                                                          </Button>
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                              if (periodIndices.length > 0) {
+                                                                handleSendDocumentsIndividually('whatsapp', periodIndices);
+                                                              }
+                                                            }}
+                                                            className="border-blue-500/50 text-blue-300 hover:bg-blue-800/50 hover:text-white bg-blue-500/10"
+                                                            disabled={periodIndices.length === 0 || sendingDocuments}
+                                                            title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período individualmente por WhatsApp'}
+                                                          >
+                                                            <MessageSquare className="h-4 w-4 mr-2" />
+                                                            <span className="whitespace-nowrap">Enviar Individual</span>
+                                                          </Button>
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                              if (periodIndices.length > 0) {
+                                                                handleSendDocumentsIndividually('email', periodIndices);
+                                                              }
+                                                            }}
+                                                            className="border-green-500/50 text-green-300 hover:bg-green-800/50 hover:text-white bg-green-500/10"
+                                                            disabled={periodIndices.length === 0 || sendingDocuments}
+                                                            title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Enviar todos os documentos do período individualmente por Email'}
+                                                          >
+                                                            <Mail className="h-4 w-4 mr-2" />
+                                                            <span className="whitespace-nowrap">Enviar Individual</span>
+                                                          </Button>
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                              if (periodIndices.length > 0) {
+                                                                setSelectedUnifiedDocuments(new Set(periodIndices));
+                                                                handleDeleteDocuments('batch');
+                                                              }
+                                                            }}
+                                                            className="border-red-500/50 text-red-300 hover:bg-red-800/50 hover:text-white bg-red-500/10"
+                                                            disabled={periodIndices.length === 0}
+                                                            title={periodIndices.length === 0 ? 'Nenhum documento unificado encontrado' : 'Excluir todos os documentos do período'}
+                                                          >
+                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            <span className="whitespace-nowrap">Excluir Todos</span>
+                                                          </Button>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                    {periodExpanded && (
+                                                      <div className="divide-y divide-gray-800 bg-gray-950/60">
+                                                        {period.payslips.map((entry, entryIndex) => {
+                                                          // Buscar índice usando função otimizada (usa cache pré-computado)
+                                                          const docIndex = getUnifiedEntryIndex(entry);
+                                                          const isSelected = docIndex !== -1 && selectedUnifiedDocuments.has(docIndex);
+                                                          const doc = docIndex !== -1 ? unifiedDocuments[docIndex] : null;
+
+                                                          // Criar chave única combinando ID do entry com índice para evitar duplicatas
+                                                          const uniqueKey = entry.id ? `${entry.id}-${entryIndex}` : `entry-${entryIndex}-${entry.employeeName}-${entry.month}-${entry.year}`;
+
+                                                          return (
+                                                            <div
+                                                              key={uniqueKey}
+                                                              className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-4 py-4"
+                                                            >
+                                                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                                                <Checkbox
+                                                                  checked={isSelected}
+                                                                  onCheckedChange={(checked) => {
+                                                                    // Usar índice já calculado ou buscar novamente se necessário
+                                                                    const finalIndex = docIndex !== -1 ? docIndex : getUnifiedEntryIndex(entry);
+
+                                                                    if (finalIndex !== -1) {
+                                                                      handleSelectUnifiedDocuments([finalIndex], checked === true);
+                                                                    } else {
+                                                                      toast({
+                                                                        title: '⚠️ Documento não encontrado',
+                                                                        description: `Não foi possível encontrar o documento de ${entry.employeeName} (${entry.month}/${entry.year}) na lista de documentos unificados.`,
+                                                                        variant: 'destructive'
+                                                                      });
+                                                                    }
+                                                                  }}
+                                                                  className="border-blue-400 mt-1"
+                                                                />
+                                                                <div className="flex-1 min-w-0">
+                                                                  <p className="text-sm font-semibold text-white">{entry.employeeName}</p>
+                                                                  <p className="text-xs text-gray-400">
+                                                                    CPF: {entry.cpf ? entry.cpf.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : 'Não informado'} · Arquivo: {entry.fileName?.replace(/^UNIFICADO_/, '') || entry.fileName}
+                                                                  </p>
+                                                                </div>
+                                                              </div>
+                                                              <div className="flex flex-wrap gap-2">
+                                                                {doc && (
+                                                                  <>
+                                                                    <Button
+                                                                      size="sm"
+                                                                      variant="outline"
+                                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                                      onClick={() => openUnifiedViewer(doc, docIndex)}
+                                                                    >
+                                                                      <Eye className="h-4 w-4 mr-1" />
+                                                                      Visualizar
+                                                                    </Button>
+                                                                    <Button
+                                                                      size="sm"
+                                                                      variant="outline"
+                                                                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                                                                      onClick={() => downloadUnifiedDocument(doc)}
+                                                                    >
+                                                                      <Download className="h-4 w-4 mr-1" />
+                                                                      Download
+                                                                    </Button>
+                                                                    <Button
+                                                                      size="sm"
+                                                                      variant="outline"
+                                                                      className="border-green-600 text-green-300 hover:bg-green-600/20"
+                                                                      onClick={() => {
+                                                                        setSelectedUnifiedDocuments(new Set([docIndex]));
+                                                                        handleSendDocuments('email');
+                                                                      }}
+                                                                    >
+                                                                      <Mail className="h-4 w-4 mr-1" />
+                                                                      Email
+                                                                    </Button>
+                                                                    <Button
+                                                                      size="sm"
+                                                                      variant="outline"
+                                                                      className="border-blue-600 text-blue-300 hover:bg-blue-600/20"
+                                                                      onClick={() => {
+                                                                        setSelectedUnifiedDocuments(new Set([docIndex]));
+                                                                        handleSendDocuments('whatsapp');
+                                                                      }}
+                                                                    >
+                                                                      <MessageSquare className="h-4 w-4 mr-1" />
+                                                                      WhatsApp
+                                                                    </Button>
+                                                                    <Button
+                                                                      size="sm"
+                                                                      variant="outline"
+                                                                      className="border-red-600 text-red-300 hover:bg-red-600/20"
+                                                                      onClick={() => {
+                                                                        if (docIndex !== -1) {
+                                                                          handleDeleteDocuments('individual', docIndex);
+                                                                        }
+                                                                      }}
+                                                                    >
+                                                                      <Trash2 className="h-4 w-4 mr-1" />
+                                                                      Excluir
+                                                                    </Button>
+                                                                  </>
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                          );
+                                                        })}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })
+                                            ) : (
+                                              <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                                                Nenhum período encontrado para este setor.
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div className="rounded-xl border border-dashed border-gray-700 p-4 text-sm text-gray-400 text-center">
+                                    Nenhum setor encontrado para esta empresa.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Nova Aba: Logs de Envio */}
@@ -8081,7 +8153,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   </div>
                 </div>
 
-                      {loadingLogs ? (
+                {loadingLogs ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                     <span className="ml-2 text-muted-foreground">Carregando logs...</span>
@@ -8095,7 +8167,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                       Nenhum log de envio encontrado
                     </h3>
                     <p className="text-gray-400 text-sm max-w-md mb-4">
-                      {logsCpf || logsName || logsStatus !== 'todos' 
+                      {logsCpf || logsName || logsStatus !== 'todos'
                         ? 'Não há registros com os filtros informados. Tente ajustar os critérios de busca.'
                         : 'Ainda não há registros de envio. Os logs aparecerão aqui após enviar holerites ou documentos unificados.'
                       }
@@ -8123,20 +8195,20 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                           <div className="flex items-center gap-3">
                             {/* Status Badge */}
-                            <Badge 
+                            <Badge
                               className={
-                                log.success 
+                                log.success
                                   ? 'bg-green-500/20 text-green-400 border-green-500/40'
                                   : 'bg-red-500/20 text-red-400 border-red-500/40'
                               }
                             >
                               {log.success ? '✅ Enviado' : '❌ Falhou'}
                             </Badge>
-                            
+
                             {/* Canal Badge */}
-                            <Badge 
+                            <Badge
                               className={
-                                log.channel === 'EMAIL' 
+                                log.channel === 'EMAIL'
                                   ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
                                   : 'bg-green-500/20 text-green-400 border-green-500/40'
                               }
@@ -8144,14 +8216,14 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                               {log.channel === 'EMAIL' ? '📧 Email' : '💬 WhatsApp'}
                             </Badge>
                           </div>
-                          
+
                           {/* Data e Hora */}
                           <div className="flex items-center gap-2 text-gray-400 text-xs">
                             <Calendar size={14} />
                             <span>{new Date(log.createdAt || log.updatedAt).toLocaleString('pt-BR')}</span>
                           </div>
                         </div>
-                        
+
                         {/* Informações do Funcionário */}
                         <div className="flex items-center gap-2 mb-2">
                           <User size={16} className="text-gray-400" />
@@ -8159,7 +8231,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           <span className="text-gray-400">•</span>
                           <span className="text-gray-300 text-sm">Período: {log.month}/{log.year}</span>
                         </div>
-                        
+
                         {/* Mensagem de Erro */}
                         {!log.success && log.errorMessage && (
                           <div className="mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
@@ -8169,7 +8241,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                             </p>
                           </div>
                         )}
-                        
+
                         {/* Tentativas */}
                         {log.attempts > 1 && (
                           <div className="mt-2 flex items-center gap-2 text-gray-400 text-xs">
@@ -8299,7 +8371,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 Esta ação não pode ser desfeita e todos os holerites selecionados serão permanentemente removidos.
               </DialogDescription>
             </DialogHeader>
-            
+
             {/* Avisos */}
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <div className="flex items-start gap-2">
@@ -8312,10 +8384,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     <li>O histórico de envios será perdido</li>
                     <li>Não será possível recuperar os dados excluídos</li>
                   </ul>
-                  </div>
-                  </div>
                 </div>
-                
+              </div>
+            </div>
+
             {/* Lista dos holerites selecionados */}
             <div className="space-y-2 max-h-32 overflow-y-auto">
               <p className="text-sm text-gray-600 mb-2">Holerites selecionados:</p>
@@ -8328,19 +8400,19 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   </div>
                 ) : null;
               })}
-              </div>
+            </div>
 
             <DialogFooter>
-                    <Button
-                      variant="outline"
+              <Button
+                variant="outline"
                 onClick={() => setShowBatchDeleteModal(false)}
                 disabled={isDeleting}
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancelar
-                    </Button>
-                    <Button
-                variant="destructive" 
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={confirmBatchDeleteHolerites}
                 disabled={isDeleting}
               >
@@ -8355,7 +8427,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     Excluir {idsPendingDeletion.length} Holerite(s)
                   </>
                 )}
-                    </Button>
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -8386,7 +8458,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     ))}
                   </SelectContent>
                 </Select>
-                  </div>
+              </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="year" className="text-right">
                   Ano
@@ -8400,7 +8472,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     <SelectItem value="2025">2025</SelectItem>
                   </SelectContent>
                 </Select>
-                </div>
+              </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="forceUnification"
@@ -8410,7 +8482,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 <Label htmlFor="forceUnification" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   Forçar unificação mesmo com nomes diferentes
                 </Label>
-                           </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowBatchUnificationModal(false)}>
@@ -8432,7 +8504,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
 
         {/* Modal de Progresso da Unificação em Lote (Assíncrono) */}
         {currentJobId && jobStatus && !jobStatus.isFinished && (
-          <Dialog open={true} onOpenChange={() => {}}>
+          <Dialog open={true} onOpenChange={() => { }}>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Processando Unificação em Lote</DialogTitle>
@@ -8449,10 +8521,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div 
+                    <div
                       className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-                      style={{ 
-                        width: `${jobStatus.progressPercentage || 0}%` 
+                      style={{
+                        width: `${jobStatus.progressPercentage || 0}%`
                       }}
                     />
                   </div>
@@ -8460,7 +8532,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     {jobStatus.progressPercentage || 0}% concluído
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="text-center p-2 bg-green-50 rounded">
                     <div className="font-bold text-green-600">{jobStatus.successCount || 0}</div>
@@ -8471,7 +8543,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     <div className="text-red-800">Falhas</div>
                   </div>
                 </div>
-                
+
                 <div className="text-xs text-gray-500 text-center">
                   Status: {jobStatus.status === 'PROCESSING' ? '🔄 Processando...' : jobStatus.status}
                 </div>
@@ -8495,17 +8567,17 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   <div className="text-center p-3 bg-blue-50 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">{batchUnificationResult.totalProcessed || 0}</div>
                     <div className="text-sm text-blue-800">Total Processado</div>
-                                 </div>
+                  </div>
                   <div className="text-center p-3 bg-green-50 rounded-lg">
                     <div className="text-2xl font-bold text-green-600">{batchUnificationResult.totalSuccess || 0}</div>
                     <div className="text-sm text-green-800">Sucessos</div>
-                               </div>
+                  </div>
                   <div className="text-center p-3 bg-red-50 rounded-lg">
                     <div className="text-2xl font-bold text-red-600">{batchUnificationResult.totalFailed || 0}</div>
                     <div className="text-sm text-red-800">Falhas</div>
-                               </div>
-                             </div>
-                             
+                  </div>
+                </div>
+
                 {batchUnificationResult.successList && Array.isArray(batchUnificationResult.successList) && batchUnificationResult.successList.length > 0 && (
                   <div>
                     <h4 className="font-semibold text-green-800 mb-2">✅ Sucessos ({batchUnificationResult.successList.length})</h4>
@@ -8514,10 +8586,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                         <div key={index} className="p-2 bg-green-50 border border-green-200 rounded text-sm">
                           <div className="font-medium text-green-800">{item.employeeName}</div>
                           <div className="text-green-600">{item.fileName}</div>
-                                 </div>
+                        </div>
                       ))}
-                               </div>
-                               </div>
+                    </div>
+                  </div>
                 )}
 
                 {batchUnificationResult.failureList && Array.isArray(batchUnificationResult.failureList) && batchUnificationResult.failureList.length > 0 && (
@@ -8526,9 +8598,9 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {batchUnificationResult.failureList.map((item, index) => {
                         const message = item.message || item.error || 'Erro desconhecido';
-                        const isReceiptNotFound = message.includes('Nenhum comprovante encontrado') || 
-                                                  (message.includes('comprovante') && message.includes('não encontrado'));
-                        
+                        const isReceiptNotFound = message.includes('Nenhum comprovante encontrado') ||
+                          (message.includes('comprovante') && message.includes('não encontrado'));
+
                         return (
                           <div key={index} className="p-4 bg-red-50 border border-red-300 rounded-lg text-sm shadow-sm">
                             {/* Cabeçalho do Item */}
@@ -8574,13 +8646,13 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           </div>
                         );
                       })}
-                               </div>
-                             </div>
+                    </div>
+                  </div>
                 )}
 
                 <div className="text-sm text-gray-600">
                   Tempo de processamento: {batchUnificationResult.processingTimeMs}ms
-                           </div>
+                </div>
               </div>
             )}
             <DialogFooter>
@@ -8607,7 +8679,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 )}
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-sm text-gray-400">
-                {sendType === 'email' 
+                {sendType === 'email'
                   ? 'Os documentos selecionados serão enviados por email.'
                   : 'Os documentos selecionados serão enviados por WhatsApp.'}
               </DialogDescription>
@@ -8641,8 +8713,8 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               <Button variant="outline" onClick={() => setShowSendModal(false)} className="w-full sm:w-auto">
                 Cancelar
               </Button>
-              <Button 
-                onClick={executeSendDocuments} 
+              <Button
+                onClick={executeSendDocuments}
                 disabled={sendingDocuments}
                 className={sendType === 'email' ? 'w-full sm:w-auto bg-blue-600 hover:bg-blue-700' : 'w-full sm:w-auto bg-green-600 hover:bg-green-700'}
               >
@@ -8675,7 +8747,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 Importe comprovantes de pagamento de salário em PDF para processamento automático
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="flex flex-col gap-2">
                 <label htmlFor="payment-receipt-file" className="text-seguranca-lightgray">Arquivo PDF de Comprovante</label>
@@ -8701,7 +8773,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   />
                 </div>
               </div>
-              
+
               <div className="bg-seguranca-black p-4 rounded-lg">
                 <h4 className="font-medium mb-2 text-seguranca-lightgray">Como funciona:</h4>
                 <ul className="text-sm text-gray-400 space-y-1">
@@ -8718,11 +8790,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                   <span className="text-blue-300">Processando comprovante de pagamento...</span>
                 </div>
               )}
-              
+
               <div className="flex justify-end gap-2 mt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowPaymentReceiptUploadModal(false)} 
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPaymentReceiptUploadModal(false)}
                   disabled={processingPaymentReceipts}
                   className="border-gray-600 text-seguranca-lightgray"
                 >
@@ -8793,190 +8865,190 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
             setShowPeriodoEnvioModal(true);
           }
         }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
-          <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
-            <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Calendar className="h-6 w-6" />
-              </div>
-              Selecionar período do holerite
-            </DialogTitle>
-            <DialogDescription className="text-white/80 text-sm">
-              Escolha o período processado que deseja enviar. Isso evita reenvio de períodos já enviados.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {periodoEnvioOptions.length === 0 ? (
-              <p className="text-sm text-red-400">Nenhum período disponível para os holerites selecionados.</p>
-            ) : (
-              <>
-                <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
-                      <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
-                        <Calendar className="h-5 w-5 text-seguranca-red" />
-                      </div>
-                      Período do holerite
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <Label className="text-seguranca-lightgray text-sm">Período</Label>
-                    <Select value={periodoEnvioSelecionado} onValueChange={setPeriodoEnvioSelecionado}>
-                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                        <SelectValue placeholder="Selecione o período" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-seguranca-graphite border-gray-600">
-                        {periodoEnvioOptions.map((periodo) => (
-                          <SelectItem key={periodo.value} value={periodo.value} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                            {periodo.label} ({periodo.count})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
-                      <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
-                        <User className="h-5 w-5 text-seguranca-red" />
-                      </div>
-                      Destinatários
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-2">
-                      <Label className="text-seguranca-lightgray text-sm">Enviar para</Label>
-                      <Select
-                        value={sendRecipientMode}
-                        onValueChange={(value) => {
-                          const mode = value as 'all' | 'selected';
-                          setSendRecipientMode(mode);
-                          if (mode === 'all') {
-                            setSelectedRecipientIds(periodoHolerites.map((h) => h.id));
-                          } else {
-                            setSelectedRecipientIds(periodoHolerites.map((h) => h.id));
-                          }
-                        }}
-                      >
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+            <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
+              <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Calendar className="h-6 w-6" />
+                </div>
+                Selecionar período do holerite
+              </DialogTitle>
+              <DialogDescription className="text-white/80 text-sm">
+                Escolha o período processado que deseja enviar. Isso evita reenvio de períodos já enviados.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {periodoEnvioOptions.length === 0 ? (
+                <p className="text-sm text-red-400">Nenhum período disponível para os holerites selecionados.</p>
+              ) : (
+                <>
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                        <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                          <Calendar className="h-5 w-5 text-seguranca-red" />
+                        </div>
+                        Período do holerite
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <Label className="text-seguranca-lightgray text-sm">Período</Label>
+                      <Select value={periodoEnvioSelecionado} onValueChange={setPeriodoEnvioSelecionado}>
                         <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                          <SelectValue placeholder="Selecione os destinatários" />
+                          <SelectValue placeholder="Selecione o período" />
                         </SelectTrigger>
                         <SelectContent className="bg-seguranca-graphite border-gray-600">
-                          <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Todos selecionados</SelectItem>
-                          <SelectItem value="selected" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Selecionar usuários</SelectItem>
+                          {periodoEnvioOptions.map((periodo) => (
+                            <SelectItem key={periodo.value} value={periodo.value} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                              {periodo.label} ({periodo.count})
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
-                    </div>
+                    </CardContent>
+                  </Card>
 
-                    {sendRecipientMode === 'selected' && (
-                      <div className="space-y-2 rounded-lg border border-gray-700/70 bg-seguranca-black p-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-400">Selecionar usuários</span>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-gray-600 text-gray-300"
-                              onClick={() => setSelectedRecipientIds(periodoHolerites.map((h) => h.id))}
-                            >
-                              Todos
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-gray-600 text-gray-300"
-                              onClick={() => setSelectedRecipientIds([])}
-                            >
-                              Limpar
-                            </Button>
-                          </div>
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                        <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                          <User className="h-5 w-5 text-seguranca-red" />
                         </div>
-                        {loadingRecipientValidation ? (
-                          <p className="text-xs text-gray-400">Verificando WhatsApp dos usuários...</p>
-                        ) : periodoHolerites.length === 0 ? (
-                          <p className="text-xs text-gray-400">Nenhum holerite encontrado para o período selecionado.</p>
-                        ) : (
-                          <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
-                            {periodoHolerites.map((holerite) => (
-                              (() => {
-                                const employeeId = recipientEmployeeMap[holerite.id];
-                                const detail = employeeId ? recipientValidationMap[employeeId] : undefined;
-                                const needsWhatsApp = detail ? (detail.needsWhatsAppUpdate || !detail.canSendWhatsApp) : false;
-                                const needsUserCreation = detail?.needsUserCreation;
-                                const canSendWhatsApp = detail?.canSendWhatsApp;
-                                return (
-                                  <label key={holerite.id} className="flex items-center justify-between gap-2 text-sm text-seguranca-lightgray">
-                                    <div className="flex items-center gap-2">
-                                      <Checkbox
-                                        checked={selectedRecipientIds.includes(holerite.id)}
-                                        onCheckedChange={(checked) => {
-                                          setSelectedRecipientIds((prev) => {
-                                            if (checked) return Array.from(new Set([...prev, holerite.id]));
-                                            return prev.filter((id) => id !== holerite.id);
-                                          });
-                                        }}
-                                        className="border-gray-600"
-                                      />
-                                      <span className="truncate">
-                                        {holerite.employeeName || holerite.cpf || 'Funcionário'}
-                                      </span>
-                                    </div>
-                                    {!detail && (
+                        Destinatários
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        <Label className="text-seguranca-lightgray text-sm">Enviar para</Label>
+                        <Select
+                          value={sendRecipientMode}
+                          onValueChange={(value) => {
+                            const mode = value as 'all' | 'selected';
+                            setSendRecipientMode(mode);
+                            if (mode === 'all') {
+                              setSelectedRecipientIds(periodoHolerites.map((h) => h.id));
+                            } else {
+                              setSelectedRecipientIds(periodoHolerites.map((h) => h.id));
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                            <SelectValue placeholder="Selecione os destinatários" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-seguranca-graphite border-gray-600">
+                            <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Todos selecionados</SelectItem>
+                            <SelectItem value="selected" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Selecionar usuários</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {sendRecipientMode === 'selected' && (
+                        <div className="space-y-2 rounded-lg border border-gray-700/70 bg-seguranca-black p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">Selecionar usuários</span>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-600 text-gray-300"
+                                onClick={() => setSelectedRecipientIds(periodoHolerites.map((h) => h.id))}
+                              >
+                                Todos
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-600 text-gray-300"
+                                onClick={() => setSelectedRecipientIds([])}
+                              >
+                                Limpar
+                              </Button>
+                            </div>
+                          </div>
+                          {loadingRecipientValidation ? (
+                            <p className="text-xs text-gray-400">Verificando WhatsApp dos usuários...</p>
+                          ) : periodoHolerites.length === 0 ? (
+                            <p className="text-xs text-gray-400">Nenhum holerite encontrado para o período selecionado.</p>
+                          ) : (
+                            <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                              {periodoHolerites.map((holerite) => (
+                                (() => {
+                                  const employeeId = recipientEmployeeMap[holerite.id];
+                                  const detail = employeeId ? recipientValidationMap[employeeId] : undefined;
+                                  const needsWhatsApp = detail ? (detail.needsWhatsAppUpdate || !detail.canSendWhatsApp) : false;
+                                  const needsUserCreation = detail?.needsUserCreation;
+                                  const canSendWhatsApp = detail?.canSendWhatsApp;
+                                  return (
+                                    <label key={holerite.id} className="flex items-center justify-between gap-2 text-sm text-seguranca-lightgray">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-xs text-yellow-300">Sem vínculo</span>
+                                        <Checkbox
+                                          checked={selectedRecipientIds.includes(holerite.id)}
+                                          onCheckedChange={(checked) => {
+                                            setSelectedRecipientIds((prev) => {
+                                              if (checked) return Array.from(new Set([...prev, holerite.id]));
+                                              return prev.filter((id) => id !== holerite.id);
+                                            });
+                                          }}
+                                          className="border-gray-600"
+                                        />
+                                        <span className="truncate">
+                                          {holerite.employeeName || holerite.cpf || 'Funcionário'}
+                                        </span>
+                                      </div>
+                                      {!detail && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-yellow-300">Sem vínculo</span>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="text-xs text-blue-400 hover:text-blue-300 p-0 h-auto"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              void handleTryCreateLink(holerite);
+                                            }}
+                                            title="Tentar buscar funcionário e criar vínculo"
+                                          >
+                                            Buscar vínculo
+                                          </Button>
+                                        </div>
+                                      )}
+                                      {detail && !needsWhatsApp && canSendWhatsApp && (
+                                        <span className="text-xs text-emerald-300">WhatsApp OK</span>
+                                      )}
+                                      {detail && (needsWhatsApp || needsUserCreation) && (
                                         <Button
                                           size="sm"
                                           variant="ghost"
-                                          className="text-xs text-blue-400 hover:text-blue-300 p-0 h-auto"
+                                          className="text-xs text-blue-400 hover:text-blue-300"
                                           onClick={(e) => {
                                             e.preventDefault();
-                                            e.stopPropagation();
-                                            void handleTryCreateLink(holerite);
+                                            setSelectedValidationDetail(detail);
+                                            setPendingWhatsappContext(null);
+                                            if (detail.needsUserCreation) {
+                                              setShowSingleUserModal(true);
+                                            } else {
+                                              setShowSingleWhatsappModal(true);
+                                            }
                                           }}
-                                          title="Tentar buscar funcionário e criar vínculo"
                                         >
-                                          Buscar vínculo
+                                          {detail.needsUserCreation ? 'Criar usuário' : 'Atualizar WhatsApp'}
                                         </Button>
-                                      </div>
-                                    )}
-                                    {detail && !needsWhatsApp && canSendWhatsApp && (
-                                      <span className="text-xs text-emerald-300">WhatsApp OK</span>
-                                    )}
-                                    {detail && (needsWhatsApp || needsUserCreation) && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="text-xs text-blue-400 hover:text-blue-300"
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          setSelectedValidationDetail(detail);
-                                          setPendingWhatsappContext(null);
-                                          if (detail.needsUserCreation) {
-                                            setShowSingleUserModal(true);
-                                          } else {
-                                            setShowSingleWhatsappModal(true);
-                                          }
-                                        }}
-                                      >
-                                        {detail.needsUserCreation ? 'Criar usuário' : 'Atualizar WhatsApp'}
-                                      </Button>
-                                    )}
-                                  </label>
-                                );
-                              })()
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </>
-            )}
-          </div>
-          <DialogFooter className="mt-4">
+                                      )}
+                                    </label>
+                                  );
+                                })()
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+            <DialogFooter className="mt-4">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -9018,10 +9090,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
           <WhatsAppUpdateModal
             open={showSingleWhatsappModal}
             onClose={() => {
-            setShowSingleWhatsappModal(false);
-            setSelectedValidationDetail(null);
-            setPendingWhatsappContext(null);
-          }}
+              setShowSingleWhatsappModal(false);
+              setSelectedValidationDetail(null);
+              setPendingWhatsappContext(null);
+            }}
             employeeDetail={selectedValidationDetail}
             onSuccess={async () => {
               const context = pendingWhatsappContext;
@@ -9073,13 +9145,13 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 Excluir Documento
               </DialogTitle>
               <DialogDescription className="text-gray-300">
-                {deleteType === 'individual' 
+                {deleteType === 'individual'
                   ? 'Tem certeza que deseja excluir este documento unificado?'
                   : `Tem certeza que deseja excluir ${selectedUnifiedDocuments.size} documento(s) unificado(s)?`
                 }
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4 py-4">
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                 <p className="text-red-300 text-sm flex items-start gap-2">
@@ -9099,10 +9171,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     </span>
                   </div>
                   <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-                    <div 
+                    <div
                       className="bg-gradient-to-r from-red-500 to-pink-600 h-2 transition-all duration-300"
-                      style={{ 
-                        width: `${((deleteProgress.completed + deleteProgress.failed) / deleteProgress.total) * 100}%` 
+                      style={{
+                        width: `${((deleteProgress.completed + deleteProgress.failed) / deleteProgress.total) * 100}%`
                       }}
                     />
                   </div>
@@ -9114,17 +9186,17 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 </div>
               )}
             </div>
-            
+
             <DialogFooter>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setShowUnifiedDeleteModal(false)}
                 disabled={deletingDocuments}
                 className="border-gray-600 text-seguranca-lightgray"
               >
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 onClick={executeDeleteDocuments}
                 disabled={deletingDocuments}
                 className="bg-red-600 hover:bg-red-700"
@@ -9176,7 +9248,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 <div className="w-full lg:w-1/3 p-4 sm:p-6 border-b lg:border-b-0 lg:border-r border-gray-600/30 bg-seguranca-black/30 max-h-[40vh] lg:max-h-none overflow-y-auto">
                   <div className="space-y-4 sm:space-y-6">
                     <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">Informações do Documento</h3>
-                    
+
                     {/* Nome do Funcionário */}
                     {viewerDocument.employeeName && (
                       <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 rounded-xl p-3 sm:p-4">
@@ -9254,7 +9326,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                         <span className="hidden sm:inline">Baixar Documento</span>
                         <span className="sm:hidden">Baixar</span>
                       </Button>
-                      
+
                       {viewerDocument?.cpf && (
                         <>
                           <Button
@@ -9272,7 +9344,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                             <span className="hidden sm:inline">Enviar Email</span>
                             <span className="sm:hidden">Email</span>
                           </Button>
-                          
+
                           <Button
                             onClick={async () => {
                               const filteredDocs = getFilteredUnifiedDocuments();
@@ -9290,7 +9362,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           </Button>
                         </>
                       )}
-                      
+
                       {!viewerDocument?.cpf && (
                         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
                           <p className="text-yellow-300 text-xs sm:text-sm flex items-start gap-2">
@@ -9333,7 +9405,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 Já existem documentos processados para este período
               </DialogDescription>
             </DialogHeader>
-            
+
             {duplicatePeriodInfo && (
               <div className="space-y-4">
                 <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
@@ -9344,7 +9416,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                         {duplicatePeriodInfo.count} {duplicatePeriodInfo.type === 'holerite' ? 'holerite(s)' : 'comprovante(s)'} já processado(s)
                       </h4>
                       <p className="text-gray-300 text-sm mb-3">
-                        {duplicatePeriodInfo.type === 'holerite' 
+                        {duplicatePeriodInfo.type === 'holerite'
                           ? 'Foram encontrados holerites já importados para os seguintes períodos:'
                           : `Já existem ${duplicatePeriodInfo.count} comprovante(s) processado(s) para:`
                         }
@@ -9366,7 +9438,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                     Atenção: Sobrescrita de Dados
                   </h4>
                   <p className="text-gray-300 text-sm">
-                    Se você continuar com a importação, os {duplicatePeriodInfo.count} {duplicatePeriodInfo.type === 'holerite' ? 'holerite(s)' : 'comprovante(s)'} existente(s) 
+                    Se você continuar com a importação, os {duplicatePeriodInfo.count} {duplicatePeriodInfo.type === 'holerite' ? 'holerite(s)' : 'comprovante(s)'} existente(s)
                     <span className="text-red-300 font-semibold"> serão permanentemente substituídos</span> pelos novos documentos que você está importando.
                   </p>
                 </div>
@@ -9381,10 +9453,10 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                 </div>
               </div>
             )}
-            
+
             <DialogFooter>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setShowDuplicatePeriodModal(false);
                   setDuplicatePeriodInfo(null);
@@ -9395,25 +9467,25 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
               >
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 onClick={async () => {
                   // Processar o arquivo pendente
                   if (pendingUploadFile && duplicatePeriodInfo) {
                     try {
                       setOverwritingPeriod(true);
-                      
+
                       toast({
                         title: "Processando...",
                         description: "Excluindo documentos existentes e importando novos...",
                       });
-                      
+
                       // Fechar o modal
                       setShowDuplicatePeriodModal(false);
-                      
+
                       // Excluir documentos existentes do período
                       if (duplicatePeriodInfo.type === 'comprovante') {
                         // Excluir todos os comprovantes do período
-                        const receiptsToDelete = paymentReceipts.filter(r => 
+                        const receiptsToDelete = paymentReceipts.filter(r =>
                           r.year === parseInt(batchUnificationYear) && r.month === parseInt(batchUnificationMonth));
                         for (const receipt of receiptsToDelete) {
                           try {
@@ -9423,7 +9495,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           }
                         }
                       }
-                      
+
                       // Adicionar novos comprovantes
                       for (const newReceipt of processedReceipts) {
                         try {
@@ -9432,7 +9504,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           console.warn('Erro ao criar novo comprovante:', err);
                         }
                       }
-                      
+
                       // Adicionar novos holerites
                       for (const newHolerite of holerites) {
                         try {
@@ -9441,7 +9513,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           console.warn('Erro ao criar novo holerite:', err);
                         }
                       }
-                      
+
                       // Adicionar novos recibos
                       for (const newRecibo of recibosProcessados) {
                         try {
@@ -9450,7 +9522,7 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           console.warn('Erro ao criar novo recibo:', err);
                         }
                       }
-                      
+
                       // Adicionar novos documentos unificados
                       for (const newUnification of individualUnifications) {
                         try {
@@ -9459,11 +9531,11 @@ const detailNeedsWhatsAppConsent = (detail?: ContactValidationDetail | null) => 
                           console.warn('Erro ao criar novo documento unificado:', err);
                         }
                       }
-                      
+
                       // Atualizar lista de documentos unificados
                       await fetchUnifiedDocuments(true);
                       await loadUnifiedOrganization();
-                      
+
                       toast({
                         title: "Sucesso",
                         description: `Novos documentos importados com sucesso!`,

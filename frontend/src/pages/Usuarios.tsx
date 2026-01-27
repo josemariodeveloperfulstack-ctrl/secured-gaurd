@@ -57,6 +57,17 @@ const Usuarios: React.FC = () => {
     loadUsers();
   }, []);
 
+  // Recarregar usuários quando a aba "Online" for ativada para garantir status atualizado
+  useEffect(() => {
+    if (activeTab === 'online') {
+      // Pequeno delay para garantir que o WebSocket tenha tempo de atualizar
+      const timer = setTimeout(() => {
+        loadUsers();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     filterUsers();
   }, [users, searchTerm, roleFilter, activeTab]);
@@ -65,7 +76,19 @@ const Usuarios: React.FC = () => {
     try {
       setIsLoading(true);
       const usersData = await userService.getAllUsers();
-      setUsers(usersData);
+      // Garantir que isOnline está sempre definido
+      const usersWithOnlineStatus = usersData.map(user => ({
+        ...user,
+        isOnline: Boolean(user.isOnline)
+      }));
+      
+      // Log apenas quando há usuários online para debug
+      const onlineUsers = usersWithOnlineStatus.filter(u => Boolean(u.isOnline));
+      if (onlineUsers.length > 0) {
+        console.log('📥 [Usuarios] Usuários carregados:', usersWithOnlineStatus.length, '| Online:', onlineUsers.length);
+      }
+      
+      setUsers(usersWithOnlineStatus);
     } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);
       
@@ -98,6 +121,24 @@ const Usuarios: React.FC = () => {
   const filterUsers = () => {
     let filtered = users;
 
+    // Filtro por online - aplicar PRIMEIRO para garantir que todos os online sejam considerados
+    if (activeTab === 'online') {
+      filtered = filtered.filter(user => {
+        const isOnline = Boolean(user.isOnline);
+        return isOnline;
+      });
+      // Log apenas quando há discrepância
+      const onlineCount = filtered.length;
+      const expectedCount = users.filter(u => Boolean(u.isOnline)).length;
+      if (onlineCount !== expectedCount) {
+        console.warn('⚠️ [Usuarios] Discrepância no filtro online:', { 
+          filtrados: onlineCount, 
+          esperados: expectedCount,
+          total: users.length 
+        });
+      }
+    }
+
     // Filtro por busca
     if (searchTerm) {
       const normalizedTerm = searchTerm.toLowerCase();
@@ -112,11 +153,6 @@ const Usuarios: React.FC = () => {
     // Filtro por role
     if (roleFilter !== 'all') {
       filtered = filtered.filter(user => extractRoleNames(user.roles).includes(roleFilter));
-    }
-
-    // Filtro por online
-    if (activeTab === 'online') {
-      filtered = filtered.filter(user => Boolean(user.isOnline));
     }
 
     setFilteredUsers(filtered);
@@ -203,7 +239,15 @@ const Usuarios: React.FC = () => {
     token: localStorage.getItem('token') || '',
     username: currentUser?.username || currentUser?.email || currentUser?.id || '',
     onUserStatus: (event) => {
-      setUsers(prev => prev.map(u => u.id === event.userId ? { ...u, isOnline: event.isOnline } : u));
+      setUsers(prev => {
+        const updated = prev.map(u => {
+          if (u.id === event.userId) {
+            return { ...u, isOnline: Boolean(event.isOnline) };
+          }
+          return u;
+        });
+        return updated;
+      });
     }
   });
 

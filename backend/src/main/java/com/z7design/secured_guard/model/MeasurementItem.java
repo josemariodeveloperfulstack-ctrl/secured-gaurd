@@ -1,19 +1,23 @@
 package com.z7design.secured_guard.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 @Entity
 @Table(name = "measurement_items")
 @Data
-@EqualsAndHashCode(callSuper = false)
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MeasurementItem {
 
     @Id
@@ -33,19 +37,24 @@ public class MeasurementItem {
     private String unit;
 
     @Column(name = "quantity", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal quantity = BigDecimal.ONE;
 
     @Column(name = "unit_price", nullable = false, precision = 15, scale = 2)
+    @Builder.Default
     private BigDecimal unitPrice = BigDecimal.ZERO;
 
     @Column(name = "total_value", precision = 15, scale = 2, insertable = false, updatable = false)
+    @Builder.Default
     private BigDecimal totalValue = BigDecimal.ZERO;
 
     @Column(name = "cost_center_id")
-    private String costCenterId;
+    @Builder.Default
+    private String costCenterId = null;
 
     @Column(name = "cost_center_name")
-    private String costCenterName;
+    @Builder.Default
+    private String costCenterName = null;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bulletin_id", nullable = false)
@@ -59,45 +68,8 @@ public class MeasurementItem {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Método para calcular valor total automaticamente
     public void calculateTotalValue() {
-        this.totalValue = this.unitPrice.multiply(this.quantity);
+        this.totalValue = this.unitPrice != null && this.quantity != null ? this.unitPrice.multiply(this.quantity)
+                : BigDecimal.ZERO;
     }
-
-    // Método para obter valor formatado em reais
-    public String getFormattedUnitPrice() {
-        return String.format("R$ %.2f", this.unitPrice);
-    }
-
-    public String getFormattedTotalValue() {
-        return String.format("R$ %.2f", this.totalValue);
-    }
-
-    // Método para obter quantidade formatada
-    public String getFormattedQuantity() {
-        return String.format("%.2f", this.quantity);
-    }
-
-    // Método para obter nome do centro de custo
-    public String getCostCenterDisplayName() {
-        if (costCenterName != null && !costCenterName.trim().isEmpty()) {
-            return costCenterName;
-        }
-        
-        // Mapeamento padrão se não houver nome personalizado
-        switch (costCenterId) {
-            case "1": return "Operacional";
-            case "2": return "Comercial";
-            case "3": return "RH";
-            case "4": return "Financeiro";
-            case "5": return "Vigilância";
-            case "6": return "Portaria";
-            case "7": return "Rondas";
-            default: return "Não definido";
-        }
-    }
-
-    // Removido @PrePersist e @PreUpdate para totalValue
-    // A coluna total_value é gerada automaticamente pelo banco de dados
-    // O método calculateTotalValue() ainda pode ser usado para cálculos em memória
 }

@@ -1,6 +1,5 @@
 package com.z7design.secured_guard.service;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Cell;
@@ -8,9 +7,13 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.dto.TransportGuideDTO;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.TransportGuide;
 import com.z7design.secured_guard.model.enums.TransportGuideStatus;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.TransportGuideRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +40,8 @@ import java.util.stream.Collectors;
 public class TransportGuideService {
 
     private final TransportGuideRepository transportGuideRepository;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
     private static final String UPLOAD_DIR = "uploads/transport-guides/";
 
     @Transactional(readOnly = true)
@@ -200,39 +205,27 @@ public class TransportGuideService {
         
         log.info("Gerando PDF com {} guias de transporte", guides.size());
         
+        // Determinar companyId
+        UUID companyId = resolveCompanyId(guides, empresa);
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PdfWriter writer = null;
-        PdfDocument pdfDoc = null;
-        Document document = null;
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
         
         try {
-            writer = new PdfWriter(baos);
-            pdfDoc = new PdfDocument(writer);
-            document = new Document(pdfDoc);
-            document.setMargins(50, 50, 50, 50);
+            PdfWriter writer = new PdfWriter(baos);
             
-            // Cabeçalho da empresa
-            Paragraph companyHeader = new Paragraph("PROMOVER VIGILÂNCIA PATRIMONIAL LTDA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setBold()
-                    .setMarginBottom(5);
-            document.add(companyHeader);
+            // Criar documento com layout padrão
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO DE GUIAS DE TRANSPORTE")
+                .topMargin(120f)
+                .bottomMargin(80f)
+                .leftMargin(50f)
+                .rightMargin(50f)
+                .build();
             
-            Paragraph companyInfo = new Paragraph("CNPJ: 43.576.260/0001-12")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(10)
-                    .setMarginBottom(20);
-            document.add(companyInfo);
-            
-            // Título
-            Paragraph title = new Paragraph("RELATÓRIO DE GUIAS DE TRANSPORTE")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(18)
-                    .setBold()
-                    .setMarginTop(10)
-                    .setMarginBottom(20);
-            document.add(title);
+            docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
             
             // Informações do relatório
             Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
@@ -301,32 +294,44 @@ public class TransportGuideService {
                 
                 document.add(table);
             }
-            
-            // Rodapé
-            Paragraph footer = new Paragraph("Documento gerado automaticamente pelo sistema Secured Guard")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(8)
-                    .setMarginTop(30);
-            document.add(footer);
+
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            document.close();
             
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de guias de transporte: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
-        } finally {
-            if (document != null) {
-                document.close();
-            }
-            if (pdfDoc != null) {
-                pdfDoc.close();
-            }
-            if (writer != null) {
-                writer.close();
-            }
         }
         
         byte[] result = baos.toByteArray();
         log.info("PDF de guias de transporte gerado com sucesso, tamanho: {} bytes", result.length);
         return result;
+    }
+
+    private UUID resolveCompanyId(List<TransportGuide> guides, String empresa) {
+        // Tentar encontrar companyId pelo nome da empresa
+        if (empresa != null && !empresa.trim().isEmpty()) {
+            List<Company> companies = companyRepository.findAll();
+            for (Company company : companies) {
+                if (company.getName() != null && company.getName().equalsIgnoreCase(empresa)) {
+                    return company.getId();
+                }
+            }
+        }
+        
+        // Fallback: usar primeira empresa ativa
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            return activeCompanies.get(0).getId();
+        }
+        
+        // Último recurso: usar qualquer empresa
+        List<Company> allCompanies = companyRepository.findAll();
+        if (allCompanies != null && !allCompanies.isEmpty()) {
+            return allCompanies.get(0).getId();
+        }
+        
+        throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
     }
     
     private Cell createHeaderCell(String text) {

@@ -79,13 +79,13 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent className="max-w-md bg-seguranca-graphite border-gray-600">
+      <AlertDialogContent className="max-w-lg w-full bg-seguranca-graphite border-gray-600 max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2 text-red-400">
-            <AlertTriangle className="h-5 w-5" />
-            Confirmar Exclusão
+          <AlertDialogTitle className="flex items-center gap-2 text-red-400 break-words">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+            <span className="break-words">Confirmar Exclusão</span>
           </AlertDialogTitle>
-          <AlertDialogDescription className="text-gray-300">
+          <AlertDialogDescription className="text-gray-300 break-words">
             Esta ação não pode ser desfeita. O usuário será permanentemente removido do sistema.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -94,14 +94,14 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           {/* Informações do Usuário */}
           <Card className="bg-seguranca-black border-gray-700">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-red-900/30 rounded-full flex items-center justify-center border border-red-700">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-red-900/30 rounded-full flex items-center justify-center border border-red-700 flex-shrink-0">
                   <User className="h-6 w-6 text-red-400" />
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-seguranca-lightgray">{user.name}</h4>
-                  <p className="text-sm text-gray-400">{user.email}</p>
-                  <div className="flex gap-2 mt-1">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-seguranca-lightgray break-words">{user.name}</h4>
+                  <p className="text-sm text-gray-400 break-words break-all mt-1">{user.email}</p>
+                  <div className="flex gap-2 mt-2 flex-wrap">
                     <Badge className={getStatusColor(user)}>
                       {getStatusText(user)}
                     </Badge>
@@ -113,14 +113,15 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
 
           {/* Confirmação */}
           <div className="space-y-2">
-            <Label htmlFor="confirmation" className="text-seguranca-lightgray">
-              Digite o nome do usuário para confirmar: <strong className="text-red-400">{user.name}</strong>
+            <Label htmlFor="confirmation" className="text-seguranca-lightgray block break-words">
+              <span className="block mb-1">Digite o nome do usuário para confirmar:</span>
+              <strong className="text-red-400 break-words block">{user.name}</strong>
             </Label>
             <Input
               id="confirmation"
               value={confirmationText}
               onChange={(e) => setConfirmationText(e.target.value)}
-              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-red-500"
+              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-red-500 w-full"
               placeholder="Digite o nome completo do usuário"
             />
           </div>
@@ -129,9 +130,9 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           <div className="bg-red-900/30 border border-red-700 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-gray-300">
-                <p className="font-medium text-red-400">Atenção:</p>
-                <ul className="list-disc list-inside mt-1 space-y-1 text-gray-400">
+              <div className="text-sm text-gray-300 min-w-0 flex-1">
+                <p className="font-medium text-red-400 break-words">Atenção:</p>
+                <ul className="list-disc list-inside mt-1 space-y-1 text-gray-400 break-words">
                   <li>Esta ação é irreversível</li>
                   <li>O usuário perderá acesso ao sistema</li>
                   <li>Dados associados podem ser afetados</li>
@@ -144,10 +145,10 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           </div>
         </div>
 
-        <AlertDialogFooter className="flex gap-2">
+        <AlertDialogFooter className="flex gap-2 flex-wrap sm:flex-nowrap">
           <AlertDialogCancel
             disabled={isLoading}
-            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black w-full sm:w-auto"
           >
             <X className="h-4 w-4 mr-2" />
             Cancelar
@@ -155,7 +156,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
           <AlertDialogAction
             onClick={handleDelete}
             disabled={isLoading || !isConfirmed}
-            className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
           >
             <Trash2 className="h-4 w-4 mr-2" />
             {isLoading ? 'Excluindo...' : 'Excluir Usuário'}

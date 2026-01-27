@@ -1,9 +1,6 @@
 package com.z7design.secured_guard.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -13,9 +10,6 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "visit_control_reports")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class VisitControlReport {
 
     @Id
@@ -32,13 +26,11 @@ public class VisitControlReport {
     private Long fileSize;
 
     @Column(length = 2000)
-    private String filters; // JSON com os filtros aplicados
+    private String filters;
 
     private UUID workPostId;
     private String workPostName;
-
-    private String status; // Status filtrado
-
+    private String status;
     private LocalDate startDate;
     private LocalDate endDate;
 
@@ -56,16 +48,120 @@ public class VisitControlReport {
     @UpdateTimestamp
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    public VisitControlReport() {
+    }
+
+    // Manual Getters and Setters
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
+    }
+
+    public String getFilePath() {
+        return filePath;
+    }
+
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
+    }
+
+    public Long getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(Long fileSize) {
+        this.fileSize = fileSize;
+    }
+
+    public String getFilters() {
+        return filters;
+    }
+
+    public void setFilters(String filters) {
+        this.filters = filters;
+    }
+
+    public UUID getWorkPostId() {
+        return workPostId;
+    }
+
+    public void setWorkPostId(UUID workPostId) {
+        this.workPostId = workPostId;
+    }
+
+    public String getWorkPostName() {
+        return workPostName;
+    }
+
+    public void setWorkPostName(String workPostName) {
+        this.workPostName = workPostName;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public Integer getTotalVisits() {
+        return totalVisits;
+    }
+
+    public void setTotalVisits(Integer totalVisits) {
+        this.totalVisits = totalVisits;
+    }
+
+    public User getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(User createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-

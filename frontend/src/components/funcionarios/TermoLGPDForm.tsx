@@ -72,7 +72,7 @@ const TermoLGPDForm = () => {
   const handleConsentChange = (consentId: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      consentTypes: checked 
+      consentTypes: checked
         ? [...prev.consentTypes, consentId]
         : prev.consentTypes.filter(id => id !== consentId)
     }));
@@ -90,35 +90,29 @@ const TermoLGPDForm = () => {
 
     setLoading(true);
     try {
-      const addressValue = typeof funcionario.address === 'string' 
-          ? funcionario.address 
-          : funcionario.address 
-            ? `${funcionario.address.street}, ${funcionario.address.number || ''}` 
-            : '';
+      const addressValue = typeof funcionario.address === 'string'
+        ? funcionario.address
+        : funcionario.address
+          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
+          : '';
 
       const payload = {
-        templateName: 'termo-consentimento-lgpd.html',
-        funcionario: funcionario.name,
-        cpf: funcionario.cpf || funcionario.document || '',
-        cargo: funcionario.position?.name,
-        departamento: funcionario.unit?.name || funcionario.position?.name,
-        endereco: addressValue,
-        empresa: empresa.name,
-        cnpj: empresa.cnpj,
-        enderecoEmpresa: empresa.address && empresa.address.street
-          ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
-              .filter(Boolean)
-              .join(', ')
-          : '',
-        tiposConsentimento: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label).join(', '),
-        finalidadeUso: formData.dataUsage,
-        prazoRetencao: formData.dataRetention,
-        informacoesAdicionais: formData.additionalInfo,
-        dataConsentimento: new Date(formData.consentDate).toLocaleDateString('pt-BR'),
-        dataAtual: new Date().toLocaleDateString('pt-BR')
+        companyId: empresa.id,
+        employeeId: funcionario.id,
+        employeeName: funcionario.name,
+        employeeCpf: funcionario.cpf || funcionario.document || '',
+        employeePosition: funcionario.position?.name,
+        employeeDepartment: funcionario.unit?.name || funcionario.position?.name,
+        employeeAddress: addressValue,
+        consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
+        dataUsagePurpose: formData.dataUsage,
+        retentionPeriod: formData.dataRetention,
+        additionalInformation: formData.additionalInfo,
+        consentDate: formData.consentDate,
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : ''
       };
 
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+      const response = await api.post('/api/lgpd-consent/generate-pdf', payload, {
         responseType: 'blob'
       });
 
@@ -151,63 +145,57 @@ const TermoLGPDForm = () => {
 
   const handlePreview = async () => {
     if (!funcionario || !empresa) {
-        toast({
-          title: 'Atenção',
-          description: 'Selecione funcionário e empresa para visualizar o termo!',
-          variant: 'destructive'
-        });
-        return;
+      toast({
+        title: 'Atenção',
+        description: 'Selecione funcionário e empresa para visualizar o termo!',
+        variant: 'destructive'
+      });
+      return;
     }
 
     setLoading(true);
     try {
-        const addressValue = typeof funcionario.address === 'string' 
-          ? funcionario.address 
-          : funcionario.address 
-            ? `${funcionario.address.street}, ${funcionario.address.number || ''}` 
-            : '';
+      const addressValue = typeof funcionario.address === 'string'
+        ? funcionario.address
+        : funcionario.address
+          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
+          : '';
 
-        const payload = {
-            templateName: 'termo-consentimento-lgpd.html',
-            funcionario: funcionario.name,
-            cpf: funcionario.cpf || funcionario.document || '',
-            cargo: funcionario.position?.name,
-            departamento: funcionario.unit?.name || funcionario.position?.name,
-            endereco: addressValue,
-            empresa: empresa.name,
-            cnpj: empresa.cnpj,
-            enderecoEmpresa: empresa.address && empresa.address.street
-              ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
-                  .filter(Boolean)
-                  .join(', ')
-              : '',
-            tiposConsentimento: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label).join(', '),
-            finalidadeUso: formData.dataUsage,
-            prazoRetencao: formData.dataRetention,
-            informacoesAdicionais: formData.additionalInfo,
-            dataConsentimento: new Date(formData.consentDate).toLocaleDateString('pt-BR'),
-            dataAtual: new Date().toLocaleDateString('pt-BR')
-        };
+      const payload = {
+        companyId: empresa.id,
+        employeeId: funcionario.id,
+        employeeName: funcionario.name,
+        employeeCpf: funcionario.cpf || funcionario.document || '',
+        employeePosition: funcionario.position?.name,
+        employeeDepartment: funcionario.unit?.name || funcionario.position?.name,
+        employeeAddress: addressValue,
+        consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
+        dataUsagePurpose: formData.dataUsage,
+        retentionPeriod: formData.dataRetention,
+        additionalInformation: formData.additionalInfo,
+        consentDate: formData.consentDate,
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : ''
+      };
 
-        const response = await api.post('/api/documents/generate-pdf', payload, {
-            responseType: 'blob'
-        });
+      const response = await api.post('/api/lgpd-consent/preview-pdf', payload, {
+        responseType: 'blob'
+      });
 
-        const blob = new Blob([response.data], { type: 'application/pdf' });
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        
-        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
 
     } catch (error) {
-        console.error('Erro ao gerar preview:', error);
-        toast({
-            title: "Erro",
-            description: "Erro ao gerar preview. Tente novamente.",
-            variant: "destructive"
-        });
+      console.error('Erro ao gerar preview:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar preview. Tente novamente.",
+        variant: "destructive"
+      });
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -234,19 +222,19 @@ const TermoLGPDForm = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Identificação */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação das Partes</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário (Titular dos Dados)</Label>
-                <Select 
-                  value={formData.funcionarioId} 
+                <Select
+                  value={formData.funcionarioId}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, funcionarioId: value }))}
                   disabled={loadingData}
                 >
@@ -262,7 +250,7 @@ const TermoLGPDForm = () => {
                           <div className="flex flex-col py-1">
                             <span className="font-medium text-base">{f.name}</span>
                             {(f.cpf || f.document) && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.cpf || f.document}</span>
+                              <span className="text-xs text-muted-foreground">CPF: {(f as any).document}</span>
                             )}
                           </div>
                         </SelectItem>
@@ -273,11 +261,11 @@ const TermoLGPDForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa (Controladora)</Label>
-                <Select 
-                  value={formData.empresaId} 
+                <Select
+                  value={formData.empresaId}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, empresaId: value }))}
                   disabled={loadingData}
                 >
@@ -321,31 +309,31 @@ const TermoLGPDForm = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.name}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || funcionario.document || '-'}
+                        {(funcionario as any).document || '-'}
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.position?.name || '-'}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Departamento</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                         {funcionario.unit?.name || funcionario.position?.name || '-'}
+                        {funcionario.unit?.name || funcionario.position?.name || '-'}
                       </div>
                     </div>
                   </div>
@@ -363,24 +351,24 @@ const TermoLGPDForm = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                       {empresa.name}
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {empresa.cnpj}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                         {empresa.sigla || '-'}
+                        {empresa.sigla || '-'}
                       </div>
                     </div>
                   </div>
@@ -388,7 +376,7 @@ const TermoLGPDForm = () => {
               </div>
             )}
           </div>
-          
+
           {(funcionario || empresa) && <Separator />}
 
           {/* Tipos de Consentimento */}
@@ -397,14 +385,13 @@ const TermoLGPDForm = () => {
               <Shield className="h-4 w-4" />
               <span>Escopo do Consentimento</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {consentOptions.map((option) => (
-                <div key={option.id} className={`flex items-start space-x-3 p-4 rounded-lg border transition-all ${
-                  formData.consentTypes.includes(option.id) 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:border-primary/50'
-                }`}>
+                <div key={option.id} className={`flex items-start space-x-3 p-4 rounded-lg border transition-all ${formData.consentTypes.includes(option.id)
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+                  }`}>
                   <Checkbox
                     id={option.id}
                     checked={formData.consentTypes.includes(option.id)}
@@ -423,12 +410,12 @@ const TermoLGPDForm = () => {
               ))}
             </div>
           </div>
-          
+
           <Separator />
 
           {/* Configurações Adicionais */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className="space-y-2">
+            <div className="space-y-2">
               <Label>Finalidade do Uso dos Dados</Label>
               <Textarea
                 value={formData.dataUsage}
@@ -460,7 +447,7 @@ const TermoLGPDForm = () => {
                 </Select>
               </div>
 
-               <div className="space-y-2">
+              <div className="space-y-2">
                 <Label>Data do Consentimento</Label>
                 <Input
                   type="date"
@@ -471,7 +458,7 @@ const TermoLGPDForm = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label>Informações Adicionais</Label>
             <Textarea

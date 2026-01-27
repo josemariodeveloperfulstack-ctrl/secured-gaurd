@@ -1,6 +1,5 @@
 package com.z7design.secured_guard.config;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,9 +12,10 @@ import java.util.Properties;
  * Configuração customizada do JavaMailSender para garantir
  * que as propriedades de email sejam aplicadas corretamente
  */
-@Configuration
-@Slf4j
+@org.springframework.context.annotation.Configuration
 public class MailConfig {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MailConfig.class);
 
     // Prioridade: variável de ambiente MAIL_HOST > spring.mail.host > padrão
     @Value("#{systemEnvironment['MAIL_HOST'] ?: '${spring.mail.host:186.209.113.105}'}")
@@ -65,24 +65,25 @@ public class MailConfig {
 
     @Bean
     public JavaMailSender javaMailSender() {
-        // Verificar se MAIL_HOST está definido na variável de ambiente (tem prioridade absoluta)
+        // Verificar se MAIL_HOST está definido na variável de ambiente (tem prioridade
+        // absoluta)
         String mailHostEnv = System.getenv("MAIL_HOST");
         if (mailHostEnv != null && !mailHostEnv.trim().isEmpty()) {
             host = mailHostEnv.trim();
             log.info("📧 Usando MAIL_HOST da variável de ambiente: {}", host);
         }
-        
+
         log.info("📧 Configurando JavaMailSender...");
         log.info("📧 Host: {} (env: {}), Port: {}, Username: {}", host, mailHostEnv, port, username);
         log.info("📧 Password configurado: {}", password != null && !password.isEmpty() ? "SIM" : "NÃO");
         log.info("📧 SSL: {}, STARTTLS: {}", sslEnable, starttlsEnable);
-        
+
         // Converter strings para int com valores padrão
         int socketFactoryPort = parseInteger(socketFactoryPortStr, 465);
         int connectionTimeout = parseInteger(connectionTimeoutStr, 10000);
         int timeout = parseInteger(timeoutStr, 10000);
         int writeTimeout = parseInteger(writeTimeoutStr, 10000);
-        
+
         log.info("📧 SocketFactory: {}:{}", socketFactoryClass, socketFactoryPort);
         log.info("📧 Timeouts: connection={}ms, timeout={}ms, write={}ms", connectionTimeout, timeout, writeTimeout);
 
@@ -101,7 +102,7 @@ public class MailConfig {
         props.put("mail.smtp.ssl.trust", sslTrust);
         // Confiar no certificado SSL (necessário para alguns servidores)
         props.put("mail.smtp.ssl.checkserveridentity", "false");
-        
+
         // SocketFactory apenas para porta 465 (SSL direto)
         // NÃO usar SocketFactory com porta 587 (STARTTLS)
         if (port == 465 && sslEnable) {
@@ -120,7 +121,7 @@ public class MailConfig {
             props.remove("mail.smtp.socketFactory.fallback");
             log.info("🔓 Porta 587: usando STARTTLS (SocketFactory removido)");
         }
-        
+
         props.put("mail.smtp.connectiontimeout", String.valueOf(connectionTimeout));
         props.put("mail.smtp.timeout", String.valueOf(timeout));
         props.put("mail.smtp.writetimeout", String.valueOf(writeTimeout));
@@ -132,7 +133,7 @@ public class MailConfig {
         log.info("✅ JavaMailSender configurado com sucesso");
         return mailSender;
     }
-    
+
     /**
      * Converte string para int com valor padrão se vazio ou inválido
      */

@@ -135,36 +135,28 @@ const OrdemServicosForm = () => {
       if (!fullEmployee) throw new Error('Funcionário não encontrado');
 
       const payload = {
-        templateName: 'ordem-servico.html',
-        // Dados do Funcionário
-        funcionario: fullEmployee.name,
-        cpf: fullEmployee.cpf || fullEmployee.document || '',
-        cargo: form.position,
-        
-        // Dados da Empresa
-        empresa: empresa.name,
-        cnpj: empresa.cnpj,
-        enderecoEmpresa: empresa.address || '',
-        
-        // Dados do Cliente
-        cliente: cliente.name,
-        enderecoCliente: cliente.address || '',
-        
-        // Dados da Ordem
-        tipoServico: form.serviceType,
-        localServico: form.location,
-        dataInicio: new Date(form.startDate).toLocaleDateString('pt-BR'),
-        dataFim: form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : '',
-        horarioInicio: form.startTime,
-        horarioFim: form.endTime,
-        prioridade: form.priority,
+        companyId: empresa.id,
+        employeeName: fullEmployee.name,
+        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
+        employeePosition: form.position,
+        sector: (fullEmployee as any).unit?.name || '',
+        clientName: cliente.name,
+        clientAddress: cliente.address || '',
+        serviceType: form.serviceType,
+        location: form.location,
+        startDate: form.startDate,
+        endDate: form.endDate || null,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        priority: form.priority,
         status: form.status,
-        descricao: form.description,
-        observacoes: form.observations,
-        dataAtual: new Date().toLocaleDateString('pt-BR')
+        description: form.description,
+        observations: form.observations,
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        documentDate: new Date().toISOString().split('T')[0]
       };
 
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+      const response = await api.post('/api/operational-service-order/generate-pdf', payload, {
         responseType: 'blob'
       });
 
@@ -177,7 +169,7 @@ const OrdemServicosForm = () => {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toast({
         title: 'Sucesso',
         description: 'Ordem de Serviço gerada com sucesso!',
@@ -207,38 +199,37 @@ const OrdemServicosForm = () => {
     setLoading(true);
     try {
       const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-      
+
       const payload = {
-        templateName: 'ordem-servico.html',
-        funcionario: fullEmployee.name,
-        cpf: fullEmployee.cpf || fullEmployee.document || '',
-        cargo: form.position,
-        empresa: empresa.name,
-        cnpj: empresa.cnpj,
-        enderecoEmpresa: empresa.address || '',
-        cliente: cliente.name,
-        enderecoCliente: cliente.address || '',
-        tipoServico: form.serviceType,
-        localServico: form.location,
-        dataInicio: form.startDate ? new Date(form.startDate).toLocaleDateString('pt-BR') : '',
-        dataFim: form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : '',
-        horarioInicio: form.startTime,
-        horarioFim: form.endTime,
-        prioridade: form.priority,
+        companyId: empresa.id,
+        employeeName: fullEmployee.name,
+        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
+        employeePosition: form.position,
+        sector: (fullEmployee as any).unit?.name || '',
+        clientName: cliente.name,
+        clientAddress: cliente.address || '',
+        serviceType: form.serviceType,
+        location: form.location,
+        startDate: form.startDate,
+        endDate: form.endDate || null,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        priority: form.priority,
         status: form.status,
-        descricao: form.description,
-        observacoes: form.observations,
-        dataAtual: new Date().toLocaleDateString('pt-BR')
+        description: form.description,
+        observations: form.observations,
+        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        documentDate: new Date().toISOString().split('T')[0]
       };
 
-      const response = await api.post('/api/documents/generate-pdf', payload, {
+      const response = await api.post('/api/operational-service-order/preview-pdf', payload, {
         responseType: 'blob'
       });
 
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-      
+
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
     } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
@@ -275,19 +266,19 @@ const OrdemServicosForm = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-          
+
           {/* Identificação */}
           <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
               <User className="h-4 w-4" />
               <span>Identificação</span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Empresa</Label>
-                <Select 
-                  value={form.companyId} 
+                <Select
+                  value={form.companyId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
                   disabled={loadingData}
                 >
@@ -319,8 +310,8 @@ const OrdemServicosForm = () => {
 
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário</Label>
-                <Select 
-                  value={form.employeeId} 
+                <Select
+                  value={form.employeeId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                   disabled={loadingData}
                 >
@@ -350,8 +341,8 @@ const OrdemServicosForm = () => {
 
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Cliente</Label>
-                <Select 
-                  value={form.clientId} 
+                <Select
+                  value={form.clientId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, clientId: value }))}
                   disabled={loadingData}
                 >
@@ -393,13 +384,13 @@ const OrdemServicosForm = () => {
                 </div>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.name}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {funcionario.cpf || funcionario.document || '-'}
@@ -407,16 +398,16 @@ const OrdemServicosForm = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {form.position || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
-                     <div className="space-y-1.5">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                         {(funcionario as any).unit?.name || '-'}
+                        {(funcionario as any).unit?.name || '-'}
                       </div>
                     </div>
                   </div>
@@ -434,7 +425,7 @@ const OrdemServicosForm = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                   <div className="space-y-1.5">
+                  <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social / Nome</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                       {cliente.name}
@@ -450,7 +441,7 @@ const OrdemServicosForm = () => {
               </div>
             )}
           </div>
-          
+
           {(funcionario || empresa) && <Separator />}
 
           {/* Detalhes do Serviço */}
@@ -474,11 +465,11 @@ const OrdemServicosForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Local de Serviço</Label>
-                <Input 
-                  value={form.location} 
+                <Input
+                  value={form.location}
                   onChange={(e) => setForm(prev => ({ ...prev, location: e.target.value }))}
                   placeholder="Endereço completo do local de serviço"
                   className="bg-background h-11"
@@ -490,19 +481,19 @@ const OrdemServicosForm = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label>Data de Início</Label>
-                <Input 
-                  type="date" 
-                  value={form.startDate} 
+                <Input
+                  type="date"
+                  value={form.startDate}
                   onChange={(e) => setForm(prev => ({ ...prev, startDate: e.target.value }))}
                   className="bg-background"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Data de Término</Label>
-                <Input 
-                  type="date" 
-                  value={form.endDate} 
+                <Input
+                  type="date"
+                  value={form.endDate}
                   onChange={(e) => setForm(prev => ({ ...prev, endDate: e.target.value }))}
                   className="bg-background"
                 />
@@ -512,22 +503,22 @@ const OrdemServicosForm = () => {
                 <Label>Horário de Início</Label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="time" 
-                    value={form.startTime} 
+                  <Input
+                    type="time"
+                    value={form.startTime}
                     onChange={(e) => setForm(prev => ({ ...prev, startTime: e.target.value }))}
                     className="bg-background pl-9"
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Horário de Término</Label>
                 <div className="relative">
                   <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="time" 
-                    value={form.endTime} 
+                  <Input
+                    type="time"
+                    value={form.endTime}
                     onChange={(e) => setForm(prev => ({ ...prev, endTime: e.target.value }))}
                     className="bg-background pl-9"
                   />
@@ -550,7 +541,7 @@ const OrdemServicosForm = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}>
@@ -568,8 +559,8 @@ const OrdemServicosForm = () => {
 
             <div className="space-y-2">
               <Label>Descrição do Serviço</Label>
-              <Textarea 
-                value={form.description} 
+              <Textarea
+                value={form.description}
                 onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Descreva detalhadamente o serviço a ser prestado..."
                 rows={4}
@@ -579,8 +570,8 @@ const OrdemServicosForm = () => {
 
             <div className="space-y-2">
               <Label>Observações</Label>
-              <Textarea 
-                value={form.observations} 
+              <Textarea
+                value={form.observations}
                 onChange={(e) => setForm(prev => ({ ...prev, observations: e.target.value }))}
                 placeholder="Observações adicionais sobre a ordem de serviço..."
                 rows={3}
@@ -593,9 +584,9 @@ const OrdemServicosForm = () => {
 
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button 
-              onClick={handlePreviewOrder} 
-              variant="outline" 
+            <Button
+              onClick={handlePreviewOrder}
+              variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
               disabled={loading || !funcionario || !empresa || !cliente}
             >
@@ -611,8 +602,8 @@ const OrdemServicosForm = () => {
                 </>
               )}
             </Button>
-            <Button 
-              onClick={handleGenerateOrder} 
+            <Button
+              onClick={handleGenerateOrder}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || !funcionario || !empresa || !cliente}
             >
