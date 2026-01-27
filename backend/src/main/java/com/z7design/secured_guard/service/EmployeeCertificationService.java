@@ -174,7 +174,7 @@ public class EmployeeCertificationService {
 
     @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findAll() {
-        List<EmployeeCertification> entities = certificationRepository.findAllWithDetails();
+        List<EmployeeCertification> entities = certificationRepository.findAll();
         System.out
                 .println("📋 EmployeeCertificationService.findAll - Entidades encontradas no Repo: " + entities.size());
         List<EmployeeCertificationResponse> responses = convertToResponse(entities);
