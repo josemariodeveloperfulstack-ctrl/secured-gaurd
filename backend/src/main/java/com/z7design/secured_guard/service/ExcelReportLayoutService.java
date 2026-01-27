@@ -472,4 +472,68 @@ public class ExcelReportLayoutService {
 
         setupPrintLayout(sheet, company, reportTitle);
     }
+
+    public int addRow(Sheet sheet, int rowIndex, String label, String value, CellStyle labelStyle,
+            CellStyle valueStyle) {
+        Row row = sheet.createRow(rowIndex++);
+        Cell labelCell = row.createCell(0);
+        labelCell.setCellValue(label != null ? label : "");
+        labelCell.setCellStyle(labelStyle);
+
+        Cell valueCell = row.createCell(1);
+        valueCell.setCellValue(value != null ? value : "");
+        valueCell.setCellStyle(valueStyle);
+        return rowIndex;
+    }
+
+    public int addSection(Sheet sheet, int rowIndex, String title, int lastColumn, Workbook workbook) {
+        Row row = sheet.createRow(rowIndex++);
+        Cell cell = row.createCell(0);
+        cell.setCellValue(title);
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        cell.setCellStyle(style);
+        sheet.addMergedRegion(new CellRangeAddress(row.getRowNum(), row.getRowNum(), 0, lastColumn));
+        return rowIndex;
+    }
+
+    public CellStyle createLabelStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
+
+    public CellStyle createValueStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setWrapText(true);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
+
+    public CellStyle createHeaderStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
 }

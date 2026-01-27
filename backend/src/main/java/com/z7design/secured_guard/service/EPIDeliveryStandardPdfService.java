@@ -9,6 +9,7 @@ import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.UUID;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.FillPatternType;
@@ -257,25 +259,31 @@ public class EPIDeliveryStandardPdfService {
                         int rowIndex = excelReportLayoutService.addHeader(sheet, workbook, company,
                                         "CONTROLE DE EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (EPI)", lastColumn);
 
-                        CellStyle labelStyle = createLabelStyle(workbook);
-                        CellStyle valueStyle = createValueStyle(workbook);
-                        CellStyle headerStyle = createHeaderStyle(workbook);
+                        CellStyle labelStyle = excelReportLayoutService.createLabelStyle(workbook);
+                        CellStyle valueStyle = excelReportLayoutService.createValueStyle(workbook);
+                        CellStyle headerStyle = excelReportLayoutService.createHeaderStyle(workbook);
 
-                        rowIndex = addRow(sheet, rowIndex, "Empresa:", company.getName(), labelStyle, valueStyle);
-                        rowIndex = addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(), labelStyle, valueStyle);
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Empresa:", company.getName(),
+                                        labelStyle, valueStyle);
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(),
+                                        labelStyle, valueStyle);
                         rowIndex++;
 
-                        rowIndex = addRow(sheet, rowIndex, "Funcionário:", employee.getName(), labelStyle, valueStyle);
-                        rowIndex = addRow(sheet, rowIndex, "CPF:", employee.getDocument(), labelStyle, valueStyle);
-                        rowIndex = addRow(sheet, rowIndex, "Função:",
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Funcionário:", employee.getName(),
+                                        labelStyle, valueStyle);
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CPF:", employee.getDocument(),
+                                        labelStyle, valueStyle);
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Função:",
                                         employee.getPosition() != null ? employee.getPosition().getName() : "",
                                         labelStyle, valueStyle);
-                        rowIndex = addRow(sheet, rowIndex, "Setor:",
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Setor:",
                                         employee.getUnit() != null ? employee.getUnit().getName() : "",
                                         labelStyle, valueStyle);
-                        rowIndex = addRow(sheet, rowIndex, "Admissão:", formatDate(employee.getHireDate()), labelStyle,
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Admissão:",
+                                        formatDate(employee.getHireDate()), labelStyle,
                                         valueStyle);
-                        rowIndex = addRow(sheet, rowIndex, "Data de Entrega:", formatDate(form.getDeliveryDate()),
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Data de Entrega:",
+                                        formatDate(form.getDeliveryDate()),
                                         labelStyle,
                                         valueStyle);
                         rowIndex++;
@@ -396,55 +404,9 @@ public class EPIDeliveryStandardPdfService {
                 document.add(sigTable);
         }
 
-        private int addRow(Sheet sheet, int rowIndex, String label, String value, CellStyle labelStyle,
-                        CellStyle valueStyle) {
-                Row row = sheet.createRow(rowIndex++);
-                org.apache.poi.ss.usermodel.Cell labelCell = row.createCell(0);
-                labelCell.setCellValue(label != null ? label : "");
-                labelCell.setCellStyle(labelStyle);
-
-                org.apache.poi.ss.usermodel.Cell valueCell = row.createCell(1);
-                valueCell.setCellValue(value != null ? value : "");
-                valueCell.setCellStyle(valueStyle);
-                return rowIndex;
-        }
-
-        private CellStyle createLabelStyle(Workbook workbook) {
-                CellStyle style = workbook.createCellStyle();
-                Font font = workbook.createFont();
-                font.setBold(true);
-                style.setFont(font);
-                style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-                style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-                style.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                return style;
-        }
-
-        private CellStyle createValueStyle(Workbook workbook) {
-                CellStyle style = workbook.createCellStyle();
-                style.setWrapText(true);
-                style.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                return style;
-        }
-
-        private CellStyle createHeaderStyle(Workbook workbook) {
-                CellStyle style = workbook.createCellStyle();
-                Font font = workbook.createFont();
-                font.setBold(true);
-                style.setFont(font);
-                style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
-                style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-                style.setBorderBottom(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderTop(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderLeft(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                style.setBorderRight(org.apache.poi.ss.usermodel.BorderStyle.THIN);
-                return style;
+        private void addTableRow(Table table, String label, String value) {
+                table.addCell(new Cell().add(new Paragraph(label).setBold().setFontSize(9f)));
+                table.addCell(new Cell().add(new Paragraph(value != null ? value : "-").setFontSize(9f)));
         }
 
         private String formatDate(LocalDate date) {

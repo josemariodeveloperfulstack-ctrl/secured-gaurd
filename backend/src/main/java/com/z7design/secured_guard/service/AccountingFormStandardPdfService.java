@@ -6,6 +6,7 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
@@ -24,6 +25,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.FillPatternType;
@@ -178,66 +180,98 @@ public class AccountingFormStandardPdfService {
             int rowIndex = excelReportLayoutService.addHeader(sheet, workbook, reportCompany,
                     "FICHA DE CADASTRO DE FUNCIONÁRIO", lastColumn);
 
-            CellStyle labelStyle = createLabelStyle(workbook);
-            CellStyle valueStyle = createValueStyle(workbook);
+            CellStyle labelStyle = excelReportLayoutService.createLabelStyle(workbook);
+            CellStyle valueStyle = excelReportLayoutService.createValueStyle(workbook);
 
-            rowIndex = addSection(sheet, rowIndex, "Para Departamento de Contabilidade", lastColumn, workbook);
-            rowIndex = addRow(sheet, rowIndex, "Data de Geração:",
+            rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "Para Departamento de Contabilidade",
+                    lastColumn, workbook);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Data de Geração:",
                     LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), labelStyle, valueStyle);
 
-            rowIndex = addSection(sheet, rowIndex, "1. DADOS PESSOAIS", lastColumn, workbook);
-            rowIndex = addRow(sheet, rowIndex, "Nome Completo:", employee.getName(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "CPF:", employee.getDocument(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "RG:", buildRg(employee), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Data de Nascimento:", formatDate(employee.getBirthDate()), labelStyle,
+            rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "1. DADOS PESSOAIS", lastColumn, workbook);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Nome Completo:", employee.getName(),
+                    labelStyle, valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CPF:", employee.getDocument(), labelStyle,
                     valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Estado Civil:", employee.getMaritalStatus(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Nacionalidade:", employee.getNationality(), labelStyle, valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "RG:", buildRg(employee), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Data de Nascimento:",
+                    formatDate(employee.getBirthDate()), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Estado Civil:", employee.getMaritalStatus(),
+                    labelStyle, valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Nacionalidade:", employee.getNationality(),
+                    labelStyle, valueStyle);
 
-            rowIndex = addSection(sheet, rowIndex, "2. DOCUMENTOS", lastColumn, workbook);
-            rowIndex = addRow(sheet, rowIndex, "PIS/PASEP:", employee.getPis(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Título de Eleitor:", employee.getTituloEleitor(), labelStyle,
+            rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "2. DOCUMENTOS", lastColumn, workbook);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "PIS/PASEP:", employee.getPis(), labelStyle,
                     valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Zona/Seção Eleitoral:", buildZonaSecao(employee), labelStyle,
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Título de Eleitor:",
+                    employee.getTituloEleitor(), labelStyle,
                     valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "CTPS:", employee.getCtps(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Série CTPS:", employee.getCtpsSeries(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "CNH:", employee.getCnhNumber(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Categoria CNH:", employee.getCnhCategory(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Validade CNH:", formatDate(employee.getCnhExpirationDate()), labelStyle,
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Zona/Seção Eleitoral:",
+                    buildZonaSecao(employee), labelStyle,
                     valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Certificado Militar:", employee.getCertificadoMilitar(), labelStyle,
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CTPS:", employee.getCtps(), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Série CTPS:", employee.getCtpsSeries(),
+                    labelStyle, valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNH:", employee.getCnhNumber(), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Categoria CNH:", employee.getCnhCategory(),
+                    labelStyle, valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Validade CNH:",
+                    formatDate(employee.getCnhExpirationDate()), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Certificado Militar:",
+                    employee.getCertificadoMilitar(), labelStyle,
                     valueStyle);
 
-            rowIndex = addSection(sheet, rowIndex, "3. ENDEREÇO E CONTATO", lastColumn, workbook);
-            rowIndex = addRow(sheet, rowIndex, "Endereço:", buildAddress(employee), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Telefone:", employee.getPhone(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "E-mail:", employee.getEmail(), labelStyle, valueStyle);
+            rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "3. ENDEREÇO E CONTATO", lastColumn,
+                    workbook);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Endereço:", buildAddress(employee), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Telefone:", employee.getPhone(), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "E-mail:", employee.getEmail(), labelStyle,
+                    valueStyle);
 
-            rowIndex = addSection(sheet, rowIndex, "4. DADOS PROFISSIONAIS", lastColumn, workbook);
-            rowIndex = addRow(sheet, rowIndex, "Número de Registro:", employee.getRegistrationNumber(), labelStyle,
+            rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "4. DADOS PROFISSIONAIS", lastColumn,
+                    workbook);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Número de Registro:",
+                    employee.getRegistrationNumber(), labelStyle,
                     valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Data de Admissão:", formatDate(employee.getHireDate()), labelStyle,
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Data de Admissão:",
+                    formatDate(employee.getHireDate()), labelStyle,
                     valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Cargo:",
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Cargo:",
                     employee.getPosition() != null ? employee.getPosition().getName() : "", labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "CBO:", employee.getCbo(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Salário Base:",
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CBO:", employee.getCbo(), labelStyle,
+                    valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Salário Base:",
                     employee.getSalario() != null ? "R$ " + String.format("%.2f", employee.getSalario()) : "",
                     labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Status:", formatStatus(employee.getStatus()), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "Setor:", employee.getUnit() != null ? employee.getUnit().getName() : "",
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Status:", formatStatus(employee.getStatus()),
+                    labelStyle, valueStyle);
+            rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Setor:",
+                    employee.getUnit() != null ? employee.getUnit().getName() : "",
                     labelStyle, valueStyle);
             if (company != null) {
-                rowIndex = addRow(sheet, rowIndex, "Empresa:", company.getName(), labelStyle, valueStyle);
-                rowIndex = addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(), labelStyle, valueStyle);
+                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Empresa:", company.getName(), labelStyle,
+                        valueStyle);
+                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(), labelStyle,
+                        valueStyle);
             }
 
             if (employee.getBanco() != null || employee.getAgencia() != null || employee.getContaCorrente() != null) {
-                rowIndex = addSection(sheet, rowIndex, "5. DADOS BANCÁRIOS", lastColumn, workbook);
-                rowIndex = addRow(sheet, rowIndex, "Banco:", employee.getBanco(), labelStyle, valueStyle);
-                rowIndex = addRow(sheet, rowIndex, "Agência:", employee.getAgencia(), labelStyle, valueStyle);
-                rowIndex = addRow(sheet, rowIndex, "Conta Corrente:", employee.getContaCorrente(), labelStyle,
+                rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "5. DADOS BANCÁRIOS", lastColumn,
+                        workbook);
+                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Banco:", employee.getBanco(), labelStyle,
+                        valueStyle);
+                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Agência:", employee.getAgencia(),
+                        labelStyle, valueStyle);
+                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Conta Corrente:",
+                        employee.getContaCorrente(), labelStyle,
                         valueStyle);
             }
 
