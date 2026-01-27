@@ -9,13 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
-import { 
-  DollarSign, 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  User, 
+import {
+  DollarSign,
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  User,
   Building,
   TrendingUp,
   TrendingDown,
@@ -66,7 +66,7 @@ export const ContasAReceber: React.FC = () => {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
-  
+
   // Estados do modal
   const [showFormModal, setShowFormModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -84,7 +84,7 @@ export const ContasAReceber: React.FC = () => {
   const { toast } = useToast();
 
   // Funções de cobrança e gestão
-  
+
   // Funções do modal
   const handleOpenFormModal = (conta?: ContaAReceber) => {
     if (conta) {
@@ -123,8 +123,8 @@ export const ContasAReceber: React.FC = () => {
       };
 
       // Atualizar histórico da conta
-      setContas(prev => prev.map(c => 
-        c.id === contaId 
+      setContas(prev => prev.map(c =>
+        c.id === contaId
           ? { ...c, historicoCobranca: [...c.historicoCobranca, novoHistorico] }
           : c
       ));
@@ -155,8 +155,8 @@ export const ContasAReceber: React.FC = () => {
         resultado: 'enviado'
       };
 
-      setContas(prev => prev.map(c => 
-        c.id === selectedConta.id 
+      setContas(prev => prev.map(c =>
+        c.id === selectedConta.id
           ? { ...c, historicoCobranca: [...c.historicoCobranca, novoHistorico] }
           : c
       ));
@@ -178,19 +178,92 @@ export const ContasAReceber: React.FC = () => {
     }
   };
 
+  const handleExportPDF = async () => {
+    if (filteredContas.length === 0) {
+      toast({
+        title: 'Aviso',
+        description: 'Não há contas para exportar com os filtros aplicados.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      // Formatar datas para o backend
+      const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : format(startOfMonth(new Date()), 'yyyy-MM-dd');
+      const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : format(endOfMonth(new Date()), 'yyyy-MM-dd');
+
+      // Endpoint para Contas a Receber
+      const url = `/api/reports/accounts-receivable/pdf?startDate=${startDate}&endDate=${endDate}`;
+
+      // Chamar endpoint do backend
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Falha ao gerar relatório no servidor');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `relatorio-contas-a-receber-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório PDF gerado pelo servidor com sucesso'
+      });
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório no servidor. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const handleExportInadimplencia = async () => {
     setExportLoading(true);
     try {
-      const contasVencidas = contas.filter(c => c.status === 'OVERDUE');
-      // Implementar exportação de relatório de inadimplência
+      const url = `/api/reports/accounts-receivable/pdf?status=OVERDUE`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Falha ao gerar relatório de inadimplência');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `relatorio-inadimplencia-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
       toast({
-        title: 'Relatório Gerado',
-        description: `Relatório de inadimplência com ${contasVencidas.length} contas gerado`
+        title: 'Sucesso',
+        description: 'Relatório de inadimplência gerado com layout padrão'
       });
     } catch (error) {
+      console.error('Erro ao exportar inadimplência:', error);
       toast({
         title: 'Erro',
-        description: 'Erro ao gerar relatório',
+        description: 'Erro ao gerar relatório de inadimplência no servidor.',
         variant: 'destructive'
       });
     } finally {
@@ -246,7 +319,7 @@ export const ContasAReceber: React.FC = () => {
     const valorVencido = contas
       .filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA')
       .reduce((sum, c) => sum + (c?.pendingAmount || c?.amount || c?.valor || 0), 0);
-    
+
     const contasComAtraso = contas.filter(c => (c?.overdueDays || 0) > 0);
     const mediaAtraso = contasComAtraso.length > 0
       ? contasComAtraso.reduce((sum, c) => sum + (c?.overdueDays || 0), 0) / contasComAtraso.length
@@ -279,17 +352,17 @@ export const ContasAReceber: React.FC = () => {
     try {
       setLoading(true);
       console.log('Carregando dados de Contas a Receber...');
-      
+
       // Carregar contas a receber
       const contasData = await contasAReceberService.getContasAReceber();
       console.log('Contas carregadas:', contasData);
       setContas(contasData);
-      
+
       // Carregar clientes
       const clientesData = await contasAReceberService.getClientes();
       console.log('Clientes carregados:', clientesData);
       setClientes(clientesData);
-      
+
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -312,14 +385,14 @@ export const ContasAReceber: React.FC = () => {
   // Filtros aplicados
   const filteredContas = contas.filter(conta => {
     if (!conta) return false;
-    
+
     const matchesSearch = (conta.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-                         (conta.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-                         (conta.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
+      (conta.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (conta.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     const matchesStatus = filterStatus === 'all' || conta.status === filterStatus;
     const matchesCategoria = filterCategoria === 'all' || conta.categoria === filterCategoria;
     const matchesCliente = filterCliente === 'all' || conta.client?.id === filterCliente;
-    
+
     // Filtro por data
     let matchesDate = true;
     if (dateRange?.from && dateRange?.to) {
@@ -331,7 +404,7 @@ export const ContasAReceber: React.FC = () => {
         matchesDate = false;
       }
     }
-    
+
     return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesDate;
   });
 
@@ -345,8 +418,8 @@ export const ContasAReceber: React.FC = () => {
             <p className="text-gray-400">Gerencie suas contas a receber e controle de inadimplência</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleExportInadimplencia}
               disabled={exportLoading}
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
@@ -354,7 +427,7 @@ export const ContasAReceber: React.FC = () => {
               <FileText className="w-4 h-4 mr-2" />
               Relatório Inadimplência
             </Button>
-            <Button 
+            <Button
               onClick={() => handleOpenFormModal()}
               className="flex items-center gap-2 bg-seguranca-red text-white hover:bg-seguranca-red/90"
             >
@@ -381,7 +454,7 @@ export const ContasAReceber: React.FC = () => {
                   />
                 </div>
               </div>
-              
+
               {/* Filtros básicos */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
@@ -435,7 +508,7 @@ export const ContasAReceber: React.FC = () => {
                       onDateChange={setDateRange}
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-seguranca-lightgray">Cliente</label>
                     <Select value={filterCliente} onValueChange={setFilterCliente}>
@@ -454,7 +527,7 @@ export const ContasAReceber: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="flex items-end">
                     <Button
                       variant="outline"
@@ -472,7 +545,7 @@ export const ContasAReceber: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                
+
                 <div className="text-sm text-gray-400">
                   Mostrando {filteredContas.length} de {contas.length} contas
                 </div>
@@ -586,7 +659,7 @@ export const ContasAReceber: React.FC = () => {
                               <span className="font-semibold text-seguranca-lightgray">{item.count}</span>
                             </div>
                             <div className="w-full bg-gray-700 rounded-full h-2">
-                              <div 
+                              <div
                                 className={`h-2 rounded-full ${item.color}`}
                                 style={{ width: `${percentage}%` }}
                               ></div>
@@ -610,26 +683,26 @@ export const ContasAReceber: React.FC = () => {
                   <CardContent>
                     <div className="space-y-4">
                       {[
-                        { 
-                          label: 'Total a Receber', 
+                        {
+                          label: 'Total a Receber',
                           value: contas.reduce((sum, c) => sum + c.amount, 0),
                           color: 'bg-seguranca-yellow',
                           textColor: 'text-seguranca-yellow'
                         },
-                        { 
-                          label: 'Valor Recebido', 
+                        {
+                          label: 'Valor Recebido',
                           value: contas.reduce((sum, c) => sum + (c?.amountPaid || 0), 0),
                           color: 'bg-seguranca-yellow',
                           textColor: 'text-seguranca-yellow'
                         },
-                        { 
-                          label: 'Valor Pendente', 
+                        {
+                          label: 'Valor Pendente',
                           value: contas.reduce((sum, c) => sum + (c?.pendingAmount || 0), 0),
                           color: 'bg-seguranca-red',
                           textColor: 'text-seguranca-red'
                         },
-                        { 
-                          label: 'Valor Vencido', 
+                        {
+                          label: 'Valor Vencido',
                           value: contas.filter(c => c.status === 'OVERDUE').reduce((sum, c) => sum + c.amount, 0),
                           color: 'bg-seguranca-red',
                           textColor: 'text-seguranca-red'
@@ -642,7 +715,7 @@ export const ContasAReceber: React.FC = () => {
                           contas.filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA').reduce((sum, c) => sum + (c?.amount || c?.valor || 0), 0)
                         );
                         const percentage = maxValue > 0 ? (item.value / maxValue) * 100 : 0;
-                        
+
                         return (
                           <div key={item.label} className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -652,7 +725,7 @@ export const ContasAReceber: React.FC = () => {
                               </span>
                             </div>
                             <div className="w-full bg-gray-700 rounded-full h-3">
-                              <div 
+                              <div
                                 className={`h-3 rounded-full ${item.color}`}
                                 style={{ width: `${percentage}%` }}
                               ></div>
@@ -695,14 +768,13 @@ export const ContasAReceber: React.FC = () => {
                               <p className="font-semibold text-seguranca-yellow">
                                 R$ {((conta?.amount || conta?.valor || 0) as number).toLocaleString('pt-BR')}
                               </p>
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs ${
-                                  conta.status === 'OVERDUE' ? 'border-seguranca-red text-seguranca-red' :
-                                  conta.status === 'PAID' ? 'border-seguranca-yellow text-seguranca-yellow' :
-                                  conta.status === 'PENDING' ? 'border-seguranca-lightgray text-seguranca-lightgray' :
-                                  'border-seguranca-yellow text-seguranca-yellow'
-                                }`}
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${conta.status === 'OVERDUE' ? 'border-seguranca-red text-seguranca-red' :
+                                    conta.status === 'PAID' ? 'border-seguranca-yellow text-seguranca-yellow' :
+                                      conta.status === 'PENDING' ? 'border-seguranca-lightgray text-seguranca-lightgray' :
+                                        'border-seguranca-yellow text-seguranca-yellow'
+                                  }`}
                               >
                                 {conta.status}
                               </Badge>
@@ -832,19 +904,19 @@ export const ContasAReceber: React.FC = () => {
                           </td>
                           <td className="px-4 py-4">
                             <Badge
-                              variant={conta.status === 'PAID' ? 'default' : 
-                                      conta.status === 'OVERDUE' ? 'destructive' : 
-                                      conta.status === 'PENDING' ? 'secondary' : 'outline'}
+                              variant={conta.status === 'PAID' ? 'default' :
+                                conta.status === 'OVERDUE' ? 'destructive' :
+                                  conta.status === 'PENDING' ? 'secondary' : 'outline'}
                             >
                               {conta.status === 'PAID' ? 'Pago' :
-                               conta.status === 'OVERDUE' ? 'Vencido' :
-                               conta.status === 'PENDING' ? 'Pendente' : 'Cancelado'}
+                                conta.status === 'OVERDUE' ? 'Vencido' :
+                                  conta.status === 'PENDING' ? 'Pendente' : 'Cancelado'}
                             </Badge>
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center space-x-2">
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
                                 onClick={() => handleViewConta(conta)}
@@ -852,8 +924,8 @@ export const ContasAReceber: React.FC = () => {
                               >
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
                                 onClick={() => handleEditConta(conta)}
@@ -862,8 +934,8 @@ export const ContasAReceber: React.FC = () => {
                                 <Edit className="w-4 h-4" />
                               </Button>
                               {(conta.status === 'PENDING' || conta.status === 'OVERDUE' || conta.status === 'ABERTA' || conta.status === 'VENCIDA') && (
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   variant="outline"
                                   className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
                                   onClick={() => {
@@ -875,8 +947,8 @@ export const ContasAReceber: React.FC = () => {
                                   <Send className="w-4 h-4" />
                                 </Button>
                               )}
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 className="border-gray-600 text-seguranca-red hover:bg-seguranca-graphite hover:text-red-700"
                                 onClick={() => handleDeleteClick(conta)}
@@ -906,7 +978,7 @@ export const ContasAReceber: React.FC = () => {
                 Enviar cobrança para {selectedConta?.client.name}
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Tipo de Cobrança</label>
@@ -921,7 +993,7 @@ export const ContasAReceber: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label>Mensagem Personalizada</Label>
                 <Textarea
@@ -932,7 +1004,7 @@ export const ContasAReceber: React.FC = () => {
                 />
               </div>
             </div>
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCobrancaModal(false)}>
                 Cancelar
@@ -1011,13 +1083,13 @@ export const ContasAReceber: React.FC = () => {
                   <div>
                     <Label className="text-seguranca-lightgray">Status</Label>
                     <Badge
-                      variant={selectedConta.status === 'PAID' || selectedConta.status === 'RECEBIDA' ? 'default' : 
-                              selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'destructive' : 
-                              selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'secondary' : 'outline'}
+                      variant={selectedConta.status === 'PAID' || selectedConta.status === 'RECEBIDA' ? 'default' :
+                        selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'destructive' :
+                          selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'secondary' : 'outline'}
                     >
                       {selectedConta.status === 'PAID' || selectedConta.status === 'RECEBIDA' ? 'Pago' :
-                       selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'Vencido' :
-                       selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'Pendente' : 'Cancelado'}
+                        selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'Vencido' :
+                          selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'Pendente' : 'Cancelado'}
                     </Badge>
                   </div>
                   <div>
@@ -1119,9 +1191,9 @@ export const ContasAReceber: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-       </div>
-     </ContasAReceberGuard>
-   );
- };
+      </div>
+    </ContasAReceberGuard>
+  );
+};
 
 export default ContasAReceber;

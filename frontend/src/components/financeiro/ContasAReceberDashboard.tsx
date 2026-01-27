@@ -2,21 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
+import {
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
   DollarSign,
   Users,
   Calendar,
   BarChart3,
   PieChart,
-  Activity
+  Activity,
+  Clock
 } from 'lucide-react';
 import { ContaAReceber } from './ContasAReceberFormModal';
 import { format, subMonths, startOfMonth, endOfMonth, addDays, isBefore, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
 interface ContasAReceberDashboardProps {
   contas: ContaAReceber[];
@@ -54,27 +55,27 @@ export const ContasAReceberDashboard: React.FC<ContasAReceberDashboardProps> = (
     const valorRecebidas = contas.filter(c => c.status === 'RECEBIDA').reduce((sum, c) => sum + c.valor, 0);
     const valorVencidas = contas.filter(c => c.status === 'VENCIDA').reduce((sum, c) => sum + c.valor, 0);
 
-    const contasVencendoEm7Dias = contas.filter(c => 
-      c.status === 'ABERTA' && 
-      isAfter(c.vencimento, hoje) && 
+    const contasVencendoEm7Dias = contas.filter(c =>
+      c.status === 'ABERTA' &&
+      isAfter(c.vencimento, hoje) &&
       isBefore(c.vencimento, proximos7Dias)
     ).length;
 
-    const valorVencendoEm7Dias = contas.filter(c => 
-      c.status === 'ABERTA' && 
-      isAfter(c.vencimento, hoje) && 
+    const valorVencendoEm7Dias = contas.filter(c =>
+      c.status === 'ABERTA' &&
+      isAfter(c.vencimento, hoje) &&
       isBefore(c.vencimento, proximos7Dias)
     ).reduce((sum, c) => sum + c.valor, 0);
 
-    const contasVencendoEm30Dias = contas.filter(c => 
-      c.status === 'ABERTA' && 
-      isAfter(c.vencimento, hoje) && 
+    const contasVencendoEm30Dias = contas.filter(c =>
+      c.status === 'ABERTA' &&
+      isAfter(c.vencimento, hoje) &&
       isBefore(c.vencimento, proximos30Dias)
     ).length;
 
-    const valorVencendoEm30Dias = contas.filter(c => 
-      c.status === 'ABERTA' && 
-      isAfter(c.vencimento, hoje) && 
+    const valorVencendoEm30Dias = contas.filter(c =>
+      c.status === 'ABERTA' &&
+      isAfter(c.vencimento, hoje) &&
       isBefore(c.vencimento, proximos30Dias)
     ).reduce((sum, c) => sum + c.valor, 0);
 
@@ -101,12 +102,12 @@ export const ContasAReceberDashboard: React.FC<ContasAReceberDashboardProps> = (
   const gerarDadosEvolucao = () => {
     const meses = [];
     const hoje = new Date();
-    
+
     for (let i = 11; i >= 0; i--) {
       const data = subMonths(hoje, i);
       const inicioMes = startOfMonth(data);
       const fimMes = endOfMonth(data);
-      
+
       const contasMes = contas.filter(c => {
         if (!c || !c.vencimento) return false;
         try {
@@ -117,10 +118,10 @@ export const ContasAReceberDashboard: React.FC<ContasAReceberDashboardProps> = (
           return false;
         }
       });
-      
+
       const valorMes = contasMes.reduce((sum, c) => sum + c.valor, 0);
       const recebidasMes = contasMes.filter(c => c.status === 'RECEBIDA').reduce((sum, c) => sum + c.valor, 0);
-      
+
       meses.push({
         mes: format(data, 'MMM/yy', { locale: ptBR }),
         total: valorMes,
@@ -128,7 +129,7 @@ export const ContasAReceberDashboard: React.FC<ContasAReceberDashboardProps> = (
         abertas: valorMes - recebidasMes
       });
     }
-    
+
     return meses;
   };
 
@@ -286,25 +287,25 @@ export const ContasAReceberDashboard: React.FC<ContasAReceberDashboardProps> = (
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="mes" stroke="#9ca3af" />
                 <YAxis stroke="#9ca3af" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1f2937', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1f2937',
                     border: '1px solid #374151',
                     borderRadius: '8px',
                     color: '#f3f4f6'
-                  }} 
+                  }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="total" 
-                  stroke="#10b981" 
+                <Line
+                  type="monotone"
+                  dataKey="total"
+                  stroke="#10b981"
                   strokeWidth={2}
                   name="Total"
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="recebidas" 
-                  stroke="#3b82f6" 
+                <Line
+                  type="monotone"
+                  dataKey="recebidas"
+                  stroke="#3b82f6"
                   strokeWidth={2}
                   name="Recebidas"
                 />
@@ -336,13 +337,13 @@ export const ContasAReceberDashboard: React.FC<ContasAReceberDashboardProps> = (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#1f2937', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1f2937',
                     border: '1px solid #374151',
                     borderRadius: '8px',
                     color: '#f3f4f6'
-                  }} 
+                  }}
                   formatter={(value: number) => [formatCurrency(value), 'Valor']}
                 />
               </RechartsPieChart>
@@ -365,13 +366,13 @@ export const ContasAReceberDashboard: React.FC<ContasAReceberDashboardProps> = (
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="tipo" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#1f2937', 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1f2937',
                   border: '1px solid #374151',
                   borderRadius: '8px',
                   color: '#f3f4f6'
-                }} 
+                }}
                 formatter={(value: number) => [formatCurrency(value), 'Valor']}
               />
               <Bar dataKey="valor" fill="#10b981" />

@@ -58,7 +58,7 @@ const ContasAPagar: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('TODOS');
   const [tipoFilter, setTipoFilter] = useState<string>('TODOS');
-  
+
   // Estados para relatórios
   const [activeTab, setActiveTab] = useState<'contas' | 'relatorios'>('contas');
   const [reportLoading, setReportLoading] = useState(false);
@@ -74,7 +74,7 @@ const ContasAPagar: React.FC = () => {
   // Estados para filtro por empresa no relatório
   const [empresaFilterRelatorio, setEmpresaFilterRelatorio] = useState<string>('TODAS');
   const [showEmpresaFilterRelatorio, setShowEmpresaFilterRelatorio] = useState<boolean>(false);
-  
+
   // Estados para paginação
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
@@ -259,7 +259,7 @@ const ContasAPagar: React.FC = () => {
     setEmpresaFilterRelatorio(empresa);
     setShowEmpresaFilterRelatorio(true);
     setCurrentPage(1); // Reset para primeira página ao filtrar
-    
+
     // Atualizar apenas o subtítulo do relatório
     if (reportData) {
       setReportData({
@@ -267,7 +267,7 @@ const ContasAPagar: React.FC = () => {
         subtitle: `Contas filtradas para a empresa: ${empresa}`
       });
     }
-    
+
     toast({
       title: "Filtro Aplicado",
       description: `Mostrando apenas contas da empresa: ${empresa}`,
@@ -280,14 +280,14 @@ const ContasAPagar: React.FC = () => {
     setEmpresaFilterRelatorio('TODAS');
     setShowEmpresaFilterRelatorio(false);
     setCurrentPage(1);
-    
+
     if (reportData) {
       setReportData({
         ...reportData,
         subtitle: reportData.type === 'empresa' ? 'Agrupamento das contas por empresa' : reportData.subtitle
       });
     }
-    
+
     toast({
       title: "Filtro Removido",
       description: "Exibindo todas as empresas",
@@ -299,13 +299,13 @@ const ContasAPagar: React.FC = () => {
   const clearEmpresaFilterRelatorio = () => {
     setEmpresaFilterRelatorio('TODAS');
     setShowEmpresaFilterRelatorio(false);
-    
+
     // Restaurar dados originais (se necessário, recarregar o relatório)
     if (reportData) {
       // Recarregar o relatório original
       generateReport(reportData.type);
     }
-    
+
     toast({
       title: "Filtro Removido",
       description: "Mostrando contas de todas as empresas",
@@ -317,21 +317,21 @@ const ContasAPagar: React.FC = () => {
   const generateReport = async (reportType: string) => {
     try {
       setReportLoading(true);
-      
+
       // Resetar filtro de empresa quando gerar novo relatório
       setEmpresaFilterRelatorio('TODAS');
       setShowEmpresaFilterRelatorio(false);
-      
+
       console.log('🔍 DEBUG: Gerando relatório do tipo:', reportType);
       console.log('🔍 DEBUG: Total de contas disponíveis:', contas.length);
       console.log('🔍 DEBUG: Filtros aplicados:', reportFilters);
       console.log('🔍 DEBUG: Contas disponíveis:', contas);
-      
+
       const contasFiltradas = contas.filter(conta => {
         const dataVencimento = new Date(conta.vencimento);
         const dataInicio = reportFilters.startDate;
         const dataFim = reportFilters.endDate;
-        
+
         console.log('🔍 DEBUG: Verificando conta:', {
           id: conta.id,
           vencimento: conta.vencimento,
@@ -342,12 +342,12 @@ const ContasAPagar: React.FC = () => {
           tipo: conta.tipo,
           fornecedor: conta.fornecedor
         });
-        
+
         const filtroData = dataVencimento >= dataInicio && dataVencimento <= dataFim;
         const filtroStatus = reportFilters.status === 'TODOS' || conta.status === reportFilters.status;
         const filtroTipo = reportFilters.tipo === 'TODOS' || conta.tipo === reportFilters.tipo;
         const filtroFornecedor = reportFilters.fornecedor === 'TODOS' || conta.fornecedor === reportFilters.fornecedor;
-        
+
         console.log('🔍 DEBUG: Filtros aplicados:', {
           filtroData,
           filtroStatus,
@@ -355,10 +355,10 @@ const ContasAPagar: React.FC = () => {
           filtroFornecedor,
           passaFiltro: filtroData && filtroStatus && filtroTipo && filtroFornecedor
         });
-        
+
         return filtroData && filtroStatus && filtroTipo && filtroFornecedor;
       });
-      
+
       console.log('🔍 DEBUG: Contas filtradas:', contasFiltradas.length, contasFiltradas);
 
       // Se não há dados reais, criar dados de teste para demonstração
@@ -440,7 +440,7 @@ const ContasAPagar: React.FC = () => {
             acc[conta.fornecedor].valor += conta.valor;
             return acc;
           }, {} as any);
-          
+
           reportData = {
             ...reportData,
             title: 'Relatório por Fornecedor - Contas a Pagar',
@@ -462,7 +462,7 @@ const ContasAPagar: React.FC = () => {
             acc[conta.status].valor += conta.valor;
             return acc;
           }, {} as any);
-          
+
           reportData = {
             ...reportData,
             title: 'Relatório por Status - Contas a Pagar',
@@ -484,7 +484,7 @@ const ContasAPagar: React.FC = () => {
             acc[empresa].valor += conta.valor;
             return acc;
           }, {} as any);
-          
+
           reportData = {
             ...reportData,
             title: 'Relatório por Empresa - Contas a Pagar',
@@ -500,12 +500,12 @@ const ContasAPagar: React.FC = () => {
       }
 
       setReportData(reportData);
-      
+
       toast({
         title: "Sucesso",
         description: "Relatório gerado com sucesso!"
       });
-      
+
     } catch (error) {
       console.error('Erro ao gerar relatório:', error);
       toast({
@@ -527,7 +527,7 @@ const ContasAPagar: React.FC = () => {
       });
       return;
     }
-    
+
     try {
       const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa', 'Categoria'];
       const csvContent = [
@@ -543,24 +543,24 @@ const ContasAPagar: React.FC = () => {
           conta.categoria || ''
         ].join(','))
       ].join('\n');
-      
+
       const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
-      
+
       // Nome do arquivo com indicação de filtro
       let fileName = `contas-a-pagar-${reportData.title.toLowerCase().replace(/\s+/g, '-')}`;
       if (empresaFilterRelatorio !== 'TODAS') {
         fileName += `-${empresaFilterRelatorio.toLowerCase()}`;
       }
       fileName += `-${new Date().toISOString().split('T')[0]}.csv`;
-      
+
       link.setAttribute('download', fileName);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast({
         title: "Sucesso",
         description: `Relatório CSV exportado com sucesso! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
@@ -588,7 +588,7 @@ const ContasAPagar: React.FC = () => {
     try {
       // Criar uma planilha HTML simples que pode ser aberta no Excel
       const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa', 'Categoria'];
-      
+
       let htmlContent = `
         <html>
         <head>
@@ -626,24 +626,24 @@ const ContasAPagar: React.FC = () => {
         </body>
         </html>
       `;
-      
+
       const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
-      
+
       // Nome do arquivo com indicação de filtro
       let fileName = `contas-a-pagar-${reportData.title.toLowerCase().replace(/\s+/g, '-')}`;
       if (empresaFilterRelatorio !== 'TODAS') {
         fileName += `-${empresaFilterRelatorio.toLowerCase()}`;
       }
       fileName += `-${new Date().toISOString().split('T')[0]}.xls`;
-      
+
       link.setAttribute('download', fileName);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast({
         title: "Sucesso",
         description: `Relatório Excel exportado com sucesso! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
@@ -658,7 +658,7 @@ const ContasAPagar: React.FC = () => {
     }
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (!reportData || !filteredReportDisplayData || filteredReportDisplayData.length === 0) {
       toast({
         title: "Erro",
@@ -669,118 +669,71 @@ const ContasAPagar: React.FC = () => {
     }
 
     try {
-      // Criar um PDF simples usando window.print() com estilos específicos
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: "Erro",
-          description: "Não foi possível abrir a janela de impressão",
-          variant: "destructive"
-        });
-        return;
+      setReportLoading(true);
+
+      // Determinar qual endpoint usar baseado no tipo de relatório
+      let url = '';
+
+      // Formatar datas para o backend
+      const startDate = format(reportFilters.startDate, 'yyyy-MM-dd');
+      const endDate = format(reportFilters.endDate, 'yyyy-MM-dd');
+
+      if (reportData.type === 'resumo') {
+        url = `/api/reports/contas-a-pagar/resumo?format=pdf`;
+      } else if (reportData.type === 'empresa') {
+        const sigla = empresaFilterRelatorio === 'TODAS' ? 'TODAS' : empresaFilterRelatorio;
+        url = `/api/reports/contas-a-pagar/empresa/${sigla}?format=pdf&startDate=${startDate}&endDate=${endDate}`;
+      } else if (reportData.type === 'periodo') {
+        url = `/api/reports/contas-a-pagar?startDate=${startDate}&endDate=${endDate}&format=pdf`;
+      } else if (reportData.type === 'status') {
+        const status = reportFilters.status !== 'TODOS' ? reportFilters.status : 'ABERTA';
+        url = `/api/reports/contas-a-pagar/status/${status}?format=pdf`;
+      } else {
+        url = `/api/reports/contas-a-pagar?startDate=${startDate}&endDate=${endDate}&format=pdf`;
       }
 
-      const headers = ['Descrição', 'Fornecedor', 'Valor', 'Vencimento', 'Status', 'Tipo', 'Empresa'];
-      
-      // Recalcular resumo com dados filtrados
-      let summaryHtml = '';
-      if (displaySummary && Object.keys(displaySummary).length > 0) {
-        summaryHtml = `
-          <div class="summary">
-            <h3>Resumo</h3>
-            <p><strong>Total de Contas:</strong> ${displaySummary.totalContas || 0}</p>
-            <p><strong>Valor Total:</strong> ${formatCurrency(displaySummary.valorTotal || 0)}</p>
-            ${displaySummary.contasPagas !== undefined ? `<p><strong>Contas Pagas:</strong> ${displaySummary.contasPagas}</p>` : ''}
-            ${displaySummary.contasAbertas !== undefined ? `<p><strong>Contas Abertas:</strong> ${displaySummary.contasAbertas}</p>` : ''}
-            ${displaySummary.contasVencidas !== undefined ? `<p><strong>Contas Vencidas:</strong> ${displaySummary.contasVencidas}</p>` : ''}
-          </div>
-        `;
-      }
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${reportData.title}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #333; font-size: 24px; margin-bottom: 10px; }
-            h2 { color: #666; font-size: 18px; margin-bottom: 5px; }
-            p { margin: 5px 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-            th { background-color: #f2f2f2; font-weight: bold; }
-            tr:nth-child(even) { background-color: #f9f9f9; }
-            .summary { margin: 20px 0; padding: 15px; background-color: #f0f0f0; border-radius: 5px; }
-            .filter-info { background-color: #e3f2fd; padding: 10px; border-left: 4px solid #2196f3; margin: 10px 0; }
-            @media print {
-              body { margin: 0; }
-              .no-print { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <h1>${reportData.title}</h1>
-          <h2>${reportData.subtitle}</h2>
-          <p><strong>Período:</strong> ${reportData.period}</p>
-          ${empresaFilterRelatorio !== 'TODAS' ? `
-            <div class="filter-info">
-              <strong>🔍 Filtro Aplicado:</strong> Empresa ${empresaFilterRelatorio}
-            </div>
-          ` : ''}
-          <p><strong>Data de geração:</strong> ${new Date().toLocaleString('pt-BR')}</p>
-          <p><strong>Total de registros:</strong> ${filteredReportDisplayData.length}</p>
-          
-          ${summaryHtml}
-          
-          <table>
-            <thead>
-              <tr>
-                ${headers.map(header => `<th>${header}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredReportDisplayData.map((conta: ContaAPagar) => `
-                <tr>
-                  <td>${conta.descricao}</td>
-                  <td>${conta.fornecedor}</td>
-                  <td>${formatCurrency(conta.valor)}</td>
-                  <td>${format(conta.vencimento, 'dd/MM/yyyy')}</td>
-                  <td>${getStatusDisplayName(conta.status)}</td>
-                  <td>${conta.tipo}</td>
-                  <td>${conta.empresa || conta.companySigla || 'Não informado'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="no-print" style="margin-top: 30px; text-align: center;">
-            <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
-              Imprimir PDF
-            </button>
-            <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
-              Fechar
-            </button>
-          </div>
-        </body>
-        </html>
-      `;
+      // Chamar endpoint do backend para gerar PDF com layout padrão
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
 
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      
+      if (!response.ok) throw new Error('Falha ao gerar relatório no servidor');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+
+      // Nome do arquivo baseado no tipo de relatório
+      let filename = 'relatorio-contas-a-pagar';
+      if (reportData.type === 'resumo') {
+        filename = 'relatorio-resumo-contas-a-pagar';
+      } else if (reportData.type === 'empresa' && empresaFilterRelatorio !== 'TODAS') {
+        filename = `relatorio-contas-a-pagar-empresa-${empresaFilterRelatorio}`;
+      }
+      filename += `.pdf`;
+
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
       toast({
         title: "Sucesso",
-        description: `Relatório PDF preparado! (${filteredReportDisplayData.length} registros)${empresaFilterRelatorio !== 'TODAS' ? ` - Filtrado por: ${empresaFilterRelatorio}` : ''}`
+        description: `Relatório PDF gerado com layout padrão!`
       });
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       toast({
         title: "Erro",
-        description: "Erro ao exportar arquivo PDF",
+        description: "Erro ao exportar arquivo PDF. Tente novamente.",
         variant: "destructive"
       });
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -945,241 +898,241 @@ const ContasAPagar: React.FC = () => {
           {/* Aba de Contas */}
           <TabsContent value="contas" className="space-y-6">
 
-        {/* Dashboard de Gráficos */}
-        {showDashboard && (
-          <ContasAPagarDashboard
-            contas={contas}
-            refreshData={loadData}
-          />
-        )}
+            {/* Dashboard de Gráficos */}
+            {showDashboard && (
+              <ContasAPagarDashboard
+                contas={contas}
+                refreshData={loadData}
+              />
+            )}
 
-        {/* Alertas de Vencimento */}
-        {alertasVencimento.length > 0 && (
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-yellow-800">
-                <Bell className="text-yellow-600" />
-                Alertas de Vencimento
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {alertasVencimento.slice(0, 3).map(conta => (
-                  <div key={conta.id} className="flex justify-between items-center p-2 bg-white rounded border">
+            {/* Alertas de Vencimento */}
+            {alertasVencimento.length > 0 && (
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-yellow-800">
+                    <Bell className="text-yellow-600" />
+                    Alertas de Vencimento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {alertasVencimento.slice(0, 3).map(conta => (
+                      <div key={conta.id} className="flex justify-between items-center p-2 bg-white rounded border">
+                        <div>
+                          <span className="font-medium">{conta.fornecedor}</span>
+                          <span className="text-sm text-gray-600 ml-2">{conta.descricao}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-yellow-700">
+                            {formatCurrency(conta.valor)}
+                          </div>
+                          <div className="text-sm text-yellow-600">
+                            Vence em {format(conta.vencimento, 'dd/MM/yyyy')}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {alertasVencimento.length > 3 && (
+                      <p className="text-sm text-yellow-600 text-center">
+                        E mais {alertasVencimento.length - 3} conta(s) vencendo em breve...
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Dashboard Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-medium">{conta.fornecedor}</span>
-                      <span className="text-sm text-gray-600 ml-2">{conta.descricao}</span>
+                      <p className="text-sm font-medium text-blue-700">Total a Pagar</p>
+                      <p className="text-xl font-bold text-blue-800">{formatCurrency(stats.valorTotal)}</p>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-yellow-700">
-                        {formatCurrency(conta.valor)}
-                      </div>
-                      <div className="text-sm text-yellow-600">
-                        Vence em {format(conta.vencimento, 'dd/MM/yyyy')}
-                      </div>
+                    <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
+                      <DollarSign className="h-5 w-5 text-blue-700" />
                     </div>
                   </div>
-                ))}
-                {alertasVencimento.length > 3 && (
-                  <p className="text-sm text-yellow-600 text-center">
-                    E mais {alertasVencimento.length - 3} conta(s) vencendo em breve...
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  <div className="mt-2">
+                    <p className="text-xs text-blue-600">{stats.totalContas} contas</p>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Dashboard Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-700">Total a Pagar</p>
-                  <p className="text-xl font-bold text-blue-800">{formatCurrency(stats.valorTotal)}</p>
-                </div>
-                <div className="h-10 w-10 bg-blue-200 rounded-lg flex items-center justify-center">
-                  <DollarSign className="h-5 w-5 text-blue-700" />
-                </div>
-              </div>
-              <div className="mt-2">
-                <p className="text-xs text-blue-600">{stats.totalContas} contas</p>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-yellow-700">Vencidas</p>
+                      <p className="text-xl font-bold text-yellow-800">{formatCurrency(stats.valorVencidas)}</p>
+                    </div>
+                    <div className="h-10 w-10 bg-yellow-200 rounded-lg flex items-center justify-center">
+                      <AlertTriangle className="h-5 w-5 text-yellow-700" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-xs text-yellow-600">{stats.contasVencidas} contas</p>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-yellow-700">Vencidas</p>
-                  <p className="text-xl font-bold text-yellow-800">{formatCurrency(stats.valorVencidas)}</p>
-                </div>
-                <div className="h-10 w-10 bg-yellow-200 rounded-lg flex items-center justify-center">
-                  <AlertTriangle className="h-5 w-5 text-yellow-700" />
-                </div>
-              </div>
-              <div className="mt-2">
-                <p className="text-xs text-yellow-600">{stats.contasVencidas} contas</p>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-700">A Vencer (30 dias)</p>
+                      <p className="text-xl font-bold text-green-800">{stats.vencendoEm7Dias}</p>
+                    </div>
+                    <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
+                      <Calendar className="h-5 w-5 text-green-700" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <Badge variant="outline" className="text-xs border-green-300 text-green-700">
+                      Próximas
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-700">A Vencer (30 dias)</p>
-                  <p className="text-xl font-bold text-green-800">{stats.vencendoEm7Dias}</p>
-                </div>
-                <div className="h-10 w-10 bg-green-200 rounded-lg flex items-center justify-center">
-                  <Calendar className="h-5 w-5 text-green-700" />
-                </div>
-              </div>
-              <div className="mt-2">
-                <Badge variant="outline" className="text-xs border-green-300 text-green-700">
-                  Próximas
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Pagas no Mês</p>
-                  <p className="text-xl font-bold text-gray-800">{stats.contasPagas}</p>
-                </div>
-                <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-5 w-5 text-gray-700" />
-                </div>
-              </div>
-              <div className="mt-2">
-                <Badge variant="outline" className="text-xs border-gray-300 text-gray-700">
-                  Quitadas
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filtros */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-lg">
-                <FileText className="text-blue-600" />
-                Filtros e Busca
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Campo de Busca */}
-              <div className="md:col-span-2">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por descrição ou fornecedor..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Filtro por Status */}
-              <div>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="TODOS">Todos os Status</option>
-                  <option value="ABERTA">Aberta</option>
-                  <option value="PAGA">Paga</option>
-                  <option value="VENCIDA">Vencida</option>
-                </select>
-              </div>
-
-              {/* Filtro por Tipo */}
-              <div>
-                <select
-                  value={tipoFilter}
-                  onChange={(e) => setTipoFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="TODOS">Todos os Tipos</option>
-                  <option value="FIXA">Fixa</option>
-                  <option value="VARIAVEL">Variável</option>
-                </select>
-              </div>
+              <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Pagas no Mês</p>
+                      <p className="text-xl font-bold text-gray-800">{stats.contasPagas}</p>
+                    </div>
+                    <div className="h-10 w-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-gray-700" />
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <Badge variant="outline" className="text-xs border-gray-300 text-gray-700">
+                      Quitadas
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Seletor de Data */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="text-blue-600" />
-                Período de Vencimento
-              </div>
-              <div className="text-sm text-gray-600">
-                {contasFiltradas.length} conta(s) encontrada(s)
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Seletor de Ano e Mês */}
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700">Ano:</span>
-                <div className="flex gap-2">
-                  {[2025, 2026].map(ano => (
-                    <Button
-                      key={ano}
-                      variant={ano === anoSelecionado ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setAnoSelecionado(ano)}
-                      className={`min-w-[60px] ${ano === anoSelecionado ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+            {/* Filtros */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-lg">
+                    <FileText className="text-blue-600" />
+                    Filtros e Busca
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Campo de Busca */}
+                  <div className="md:col-span-2">
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por descrição ou fornecedor..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Filtro por Status */}
+                  <div>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      {ano}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
+                      <option value="TODOS">Todos os Status</option>
+                      <option value="ABERTA">Aberta</option>
+                      <option value="PAGA">Paga</option>
+                      <option value="VENCIDA">Vencida</option>
+                    </select>
+                  </div>
 
-            {/* Seletor de Mês */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-medium text-gray-700">Mês:</span>
-                <span className="text-sm text-blue-600 font-medium">
-                  {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][mesSelecionado - 1]} {anoSelecionado}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {[
-                  'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-                  'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
-                ].map((mes, index) => (
-                  <Button
-                    key={index + 1}
-                    variant={index + 1 === mesSelecionado ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setMesSelecionado(index + 1)}
-                    className={`text-xs ${index + 1 === mesSelecionado ? "bg-blue-600 hover:bg-blue-700" : ""}`}
-                  >
-                    {mes}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  {/* Filtro por Tipo */}
+                  <div>
+                    <select
+                      value={tipoFilter}
+                      onChange={(e) => setTipoFilter(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="TODOS">Todos os Tipos</option>
+                      <option value="FIXA">Fixa</option>
+                      <option value="VARIAVEL">Variável</option>
+                    </select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Seletor de Data */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="text-blue-600" />
+                    Período de Vencimento
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {contasFiltradas.length} conta(s) encontrada(s)
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Seletor de Ano e Mês */}
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Ano:</span>
+                    <div className="flex gap-2">
+                      {[2025, 2026].map(ano => (
+                        <Button
+                          key={ano}
+                          variant={ano === anoSelecionado ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAnoSelecionado(ano)}
+                          className={`min-w-[60px] ${ano === anoSelecionado ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                        >
+                          {ano}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seletor de Mês */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-sm font-medium text-gray-700">Mês:</span>
+                    <span className="text-sm text-blue-600 font-medium">
+                      {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'][mesSelecionado - 1]} {anoSelecionado}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {[
+                      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+                    ].map((mes, index) => (
+                      <Button
+                        key={index + 1}
+                        variant={index + 1 === mesSelecionado ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMesSelecionado(index + 1)}
+                        className={`text-xs ${index + 1 === mesSelecionado ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                      >
+                        {mes}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Tabela de Contas */}
             <ContasAPagarTable
@@ -1423,14 +1376,13 @@ const ContasAPagar: React.FC = () => {
                             {Object.entries(displaySummary.empresas).map(([empresa, valor]: [string, any]) => (
                               <div key={empresa} className="p-4 bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-lg border border-gray-600/30 hover:border-gray-500/50 transition-all duration-200">
                                 <div className="flex items-center justify-between mb-2">
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-sm font-medium ${
-                                      empresa === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
-                                      empresa === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
-                                      empresa === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
-                                      'border-gray-500 text-gray-300 bg-gray-500/10'
-                                    }`}
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-sm font-medium ${empresa === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
+                                        empresa === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
+                                          empresa === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
+                                            'border-gray-500 text-gray-300 bg-gray-500/10'
+                                      }`}
                                   >
                                     {empresa}
                                   </Badge>
@@ -1478,14 +1430,13 @@ const ContasAPagar: React.FC = () => {
                               <tr key={conta.id || index} className={index % 2 === 0 ? 'bg-seguranca-graphite/30' : 'bg-seguranca-black/30'}>
                                 <td className="px-4 py-3 border-b border-gray-700/30">
                                   <div className="flex items-center gap-2">
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`text-xs font-medium ${
-                                        empresaSigla === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
-                                        empresaSigla === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
-                                        empresaSigla === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
-                                        'border-gray-500 text-gray-300 bg-gray-500/10'
-                                      }`}
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs font-medium ${empresaSigla === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
+                                          empresaSigla === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
+                                            empresaSigla === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
+                                              'border-gray-500 text-gray-300 bg-gray-500/10'
+                                        }`}
                                     >
                                       {empresaSigla}
                                     </Badge>
@@ -1538,7 +1489,7 @@ const ContasAPagar: React.FC = () => {
                           <ChevronLeft size={16} className="mr-1" />
                           Anterior
                         </Button>
-                        
+
                         <div className="flex items-center gap-1">
                           {[...Array(totalPages)].map((_, idx) => {
                             const pageNum = idx + 1;
@@ -1554,11 +1505,10 @@ const ContasAPagar: React.FC = () => {
                                   onClick={() => setCurrentPage(pageNum)}
                                   variant={currentPage === pageNum ? "default" : "outline"}
                                   size="sm"
-                                  className={`min-w-[40px] ${
-                                    currentPage === pageNum
+                                  className={`min-w-[40px] ${currentPage === pageNum
                                       ? "bg-blue-600 text-white hover:bg-blue-700"
                                       : "border-gray-600 text-gray-300 hover:bg-seguranca-black"
-                                  }`}
+                                    }`}
                                 >
                                   {pageNum}
                                 </Button>
@@ -1587,8 +1537,8 @@ const ContasAPagar: React.FC = () => {
                   {/* Mensagem quando não há dados filtrados */}
                   {filteredReportDisplayData && filteredReportDisplayData.length === 0 && (
                     <div className="text-center py-8 text-gray-400">
-                      {empresaFilterRelatorio !== 'TODAS' 
-                        ? `Nenhuma conta encontrada para a empresa: ${empresaFilterRelatorio}` 
+                      {empresaFilterRelatorio !== 'TODAS'
+                        ? `Nenhuma conta encontrada para a empresa: ${empresaFilterRelatorio}`
                         : 'Nenhuma conta encontrada para os filtros aplicados.'
                       }
                     </div>

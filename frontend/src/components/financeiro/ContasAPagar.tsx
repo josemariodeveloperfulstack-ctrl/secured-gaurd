@@ -115,95 +115,61 @@ export const ContasAPagar: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
+    if (filteredContas.length === 0) {
+      toast({
+        title: 'Aviso',
+        description: 'Não há contas para exportar com os filtros aplicados.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setExportLoading(true);
     try {
-      // Usar as contas já filtradas no frontend
-      const contasParaExportar = filteredContas;
+      // Determinar qual endpoint usar baseado no estado atual
+      // Priorizar o filtro de empresa se houver, ou usar o geral por período
+      let url = '';
+      const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : format(startOfMonth(new Date()), 'yyyy-MM-dd');
+      const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-      if (contasParaExportar.length === 0) {
-        toast({
-          title: 'Aviso',
-          description: 'Não há contas para exportar com os filtros aplicados.',
-          variant: 'destructive'
-        });
-        setExportLoading(false);
-        return;
+      // Se todas as empresas estão na lista filtrada, usamos o endpoint de 'TODAS'
+      const uniqueCompanies = new Set(filteredContas.map(c => c.companySigla || c.empresa).filter(Boolean));
+
+      if (uniqueCompanies.size > 1 || uniqueCompanies.size === 0) {
+        url = `/api/reports/contas-a-pagar/empresa/TODAS?format=pdf&startDate=${startDate}&endDate=${endDate}`;
+      } else {
+        const sigla = Array.from(uniqueCompanies)[0] as string;
+        url = `/api/reports/contas-a-pagar/empresa/${sigla}?format=pdf&startDate=${startDate}&endDate=${endDate}`;
       }
 
-      // Criar PDF usando jsPDF
-      const doc = new jsPDF('landscape'); // Modo paisagem para mais espaço
-      
-      // Título
-      doc.setFontSize(16);
-      doc.text('Relatório de Contas a Pagar', 14, 15);
-      
-      // Informações do período
-      doc.setFontSize(10);
-      const periodoTexto = dateRange?.from && dateRange?.to
-        ? `Período: ${format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })} a ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}`
-        : 'Período: Todos';
-      doc.text(periodoTexto, 14, 22);
-      doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, 14, 27);
-      doc.text(`Total de contas: ${contasParaExportar.length}`, 14, 32);
-
-      // Preparar dados da tabela
-      const tableData = contasParaExportar.map(conta => [
-        format(new Date(conta.vencimento), 'dd/MM/yyyy', { locale: ptBR }),
-        conta.fornecedor?.nome || 'Não informado',
-        conta.descricao || '',
-        conta.empresa || '',
-        conta.tipo || '',
-        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(conta.valor),
-        conta.status || '',
-        conta.dataPagamento ? format(new Date(conta.dataPagamento), 'dd/MM/yyyy', { locale: ptBR }) : '-'
-      ]);
-
-      // Adicionar tabela
-      (doc as any).autoTable({
-        head: [['Vencimento', 'Fornecedor', 'Descrição', 'Empresa', 'Tipo', 'Valor', 'Status', 'Dt. Pagamento']],
-        body: tableData,
-        startY: 38,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [66, 139, 202], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        margin: { top: 38 },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 50 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 30, halign: 'right' },
-          6: { cellWidth: 25 },
-          7: { cellWidth: 25 }
+      // Chamar endpoint do backend
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
 
-      // Calcular totais
-      const valorTotal = contasParaExportar.reduce((sum, conta) => sum + conta.valor, 0);
-      const finalY = (doc as any).lastAutoTable.finalY || 38;
-      
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text(
-        `Valor Total: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorTotal)}`,
-        14,
-        finalY + 10
-      );
+      if (!response.ok) throw new Error('Falha ao gerar relatório no servidor');
 
-      // Salvar PDF
-      const fileName = `contas-a-pagar-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      doc.save(fileName);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `relatorio-contas-a-pagar-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
 
       toast({
         title: 'Sucesso',
-        description: 'Relatório PDF gerado e baixado com sucesso'
+        description: 'Relatório PDF gerado pelo servidor com sucesso'
       });
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       toast({
         title: 'Erro',
-        description: 'Erro ao gerar relatório PDF. Tente novamente.',
+        description: 'Erro ao gerar relatório no servidor. Tente novamente.',
         variant: 'destructive'
       });
     } finally {
@@ -267,19 +233,19 @@ export const ContasAPagar: React.FC = () => {
 
   const filteredContas = contas.filter(conta => {
     const matchesSearch = conta.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         conta.fornecedor.nome.toLowerCase().includes(searchTerm.toLowerCase());
+      conta.fornecedor.nome.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || conta.status === statusFilter;
     const matchesTipo = tipoFilter === 'all' || conta.tipo === tipoFilter;
     const matchesFornecedor = fornecedorFilter === 'all' || conta.fornecedor.nome === fornecedorFilter;
     const matchesCentroCusto = centroCustoFilter === 'all' || conta.centroCusto === centroCustoFilter;
-    
+
     // Filtro por data
     let matchesDate = true;
     if (dateRange?.from && dateRange?.to) {
       const contaDate = new Date(conta.vencimento);
       matchesDate = contaDate >= dateRange.from && contaDate <= dateRange.to;
     }
-    
+
     return matchesSearch && matchesStatus && matchesTipo && matchesFornecedor && matchesCentroCusto && matchesDate;
   });
 
