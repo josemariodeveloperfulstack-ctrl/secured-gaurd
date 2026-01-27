@@ -147,29 +147,39 @@ public class EmployeeCertificationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Certificação não encontrada"));
     }
 
+    @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findByEmployeeId(UUID employeeId) {
         return convertToResponse(certificationRepository.findByEmployeeId(employeeId));
     }
 
+    @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findByEmployeeIdAndStatus(UUID employeeId, CertificationStatus status) {
         return convertToResponse(certificationRepository.findByEmployeeIdAndStatus(employeeId, status));
     }
 
+    @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findByTrainingId(UUID trainingId) {
         return convertToResponse(certificationRepository.findByTrainingId(trainingId));
     }
 
+    @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findExpiringSoon(LocalDate date) {
         return convertToResponse(certificationRepository.findByExpirationDateBefore(date));
     }
 
+    @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findExpiringBetween(LocalDate startDate, LocalDate endDate) {
         return convertToResponse(certificationRepository.findByExpirationDateBetween(startDate, endDate));
     }
 
     @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findAll() {
-        return convertToResponse(certificationRepository.findAllWithDetails());
+        List<EmployeeCertification> entities = certificationRepository.findAllWithDetails();
+        System.out
+                .println("📋 EmployeeCertificationService.findAll - Entidades encontradas no Repo: " + entities.size());
+        List<EmployeeCertificationResponse> responses = convertToResponse(entities);
+        System.out.println("📋 EmployeeCertificationService.findAll - Responses convertidas: " + responses.size());
+        return responses;
     }
 
     private List<EmployeeCertificationResponse> convertToResponse(List<EmployeeCertification> entities) {
