@@ -119,18 +119,23 @@ public class ReportService {
                 for (Employee e : employees) {
                     table.addCell(new Paragraph(e.getName() != null ? e.getName().toUpperCase() : "").setFontSize(8));
                     table.addCell(new Paragraph(
-                            e.getCpf() != null ? com.z7design.secured_guard.util.ValidationUtils.formatCpf(e.getCpf())
+                            e.getDocument() != null
+                                    ? com.z7design.secured_guard.util.ValidationUtils.formatCpf(e.getDocument())
                                     : "")
                             .setFontSize(8).setTextAlignment(TextAlignment.CENTER));
-                    table.addCell(new Paragraph(e.getJobTitle() != null ? e.getJobTitle() : "").setFontSize(8));
-                    table.addCell(new Paragraph(e.getDepartment() != null ? e.getDepartment() : "").setFontSize(8));
+
+                    String jobTitle = e.getPosition() != null ? e.getPosition().getName() : "";
+                    table.addCell(new Paragraph(jobTitle).setFontSize(8));
+
+                    String deptName = e.getDepartment() != null ? e.getDepartment().getName() : "";
+                    table.addCell(new Paragraph(deptName).setFontSize(8));
 
                     String status = e.getStatus() != null ? e.getStatus().toString() : "-";
                     // Tentar pegar descrição amigável se possível, senão usar enum name
                     table.addCell(new Paragraph(status).setFontSize(8).setTextAlignment(TextAlignment.CENTER));
 
                     table.addCell(
-                            new Paragraph(e.getAdmissionDate() != null ? e.getAdmissionDate().format(dateFmt) : "")
+                            new Paragraph(e.getHireDate() != null ? e.getHireDate().format(dateFmt) : "")
                                     .setFontSize(8).setTextAlignment(TextAlignment.CENTER));
                 }
 
