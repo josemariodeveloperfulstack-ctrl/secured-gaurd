@@ -52,7 +52,7 @@ interface ViewState {
 
 const RelatoriosTab: React.FC = () => {
   const { toast } = useToast();
-  
+
   // Estados
   const [loading, setLoading] = useState(false);
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
@@ -60,13 +60,13 @@ const RelatoriosTab: React.FC = () => {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<'PDF' | 'EXCEL' | 'CSV'>('PDF');
   const [showReportView, setShowReportView] = useState(false);
-  
+
   // Sistema de navegação por histórico
   const [viewHistory, setViewHistory] = useState<ViewState[]>([
     { view: 'list', timestamp: Date.now() }
   ]);
   const [currentViewIndex, setCurrentViewIndex] = useState(0);
-  
+
   // Filtros
   const [filters, setFilters] = useState<ReportFilters>({
     startDate: subDays(new Date(), 30),
@@ -86,11 +86,11 @@ const RelatoriosTab: React.FC = () => {
       filters: filterData,
       timestamp: Date.now()
     };
-    
+
     // Remove estados futuros se estiver navegando do meio do histórico
     const newHistory = viewHistory.slice(0, currentViewIndex + 1);
     newHistory.push(newState);
-    
+
     setViewHistory(newHistory);
     setCurrentViewIndex(newHistory.length - 1);
   };
@@ -99,9 +99,9 @@ const RelatoriosTab: React.FC = () => {
     if (currentViewIndex > 0) {
       const newIndex = currentViewIndex - 1;
       const previousState = viewHistory[newIndex];
-      
+
       setCurrentViewIndex(newIndex);
-      
+
       // Restaurar estado anterior
       if (previousState.view === 'list') {
         setReportData(null);
@@ -114,7 +114,7 @@ const RelatoriosTab: React.FC = () => {
         setEmpresaFiltrada(previousState.data);
         // Não chamar aplicarFiltroEmpresa para evitar adicionar ao histórico novamente
       }
-      
+
       toast({
         title: "Navegação",
         description: "Voltou para a visualização anterior",
@@ -134,7 +134,7 @@ const RelatoriosTab: React.FC = () => {
   const aplicarFiltroEmpresa = (empresa: string) => {
     setEmpresaFiltrada(empresa);
     pushToHistory('filtered', empresa, filters);
-    
+
     toast({
       title: "Filtro Aplicado",
       description: `Exibindo contas da empresa: ${empresa}`,
@@ -199,9 +199,9 @@ const RelatoriosTab: React.FC = () => {
     try {
       const { startDate, endDate, status, tipo: tipoFiltro } = filters;
       const periodo = `${format(startDate!, 'dd/MM/yyyy')} - ${format(endDate!, 'dd/MM/yyyy')}`;
-      
+
       let data: ReportData;
-      
+
       switch (tipo) {
         case ReportType.CONTAS_PAGAR:
           data = await gerarRelatorioContasPagar(periodo);
@@ -224,7 +224,7 @@ const RelatoriosTab: React.FC = () => {
         default:
           throw new Error('Tipo de relatório não suportado');
       }
-      
+
       setReportData(data);
       setSelectedReport(tipo);
       return data;
@@ -406,11 +406,11 @@ const RelatoriosTab: React.FC = () => {
       setLoading(true);
       setSelectedReport(tipo);
       setShowReportView(true);
-      
+
       try {
         const data = await carregarDadosRelatorio(tipo);
         pushToHistory('report', data, filters);
-        
+
         toast({
           title: "Sucesso",
           description: "Relatório carregado com sucesso!",
@@ -446,21 +446,67 @@ const RelatoriosTab: React.FC = () => {
       });
       return;
     }
-    
+
     try {
       setLoading(true);
-      
+
       // Carregar dados do relatório
       const data = await carregarDadosRelatorio(selectedReport);
-      
+
       // Gerar arquivo no formato selecionado
       switch (selectedFormat) {
         case 'PDF':
-          await ReportGenerator.generatePDF(data);
-          toast({
-            title: "Sucesso",
-            description: "Relatório PDF gerado e baixado com sucesso!",
-          });
+          let endpoint = '';
+          const queryParams = new URLSearchParams();
+          if (filters.startDate) queryParams.append('startDate', format(filters.startDate, 'yyyy-MM-dd'));
+          if (filters.endDate) queryParams.append('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+
+          switch (selectedReport) {
+            case ReportType.CONTAS_PAGAR:
+              endpoint = `/api/reports/contas-a-pagar/pdf?${queryParams.toString()}`;
+              break;
+            case ReportType.CONTAS_RECEBER:
+              endpoint = `/api/reports/accounts-receivable/pdf?${queryParams.toString()}`;
+              break;
+            case ReportType.FLUXO_CAIXA:
+              endpoint = `/api/reports/cash-flow/pdf?${queryParams.toString()}`;
+              break;
+            case ReportType.RESUMO_FINANCEIRO:
+              endpoint = `/api/reports/summary/pdf?${queryParams.toString()}`;
+              break;
+            default:
+              // Fallback para geração no frontend se endpoint não existir
+              await ReportGenerator.generatePDF(data);
+              toast({
+                title: "Sucesso",
+                description: "Relatório PDF gerado localmente com sucesso!",
+              });
+              break;
+          }
+
+          if (endpoint) {
+            const response = await fetch(endpoint, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
+
+            if (!response.ok) throw new Error('Falha ao gerar relatório no servidor');
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `relatorio-${selectedReport}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            toast({
+              title: "Sucesso",
+              description: "Relatório PDF gerado pelo servidor com sucesso!",
+            });
+          }
           break;
         case 'EXCEL':
           ReportGenerator.generateExcel(data);
@@ -477,10 +523,10 @@ const RelatoriosTab: React.FC = () => {
           });
           break;
       }
-      
+
       // Adicionar ao histórico quando gerar relatório
       pushToHistory('report', data, filters);
-      
+
       setShowConfigModal(false);
     } catch (error) {
       console.error('Erro ao confirmar geração:', error);
@@ -495,27 +541,71 @@ const RelatoriosTab: React.FC = () => {
   };
 
   const handleExportarPDF = async () => {
-    if (!reportData) return;
-    
+    if (!selectedReport) return;
+
     try {
-      await ReportGenerator.generatePDF(reportData);
-      toast({
-        title: "Sucesso",
-        description: "Relatório PDF gerado com sucesso!",
-      });
+      setLoading(true);
+      const queryParams = new URLSearchParams();
+      if (filters.startDate) queryParams.append('startDate', format(filters.startDate, 'yyyy-MM-dd'));
+      if (filters.endDate) queryParams.append('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+
+      let endpoint = '';
+      switch (selectedReport) {
+        case ReportType.CONTAS_PAGAR:
+          endpoint = `/api/reports/contas-a-pagar/pdf?${queryParams.toString()}`;
+          break;
+        case ReportType.CONTAS_RECEBER:
+          endpoint = `/api/reports/accounts-receivable/pdf?${queryParams.toString()}`;
+          break;
+        case ReportType.FLUXO_CAIXA:
+          endpoint = `/api/reports/cash-flow/pdf?${queryParams.toString()}`;
+          break;
+        case ReportType.RESUMO_FINANCEIRO:
+          endpoint = `/api/reports/summary/pdf?${queryParams.toString()}`;
+          break;
+        default:
+          if (reportData) await ReportGenerator.generatePDF(reportData);
+          return;
+      }
+
+      if (endpoint) {
+        const response = await fetch(endpoint, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Falha ao gerar relatório no servidor');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `relatorio-${selectedReport}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        toast({
+          title: "Sucesso",
+          description: "Relatório PDF gerado pelo servidor com sucesso!",
+        });
+      }
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       toast({
         title: "Erro",
-        description: "Erro ao gerar relatório PDF",
+        description: "Erro ao gerar relatório PDF no servidor",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleExportarExcel = () => {
     if (!reportData) return;
-    
+
     try {
       ReportGenerator.generateExcel(reportData);
       toast({
@@ -534,7 +624,7 @@ const RelatoriosTab: React.FC = () => {
 
   const handleExportarCSV = () => {
     if (!reportData) return;
-    
+
     try {
       ReportGenerator.generateCSV(reportData);
       toast({
@@ -557,7 +647,7 @@ const RelatoriosTab: React.FC = () => {
       {(reportData || empresaFiltrada) && (
         <div className="bg-seguranca-black border-b border-gray-700 px-6 py-2">
           <div className="flex items-center gap-2 text-sm text-gray-400">
-            <button 
+            <button
               onClick={resetView}
               className="hover:text-seguranca-yellow transition-colors"
             >
@@ -595,7 +685,7 @@ const RelatoriosTab: React.FC = () => {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             )}
-            
+
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${reportData ? 'bg-purple-600' : 'bg-blue-600'}`}>
@@ -604,9 +694,9 @@ const RelatoriosTab: React.FC = () => {
                 {reportData ? reportData.title : 'Relatórios Financeiros'}
               </h1>
               <p className="text-gray-400 mt-1">
-                {empresaFiltrada 
-                  ? `Contas filtradas para a empresa: ${empresaFiltrada}` 
-                  : reportData 
+                {empresaFiltrada
+                  ? `Contas filtradas para a empresa: ${empresaFiltrada}`
+                  : reportData
                     ? `Período: ${reportData.period}`
                     : 'Gere relatórios detalhados em PDF, Excel e CSV'
                 }
@@ -628,7 +718,7 @@ const RelatoriosTab: React.FC = () => {
                 Limpar Visualização
               </Button>
             )}
-            
+
             {!reportData && !empresaFiltrada && (
               <>
                 <Button
@@ -667,7 +757,7 @@ const RelatoriosTab: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-r from-green-600 to-green-700 border-0">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -679,7 +769,7 @@ const RelatoriosTab: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-r from-purple-600 to-purple-700 border-0">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -691,7 +781,7 @@ const RelatoriosTab: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-r from-orange-600 to-orange-700 border-0">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -814,217 +904,215 @@ const RelatoriosTab: React.FC = () => {
         </Card>
       </div>
 
-        {/* Visualização do Relatório */}
-        {showReportView && (
-          <Card className="mt-8 bg-seguranca-graphite border-gray-600">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <Eye className="text-blue-500" />
-                    {reportData ? reportData.title : (selectedReport ? REPORT_CONFIGS[selectedReport]?.title || 'Visualização de Relatório' : 'Visualização de Relatório')}
-                  </CardTitle>
-                  {reportData?.subtitle && (
-                    <p className="text-gray-400 text-sm mt-1">{reportData.subtitle}</p>
-                  )}
-                  {reportData?.period && (
-                    <p className="text-gray-400 text-sm">Período: {reportData.period}</p>
-                  )}
+      {/* Visualização do Relatório */}
+      {showReportView && (
+        <Card className="mt-8 bg-seguranca-graphite border-gray-600">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Eye className="text-blue-500" />
+                  {reportData ? reportData.title : (selectedReport ? REPORT_CONFIGS[selectedReport]?.title || 'Visualização de Relatório' : 'Visualização de Relatório')}
+                </CardTitle>
+                {reportData?.subtitle && (
+                  <p className="text-gray-400 text-sm mt-1">{reportData.subtitle}</p>
+                )}
+                {reportData?.period && (
+                  <p className="text-gray-400 text-sm">Período: {reportData.period}</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                {reportData && (
+                  <>
+                    <Button
+                      onClick={handleExportarPDF}
+                      className="bg-red-600 hover:bg-red-700 text-white border border-red-700"
+                    >
+                      <FileImage size={16} className="mr-2" />
+                      PDF
+                    </Button>
+                    <Button
+                      onClick={handleExportarExcel}
+                      className="bg-green-600 hover:bg-green-700 text-white border border-green-700"
+                    >
+                      <FileSpreadsheet size={16} className="mr-2" />
+                      Excel
+                    </Button>
+                    <Button
+                      onClick={handleExportarCSV}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <Download size={16} className="mr-2" />
+                      CSV
+                    </Button>
+                  </>
+                )}
+                <Button
+                  onClick={() => {
+                    setShowReportView(false);
+                    setReportData(null);
+                    setSelectedReport(null);
+                  }}
+                  variant="outline"
+                  className="border-gray-600 text-gray-400 hover:bg-seguranca-black hover:text-white"
+                >
+                  <X size={16} className="mr-2" />
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Alerta de Filtro Ativo */}
+            {empresaFiltrada && (
+              <div className="mb-4 p-4 bg-blue-900/30 border border-blue-700 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2 text-blue-300">
+                  <Filter className="h-5 w-5" />
+                  <span>Contas filtradas para a empresa: <strong>{empresaFiltrada}</strong></span>
                 </div>
-                <div className="flex gap-2">
-                  {reportData && (
-                    <>
-                      <Button
-                        onClick={handleExportarPDF}
-                        className="bg-red-600 hover:bg-red-700 text-white border border-red-700"
-                      >
-                        <FileImage size={16} className="mr-2" />
-                        PDF
-                      </Button>
-                      <Button
-                        onClick={handleExportarExcel}
-                        className="bg-green-600 hover:bg-green-700 text-white border border-green-700"
-                      >
-                        <FileSpreadsheet size={16} className="mr-2" />
-                        Excel
-                      </Button>
-                      <Button
-                        onClick={handleExportarCSV}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
-                      >
-                        <Download size={16} className="mr-2" />
-                        CSV
-                      </Button>
-                    </>
-                  )}
-                  <Button
-                    onClick={() => {
-                      setShowReportView(false);
-                      setReportData(null);
-                      setSelectedReport(null);
-                    }}
-                    variant="outline"
-                    className="border-gray-600 text-gray-400 hover:bg-seguranca-black hover:text-white"
-                  >
-                    <X size={16} className="mr-2" />
-                    Fechar
-                  </Button>
+                <Button
+                  onClick={limparFiltroEmpresa}
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-600 text-blue-300 hover:bg-blue-900"
+                >
+                  <X size={14} className="mr-1" />
+                  Remover Filtro
+                </Button>
+              </div>
+            )}
+
+            {/* Mensagem quando não há dados */}
+            {!reportData || !reportData.rows || reportData.rows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4">
+                <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-6 max-w-md w-full">
+                  <div className="flex items-center gap-3 mb-4">
+                    <AlertTriangle className="h-8 w-8 text-yellow-500" />
+                    <h3 className="text-white font-semibold text-lg">Nenhum relatório disponível</h3>
+                  </div>
+                  <p className="text-gray-400 mb-4">
+                    Não há dados para exibir no relatório selecionado. Por favor, gere um relatório primeiro usando o botão "Gerar Relatório".
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        if (selectedReport) {
+                          setShowReportView(false);
+                          setShowConfigModal(true);
+                        }
+                      }}
+                      className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
+                    >
+                      <FileText size={16} className="mr-2" />
+                      Gerar Relatório
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowReportView(false);
+                        setReportData(null);
+                        setSelectedReport(null);
+                      }}
+                      variant="outline"
+                      className="border-gray-600 text-gray-400 hover:bg-seguranca-black hover:text-white"
+                    >
+                      Fechar
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              {/* Alerta de Filtro Ativo */}
-              {empresaFiltrada && (
-                <div className="mb-4 p-4 bg-blue-900/30 border border-blue-700 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-blue-300">
-                    <Filter className="h-5 w-5" />
-                    <span>Contas filtradas para a empresa: <strong>{empresaFiltrada}</strong></span>
-                  </div>
-                  <Button
-                    onClick={limparFiltroEmpresa}
-                    variant="outline"
-                    size="sm"
-                    className="border-blue-600 text-blue-300 hover:bg-blue-900"
-                  >
-                    <X size={14} className="mr-1" />
-                    Remover Filtro
-                  </Button>
-                </div>
-              )}
-
-              {/* Mensagem quando não há dados */}
-              {!reportData || !reportData.rows || reportData.rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4">
-                  <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-6 max-w-md w-full">
-                    <div className="flex items-center gap-3 mb-4">
-                      <AlertTriangle className="h-8 w-8 text-yellow-500" />
-                      <h3 className="text-white font-semibold text-lg">Nenhum relatório disponível</h3>
-                    </div>
-                    <p className="text-gray-400 mb-4">
-                      Não há dados para exibir no relatório selecionado. Por favor, gere um relatório primeiro usando o botão "Gerar Relatório".
-                    </p>
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => {
-                          if (selectedReport) {
-                            setShowReportView(false);
-                            setShowConfigModal(true);
-                          }
-                        }}
-                        className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
-                      >
-                        <FileText size={16} className="mr-2" />
-                        Gerar Relatório
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setShowReportView(false);
-                          setReportData(null);
-                          setSelectedReport(null);
-                        }}
-                        variant="outline"
-                        className="border-gray-600 text-gray-400 hover:bg-seguranca-black hover:text-white"
-                      >
-                        Fechar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Tabela de Dados */}
-                  <div className="overflow-x-auto rounded-lg border border-gray-600">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-seguranca-black">
-                          {reportData.headers.map((header, index) => (
-                            <th key={index} className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600">
-                              {header}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reportData.rows
-                          .filter(row => !empresaFiltrada || row[0]?.toString() === empresaFiltrada)
-                          .map((row, rowIndex) => (
+            ) : (
+              <>
+                {/* Tabela de Dados */}
+                <div className="overflow-x-auto rounded-lg border border-gray-600">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-seguranca-black">
+                        {reportData.headers.map((header, index) => (
+                          <th key={index} className="px-4 py-3 text-left text-white font-semibold border-b border-gray-600">
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.rows
+                        .filter(row => !empresaFiltrada || row[0]?.toString() === empresaFiltrada)
+                        .map((row, rowIndex) => (
                           <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-seguranca-graphite' : 'bg-seguranca-black'}>
                             {row.map((cell, cellIndex) => (
                               <td key={cellIndex} className="px-4 py-3 text-gray-300 border-b border-gray-700">
                                 {/* Se for a coluna de Empresa (primeira coluna), adicionar badge e botão de filtrar */}
-                            {cellIndex === 0 && typeof cell === 'string' && cell.match(/^[A-Z]{2,4}$/i) ? (
-                              <div className="flex items-center gap-2">
-                                <Badge 
-                                  className={`${
-                                    cell === 'TERC' ? 'bg-green-600' : 
-                                    cell === 'VIG' ? 'bg-purple-600' : 
-                                    cell === 'ADM' ? 'bg-blue-600' : 
-                                    'bg-gray-600'
-                                  } text-white`}
-                                >
-                                  {cell}
-                                </Badge>
-                                {!empresaFiltrada && (
-                                  <Button
-                                    onClick={() => aplicarFiltroEmpresa(cell)}
-                                    variant="link"
-                                    size="sm"
-                                    className="text-blue-400 hover:text-blue-300 p-0 h-auto"
+                                {cellIndex === 0 && typeof cell === 'string' && cell.match(/^[A-Z]{2,4}$/i) ? (
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      className={`${cell === 'TERC' ? 'bg-green-600' :
+                                        cell === 'VIG' ? 'bg-purple-600' :
+                                          cell === 'ADM' ? 'bg-blue-600' :
+                                            'bg-gray-600'
+                                        } text-white`}
+                                    >
+                                      {cell}
+                                    </Badge>
+                                    {!empresaFiltrada && (
+                                      <Button
+                                        onClick={() => aplicarFiltroEmpresa(cell)}
+                                        variant="link"
+                                        size="sm"
+                                        className="text-blue-400 hover:text-blue-300 p-0 h-auto"
+                                      >
+                                        Filtrar
+                                      </Button>
+                                    )}
+                                  </div>
+                                ) : cellIndex === 5 ? (
+                                  // Coluna de Status com badge colorido
+                                  <Badge
+                                    className={`${cell === 'PAGA' || cell === 'RECEBIDA' ? 'bg-red-600' :
+                                      cell === 'ABERTA' ? 'bg-gray-500' :
+                                        cell === 'ATRASADA' ? 'bg-orange-600' :
+                                          cell === 'CANCELADA' ? 'bg-gray-700' :
+                                            'bg-gray-600'
+                                      } text-white`}
                                   >
-                                    Filtrar
-                                  </Button>
+                                    {cell}
+                                  </Badge>
+                                ) : (
+                                  cell
                                 )}
-                              </div>
-                            ) : cellIndex === 5 ? (
-                              // Coluna de Status com badge colorido
-                              <Badge 
-                                className={`${
-                                  cell === 'PAGA' || cell === 'RECEBIDA' ? 'bg-red-600' : 
-                                  cell === 'ABERTA' ? 'bg-gray-500' : 
-                                  cell === 'ATRASADA' ? 'bg-orange-600' : 
-                                  cell === 'CANCELADA' ? 'bg-gray-700' :
-                                  'bg-gray-600'
-                                } text-white`}
-                              >
-                                {cell}
-                              </Badge>
-                            ) : (
-                              cell
-                            )}
-                          </td>
+                              </td>
+                            ))}
+                          </tr>
                         ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Resumo */}
-              {reportData.summary && reportData.summary.length > 0 && (
-                <div className="mt-6 p-6 bg-seguranca-black rounded-lg border border-gray-600">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <BarChart3 className="text-blue-500" />
-                    Resumo Executivo
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {reportData.summary.map((item, index) => (
-                      <div key={index} className="text-center p-3 bg-seguranca-graphite rounded-lg border border-gray-600">
-                        <p className="text-gray-400 text-sm mb-1">{item.label}</p>
-                        <p className="text-white font-bold text-lg">
-                          {item.format === 'currency' ? ReportGenerator.formatCurrency(item.value) :
-                           item.format === 'number' ? ReportGenerator.formatNumber(item.value) :
-                           item.value.toString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
-              )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        )}
+
+                {/* Resumo */}
+                {reportData.summary && reportData.summary.length > 0 && (
+                  <div className="mt-6 p-6 bg-seguranca-black rounded-lg border border-gray-600">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <BarChart3 className="text-blue-500" />
+                      Resumo Executivo
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {reportData.summary.map((item, index) => (
+                        <div key={index} className="text-center p-3 bg-seguranca-graphite rounded-lg border border-gray-600">
+                          <p className="text-gray-400 text-sm mb-1">{item.label}</p>
+                          <p className="text-white font-bold text-lg">
+                            {item.format === 'currency' ? ReportGenerator.formatCurrency(item.value) :
+                              item.format === 'number' ? ReportGenerator.formatNumber(item.value) :
+                                item.value.toString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal de Configuração */}
       <Dialog open={showConfigModal} onOpenChange={setShowConfigModal}>
@@ -1038,7 +1126,7 @@ const RelatoriosTab: React.FC = () => {
               Configure os filtros e parâmetros para gerar o relatório personalizado
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6">
             {/* Período */}
             <div className="space-y-3">

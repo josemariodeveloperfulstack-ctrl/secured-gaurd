@@ -98,7 +98,7 @@ class PagamentosService {
   }
 
   // ===== PAGAMENTOS =====
-  
+
   async getPagamentos(): Promise<Pagamento[]> {
     try {
       const response = await axios.get(`${API_BASE_URL}/accounts-receivable/all`, {
@@ -250,7 +250,7 @@ class PagamentosService {
   }
 
   // ===== AGENDAMENTO DE PAGAMENTOS =====
-  
+
   async agendarPagamento(pagamentoId: string, dataAgendamento: string, observacoes?: string): Promise<AgendamentoPagamento> {
     try {
       const response = await axios.post(`${API_BASE_URL}/scheduled-payments`, {
@@ -333,7 +333,7 @@ class PagamentosService {
   }
 
   // ===== ALERTAS DE VENCIMENTO =====
-  
+
   async getPagamentosProximosVencimento(dias: number = 3): Promise<Pagamento[]> {
     try {
       const response = await axios.get(`${API_BASE_URL}/accounts-receivable/upcoming-due`, {
@@ -359,7 +359,7 @@ class PagamentosService {
   }
 
   // ===== CLIENTES =====
-  
+
   async getClientes(): Promise<Cliente[]> {
     try {
       const response = await axios.get(`${API_BASE_URL}/clients/all`, {
@@ -441,7 +441,7 @@ class PagamentosService {
   }
 
   // ===== RELATÓRIOS =====
-  
+
   async generateRelatorioPagamentos(request: RelatorioPagamentoRequest): Promise<Blob> {
     try {
       const response = await axios.post(`${API_BASE_URL}/accounts-receivable/reports`, request, {
@@ -457,7 +457,22 @@ class PagamentosService {
 
   async generateRelatorioPagamentosPDF(filtros?: FiltrosPagamento): Promise<Blob> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/accounts-receivable/reports/pdf`, filtros || {}, {
+      // Mapear filtros para query params
+      const params: any = {};
+      if (filtros) {
+        if (filtros.dataInicio) params.startDate = filtros.dataInicio;
+        if (filtros.dataFim) params.endDate = filtros.dataFim;
+        if (filtros.clienteId) params.clientFilter = filtros.clienteId; // O backend espera clientFilter, mas pode ser nome ou ID? Vamos verificar depois. Por enquanto mandamos o ID se for filtro por ID. 
+        if (filtros.status) params.statusFilter = filtros.status;
+        if (filtros.formaPagamento) params.paymentMethodFilter = filtros.formaPagamento;
+        if (filtros.valorMinimo) params.amountMin = filtros.valorMinimo;
+        if (filtros.valorMaximo) params.amountMax = filtros.valorMaximo;
+        if (filtros.categoria) params.categoryFilter = filtros.categoria;
+        // params.selectedIds não temos no FiltrosPagamento interface ainda, mas se tivermos adicionamos.
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/accounts-receivable/reports/pdf`, {
+        params,
         headers: this.getAuthHeaders(),
         responseType: 'blob'
       });
@@ -482,7 +497,7 @@ class PagamentosService {
   }
 
   // ===== OPERAÇÕES EM LOTE =====
-  
+
   async deletePagamentos(ids: string[]): Promise<void> {
     try {
       await axios.delete(`${API_BASE_URL}/accounts-receivable/batch`, {
@@ -510,7 +525,7 @@ class PagamentosService {
   }
 
   // ===== ESTATÍSTICAS =====
-  
+
   async getEstatisticasPagamentos(): Promise<{
     total: number;
     pendentes: number;

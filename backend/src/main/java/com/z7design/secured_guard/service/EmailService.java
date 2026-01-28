@@ -71,6 +71,11 @@ public class EmailService {
                     log.error("   - Host e porta estão corretos?");
                     log.error("   - Firewall/antivírus está bloqueando?");
                     log.error("   - Servidor SMTP está acessível?");
+                } else if (cause.getMessage() != null && cause.getMessage().contains("550")
+                        && cause.getMessage().contains("suspended")) {
+                    log.error("🛑 ERRO CRÍTICO: CONTA DE EMAIL SUSPENSA PELO PROVEDOR");
+                    log.error("   - O servidor SMTP recusou o envio informando que a conta está suspensa.");
+                    log.error("   - AÇÃO NECESSÁRIA: Verifique no cPanel ou contate o suporte da hospedagem.");
                 }
             } else {
                 log.error("💥 Erro ao enviar email para {}: {}", toEmail, e.getMessage(), e);

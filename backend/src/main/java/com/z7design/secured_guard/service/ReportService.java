@@ -10,9 +10,9 @@ import com.z7design.secured_guard.exception.ReportGenerationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jasperreports.engine.*;
- 
+
 import org.springframework.stereotype.Service;
- 
+
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -46,7 +46,8 @@ public class ReportService {
     private final ProductService productService;
     private final InventoryItemService inventoryItemService;
     private final FinancialTransactionService financialTransactionService;
-    // private final KmControlRepository kmControlRepository; // Injetar KmControlRepository (usado em relatórios de KM)
+    // private final KmControlRepository kmControlRepository; // Injetar
+    // KmControlRepository (usado em relatórios de KM)
     private final com.z7design.secured_guard.repository.PayrollRepository payrollRepository;
     private final com.z7design.secured_guard.service.PayrollService payrollService;
     private final StandardReportLayoutService standardReportLayoutService;
@@ -58,15 +59,92 @@ public class ReportService {
     public byte[] generateEmployeeReportPdf(Map<String, Object> filters) {
         try {
             List<Employee> employees = employeeService.findAll();
-            Map<String, Object> parameters = createEmployeeReportParameters(filters);
-            
-            return jasperReportsConfig.generatePdfReport(
-                "reports/employee_report.jrxml", 
-                employees, 
-                parameters
-            );
-        } catch (JRException | IOException e) {
-            log.error("Erro ao gerar relatório de funcionários em PDF", e);
+            log.info("Gerando relatório iText para {} funcionários", employees.size());
+
+            // 1. Determinar empresa para layout (fallback para primeira ativa)
+            java.util.UUID companyId = null;
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+            } else {
+                List<Company> all = companyRepository.findAll();
+                if (all != null && !all.isEmpty()) {
+                    companyId = all.get(0).getId();
+                } else {
+                    // Fallback extremo
+                    return jasperReportsConfig.generatePdfReport("reports/employee_report.jrxml", employees,
+                            createEmployeeReportParameters(filters));
+                }
+            }
+
+            // 2. Configurar Layout
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter writer = new PdfWriter(baos);
+
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO DE FUNCIONÁRIOS")
+                    .topMargin(130f)
+                    .bottomMargin(80f)
+                    .leftMargin(20f)
+                    .rightMargin(20f)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+
+            // 3. Cabeçalho extra
+            document.add(new Paragraph(
+                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT).setFontSize(9).setMarginBottom(10));
+
+            // 4. Tabela
+            if (employees.isEmpty()) {
+                document.add(new Paragraph("Nenhum funcionário encontrado.").setTextAlignment(TextAlignment.CENTER));
+            } else {
+                // Colunas: Nome (30%), CPF (15%), Cargo (20%), Depto (15%), Status (10%),
+                // Admissão (10%)
+                Table table = new Table(UnitValue.createPercentArray(new float[] { 30, 15, 20, 15, 10, 10 }))
+                        .setWidth(UnitValue.createPercentValue(100));
+
+                String[] headers = { "Nome", "CPF", "Cargo", "Departamento", "Status", "Admissão" };
+                for (String h : headers) {
+                    table.addHeaderCell(
+                            new Paragraph(h).setBold().setFontSize(8).setTextAlignment(TextAlignment.CENTER));
+                }
+
+                DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+                for (Employee e : employees) {
+                    table.addCell(new Paragraph(e.getName() != null ? e.getName().toUpperCase() : "").setFontSize(8));
+                    table.addCell(new Paragraph(
+                            e.getCpf() != null ? com.z7design.secured_guard.util.ValidationUtils.formatCpf(e.getCpf())
+                                    : "")
+                            .setFontSize(8).setTextAlignment(TextAlignment.CENTER));
+                    table.addCell(new Paragraph(e.getJobTitle() != null ? e.getJobTitle() : "").setFontSize(8));
+                    table.addCell(new Paragraph(e.getDepartment() != null ? e.getDepartment() : "").setFontSize(8));
+
+                    String status = e.getStatus() != null ? e.getStatus().toString() : "-";
+                    // Tentar pegar descrição amigável se possível, senão usar enum name
+                    table.addCell(new Paragraph(status).setFontSize(8).setTextAlignment(TextAlignment.CENTER));
+
+                    table.addCell(
+                            new Paragraph(e.getAdmissionDate() != null ? e.getAdmissionDate().format(dateFmt) : "")
+                                    .setFontSize(8).setTextAlignment(TextAlignment.CENTER));
+                }
+
+                document.add(table);
+            }
+
+            // 5. Finalizar
+            // standardReportLayoutService.finalizeDocumentLayout(docWithPdf); // Deprecated
+            document.close();
+
+            return baos.toByteArray();
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório iText de funcionários", e);
             throw new ReportGenerationException("Erro ao gerar relatório de funcionários", e);
         }
     }
@@ -78,12 +156,11 @@ public class ReportService {
         try {
             List<Employee> employees = employeeService.findAll();
             Map<String, Object> parameters = createEmployeeReportParameters(filters);
-            
+
             return jasperReportsConfig.generateExcelReport(
-                "reports/employee_report.jrxml", 
-                employees, 
-                parameters
-            );
+                    "reports/employee_report.jrxml",
+                    employees,
+                    parameters);
         } catch (JRException | IOException e) {
             log.error("Erro ao gerar relatório de funcionários em Excel", e);
             throw new ReportGenerationException("Erro ao gerar relatório de funcionários", e);
@@ -97,12 +174,11 @@ public class ReportService {
         try {
             List<CompanyDTO> companies = companyService.getAllCompanies();
             Map<String, Object> parameters = createCompanyReportParameters(filters);
-            
+
             return jasperReportsConfig.generatePdfReport(
-                "reports/company_report.jrxml", 
-                companies, 
-                parameters
-            );
+                    "reports/company_report.jrxml",
+                    companies,
+                    parameters);
         } catch (JRException | IOException e) {
             log.error("Erro ao gerar relatório de empresas em PDF", e);
             throw new ReportGenerationException("Erro ao gerar relatório de empresas", e);
@@ -116,12 +192,11 @@ public class ReportService {
         try {
             List<ProductDTO> products = productService.getAllProducts();
             Map<String, Object> parameters = createProductReportParameters(filters);
-            
+
             return jasperReportsConfig.generatePdfReport(
-                "reports/product_report.jrxml", 
-                products, 
-                parameters
-            );
+                    "reports/product_report.jrxml",
+                    products,
+                    parameters);
         } catch (JRException | IOException e) {
             log.error("Erro ao gerar relatório de produtos em PDF", e);
             throw new ReportGenerationException("Erro ao gerar relatório de produtos", e);
@@ -135,12 +210,11 @@ public class ReportService {
         try {
             List<InventoryItem> items = inventoryItemService.findAll();
             Map<String, Object> parameters = createInventoryReportParameters(filters);
-            
+
             return jasperReportsConfig.generatePdfReport(
-                "reports/inventory_report.jrxml", 
-                items, 
-                parameters
-            );
+                    "reports/inventory_report.jrxml",
+                    items,
+                    parameters);
         } catch (JRException | IOException e) {
             log.error("Erro ao gerar relatório de estoque em PDF", e);
             throw new ReportGenerationException("Erro ao gerar relatório de estoque", e);
@@ -153,54 +227,55 @@ public class ReportService {
     public byte[] generateFinancialReportPdf(Map<String, Object> filters) {
         try {
             log.info("Gerando relatório financeiro em PDF com layout padrão");
-            
+
             List<FinancialTransaction> transactions = financialTransactionService.findAll();
-            
+
             // Determinar companyId - usar primeira empresa ativa
             java.util.UUID companyId = null;
             List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
             if (activeCompanies != null && !activeCompanies.isEmpty()) {
                 companyId = activeCompanies.get(0).getId();
-                log.info("Usando primeira empresa ativa: {} (ID: {})", 
+                log.info("Usando primeira empresa ativa: {} (ID: {})",
                         activeCompanies.get(0).getName(), companyId);
             } else {
                 List<Company> allCompanies = companyRepository.findAll();
                 if (allCompanies != null && !allCompanies.isEmpty()) {
                     companyId = allCompanies.get(0).getId();
-                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})",
                             allCompanies.get(0).getName(), companyId);
                 } else {
                     throw new ReportGenerationException("Não foi possível determinar a empresa para o relatório. " +
                             "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
                 }
             }
-            
+
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
-            
+
             try {
                 PdfWriter writer = new PdfWriter(baos);
-                
+
                 // Criar documento com layout padrão
                 ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
-                    .companyId(companyId)
-                    .reportTitle("RELATÓRIO FINANCEIRO")
-                    .topMargin(120f)  // Espaço para cabeçalho
-                    .bottomMargin(80f) // Espaço para rodapé
-                    .leftMargin(50f)
-                    .rightMargin(50f)
-                    .build();
-                
+                        .companyId(companyId)
+                        .reportTitle("RELATÓRIO FINANCEIRO")
+                        .topMargin(120f) // Espaço para cabeçalho
+                        .bottomMargin(80f) // Espaço para rodapé
+                        .leftMargin(50f)
+                        .rightMargin(50f)
+                        .build();
+
                 docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
                 Document document = docWithPdf.getDocument();
-                
+
                 // Informações do relatório
-                Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                Paragraph reportInfo = new Paragraph(
+                        "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
                         .setTextAlignment(TextAlignment.RIGHT)
                         .setFontSize(10)
                         .setMarginBottom(10);
                 document.add(reportInfo);
-                
+
                 // Estatísticas
                 double totalIncome = transactions.stream()
                         .filter(t -> t.getType() != null && "INCOME".equalsIgnoreCase(t.getType()))
@@ -211,7 +286,7 @@ public class ReportService {
                         .mapToDouble(t -> t.getAmount() != null ? t.getAmount().doubleValue() : 0.0)
                         .sum();
                 double balance = totalIncome - totalExpense;
-                
+
                 Paragraph stats = new Paragraph(String.format(
                         "Total de transações: %d | Receitas: R$ %,.2f | Despesas: R$ %,.2f | Saldo: R$ %,.2f",
                         transactions.size(), totalIncome, totalExpense, balance))
@@ -219,7 +294,7 @@ public class ReportService {
                         .setBold()
                         .setMarginBottom(15);
                 document.add(stats);
-                
+
                 // Tabela de transações
                 if (transactions.isEmpty()) {
                     Paragraph noData = new Paragraph("Nenhuma transação financeira encontrada.")
@@ -229,7 +304,7 @@ public class ReportService {
                     document.add(noData);
                 } else {
                     Table table = new Table(6).setWidth(UnitValue.createPercentValue(100));
-                    
+
                     // Cabeçalhos
                     table.addHeaderCell(createHeaderCell("Data"));
                     table.addHeaderCell(createHeaderCell("Tipo"));
@@ -237,44 +312,45 @@ public class ReportService {
                     table.addHeaderCell(createHeaderCell("Valor"));
                     table.addHeaderCell(createHeaderCell("Status"));
                     table.addHeaderCell(createHeaderCell("Categoria"));
-                    
+
                     // Dados
                     DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
                     for (FinancialTransaction transaction : transactions) {
-                        table.addCell(createCell(transaction.getDate() != null ? 
-                                transaction.getDate().format(dateFormatter) : ""));
+                        table.addCell(createCell(
+                                transaction.getDate() != null ? transaction.getDate().format(dateFormatter) : ""));
                         table.addCell(createCell(transaction.getType() != null ? transaction.getType() : ""));
-                        
+
                         // Descrição (truncar se muito longa)
                         String desc = transaction.getDescription() != null ? transaction.getDescription() : "";
                         if (desc.length() > 40) {
                             desc = desc.substring(0, 37) + "...";
                         }
                         table.addCell(createCell(desc));
-                        
-                        table.addCell(createCell(transaction.getAmount() != null ? 
-                                String.format("R$ %,.2f", transaction.getAmount()).replace(",", "X").replace(".", ",").replace("X", ".") : ""));
+
+                        table.addCell(createCell(
+                                transaction.getAmount() != null ? String.format("R$ %,.2f", transaction.getAmount())
+                                        .replace(",", "X").replace(".", ",").replace("X", ".") : ""));
                         table.addCell(createCell(transaction.getStatus() != null ? transaction.getStatus() : ""));
                         table.addCell(createCell(transaction.getCategory() != null ? transaction.getCategory() : ""));
                     }
-                    
+
                     document.add(table);
                 }
-                
+
                 // Finalizar layout padrão (adiciona header/footer em todas as páginas)
                 standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
-                
+
                 document.close();
-                
+
             } catch (Exception e) {
                 log.error("Erro ao gerar PDF financeiro: {}", e.getMessage(), e);
                 throw new ReportGenerationException("Erro ao gerar relatório financeiro: " + e.getMessage(), e);
             }
-            
+
             byte[] result = baos.toByteArray();
             log.info("PDF financeiro gerado com sucesso, tamanho: {} bytes", result.length);
             return result;
-            
+
         } catch (ReportGenerationException e) {
             throw e;
         } catch (Exception e) {
@@ -284,65 +360,189 @@ public class ReportService {
     }
 
     /**
-     * Gera relatório consolidado em PDF
+     * Gera relatório consolidado em PDF com layout padrão
      */
     public byte[] generateConsolidatedReportPdf(Map<String, Object> filters) {
         try {
-            Map<String, Object> parameters = createConsolidatedReportParameters(filters);
-            
-            // Criar dados consolidados
-            Map<String, Object> consolidatedData = new HashMap<>();
-            consolidatedData.put("employees", employeeService.findAll());
-            consolidatedData.put("companies", companyService.getAllCompanies());
-            consolidatedData.put("products", productService.getAllProducts());
-            consolidatedData.put("inventory", inventoryItemService.findAll());
-            consolidatedData.put("transactions", financialTransactionService.findAll());
-            
-            return jasperReportsConfig.generatePdfReport(
-                "reports/consolidated_report.jrxml", 
-                List.of(consolidatedData), 
-                parameters
-            );
-        } catch (JRException | IOException e) {
+            log.info("Gerando relatório consolidado em PDF com layout padrão");
+
+            // Determinar companyId - usar primeira empresa ativa
+            java.util.UUID companyId = null;
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+            } else {
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                } else {
+                    throw new ReportGenerationException("Nenhuma empresa cadastrada.");
+                }
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter writer = new PdfWriter(baos);
+
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO CONSOLIDADO DO SISTEMA")
+                    .topMargin(120f)
+                    .bottomMargin(80f)
+                    .leftMargin(50f)
+                    .rightMargin(50f)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
+
+            // 1. Visão Geral (Estatísticas Rápidas)
+            document.add(new Paragraph("1. VISÃO GERAL").setBold().setFontSize(14).setMarginTop(10));
+            Table summaryTable = new Table(2).setWidth(UnitValue.createPercentValue(100));
+            summaryTable.addCell(createCell("Total de Funcionários:"));
+            summaryTable.addCell(createCell(String.valueOf(employeeService.findAll().size())));
+            summaryTable.addCell(createCell("Total de Empresas:"));
+            summaryTable.addCell(createCell(String.valueOf(companyService.getAllCompanies().size())));
+            summaryTable.addCell(createCell("Total de Produtos:"));
+            summaryTable.addCell(createCell(String.valueOf(productService.getAllProducts().size())));
+            document.add(summaryTable);
+
+            // 2. Resumo Financeiro
+            document.add(new Paragraph("2. RESUMO FINANCEIRO").setBold().setFontSize(14).setMarginTop(20));
+            List<FinancialTransaction> transactions = financialTransactionService.findAll();
+            double totalIncome = transactions.stream()
+                    .filter(t -> "INCOME".equalsIgnoreCase(t.getType()))
+                    .mapToDouble(t -> t.getAmount() != null ? t.getAmount().doubleValue() : 0.0)
+                    .sum();
+            double totalExpense = transactions.stream()
+                    .filter(t -> "EXPENSE".equalsIgnoreCase(t.getType()))
+                    .mapToDouble(t -> t.getAmount() != null ? t.getAmount().doubleValue() : 0.0)
+                    .sum();
+
+            Table finTable = new Table(2).setWidth(UnitValue.createPercentValue(100));
+            finTable.addCell(createCell("Total de Receitas:"));
+            finTable.addCell(createCell(String.format("R$ %,.2f", totalIncome)));
+            finTable.addCell(createCell("Total de Despesas:"));
+            finTable.addCell(createCell(String.format("R$ %,.2f", totalExpense)));
+            finTable.addCell(createCell("Saldo Geral:"));
+            finTable.addCell(createCell(String.format("R$ %,.2f", totalIncome - totalExpense)));
+            document.add(finTable);
+
+            document.add(new Paragraph(
+                    "\nEste relatório apresenta uma visão consolidada dos principais módulos do sistema Secure Guard.")
+                    .setFontSize(10).setItalic());
+
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            document.close();
+
+            return baos.toByteArray();
+        } catch (Exception e) {
             log.error("Erro ao gerar relatório consolidado em PDF", e);
             throw new ReportGenerationException("Erro ao gerar relatório consolidado", e);
         }
     }
 
     /**
-     * Gera relatório de folha de pagamento em PDF
+     * Gera relatório de folha de pagamento em PDF com layout padrão
      */
     public byte[] generatePayrollReportPdf(String referenceMonth, UUID unitId, UUID employeeId) {
         try {
-            Map<String, Object> parameters = jasperReportsConfig.createDefaultParameters();
-            parameters.put("REFERENCE_MONTH", referenceMonth);
-            if (unitId != null) parameters.put("UNIT_ID", unitId.toString());
-            if (employeeId != null) parameters.put("EMPLOYEE_ID", employeeId.toString());
+            log.info("Gerando relatório de folha em PDF com layout padrão - Mês: {}, Unidade: {}, Funcionário: {}",
+                    referenceMonth, unitId, employeeId);
 
             // Montar dataset básico da folha
             List<com.z7design.secured_guard.model.Payroll> data;
             if (employeeId != null && referenceMonth != null) {
                 data = payrollService.findByEmployeeId(employeeId).stream()
-                    .filter(p -> referenceMonth.equals(p.getReferenceMonth()))
-                    .toList();
+                        .filter(p -> referenceMonth.equals(p.getReferenceMonth()))
+                        .collect(java.util.stream.Collectors.toList());
             } else if (unitId != null && referenceMonth != null) {
                 data = payrollService.findByUnitId(unitId).stream()
-                    .filter(p -> referenceMonth.equals(p.getReferenceMonth()))
-                    .toList();
+                        .filter(p -> referenceMonth.equals(p.getReferenceMonth()))
+                        .collect(java.util.stream.Collectors.toList());
             } else if (referenceMonth != null) {
                 data = payrollRepository.findByReferenceMonth(referenceMonth);
             } else {
                 data = payrollService.findAll();
             }
 
-            parameters.put("TOTAL_NET", data.stream().map(p -> p.getNetSalary() == null ? 0d : p.getNetSalary()).reduce(0d, Double::sum));
+            // Determinar companyId - usar primeira empresa ativa
+            java.util.UUID companyId = null;
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+            } else {
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    companyId = allCompanies.get(0).getId();
+                } else {
+                    throw new ReportGenerationException("Nenhuma empresa cadastrada para gerar o relatório.");
+                }
+            }
 
-            return jasperReportsConfig.generatePdfReport(
-                "reports/payroll_report.jrxml",
-                data,
-                parameters
-            );
-        } catch (JRException | IOException e) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter writer = new PdfWriter(baos);
+
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO DE FOLHA DE PAGAMENTO")
+                    .topMargin(120f)
+                    .bottomMargin(80f)
+                    .leftMargin(50f)
+                    .rightMargin(50f)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
+
+            // Informações do relatório
+            Paragraph reportInfo = new Paragraph("Competência: " + (referenceMonth != null ? referenceMonth : "Todos"))
+                    .setFontSize(11)
+                    .setBold()
+                    .setMarginBottom(10);
+            document.add(reportInfo);
+
+            if (data.isEmpty()) {
+                document.add(new Paragraph("Nenhum registro de folha encontrado para os filtros selecionados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setMarginTop(20));
+            } else {
+                Table table = new Table(5).setWidth(UnitValue.createPercentValue(100));
+                table.addHeaderCell(createHeaderCell("Funcionário"));
+                table.addHeaderCell(createHeaderCell("Cargo"));
+                table.addHeaderCell(createHeaderCell("Referência"));
+                table.addHeaderCell(createHeaderCell("Salário Bruto"));
+                table.addHeaderCell(createHeaderCell("Salário Líquido"));
+
+                for (var payroll : data) {
+                    table.addCell(createCell(payroll.getEmployee() != null ? payroll.getEmployee().getName() : "N/A"));
+                    table.addCell(
+                            createCell(payroll.getEmployee() != null && payroll.getEmployee().getPosition() != null
+                                    ? payroll.getEmployee().getPosition().getName()
+                                    : "N/A"));
+                    table.addCell(createCell(payroll.getReferenceMonth()));
+                    table.addCell(createCell(String.format("R$ %,.2f",
+                            payroll.getGrossSalary() != null ? payroll.getGrossSalary() : 0.0)));
+                    table.addCell(createCell(
+                            String.format("R$ %,.2f", payroll.getNetSalary() != null ? payroll.getNetSalary() : 0.0)));
+                }
+                document.add(table);
+
+                double totalNet = data.stream().map(p -> p.getNetSalary() == null ? 0d : p.getNetSalary()).reduce(0d,
+                        Double::sum);
+                Paragraph total = new Paragraph("TOTAL LÍQUIDO: " + String.format("R$ %,.2f", totalNet))
+                        .setTextAlignment(TextAlignment.RIGHT)
+                        .setBold()
+                        .setMarginTop(15);
+                document.add(total);
+            }
+
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            document.close();
+
+            return baos.toByteArray();
+        } catch (Exception e) {
             log.error("Erro ao gerar relatório de folha em PDF", e);
             throw new ReportGenerationException("Erro ao gerar relatório de folha", e);
         }
@@ -351,7 +551,8 @@ public class ReportService {
     /**
      * Gera relatório de Controle de Quilometragem em PDF ou Excel
      */
-    public byte[] generateKmControlReport(List<KmControl> kmControls, Map<String, Object> filters, String format) throws JRException, IOException {
+    public byte[] generateKmControlReport(List<KmControl> kmControls, Map<String, Object> filters, String format)
+            throws JRException, IOException {
         if ("pdf".equalsIgnoreCase(format)) {
             // Usar layout padrão para PDF
             return generateKmControlReportPDFWithIText(kmControls, filters);
@@ -363,13 +564,14 @@ public class ReportService {
             throw new IllegalArgumentException("Formato de relatório inválido: " + format);
         }
     }
-    
+
     /**
      * Gera relatório PDF de Controle de KM usando iText com layout padrão
      */
-    private byte[] generateKmControlReportPDFWithIText(List<KmControl> kmControls, Map<String, Object> filters) throws IOException {
+    private byte[] generateKmControlReportPDFWithIText(List<KmControl> kmControls, Map<String, Object> filters)
+            throws IOException {
         log.info("Gerando relatório PDF de Controle de KM com layout padrão - {} registros", kmControls.size());
-        
+
         // Determinar companyId
         java.util.UUID companyId = null;
         if (!kmControls.isEmpty()) {
@@ -381,20 +583,20 @@ public class ReportService {
                 }
             }
         }
-        
+
         // Fallback: usar primeira empresa ativa
         if (companyId == null) {
             log.warn("Nenhum registro possui empresa associada. Buscando primeira empresa ativa como fallback...");
             List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
             if (activeCompanies != null && !activeCompanies.isEmpty()) {
                 companyId = activeCompanies.get(0).getId();
-                log.info("Usando primeira empresa ativa como fallback: {} (ID: {})", 
+                log.info("Usando primeira empresa ativa como fallback: {} (ID: {})",
                         activeCompanies.get(0).getName(), companyId);
             } else {
                 List<Company> allCompanies = companyRepository.findAll();
                 if (allCompanies != null && !allCompanies.isEmpty()) {
                     companyId = allCompanies.get(0).getId();
-                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})", 
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})",
                             allCompanies.get(0).getName(), companyId);
                 } else {
                     throw new ReportGenerationException("Não foi possível determinar a empresa para o relatório. " +
@@ -402,33 +604,34 @@ public class ReportService {
                 }
             }
         }
-        
+
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         StandardReportLayoutService.DocumentWithPdf docWithPdf = null;
-        
+
         try {
             PdfWriter writer = new PdfWriter(baos);
-            
+
             // Criar documento com layout padrão
             ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
-                .companyId(companyId)
-                .reportTitle("RELATÓRIO DE CONTROLE DE QUILOMETRAGEM")
-                .topMargin(120f)  // Espaço para cabeçalho
-                .bottomMargin(80f) // Espaço para rodapé
-                .leftMargin(50f)
-                .rightMargin(50f)
-                .build();
-            
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO DE CONTROLE DE QUILOMETRAGEM")
+                    .topMargin(120f) // Espaço para cabeçalho
+                    .bottomMargin(80f) // Espaço para rodapé
+                    .leftMargin(50f)
+                    .rightMargin(50f)
+                    .build();
+
             docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
             Document document = docWithPdf.getDocument();
-            
+
             // Informações do relatório
-            Paragraph reportInfo = new Paragraph("Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+            Paragraph reportInfo = new Paragraph(
+                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
                     .setTextAlignment(TextAlignment.RIGHT)
                     .setFontSize(10)
                     .setMarginBottom(10);
             document.add(reportInfo);
-            
+
             // Filtros aplicados
             if (filters != null && !filters.isEmpty()) {
                 if (filters.containsKey("startDate") || filters.containsKey("endDate")) {
@@ -437,27 +640,30 @@ public class ReportService {
                         period = filters.get("startDate").toString();
                     }
                     if (filters.containsKey("endDate")) {
-                        if (!period.isEmpty()) period += " a ";
+                        if (!period.isEmpty())
+                            period += " a ";
                         period += filters.get("endDate").toString();
                     }
                     document.add(new Paragraph("Período: " + period).setFontSize(10).setMarginBottom(2));
                 }
                 if (filters.containsKey("supervisor")) {
-                    document.add(new Paragraph("Supervisor: " + filters.get("supervisor")).setFontSize(10).setMarginBottom(2));
+                    document.add(new Paragraph("Supervisor: " + filters.get("supervisor")).setFontSize(10)
+                            .setMarginBottom(2));
                 }
                 if (filters.containsKey("vehiclePlate")) {
-                    document.add(new Paragraph("Placa: " + filters.get("vehiclePlate")).setFontSize(10).setMarginBottom(2));
+                    document.add(
+                            new Paragraph("Placa: " + filters.get("vehiclePlate")).setFontSize(10).setMarginBottom(2));
                 }
                 document.add(new Paragraph("").setMarginBottom(10));
             }
-            
+
             // Estatísticas
             Paragraph stats = new Paragraph(String.format("Total de registros: %d", kmControls.size()))
                     .setFontSize(12)
                     .setBold()
                     .setMarginBottom(15);
             document.add(stats);
-            
+
             // Tabela de registros
             if (kmControls.isEmpty()) {
                 Paragraph noData = new Paragraph("Nenhum registro encontrado com os filtros aplicados.")
@@ -467,7 +673,7 @@ public class ReportService {
                 document.add(noData);
             } else {
                 Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
-                
+
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Data"));
                 table.addHeaderCell(createHeaderCell("Supervisor"));
@@ -476,49 +682,52 @@ public class ReportService {
                 table.addHeaderCell(createHeaderCell("KM Final"));
                 table.addHeaderCell(createHeaderCell("Total KM"));
                 table.addHeaderCell(createHeaderCell("Valor"));
-                
+
                 // Dados
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
                 for (KmControl kmControl : kmControls) {
-                    table.addCell(createCell(kmControl.getDate() != null ? 
-                            kmControl.getDate().format(dateFormatter) : ""));
+                    table.addCell(
+                            createCell(kmControl.getDate() != null ? kmControl.getDate().format(dateFormatter) : ""));
                     table.addCell(createCell(kmControl.getSupervisor() != null ? kmControl.getSupervisor() : ""));
                     table.addCell(createCell(kmControl.getVehiclePlate() != null ? kmControl.getVehiclePlate() : ""));
-                    table.addCell(createCell(kmControl.getInitialKm() != null ? 
-                            String.valueOf(kmControl.getInitialKm()) : ""));
-                    table.addCell(createCell(kmControl.getFinalKm() != null ? 
-                            String.valueOf(kmControl.getFinalKm()) : ""));
-                    table.addCell(createCell(kmControl.getTotalKm() != null ? 
-                            String.valueOf(kmControl.getTotalKm()) : ""));
-                    table.addCell(createCell(kmControl.getValue() != null ? 
-                            "R$ " + kmControl.getValue().setScale(2, java.math.RoundingMode.HALF_UP).toString().replace(".", ",") : ""));
+                    table.addCell(createCell(
+                            kmControl.getInitialKm() != null ? String.valueOf(kmControl.getInitialKm()) : ""));
+                    table.addCell(
+                            createCell(kmControl.getFinalKm() != null ? String.valueOf(kmControl.getFinalKm()) : ""));
+                    table.addCell(
+                            createCell(kmControl.getTotalKm() != null ? String.valueOf(kmControl.getTotalKm()) : ""));
+                    table.addCell(
+                            createCell(kmControl.getValue() != null
+                                    ? "R$ " + kmControl.getValue().setScale(2, java.math.RoundingMode.HALF_UP)
+                                            .toString().replace(".", ",")
+                                    : ""));
                 }
-                
+
                 document.add(table);
             }
-            
+
             // Finalizar layout padrão (adiciona header/footer em todas as páginas)
             standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
-            
+
             document.close();
-            
+
         } catch (Exception e) {
             log.error("Erro ao gerar PDF de Controle de KM: {}", e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
         }
-        
+
         byte[] result = baos.toByteArray();
         log.info("PDF de Controle de KM gerado com sucesso, tamanho: {} bytes", result.length);
         return result;
     }
-    
+
     private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
         return new com.itextpdf.layout.element.Cell()
                 .add(new Paragraph(text).setBold().setFontSize(10))
                 .setTextAlignment(TextAlignment.CENTER)
                 .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
     }
-    
+
     private com.itextpdf.layout.element.Cell createCell(String text) {
         return new com.itextpdf.layout.element.Cell()
                 .add(new Paragraph(text != null ? text : "").setFontSize(9))
@@ -605,4 +814,4 @@ public class ReportService {
         parameters.put("REPORT_DATE", LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
         return parameters;
     }
-} 
+}

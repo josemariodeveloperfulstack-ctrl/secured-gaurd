@@ -5,14 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { 
-  Download, 
-  FileText, 
-  Filter, 
-  Search, 
-  Calendar, 
-  DollarSign, 
-  TrendingUp, 
+import {
+  Download,
+  FileText,
+  Filter,
+  Search,
+  Calendar,
+  DollarSign,
+  TrendingUp,
   TrendingDown,
   RefreshCw,
   Printer,
@@ -156,36 +156,36 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
 
     // Filtro por centro de custo
     if (filtros.centroCusto) {
-      dados = dados.filter(item => 
+      dados = dados.filter(item =>
         item.costCenter?.toLowerCase().includes(filtros.centroCusto.toLowerCase())
       );
     }
 
     // Filtro por departamento (unidade)
     if (filtros.departamento !== 'all') {
-      dados = dados.filter(item => 
-        item.unitId === filtros.departamento || 
+      dados = dados.filter(item =>
+        item.unitId === filtros.departamento ||
         item.unit?.id === filtros.departamento
       );
     }
 
     // Filtro por fornecedor
     if (filtros.fornecedor !== 'all') {
-      dados = dados.filter(item => 
+      dados = dados.filter(item =>
         item.supplier?.id === filtros.fornecedor
       );
     }
 
     // Filtro por valor mínimo
     if (filtros.valorMin) {
-      dados = dados.filter(item => 
+      dados = dados.filter(item =>
         Number(item.amount) >= Number(filtros.valorMin)
       );
     }
 
     // Filtro por valor máximo
     if (filtros.valorMax) {
-      dados = dados.filter(item => 
+      dados = dados.filter(item =>
         Number(item.amount) <= Number(filtros.valorMax)
       );
     }
@@ -291,18 +291,48 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
   const exportarPDF = async () => {
     setLoading(true);
     try {
-      // Simular exportação por enquanto
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const queryParams = new URLSearchParams();
+      if (filtros.dataInicio) queryParams.append('startDate', format(filtros.dataInicio, 'yyyy-MM-dd'));
+      if (filtros.dataFim) queryParams.append('endDate', format(filtros.dataFim, 'yyyy-MM-dd'));
+
+      let endpoint = '';
+      if (filtros.tipo === 'INCOME') {
+        // Relatório de Contas a Receber
+        endpoint = `/api/reports/accounts-receivable/pdf?${queryParams.toString()}`;
+      } else if (filtros.tipo === 'EXPENSE') {
+        // Relatório de Contas a Pagar
+        endpoint = `/api/reports/contas-a-pagar/pdf?${queryParams.toString()}`;
+      } else {
+        // Fluxo de Caixa (Ambos)
+        endpoint = `/api/reports/cash-flow/pdf?${queryParams.toString()}`;
+      }
+
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Falha ao gerar relatório no servidor');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-financeiro-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+
       toast({
         title: "Sucesso",
-        description: "Relatório exportado com sucesso!",
+        description: "Relatório PDF gerado pelo servidor com sucesso!",
       });
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       toast({
         title: "Erro",
-        description: "Erro ao exportar relatório.",
+        description: error instanceof Error ? error.message : "Erro ao exportar relatório.",
         variant: "destructive"
       });
     } finally {
@@ -664,10 +694,10 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
                     <TableCell>
                       <Badge className={`${getStatusColor(item.status)} text-white`}>
                         {item.status === 'PENDING' ? 'Pendente' :
-                         item.status === 'CONFIRMED' ? 'Confirmado' :
-                         item.status === 'CANCELLED' ? 'Cancelado' :
-                         item.status === 'PAGA' ? 'Pago' :
-                         item.status === 'PENDENTE_ERRO' ? 'Atrasado' : item.status}
+                          item.status === 'CONFIRMED' ? 'Confirmado' :
+                            item.status === 'CANCELLED' ? 'Cancelado' :
+                              item.status === 'PAGA' ? 'Pago' :
+                                item.status === 'PENDENTE_ERRO' ? 'Atrasado' : item.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-seguranca-lightgray">
