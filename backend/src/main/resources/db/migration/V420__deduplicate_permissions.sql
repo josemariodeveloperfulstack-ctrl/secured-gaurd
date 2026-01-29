@@ -2,25 +2,29 @@
 -- Description: Merge redundant and old-style permission names into standard format
 
 -- 1. Ensure new standard permissions exist
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'CLIENTS_READ', 'Visualizar clientes'),
-(gen_random_uuid(), 'CLIENTS_WRITE', 'Gerenciar clientes'),
-(gen_random_uuid(), 'EMPLOYEES_READ', 'Visualizar funcionários'),
-(gen_random_uuid(), 'EMPLOYEES_WRITE', 'Gerenciar funcionários'),
-(gen_random_uuid(), 'CONTRACTS_READ', 'Visualizar contratos'),
-(gen_random_uuid(), 'CONTRACTS_WRITE', 'Gerenciar contratos'),
-(gen_random_uuid(), 'FINANCIAL_READ', 'Visualizar financeiro'),
-(gen_random_uuid(), 'FINANCIAL_WRITE', 'Gerenciar financeiro'),
-(gen_random_uuid(), 'EQUIPMENTS_READ', 'Visualizar equipamentos'),
-(gen_random_uuid(), 'EQUIPMENTS_WRITE', 'Gerenciar equipamentos'),
-(gen_random_uuid(), 'REPORTS_READ', 'Visualizar relatórios'),
-(gen_random_uuid(), 'SYSTEM_CONFIG', 'Configurações do sistema'),
-(gen_random_uuid(), 'PROFILE_READ', 'Visualizar perfil próprio'),
-(gen_random_uuid(), 'PROFILE_WRITE', 'Editar perfil próprio'),
-(gen_random_uuid(), 'DOCUMENTS_READ', 'Visualizar documentos'),
-(gen_random_uuid(), 'DOCUMENTS_WRITE', 'Gerenciar documentos'),
-(gen_random_uuid(), 'PAYSLIPS_READ', 'Visualizar holerites')
-ON CONFLICT (name) DO NOTHING;
+-- 1. Ensure new standard permissions exist
+INSERT INTO permissions (id, name, description)
+SELECT gen_random_uuid(), n, d
+FROM (VALUES
+    ('CLIENTS_READ', 'Visualizar clientes'),
+    ('CLIENTS_WRITE', 'Gerenciar clientes'),
+    ('EMPLOYEES_READ', 'Visualizar funcionários'),
+    ('EMPLOYEES_WRITE', 'Gerenciar funcionários'),
+    ('CONTRACTS_READ', 'Visualizar contratos'),
+    ('CONTRACTS_WRITE', 'Gerenciar contratos'),
+    ('FINANCIAL_READ', 'Visualizar financeiro'),
+    ('FINANCIAL_WRITE', 'Gerenciar financeiro'),
+    ('EQUIPMENTS_READ', 'Visualizar equipamentos'),
+    ('EQUIPMENTS_WRITE', 'Gerenciar equipamentos'),
+    ('REPORTS_READ', 'Visualizar relatórios'),
+    ('SYSTEM_CONFIG', 'Configurações do sistema'),
+    ('PROFILE_READ', 'Visualizar perfil próprio'),
+    ('PROFILE_WRITE', 'Editar perfil próprio'),
+    ('DOCUMENTS_READ', 'Visualizar documentos'),
+    ('DOCUMENTS_WRITE', 'Gerenciar documentos'),
+    ('PAYSLIPS_READ', 'Visualizar holerites')
+) as t(n, d)
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE name = t.n);
 
 -- 2. Merging role_permissions
 -- Clients
