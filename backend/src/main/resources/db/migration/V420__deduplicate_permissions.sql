@@ -2,7 +2,6 @@
 -- Description: Merge redundant and old-style permission names into standard format
 
 -- 1. Ensure new standard permissions exist
--- 1. Ensure new standard permissions exist
 INSERT INTO permissions (id, name, description)
 SELECT gen_random_uuid(), n, d
 FROM (VALUES
@@ -125,19 +124,58 @@ UPDATE user_group_permissions SET permission = 'DOCUMENTS_WRITE' WHERE permissio
 UPDATE user_group_permissions SET permission = 'PAYSLIPS_READ' WHERE permission = 'VIEW_PAYSLIP';
 
 -- 4. Merging user_custom_permissions
-UPDATE user_custom_permissions SET permission_id = (SELECT id FROM permissions WHERE name = 'CLIENTS_READ')
-WHERE permission_id IN (SELECT id FROM permissions WHERE name = 'VIEW_CLIENTS')
-AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_id = (SELECT id FROM permissions WHERE name = 'CLIENTS_READ'));
+UPDATE user_custom_permissions SET permission_key = 'CLIENTS_READ' WHERE permission_key = 'VIEW_CLIENTS'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'CLIENTS_READ');
 
-UPDATE user_custom_permissions SET permission_id = (SELECT id FROM permissions WHERE name = 'CLIENTS_WRITE')
-WHERE permission_id IN (SELECT id FROM permissions WHERE name = 'MANAGE_CLIENTS')
-AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_id = (SELECT id FROM permissions WHERE name = 'CLIENTS_WRITE'));
+UPDATE user_custom_permissions SET permission_key = 'CLIENTS_WRITE' WHERE permission_key = 'MANAGE_CLIENTS'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'CLIENTS_WRITE');
 
--- (Repeat for other permissions in user_custom_permissions if necessary, but role_permissions and user_group_permissions are the main ones)
+UPDATE user_custom_permissions SET permission_key = 'EMPLOYEES_READ' WHERE permission_key = 'VIEW_EMPLOYEES'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'EMPLOYEES_READ');
+
+UPDATE user_custom_permissions SET permission_key = 'EMPLOYEES_WRITE' WHERE permission_key = 'MANAGE_EMPLOYEES'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'EMPLOYEES_WRITE');
+
+UPDATE user_custom_permissions SET permission_key = 'CONTRACTS_READ' WHERE permission_key = 'VIEW_CONTRACTS'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'CONTRACTS_READ');
+
+UPDATE user_custom_permissions SET permission_key = 'CONTRACTS_WRITE' WHERE permission_key = 'MANAGE_CONTRACTS'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'CONTRACTS_WRITE');
+
+UPDATE user_custom_permissions SET permission_key = 'FINANCIAL_READ' WHERE permission_key = 'VIEW_FINANCIAL'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'FINANCIAL_READ');
+
+UPDATE user_custom_permissions SET permission_key = 'FINANCIAL_WRITE' WHERE permission_key = 'MANAGE_FINANCIAL'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'FINANCIAL_WRITE');
+
+UPDATE user_custom_permissions SET permission_key = 'EQUIPMENTS_READ' WHERE permission_key IN ('VIEW_FLEET', 'FLEET_READ')
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'EQUIPMENTS_READ');
+
+UPDATE user_custom_permissions SET permission_key = 'EQUIPMENTS_WRITE' WHERE permission_key IN ('MANAGE_FLEET', 'FLEET_WRITE')
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'EQUIPMENTS_WRITE');
+
+UPDATE user_custom_permissions SET permission_key = 'REPORTS_READ' WHERE permission_key = 'VIEW_REPORTS'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'REPORTS_READ');
+
+UPDATE user_custom_permissions SET permission_key = 'SYSTEM_CONFIG' WHERE permission_key IN ('MANAGE_SYSTEM', 'SETTINGS_WRITE')
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'SYSTEM_CONFIG');
+
+UPDATE user_custom_permissions SET permission_key = 'PROFILE_READ' WHERE permission_key = 'VIEW_PROFILE'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'PROFILE_READ');
+
+UPDATE user_custom_permissions SET permission_key = 'PROFILE_WRITE' WHERE permission_key = 'EDIT_PROFILE'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'PROFILE_WRITE');
+
+UPDATE user_custom_permissions SET permission_key = 'DOCUMENTS_READ' WHERE permission_key = 'VIEW_DOCUMENTS'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'DOCUMENTS_READ');
+
+UPDATE user_custom_permissions SET permission_key = 'DOCUMENTS_WRITE' WHERE permission_key = 'MANAGE_DOCUMENTS'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'DOCUMENTS_WRITE');
+
+UPDATE user_custom_permissions SET permission_key = 'PAYSLIPS_READ' WHERE permission_key = 'VIEW_PAYSLIP'
+AND NOT EXISTS (SELECT 1 FROM user_custom_permissions ucp2 WHERE ucp2.user_id = user_custom_permissions.user_id AND ucp2.permission_key = 'PAYSLIPS_READ');
 
 -- 5. Final cleanup of old permissions
--- Delete from role_permissions, user_group_permissions, user_custom_permissions first (not needed as we UPDATED them)
--- But we might have orphans if multiple old names mapped to the same new name for the same role/group.
 DELETE FROM role_permissions WHERE permission_id IN (SELECT id FROM permissions WHERE name IN (
     'VIEW_CLIENTS', 'MANAGE_CLIENTS',
     'VIEW_EMPLOYEES', 'MANAGE_EMPLOYEES',
@@ -151,7 +189,7 @@ DELETE FROM role_permissions WHERE permission_id IN (SELECT id FROM permissions 
     'VIEW_PAYSLIP'
 ));
 
-DELETE FROM user_custom_permissions WHERE permission_id IN (SELECT id FROM permissions WHERE name IN (
+DELETE FROM user_custom_permissions WHERE permission_key IN (
     'VIEW_CLIENTS', 'MANAGE_CLIENTS',
     'VIEW_EMPLOYEES', 'MANAGE_EMPLOYEES',
     'VIEW_CONTRACTS', 'MANAGE_CONTRACTS',
@@ -162,7 +200,7 @@ DELETE FROM user_custom_permissions WHERE permission_id IN (SELECT id FROM permi
     'VIEW_PROFILE', 'EDIT_PROFILE',
     'VIEW_DOCUMENTS', 'MANAGE_DOCUMENTS',
     'VIEW_PAYSLIP'
-));
+);
 
 -- Finally delete from permissions table
 DELETE FROM permissions WHERE name IN (
