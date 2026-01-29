@@ -8,6 +8,24 @@ BEGIN
     
     -- 2. Se a tabela não existe mas chat_messages existe, criamos a tabela já com o tamanho correto
     ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'chat_messages') THEN
+        -- 2.1 Garantir que chat_messages tem PRIMARY KEY (evita erro de constraint em ambientes inconsistentes)
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conrelid = 'chat_messages'::regclass 
+            AND contype = 'p'
+        ) THEN
+            ALTER TABLE chat_messages ADD PRIMARY KEY (id);
+        END IF;
+
+        -- 2.2 Garantir que users tem PRIMARY KEY
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conrelid = 'users'::regclass 
+            AND contype = 'p'
+        ) THEN
+            ALTER TABLE users ADD PRIMARY KEY (id);
+        END IF;
+
         CREATE TABLE message_reactions (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             message_id UUID NOT NULL,

@@ -1,5 +1,19 @@
--- Migration: V420__deduplicate_permissions.sql
--- Description: Merge redundant and old-style permission names into standard format
+-- 0. Ensure PKs exist (v421-style safety for inconsistent CI environments)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'permissions'::regclass AND contype = 'p') THEN
+        ALTER TABLE permissions ADD PRIMARY KEY (id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'roles'::regclass AND contype = 'p') THEN
+        ALTER TABLE roles ADD PRIMARY KEY (id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'role_permissions'::regclass AND contype = 'p') THEN
+        -- Check if it has the columns before adding PK
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'role_permissions' AND column_name = 'role_id') THEN
+             ALTER TABLE role_permissions ADD PRIMARY KEY (role_id, permission_id);
+        END IF;
+    END IF;
+END $$;
 
 -- 1. Ensure new standard permissions exist
 INSERT INTO permissions (id, name, description)
