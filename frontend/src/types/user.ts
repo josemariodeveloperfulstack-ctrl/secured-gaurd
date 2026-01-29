@@ -1,6 +1,6 @@
 export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL';
 
-export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_GESTOR' | 'GRUPO_RH' | 'GRUPO_DPE' | 'GRUPO_SUPERVISOR' | 'GRUPO_COLABORADORES' | 'GRUPO_OPERACIONAL' | 'GRUPO_VIGILANTES' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_AUXILIARES';
+export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_GESTOR' | 'GRUPO_RH' | 'GRUPO_DPE' | 'GRUPO_SUPERVISOR' | 'GRUPO_COLABORADORES' | 'GRUPO_OPERACIONAL' | 'GRUPO_VIGILANTES' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_AUXILIARES' | 'GRUPO_COMERCIAL';
 
 export interface UserPermissions {
   // Permissões de Usuários
@@ -297,6 +297,13 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
     { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟥' },
     { label: 'Configurações', path: '/settings', icon: 'Settings', color: '🟥' },
   ],
+  ASSISTENCIA_RH: [],
+  DEPARTAMENTO_PESSOAL: [],
+  OPERACIONAL: [],
+  VIGILANTE: [],
+  AUXI_ADMINISTRATIVO: [],
+  AUX_DEP: [],
+  GESTOR: [],
 };
 
 export interface UserWithGroups extends User {

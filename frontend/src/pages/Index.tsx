@@ -10,12 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
-import { 
-  BarChart3, 
-  Users, 
-  Building, 
-  FileText, 
-  DollarSign, 
+import {
+  BarChart3,
+  Users,
+  Building,
+  FileText,
+  DollarSign,
   Truck,
   LogOut,
   User,
@@ -321,7 +321,7 @@ const Index: React.FC = () => {
               )}
             </div>
           </CardContent>
-      </Card>
+        </Card>
 
         <Card className="bg-seguranca-black border-gray-700">
           <CardHeader>
@@ -400,26 +400,26 @@ const Index: React.FC = () => {
       {/* Dashboard com abas */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4 bg-seguranca-graphite border border-gray-700">
-          <TabsTrigger 
-            value="overview" 
+          <TabsTrigger
+            value="overview"
             className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Visão Geral
           </TabsTrigger>
-          <TabsTrigger 
-            value="modules" 
+          <TabsTrigger
+            value="modules"
             className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Módulos
           </TabsTrigger>
-          <TabsTrigger 
-            value="activity" 
+          <TabsTrigger
+            value="activity"
             className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Atividade
           </TabsTrigger>
-          <TabsTrigger 
-            value="profile" 
+          <TabsTrigger
+            value="profile"
             className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
           >
             Perfil
@@ -439,649 +439,675 @@ const Index: React.FC = () => {
                 <p className="text-gray-400">Acesse as funcionalidades baseadas em suas permissões</p>
               </div>
             </div>
-            
+
             {/* Cards de resumo baseados no role */}
             <DashboardGrid>
-        {/* SUPER_ADMIN - Acesso total */}
-        {user.role === 'SUPER_ADMIN' && (
-          <>
-            {/* Módulos de Sistema */}
-            <DashboardCard
-              title="Controle Total"
-              value="🟥"
-              description="Acesso irrestrito a todas as funcionalidades do sistema"
-              icon={Shield}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar Sistema",
-                onClick: () => navigate('/configuracoes'),
-                variant: 'default'
-              }}
-            />
+              {/* SUPER_ADMIN - Acesso total */}
+              {user.role === 'SUPER_ADMIN' && (
+                <>
+                  {/* Módulos de Sistema */}
+                  <DashboardCard
+                    title="Controle Total"
+                    value="🟥"
+                    description="Acesso irrestrito a todas as funcionalidades do sistema"
+                    icon={Shield}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar Sistema",
+                      onClick: () => navigate('/configuracoes'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Usuários"
-              value="🟥"
-              description="Gerencie usuários e permissões do sistema"
-              icon={UserCog}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar Usuários",
-                onClick: () => navigate('/usuarios'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Usuários"
+                    value="🟥"
+                    description="Gerencie usuários e permissões do sistema"
+                    icon={UserCog}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar Usuários",
+                      onClick: () => navigate('/usuarios'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Grupos"
-              value="🟥"
-              description="Configure grupos e permissões"
-              icon={UserCheck}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar Grupos",
-                onClick: () => navigate('/grupos'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Grupos"
+                    value="🟥"
+                    description="Configure grupos e permissões"
+                    icon={UserCheck}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar Grupos",
+                      onClick: () => navigate('/grupos'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Sistema"
-              value="🟥"
-              description="Configurações avançadas do sistema"
-              icon={Database}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Configurar",
-                onClick: () => navigate('/configuracoes'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Sistema"
+                    value="🟥"
+                    description="Configurações avançadas do sistema"
+                    icon={Database}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Configurar",
+                      onClick: () => navigate('/configuracoes'),
+                      variant: 'default'
+                    }}
+                  />
 
-            {/* Módulos Operacionais */}
-            <DashboardCard
-              title="Operacional"
-              value="🟥"
-              description="Controle operacional e escalas"
-              icon={Shield}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/operacional'),
-                variant: 'default'
-              }}
-            />
+                  {/* Módulos Operacionais */}
+                  <DashboardCard
+                    title="Operacional"
+                    value="🟥"
+                    description="Controle operacional e escalas"
+                    icon={Shield}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/operacional'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Controle de Visitas"
-              value="🟥"
-              description="Gestão avançada de visitas"
-              icon={Target}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/controle-visitas-avancado'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Controle de Visitas"
+                    value="🟥"
+                    description="Gestão avançada de visitas"
+                    icon={Target}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/controle-visitas-avancado'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Supervisão"
-              value="🟥"
-              description="Supervisão principal do sistema"
-              icon={Shield}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/supervisao'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Supervisão"
+                    value="🟥"
+                    description="Supervisão principal do sistema"
+                    icon={Shield}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/supervisao'),
+                      variant: 'default'
+                    }}
+                  />
 
-            {/* Módulos de RH */}
-            <DashboardCard
-              title="Funcionários"
-              value="🟥"
-              description="Gestão completa de funcionários"
-              icon={Users}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/funcionarios'),
-                variant: 'default'
-              }}
-            />
+                  {/* Módulos de RH */}
+                  <DashboardCard
+                    title="Funcionários"
+                    value="🟥"
+                    description="Gestão completa de funcionários"
+                    icon={Users}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/funcionarios'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Postos de Trabalho"
-              value="🟥"
-              description="Gestão de postos e funções"
-              icon={Target}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/postos'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Postos de Trabalho"
+                    value="🟥"
+                    description="Gestão de postos e funções"
+                    icon={Target}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/postos'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Funções"
-              value="🟥"
-              description="Gestão de funções e cargos"
-              icon={Settings}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/rh/funcoes'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Funções"
+                    value="🟥"
+                    description="Gestão de funções e cargos"
+                    icon={Settings}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/rh/funcoes'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Cargos"
-              value="🟥"
-              description="Gestão de cargos e hierarquia"
-              icon={ClipboardList}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/rh/cargos'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Cargos"
+                    value="🟥"
+                    description="Gestão de cargos e hierarquia"
+                    icon={ClipboardList}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/rh/cargos'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Holerites"
-              value="🟥"
-              description="Gestão de holerites e pagamentos"
-              icon={FileText}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/holerites'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Holerites"
+                    value="🟥"
+                    description="Gestão de holerites e pagamentos"
+                    icon={FileText}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/holerites'),
+                      variant: 'default'
+                    }}
+                  />
 
-            {/* Módulos SST */}
-            <DashboardCard
-              title="SST"
-              value="🟥"
-              description="Saúde e Segurança do Trabalho"
-              icon={Shield}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/rh/sst'),
-                variant: 'default'
-              }}
-            />
+                  {/* Módulos SST */}
+                  <DashboardCard
+                    title="SST"
+                    value="🟥"
+                    description="Saúde e Segurança do Trabalho"
+                    icon={Shield}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/rh/sst'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Exames Médicos"
-              value="🟥"
-              description="Gestão de exames médicos"
-              icon={Activity}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/rh/sst/exames'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Exames Médicos"
+                    value="🟥"
+                    description="Gestão de exames médicos"
+                    icon={Activity}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/rh/sst/exames'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="EPIs"
-              value="🟥"
-              description="Gestão de equipamentos de proteção"
-              icon={Package}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/rh/sst/epis'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="EPIs"
+                    value="🟥"
+                    description="Gestão de equipamentos de proteção"
+                    icon={Package}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/rh/sst/epis'),
+                      variant: 'default'
+                    }}
+                  />
 
-            {/* Módulos Comerciais */}
-            <DashboardCard
-              title="Clientes"
-              value="🟥"
-              description="Gestão de clientes e contratos"
-              icon={Building}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/clientes'),
-                variant: 'default'
-              }}
-            />
+                  {/* Módulos Comerciais */}
+                  <DashboardCard
+                    title="Clientes"
+                    value="🟥"
+                    description="Gestão de clientes e contratos"
+                    icon={Building}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/clientes'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Contratos"
-              value="🟥"
-              description="Gestão de contratos de segurança"
-              icon={FileText}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/contratos'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Contratos"
+                    value="🟥"
+                    description="Gestão de contratos de segurança"
+                    icon={FileText}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/contratos'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Leads"
-              value="🟥"
-              description="Gestão de leads e oportunidades"
-              icon={Target}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/leads'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Leads"
+                    value="🟥"
+                    description="Gestão de leads e oportunidades"
+                    icon={Target}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/leads'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Propostas"
-              value="🟥"
-              description="Controle de propostas comerciais"
-              icon={FileCheck}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/propostas'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Propostas"
+                    value="🟥"
+                    description="Controle de propostas comerciais"
+                    icon={FileCheck}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/propostas'),
+                      variant: 'default'
+                    }}
+                  />
 
-            {/* Módulos Financeiros */}
-            <DashboardCard
-              title="Financeiro"
-              value="🟥"
-              description="Controle financeiro completo"
-              icon={DollarSign}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/financeiro'),
-                variant: 'default'
-              }}
-            />
+                  {/* Módulos Financeiros */}
+                  <DashboardCard
+                    title="Financeiro"
+                    value="🟥"
+                    description="Controle financeiro completo"
+                    icon={DollarSign}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/financeiro'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Contas a Pagar"
-              value="🟥"
-              description="Gestão de contas a pagar"
-              icon={CreditCard}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/contas-a-pagar'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Contas a Pagar"
+                    value="🟥"
+                    description="Gestão de contas a pagar"
+                    icon={CreditCard}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/contas-a-pagar'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Contas a Receber"
-              value="🟥"
-              description="Gestão de contas a receber"
-              icon={Banknote}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/financeiro/contas-receber'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Contas a Receber"
+                    value="🟥"
+                    description="Gestão de contas a receber"
+                    icon={Banknote}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/financeiro/contas-receber'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Fluxo de Caixa"
-              value="🟥"
-              description="Controle de fluxo de caixa"
-              icon={TrendingUp}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/financeiro/fluxo-caixa'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Fluxo de Caixa"
+                    value="🟥"
+                    description="Controle de fluxo de caixa"
+                    icon={TrendingUp}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/financeiro/fluxo-caixa'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Conciliação Bancária"
-              value="🟥"
-              description="Conciliação de movimentações bancárias"
-              icon={Calculator}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/financeiro/conciliacao-bancaria'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Conciliação Bancária"
+                    value="🟥"
+                    description="Conciliação de movimentações bancárias"
+                    icon={Calculator}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/financeiro/conciliacao-bancaria'),
+                      variant: 'default'
+                    }}
+                  />
 
-            {/* Módulos de Frota e Operações */}
-            <DashboardCard
-              title="Frota"
-              value="🟥"
-              description="Controle de veículos e manutenção"
-              icon={Truck}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/frota'),
-                variant: 'default'
-              }}
-            />
+                  {/* Módulos de Frota e Operações */}
+                  <DashboardCard
+                    title="Frota"
+                    value="🟥"
+                    description="Controle de veículos e manutenção"
+                    icon={Truck}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/frota'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Filiais"
-              value="🟥"
-              description="Gestão de filiais e unidades"
-              icon={Building}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/filiais'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Filiais"
+                    value="🟥"
+                    description="Gestão de filiais e unidades"
+                    icon={Building}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/filiais'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Serviços"
-              value="🟥"
-              description="Controle de serviços prestados"
-              icon={ClipboardList}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Gerenciar",
-                onClick: () => navigate('/operacional?tab=servicos'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Serviços"
+                    value="🟥"
+                    description="Controle de serviços prestados"
+                    icon={ClipboardList}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Gerenciar",
+                      onClick: () => navigate('/operacional?tab=servicos'),
+                      variant: 'default'
+                    }}
+                  />
 
-            {/* Módulos de Relatórios e Suporte */}
-            <DashboardCard
-              title="Relatórios"
-              value="🟥"
-              description="Relatórios e análises do sistema"
-              icon={BarChart3}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/relatorios'),
-                variant: 'default'
-              }}
-            />
+                  {/* Módulos de Relatórios e Suporte */}
+                  <DashboardCard
+                    title="Relatórios"
+                    value="🟥"
+                    description="Relatórios e análises do sistema"
+                    icon={BarChart3}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/relatorios'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Gestão de Atividades"
-              value="🟥"
-              description="Controle de atividades do sistema"
-              icon={Activity}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/atividades'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Gestão de Atividades"
+                    value="🟥"
+                    description="Controle de atividades do sistema"
+                    icon={Activity}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/atividades'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Central de Suporte"
-              value="🟥"
-              description="Central de suporte e atendimento"
-              icon={Bell}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/suporte'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Central de Suporte"
+                    value="🟥"
+                    description="Central de suporte e atendimento"
+                    icon={Bell}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/suporte'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Gestão de Mensagens"
-              value="🟥"
-              description="Sistema de mensagens internas"
-              icon={MessageSquare}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/gestao-mensagens/inbox'),
-                variant: 'default'
-              }}
-            />
-          </>
-        )}
+                  <DashboardCard
+                    title="Gestão de Mensagens"
+                    value="🟥"
+                    description="Sistema de mensagens internas"
+                    icon={MessageSquare}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/gestao-mensagens/inbox'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
 
-        {/* ADMIN - Acesso administrativo */}
-        {user.role === 'ADMIN' && (
-          <>
-            <DashboardCard
-              title="Usuários"
-              value="Gerenciar"
-              description="Gerencie usuários e permissões do sistema"
-              icon={UserCog}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/usuarios'),
-                variant: 'default'
-              }}
-            />
+              {/* ADMIN - Acesso administrativo */}
+              {user.role === 'ADMIN' && (
+                <>
+                  <DashboardCard
+                    title="Usuários"
+                    value="Gerenciar"
+                    description="Gerencie usuários e permissões do sistema"
+                    icon={UserCog}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/usuarios'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Grupos de Usuários"
-              value="Gerenciar"
-              description="Configure grupos e permissões"
-              icon={UserCheck}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/grupos'),
-                variant: 'default'
-              }}
-            />
-          </>
-        )}
+                  <DashboardCard
+                    title="Grupos de Usuários"
+                    value="Gerenciar"
+                    description="Configure grupos e permissões"
+                    icon={UserCheck}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/grupos'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
 
-        {/* COLABORADOR */}
-        {user.role === 'COLABORADOR' && (
-          <>
-            <DashboardCard
-              title="Meu Holerite"
-              value="Visualizar"
-              description="Visualize e baixe seus holerites mensais"
-              icon={FileText}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/holerites'),
-                variant: 'default'
-              }}
-            />
+              {/* COLABORADOR */}
+              {user.role === 'COLABORADOR' && (
+                <>
+                  <DashboardCard
+                    title="Meu Holerite"
+                    value="Visualizar"
+                    description="Visualize e baixe seus holerites mensais"
+                    icon={FileText}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/holerites'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Meu Perfil"
-              value="Gerenciar"
-              description="Gerencie suas informações pessoais"
-              icon={User}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/profile'),
-                variant: 'default'
-              }}
-            />
-          </>
-        )}
+                  <DashboardCard
+                    title="Meu Perfil"
+                    value="Gerenciar"
+                    description="Gerencie suas informações pessoais"
+                    icon={User}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/profile'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
 
-        {/* ADMIN, RH, SUPERVISOR */}
-        {(user.role === 'ADMIN' || user.role === 'RH' || user.role === 'SUPERVISOR') && (
-          <>
-            <DashboardCard
-              title="Funcionários"
-              value="Gerenciar"
-              description="Gerencie o quadro de funcionários"
-              icon={Users}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/funcionarios'),
-                variant: 'default'
-              }}
-            />
+              {/* ADMIN, RH, SUPERVISOR */}
+              {(user.role === 'ADMIN' || user.role === 'RH' || user.role === 'SUPERVISOR') && (
+                <>
+                  <DashboardCard
+                    title="Funcionários"
+                    value="Gerenciar"
+                    description="Gerencie o quadro de funcionários"
+                    icon={Users}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/funcionarios'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Holerites"
-              value="Gerenciar"
-              description="Gerencie holerites dos funcionários"
-              icon={FileText}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/holerites/envio'),
-                variant: 'default'
-              }}
-            />
-          </>
-        )}
+                  <DashboardCard
+                    title="Holerites"
+                    value="Gerenciar"
+                    description="Gerencie holerites dos funcionários"
+                    icon={FileText}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/holerites/envio'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
 
-        {/* ADMIN */}
-        {user.role === 'ADMIN' && (
-          <>
-            <DashboardCard
-              title="Clientes"
-              value="Gerenciar"
-              description="Gerencie clientes e contratos"
-              icon={Building}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/clientes'),
-                variant: 'default'
-              }}
-            />
+              {/* ADMIN */}
+              {user.role === 'ADMIN' && (
+                <>
+                  <DashboardCard
+                    title="Clientes"
+                    value="Gerenciar"
+                    description="Gerencie clientes e contratos"
+                    icon={Building}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/clientes'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Financeiro"
-              value="Gerenciar"
-              description="Controle financeiro e relatórios"
-              icon={DollarSign}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/financeiro'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Financeiro"
+                    value="Gerenciar"
+                    description="Controle financeiro e relatórios"
+                    icon={DollarSign}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/financeiro'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Frota"
-              value="Gerenciar"
-              description="Controle de veículos e manutenção"
-              icon={Truck}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/frota'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Frota"
+                    value="Gerenciar"
+                    description="Controle de veículos e manutenção"
+                    icon={Truck}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/frota'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Configurações"
-              value="Sistema"
-              description="Configurações gerais do sistema"
-              icon={Settings}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => navigate('/configuracoes'),
-                variant: 'default'
-              }}
-            />
-          </>
-        )}
+                  <DashboardCard
+                    title="Configurações"
+                    value="Sistema"
+                    description="Configurações gerais do sistema"
+                    icon={Settings}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/configuracoes'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
 
-        {/* Módulo Operacional */}
-        {(user.role === 'ADMIN' || user.role === 'SUPERVISOR') && (
-          <>
-            <DashboardCard
-              title="Operacional"
-              value="Gerenciar"
-              description="Controle operacional e escalas"
-              icon={Shield}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => console.log('Acessar Operacional'),
-                variant: 'default'
-              }}
-            />
+              {/* Módulo Operacional */}
+              {(user.role === 'ADMIN' || user.role === 'SUPERVISOR') && (
+                <>
+                  <DashboardCard
+                    title="Operacional"
+                    value="Gerenciar"
+                    description="Controle operacional e escalas"
+                    icon={Shield}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => console.log('Acessar Operacional'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Serviços"
-              value="Gerenciar"
-              description="Controle de serviços prestados"
-              icon={ClipboardList}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => console.log('Acessar Serviços'),
-                variant: 'default'
-              }}
-            />
-          </>
-        )}
+                  <DashboardCard
+                    title="Serviços"
+                    value="Gerenciar"
+                    description="Controle de serviços prestados"
+                    icon={ClipboardList}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => console.log('Acessar Serviços'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
 
-        {/* Módulo Comercial */}
-        {user.role === 'ADMIN' && (
-          <>
-            <DashboardCard
-              title="Leads"
-              value="Gerenciar"
-              description="Gestão de leads e oportunidades"
-              icon={Target}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => console.log('Acessar Leads'),
-                variant: 'default'
-              }}
-            />
+              {/* Módulo Comercial */}
+              {(user.role === 'ADMIN' || user.role === 'COMERCIAL') && (
+                <>
+                  <DashboardCard
+                    title="Clientes"
+                    value="Gerenciar"
+                    description="Gestão de clientes e contratos"
+                    icon={Building}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/clientes'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Propostas"
-              value="Gerenciar"
-              description="Controle de propostas comerciais"
-              icon={FileCheck}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => console.log('Acessar Propostas'),
-                variant: 'default'
-              }}
-            />
+                  <DashboardCard
+                    title="Contratos"
+                    value="Gerenciar"
+                    description="Gestão de contratos"
+                    icon={FileText}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/contratos'),
+                      variant: 'default'
+                    }}
+                  />
 
-            <DashboardCard
-              title="Orçamentos"
-              value="Gerenciar"
-              description="Gestão de orçamentos"
-              icon={Calculator}
-              iconColor="text-seguranca-yellow"
-              action={{
-                label: "Acessar",
-                onClick: () => console.log('Acessar Orçamentos'),
-                variant: 'default'
-              }}
-            />
-          </>
-        )}
+                  <DashboardCard
+                    title="Leads"
+                    value="Gerenciar"
+                    description="Gestão de leads e oportunidades"
+                    icon={Target}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/leads'),
+                      variant: 'default'
+                    }}
+                  />
+
+                  <DashboardCard
+                    title="Propostas"
+                    value="Gerenciar"
+                    description="Controle de propostas comerciais"
+                    icon={FileCheck}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/propostas'),
+                      variant: 'default'
+                    }}
+                  />
+
+                  <DashboardCard
+                    title="Orçamentos"
+                    value="Gerenciar"
+                    description="Gestão de orçamentos"
+                    icon={Calculator}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/orcamentos'), // Fixed path from earlier log
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
             </DashboardGrid>
           </div>
         </TabsContent>
@@ -1137,7 +1163,7 @@ const Index: React.FC = () => {
         <TabsContent value="profile" className="mt-6">
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-seguranca-lightgray">Informações do Perfil</h2>
-            
+
             {/* Perfil Principal */}
             <Card className="bg-seguranca-black border-gray-700">
               <CardHeader>
@@ -1170,7 +1196,7 @@ const Index: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                
+
                 {user.role === 'SUPER_ADMIN' && (
                   <div className="mt-6 p-4 bg-seguranca-graphite border border-seguranca-yellow rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
@@ -1235,35 +1261,35 @@ const Index: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
                     onClick={() => navigate('/profile')}
                   >
                     <User className="h-4 w-4 mr-2" />
                     Editar Perfil
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
                     onClick={() => navigate('/configuracoes')}
                   >
                     <Settings className="h-4 w-4 mr-2" />
                     Configurações
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
                     onClick={() => navigate('/usuarios')}
                   >
                     <Users className="h-4 w-4 mr-2" />
                     Gerenciar Usuários
                   </Button>
-                  
-                  <Button 
-                    variant="outline" 
+
+                  <Button
+                    variant="outline"
                     className="bg-red-600 border-red-600 text-white hover:bg-red-700 hover:border-red-700"
                     onClick={logout}
                   >

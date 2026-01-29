@@ -1,6 +1,7 @@
 import { UserRole, UserPermissions, UserGroupData } from '@/types/user';
 
-'SUPER_ADMIN',
+export const USER_ROLE_LIST: UserRole[] = [
+  'SUPER_ADMIN',
   'ADMIN',
   'GESTOR',
   'COMERCIAL',

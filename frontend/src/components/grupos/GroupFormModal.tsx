@@ -33,6 +33,7 @@ const GROUP_OPTIONS: { value: UserGroup; label: string }[] = [
   { value: 'GRUPO_TI_SUPORTE', label: 'TI / Suporte' },
   { value: 'GRUPO_AUDITOR', label: 'Auditor' },
   { value: 'GRUPO_AUXILIARES', label: 'Auxiliares' },
+  { value: 'GRUPO_COMERCIAL', label: 'Comercial' },
 ];
 
 export const GroupFormModal: React.FC<GroupFormModalProps> = ({
@@ -106,7 +107,7 @@ export const GroupFormModal: React.FC<GroupFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const normalizedGroupName = (formData.groupName || '').toString().trim();
     const normalizedDisplayName = formData.displayName.trim();
 
@@ -137,7 +138,7 @@ export const GroupFormModal: React.FC<GroupFormModalProps> = ({
 
     try {
       setLoading(true);
-      
+
       if (isEditing && group) {
         await groupService.updateGroup(group.id, payload);
         toast({
@@ -151,7 +152,7 @@ export const GroupFormModal: React.FC<GroupFormModalProps> = ({
           description: 'Grupo criado com sucesso.',
         });
       }
-      
+
       onSuccess();
       handleClose();
     } catch (error: any) {
@@ -217,8 +218,8 @@ export const GroupFormModal: React.FC<GroupFormModalProps> = ({
           {/* Nome do Grupo */}
           <div className="space-y-2">
             <Label htmlFor="groupName">Nome do Grupo *</Label>
-            <Select 
-              value={formData.groupName} 
+            <Select
+              value={formData.groupName}
               onValueChange={(value: UserGroup) => setFormData(prev => ({ ...prev, groupName: value }))}
               disabled={isEditing}
             >
@@ -282,7 +283,7 @@ export const GroupFormModal: React.FC<GroupFormModalProps> = ({
                 </Button>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto border rounded-md p-4">
               {isLoadingPermissions ? (
                 <div className="col-span-2 text-center text-sm text-gray-400">

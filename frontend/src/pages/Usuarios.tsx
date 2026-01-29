@@ -9,10 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 import { userService } from '@/services/userService';
 import { User, UserRole } from '@/types/user';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Users, 
-  Plus, 
-  Search, 
+import {
+  Users,
+  Plus,
+  Search,
   Filter,
   RefreshCw,
   User as UserIcon,
@@ -81,17 +81,17 @@ const Usuarios: React.FC = () => {
         ...user,
         isOnline: Boolean(user.isOnline)
       }));
-      
+
       // Log apenas quando há usuários online para debug
       const onlineUsers = usersWithOnlineStatus.filter(u => Boolean(u.isOnline));
       if (onlineUsers.length > 0) {
         console.log('📥 [Usuarios] Usuários carregados:', usersWithOnlineStatus.length, '| Online:', onlineUsers.length);
       }
-      
+
       setUsers(usersWithOnlineStatus);
     } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);
-      
+
       if (error.response?.status === 403 || error.response?.status === 401) {
         toast({
           title: 'Acesso Negado',
@@ -131,10 +131,10 @@ const Usuarios: React.FC = () => {
       const onlineCount = filtered.length;
       const expectedCount = users.filter(u => Boolean(u.isOnline)).length;
       if (onlineCount !== expectedCount) {
-        console.warn('⚠️ [Usuarios] Discrepância no filtro online:', { 
-          filtrados: onlineCount, 
+        console.warn('⚠️ [Usuarios] Discrepância no filtro online:', {
+          filtrados: onlineCount,
           esperados: expectedCount,
-          total: users.length 
+          total: users.length
         });
       }
     }
@@ -253,7 +253,7 @@ const Usuarios: React.FC = () => {
 
   if (isLoading) {
     return (
-      <StandardLayout 
+      <StandardLayout
         title="Usuários"
         subtitle="Carregando usuários..."
       >
@@ -269,7 +269,7 @@ const Usuarios: React.FC = () => {
   }
 
   return (
-    <StandardLayout 
+    <StandardLayout
       title="Usuários"
       subtitle={`${filteredUsers.length} usuário${filteredUsers.length !== 1 ? 's' : ''} encontrado${filteredUsers.length !== 1 ? 's' : ''} • ${onlineCount} online`}
     >
@@ -290,7 +290,7 @@ const Usuarios: React.FC = () => {
                   className="pl-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                 />
               </div>
-              
+
               <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
@@ -301,8 +301,8 @@ const Usuarios: React.FC = () => {
                   <option key={role} value={role}>{getRoleDisplayName(role)}</option>
                 ))}
               </select>
-              
-              <Button 
+
+              <Button
                 className="bg-seguranca-red hover:bg-seguranca-darkred"
                 onClick={handleCreateUser}
               >
@@ -325,7 +325,7 @@ const Usuarios: React.FC = () => {
               >
                 Online ({onlineCount})
               </Button>
-              <Button 
+              <Button
                 variant="outline"
                 className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
                 onClick={() => {
@@ -359,190 +359,189 @@ const Usuarios: React.FC = () => {
                   {activeTab === 'online'
                     ? 'Nenhum usuário online no momento.'
                     : (searchTerm || roleFilter !== 'all'
-                        ? 'Tente ajustar os filtros de busca.'
-                        : 'Não há usuários cadastrados no sistema.'
-                      )
+                      ? 'Tente ajustar os filtros de busca.'
+                      : 'Não há usuários cadastrados no sistema.'
+                    )
                   }
                 </p>
               </div>
             ) : activeTab === 'online' ? (
               <div className="w-full overflow-x-auto">
                 <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow className="border-gray-600">
-                    <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Email</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id} className="border-gray-600">
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
-                            <UserIcon className="text-white" size={20} />
-                          </div>
-                          <div>
-                            <div className="font-medium text-seguranca-lightgray">{user.name}</div>
-                            {/* ID oculto conforme solicitado */}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[260px]">
-                        <div className="flex items-center space-x-2">
-                          <Mail size={16} className="text-gray-400" />
-                          <span className="text-seguranca-lightgray truncate">{user.email}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {extractRoleNames(user.roles).map((role: string) => (
-                          <Badge key={role} className={getRoleColor(role)}>{getRoleDisplayName(role)}</Badge>
-                        ))}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                            onClick={() => navigate(`/chat-interno?user=${user.id}`)}
-                          >
-                            <MessageCircle className="h-4 w-4 mr-1.5" />
-                            Chat Interno
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                            onClick={() => navigate(`/mensagens?user=${user.id}`)}
-                          >
-                            <Send className="h-4 w-4 mr-1.5" />
-                            Enviar Mensagem
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-                            onClick={() => navigate(`/gestao-mensagens/notificacoes?user=${user.id}`)}
-                          >
-                            <Bell className="h-4 w-4 mr-1.5" />
-                            Notificações
-                          </Button>
-                        </div>
-                      </TableCell>
+                  <TableHeader>
+                    <TableRow className="border-gray-600">
+                      <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Email</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id} className="border-gray-600">
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
+                              <UserIcon className="text-white" size={20} />
+                            </div>
+                            <div>
+                              <div className="font-medium text-seguranca-lightgray">{user.name}</div>
+                              {/* ID oculto conforme solicitado */}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[260px]">
+                          <div className="flex items-center space-x-2">
+                            <Mail size={16} className="text-gray-400" />
+                            <span className="text-seguranca-lightgray truncate">{user.email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {extractRoleNames(user.roles).map((role: string) => (
+                            <Badge key={role} className={getRoleColor(role)}>{getRoleDisplayName(role)}</Badge>
+                          ))}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              onClick={() => navigate(`/chat-interno?user=${user.id}`)}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-1.5" />
+                              Chat Interno
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              onClick={() => navigate(`/mensagens?user=${user.id}`)}
+                            >
+                              <Send className="h-4 w-4 mr-1.5" />
+                              Enviar Mensagem
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              onClick={() => navigate(`/gestao-mensagens/notificacoes?user=${user.id}`)}
+                            >
+                              <Bell className="h-4 w-4 mr-1.5" />
+                              Notificações
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
                 </Table>
               </div>
             ) : (
               <div className="w-full overflow-x-auto">
                 <Table className="min-w-[1000px]">
-                <TableHeader>
-                  <TableRow className="border-gray-600">
-                    <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Email</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                    <TableHead className="text-seguranca-lightgray">Grupos</TableHead>
-                    <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id} className="border-gray-600">
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-seguranca-red rounded-full flex items-center justify-center relative">
-                            <UserIcon className="text-white" size={20} />
-                            <span
-                              className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-seguranca-graphite ${
-                                user.isOnline ? 'bg-emerald-500' : 'bg-gray-500'
-                              }`}
-                              title={user.isOnline ? 'Online' : 'Offline'}
-                            />
-                          </div>
-                          <div>
-                            <div className="font-medium text-seguranca-lightgray flex items-center gap-2">
-                              {user.name}
-                              <span className={`text-xs ${user.isOnline ? 'text-emerald-400' : 'text-gray-400'}`}>
-                                {user.isOnline ? 'Online' : 'Offline'}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-400">ID: {user.id}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Mail size={16} className="text-gray-400" />
-                          <span className="text-seguranca-lightgray">{user.email}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {extractRoleNames(user.roles).map((role: string) => (
-                          <Badge key={role} className={getRoleColor(role)}>{getRoleDisplayName(role)}</Badge>
-                        ))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={user.isOnline ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}>
-                          {user.isOnline ? 'Online' : 'Offline'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.groups && user.groups.length > 0 ? (
-                            user.groups.slice(0, 2).map((group) => (
-                              <Badge key={group.id} variant="outline" className="text-xs">
-                                {group.displayName}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-gray-400 text-sm">Sem grupos</span>
-                          )}
-                          {user.groups && user.groups.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{user.groups.length - 2}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewUser(user)}
-                            title="Visualizar Usuário"
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditUser(user)}
-                            title="Editar Usuário"
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUser(user)}
-                            title="Excluir Usuário"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                  <TableHeader>
+                    <TableRow className="border-gray-600">
+                      <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Email</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Status</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Grupos</TableHead>
+                      <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id} className="border-gray-600">
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-seguranca-red rounded-full flex items-center justify-center relative">
+                              <UserIcon className="text-white" size={20} />
+                              <span
+                                className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-seguranca-graphite ${user.isOnline ? 'bg-emerald-500' : 'bg-gray-500'
+                                  }`}
+                                title={user.isOnline ? 'Online' : 'Offline'}
+                              />
+                            </div>
+                            <div>
+                              <div className="font-medium text-seguranca-lightgray flex items-center gap-2">
+                                {user.name}
+                                <span className={`text-xs ${user.isOnline ? 'text-emerald-400' : 'text-gray-400'}`}>
+                                  {user.isOnline ? 'Online' : 'Offline'}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-400">ID: {user.id}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Mail size={16} className="text-gray-400" />
+                            <span className="text-seguranca-lightgray">{user.email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {extractRoleNames(user.roles).map((role: string) => (
+                            <Badge key={role} className={getRoleColor(role)}>{getRoleDisplayName(role)}</Badge>
+                          ))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={user.isOnline ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-800'}>
+                            {user.isOnline ? 'Online' : 'Offline'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {user.groups && user.groups.length > 0 ? (
+                              user.groups.slice(0, 2).map((group) => (
+                                <Badge key={group.id} variant="outline" className="text-xs">
+                                  {group.displayName}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 text-sm">Sem grupos</span>
+                            )}
+                            {user.groups && user.groups.length > 2 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{user.groups.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap min-w-[150px]">
+                          <div className="flex items-center justify-end space-x-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleViewUser(user)}
+                              title="Visualizar Usuário"
+                              className="bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 hover:text-blue-300 border border-blue-900/50"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleEditUser(user)}
+                              title="Editar Usuário"
+                              className="bg-green-900/30 text-green-400 hover:bg-green-900/50 hover:text-green-300 border border-green-900/50"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user)}
+                              title="Excluir Usuário"
+                              className="bg-red-900/30 text-red-400 hover:bg-red-900/50 hover:text-red-300 border border-red-900/50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
                 </Table>
               </div>
             )}

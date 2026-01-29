@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { validateCPF, validateCNPJ } from '@/utils/validation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogPortal, DialogOverlay } from '@/components/ui/dialog';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Input } from '@/components/ui/input';
@@ -126,13 +127,17 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
       if (!normalized.cnpj) {
         throw new Error('CNPJ é obrigatório');
       }
-      if ((normalized.cnpj || '').replace(/\D/g, '').length !== 14) {
-        throw new Error('CNPJ inválido. Use o formato 00.000.000/0000-00');
+
+      // Validação estrita de CNPJ
+      if (!validateCNPJ(normalized.cnpj)) {
+        throw new Error('CNPJ inválido. Verifique os dígitos informados.');
       }
 
       // Validar CPF se preenchido
-      if (normalized.cpf && normalized.cpf.replace(/\D/g, '').length !== 11) {
-        throw new Error('CPF inválido. Use o formato 000.000.000-00');
+      if (normalized.cpf) {
+        if (!validateCPF(normalized.cpf)) {
+          throw new Error('CPF inválido. Verifique os dígitos informados.');
+        }
       }
 
       // Email e Telefone não são mais obrigatórios
