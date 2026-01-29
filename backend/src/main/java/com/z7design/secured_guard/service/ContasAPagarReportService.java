@@ -557,7 +557,18 @@ public class ContasAPagarReportService {
             // Buscar dados com filtros
             List<Invoice> invoices;
             if (startDate != null && endDate != null) {
+                log.info("🔍 DEBUG: Buscando faturas com dueDate entre {} e {}", startDate, endDate);
                 invoices = invoiceService.findByDueDateBetween(startDate, endDate);
+                log.info("🔍 DEBUG: Encontradas {} faturas no período", invoices.size());
+
+                // Debug: Mostrar todas as faturas para comparação
+                List<Invoice> allInvoices = invoiceService.findAll();
+                log.info("🔍 DEBUG: Total de faturas no sistema: {}", allInvoices.size());
+                if (!allInvoices.isEmpty()) {
+                    log.info("🔍 DEBUG: Primeiras 5 faturas (dueDate):");
+                    allInvoices.stream().limit(5).forEach(inv -> log.info("  - ID: {}, DueDate: {}, Description: {}",
+                            inv.getId(), inv.getDueDate(), inv.getDescription()));
+                }
             } else {
                 invoices = invoiceService.findAll();
             }
