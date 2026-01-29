@@ -88,11 +88,9 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh ${{ secrets.VPS_USER_PROD }}@${{ secrets.VPS_HOST_PROD }} << 'EOF'
             mkdir -p /var/www/secured_guard/prod
             cd /var/www/secured_guard/prod
-            cat > .env << 'ENVEOF'
-POSTGRES_PASSWORD_PROD=${{ secrets.POSTGRES_PASSWORD_PROD }}
-REDIS_PASSWORD_PROD=${{ secrets.REDIS_PASSWORD_PROD }}
-JWT_SECRET_PROD=${{ secrets.JWT_SECRET_PROD }}
-ENVEOF
+            echo "POSTGRES_PASSWORD_PROD=${{ secrets.POSTGRES_PASSWORD_PROD }}" > .env
+            echo "REDIS_PASSWORD_PROD=${{ secrets.REDIS_PASSWORD_PROD }}" >> .env
+            echo "JWT_SECRET_PROD=${{ secrets.JWT_SECRET_PROD }}" >> .env
           EOF
 
       - name: 📤 Transfer files to PROD VPS

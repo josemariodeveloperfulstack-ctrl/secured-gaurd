@@ -29,14 +29,14 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  FileText, 
-  Plus, 
-  Search, 
-  Filter, 
-  Eye, 
-  Edit, 
-  Trash2, 
+import {
+  FileText,
+  Plus,
+  Search,
+  Filter,
+  Eye,
+  Edit,
+  Trash2,
   Building2,
   Calendar,
   DollarSign,
@@ -90,6 +90,20 @@ const Propostas = () => {
     try {
       setLoading(true);
       const data = await proposalService.getAllProposals();
+
+      // Defensive check: ensure data is an array
+      if (!Array.isArray(data)) {
+        console.error('❌ API retornou dados inválidos (não é array):', data);
+        toast({
+          title: "Erro",
+          description: "Formato de resposta inválido do servidor.",
+          variant: "destructive"
+        });
+        setProposals([]);
+        setFilteredProposals([]);
+        return;
+      }
+
       // Map backend data to frontend format
       const mappedProposals = data.map((proposal: any) => ({
         id: proposal.id,
@@ -115,6 +129,9 @@ const Propostas = () => {
         description: error.response?.data?.message || "Não foi possível carregar as propostas.",
         variant: "destructive"
       });
+      // Set empty arrays on error to prevent crashes
+      setProposals([]);
+      setFilteredProposals([]);
     } finally {
       setLoading(false);
     }
@@ -186,7 +203,7 @@ const Propostas = () => {
   const handleClientCreated = async (createdClient?: Client) => {
     await loadClients();
     setIsClientModalOpen(false);
-    
+
     // Se um cliente foi criado, selecioná-lo automaticamente
     if (createdClient && createdClient.id) {
       setFormData({ ...formData, clientId: isNaN(Number(createdClient.id)) ? createdClient.id : Number(createdClient.id) });
@@ -267,16 +284,16 @@ const Propostas = () => {
     }
     try {
       setIsSubmitting(true);
-      
+
       // Converter clientId e leadId para string (UUID) se necessário
-      const clientId = formData.clientId 
+      const clientId = formData.clientId
         ? (typeof formData.clientId === 'string' ? formData.clientId : String(formData.clientId))
         : undefined;
-      
+
       const leadId = formData.leadId
         ? (typeof formData.leadId === 'string' ? formData.leadId : String(formData.leadId))
         : undefined;
-      
+
       const updateData: UpdateProposalRequest = {
         title: formData.title,
         clientId: clientId,
@@ -286,12 +303,12 @@ const Propostas = () => {
         description: formData.description,
         status: formData.status || selectedProposal.status
       };
-      
+
       // Converter ID para string (pode ser UUID ou number)
-      const proposalId = typeof selectedProposal.id === 'string' 
-        ? selectedProposal.id 
+      const proposalId = typeof selectedProposal.id === 'string'
+        ? selectedProposal.id
         : String(selectedProposal.id);
-      
+
       console.log('📤 Atualizando proposta:', { id: proposalId, data: updateData });
       await proposalService.updateProposal(proposalId, updateData);
       toast({
@@ -352,7 +369,7 @@ const Propostas = () => {
   // Open edit modal
   const handleEdit = async (proposal: Proposal) => {
     setSelectedProposal(proposal);
-    
+
     // Carregar clientes e leads se ainda não foram carregados
     if (clients.length === 0) {
       await loadClients();
@@ -360,22 +377,22 @@ const Propostas = () => {
     if (leads.length === 0) {
       await loadLeads();
     }
-    
+
     // Buscar a proposta completa do backend para ter todos os dados
     try {
       // Converter ID para string se necessário
       const proposalId = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
       const fullProposal = await proposalService.getProposalById(proposalId);
-      
+
       // Extrair clientId e leadId (pode estar em client.id ou clientId direto)
-      const clientId = (fullProposal as any).clientId 
+      const clientId = (fullProposal as any).clientId
         ? String((fullProposal as any).clientId)
         : (fullProposal.client?.id ? String(fullProposal.client.id) : undefined);
-      
+
       const leadId = (fullProposal as any).leadId
         ? String((fullProposal as any).leadId)
         : (fullProposal.lead?.id ? String(fullProposal.lead.id) : undefined);
-      
+
       setFormData({
         title: fullProposal.title || proposal.title || '',
         clientId: clientId || undefined,
@@ -388,14 +405,14 @@ const Propostas = () => {
     } catch (error) {
       // Se falhar, usar os dados que temos
       console.error('Erro ao carregar proposta completa:', error);
-      const clientId = (proposal as any).clientId 
+      const clientId = (proposal as any).clientId
         ? String((proposal as any).clientId)
         : (proposal.client?.id ? String(proposal.client.id) : undefined);
-      
+
       const leadId = (proposal as any).leadId
         ? String((proposal as any).leadId)
         : (proposal.lead?.id ? String(proposal.lead.id) : undefined);
-      
+
       setFormData({
         title: proposal.title || '',
         clientId: clientId || undefined,
@@ -406,7 +423,7 @@ const Propostas = () => {
         status: proposal.status || 'DRAFT'
       });
     }
-    
+
     setIsEditModalOpen(true);
   };
 
@@ -454,9 +471,9 @@ const Propostas = () => {
                 <h1 className="text-2xl font-bold text-seguranca-lightgray">Propostas</h1>
                 <p className="text-gray-400 mt-1">Gestão de propostas comerciais</p>
               </div>
-              
+
               <div className="flex items-center gap-2">
-                <Button 
+                <Button
                   className="bg-seguranca-red hover:bg-seguranca-darkred"
                   onClick={() => setIsCreateModalOpen(true)}
                 >
@@ -489,7 +506,7 @@ const Propostas = () => {
                       />
                     </div>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="status" className="text-seguranca-lightgray">Status</Label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -508,7 +525,7 @@ const Propostas = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="client" className="text-seguranca-lightgray">Cliente</Label>
                     <Select value={clientFilter} onValueChange={setClientFilter}>
@@ -523,10 +540,10 @@ const Propostas = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="flex items-end">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                       onClick={() => {
                         setSearchTerm('');
@@ -554,7 +571,7 @@ const Propostas = () => {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-seguranca-graphite border-gray-600">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -570,7 +587,7 @@ const Propostas = () => {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-seguranca-graphite border-gray-600">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -586,7 +603,7 @@ const Propostas = () => {
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card className="bg-seguranca-graphite border-gray-600">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -760,12 +777,12 @@ const Propostas = () => {
                         <p className="text-seguranca-lightgray">{formatDate(selectedProposal.updatedAt)}</p>
                       </div>
                     </div>
-                    
+
                     <div>
                       <Label className="text-gray-400">Descrição</Label>
                       <p className="text-seguranca-lightgray mt-1">{selectedProposal.description}</p>
                     </div>
-                    
+
                     <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
@@ -774,7 +791,7 @@ const Propostas = () => {
                       >
                         Fechar
                       </Button>
-                      <Button 
+                      <Button
                         className="bg-seguranca-red hover:bg-seguranca-darkred"
                         onClick={() => {
                           if (selectedProposal) {
@@ -824,10 +841,10 @@ const Propostas = () => {
                             }}
                             disabled={loadingClients}
                           >
-                            <SelectTrigger 
+                            <SelectTrigger
                               className="bg-seguranca-black border-gray-600 text-white [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-70"
                             >
-                              <SelectValue 
+                              <SelectValue
                                 placeholder={loadingClients ? "Carregando clientes..." : clients.length === 0 ? "Nenhum cliente cadastrado" : "Selecione o cliente"}
                               />
                             </SelectTrigger>
@@ -842,8 +859,8 @@ const Propostas = () => {
                                 </SelectItem>
                               ) : (
                                 clients.map((client) => (
-                                  <SelectItem 
-                                    key={client.id} 
+                                  <SelectItem
+                                    key={client.id}
                                     value={String(client.id)}
                                     className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray"
                                   >
@@ -902,8 +919,8 @@ const Propostas = () => {
                             </SelectItem>
                           ) : (
                             leads.map((lead) => (
-                              <SelectItem 
-                                key={lead.id} 
+                              <SelectItem
+                                key={lead.id}
                                 value={String(lead.id)}
                                 className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray"
                               >
@@ -953,7 +970,7 @@ const Propostas = () => {
                       </Select>
                     </div>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="description" className="text-seguranca-lightgray">Descrição</Label>
                     <Textarea
@@ -965,7 +982,7 @@ const Propostas = () => {
                       rows={3}
                     />
                   </div>
-                  
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="outline"
@@ -977,7 +994,7 @@ const Propostas = () => {
                     >
                       Cancelar
                     </Button>
-                    <Button 
+                    <Button
                       className="bg-seguranca-red hover:bg-seguranca-darkred"
                       onClick={handleCreateProposal}
                       disabled={isSubmitting}
@@ -1031,8 +1048,8 @@ const Propostas = () => {
                         </SelectTrigger>
                         <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
                           {clients.map((client) => (
-                            <SelectItem 
-                              key={client.id} 
+                            <SelectItem
+                              key={client.id}
                               value={String(client.id)}
                               className="text-seguranca-lightgray hover:bg-seguranca-red/20"
                             >
@@ -1085,7 +1102,7 @@ const Propostas = () => {
                       </Select>
                     </div>
                   </div>
-                  
+
                   <div>
                     <Label htmlFor="edit-description" className="text-seguranca-lightgray">Descrição</Label>
                     <Textarea
@@ -1097,7 +1114,7 @@ const Propostas = () => {
                       rows={3}
                     />
                   </div>
-                  
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="outline"
@@ -1109,7 +1126,7 @@ const Propostas = () => {
                     >
                       Cancelar
                     </Button>
-                    <Button 
+                    <Button
                       className="bg-seguranca-red hover:bg-seguranca-darkred"
                       onClick={handleUpdateProposal}
                       disabled={isSubmitting}
@@ -1151,9 +1168,9 @@ const Propostas = () => {
                 <TabsTrigger value="simulacao">Simulação</TabsTrigger>
                 <TabsTrigger value="lista">Lista de Propostas de Acordo</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="simulacao">
-                <PropostaAcordo 
+                <PropostaAcordo
                   onSaveProposal={async (proposalData: any) => {
                     try {
                       // Salvar como proposta no backend
@@ -1182,7 +1199,7 @@ const Propostas = () => {
                   }}
                 />
               </TabsContent>
-              
+
               <TabsContent value="lista">
                 <AgreementProposalsList />
               </TabsContent>

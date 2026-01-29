@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: secured_guard_prod
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_PROD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "55434:5432"
@@ -36,7 +36,7 @@ services:
       - redis_data_prod:/data
     networks:
       - secured-guard-prod
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD_PROD}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -56,9 +56,12 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard_prod
       SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_PROD}
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD_PROD}
+      JWT_SECRET: ${JWT_SECRET_PROD}
       # WhatsApp/Baileys REST API
       BAILEYS_REST_URL: http://whatsapp-service-prod:3333
       BAILEYS_INSTANCE_KEY: securedguard
@@ -92,8 +95,9 @@ services:
       dockerfile: Dockerfile.prod
     container_name: secured-guard-frontend-prod
     environment:
-      VITE_API_URL: https://secured-guard.com.br/api
-      VITE_WS_URL: wss://secured-guard.com.br/ws
+    environment:
+      VITE_API_URL: https://securedguard.z7botsolutions.com.br/api
+      VITE_WS_URL: wss://securedguard.z7botsolutions.com.br/ws
       NODE_ENV: production
     ports:
       - "5176:80"

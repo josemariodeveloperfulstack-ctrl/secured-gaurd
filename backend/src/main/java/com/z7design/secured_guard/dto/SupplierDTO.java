@@ -21,6 +21,10 @@ public class SupplierDTO {
     @Schema(description = "CNPJ do fornecedor", example = "12.345.678/0001-90")
     private String cnpj;
     
+    @Pattern(regexp = "\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}", message = "CPF deve estar no formato XXX.XXX.XXX-XX")
+    @Schema(description = "CPF do fornecedor (pessoa física)", example = "123.456.789-00")
+    private String cpf;
+    
     @Email(message = "Email deve ser válido")
     @Schema(description = "Email do fornecedor", example = "contato@empresaabc.com")
     private String email;

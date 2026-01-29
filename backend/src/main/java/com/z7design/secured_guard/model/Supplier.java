@@ -32,6 +32,10 @@ public class Supplier {
     @Column(name = "cnpj", unique = true)
     private String cnpj;
     
+    @Size(max = 14, message = "CPF deve ter no máximo 14 caracteres")
+    @Column(name = "cpf")
+    private String cpf;
+    
     @Email(message = "Email deve ser válido")
     @Size(max = 255, message = "Email deve ter no máximo 255 caracteres")
     @Column(name = "email")
