@@ -373,7 +373,7 @@ const Usuarios: React.FC = () => {
                       <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
                       <TableHead className="text-seguranca-lightgray">Email</TableHead>
                       <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
-                      <TableHead className="text-seguranca-lightgray">Ações</TableHead>
+                      <TableHead className="text-seguranca-lightgray text-right w-[200px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -401,34 +401,34 @@ const Usuarios: React.FC = () => {
                             <Badge key={role} className={getRoleColor(role)}>{getRoleDisplayName(role)}</Badge>
                           ))}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
+                        <TableCell className="min-w-[200px]">
+                          <div className="flex items-center justify-end space-x-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              className="bg-blue-950 text-blue-400 hover:bg-blue-900 border-blue-800"
                               onClick={() => navigate(`/chat-interno?user=${user.id}`)}
                             >
                               <MessageCircle className="h-4 w-4 mr-1.5" />
-                              Chat Interno
+                              Chat
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              className="bg-purple-950 text-purple-400 hover:bg-purple-900 border-purple-800"
                               onClick={() => navigate(`/mensagens?user=${user.id}`)}
                             >
                               <Send className="h-4 w-4 mr-1.5" />
-                              Enviar Mensagem
+                              Msg
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              className="bg-orange-950 text-orange-400 hover:bg-orange-900 border-orange-800"
                               onClick={() => navigate(`/gestao-mensagens/notificacoes?user=${user.id}`)}
                             >
                               <Bell className="h-4 w-4 mr-1.5" />
-                              Notificações
+                              Notif
                             </Button>
                           </div>
                         </TableCell>
@@ -439,7 +439,7 @@ const Usuarios: React.FC = () => {
               </div>
             ) : (
               <div className="w-full overflow-x-auto">
-                <Table className="min-w-[1000px]">
+                <Table className="min-w-[800px] w-full">
                   <TableHeader>
                     <TableRow className="border-gray-600">
                       <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
@@ -447,7 +447,7 @@ const Usuarios: React.FC = () => {
                       <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
                       <TableHead className="text-seguranca-lightgray">Status</TableHead>
                       <TableHead className="text-seguranca-lightgray">Grupos</TableHead>
-                      <TableHead className="text-seguranca-lightgray text-right">Ações</TableHead>
+                      <TableHead className="text-seguranca-lightgray text-right w-[200px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -477,7 +477,7 @@ const Usuarios: React.FC = () => {
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <Mail size={16} className="text-gray-400" />
-                            <span className="text-seguranca-lightgray">{user.email}</span>
+                            <span className="text-seguranca-lightgray truncate max-w-[150px] sm:max-w-[200px]" title={user.email}>{user.email}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -508,32 +508,29 @@ const Usuarios: React.FC = () => {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right whitespace-nowrap min-w-[150px]">
+                        <TableCell className="text-right whitespace-nowrap min-w-[200px]">
                           <div className="flex items-center justify-end space-x-2">
                             <Button
-                              variant="secondary"
-                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-blue-950 text-blue-400 hover:bg-blue-900 border-blue-800"
                               onClick={() => handleViewUser(user)}
                               title="Visualizar Usuário"
-                              className="bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 hover:text-blue-300 border border-blue-900/50"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                             <Button
-                              variant="secondary"
-                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-emerald-950 text-emerald-400 hover:bg-emerald-900 border-emerald-800"
                               onClick={() => handleEditUser(user)}
                               title="Editar Usuário"
-                              className="bg-green-900/30 text-green-400 hover:bg-green-900/50 hover:text-green-300 border border-green-900/50"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
-                              variant="secondary"
-                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 bg-red-950 text-red-400 hover:bg-red-900 border-red-800"
                               onClick={() => handleDeleteUser(user)}
                               title="Excluir Usuário"
-                              className="bg-red-900/30 text-red-400 hover:bg-red-900/50 hover:text-red-300 border border-red-900/50"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

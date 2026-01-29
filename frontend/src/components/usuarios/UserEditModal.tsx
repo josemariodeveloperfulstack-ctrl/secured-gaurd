@@ -638,7 +638,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                   {individualPermissions.length === 0 && <span className="text-gray-400">Nenhuma permissão individual atribuída.</span>}
                   {individualPermissions.map((perm) => (
                     <Badge key={perm.id} variant="outline" className="flex items-center gap-1">
-                      {perm.name}
+                      {perm.description || perm.name}
                       <button
                         type="button"
                         className="ml-1 text-red-500 hover:text-red-700"
@@ -660,7 +660,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                       .filter(p => !individualPermissions.some(ip => ip.id === p.id))
                       .map((perm) => (
                         <SelectItem key={perm.id} value={perm.id}>
-                          {perm.name} <span className="text-xs text-gray-400 ml-2">{perm.description}</span>
+                          {perm.description || perm.name} <span className="text-xs text-gray-400 ml-2">({perm.name})</span>
                         </SelectItem>
                       ))}
                   </SelectContent>
