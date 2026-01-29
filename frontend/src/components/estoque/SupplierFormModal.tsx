@@ -106,10 +106,15 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
         ...form,
         name: (form.name || '').trim(),
         cnpj: formatCnpj(form.cnpj || ''),
-        cpf: formatCpf(form.cpf || ''),
-        email: (form.email || '').trim(),
-        phone: formatPhone(form.phone || ''),
-        zipCode: formatZipCode(form.zipCode || ''),
+        cpf: form.cpf ? formatCpf(form.cpf) : undefined, // Send undefined if empty to avoid regex mismatch
+        email: form.email ? (form.email || '').trim() : undefined,
+        phone: form.phone ? formatPhone(form.phone) : undefined,
+        zipCode: form.zipCode ? formatZipCode(form.zipCode) : undefined,
+        city: form.city || undefined,
+        state: form.state || undefined,
+        address: form.address || undefined,
+        category: form.category || undefined,
+        notes: form.notes || undefined
       };
 
       // Validações obrigatórias
@@ -117,18 +122,9 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
         throw new Error('Nome é obrigatório');
       }
 
-      // CNPJ ou CPF deve ser informado (pelo menos um deles, ou ambos se a lógica de negócio permitir)
-      // Aqui assumindo que pode ser um ou outro, ou ambos opcionais dependendo da regra exata.
-      // O usuário pediu especificamente "campo de CPF ainda não apareceu", então vamos adicionar o campo.
-      // Se a regra for "CNPJ é obrigatório", mantemos. Se for "Pessoa Jurídica CNPJ, Pessoa Física CPF", teríamos que ter um seletor.
-      // Vou manter CNPJ obrigatório (já que tem asterisco na UI atual) e CPF opcional por enquanto, ou validar formato se preenchido.
-
-      if (normalized.cnpj && (normalized.cnpj || '').replace(/\D/g, '').length !== 14) {
-        // Se preenchido, valida formato. Se for obrigatório, checar !normalized.cnpj
-        // Na imagem original "CNPJ *" indica obrigatório.
-      }
+      // CNPJ ou CPF deve ser informado
       if (!normalized.cnpj) {
-        throw new Error('CNPJ é obrigatório'); // Mantendo obrigatório conforme UI original
+        throw new Error('CNPJ é obrigatório');
       }
       if ((normalized.cnpj || '').replace(/\D/g, '').length !== 14) {
         throw new Error('CNPJ inválido. Use o formato 00.000.000/0000-00');
@@ -168,115 +164,126 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogPortal>
-        <DialogOverlay className="z-[10100]" />
+        <DialogOverlay className="z-[10100] bg-black/80 backdrop-blur-sm" />
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-[10110] grid w-[95vw] max-w-[700px] max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-gradient-to-br from-seguranca-graphite/95 to-seguranca-black/95 border-gray-600/50 shadow-2xl backdrop-blur-sm p-6 rounded-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
+          className="fixed left-[50%] top-[50%] z-[10110] grid w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-0 border bg-[#1A1D21] border-gray-700/50 shadow-2xl p-0 rounded-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         >
-          <DialogHeader className="space-y-3 sm:space-y-4">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-seguranca-red/20 to-seguranca-red/10 border border-seguranca-red/30 shadow-lg shadow-seguranca-red/10">
-                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-seguranca-red" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-white truncate">
-                  {supplier ? 'Editar Fornecedor' : 'Novo Fornecedor'}
-                </DialogTitle>
-                <DialogDescription className="text-gray-400 text-sm sm:text-base mt-1">
-                  Preencha os dados do fornecedor
-                </DialogDescription>
-              </div>
-            </div>
-
-            <Card className="bg-gradient-to-r from-seguranca-red/10 to-seguranca-darkred/10 border-seguranca-red/20 p-3 sm:p-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-seguranca-red">
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="font-medium">Campos obrigatórios:</span>
-                <div className="flex flex-wrap gap-1">
-                  <Badge variant="destructive" className="text-xs px-2 py-1">Nome</Badge>
-                  <Badge variant="destructive" className="text-xs px-2 py-1">CNPJ</Badge>
+          {/* Header */}
+          <div className="p-6 pb-4 space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-[#2A1515] border border-red-900/30">
+                  <Building2 className="h-6 w-6 text-red-500" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-semibold text-white">
+                    {supplier ? 'Editar Fornecedor' : 'Novo Fornecedor'}
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-400 mt-1">
+                    Preencha os dados do fornecedor
+                  </DialogDescription>
                 </div>
               </div>
-            </Card>
-          </DialogHeader>
+              <DialogPrimitive.Close className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                <X className="h-5 w-5 text-gray-400 hover:text-white transition-colors" />
+                <span className="sr-only">Close</span>
+              </DialogPrimitive.Close>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+            {/* Required Fields Banner */}
+            <div className="bg-[#2A1515] border border-red-900/20 rounded-lg p-3 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-red-500" />
+              <span className="text-red-500 text-sm font-medium">Campos obrigatórios:</span>
+              <div className="flex gap-2">
+                <Badge variant="secondary" className="bg-red-500 hover:bg-red-600 text-white border-0 text-xs font-medium">Nome</Badge>
+                <Badge variant="secondary" className="bg-red-500 hover:bg-red-600 text-white border-0 text-xs font-medium">CNPJ</Badge>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-6">
+
             {/* Informações Básicas */}
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
-                <User className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red flex-shrink-0" />
-                <span className="truncate">Informações Básicas</span>
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
-                    <User className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-white font-medium">
+                <User className="h-4 w-4 text-red-500" />
+                <h3>Informações Básicas</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-1 md:col-span-1">
+                  <Label className="text-gray-300 text-sm flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-red-500" />
                     Nome *
                   </Label>
                   <Input
                     value={form.name}
                     onChange={e => update('name', e.target.value)}
                     required
-                    className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="Nome do fornecedor"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
-                    <Hash className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
+
+                <div className="space-y-2 col-span-1 md:col-span-1">
+                  <Label className="text-gray-300 text-sm flex items-center gap-2">
+                    <Hash className="h-3.5 w-3.5 text-red-500" />
                     CNPJ *
                   </Label>
                   <Input
                     value={form.cnpj}
                     onChange={e => update('cnpj', formatCnpj(e.target.value))}
                     required
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="00.000.000/0000-00"
-                    className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
-                    <Hash className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
+
+                <div className="space-y-2 col-span-1 md:col-span-2">
+                  <Label className="text-gray-300 text-sm flex items-center gap-2">
+                    <Hash className="h-3.5 w-3.5 text-red-500" />
                     CPF
                   </Label>
                   <Input
                     value={form.cpf}
                     onChange={e => update('cpf', formatCpf(e.target.value))}
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20 max-w-[50%]"
                     placeholder="000.000.000-00"
-                    className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
                   />
                 </div>
               </div>
             </div>
 
             {/* Contato */}
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
-                <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red flex-shrink-0" />
-                <span className="truncate">Contato</span>
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-white font-medium">
+                <Mail className="h-4 w-4 text-red-500" />
+                <h3>Contato</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
-                    <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
+                  <Label className="text-gray-300 text-sm flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5 text-red-500" />
                     E-mail
                   </Label>
                   <Input
                     value={form.email || ''}
                     onChange={e => update('email', e.target.value)}
-                    type="email"
-                    className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="contato@fornecedor.com"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
-                    <Phone className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
+                  <Label className="text-gray-300 text-sm flex items-center gap-2">
+                    <Phone className="h-3.5 w-3.5 text-red-500" />
                     Telefone
                   </Label>
                   <Input
                     value={form.phone || ''}
                     onChange={e => update('phone', formatPhone(e.target.value))}
-                    className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="(11) 99999-9999"
                   />
                 </div>
@@ -284,50 +291,52 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
             </div>
 
             {/* Endereço */}
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
-                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red flex-shrink-0" />
-                <span className="truncate">Endereço</span>
-              </h3>
-              <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-white font-medium">
+                <MapPin className="h-4 w-4 text-red-500" />
+                <h3>Endereço</h3>
+              </div>
+
+              <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
-                    <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
+                  <Label className="text-gray-300 text-sm flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 text-red-500" />
                     Endereço
                   </Label>
                   <Input
                     value={form.address || ''}
                     onChange={e => update('address', e.target.value)}
-                    className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                    className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="Rua, número, bairro"
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-gray-300 text-sm sm:text-base">Cidade</Label>
+
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-12 md:col-span-5 space-y-2">
+                    <Label className="text-gray-300 text-sm">Cidade</Label>
                     <Input
                       value={form.city || ''}
                       onChange={e => update('city', e.target.value)}
-                      className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                      className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                       placeholder="Cidade"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-gray-300 text-sm sm:text-base">Estado</Label>
+                  <div className="col-span-12 md:col-span-4 space-y-2">
+                    <Label className="text-gray-300 text-sm">Estado</Label>
                     <Input
                       value={form.state || ''}
                       onChange={e => update('state', e.target.value.toUpperCase())}
-                      className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                      className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                       placeholder="SP"
                       maxLength={2}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-gray-300 text-sm sm:text-base">CEP</Label>
+                  <div className="col-span-12 md:col-span-3 space-y-2">
+                    <Label className="text-gray-300 text-sm">CEP</Label>
                     <Input
                       value={form.zipCode || ''}
                       onChange={e => update('zipCode', formatZipCode(e.target.value))}
-                      className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                      className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                       placeholder="00000-000"
                     />
                   </div>
@@ -335,60 +344,46 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
               </div>
             </div>
 
-            {/* Informações Adicionais */}
-            <div className="space-y-3 sm:space-y-4">
-              <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
-                <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red flex-shrink-0" />
-                <span className="truncate">Informações Adicionais</span>
-              </h3>
-              <div className="space-y-3 sm:space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-gray-300 text-sm sm:text-base">Categoria</Label>
-                  <Input
-                    value={form.category || ''}
-                    onChange={e => update('category', e.target.value)}
-                    className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
-                    placeholder="Categoria do fornecedor"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
-                    <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
-                    Observações
-                  </Label>
-                  <Textarea
-                    value={form.notes || ''}
-                    onChange={e => update('notes', e.target.value)}
-                    className="min-h-[80px] bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 resize-y text-sm sm:text-base"
-                    placeholder="Observações adicionais"
-                  />
-                </div>
+            {/* Outros */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-gray-300 text-sm">Categoria</Label>
+                <Input
+                  value={form.category || ''}
+                  onChange={e => update('category', e.target.value)}
+                  className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
+                  placeholder="Categoria do fornecedor"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-300 text-sm">Observações</Label>
+                <Textarea
+                  value={form.notes || ''}
+                  onChange={e => update('notes', e.target.value)}
+                  className="min-h-[80px] bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20 resize-y"
+                  placeholder="Observações adicionais"
+                />
               </div>
             </div>
 
-            {/* Botões */}
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sm:pt-6 border-t border-gray-600/30">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-700/50">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={onClose}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-2 sm:order-1"
+                className="text-gray-400 hover:text-white hover:bg-white/10"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-1 sm:order-2"
+                className="bg-red-600 hover:bg-red-700 text-white px-8"
               >
                 {loading ? 'Salvando...' : 'Salvar'}
               </Button>
             </div>
           </form>
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-            <X className="h-4 w-4 text-white" />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
         </DialogPrimitive.Content>
       </DialogPortal>
     </Dialog>
@@ -396,5 +391,3 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
 };
 
 export default SupplierFormModal;
-
-

@@ -7,10 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, RefreshCw, Search, Edit2, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { contasAPagarService, Supplier, CreateSupplierRequest, UpdateSupplierRequest } from '@/services/contasAPagarService';
 import { useToast } from '@/hooks/use-toast';
-
-const UFS = [
-  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'
-] as const;
+import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
 
 export default function Fornecedores() {
   const { toast } = useToast();
@@ -19,7 +16,6 @@ export default function Fornecedores() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
-  const [form, setForm] = useState<CreateSupplierRequest>({ name: '', cnpj: '' });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -46,43 +42,22 @@ export default function Fornecedores() {
 
   useEffect(() => { load(); }, []);
 
-  const resetForm = () => {
-    setEditing(null);
-    setForm({ name: '', cnpj: '', cpf: '', email: '', phone: '', address: '', city: '', state: '', zipCode: '', category: '', notes: '' });
-  };
+  const openCreate = () => { setEditing(null); setShowModal(true); };
 
-  const openCreate = () => { resetForm(); setShowModal(true); };
   const openEdit = (s: Supplier) => {
     setEditing(s);
-    setForm({
-      name: s.name,
-      cnpj: s.cnpj || '',
-      cpf: (s as any).cpf || '',
-      email: s.email,
-      phone: s.phone,
-      address: s.address,
-      city: s.city,
-      state: s.state,
-      zipCode: (s as any).zipCode,
-      category: (s as any).category,
-      notes: s.notes,
-    });
     setShowModal(true);
   };
 
-  const save = async () => {
+  const handleSave = async (data: CreateSupplierRequest) => {
     try {
-      if (!form.name?.trim() || !form.cnpj?.trim()) {
-        toast({ title: 'Campos obrigatórios', description: 'Informe Nome e CNPJ.', variant: 'destructive' });
-        return;
-      }
       if (editing) {
-        const payload: UpdateSupplierRequest = { ...form };
+        const payload: UpdateSupplierRequest = { ...data };
         const updated = await contasAPagarService.updateFornecedor(String((editing as any).id || editing.id), payload);
         setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s));
         toast({ title: 'Sucesso', description: 'Fornecedor atualizado.' });
       } else {
-        const created = await contasAPagarService.createFornecedor(form);
+        const created = await contasAPagarService.createFornecedor(data);
         setSuppliers(prev => [created, ...prev]);
         toast({ title: 'Sucesso', description: 'Fornecedor criado.' });
       }
@@ -90,6 +65,7 @@ export default function Fornecedores() {
     } catch (e: any) {
       const msg = e?.response?.data?.message || 'Não foi possível salvar.';
       toast({ title: 'Erro', description: msg, variant: 'destructive' });
+      throw e; // Re-throw to let modal handle loading state if needed, though modal handles error toast too.
     }
   };
 
@@ -162,67 +138,12 @@ export default function Fornecedores() {
           )}
         </Card>
 
-        {showModal && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]">
-            <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 w-[95vw] max-w-[640px]">
-              <h3 className="text-lg font-semibold text-seguranca-lightgray mb-3">{editing ? 'Editar fornecedor' : 'Novo fornecedor'}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">Nome *</label>
-                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="form-input" />
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">CNPJ *</label>
-                  <Input value={form.cnpj} onChange={e => setForm({ ...form, cnpj: e.target.value })} className="form-input" placeholder="00.000.000/0000-00" />
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">CPF</label>
-                  <Input value={form.cpf || ''} onChange={e => setForm({ ...form, cpf: e.target.value })} className="form-input" placeholder="000.000.000-00" />
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">Email</label>
-                  <Input value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} className="form-input" />
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">Telefone</label>
-                  <Input value={form.phone || ''} onChange={e => setForm({ ...form, phone: e.target.value })} className="form-input" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm text-seguranca-lightgray">Endereço</label>
-                  <Input value={form.address || ''} onChange={e => setForm({ ...form, address: e.target.value })} className="form-input" />
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">Cidade</label>
-                  <Input value={form.city || ''} onChange={e => setForm({ ...form, city: e.target.value })} className="form-input" />
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">UF</label>
-                  <select value={(form.state || '').toUpperCase()} onChange={e => setForm({ ...form, state: e.target.value })} className="form-input">
-                    <option value="">Selecione</option>
-                    {UFS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">CEP</label>
-                  <Input value={form.zipCode || ''} onChange={e => setForm({ ...form, zipCode: e.target.value })} className="form-input" placeholder="00000-000" />
-                </div>
-                <div>
-                  <label className="text-sm text-seguranca-lightgray">Categoria</label>
-                  <Input value={form.category || ''} onChange={e => setForm({ ...form, category: e.target.value })} className="form-input" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-sm text-seguranca-lightgray">Observações</label>
-                  <Input value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} className="form-input" />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
-                <Button onClick={save} className="bg-seguranca-red hover:bg-seguranca-darkred">Salvar</Button>
-              </div>
-            </div>
-          </div>
-        )}
+        <SupplierFormModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          supplier={editing}
+          onSave={handleSave}
+        />
       </div>
     </StandardLayout>
   );
