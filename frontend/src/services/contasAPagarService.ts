@@ -42,6 +42,7 @@ export interface Supplier {
   id: string;
   name: string;
   cnpj?: string;
+  cpf?: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -56,6 +57,7 @@ export interface Supplier {
 export interface CreateSupplierRequest {
   name: string;
   cnpj: string;
+  cpf?: string;
   email?: string;
   phone?: string;
   address?: string;

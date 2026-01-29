@@ -48,7 +48,7 @@ export default function Fornecedores() {
 
   const resetForm = () => {
     setEditing(null);
-    setForm({ name: '', cnpj: '', email: '', phone: '', address: '', city: '', state: '', zipCode: '', category: '', notes: '' });
+    setForm({ name: '', cnpj: '', cpf: '', email: '', phone: '', address: '', city: '', state: '', zipCode: '', category: '', notes: '' });
   };
 
   const openCreate = () => { resetForm(); setShowModal(true); };
@@ -57,6 +57,7 @@ export default function Fornecedores() {
     setForm({
       name: s.name,
       cnpj: s.cnpj || '',
+      cpf: (s as any).cpf || '',
       email: s.email,
       phone: s.phone,
       address: s.address,
@@ -173,6 +174,10 @@ export default function Fornecedores() {
                 <div>
                   <label className="text-sm text-seguranca-lightgray">CNPJ *</label>
                   <Input value={form.cnpj} onChange={e => setForm({ ...form, cnpj: e.target.value })} className="form-input" placeholder="00.000.000/0000-00" />
+                </div>
+                <div>
+                  <label className="text-sm text-seguranca-lightgray">CPF</label>
+                  <Input value={form.cpf || ''} onChange={e => setForm({ ...form, cpf: e.target.value })} className="form-input" placeholder="000.000.000-00" />
                 </div>
                 <div>
                   <label className="text-sm text-seguranca-lightgray">Email</label>

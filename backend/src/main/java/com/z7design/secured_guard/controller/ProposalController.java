@@ -44,7 +44,7 @@ public class ProposalController {
     public ResponseEntity<List<Proposal>> getAllProposalsList() {
         try {
             List<Proposal> proposals = proposalService.findAll();
-            
+
             // Inicializar relacionamentos lazy antes da serialização JSON
             for (Proposal proposal : proposals) {
                 // Inicializar client
@@ -53,30 +53,33 @@ public class ProposalController {
                         proposal.getClient().getId();
                         proposal.getClient().getName();
                     } catch (Exception e) {
-                        // Ignorar erros de lazy loading
+                        System.err.println("⚠️ Erro ao inicializar client para proposal " + proposal.getId() + ": "
+                                + e.getMessage());
                     }
                 }
-                
+
                 // Inicializar createdBy
                 if (proposal.getCreatedBy() != null) {
                     try {
                         proposal.getCreatedBy().getId();
                         proposal.getCreatedBy().getName();
                     } catch (Exception e) {
-                        // Ignorar erros de lazy loading
+                        System.err.println("⚠️ Erro ao inicializar createdBy para proposal " + proposal.getId() + ": "
+                                + e.getMessage());
                     }
                 }
-                
+
                 // Inicializar assignedTo
                 if (proposal.getAssignedTo() != null) {
                     try {
                         proposal.getAssignedTo().getId();
                         proposal.getAssignedTo().getName();
                     } catch (Exception e) {
-                        // Ignorar erros de lazy loading
+                        System.err.println("⚠️ Erro ao inicializar assignedTo para proposal " + proposal.getId() + ": "
+                                + e.getMessage());
                     }
                 }
-                
+
                 // Inicializar items
                 if (proposal.getItems() != null) {
                     try {
@@ -85,14 +88,18 @@ public class ProposalController {
                             item.getId();
                         }
                     } catch (Exception e) {
-                        // Ignorar erros de lazy loading
+                        System.err.println("⚠️ Erro ao inicializar items para proposal " + proposal.getId() + ": "
+                                + e.getMessage());
                     }
                 }
             }
-            
+
             return ResponseEntity.ok(proposals);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            System.err.println("❌ Erro ao carregar propostas: " + e.getMessage());
+            e.printStackTrace();
+            // Retornar lista vazia ao invés de body vazio para evitar erro no frontend
+            return ResponseEntity.ok(List.of());
         }
     }
 
@@ -110,10 +117,10 @@ public class ProposalController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        
+
         User currentUser = (User) authentication.getPrincipal();
         UUID currentUserId = currentUser.getId();
-        
+
         Proposal createdProposal = proposalService.create(proposalDTO, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdProposal);
     }
@@ -127,7 +134,8 @@ public class ProposalController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Atualizar status da proposta", description = "Atualiza apenas o status de uma proposta")
-    public ResponseEntity<Proposal> updateProposalStatus(@PathVariable String id, @RequestBody Map<String, String> statusUpdate) {
+    public ResponseEntity<Proposal> updateProposalStatus(@PathVariable String id,
+            @RequestBody Map<String, String> statusUpdate) {
         String status = statusUpdate.get("status");
         Proposal updated = proposalService.updateStatus(UUID.fromString(id), status);
         return ResponseEntity.ok(updated);
@@ -197,14 +205,13 @@ public class ProposalController {
     @Operation(summary = "Estatísticas por status", description = "Retorna contagem de propostas por status")
     public ResponseEntity<Map<String, Long>> getCountByStatus() {
         Map<String, Long> stats = Map.of(
-            "DRAFT", proposalService.countByStatus(ProposalStatus.DRAFT),
-            "SENT", proposalService.countByStatus(ProposalStatus.SENT),
-            "UNDER_REVIEW", proposalService.countByStatus(ProposalStatus.UNDER_REVIEW),
-            "APPROVED", proposalService.countByStatus(ProposalStatus.APPROVED),
-            "REJECTED", proposalService.countByStatus(ProposalStatus.REJECTED),
-            "EXPIRED", proposalService.countByStatus(ProposalStatus.EXPIRED),
-            "CONVERTED", proposalService.countByStatus(ProposalStatus.CONVERTED)
-        );
+                "DRAFT", proposalService.countByStatus(ProposalStatus.DRAFT),
+                "SENT", proposalService.countByStatus(ProposalStatus.SENT),
+                "UNDER_REVIEW", proposalService.countByStatus(ProposalStatus.UNDER_REVIEW),
+                "APPROVED", proposalService.countByStatus(ProposalStatus.APPROVED),
+                "REJECTED", proposalService.countByStatus(ProposalStatus.REJECTED),
+                "EXPIRED", proposalService.countByStatus(ProposalStatus.EXPIRED),
+                "CONVERTED", proposalService.countByStatus(ProposalStatus.CONVERTED));
         return ResponseEntity.ok(stats);
     }
 
@@ -212,14 +219,13 @@ public class ProposalController {
     @Operation(summary = "Valor total por status", description = "Retorna valor total das propostas por status")
     public ResponseEntity<Map<String, BigDecimal>> getTotalValueByStatus() {
         Map<String, BigDecimal> stats = Map.of(
-            "DRAFT", proposalService.getTotalValueByStatus(ProposalStatus.DRAFT),
-            "SENT", proposalService.getTotalValueByStatus(ProposalStatus.SENT),
-            "UNDER_REVIEW", proposalService.getTotalValueByStatus(ProposalStatus.UNDER_REVIEW),
-            "APPROVED", proposalService.getTotalValueByStatus(ProposalStatus.APPROVED),
-            "REJECTED", proposalService.getTotalValueByStatus(ProposalStatus.REJECTED),
-            "EXPIRED", proposalService.getTotalValueByStatus(ProposalStatus.EXPIRED),
-            "CONVERTED", proposalService.getTotalValueByStatus(ProposalStatus.CONVERTED)
-        );
+                "DRAFT", proposalService.getTotalValueByStatus(ProposalStatus.DRAFT),
+                "SENT", proposalService.getTotalValueByStatus(ProposalStatus.SENT),
+                "UNDER_REVIEW", proposalService.getTotalValueByStatus(ProposalStatus.UNDER_REVIEW),
+                "APPROVED", proposalService.getTotalValueByStatus(ProposalStatus.APPROVED),
+                "REJECTED", proposalService.getTotalValueByStatus(ProposalStatus.REJECTED),
+                "EXPIRED", proposalService.getTotalValueByStatus(ProposalStatus.EXPIRED),
+                "CONVERTED", proposalService.getTotalValueByStatus(ProposalStatus.CONVERTED));
         return ResponseEntity.ok(stats);
     }
-} 
+}
