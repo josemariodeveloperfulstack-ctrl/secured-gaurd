@@ -115,7 +115,28 @@ public class Proposal {
     }
 
     public Client getClient() {
-        return client;
+        if (client == null) {
+            return null;
+        }
+
+        try {
+            if (client instanceof HibernateProxy) {
+                HibernateProxy proxy = (HibernateProxy) client;
+                try {
+                    proxy.getHibernateLazyInitializer().initialize();
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    this.client = null;
+                    return null;
+                }
+            }
+            client.getId();
+            return client;
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            this.client = null;
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public void setClient(Client client) {
@@ -206,7 +227,28 @@ public class Proposal {
     }
 
     public User getCreatedBy() {
-        return createdBy;
+        if (createdBy == null) {
+            return null;
+        }
+
+        try {
+            if (createdBy instanceof HibernateProxy) {
+                HibernateProxy proxy = (HibernateProxy) createdBy;
+                try {
+                    proxy.getHibernateLazyInitializer().initialize();
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    this.createdBy = null;
+                    return null;
+                }
+            }
+            createdBy.getId();
+            return createdBy;
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            this.createdBy = null;
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public void setCreatedBy(User createdBy) {
@@ -214,7 +256,28 @@ public class Proposal {
     }
 
     public User getAssignedTo() {
-        return assignedTo;
+        if (assignedTo == null) {
+            return null;
+        }
+
+        try {
+            if (assignedTo instanceof HibernateProxy) {
+                HibernateProxy proxy = (HibernateProxy) assignedTo;
+                try {
+                    proxy.getHibernateLazyInitializer().initialize();
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    this.assignedTo = null;
+                    return null;
+                }
+            }
+            assignedTo.getId();
+            return assignedTo;
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            this.assignedTo = null;
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public void setAssignedTo(User assignedTo) {

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,17 +24,17 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { 
-  MessageCircle, 
-  Send, 
-  Search, 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
-  Reply, 
-  X, 
-  AlertCircle, 
-  Wifi, 
+import {
+  MessageCircle,
+  Send,
+  Search,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Reply,
+  X,
+  AlertCircle,
+  Wifi,
   WifiOff,
   Loader2,
   Info,
@@ -70,6 +71,12 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { groupService } from '@/services/groupService';
 import api from '@/lib/axios';
 import { getApiUrl, getChatFileUrl } from '@/config/environment';
+
+const COMMON_EMOJIS = [
+  '😀', '😂', '😍', '🥳', '😎', '🤔', '👍', '❤️', '🔥', '✨',
+  '🙌', '👏', '🙏', '💪', '🚀', '🎉', '✅', '❌', '👀', '📍',
+  '⭐', '🌙', '☀️', '☁️', '⛈️', '🌈', '🍦', '🍕', '☕', '🍷'
+];
 
 const ChatInterno: React.FC = () => {
   const MIN_SEARCH_LENGTH = 3;
@@ -118,13 +125,13 @@ const ChatInterno: React.FC = () => {
   const [messageToReport, setMessageToReport] = useState<ChatMessage | null>(null);
   const [reportReason, setReportReason] = useState('');
   const [reportDescription, setReportDescription] = useState('');
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageCountRef = useRef<number>(0);
   const userStatusUpdatedRef = useRef<{ userId: string | null; isOnline: boolean | null }>({ userId: null, isOnline: null });
   const { toast } = useToast();
-  
+
   // Estado global do store
   const {
     conversations,
@@ -153,7 +160,7 @@ const ChatInterno: React.FC = () => {
 
   const currentUser = getCurrentUser();
   const filteredConversationsRaw = getFilteredConversations();
-  
+
   // Garantir que availableUsers, filteredConversations e chatMessages sejam sempre arrays
   const safeAvailableUsers = Array.isArray(availableUsers) ? availableUsers : [];
   const filteredConversations = Array.isArray(filteredConversationsRaw) ? filteredConversationsRaw : [];
@@ -174,11 +181,11 @@ const ChatInterno: React.FC = () => {
   const shouldFilterUsers = userSearchTerm.trim().length >= MIN_SEARCH_LENGTH;
   const shouldFilterGroups = groupSearchTerm.trim().length >= MIN_SEARCH_LENGTH;
   const shouldFilterDepartments = departmentSearchTerm.trim().length >= MIN_SEARCH_LENGTH;
-  
+
   // Filtrar mensagens apenas da conversa selecionada
   const safeChatMessages = useMemo(() => {
     if (!selectedConversation || !Array.isArray(chatMessages)) return [];
-    
+
     return chatMessages.filter((message) => {
       // Para conversas individuais, verificar se o remetente ou destinatário corresponde
       if (selectedConversation.type === 'individual') {
@@ -189,17 +196,17 @@ const ChatInterno: React.FC = () => {
           (message.sender?.id === currentUser?.id && message.recipient?.id === selectedConversation.id)
         );
       }
-      
+
       // Para grupos, verificar se o group.id corresponde
       if (selectedConversation.type === 'group') {
         return message.group?.id === selectedConversation.id;
       }
-      
+
       // Para departamentos, verificar se o department.id corresponde
       if (selectedConversation.type === 'department') {
         return message.department?.id === selectedConversation.id;
       }
-      
+
       return false;
     });
   }, [chatMessages, selectedConversation, currentUser?.id]);
@@ -240,14 +247,14 @@ const ChatInterno: React.FC = () => {
   // Função para atualizar status online dos usuários
   const updateUserOnlineStatus = (userId: string, isOnline: boolean) => {
     // Verificar se já atualizamos este status para evitar loops infinitos
-    if (userStatusUpdatedRef.current.userId === userId && 
-        userStatusUpdatedRef.current.isOnline === isOnline) {
+    if (userStatusUpdatedRef.current.userId === userId &&
+      userStatusUpdatedRef.current.isOnline === isOnline) {
       return; // Já atualizado, não fazer nada
     }
-    
+
     // Atualizar ref antes de chamar updateUserStatus
     userStatusUpdatedRef.current = { userId, isOnline };
-    
+
     // Usar a função do store que já atualiza users e conversations
     updateUserStatus(userId, isOnline);
   };
@@ -255,21 +262,21 @@ const ChatInterno: React.FC = () => {
   // Scroll automático para última mensagem (apenas quando novas mensagens são adicionadas)
   useEffect(() => {
     const currentMessageCount = safeChatMessages.length;
-    
+
     // Só fazer scroll se houver novas mensagens
     if (currentMessageCount > lastMessageCountRef.current) {
       // Limpar timeout anterior se existir
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
-      
+
       // Usar timeout para evitar múltiplos scrolls durante renderizações rápidas
       scrollTimeoutRef.current = setTimeout(() => {
-    scrollToBottom();
+        scrollToBottom();
         lastMessageCountRef.current = currentMessageCount;
       }, 100);
     }
-    
+
     // Cleanup
     return () => {
       if (scrollTimeoutRef.current) {
@@ -304,7 +311,7 @@ const ChatInterno: React.FC = () => {
           const usersArray = Array.isArray(users) ? users : [];
           setAvailableUsers(usersArray);
           console.log('✅ [MODAL] Usuários carregados:', usersArray.length);
-          
+
           // Recarregar grupos e departamentos se estiverem vazios
           if (groups.length === 0 || departments.length === 0) {
             await loadGroupsAndDepartments();
@@ -315,7 +322,7 @@ const ChatInterno: React.FC = () => {
           setLoadingModalUsers(false);
         }
       };
-      
+
       reloadData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -460,46 +467,46 @@ const ChatInterno: React.FC = () => {
       const normalizedConversations = isMessageList
         ? buildConversationsFromMessages(conversationsData)
         : (Array.isArray(conversationsData) ? conversationsData.map((conv: any) => {
-            // Garantir que a conversa tenha um nome adequado
-            let conversationName = conv.name || 'Conversa sem nome';
-            
-            // Se for conversa individual e não tiver nome, tentar pegar do recipient ou sender
-            if (conversationName === 'Conversa sem nome' && conv.type === 'individual') {
-              if (conv.recipient?.name) {
-                conversationName = conv.recipient.name;
-              } else if (conv.sender?.name) {
-                conversationName = conv.sender.name;
-              } else if (conv.participants && conv.participants.length > 0) {
-                const otherParticipant = conv.participants.find((p: any) => p.id !== currentUser?.id);
-                if (otherParticipant?.name) {
-                  conversationName = otherParticipant.name;
-                }
+          // Garantir que a conversa tenha um nome adequado
+          let conversationName = conv.name || 'Conversa sem nome';
+
+          // Se for conversa individual e não tiver nome, tentar pegar do recipient ou sender
+          if (conversationName === 'Conversa sem nome' && conv.type === 'individual') {
+            if (conv.recipient?.name) {
+              conversationName = conv.recipient.name;
+            } else if (conv.sender?.name) {
+              conversationName = conv.sender.name;
+            } else if (conv.participants && conv.participants.length > 0) {
+              const otherParticipant = conv.participants.find((p: any) => p.id !== currentUser?.id);
+              if (otherParticipant?.name) {
+                conversationName = otherParticipant.name;
               }
             }
+          }
 
-            if (conversationName === 'Conversa sem nome' && conv.type === 'group') {
-              conversationName = conv.group?.name || conv.group?.displayName || conv.groupName || conv.name || 'Conversa sem nome';
-            }
+          if (conversationName === 'Conversa sem nome' && conv.type === 'group') {
+            conversationName = conv.group?.name || conv.group?.displayName || conv.groupName || conv.name || 'Conversa sem nome';
+          }
 
-            if (conversationName === 'Conversa sem nome' && conv.type === 'department') {
-              conversationName = conv.department?.name || conv.departmentName || conv.name || 'Conversa sem nome';
-            }
-            
-            return {
-              ...conv,
-              name: conversationName,
-              // Garantir que campos obrigatórios existam
-              id: conv.id || conv.conversationId,
-              type: conv.type || 'individual',
-              unreadCount: conv.unreadCount || 0,
-              isOnline: conv.isOnline || false
-            };
-          }).filter((conv: any) => conv && conv.id) : []);
+          if (conversationName === 'Conversa sem nome' && conv.type === 'department') {
+            conversationName = conv.department?.name || conv.departmentName || conv.name || 'Conversa sem nome';
+          }
+
+          return {
+            ...conv,
+            name: conversationName,
+            // Garantir que campos obrigatórios existam
+            id: conv.id || conv.conversationId,
+            type: conv.type || 'individual',
+            unreadCount: conv.unreadCount || 0,
+            isOnline: conv.isOnline || false
+          };
+        }).filter((conv: any) => conv && conv.id) : []);
 
       // Usar setConversations que já faz deduplicação
       setConversations(normalizedConversations);
       setAvailableUsers(usersWithOnlineStatus);
-      
+
       console.log('✅ [CHAT] Dados iniciais carregados:', {
         conversations: normalizedConversations.length,
         users: usersWithOnlineStatus.length,
@@ -522,10 +529,10 @@ const ChatInterno: React.FC = () => {
 
   const loadConversation = async (conversationId: string, conversationType?: Conversation['type']) => {
     if (!conversationId) return;
-    
+
     setLoading(true);
     console.log('💬 [CHAT] Carregando conversa:', conversationId);
-    
+
     try {
       const type = conversationType || selectedConversation?.type || 'individual';
       const messages = type === 'group'
@@ -535,11 +542,11 @@ const ChatInterno: React.FC = () => {
           : await messageService.getConversationMessages(conversationId);
       setChatMessages(messages);
       console.log('✅ [CHAT] Mensagens carregadas:', messages.length);
-      
+
       // Carregar estados de fixar e favoritar para todas as mensagens
       const pinnedSet = new Set<string>();
       const favoriteSet = new Set<string>();
-      
+
       await Promise.all(
         messages.map(async (msg) => {
           try {
@@ -555,7 +562,7 @@ const ChatInterno: React.FC = () => {
           }
         })
       );
-      
+
       setPinnedMessages(pinnedSet);
       setFavoriteMessages(favoriteSet);
     } catch (error) {
@@ -638,18 +645,18 @@ const ChatInterno: React.FC = () => {
         }
       } else {
         // Enviar mensagem de texto
-      const messageData = {
-        content: newMessage,
-        recipientId: selectedConversation.type === 'individual' ? selectedConversation.id : undefined,
-        groupId: selectedConversation.type === 'group' ? selectedConversation.id : undefined,
-        departmentId: selectedConversation.type === 'department' ? selectedConversation.id : undefined,
-        type: 'TEXT' as const,
-        replyToId: replyToMessage?.id
-      };
+        const messageData = {
+          content: newMessage,
+          recipientId: selectedConversation.type === 'individual' ? selectedConversation.id : undefined,
+          groupId: selectedConversation.type === 'group' ? selectedConversation.id : undefined,
+          departmentId: selectedConversation.type === 'department' ? selectedConversation.id : undefined,
+          type: 'TEXT' as const,
+          replyToId: replyToMessage?.id
+        };
 
         sentMessage = await messageService.sendChatMessage(messageData);
       }
-      
+
       // Remover mensagem temporária e adicionar a mensagem real
       removeChatMessage(tempMessageId);
       setSendingMessages(prev => {
@@ -657,7 +664,7 @@ const ChatInterno: React.FC = () => {
         newSet.delete(tempMessageId);
         return newSet;
       });
-      
+
       // Garantir que todas as informações do arquivo estejam presentes
       console.log('📤 [CHAT] Mensagem enviada:', {
         id: sentMessage.id,
@@ -667,15 +674,15 @@ const ChatInterno: React.FC = () => {
         fileSize: sentMessage.fileSize,
         fileContentType: sentMessage.fileContentType
       });
-      
+
       addChatMessage(sentMessage);
-      
+
       // Limpar campos
       setNewMessage('');
       setReplyToMessage(null);
 
       console.log('✅ [CHAT] Mensagem enviada com sucesso');
-      
+
       toast({
         title: "Sucesso",
         description: "Mensagem enviada",
@@ -684,7 +691,7 @@ const ChatInterno: React.FC = () => {
 
     } catch (error) {
       console.error('❌ [CHAT] Erro ao enviar mensagem:', error);
-      
+
       // Remover mensagem temporária em caso de erro
       removeChatMessage(tempMessageId);
       setSendingMessages(prev => {
@@ -692,7 +699,7 @@ const ChatInterno: React.FC = () => {
         newSet.delete(tempMessageId);
         return newSet;
       });
-      
+
       if (error instanceof MessageServiceError) {
         toast({
           title: "Erro",
@@ -765,7 +772,7 @@ const ChatInterno: React.FC = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
         setSelectedFile(audioFile);
-        
+
         // Parar todos os tracks do stream
         stream.getTracks().forEach(track => track.stop());
       };
@@ -810,7 +817,7 @@ const ChatInterno: React.FC = () => {
       }
       setRecordingTime(0);
       audioChunksRef.current = [];
-      
+
       // Parar todos os tracks
       if (mediaRecorderRef.current.stream) {
         mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
@@ -866,10 +873,10 @@ const ChatInterno: React.FC = () => {
     try {
       const updatedMessage = await messageService.editChatMessage(messageId, newContent);
       updateChatMessage(messageId, updatedMessage);
-      
+
       setEditingMessage(null);
       setEditContent('');
-      
+
       toast({
         title: "Sucesso",
         description: "Mensagem editada",
@@ -936,9 +943,8 @@ const ChatInterno: React.FC = () => {
   const renderConversationItem = (conversation: Conversation) => (
     <div
       key={conversation.id}
-      className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
-        selectedConversation?.id === conversation.id ? 'bg-muted' : ''
-      }`}
+      className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${selectedConversation?.id === conversation.id ? 'bg-muted' : ''
+        }`}
       onClick={() => {
         setSelectedConversation(conversation);
         loadConversation(conversation.id, conversation.type);
@@ -1026,7 +1032,7 @@ const ChatInterno: React.FC = () => {
   const handlePinMessage = async (messageId: string) => {
     try {
       const isPinned = await messageService.togglePin(messageId);
-      
+
       setPinnedMessages(prev => {
         const newSet = new Set(prev);
         if (isPinned) {
@@ -1054,7 +1060,7 @@ const ChatInterno: React.FC = () => {
   const handleFavoriteMessage = async (messageId: string) => {
     try {
       const isFavorite = await messageService.toggleFavorite(messageId);
-      
+
       setFavoriteMessages(prev => {
         const newSet = new Set(prev);
         if (isFavorite) {
@@ -1156,13 +1162,13 @@ const ChatInterno: React.FC = () => {
     try {
       // Chamar API para adicionar/remover reação
       const reactionSummary = await messageService.toggleReaction(messageId, emoji);
-      
+
       // Atualizar a mensagem no store com as novas reações
       const message = safeChatMessages.find(m => m.id === messageId);
       if (message) {
         // Buscar todas as reações atualizadas
         const allReactions = await messageService.getMessageReactions(messageId);
-        
+
         // Atualizar mensagem no store
         updateChatMessage(messageId, {
           ...message,
@@ -1184,12 +1190,12 @@ const ChatInterno: React.FC = () => {
 
     if (chatType === 'individual' && selectedUser) {
       newConversation = {
-      id: selectedUser.id,
-      name: selectedUser.name,
-      type: 'individual' as const,
-      unreadCount: 0,
-      isOnline: selectedUser.isOnline
-    };
+        id: selectedUser.id,
+        name: selectedUser.name,
+        type: 'individual' as const,
+        unreadCount: 0,
+        isOnline: selectedUser.isOnline
+      };
     } else if (chatType === 'group' && selectedGroup) {
       newConversation = {
         id: selectedGroup.id,
@@ -1273,7 +1279,7 @@ const ChatInterno: React.FC = () => {
                   <WifiOff className="w-4 h-4 text-red-500" title="Desconectado" />
                 )}
               </div>
-              
+
               <Dialog open={showNewChatModal} onOpenChange={setShowNewChatModal}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline" className="text-xs sm:text-sm">
@@ -1282,7 +1288,7 @@ const ChatInterno: React.FC = () => {
                     <span className="sm:hidden">Nova</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent 
+                <DialogContent
                   className="bg-seguranca-darkgray border-seguranca-gray/30 max-w-md w-[90vw] sm:w-full overflow-visible"
                   style={{ zIndex: 10050 }}
                 >
@@ -1311,7 +1317,7 @@ const ChatInterno: React.FC = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     {chatType === 'individual' && (
                       <div className="space-y-2 pt-2">
                         <div className="flex items-center justify-between">
@@ -1336,7 +1342,7 @@ const ChatInterno: React.FC = () => {
                           className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                           autoComplete="off"
                         />
-                        <Select 
+                        <Select
                           value={selectedUser?.id || undefined}
                           onValueChange={(value) => {
                             const user = safeAvailableUsers.find(u => u.id === value);
@@ -1377,11 +1383,11 @@ const ChatInterno: React.FC = () => {
                                   <SelectItem key={user.id} value={user.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
                                     <div className="flex items-center gap-2 w-full">
                                       <div className="relative flex-shrink-0">
-                                      <Avatar className="w-6 h-6">
+                                        <Avatar className="w-6 h-6">
                                           <AvatarFallback className="bg-seguranca-yellow/20 text-seguranca-yellow">
                                             {getInitials(user.name)}
                                           </AvatarFallback>
-                                      </Avatar>
+                                        </Avatar>
                                         {user.isOnline && (
                                           <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-seguranca-darkgray" />
                                         )}
@@ -1425,7 +1431,7 @@ const ChatInterno: React.FC = () => {
                           <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
                             <SelectValue placeholder={loadingGroups ? "Carregando grupos..." : "Escolha um grupo"} />
                           </SelectTrigger>
-                        <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
+                          <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
                             {loadingGroups ? (
                               <SelectItem value="loading" disabled className="text-seguranca-gray">
                                 Carregando...
@@ -1442,10 +1448,10 @@ const ChatInterno: React.FC = () => {
                               groups
                                 .filter(group => shouldFilterGroups && (group.name || group.groupName || '').toLowerCase().includes(groupSearchTerm.toLowerCase()))
                                 .map(group => (
-                                <SelectItem key={group.id} value={group.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
-                                  {group.name || group.groupName || 'Grupo sem nome'}
-                                </SelectItem>
-                              ))
+                                  <SelectItem key={group.id} value={group.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
+                                    {group.name || group.groupName || 'Grupo sem nome'}
+                                  </SelectItem>
+                                ))
                             )}
                           </SelectContent>
                         </Select>
@@ -1472,7 +1478,7 @@ const ChatInterno: React.FC = () => {
                           <SelectTrigger className="bg-seguranca-darkgray border-seguranca-gray/30 text-seguranca-lightgray">
                             <SelectValue placeholder={loadingDepartments ? "Carregando departamentos..." : "Escolha um departamento"} />
                           </SelectTrigger>
-                        <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
+                          <SelectContent className="!bg-seguranca-graphite !border-seguranca-gray/50 shadow-2xl" style={{ backgroundColor: '#1f2937', opacity: 1, backdropFilter: 'none', zIndex: 10070 }}>
                             {loadingDepartments ? (
                               <SelectItem value="loading" disabled className="text-seguranca-gray">
                                 Carregando...
@@ -1489,10 +1495,10 @@ const ChatInterno: React.FC = () => {
                               departments
                                 .filter(dept => shouldFilterDepartments && (dept.name || '').toLowerCase().includes(departmentSearchTerm.toLowerCase()))
                                 .map(dept => (
-                                <SelectItem key={dept.id} value={dept.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
-                                  {dept.name || 'Departamento sem nome'}
-                                </SelectItem>
-                              ))
+                                  <SelectItem key={dept.id} value={dept.id} className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow hover:bg-seguranca-gray/30">
+                                    {dept.name || 'Departamento sem nome'}
+                                  </SelectItem>
+                                ))
                             )}
                           </SelectContent>
                         </Select>
@@ -1500,8 +1506,8 @@ const ChatInterno: React.FC = () => {
                     )}
 
                     <div className="flex justify-end space-x-2 pt-4 border-t border-seguranca-gray/20 mt-4">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={() => {
                           setShowNewChatModal(false);
                           setSelectedUser(null);
@@ -1512,8 +1518,8 @@ const ChatInterno: React.FC = () => {
                       >
                         Cancelar
                       </Button>
-                      <Button 
-                        onClick={startNewConversation} 
+                      <Button
+                        onClick={startNewConversation}
                         disabled={
                           (chatType === 'individual' && !selectedUser) ||
                           (chatType === 'group' && !selectedGroup) ||
@@ -1528,7 +1534,7 @@ const ChatInterno: React.FC = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
@@ -1539,7 +1545,7 @@ const ChatInterno: React.FC = () => {
               />
             </div>
           </CardHeader>
-          
+
           <CardContent className="flex-1 p-0">
             {error && (
               <Alert className="m-4 mb-2" variant="destructive">
@@ -1547,7 +1553,7 @@ const ChatInterno: React.FC = () => {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            
+
             <div className="h-full overflow-y-auto">
               <div className="space-y-1">
                 {loading ? (
@@ -1648,9 +1654,9 @@ const ChatInterno: React.FC = () => {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
+                      <Button variant="ghost" size="sm">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel>Opções da Conversa</DropdownMenuLabel>
@@ -1686,7 +1692,7 @@ const ChatInterno: React.FC = () => {
                         Marcar todas como lidas
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         onClick={() => {
                           if (selectedConversation && window.confirm('Tem certeza que deseja limpar esta conversa?')) {
                             setChatMessages([]);
@@ -1728,7 +1734,7 @@ const ChatInterno: React.FC = () => {
                         const isSending = sendingMessages.has(message.id);
                         const isGroupOrDepartment = selectedConversation?.type === 'group' || selectedConversation?.type === 'department';
                         const shouldShowSender = !isCurrentUser || isGroupOrDepartment;
-                        
+
                         return (
                           <div
                             key={message.id}
@@ -1752,47 +1758,46 @@ const ChatInterno: React.FC = () => {
                                   <span className="text-xs text-muted-foreground">Enviando...</span>
                                 </div>
                               )}
-                              
+
                               {message.replyToId && replyToMessage && (
                                 <div className="bg-muted/50 p-2 rounded-t-lg border-l-2 border-primary mb-1">
                                   <p className="text-xs text-muted-foreground">Respondendo a {replyToMessage.sender.name}</p>
                                   <p className="text-xs truncate">{replyToMessage.content}</p>
                                 </div>
                               )}
-                              
+
                               <ContextMenu>
                                 <ContextMenuTrigger asChild>
-                              <div
-                                    className={`p-3 rounded-lg cursor-pointer transition-all hover:opacity-90 ${
-                                  isCurrentUser
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-muted'
-                                    } ${selectedMessages.has(message.id) ? 'ring-2 ring-seguranca-yellow' : ''}`}
-                              >
-                                {editingMessage === message.id ? (
-                                  <div className="space-y-2">
-                                    <Textarea
-                                      value={editContent}
-                                      onChange={(e) => setEditContent(e.target.value)}
-                                      className="min-h-[60px]"
-                                    />
-                                    <div className="flex gap-2">
-                                      <Button size="sm" onClick={() => editMessage(message.id, editContent)}>
-                                        Salvar
-                                      </Button>
-                                      <Button size="sm" variant="outline" onClick={() => setEditingMessage(null)}>
-                                        Cancelar
-                                      </Button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div>
+                                  <div
+                                    className={`p-3 rounded-lg cursor-pointer transition-all hover:opacity-90 ${isCurrentUser
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted'
+                                      } ${selectedMessages.has(message.id) ? 'ring-2 ring-seguranca-yellow' : ''}`}
+                                  >
+                                    {editingMessage === message.id ? (
+                                      <div className="space-y-2">
+                                        <Textarea
+                                          value={editContent}
+                                          onChange={(e) => setEditContent(e.target.value)}
+                                          className="min-h-[60px]"
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button size="sm" onClick={() => editMessage(message.id, editContent)}>
+                                            Salvar
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={() => setEditingMessage(null)}>
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div>
                                         {/* Exibir arquivo se houver */}
                                         {message.fileUrl && (
                                           <div className="mb-2">
                                             {message.type === 'IMAGE' ? (
                                               <div className="rounded-lg overflow-hidden max-w-xs">
-                                                <img 
+                                                <img
                                                   src={getFileUrl(message.fileUrl)}
                                                   alt={message.fileName || 'Imagem'}
                                                   className="max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
@@ -1802,8 +1807,8 @@ const ChatInterno: React.FC = () => {
                                             ) : message.type === 'AUDIO' ? (
                                               <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg min-w-[200px]">
                                                 <Mic className="w-5 h-5 flex-shrink-0 text-primary" />
-                                                <audio 
-                                                  controls 
+                                                <audio
+                                                  controls
                                                   src={getFileUrl(message.fileUrl)}
                                                   className="flex-1 h-8"
                                                   preload="metadata"
@@ -1821,8 +1826,8 @@ const ChatInterno: React.FC = () => {
                                               </div>
                                             ) : message.type === 'VIDEO' ? (
                                               <div className="rounded-lg overflow-hidden max-w-xs">
-                                                <video 
-                                                  controls 
+                                                <video
+                                                  controls
                                                   src={getFileUrl(message.fileUrl)}
                                                   className="max-w-full h-auto"
                                                 />
@@ -1848,7 +1853,7 @@ const ChatInterno: React.FC = () => {
                                             )}
                                           </div>
                                         )}
-                                        
+
                                         <div className="flex items-start justify-between gap-2">
                                           {message.content && (
                                             <p className={`text-sm flex-1 ${isSending ? 'opacity-70 italic' : ''}`}>
@@ -1869,7 +1874,7 @@ const ChatInterno: React.FC = () => {
                                             <Star className="w-3 h-3 opacity-70 flex-shrink-0 fill-yellow-400 text-yellow-400" />
                                           )}
                                         </div>
-                                        
+
                                         {/* Exibir reações (estilo WhatsApp) */}
                                         {message.reactions && message.reactions.length > 0 && (
                                           <div className="flex flex-wrap gap-1 mt-2 mb-1">
@@ -1882,11 +1887,10 @@ const ChatInterno: React.FC = () => {
                                                     e.stopPropagation();
                                                     handleReaction(message.id, reaction.emoji);
                                                   }}
-                                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all ${
-                                                    hasUserReaction
+                                                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs transition-all ${hasUserReaction
                                                       ? 'bg-blue-500/30 border border-blue-500/50'
                                                       : 'bg-gray-600/30 border border-gray-500/30 hover:bg-gray-500/40'
-                                                  }`}
+                                                    }`}
                                                   title={`${reaction.count} ${reaction.count === 1 ? 'reação' : 'reações'}`}
                                                 >
                                                   <span className="text-sm">{reaction.emoji}</span>
@@ -1898,22 +1902,22 @@ const ChatInterno: React.FC = () => {
                                             })}
                                           </div>
                                         )}
-                                        
-                                    <div className="flex items-center justify-between mt-2">
-                                      <span className="text-xs opacity-70">
-                                        {format(new Date(message.createdAt), 'HH:mm', { locale: ptBR })}
-                                        {message.editedAt && ' (editada)'}
-                                      </span>
-                                      {isCurrentUser && (
-                                        <span className="flex items-center gap-1 text-xs opacity-70">
-                                          {message.isRead ? (
-                                            <CheckCheck className="w-3 h-3 text-blue-400" />
-                                          ) : (
-                                            <Check className="w-3 h-3" />
+
+                                        <div className="flex items-center justify-between mt-2">
+                                          <span className="text-xs opacity-70">
+                                            {format(new Date(message.createdAt), 'HH:mm', { locale: ptBR })}
+                                            {message.editedAt && ' (editada)'}
+                                          </span>
+                                          {isCurrentUser && (
+                                            <span className="flex items-center gap-1 text-xs opacity-70">
+                                              {message.isRead ? (
+                                                <CheckCheck className="w-3 h-3 text-blue-400" />
+                                              ) : (
+                                                <Check className="w-3 h-3" />
+                                              )}
+                                            </span>
                                           )}
-                                        </span>
-                                      )}
-                                    </div>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1971,7 +1975,7 @@ const ChatInterno: React.FC = () => {
                                       <Plus className="w-4 h-4" />
                                     </button>
                                   </div>
-                                  
+
                                   {/* Opções do menu */}
                                   <ContextMenuItem
                                     onClick={() => setReplyToMessage(message)}
@@ -2024,14 +2028,14 @@ const ChatInterno: React.FC = () => {
                                       Denunciar
                                     </ContextMenuItem>
                                   )}
-                                      {isCurrentUser && (
+                                  {isCurrentUser && (
                                     <>
                                       <ContextMenuSeparator />
                                       <ContextMenuItem
-                                            onClick={() => {
-                                              setEditingMessage(message.id);
-                                              setEditContent(message.content);
-                                            }}
+                                        onClick={() => {
+                                          setEditingMessage(message.id);
+                                          setEditContent(message.content);
+                                        }}
                                         className="text-seguranca-lightgray focus:bg-seguranca-yellow/20 focus:text-seguranca-yellow"
                                       >
                                         <Edit className="mr-2 h-4 w-4" />
@@ -2074,7 +2078,7 @@ const ChatInterno: React.FC = () => {
                       </Button>
                     </div>
                   )}
-                  
+
                   {selectedFile && (
                     <div className="mb-2 p-2 bg-muted/50 rounded-lg flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -2098,23 +2102,43 @@ const ChatInterno: React.FC = () => {
                       </Button>
                     </div>
                   )}
-                  
+
                   {/* Input estilo WhatsApp com ícones dentro */}
                   <div className="relative flex items-end gap-1 sm:gap-2 bg-muted/30 rounded-xl sm:rounded-2xl px-2 sm:px-3 py-1.5 sm:py-2 border border-border/50">
                     {/* Ícones à esquerda */}
                     <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
                       {/* Emoji */}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-muted touch-manipulation"
-                        title="Emoji"
-                      >
-                        <Smile className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
-                      </Button>
-                      
+                      <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-muted touch-manipulation"
+                            title="Emoji"
+                          >
+                            <Smile className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent side="top" align="start" className="w-64 p-2 bg-background border-border shadow-xl">
+                          <div className="grid grid-cols-6 gap-1">
+                            {COMMON_EMOJIS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => {
+                                  setNewMessage(prev => prev + emoji);
+                                  // No auto-close to allow multiple emojis
+                                }}
+                                className="w-8 h-8 flex items-center justify-center hover:bg-muted rounded text-lg transition-colors"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
                       {/* Anexo/Arquivo */}
                       <Button
                         type="button"
@@ -2126,7 +2150,7 @@ const ChatInterno: React.FC = () => {
                       >
                         <Paperclip className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                       </Button>
-                      
+
                       {/* Câmera */}
                       <Button
                         type="button"
@@ -2185,18 +2209,18 @@ const ChatInterno: React.FC = () => {
                           </Button>
                         </div>
                       ) : newMessage.trim() || selectedFile ? (
-                    <Button 
-                      onClick={sendMessage} 
+                        <Button
+                          onClick={sendMessage}
                           disabled={loading}
                           className="h-8 w-8 p-0 bg-primary hover:bg-primary/90 rounded-full"
                           title="Enviar"
-                    >
-                      {loading ? (
+                        >
+                          {loading ? (
                             <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      ) : (
+                          ) : (
                             <Send className="w-4 h-4 text-white" />
-                      )}
-                    </Button>
+                          )}
+                        </Button>
                       ) : (
                         <Button
                           type="button"
