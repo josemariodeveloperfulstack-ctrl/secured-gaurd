@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ChatFileService {
 
-    @Value("${app.chat.upload-dir:uploads/chat}")
+    @Value("${app.upload.base-dir:uploads}")
     private String uploadDir;
 
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
