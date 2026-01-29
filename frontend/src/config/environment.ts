@@ -28,7 +28,7 @@ export function detectEnvironment(): 'local' | 'ci' | 'dev' | 'test' | 'prod' {
 
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
-  
+
   console.log('🔍 Detectando ambiente:', { hostname, protocol });
 
   // Ambiente CI
@@ -69,16 +69,16 @@ function getBackendHost(): string {
   if (typeof window === 'undefined') {
     return 'localhost';
   }
-  
+
   const hostname = window.location.hostname;
-  
+
   // Se for IP local (192.168.x.x, 10.x.x.x, etc), usa o mesmo IP
   if (hostname.match(/^(\d{1,3}\.){3}\d{1,3}$/)) {
     console.log('🔧 Detectado acesso via IP:', hostname);
     console.log('🔧 Usando mesmo IP para backend:', hostname);
     return hostname;
   }
-  
+
   // Se for localhost ou 127.0.0.1, mantém localhost
   return 'localhost';
 }
@@ -150,10 +150,10 @@ const environments: Record<string, EnvironmentConfig> = {
 export function getCurrentEnvironmentConfig(): EnvironmentConfig {
   const env = detectEnvironment();
   const config = environments[env];
-  
+
   console.log('🌍 Ambiente detectado:', env);
   console.log('⚙️ Configuração:', config);
-  
+
   return config;
 }
 
@@ -205,7 +205,7 @@ export function isDebugMode(): boolean {
 export function getEnvironmentInfo() {
   const env = detectEnvironment();
   const config = getCurrentEnvironmentConfig();
-  
+
   return {
     environment: env,
     config,
@@ -219,27 +219,36 @@ export function getEnvironmentInfo() {
  * Obtém a URL completa para arquivos de chat
  */
 export function getChatFileUrl(filePath: string): string {
+  if (!filePath) return '';
+
   const config = getCurrentEnvironmentConfig();
-  const baseUrl = config.apiUrl.replace('/api', ''); // Remove /api para obter base URL
-  
-  // Se o filePath já for uma URL completa, retorna como está
-  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+  const baseUrl = config.apiUrl.replace('/api', ''); // Base URL sem /api (ex: http://localhost:8083)
+
+  // Se já for uma URL completa ou um blob, retorna como está
+  if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:')) {
     return filePath;
   }
-  
-  // Constrói a URL completa para arquivos de chat
-  // Ex: http://localhost:8083/uploads/chat/images/filename.jpg
-  // ou http://localhost:8083/api/uploads/chat/images/filename.jpg
-  if (filePath.startsWith('/uploads/')) {
-    return `${baseUrl}${filePath}`;
-  }
-  
+
+  // Normalizar caminhos que começam com /api/uploads para usar o ResourceHandler em /uploads
   if (filePath.startsWith('/api/uploads/')) {
     return `${baseUrl}${filePath.replace('/api', '')}`;
   }
-  
-  // Se não começar com /, adiciona o caminho completo
-  return `${baseUrl}/uploads/chat/${filePath}`;
+
+  // Se já começar com /uploads/, apenas anexa à base
+  if (filePath.startsWith('/uploads/')) {
+    return `${baseUrl}${filePath}`;
+  }
+
+  // Se for um caminho relativo, assumimos que é uma sub-pasta dentro de /uploads/chat/
+  // Garante que não haja barras duplicadas
+  const cleanPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
+
+  // Se o caminho já contiver 'chat/', não duplicamos
+  if (cleanPath.startsWith('chat/')) {
+    return `${baseUrl}/uploads/${cleanPath}`;
+  }
+
+  return `${baseUrl}/uploads/chat/${cleanPath}`;
 }
 
 // Log inicial do ambiente (apenas em desenvolvimento)

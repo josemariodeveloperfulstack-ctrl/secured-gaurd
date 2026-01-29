@@ -24,9 +24,9 @@ import java.util.UUID;
 @Slf4j
 @Tag(name = "Veículos", description = "API para gerenciamento de veículos da frota")
 public class VehicleController {
-    
+
     private final VehicleService vehicleService;
-    
+
     @GetMapping
     @Operation(summary = "Listar todos os veículos", description = "Retorna uma lista de todos os veículos")
     @ApiResponses(value = {
@@ -45,7 +45,7 @@ public class VehicleController {
             throw new RuntimeException("Erro interno do servidor. Tente novamente mais tarde.");
         }
     }
-    
+
     @GetMapping("/{id}")
     @Operation(summary = "Buscar veículo por ID", description = "Retorna um veículo específico pelo ID")
     @ApiResponses(value = {
@@ -58,7 +58,7 @@ public class VehicleController {
         VehicleDTO vehicle = vehicleService.getVehicleById(id);
         return ResponseEntity.ok(vehicle);
     }
-    
+
     @GetMapping("/plate/{plate}")
     @Operation(summary = "Buscar veículo por placa", description = "Retorna um veículo específico pela placa")
     @ApiResponses(value = {
@@ -75,7 +75,7 @@ public class VehicleController {
             return ResponseEntity.notFound().build();
         }
     }
-    
+
     @GetMapping("/status/{status}")
     @Operation(summary = "Buscar veículos por status", description = "Retorna veículos filtrados por status")
     @ApiResponses(value = {
@@ -87,7 +87,7 @@ public class VehicleController {
         List<VehicleDTO> vehicles = vehicleService.getVehiclesByStatus(status);
         return ResponseEntity.ok(vehicles);
     }
-    
+
     @GetMapping("/search")
     @Operation(summary = "Buscar veículos", description = "Busca veículos por placa, modelo ou marca")
     @ApiResponses(value = {
@@ -99,9 +99,9 @@ public class VehicleController {
         List<VehicleDTO> vehicles = vehicleService.searchVehicles(searchTerm);
         return ResponseEntity.ok(vehicles);
     }
-    
+
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('FLEET_WRITE', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Criar novo veículo", description = "Cria um novo veículo na frota")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Veículo criado com sucesso"),
@@ -113,9 +113,9 @@ public class VehicleController {
         VehicleDTO createdVehicle = vehicleService.createVehicle(vehicleDTO);
         return ResponseEntity.status(201).body(createdVehicle);
     }
-    
+
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FLEET_WRITE', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Atualizar veículo", description = "Atualiza os dados de um veículo existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Veículo atualizado com sucesso"),
@@ -128,9 +128,9 @@ public class VehicleController {
         VehicleDTO updatedVehicle = vehicleService.updateVehicle(id, vehicleDTO);
         return ResponseEntity.ok(updatedVehicle);
     }
-    
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('FLEET_WRITE', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Excluir veículo", description = "Exclui um veículo da frota")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Veículo excluído com sucesso"),
@@ -142,7 +142,7 @@ public class VehicleController {
         vehicleService.deleteVehicle(id);
         return ResponseEntity.noContent().build();
     }
-    
+
     @GetMapping("/count")
     @Operation(summary = "Contar veículos", description = "Retorna o número total de veículos")
     public ResponseEntity<Object> getCount() {

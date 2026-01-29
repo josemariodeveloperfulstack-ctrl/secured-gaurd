@@ -20,14 +20,14 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class ChatFileService {
-    
-    @Value("${app.upload.dir:uploads}")
+
+    @Value("${app.chat.upload-dir:uploads/chat}")
     private String uploadDir;
-    
+
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
     private static final long MAX_AUDIO_SIZE = 20 * 1024 * 1024; // 20MB
-    
+
     /**
      * Salva arquivo de chat e retorna informações do arquivo
      */
@@ -37,35 +37,36 @@ public class ChatFileService {
             if (file.isEmpty()) {
                 throw new BusinessException("Arquivo não pode estar vazio");
             }
-            
+
             // Validar tamanho baseado no tipo
             long maxSize = getMaxSizeForType(messageType);
             if (file.getSize() > maxSize) {
-                throw new BusinessException(String.format("Arquivo muito grande. Máximo permitido: %dMB", maxSize / (1024 * 1024)));
+                throw new BusinessException(
+                        String.format("Arquivo muito grande. Máximo permitido: %dMB", maxSize / (1024 * 1024)));
             }
-            
+
             // Validar tipo de arquivo
             String contentType = file.getContentType();
             if (contentType == null || !isValidFileType(contentType, messageType)) {
                 throw new BusinessException("Tipo de arquivo não permitido para " + messageType.getDisplayName());
             }
-            
+
             // Gerar nome único para o arquivo
             String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
             String fileExtension = getFileExtension(originalFilename);
             String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
-            
+
             // Criar diretório se não existir
             String subDir = getSubDirectoryForType(messageType);
             Path uploadPath = Paths.get(uploadDir, "chat", subDir);
             Files.createDirectories(uploadPath);
-            
+
             // Salvar arquivo
             Path filePath = uploadPath.resolve(uniqueFilename);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            
+
             log.info("✅ Arquivo de chat salvo: {}", filePath.toString());
-            
+
             // Retornar informações do arquivo
             ChatFileInfo fileInfo = new ChatFileInfo();
             fileInfo.setFileName(uniqueFilename);
@@ -74,15 +75,15 @@ public class ChatFileService {
             fileInfo.setSize(file.getSize());
             fileInfo.setContentType(contentType);
             fileInfo.setUrl("/api/uploads/chat/" + subDir + "/" + uniqueFilename);
-            
+
             return fileInfo;
-            
+
         } catch (IOException e) {
             log.error("❌ Erro ao salvar arquivo de chat", e);
             throw new BusinessException("Erro ao salvar arquivo: " + e.getMessage());
         }
     }
-    
+
     /**
      * Deleta arquivo de chat
      */
@@ -97,7 +98,7 @@ public class ChatFileService {
             log.warn("⚠️ Erro ao deletar arquivo de chat: {}", filePath, e);
         }
     }
-    
+
     /**
      * Obtém tamanho máximo permitido baseado no tipo de mensagem
      */
@@ -115,7 +116,7 @@ public class ChatFileService {
                 return MAX_FILE_SIZE;
         }
     }
-    
+
     /**
      * Obtém subdiretório baseado no tipo de mensagem
      */
@@ -133,7 +134,7 @@ public class ChatFileService {
                 return "files";
         }
     }
-    
+
     /**
      * Valida tipo de arquivo baseado no tipo de mensagem
      */
@@ -148,19 +149,19 @@ public class ChatFileService {
             case FILE:
                 // Aceitar vários tipos de arquivo
                 return contentType.equals("application/pdf") ||
-                       contentType.equals("application/msword") ||
-                       contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
-                       contentType.equals("application/vnd.ms-excel") ||
-                       contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
-                       contentType.equals("application/zip") ||
-                       contentType.equals("application/x-zip-compressed") ||
-                       contentType.equals("text/plain") ||
-                       contentType.equals("text/csv");
+                        contentType.equals("application/msword") ||
+                        contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
+                        contentType.equals("application/vnd.ms-excel") ||
+                        contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
+                        contentType.equals("application/zip") ||
+                        contentType.equals("application/x-zip-compressed") ||
+                        contentType.equals("text/plain") ||
+                        contentType.equals("text/csv");
             default:
                 return false;
         }
     }
-    
+
     /**
      * Obtém extensão do arquivo
      */
@@ -170,7 +171,7 @@ public class ChatFileService {
         }
         return "";
     }
-    
+
     /**
      * Classe interna para informações do arquivo
      */
@@ -181,25 +182,54 @@ public class ChatFileService {
         private Long size;
         private String contentType;
         private String url;
-        
+
         // Getters e Setters
-        public String getFileName() { return fileName; }
-        public void setFileName(String fileName) { this.fileName = fileName; }
-        
-        public String getOriginalName() { return originalName; }
-        public void setOriginalName(String originalName) { this.originalName = originalName; }
-        
-        public String getPath() { return path; }
-        public void setPath(String path) { this.path = path; }
-        
-        public Long getSize() { return size; }
-        public void setSize(Long size) { this.size = size; }
-        
-        public String getContentType() { return contentType; }
-        public void setContentType(String contentType) { this.contentType = contentType; }
-        
-        public String getUrl() { return url; }
-        public void setUrl(String url) { this.url = url; }
+        public String getFileName() {
+            return fileName;
+        }
+
+        public void setFileName(String fileName) {
+            this.fileName = fileName;
+        }
+
+        public String getOriginalName() {
+            return originalName;
+        }
+
+        public void setOriginalName(String originalName) {
+            this.originalName = originalName;
+        }
+
+        public String getPath() {
+            return path;
+        }
+
+        public void setPath(String path) {
+            this.path = path;
+        }
+
+        public Long getSize() {
+            return size;
+        }
+
+        public void setSize(Long size) {
+            this.size = size;
+        }
+
+        public String getContentType() {
+            return contentType;
+        }
+
+        public void setContentType(String contentType) {
+            this.contentType = contentType;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
     }
 }
-

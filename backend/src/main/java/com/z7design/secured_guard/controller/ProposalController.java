@@ -33,67 +33,17 @@ public class ProposalController {
 
     @GetMapping
     @Operation(summary = "Listar todas as propostas", description = "Retorna uma lista paginada de todas as propostas")
-    public ResponseEntity<Page<Proposal>> getAllProposals(Pageable pageable) {
-        Page<Proposal> proposals = proposalService.findAll(pageable);
+    public ResponseEntity<Page<ProposalDTO>> getAllProposals(Pageable pageable) {
+        Page<ProposalDTO> proposals = proposalService.findAll(pageable);
         return ResponseEntity.ok(proposals);
     }
 
     @GetMapping("/all")
     @Operation(summary = "Listar todas as propostas sem paginação", description = "Retorna uma lista completa de todas as propostas")
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public ResponseEntity<List<Proposal>> getAllProposalsList() {
+    public ResponseEntity<List<ProposalDTO>> getAllProposalsList() {
         try {
-            List<Proposal> proposals = proposalService.findAll();
-
-            // Inicializar relacionamentos lazy antes da serialização JSON
-            for (Proposal proposal : proposals) {
-                // Inicializar client
-                if (proposal.getClient() != null) {
-                    try {
-                        proposal.getClient().getId();
-                        proposal.getClient().getName();
-                    } catch (Exception e) {
-                        System.err.println("⚠️ Erro ao inicializar client para proposal " + proposal.getId() + ": "
-                                + e.getMessage());
-                    }
-                }
-
-                // Inicializar createdBy
-                if (proposal.getCreatedBy() != null) {
-                    try {
-                        proposal.getCreatedBy().getId();
-                        proposal.getCreatedBy().getName();
-                    } catch (Exception e) {
-                        System.err.println("⚠️ Erro ao inicializar createdBy para proposal " + proposal.getId() + ": "
-                                + e.getMessage());
-                    }
-                }
-
-                // Inicializar assignedTo
-                if (proposal.getAssignedTo() != null) {
-                    try {
-                        proposal.getAssignedTo().getId();
-                        proposal.getAssignedTo().getName();
-                    } catch (Exception e) {
-                        System.err.println("⚠️ Erro ao inicializar assignedTo para proposal " + proposal.getId() + ": "
-                                + e.getMessage());
-                    }
-                }
-
-                // Inicializar items
-                if (proposal.getItems() != null) {
-                    try {
-                        proposal.getItems().size();
-                        for (var item : proposal.getItems()) {
-                            item.getId();
-                        }
-                    } catch (Exception e) {
-                        System.err.println("⚠️ Erro ao inicializar items para proposal " + proposal.getId() + ": "
-                                + e.getMessage());
-                    }
-                }
-            }
-
+            List<ProposalDTO> proposals = proposalService.findAll();
             return ResponseEntity.ok(proposals);
         } catch (Exception e) {
             System.err.println("❌ Erro ao carregar propostas: " + e.getMessage());
@@ -105,14 +55,14 @@ public class ProposalController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar proposta por ID", description = "Retorna uma proposta específica pelo ID")
-    public ResponseEntity<Proposal> getProposalById(@PathVariable String id) {
+    public ResponseEntity<ProposalDTO> getProposalById(@PathVariable String id) {
         Proposal proposal = proposalService.findById(UUID.fromString(id));
-        return ResponseEntity.ok(proposal);
+        return ResponseEntity.ok(proposalService.mapToDTO(proposal));
     }
 
     @PostMapping
     @Operation(summary = "Criar nova proposta", description = "Cria uma nova proposta no sistema")
-    public ResponseEntity<Proposal> createProposal(@RequestBody ProposalDTO proposalDTO) {
+    public ResponseEntity<ProposalDTO> createProposal(@RequestBody ProposalDTO proposalDTO) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -122,23 +72,23 @@ public class ProposalController {
         UUID currentUserId = currentUser.getId();
 
         Proposal createdProposal = proposalService.create(proposalDTO, currentUserId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdProposal);
+        return ResponseEntity.status(HttpStatus.CREATED).body(proposalService.mapToDTO(createdProposal));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar proposta", description = "Atualiza uma proposta existente")
-    public ResponseEntity<Proposal> updateProposal(@PathVariable String id, @RequestBody ProposalDTO proposalDTO) {
+    public ResponseEntity<ProposalDTO> updateProposal(@PathVariable String id, @RequestBody ProposalDTO proposalDTO) {
         Proposal updated = proposalService.update(UUID.fromString(id), proposalDTO);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(proposalService.mapToDTO(updated));
     }
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Atualizar status da proposta", description = "Atualiza apenas o status de uma proposta")
-    public ResponseEntity<Proposal> updateProposalStatus(@PathVariable String id,
+    public ResponseEntity<ProposalDTO> updateProposalStatus(@PathVariable String id,
             @RequestBody Map<String, String> statusUpdate) {
         String status = statusUpdate.get("status");
         Proposal updated = proposalService.updateStatus(UUID.fromString(id), status);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(proposalService.mapToDTO(updated));
     }
 
     @DeleteMapping("/{id}")
@@ -150,55 +100,59 @@ public class ProposalController {
 
     @GetMapping("/status/{status}")
     @Operation(summary = "Buscar propostas por status", description = "Retorna propostas filtradas por status")
-    public ResponseEntity<List<Proposal>> getProposalsByStatus(@PathVariable String status) {
+    public ResponseEntity<List<ProposalDTO>> getProposalsByStatus(@PathVariable String status) {
         ProposalStatus proposalStatus = ProposalStatus.valueOf(status.toUpperCase());
         List<Proposal> proposals = proposalService.findByStatus(proposalStatus);
-        return ResponseEntity.ok(proposals);
+        return ResponseEntity.ok(proposals.stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/client/{clientId}")
     @Operation(summary = "Buscar propostas por cliente", description = "Retorna propostas de um cliente específico")
-    public ResponseEntity<List<Proposal>> getProposalsByClient(@PathVariable String clientId) {
-        return ResponseEntity.ok(proposalService.findByClient(UUID.fromString(clientId)));
+    public ResponseEntity<List<ProposalDTO>> getProposalsByClient(@PathVariable String clientId) {
+        return ResponseEntity.ok(proposalService.findByClient(UUID.fromString(clientId))
+                .stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/lead/{leadId}")
     @Operation(summary = "Buscar propostas por lead", description = "Retorna propostas de um lead específico")
-    public ResponseEntity<List<Proposal>> getProposalsByLead(@PathVariable String leadId) {
-        return ResponseEntity.ok(proposalService.findByLead(UUID.fromString(leadId)));
+    public ResponseEntity<List<ProposalDTO>> getProposalsByLead(@PathVariable String leadId) {
+        return ResponseEntity.ok(proposalService.findByLead(UUID.fromString(leadId))
+                .stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/assigned/{userId}")
     @Operation(summary = "Buscar propostas por responsável", description = "Retorna propostas atribuídas a um usuário específico")
-    public ResponseEntity<List<Proposal>> getProposalsByAssignedTo(@PathVariable String userId) {
-        return ResponseEntity.ok(proposalService.findByAssignedTo(UUID.fromString(userId)));
+    public ResponseEntity<List<ProposalDTO>> getProposalsByAssignedTo(@PathVariable String userId) {
+        return ResponseEntity.ok(proposalService.findByAssignedTo(UUID.fromString(userId))
+                .stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/created/{userId}")
     @Operation(summary = "Buscar propostas por criador", description = "Retorna propostas criadas por um usuário específico")
-    public ResponseEntity<List<Proposal>> getProposalsByCreatedBy(@PathVariable String userId) {
-        return ResponseEntity.ok(proposalService.findByCreatedBy(UUID.fromString(userId)));
+    public ResponseEntity<List<ProposalDTO>> getProposalsByCreatedBy(@PathVariable String userId) {
+        return ResponseEntity.ok(proposalService.findByCreatedBy(UUID.fromString(userId))
+                .stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/expired")
     @Operation(summary = "Buscar propostas expiradas", description = "Retorna propostas que já expiraram")
-    public ResponseEntity<List<Proposal>> getExpiredProposals() {
+    public ResponseEntity<List<ProposalDTO>> getExpiredProposals() {
         List<Proposal> proposals = proposalService.findExpiredProposals();
-        return ResponseEntity.ok(proposals);
+        return ResponseEntity.ok(proposals.stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/expiring-soon/{days}")
     @Operation(summary = "Buscar propostas expirando em breve", description = "Retorna propostas que expiram nos próximos X dias")
-    public ResponseEntity<List<Proposal>> getProposalsExpiringSoon(@PathVariable int days) {
+    public ResponseEntity<List<ProposalDTO>> getProposalsExpiringSoon(@PathVariable int days) {
         List<Proposal> proposals = proposalService.findProposalsExpiringSoon(days);
-        return ResponseEntity.ok(proposals);
+        return ResponseEntity.ok(proposals.stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/search")
     @Operation(summary = "Buscar propostas", description = "Busca propostas por termo de pesquisa")
-    public ResponseEntity<List<Proposal>> searchProposals(@RequestParam String term) {
+    public ResponseEntity<List<ProposalDTO>> searchProposals(@RequestParam String term) {
         List<Proposal> proposals = proposalService.searchProposals(term);
-        return ResponseEntity.ok(proposals);
+        return ResponseEntity.ok(proposals.stream().map(proposalService::mapToDTO).toList());
     }
 
     @GetMapping("/stats/count-by-status")

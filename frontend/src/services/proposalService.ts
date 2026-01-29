@@ -16,10 +16,12 @@ export interface Proposal {
     id: number | string;
     name: string;
   };
+  clientName?: string;
   lead?: {
     id: number | string;
     name: string;
   };
+  leadName?: string;
   status: string;
   totalValue: number;
   validUntil: string;
@@ -28,10 +30,12 @@ export interface Proposal {
     id: number | string;
     name: string;
   };
+  assignedToName?: string;
   createdBy: {
     id: number | string;
     name: string;
   };
+  createdByName?: string;
   createdAt: string;
   updatedAt: string;
   items?: ProposalItem[];
@@ -137,7 +141,7 @@ export const proposalService = {
   },
 
   async getExpiredProposals(): Promise<Proposal[]> {
-    const response = await api.get('/proposals/expired');
+    const response = await api.get('/api/proposals/expired');
     return response.data;
   },
 
@@ -152,12 +156,12 @@ export const proposalService = {
   },
 
   async getStatsByStatus(): Promise<ProposalStats> {
-    const response = await api.get('/proposals/stats/count-by-status');
+    const response = await api.get('/api/proposals/stats/count-by-status');
     return response.data;
   },
 
   async getTotalValueByStatus(): Promise<ProposalStats> {
-    const response = await api.get('/proposals/stats/total-value-by-status');
+    const response = await api.get('/api/proposals/stats/total-value-by-status');
     return response.data;
   }
 };

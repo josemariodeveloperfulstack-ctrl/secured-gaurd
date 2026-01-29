@@ -38,7 +38,7 @@ public class FileUploadController {
 
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
 
-    @Value("${app.upload.dir:uploads}")
+    @Value("${app.upload.base-dir:uploads}")
     private String uploadDir;
 
     @PostMapping("/atestados")
@@ -50,27 +50,26 @@ public class FileUploadController {
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
     public ResponseEntity<Map<String, String>> uploadAtestado(
-            @Parameter(description = "Arquivo do atestado")
-            @RequestParam("file") MultipartFile file) {
-        
+            @Parameter(description = "Arquivo do atestado") @RequestParam("file") MultipartFile file) {
+
         try {
             // Validar arquivo
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Arquivo não pode estar vazio"));
+                        .body(Map.of("error", "Arquivo não pode estar vazio"));
             }
 
             // Validar tipo de arquivo (PDF, JPG, JPEG, PNG)
             String contentType = file.getContentType();
             if (contentType == null || !isValidFileType(contentType)) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Tipo de arquivo não permitido. Use PDF, JPG, JPEG ou PNG"));
+                        .body(Map.of("error", "Tipo de arquivo não permitido. Use PDF, JPG, JPEG ou PNG"));
             }
 
             // Validar tamanho (máximo 10MB)
             if (file.getSize() > 10 * 1024 * 1024) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Arquivo muito grande. Máximo 10MB"));
+                        .body(Map.of("error", "Arquivo muito grande. Máximo 10MB"));
             }
 
             // Gerar nome único para o arquivo
@@ -99,7 +98,7 @@ public class FileUploadController {
 
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
+                    .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
         }
     }
 
@@ -112,27 +111,26 @@ public class FileUploadController {
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
     public ResponseEntity<Map<String, String>> uploadComprovante(
-            @Parameter(description = "Arquivo do comprovante")
-            @RequestParam("file") MultipartFile file) {
-        
+            @Parameter(description = "Arquivo do comprovante") @RequestParam("file") MultipartFile file) {
+
         try {
             // Validar arquivo
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Arquivo não pode estar vazio"));
+                        .body(Map.of("error", "Arquivo não pode estar vazio"));
             }
 
             // Validar tipo de arquivo (PDF, JPG, JPEG, PNG)
             String contentType = file.getContentType();
             if (contentType == null || !isValidFileType(contentType)) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Tipo de arquivo não permitido. Use PDF, JPG, JPEG ou PNG"));
+                        .body(Map.of("error", "Tipo de arquivo não permitido. Use PDF, JPG, JPEG ou PNG"));
             }
 
             // Validar tamanho (máximo 10MB)
             if (file.getSize() > 10 * 1024 * 1024) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Arquivo muito grande. Máximo 10MB"));
+                        .body(Map.of("error", "Arquivo muito grande. Máximo 10MB"));
             }
 
             // Gerar nome único para o arquivo
@@ -161,7 +159,7 @@ public class FileUploadController {
 
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
+                    .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
         }
     }
 
@@ -173,9 +171,8 @@ public class FileUploadController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<Resource> downloadComprovante(
-            @Parameter(description = "Nome do arquivo")
-            @PathVariable String filename) {
-        
+            @Parameter(description = "Nome do arquivo") @PathVariable String filename) {
+
         try {
             Path filePath = Paths.get(uploadDir, "comprovantes").resolve(filename);
             Resource resource = new UrlResource(filePath.toUri());
@@ -188,9 +185,9 @@ public class FileUploadController {
                 }
 
                 return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                    .body(resource);
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                        .body(resource);
             } else {
                 return ResponseEntity.notFound().build();
             }
@@ -210,12 +207,11 @@ public class FileUploadController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<Map<String, String>> deleteComprovante(
-            @Parameter(description = "Nome do arquivo")
-            @PathVariable String filename) {
-        
+            @Parameter(description = "Nome do arquivo") @PathVariable String filename) {
+
         try {
             Path filePath = Paths.get(uploadDir, "comprovantes").resolve(filename);
-            
+
             if (Files.exists(filePath)) {
                 Files.delete(filePath);
                 return ResponseEntity.ok(Map.of("message", "Arquivo excluído com sucesso"));
@@ -225,10 +221,10 @@ public class FileUploadController {
 
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Erro ao excluir arquivo: " + e.getMessage()));
+                    .body(Map.of("error", "Erro ao excluir arquivo: " + e.getMessage()));
         }
     }
-    
+
     /**
      * Download de arquivo do chat
      */
@@ -236,7 +232,7 @@ public class FileUploadController {
     public ResponseEntity<Resource> downloadChatFile(
             @PathVariable String subDir,
             @PathVariable String filename) {
-        
+
         try {
             Path filePath = Paths.get(uploadDir, "chat", subDir).resolve(filename);
             Resource resource = new UrlResource(filePath.toUri());
@@ -248,9 +244,9 @@ public class FileUploadController {
                 }
 
                 return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                    .body(resource);
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                        .body(resource);
             } else {
                 return ResponseEntity.notFound().build();
             }
@@ -270,71 +266,70 @@ public class FileUploadController {
     })
     @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH')")
     public ResponseEntity<Map<String, String>> uploadCompanyLogo(
-            @Parameter(description = "Arquivo do logo (PNG, JPG, JPEG)")
-            @RequestParam("file") MultipartFile file) {
-        
+            @Parameter(description = "Arquivo do logo (PNG, JPG, JPEG)") @RequestParam("file") MultipartFile file) {
+
         try {
-            log.info("📤 Iniciando upload de logo da empresa - Nome original: {}, Tamanho: {} bytes", 
+            log.info("📤 Iniciando upload de logo da empresa - Nome original: {}, Tamanho: {} bytes",
                     file.getOriginalFilename(), file.getSize());
-            
+
             // Validar arquivo
             if (file.isEmpty()) {
                 log.warn("❌ Arquivo vazio recebido");
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Arquivo não pode estar vazio"));
+                        .body(Map.of("error", "Arquivo não pode estar vazio"));
             }
 
             // Validar tipo de arquivo (apenas imagens: JPG, JPEG, PNG)
             String contentType = file.getContentType();
             log.info("📄 Content-Type recebido: {}", contentType);
-            
+
             if (contentType == null || !isValidImageType(contentType)) {
                 log.warn("❌ Tipo de arquivo inválido: {}", contentType);
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Tipo de arquivo não permitido. Use PNG, JPG ou JPEG"));
+                        .body(Map.of("error", "Tipo de arquivo não permitido. Use PNG, JPG ou JPEG"));
             }
 
             // Validar tamanho (máximo 5MB para logos)
             if (file.getSize() > 5 * 1024 * 1024) {
                 log.warn("❌ Arquivo muito grande: {} bytes", file.getSize());
                 return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Arquivo muito grande. Máximo 5MB"));
+                        .body(Map.of("error", "Arquivo muito grande. Máximo 5MB"));
             }
 
             // Gerar nome único para o arquivo
             String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
             String fileExtension = getFileExtension(originalFilename);
             String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
-            
+
             log.info("📝 Nome único gerado: {}", uniqueFilename);
 
             // Criar diretório se não existir (usar caminho absoluto)
             Path uploadPath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
             log.info("📁 Caminho de upload: {}", uploadPath);
-            
+
             Files.createDirectories(uploadPath);
             log.info("✅ Diretório verificado/criado: {}", uploadPath);
 
             // Salvar arquivo
             Path filePath = uploadPath.resolve(uniqueFilename);
             log.info("💾 Salvando arquivo em: {}", filePath);
-            
+
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            
+
             // Verificar se o arquivo foi salvo corretamente
             if (!Files.exists(filePath)) {
                 log.error("❌ Arquivo não foi salvo corretamente: {}", filePath);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Erro ao salvar arquivo: arquivo não encontrado após upload"));
+                        .body(Map.of("error", "Erro ao salvar arquivo: arquivo não encontrado após upload"));
             }
-            
+
             log.info("✅ Arquivo salvo com sucesso: {} ({} bytes)", filePath, Files.size(filePath));
 
             // Retornar informações do arquivo
             // IMPORTANTE: Retornar apenas o caminho relativo (sem host/porta)
             // O frontend construirá a URL completa quando necessário para exibição
             String relativeUrl = "/api/uploads/companies/logos/" + uniqueFilename;
-            
+
             Map<String, String> response = new HashMap<>();
             response.put("filename", uniqueFilename);
             response.put("originalName", originalFilename);
@@ -342,7 +337,7 @@ public class FileUploadController {
             response.put("size", String.valueOf(file.getSize()));
             response.put("contentType", contentType);
             response.put("url", relativeUrl); // Caminho relativo: /api/uploads/companies/logos/{filename}
-            
+
             log.info("✅ Upload concluído com sucesso. URL relativa: {}", relativeUrl);
             log.info("📁 Arquivo salvo em: {}", filePath.toAbsolutePath());
 
@@ -351,11 +346,11 @@ public class FileUploadController {
         } catch (IOException e) {
             log.error("❌ Erro ao salvar arquivo de logo: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
+                    .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
         } catch (Exception e) {
             log.error("❌ Erro inesperado ao fazer upload de logo: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Erro inesperado: " + e.getMessage()));
+                    .body(Map.of("error", "Erro inesperado: " + e.getMessage()));
         }
     }
 
@@ -363,27 +358,24 @@ public class FileUploadController {
     // O ResourceHandler em WebConfig.java serve os arquivos estáticos diretamente
     // que é mais eficiente e não causa conflitos de headers
     // Se necessário, este endpoint pode ser restaurado como fallback
-    
+
     // @GetMapping("/companies/logos/{filename}")
-    // @Operation(summary = "Download de logo da empresa", description = "Faz download de um logo de empresa")
+    // @Operation(summary = "Download de logo da empresa", description = "Faz
+    // download de um logo de empresa")
     // public ResponseEntity<Resource> downloadCompanyLogo(...) { ... }
 
     // Métodos auxiliares
     private boolean isValidFileType(String contentType) {
-        return contentType != null && (
-            contentType.equals("application/pdf") ||
-            contentType.equals("image/jpeg") ||
-            contentType.equals("image/jpg") ||
-            contentType.equals("image/png")
-        );
+        return contentType != null && (contentType.equals("application/pdf") ||
+                contentType.equals("image/jpeg") ||
+                contentType.equals("image/jpg") ||
+                contentType.equals("image/png"));
     }
 
     private boolean isValidImageType(String contentType) {
-        return contentType != null && (
-            contentType.equals("image/jpeg") ||
-            contentType.equals("image/jpg") ||
-            contentType.equals("image/png")
-        );
+        return contentType != null && (contentType.equals("image/jpeg") ||
+                contentType.equals("image/jpg") ||
+                contentType.equals("image/png"));
     }
 
     private String getFileExtension(String filename) {

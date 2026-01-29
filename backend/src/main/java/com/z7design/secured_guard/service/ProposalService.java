@@ -42,89 +42,90 @@ public class ProposalService {
     @Autowired
     private UserRepository userRepository;
 
-    public List<Proposal> findAll() {
+    public List<ProposalDTO> findAll() {
         List<Proposal> proposals = proposalRepository.findAll();
-        
-        // Inicializar relacionamentos lazy dentro da transação
-        for (Proposal proposal : proposals) {
-            // Inicializar client (obrigatório)
-            if (proposal.getClient() != null) {
-                try {
-                    org.hibernate.Hibernate.initialize(proposal.getClient());
-                    proposal.getClient().getId();
-                    proposal.getClient().getName();
-                } catch (Exception e) {
-                    // Ignorar erros de lazy loading
-                }
-            }
-            
-            // Inicializar createdBy (obrigatório)
-            if (proposal.getCreatedBy() != null) {
-                try {
-                    org.hibernate.Hibernate.initialize(proposal.getCreatedBy());
-                    proposal.getCreatedBy().getId();
-                    proposal.getCreatedBy().getName();
-                } catch (Exception e) {
-                    // Ignorar erros de lazy loading
-                }
-            }
-            
-            // Inicializar assignedTo (opcional)
-            if (proposal.getAssignedTo() != null) {
-                try {
-                    org.hibernate.Hibernate.initialize(proposal.getAssignedTo());
-                    proposal.getAssignedTo().getId();
-                    proposal.getAssignedTo().getName();
-                } catch (Exception e) {
-                    // Ignorar erros de lazy loading
-                }
-            }
-            
-            // Inicializar items
-            if (proposal.getItems() != null) {
-                try {
-                    org.hibernate.Hibernate.initialize(proposal.getItems());
-                    proposal.getItems().size();
-                } catch (Exception e) {
-                    // Ignorar erros de lazy loading
-                }
-            }
-            
-            // Limpar referências órfãs de Lead
-            if (proposal.getLead() != null) {
-                try {
-                    org.hibernate.Hibernate.initialize(proposal.getLead());
-                    proposal.getLead().getId();
-                } catch (jakarta.persistence.EntityNotFoundException e) {
-                    // Lead foi deletado, limpar referência
-                    proposal.setLead(null);
-                } catch (Exception e) {
-                    // Outro erro, limpar referência para evitar problemas na serialização
-                    proposal.setLead(null);
-                }
-            }
-        }
-        return proposals;
+        return proposals.stream()
+                .map(this::mapToDTO)
+                .toList();
     }
 
-    public Page<Proposal> findAll(Pageable pageable) {
+    public Page<ProposalDTO> findAll(Pageable pageable) {
         Page<Proposal> proposals = proposalRepository.findAll(pageable);
-        // Limpar referências órfãs de Lead
-        proposals.getContent().forEach(proposal -> {
-            if (proposal.getLead() != null) {
-                try {
-                    // Tentar acessar o Lead para verificar se ainda existe
-                    proposal.getLead().getId();
-                } catch (jakarta.persistence.EntityNotFoundException e) {
-                    // Lead foi deletado, limpar referência
-                    proposal.setLead(null);
-                } catch (Exception e) {
-                    // Outro erro, limpar referência para evitar problemas na serialização
-                    proposal.setLead(null);
-                }
+        return proposals.map(this::mapToDTO);
+    }
+
+    public ProposalDTO mapToDTO(Proposal proposal) {
+        if (proposal == null) {
+            return null;
+        }
+
+        ProposalDTO dto = new ProposalDTO();
+        dto.setId(proposal.getId());
+        dto.setTitle(proposal.getTitle());
+        dto.setProposalNumber(proposal.getProposalNumber());
+
+        if (proposal.getClient() != null) {
+            try {
+                dto.setClientId(proposal.getClient().getId());
+                dto.setClientName(proposal.getClient().getName());
+            } catch (Exception e) {
+                // Client deletado ou erro de proxy
             }
-        });
-        return proposals;
+        }
+
+        if (proposal.getLead() != null) {
+            try {
+                dto.setLeadId(proposal.getLead().getId());
+                dto.setLeadName(proposal.getLead().getName());
+            } catch (Exception e) {
+                // Lead deletado ou erro de proxy
+            }
+        }
+
+        dto.setStatus(proposal.getStatus());
+        dto.setTotalValue(proposal.getTotalValue());
+        dto.setValidUntil(proposal.getValidUntil());
+        dto.setDescription(proposal.getDescription());
+        dto.setTermsConditions(proposal.getTermsConditions());
+        dto.setNotes(proposal.getNotes());
+
+        if (proposal.getCreatedBy() != null) {
+            try {
+                dto.setCreatedById(proposal.getCreatedBy().getId());
+                dto.setCreatedByName(proposal.getCreatedBy().getName());
+            } catch (Exception e) {
+                // User deletado ou erro de proxy
+            }
+        }
+
+        if (proposal.getAssignedTo() != null) {
+            try {
+                dto.setAssignedToId(proposal.getAssignedTo().getId());
+                dto.setAssignedToName(proposal.getAssignedTo().getName());
+            } catch (Exception e) {
+                // User deletado ou erro de proxy
+            }
+        }
+
+        if (proposal.getItems() != null) {
+            dto.setItems(proposal.getItems().stream()
+                    .map(item -> {
+                        ProposalItemDTO itemDto = new ProposalItemDTO();
+                        itemDto.setId(item.getId());
+                        itemDto.setDescription(item.getDescription());
+                        itemDto.setQuantity(item.getQuantity());
+                        itemDto.setUnitPrice(item.getUnitPrice());
+                        itemDto.setTotalPrice(item.getTotalPrice());
+                        itemDto.setNotes(item.getNotes());
+                        return itemDto;
+                    })
+                    .toList());
+        }
+
+        dto.setCreatedAt(proposal.getCreatedAt());
+        dto.setUpdatedAt(proposal.getUpdatedAt());
+
+        return dto;
     }
 
     public Proposal findById(UUID id) {
@@ -142,17 +143,17 @@ public class ProposalService {
         proposal.setDescription(proposalDTO.getDescription());
         proposal.setCreatedBy(userRepository.findById(createdById)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado")));
-        
+
         if (proposalDTO.getClientId() != null) {
             proposal.setClient(clientRepository.findById(proposalDTO.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado")));
         }
-        
+
         if (proposalDTO.getLeadId() != null) {
             proposal.setLead(leadRepository.findById(proposalDTO.getLeadId())
                     .orElseThrow(() -> new ResourceNotFoundException("Lead não encontrado")));
         }
-        
+
         if (proposalDTO.getAssignedToId() != null) {
             proposal.setAssignedTo(userRepository.findById(UUID.fromString(proposalDTO.getAssignedToId().toString()))
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário responsável não encontrado")));
@@ -182,21 +183,21 @@ public class ProposalService {
         proposal.setTotalValue(proposalDTO.getTotalValue());
         proposal.setValidUntil(proposalDTO.getValidUntil());
         proposal.setDescription(proposalDTO.getDescription());
-        
+
         if (proposalDTO.getClientId() != null) {
             proposal.setClient(clientRepository.findById(proposalDTO.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado")));
         } else {
             proposal.setClient(null);
         }
-        
+
         if (proposalDTO.getLeadId() != null) {
             proposal.setLead(leadRepository.findById(proposalDTO.getLeadId())
                     .orElseThrow(() -> new ResourceNotFoundException("Lead não encontrado")));
         } else {
             proposal.setLead(null);
         }
-        
+
         if (proposalDTO.getAssignedToId() != null) {
             proposal.setAssignedTo(userRepository.findById(UUID.fromString(proposalDTO.getAssignedToId().toString()))
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário responsável não encontrado")));
@@ -265,4 +266,4 @@ public class ProposalService {
         long count = proposalRepository.countByYear(LocalDateTime.now().getYear());
         return prefix + String.format("%03d", count + 1);
     }
-} 
+}
