@@ -89,6 +89,7 @@ public class ContasAPagarReportService {
     /**
      * Gera relatório PDF de contas a pagar por status com layout padrão
      */
+    @Transactional(readOnly = true)
     public byte[] generateContasAPagarReportPDFByStatus(ExpenseStatus status) throws IOException {
         log.info("Gerando relatório PDF de contas a pagar por status: {} com layout padrão", status);
 
@@ -329,6 +330,7 @@ public class ContasAPagarReportService {
     /**
      * Gera relatório PDF de contas a pagar por empresa (sigla) com layout padrão
      */
+    @Transactional(readOnly = true)
     public byte[] generateContasAPagarReportPDFByCompany(String companySigla,
             LocalDate startDate,
             LocalDate endDate) throws IOException {
@@ -494,8 +496,17 @@ public class ContasAPagarReportService {
                 for (Invoice invoice : invoices) {
                     table.addCell(
                             createCell(invoice.getDueDate() != null ? invoice.getDueDate().format(dateFormatter) : ""));
-                    table.addCell(createCell(
-                            invoice.getSupplier() != null ? invoice.getSupplier().getName() : "Não informado"));
+
+                    // Defensive null check for lazy-loaded Supplier
+                    String supplierName = "Não informado";
+                    try {
+                        if (invoice.getSupplier() != null) {
+                            supplierName = invoice.getSupplier().getName();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Erro ao acessar fornecedor da fatura {}: {}", invoice.getId(), e.getMessage());
+                    }
+                    table.addCell(createCell(supplierName));
 
                     // Descrição (truncar se muito longa)
                     String desc = invoice.getDescription() != null ? invoice.getDescription() : "";
@@ -536,6 +547,7 @@ public class ContasAPagarReportService {
     /**
      * Gera relatório PDF de contas a pagar com layout padrão
      */
+    @Transactional(readOnly = true)
     public byte[] generateContasAPagarReportPDF(LocalDate startDate, LocalDate endDate,
             ExpenseStatus statusFilter, ExpenseType typeFilter) throws IOException {
         log.info("Gerando relatório PDF de contas a pagar com layout padrão - Período: {} a {}, Status: {}, Tipo: {}",

@@ -1298,20 +1298,6 @@ const ContasAPagar: React.FC = () => {
                       <p className="text-gray-400 text-sm mt-2">{reportData.subtitle}</p>
                       <p className="text-gray-500 text-sm">Período: {reportData.period}</p>
                     </div>
-                    <div className="flex gap-3">
-                      <Button onClick={exportToPDF} variant="outline" className="flex items-center gap-2 border-red-500/50 text-red-300 hover:bg-red-500/10 hover:text-red-200">
-                        <FileImage size={16} />
-                        PDF
-                      </Button>
-                      <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2 border-green-500/50 text-green-300 hover:bg-green-500/10 hover:text-green-200">
-                        <FileSpreadsheet size={16} />
-                        Excel
-                      </Button>
-                      <Button onClick={exportToCSV} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
-                        <Download size={16} />
-                        CSV
-                      </Button>
-                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -1379,9 +1365,9 @@ const ContasAPagar: React.FC = () => {
                                   <Badge
                                     variant="outline"
                                     className={`text-sm font-medium ${empresa === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
-                                        empresa === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
-                                          empresa === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
-                                            'border-gray-500 text-gray-300 bg-gray-500/10'
+                                      empresa === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
+                                        empresa === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
+                                          'border-gray-500 text-gray-300 bg-gray-500/10'
                                       }`}
                                   >
                                     {empresa}
@@ -1433,9 +1419,9 @@ const ContasAPagar: React.FC = () => {
                                     <Badge
                                       variant="outline"
                                       className={`text-xs font-medium ${empresaSigla === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
-                                          empresaSigla === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
-                                            empresaSigla === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
-                                              'border-gray-500 text-gray-300 bg-gray-500/10'
+                                        empresaSigla === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
+                                          empresaSigla === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
+                                            'border-gray-500 text-gray-300 bg-gray-500/10'
                                         }`}
                                     >
                                       {empresaSigla}
@@ -1506,8 +1492,8 @@ const ContasAPagar: React.FC = () => {
                                   variant={currentPage === pageNum ? "default" : "outline"}
                                   size="sm"
                                   className={`min-w-[40px] ${currentPage === pageNum
-                                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                                      : "border-gray-600 text-gray-300 hover:bg-seguranca-black"
+                                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                                    : "border-gray-600 text-gray-300 hover:bg-seguranca-black"
                                     }`}
                                 >
                                   {pageNum}
