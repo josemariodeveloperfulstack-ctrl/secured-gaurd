@@ -517,7 +517,12 @@ public class StandardReportLayoutService {
 
                 if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
                     log.debug("Carregando logo de URL: {}", logoUrl);
-                    imageData = ImageDataFactory.create(logoUrl);
+                    try {
+                        imageData = ImageDataFactory.create(logoUrl);
+                    } catch (OutOfMemoryError e) {
+                        log.error("❌ Erro de memória ao carregar logo de URL {}: imagem muito grande", logoUrl);
+                        return null;
+                    }
                 } else {
                     String logoPath = resolveLogoPath(logoUrl);
 
@@ -526,12 +531,25 @@ public class StandardReportLayoutService {
                         String publicLogoUrl = buildPublicLogoUrl(logoUrl);
                         if (publicLogoUrl != null) {
                             log.info("🔗 Carregando logo via URL pública: {}", publicLogoUrl);
-                            imageData = ImageDataFactory.create(publicLogoUrl);
+                            try {
+                                imageData = ImageDataFactory.create(publicLogoUrl);
+                            } catch (OutOfMemoryError e) {
+                                log.error("❌ Erro de memória ao carregar logo de URL pública {}: imagem muito grande",
+                                        publicLogoUrl);
+                                return null;
+                            }
                         } else {
                             return null;
                         }
                     } else {
-                        imageData = ImageDataFactory.create(logoPath);
+                        try {
+                            imageData = ImageDataFactory.create(logoPath);
+                        } catch (OutOfMemoryError e) {
+                            log.error(
+                                    "❌ Erro de memória ao carregar logo do caminho {}: imagem muito grande. Tamanho do arquivo: {} bytes",
+                                    logoPath, Files.size(Paths.get(logoPath)));
+                            return null;
+                        }
                     }
                 }
 
@@ -557,6 +575,9 @@ public class StandardReportLayoutService {
             return image;
         } catch (MalformedURLException e) {
             log.error("Erro ao criar URL da imagem do logo: {}", e.getMessage(), e);
+            return null;
+        } catch (OutOfMemoryError e) {
+            log.error("❌ Erro de memória ao processar logo da empresa {}: imagem muito grande", company.getName());
             return null;
         } catch (Exception e) {
             log.error("Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage(), e);

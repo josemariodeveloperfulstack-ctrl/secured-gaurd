@@ -273,7 +273,7 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
@@ -282,6 +282,7 @@ public class ContasAPagarReportService {
                 table.addHeaderCell(createHeaderCell("Tipo"));
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Empresa"));
                 table.addHeaderCell(createHeaderCell("Nº Fatura"));
 
                 // Dados
@@ -307,6 +308,8 @@ public class ContasAPagarReportService {
                                                     .toString().replace(".", ",")
                                             : ""));
                     table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
+                    table.addCell(createCell(
+                            invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
                     table.addCell(createCell(invoice.getInvoiceNumber() != null ? invoice.getInvoiceNumber() : ""));
                 }
 
@@ -376,22 +379,43 @@ public class ContasAPagarReportService {
         log.info("Gerando relatório PDF de contas a pagar com iText - {} contas para empresa {}", invoices.size(),
                 companySigla);
 
-        // Determinar companyId - usar primeira empresa ativa
+        // Determinar companyId baseado no companySigla
         java.util.UUID companyId = null;
-        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
-        if (activeCompanies != null && !activeCompanies.isEmpty()) {
-            companyId = activeCompanies.get(0).getId();
-            log.info("Usando primeira empresa ativa: {} (ID: {})",
-                    activeCompanies.get(0).getName(), companyId);
-        } else {
-            List<Company> allCompanies = companyRepository.findAll();
-            if (allCompanies != null && !allCompanies.isEmpty()) {
-                companyId = allCompanies.get(0).getId();
-                log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})",
-                        allCompanies.get(0).getName(), companyId);
+        Company selectedCompany = null;
+
+        // Se não for "TODAS", buscar a empresa específica pela sigla
+        if (!"TODAS".equalsIgnoreCase(companySigla)) {
+            Optional<Company> companyOpt = companyRepository.findBySigla(companySigla);
+            if (companyOpt.isPresent()) {
+                selectedCompany = companyOpt.get();
+                companyId = selectedCompany.getId();
+                log.info("Usando empresa específica: {} (ID: {}, Sigla: {})",
+                        selectedCompany.getName(), companyId, companySigla);
             } else {
-                throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
-                        "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                log.warn("Empresa com sigla {} não encontrada. Usando empresa padrão.", companySigla);
+            }
+        }
+
+        // Se for "TODAS" ou empresa não encontrada, usar primeira empresa ativa (padrão
+        // Vigilância)
+        if (companyId == null) {
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                selectedCompany = activeCompanies.get(0);
+                companyId = selectedCompany.getId();
+                log.info("Usando primeira empresa ativa (padrão): {} (ID: {})",
+                        selectedCompany.getName(), companyId);
+            } else {
+                List<Company> allCompanies = companyRepository.findAll();
+                if (allCompanies != null && !allCompanies.isEmpty()) {
+                    selectedCompany = allCompanies.get(0);
+                    companyId = selectedCompany.getId();
+                    log.warn("Nenhuma empresa ativa encontrada. Usando primeira empresa cadastrada: {} (ID: {})",
+                            selectedCompany.getName(), companyId);
+                } else {
+                    throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
+                            "Nenhuma empresa cadastrada no sistema. Por favor, cadastre pelo menos uma empresa.");
+                }
             }
         }
 
@@ -481,7 +505,7 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
@@ -490,6 +514,7 @@ public class ContasAPagarReportService {
                 table.addHeaderCell(createHeaderCell("Tipo"));
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Empresa"));
                 table.addHeaderCell(createHeaderCell("Nº Fatura"));
 
                 // Dados
@@ -524,6 +549,8 @@ public class ContasAPagarReportService {
                                                     .toString().replace(".", ",")
                                             : ""));
                     table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
+                    table.addCell(createCell(
+                            invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
                     table.addCell(createCell(invoice.getInvoiceNumber() != null ? invoice.getInvoiceNumber() : ""));
                 }
 
@@ -712,7 +739,7 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
@@ -721,6 +748,7 @@ public class ContasAPagarReportService {
                 table.addHeaderCell(createHeaderCell("Tipo"));
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Empresa"));
                 table.addHeaderCell(createHeaderCell("Nº Fatura"));
 
                 // Dados
@@ -746,6 +774,8 @@ public class ContasAPagarReportService {
                                                     .toString().replace(".", ",")
                                             : ""));
                     table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
+                    table.addCell(createCell(
+                            invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
                     table.addCell(createCell(invoice.getInvoiceNumber() != null ? invoice.getInvoiceNumber() : ""));
                 }
 
