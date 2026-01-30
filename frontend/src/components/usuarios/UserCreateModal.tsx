@@ -39,7 +39,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     name: '',
     password: '',
     confirmPassword: '',
-    role: '' as UserRole,
+    roles: [] as string[],
     whatsapp: '',
   });
 
@@ -52,7 +52,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
 
   const handleSave = async () => {
     // Validações
-    if (!formData.username || !formData.email || !formData.name || !formData.password || !formData.role) {
+    if (!formData.username || !formData.email || !formData.name || !formData.password || formData.roles.length === 0) {
       toast({
         title: 'Erro!',
         description: 'Todos os campos obrigatórios devem ser preenchidos.',
@@ -97,7 +97,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         email: formData.email,
         name: formData.name,
         password: formData.password,
-        roles: [formData.role], // Backend espera array de STRINGS!
+        roles: formData.roles, // Backend espera array de STRINGS!
         whatsapp: formData.whatsapp || undefined,
         status: "ACTIVE",
         active: true
@@ -116,7 +116,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         name: '',
         password: '',
         confirmPassword: '',
-        role: '' as UserRole,
+        roles: [] as string[],
         whatsapp: '',
       });
 
@@ -141,7 +141,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
       name: '',
       password: '',
       confirmPassword: '',
-      role: '' as UserRole,
+      roles: [] as string[],
       whatsapp: '',
     });
     onClose();
@@ -152,7 +152,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     formData.name &&
     formData.password &&
     formData.confirmPassword &&
-    formData.role &&
+    formData.roles.length > 0 &&
     formData.password === formData.confirmPassword &&
     formData.password.length >= 6;
 
@@ -222,17 +222,53 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="role" className="text-seguranca-lightgray">
-                    Permissão *
+                    Permissões *
                   </Label>
+
+                  {/* Selected Roles Display */}
+                  <div className="flex flex-wrap gap-2 mb-2 p-2 bg-seguranca-black border border-gray-600 rounded-md min-h-[42px]">
+                    {formData.roles.length === 0 ? (
+                      <span className="text-gray-500 text-sm">Nenhuma permissão selecionada</span>
+                    ) : (
+                      formData.roles.map((role) => (
+                        <Badge
+                          key={role}
+                          className={`${getRoleColor(role)} flex items-center gap-1`}
+                        >
+                          {getRoleDisplayName(role)}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                roles: prev.roles.filter(r => r !== role)
+                              }));
+                            }}
+                            className="ml-1 hover:text-red-300"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Available Roles */}
                   <Select
-                    value={formData.role}
-                    onValueChange={(value) => handleInputChange('role', value as UserRole)}
+                    onValueChange={(value) => {
+                      if (!formData.roles.includes(value)) {
+                        setFormData(prev => ({
+                          ...prev,
+                          roles: [...prev.roles, value]
+                        }));
+                      }
+                    }}
                   >
                     <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione a permissão" />
+                      <SelectValue placeholder="Adicionar permissão..." />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-600">
-                      {USER_ROLE_LIST.map((role) => (
+                      {USER_ROLE_LIST.filter(role => !formData.roles.includes(role)).map((role) => (
                         <SelectItem key={role} value={role}>
                           <div className="flex items-center gap-2">
                             <Badge className={getRoleColor(role)}>

@@ -44,7 +44,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     name: '',
     email: '',
     username: '',
-    role: '',
+    roles: [] as string[],
     active: true,
     whatsapp: '',
     password: '',
@@ -65,11 +65,16 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
 
   useEffect(() => {
     if (user) {
+      // Extrair todas as roles do usuário
+      const userRoles = user.roles && user.roles.length > 0
+        ? user.roles.map(role => typeof role === 'string' ? role : (role as { name: string }).name)
+        : [];
+
       setFormData({
         name: user.name || '',
         email: user.email || '',
         username: user.username || '',
-        role: user.roles && user.roles.length > 0 ? (typeof user.roles[0] === 'string' ? user.roles[0] as string : (user.roles[0] as { name: string }).name) : '',
+        roles: userRoles,
         active: user.active !== false,
         whatsapp: user.whatsapp || '',
         password: '',
@@ -171,7 +176,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         name: formData.name,
         email: formData.email,
         username: formData.username,
-        roles: formData.role ? [formData.role] : [],
+        roles: formData.roles,
         active: formData.active,
         whatsapp: formData.whatsapp,
         avatar: formData.avatar || '',
@@ -369,17 +374,53 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="role" className="text-seguranca-lightgray">
-                    Permissão *
+                    Permissões *
                   </Label>
+
+                  {/* Selected Roles Display */}
+                  <div className="flex flex-wrap gap-2 mb-2 p-2 bg-seguranca-black border border-gray-600 rounded-md min-h-[42px]">
+                    {formData.roles.length === 0 ? (
+                      <span className="text-gray-500 text-sm">Nenhuma permissão selecionada</span>
+                    ) : (
+                      formData.roles.map((role) => (
+                        <Badge
+                          key={role}
+                          className={`${getRoleColor(role)} flex items-center gap-1`}
+                        >
+                          {getRoleDisplayName(role)}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                roles: prev.roles.filter(r => r !== role)
+                              }));
+                            }}
+                            className="ml-1 hover:text-red-300"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Available Roles */}
                   <Select
-                    value={formData.role}
-                    onValueChange={(value) => handleInputChange('role', value as UserRole)}
+                    onValueChange={(value) => {
+                      if (!formData.roles.includes(value)) {
+                        setFormData(prev => ({
+                          ...prev,
+                          roles: [...prev.roles, value]
+                        }));
+                      }
+                    }}
                   >
                     <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione a permissão" />
+                      <SelectValue placeholder="Adicionar permissão..." />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-600">
-                      {USER_ROLE_LIST.map((role) => (
+                      {USER_ROLE_LIST.filter(role => !formData.roles.includes(role)).map((role) => (
                         <SelectItem key={role} value={role}>
                           <div className="flex items-center gap-2">
                             <Badge className={getRoleColor(role)}>
@@ -682,7 +723,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isLoading || !formData.name || !formData.email || !formData.username || !formData.role}
+            disabled={isLoading || !formData.name || !formData.email || !formData.username || formData.roles.length === 0}
             className="bg-seguranca-red hover:bg-seguranca-darkred"
           >
             <Save className="h-4 w-4 mr-2" />
