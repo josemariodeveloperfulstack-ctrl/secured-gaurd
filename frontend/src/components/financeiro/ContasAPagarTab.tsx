@@ -1084,7 +1084,7 @@ const ContasAPagarTab: React.FC = () => {
                   <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Início</label>
                   <input
                     type="date"
-                    value={format(reportFilters.startDate, 'yyyy-MM-dd')}
+                    value={reportFilters.startDate ? format(reportFilters.startDate, 'yyyy-MM-dd') : ''}
                     onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: new Date(e.target.value) }))}
                     className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   />
@@ -1093,7 +1093,7 @@ const ContasAPagarTab: React.FC = () => {
                   <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Fim</label>
                   <input
                     type="date"
-                    value={format(reportFilters.endDate, 'yyyy-MM-dd')}
+                    value={reportFilters.endDate ? format(reportFilters.endDate, 'yyyy-MM-dd') : ''}
                     onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: new Date(e.target.value) }))}
                     className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   />
@@ -1297,9 +1297,9 @@ const ContasAPagarTab: React.FC = () => {
                                 <Badge
                                   variant="outline"
                                   className={`text-sm font-medium ${empresa === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
-                                      empresa === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
-                                        empresa === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
-                                          'border-gray-500 text-gray-300 bg-gray-500/10'
+                                    empresa === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
+                                      empresa === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
+                                        'border-gray-500 text-gray-300 bg-gray-500/10'
                                     }`}
                                 >
                                   {empresa}
@@ -1351,9 +1351,9 @@ const ContasAPagarTab: React.FC = () => {
                                   <Badge
                                     variant="outline"
                                     className={`text-xs font-medium ${empresaSigla === 'ADM' ? 'border-blue-500 text-blue-300 bg-blue-500/10' :
-                                        empresaSigla === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
-                                          empresaSigla === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
-                                            'border-gray-500 text-gray-300 bg-gray-500/10'
+                                      empresaSigla === 'TERC' ? 'border-green-500 text-green-300 bg-green-500/10' :
+                                        empresaSigla === 'VIG' ? 'border-purple-500 text-purple-300 bg-purple-500/10' :
+                                          'border-gray-500 text-gray-300 bg-gray-500/10'
                                       }`}
                                   >
                                     {empresaSigla}
@@ -1423,8 +1423,8 @@ const ContasAPagarTab: React.FC = () => {
                                 variant={currentPage === pageNum ? "default" : "outline"}
                                 size="sm"
                                 className={`min-w-[40px] ${currentPage === pageNum
-                                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                                    : "border-gray-600 text-gray-300 hover:bg-seguranca-black"
+                                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                                  : "border-gray-600 text-gray-300 hover:bg-seguranca-black"
                                   }`}
                               >
                                 {pageNum}
