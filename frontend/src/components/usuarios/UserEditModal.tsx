@@ -369,14 +369,14 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="role" className="text-seguranca-lightgray">
-                    Função *
+                    Permissão *
                   </Label>
                   <Select
                     value={formData.role}
                     onValueChange={(value) => handleInputChange('role', value as UserRole)}
                   >
                     <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione a função" />
+                      <SelectValue placeholder="Selecione a permissão" />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-600">
                       {USER_ROLE_LIST.map((role) => (

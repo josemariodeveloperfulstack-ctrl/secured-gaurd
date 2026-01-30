@@ -108,7 +108,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         title: 'Sucesso!',
         description: 'Usuário criado com sucesso.',
       });
-      
+
       // Limpar formulário
       setFormData({
         username: '',
@@ -119,7 +119,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         role: '' as UserRole,
         whatsapp: '',
       });
-      
+
       onSave();
       onClose();
     } catch (error: any) {
@@ -147,14 +147,14 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     onClose();
   };
 
-  const isFormValid = formData.username && 
-                     formData.email && 
-                     formData.name && 
-                     formData.password && 
-                     formData.confirmPassword && 
-                     formData.role &&
-                     formData.password === formData.confirmPassword &&
-                     formData.password.length >= 6;
+  const isFormValid = formData.username &&
+    formData.email &&
+    formData.name &&
+    formData.password &&
+    formData.confirmPassword &&
+    formData.role &&
+    formData.password === formData.confirmPassword &&
+    formData.password.length >= 6;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -222,14 +222,14 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="role" className="text-seguranca-lightgray">
-                    Função *
+                    Permissão *
                   </Label>
                   <Select
                     value={formData.role}
                     onValueChange={(value) => handleInputChange('role', value as UserRole)}
                   >
                     <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Selecione a função" />
+                      <SelectValue placeholder="Selecione a permissão" />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-600">
                       {USER_ROLE_LIST.map((role) => (
@@ -344,7 +344,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
             <CardContent>
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">
-                  <strong>Nota:</strong> Após a criação, o usuário poderá fazer login imediatamente 
+                  <strong>Nota:</strong> Após a criação, o usuário poderá fazer login imediatamente
                   com as credenciais fornecidas. Recomenda-se que o usuário altere sua senha no primeiro acesso.
                 </p>
               </div>
