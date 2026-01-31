@@ -107,7 +107,7 @@ export const NotificationBell: React.FC = () => {
               // Tablet (Dropdown)
               "sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[450px] sm:rounded-lg",
               // Desktop (Drawer - Lateral Direito)
-              "lg:fixed lg:inset-y-0 lg:right-0 lg:left-auto lg:top-0 lg:mt-0 lg:w-[500px] lg:h-full lg:rounded-l-2xl lg:rounded-r-none lg:border-l lg:border-y-0 lg:border-r-0 lg:shadow-[0_0_50px_rgba(0,0,0,0.5)]",
+              "lg:fixed lg:inset-y-0 lg:right-0 lg:left-auto lg:top-0 lg:mt-0 lg:w-[380px] lg:h-full lg:rounded-l-2xl lg:rounded-r-none lg:border-l lg:border-y-0 lg:border-r-0 lg:shadow-[0_0_50px_rgba(0,0,0,0.5)]",
               // Altura
               "max-h-[80vh] sm:max-h-[600px] lg:max-h-screen",
               // Animação

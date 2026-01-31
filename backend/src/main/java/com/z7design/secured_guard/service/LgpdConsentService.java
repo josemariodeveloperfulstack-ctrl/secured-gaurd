@@ -30,14 +30,38 @@ public class LgpdConsentService {
      * Registra consentimento do usuário
      */
     public UserConsent registerConsent(
-        UUID userId,
-        ConsentType consentType,
-        String ipAddress,
-        String userAgent,
-        BigDecimal latitude,
-        BigDecimal longitude
-    ) {
+            UUID userId,
+            ConsentType consentType,
+            String ipAddress,
+            String userAgent,
+            BigDecimal latitude,
+            BigDecimal longitude) {
         log.info("📝 Registrando consentimento {} para usuário {}", consentType, userId);
+
+        // Check if consent already exists for this version
+        var existingConsent = consentRepository.findByUserIdAndConsentTypeAndTermVersion(
+                userId, consentType, CURRENT_TERM_VERSION);
+
+        if (existingConsent.isPresent()) {
+            UserConsent consent = existingConsent.get();
+            if (Boolean.TRUE.equals(consent.getAccepted())) {
+                log.info("✅ Consentimento {} já registrado e aceito para usuário {} (Idempotente)", consentType,
+                        userId);
+                return consent;
+            } else {
+                log.info("📝 Atualizando consentimento {} existente para usuário {}", consentType, userId);
+                consent.setAccepted(true);
+                consent.setAcceptedAt(LocalDateTime.now());
+                consent.setIpAddress(ipAddress);
+                consent.setUserAgent(userAgent);
+                consent.setLatitude(latitude);
+                consent.setLongitude(longitude);
+                consent.setRevoked(false);
+                consent.setRevokedAt(null);
+                consent.setRevokedReason(null);
+                return consentRepository.save(consent);
+            }
+        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -131,4 +155,3 @@ public class LgpdConsentService {
         return user.getFirstAccessCompleted() != null && user.getFirstAccessCompleted();
     }
 }
-

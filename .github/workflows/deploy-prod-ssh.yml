@@ -1,0 +1,71 @@
+name: 🚀 Deploy PROD (Git Pull Strategy)
+
+on:
+  push:
+    branches:
+      - prod
+  workflow_dispatch:
+
+env:
+  ENVIRONMENT: prod
+  APP_URL: https://securedguard.z7botsolutions.com.br
+
+jobs:
+  deploy:
+    name: 🚀 Deploy to PROD VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔑 Install sshpass
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST_PROD }} >> ~/.ssh/known_hosts
+
+      - name: 🚀 Deploy via SSH
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER_PROD }}@${{ secrets.VPS_HOST_PROD }} << 'EOF'
+            # 1. Go to project root
+            cd /var/www/secured_guard/prod
+
+            # 2. Get latest code
+            git pull origin prod
+
+            # 2.5 Create/Update .env file with secrets
+            echo "POSTGRES_PASSWORD_PROD=${{ secrets.POSTGRES_PASSWORD_PROD }}" > deploy/.env
+            echo "REDIS_PASSWORD_PROD=${{ secrets.REDIS_PASSWORD_PROD }}" >> deploy/.env
+            echo "JWT_SECRET_PROD=${{ secrets.JWT_SECRET_PROD }}" >> deploy/.env
+            echo "MAIL_HOST=${{ secrets.MAIL_HOST }}" >> deploy/.env
+            echo "MAIL_PORT=${{ secrets.MAIL_PORT }}" >> deploy/.env
+            echo "MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}" >> deploy/.env
+            echo "MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}" >> deploy/.env
+
+            # 3. Create network if missing
+            if ! docker network ls | grep -q "secured-guard"; then
+              docker network create secured-guard
+            fi
+
+            # 4. Point to deploy/docker-compose.prod.yml
+            # This uses relative path "../backend" in build context which works from here
+            docker-compose -f deploy/docker-compose.prod.yml up -d --build
+          EOF
+
+      - name: 🏥 Health Check
+        run: |
+          echo "⏳ Waiting for service startup (60s)..."
+          sleep 60
+
+          for i in {1..10}; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" https://securedguard.z7botsolutions.com.br/api/health || echo 000)
+            echo "Attempt $i - HTTP $CODE"
+            if [ "$CODE" = "200" ]; then
+              echo "✅ PROD Deployment Successful!"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "❌ Health check failed after 10 attempts."
+          # Optional: Do not fail build if health check endpoint is protected or behaves differently
+          # exit 1 

@@ -14,7 +14,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { User, Mail, Shield, Users, Save, X } from 'lucide-react';
+import { User, Mail, Shield, Users, Save, X, Check, ChevronsUpDown } from 'lucide-react';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import { User as UserType, UserRole } from '@/types/user';
 import { getRoleDisplayName, getRoleColor, USER_ROLE_LIST } from '@/utils/permissions';
 import { userService } from '@/services/userService';
@@ -210,13 +224,33 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     }
   };
 
-  const handleAddPermission = async (permissionId: string) => {
+  const handleSavePermissions = async () => {
     if (!user) return;
+    const currentPermissionIds = individualPermissions.map(p => p.id);
+    // Find permissions to add
+    const toAdd = formData.roles.length > 0 ? [] : []; // Logic placeholder if needed? No.
+    // Actually we need a local state for selection if we want "Save Selected".
+    // But Op Option A said "Search & Select multiple... Button Add Selected".
+    // Let's implement immediate toggle for better UX or batch?
+    // Batch is safer.
+    // Let's add a local state `selectedPermissionIds`.
+  };
+
+  // NEW LOGIC: Multi-Select state
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState<string[]>([]);
+  const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+
+  const handleAddSelectedPermissions = async () => {
+    if (!user || selectedPermissionIds.length === 0) return;
     setIsPermLoading(true);
     try {
-      const updated = await userService.addUserPermissions(user.id, [permissionId]);
+      const updated = await userService.addUserPermissions(user.id, selectedPermissionIds);
       setIndividualPermissions(updated);
-      toast({ title: 'Permissão adicionada!' });
+      setSelectedPermissionIds([]);
+      setIsComboboxOpen(false);
+      toast({ title: 'Permissões adicionadas com sucesso!' });
+    } catch (e) {
+      toast({ title: 'Erro ao adicionar permissões', variant: 'destructive' });
     } finally {
       setIsPermLoading(false);
     }
@@ -692,20 +726,79 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                     </Badge>
                   ))}
                 </div>
-                <Select onValueChange={handleAddPermission}>
-                  <SelectTrigger className="w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                    <SelectValue placeholder="Adicionar permissão individual..." />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {allPermissions
-                      .filter(p => !individualPermissions.some(ip => ip.id === p.id))
-                      .map((perm) => (
-                        <SelectItem key={perm.id} value={perm.id}>
-                          {perm.description || perm.name} <span className="text-xs text-gray-400 ml-2">({perm.name})</span>
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={isComboboxOpen}
+                          className="w-full justify-between bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black/80 hover:text-white"
+                        >
+                          {selectedPermissionIds.length > 0
+                            ? `${selectedPermissionIds.length} permissões selecionadas`
+                            : "Selecione permissões para adicionar..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0 bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                        <Command className="bg-seguranca-black text-seguranca-lightgray">
+                          <CommandInput placeholder="Buscar permissão..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>Nenhuma permissão encontrada.</CommandEmpty>
+                            <CommandGroup className="max-h-[300px] overflow-auto">
+                              {allPermissions
+                                .filter(p => !individualPermissions.some(ip => ip.id === p.id))
+                                .map((perm) => (
+                                  <CommandItem
+                                    key={perm.id}
+                                    value={perm.name} // Search by name
+                                    onSelect={() => {
+                                      setSelectedPermissionIds(prev =>
+                                        prev.includes(perm.id)
+                                          ? prev.filter(id => id !== perm.id)
+                                          : [...prev, perm.id]
+                                      );
+                                    }}
+                                    className="cursor-pointer hover:bg-gray-800 aria-selected:bg-gray-800"
+                                  >
+                                    <div className="flex items-center gap-2 w-full">
+                                      <div className={cn(
+                                        "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                        selectedPermissionIds.includes(perm.id)
+                                          ? "bg-primary text-primary-foreground"
+                                          : "opacity-50 [&_svg]:invisible"
+                                      )}>
+                                        <Check className={cn("h-4 w-4", selectedPermissionIds.includes(perm.id) ? "opacity-100" : "opacity-0")} />
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span>{perm.description || perm.name}</span>
+                                        <span className="text-xs text-gray-500">{perm.name}</span>
+                                      </div>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      onClick={handleAddSelectedPermissions}
+                      disabled={selectedPermissionIds.length === 0 || isPermLoading}
+                      className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-500"
+                    >
+                      {isPermLoading ? '...' : <Check className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {/* Feedback selection */}
+                  {selectedPermissionIds.length > 0 && (
+                    <p className="text-xs text-gray-400">
+                      Clique no botão amarelo para confirmar a adição de {selectedPermissionIds.length} permissões.
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
