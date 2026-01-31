@@ -46,19 +46,15 @@ jobs:
           GIT_USER: ${{ secrets.USER_GITHUB }}
           GIT_TOKEN: ${{ secrets.TOKEN_GITHUB }}
         run: |
-          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" << 'EOF'
-            set -e
-            cd /var/www/secured_guard/prod
-
-            # Safely create .env without shell expansion using external env vars
-            # Note: Variables below like $PG_PASS come from the GitHub Actions environment 
-            # injected into the SSH session if we were using envs, but here we 
-            # need to pass them explicitly because sshpass doesn't automatically forward them.
-          EOF
-
-          # To pass variables safely to the EOF block in sshpass, we'll use a slightly different syntax
-          # that avoids local shell expansion of sensitive chars.
+          echo "🔍 Step 1: Connectivity check (Port 22)"
+          nc -zv -w 5 $VPS_HOST 22 || echo "⚠️ Warning: Cannot connect to $VPS_HOST on port 22. This might explain the timeout/reset."
           
+          echo "🔍 Step 2: Detailed SSH Debug Handshake"
+          sshpass -p "$VPS_PASSWORD" ssh -vvv -o StrictHostKeyChecking=no -o ConnectTimeout=15 "$VPS_USER@$VPS_HOST" "echo 'SSH Connection Successful!'" || {
+            echo "❌ Detailed SSH Handshake failed. Check logs above for 'connection reset' or 'denied' messages."
+          }
+
+          echo "🚀 Step 3: Executing Deployment Script"
           sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" \
             PG_PASS="$PG_PASS" RD_PASS="$RD_PASS" JWT_SEC="$JWT_SEC" \
             ML_HOST="$ML_HOST" ML_PORT="$ML_PORT" ML_USER="$ML_USER" ML_PASS="$ML_PASS" \
@@ -88,8 +84,7 @@ jobs:
               cd deploy
               docker-compose -f docker-compose.prod.yml build --no-cache
               docker-compose -f docker-compose.prod.yml up -d --force-recreate
-EOF
-
+          EOF
       - name: 🏥 Health Check
         run: |
           echo "⏳ Waiting for service startup (60s)..."
