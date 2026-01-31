@@ -46,7 +46,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional
     public AuthenticationResponse register(RegisterRequest request) {
         log.info("Starting user registration for username: {}", request.getUsername());
-        
+
         if (userRepository.existsByUsername(request.getUsername())) {
             log.warn("Username already exists: {}", request.getUsername());
             throw new IllegalArgumentException("Username already exists");
@@ -71,10 +71,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             }
         } else {
             Role defaultRole = roleRepository.findByName("COLABORADOR")
-                .orElseThrow(() -> new IllegalArgumentException("Role padrão COLABORADOR não encontrado"));
+                    .orElseThrow(() -> new IllegalArgumentException("Role padrão COLABORADOR não encontrado"));
             userRoles = java.util.Set.of(defaultRole);
         }
-        
+
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
@@ -88,7 +88,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         log.info("Saving user: {}", user.getUsername());
         User savedUser = userRepository.save(user);
         log.info("User saved successfully with ID: {}", savedUser.getId());
-        
+
         // Verify the user was actually saved
         User verifyUser = userRepository.findById(savedUser.getId()).orElse(null);
         if (verifyUser == null) {
@@ -99,16 +99,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         String jwtToken = jwtService.generateToken(savedUser);
         String refreshToken = jwtService.generateRefreshToken(savedUser);
-        
+
         // Buscar permissões customizadas
         java.util.List<String> customPermissions = customPermissionService.getActivePermissions(savedUser.getId());
-        
+
         log.info("Registration completed successfully for user: {}", savedUser.getUsername());
-        
+
         return AuthenticationResponse.builder()
                 .token(jwtToken)
                 .refreshToken(refreshToken)
                 .user(UserResponse.builder()
+                        .id(savedUser.getId().toString())
                         .username(savedUser.getUsername())
                         .email(savedUser.getEmail())
                         .fullName(savedUser.getName())
@@ -122,20 +123,20 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         try {
             log.info("🔐 Tentando autenticar usuário: {}", request.getUsername());
-            
+
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-            
+
             User user = userRepository.findByUsername(request.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found"));
-            
+
             log.info("✅ Usuário encontrado: {} (ID: {})", user.getUsername(), user.getId());
-            
+
             String jwtToken = jwtService.generateToken(user);
             String refreshToken = jwtService.generateRefreshToken(user);
-            
+
             log.info("🔑 Tokens gerados com sucesso");
-            
+
             // Buscar permissões customizadas (com tratamento de erro)
             java.util.List<String> customPermissions = java.util.Collections.emptyList();
             try {
@@ -144,7 +145,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             } catch (Exception e) {
                 log.error("⚠️ Erro ao buscar permissões customizadas (usando lista vazia): {}", e.getMessage());
             }
-            
+
             // Buscar roles (com verificação de null)
             java.util.List<String> roles = java.util.Collections.emptyList();
             try {
@@ -168,7 +169,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             } catch (Exception e) {
                 log.error("⚠️ Erro ao buscar roles (usando lista vazia): {}", e.getMessage(), e);
             }
-            
+
             // Verificar status de LGPD e segurança (com tratamento de erro)
             boolean requiresLgpdConsent = false;
             try {
@@ -177,7 +178,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             } catch (Exception e) {
                 log.error("⚠️ Erro ao verificar consentimento LGPD (assumindo false): {}", e.getMessage());
             }
-            
+
             boolean requires2FA = false;
             try {
                 requires2FA = twoFactorAuthService.is2FAEnabled(user.getId());
@@ -185,12 +186,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             } catch (Exception e) {
                 log.error("⚠️ Erro ao verificar 2FA (assumindo false): {}", e.getMessage());
             }
-            
+
             boolean requiresPasswordChange = user.getRequirePasswordChange() != null && user.getRequirePasswordChange();
             boolean firstAccessCompleted = user.getFirstAccessCompleted() != null && user.getFirstAccessCompleted();
-            
+
             log.info("✅ Autenticação concluída com sucesso para usuário: {}", user.getUsername());
-            
+
             return AuthenticationResponse.builder()
                     .token(jwtToken)
                     .refreshToken(refreshToken)
@@ -235,6 +236,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                         .token(accessToken)
                         .refreshToken(newRefreshToken)
                         .user(UserResponse.builder()
+                                .id(user.getId().toString())
                                 .username(user.getUsername())
                                 .email(user.getEmail())
                                 .fullName(user.getName())
@@ -258,7 +260,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (authentication == null || authentication.getPrincipal() == null) {
             throw new RuntimeException("No authentication found");
         }
-        
+
         String username = authentication.getName();
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));

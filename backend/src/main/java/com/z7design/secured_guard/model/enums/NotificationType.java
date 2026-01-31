@@ -5,5 +5,9 @@ public enum NotificationType {
     TIME_RECORD,
     EVALUATION,
     BENEFIT,
-    SYSTEM
-} 
+    SYSTEM,
+    INFO,
+    WARNING,
+    ERROR
+
+}

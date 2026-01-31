@@ -20,18 +20,18 @@ export const unifiedDocumentService = {
       // Verificar se é um colaborador para adicionar filtro por CPF
       const userStr = localStorage.getItem('user');
       let cpfParam = '';
-      
+
       if (userStr) {
         const user = JSON.parse(userStr);
         console.log('👤 UnifiedDocumentService - Usuário logado:', user.name, 'Role:', user.role);
-        
+
         // Se for COLABORADOR, adicionar filtro por CPF (username é o CPF)
         if (user.role === 'COLABORADOR' && user.username) {
           console.log('🔒 UnifiedDocumentService - Filtrando por CPF:', user.username);
           cpfParam = `?cpf=${user.username}`;
         }
       }
-      
+
       // Tentar primeiro o endpoint protegido (quando as permissões estiverem funcionando)
       try {
         const response = await api.get(`/unified-documents/list${cpfParam}`);
@@ -41,7 +41,7 @@ export const unifiedDocumentService = {
         return normalizeDocuments(response.data || []);
       } catch (protectedError) {
         console.warn('Endpoint protegido falhou, tentando público:', protectedError);
-        
+
         // Fallback para endpoint público
         const publicResponse = await api.get(`/unified-documents/public/list${cpfParam}`);
         if (publicResponse.data && publicResponse.data.documents) {
@@ -92,6 +92,13 @@ export const unifiedDocumentService = {
   },
 
   /**
+   * Alias para fetchUnifiedDocumentBlob para manter consistência
+   */
+  async downloadUnifiedDocumentBlob(fileName: string): Promise<Blob> {
+    return this.fetchUnifiedDocumentBlob(fileName);
+  },
+
+  /**
    * Visualiza um documento unificado em nova aba
    */
   async viewUnifiedDocument(fileName: string): Promise<void> {
@@ -114,14 +121,14 @@ export const unifiedDocumentService = {
       // Criar AbortController para timeout de 30 segundos
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos
-      
+
       try {
         // Adicionar timestamp para evitar cache quando forçar refresh
         const params: any = {};
         if (forceRefresh) {
           params._t = Date.now(); // Cache-busting
         }
-        
+
         const response = await api.get('/api/unified-documents/organization', {
           params,
           signal: controller.signal,
@@ -131,13 +138,13 @@ export const unifiedDocumentService = {
         return response.data;
       } catch (error: any) {
         clearTimeout(timeoutId);
-        
+
         // Verificar se foi cancelado por timeout
         if (error.name === 'AbortError' || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
           console.error('⏱️ Timeout ao buscar organização de documentos unificados (30s)');
           throw new Error('A requisição demorou muito para responder. Tente novamente ou use filtros para reduzir a quantidade de dados.');
         }
-        
+
         throw error;
       }
     } catch (error) {

@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import holeriteService, { Holerite } from '@/services/holeriteService';
-import { Loader2, Calendar, Download, Eye, FileText } from 'lucide-react';
+import receiptService, { Receipt } from '@/services/receiptService';
+import { Loader2, Calendar, Download, Eye, FileText, CheckCircle, File, AlertCircle } from 'lucide-react';
+import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
 
 const monthNames: Record<number, string> = {
   1: 'Janeiro',
@@ -30,21 +32,32 @@ const formatMonth = (month: number) => monthNames[month] ?? `Mês ${month}`;
 const MeusHoleritesContent: React.FC = () => {
   const { toast } = useToast();
   const [holerites, setHolerites] = useState<Holerite[]>([]);
+  const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Preview State
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<any>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await holeriteService.getAllHolerites();
-        setHolerites(data || []);
+        const [holeritesData, receiptsData] = await Promise.all([
+          holeriteService.getAllHolerites(),
+          receiptService.getAllReceipts()
+        ]);
+        setHolerites(holeritesData || []);
+        setReceipts(receiptsData || []);
       } catch (err: any) {
-        console.error('Erro ao carregar holerites do colaborador', err);
-        setError(err?.response?.data?.message || 'Não foi possível carregar seus holerites.');
+        console.error('Erro ao carregar documentos do colaborador', err);
+        setError(err?.response?.data?.message || 'Não foi possível carregar seus documentos.');
         toast({
-          title: 'Erro ao carregar holerites',
+          title: 'Erro ao carregar documentos',
           description: err?.response?.data?.message || 'Tente novamente mais tarde.',
           variant: 'destructive',
         });
@@ -57,26 +70,24 @@ const MeusHoleritesContent: React.FC = () => {
   }, [toast]);
 
   const groupedByYearAndMonth = useMemo(() => {
-    const grouped: Record<number, Record<number, Holerite[]>> = {};
+    const grouped: Record<number, Record<number, any[]>> = {};
 
-    holerites.forEach((holerite) => {
-      if (!holerite.year || !holerite.month) {
-        return;
-      }
+    const addItems = (items: any[], type: 'holerite' | 'receipt') => {
+      items.forEach((item) => {
+        if (!item.year || !item.month) return;
 
-      if (!grouped[holerite.year]) {
-        grouped[holerite.year] = {};
-      }
+        if (!grouped[item.year]) grouped[item.year] = {};
+        if (!grouped[item.year][item.month]) grouped[item.year][item.month] = [];
 
-      if (!grouped[holerite.year][holerite.month]) {
-        grouped[holerite.year][holerite.month] = [];
-      }
+        grouped[item.year][item.month].push({ ...item, docType: type });
+      });
+    };
 
-      grouped[holerite.year][holerite.month].push(holerite);
-    });
+    addItems(holerites, 'holerite');
+    addItems(receipts, 'receipt');
 
     return grouped;
-  }, [holerites]);
+  }, [holerites, receipts]);
 
   const years = useMemo(() => {
     return Object.keys(groupedByYearAndMonth)
@@ -84,47 +95,89 @@ const MeusHoleritesContent: React.FC = () => {
       .sort((a, b) => b - a);
   }, [groupedByYearAndMonth]);
 
-  const handleDownload = async (fileName: string) => {
+  const handleDownload = async (item: any) => {
     try {
-      const blob = await holeriteService.downloadHolerite(fileName);
-      const url = window.URL.createObjectURL(blob);
+      let blob: Blob;
+      if (item.docType === 'holerite') {
+        // Usar downloadHoleriteById que é mais preciso
+        blob = await holeriteService.downloadHoleriteById(item.id);
+      } else {
+        blob = await receiptService.downloadReceiptBlob(item.id);
+      }
+
+      // Criar link temporário para download compatível com mobile
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = fileName;
+      link.setAttribute('download', item.fileName || `documento_${item.id}.pdf`);
+
+      // Essencial para downloads em alguns navegadores mobile
+      link.setAttribute('target', '_blank');
+
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+
+      // Pequeno delay para garantir que o download inicie antes de remover o link e revogar a URL
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      toast({
+        title: 'Sucesso',
+        description: `${item.docType === 'holerite' ? 'Holerite' : 'Comprovante'} baixado com sucesso!`,
+      });
     } catch (err: any) {
-      console.error('Erro ao baixar holerite', err);
+      console.error('Erro ao baixar documento', err);
       toast({
         title: 'Erro ao baixar',
-        description: err?.response?.data?.message || 'Não foi possível baixar o holerite.',
+        description: err?.response?.data?.message || 'Não foi possível baixar o arquivo.',
         variant: 'destructive',
       });
     }
   };
 
-  const handleView = async (fileName: string) => {
+  const handleView = async (item: any) => {
     try {
-      const blob = await holeriteService.downloadHolerite(fileName);
+      setPreviewLoading(true);
+      setPreviewDoc(item);
+      setPreviewOpen(true);
+
+      let blob: Blob;
+      if (item.docType === 'holerite') {
+        blob = await holeriteService.downloadHolerite(item.fileName);
+      } else {
+        blob = await receiptService.downloadReceiptBlob(item.id);
+      }
+
       const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener,noreferrer');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setPreviewUrl(url);
     } catch (err: any) {
-      console.error('Erro ao visualizar holerite', err);
+      console.error('Erro ao visualizar documento', err);
       toast({
         title: 'Erro ao visualizar',
-        description: err?.response?.data?.message || 'Não foi possível abrir o holerite.',
+        description: err?.response?.data?.message || 'Não foi possível carregar a pré-visualização.',
         variant: 'destructive',
       });
+      setPreviewOpen(false);
+    } finally {
+      setPreviewLoading(false);
     }
+  };
+
+  const handleClosePreview = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl('');
+    setPreviewOpen(false);
+    setPreviewDoc(null);
   };
 
   return (
     <StandardLayout
-      title="Meus Holerites"
-      subtitle="Visualize e gerencie seus holerites organizados por ano e mês"
+      title="Meus Documentos"
+      subtitle="Visualize e gerencie seus holerites e comprovantes de pagamento organizados por ano e mês"
     >
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-300">
@@ -137,13 +190,13 @@ const MeusHoleritesContent: React.FC = () => {
             {error}
           </CardContent>
         </Card>
-      ) : holerites.length === 0 ? (
+      ) : holerites.length === 0 && receipts.length === 0 ? (
         <Card className="bg-seguranca-graphite border-gray-700">
           <CardContent className="py-10 flex flex-col items-center gap-3 text-gray-300">
             <FileText className="w-10 h-10" />
-            <p>Nenhum holerite encontrado.</p>
+            <p>Nenhum documento encontrado.</p>
             <span className="text-sm text-gray-500">
-              Assim que novos holerites forem disponibilizados, eles aparecerão aqui.
+              Assim que novos holerites ou comprovantes forem disponibilizados, eles aparecerão aqui.
             </span>
           </CardContent>
         </Card>
@@ -191,24 +244,32 @@ const MeusHoleritesContent: React.FC = () => {
                               className="rounded-lg border border-gray-700 bg-seguranca-black/40 p-3 space-y-3"
                             >
                               <div className="space-y-1 text-sm text-gray-300">
-                                <p className="font-medium text-gray-100">{item.employeeName}</p>
+                                <div className="flex items-center justify-between">
+                                  <p className="font-medium text-gray-100">{item.employeeName}</p>
+                                  <Badge className={item.docType === 'holerite' ? "bg-blue-500/20 text-blue-200 border-blue-500/40" : "bg-green-500/20 text-green-200 border-green-500/40"}>
+                                    {item.docType === 'holerite' ? 'Holerite' : 'Comprovante'}
+                                  </Badge>
+                                </div>
                                 <p className="text-xs text-gray-400">CPF: {item.cpf}</p>
                                 <p className="text-xs text-gray-500 truncate">{item.fileName}</p>
+                                {item.transferDate && (
+                                  <p className="text-[10px] text-gray-500">Pagamento: {new Date(item.transferDate).toLocaleDateString('pt-BR')}</p>
+                                )}
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="border-gray-600 text-gray-100 hover:bg-gray-800"
-                                  onClick={() => handleView(item.fileName)}
+                                  onClick={() => handleView(item)}
                                 >
                                   <Eye className="w-4 h-4 mr-1" />
                                   Visualizar
                                 </Button>
                                 <Button
                                   size="sm"
-                                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                                  onClick={() => handleDownload(item.fileName)}
+                                  className={item.docType === 'holerite' ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"}
+                                  onClick={() => handleDownload(item)}
                                 >
                                   <Download className="w-4 h-4 mr-1" />
                                   Baixar
@@ -226,6 +287,17 @@ const MeusHoleritesContent: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Modal de Pré-visualização */}
+      <DocumentPreviewModal
+        isOpen={previewOpen}
+        onClose={handleClosePreview}
+        title={previewDoc?.docType === 'holerite' ? 'Holerite' : 'Comprovante'}
+        fileName={previewDoc?.fileName || ''}
+        fileUrl={previewUrl}
+        onDownload={() => handleDownload(previewDoc)}
+        loading={previewLoading}
+      />
     </StandardLayout>
   );
 };

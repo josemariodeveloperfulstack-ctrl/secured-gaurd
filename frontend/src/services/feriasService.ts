@@ -1,10 +1,10 @@
 import api from '../lib/axios';
-import { 
-  FeriasPeriodo, 
-  Afastamento, 
-  CreateFeriasRequest, 
-  UpdateFeriasRequest, 
-  CreateAfastamentoRequest, 
+import {
+  FeriasPeriodo,
+  Afastamento,
+  CreateFeriasRequest,
+  UpdateFeriasRequest,
+  CreateAfastamentoRequest,
   UpdateAfastamentoRequest,
   FeriasFilters,
   AfastamentoFilters
@@ -26,13 +26,13 @@ export const feriasService = {
       periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
-      status: vacation.status === 'PENDING' ? 'PENDENTE' : 
-              vacation.status === 'APPROVED' ? 'APROVADO' : 
-              vacation.status === 'REJECTED' ? 'REJECTED' :
-              vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+      status: vacation.status === 'PENDING' ? 'PENDENTE' :
+        vacation.status === 'APPROVED' ? 'APROVADO' :
+          vacation.status === 'REJECTED' ? 'REJEITADO' :
+            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
       tipo: vacation.vacationType === 'SOLD' ? 'FERIAS_VENDIDAS' :
-            vacation.vacationType === 'PECUNIARY_BONUS' ? 'ABONO_PECUNIARIO' : 
-            vacation.vacationType === 'NORMAL' ? 'FERIAS_NORMAIS' : 'FERIAS_NORMAIS', // Valor padrão
+        vacation.vacationType === 'PECUNIARY_BONUS' ? 'ABONO_PECUNIARIO' :
+          vacation.vacationType === 'NORMAL' ? 'FERIAS_NORMAIS' : 'FERIAS_NORMAIS', // Valor padrão
       observacoes: '',
       createdAt: vacation.createdAt
     }));
@@ -49,12 +49,12 @@ export const feriasService = {
       periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
-      status: vacation.status === 'PENDING' ? 'PENDENTE' : 
-              vacation.status === 'APPROVED' ? 'APROVADO' : 
-              vacation.status === 'REJECTED' ? 'REJECTED' :
-              vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+      status: vacation.status === 'PENDING' ? 'PENDENTE' :
+        vacation.status === 'APPROVED' ? 'APROVADO' :
+          vacation.status === 'REJECTED' ? 'REJEITADO' :
+            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
       tipo: vacation.vacationType === 'SOLD' ? 'FERIAS_VENDIDAS' :
-            vacation.vacationType === 'PECUNIARY_BONUS' ? 'ABONO_PECUNIARIO' : 'FERIAS_NORMAIS', // Valor padrão
+        vacation.vacationType === 'PECUNIARY_BONUS' ? 'ABONO_PECUNIARIO' : 'FERIAS_NORMAIS', // Valor padrão
       observacoes: vacation.observacoes || vacation.notes || '',
       createdAt: vacation.createdAt,
       updatedAt: vacation.updatedAt
@@ -70,14 +70,14 @@ export const feriasService = {
     // Converter dados do frontend para o formato esperado pelo backend
     const startDate = new Date(data.dataInicio).toISOString().split('T')[0];
     const endDate = new Date(data.dataFim).toISOString().split('T')[0];
-    
+
     // Mapear tipo do frontend para o backend
     const tipoMap: Record<string, string> = {
       'FERIAS_NORMAIS': 'NORMAL',
       'FERIAS_VENDIDAS': 'SOLD',
       'ABONO_PECUNIARIO': 'PECUNIARY_BONUS'
     };
-    
+
     const backendData = {
       employeeId: data.employeeId,
       startDate: startDate,
@@ -94,11 +94,11 @@ export const feriasService = {
   async updateFerias(id: string, data: UpdateFeriasRequest): Promise<FeriasPeriodo> {
     // Primeiro, buscar o registro existente para obter os dados completos
     const existingVacation = await this.getFeriasById(id);
-    
+
     // Converter dados do frontend para o formato esperado pelo backend
     const startDate = data.dataInicio ? new Date(data.dataInicio).toISOString().split('T')[0] : existingVacation.dataInicio;
     const endDate = data.dataFim ? new Date(data.dataFim).toISOString().split('T')[0] : existingVacation.dataFim;
-    
+
     // Calcular dias
     let daysTaken = 0;
     if (startDate && endDate) {
@@ -106,7 +106,7 @@ export const feriasService = {
       const end = new Date(endDate);
       daysTaken = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     }
-    
+
     // Mapear status do frontend para o backend
     // O backend só aceita: PENDING, APPROVED, REJECTED, CANCELLED
     const statusMap: Record<string, string> = {
@@ -119,14 +119,14 @@ export const feriasService = {
       'EM_ANDAMENTO': 'PENDING', // Mapear para PENDING se não houver equivalente
       'CONCLUIDO': 'APPROVED' // Mapear para APPROVED se não houver equivalente
     };
-    
+
     // Mapear tipo do frontend para o backend
     const tipoMap: Record<string, string> = {
       'FERIAS_NORMAIS': 'NORMAL',
       'FERIAS_VENDIDAS': 'SOLD',
       'ABONO_PECUNIARIO': 'PECUNIARY_BONUS'
     };
-    
+
     // Preparar dados no formato que o backend espera (objeto Vacation completo)
     // O backend precisa de todos os campos obrigatórios, incluindo employee como objeto
     const backendData: any = {
@@ -141,9 +141,9 @@ export const feriasService = {
       status: data.status ? statusMap[data.status] || statusMap[existingVacation.status] || 'PENDING' : statusMap[existingVacation.status] || 'PENDING', // Usar status do formulário se fornecido
       vacationType: data.tipo ? tipoMap[data.tipo] || 'NORMAL' : (existingVacation.tipo ? tipoMap[existingVacation.tipo] : 'NORMAL') // Usar tipo do formulário se fornecido
     };
-    
+
     const response = await api.put(`/api/vacations/${id}`, backendData);
-    
+
     // Converter resposta do backend para o formato esperado pelo frontend
     const vacation = response.data;
     return {
@@ -153,10 +153,10 @@ export const feriasService = {
       periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
-      status: vacation.status === 'PENDING' ? 'PENDENTE' : 
-              vacation.status === 'APPROVED' ? 'APROVADO' : 
-              vacation.status === 'REJECTED' ? 'REJECTED' :
-              vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+      status: vacation.status === 'PENDING' ? 'PENDENTE' :
+        vacation.status === 'APPROVED' ? 'APROVADO' :
+          vacation.status === 'REJECTED' ? 'REJECTED' :
+            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
       tipo: data.tipo || existingVacation.tipo || 'FERIAS_NORMAIS', // Preservar tipo do formulário ou existente
       observacoes: data.observacoes || existingVacation.observacoes || '',
       createdAt: vacation.createdAt,
@@ -186,7 +186,7 @@ export const feriasService = {
       if (value) params.append(key, value);
     });
     const response = await api.get(`/api/absences?${params.toString()}`);
-    
+
     // Mapear tipos do backend (inglês) para frontend (português)
     const tipoMapInverso: Record<string, string> = {
       'SICK_LEAVE': 'ATESTADO',
@@ -197,7 +197,7 @@ export const feriasService = {
       'WEDDING': 'OUTROS',
       'FAMILY_EMERGENCY': 'OUTROS'
     };
-    
+
     // Converter dados do backend para o formato esperado pelo frontend
     return response.data.map((absence: any) => ({
       id: absence.id,
@@ -215,9 +215,9 @@ export const feriasService = {
         return absence.absenceDate; // Se não houver medicalCertificateDays, usar a mesma data
       })(),
       status: absence.status === 'PENDING' ? 'PENDENTE' :
-              absence.status === 'APPROVED' ? 'APROVADO' :
-              absence.status === 'REJECTED' ? 'CANCELADO' :
-              absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+        absence.status === 'APPROVED' ? 'APROVADO' :
+          absence.status === 'REJECTED' ? 'CANCELADO' :
+            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
       motivo: absence.reason || '',
       documento: absence.documentUrl || '',
       observacoes: absence.coverageNotes || '',
@@ -228,7 +228,7 @@ export const feriasService = {
   async getAfastamentoById(id: string): Promise<Afastamento> {
     const response = await api.get(`/api/absences/${id}`);
     const absence = response.data;
-    
+
     // Converter dados do backend para o formato esperado pelo frontend
     const tipoMapInverso: Record<string, string> = {
       'SICK_LEAVE': 'ATESTADO',
@@ -239,7 +239,7 @@ export const feriasService = {
       'WEDDING': 'OUTROS',
       'FAMILY_EMERGENCY': 'OUTROS'
     };
-    
+
     // Calcular data fim baseado em medicalCertificateDays ou usar absenceDate
     const dataInicio = absence.absenceDate;
     let dataFim = absence.absenceDate;
@@ -248,7 +248,7 @@ export const feriasService = {
       startDate.setDate(startDate.getDate() + absence.medicalCertificateDays - 1);
       dataFim = startDate.toISOString().split('T')[0];
     }
-    
+
     return {
       id: absence.id,
       employeeId: absence.employee?.id || absence.employeeId || null,
@@ -257,9 +257,9 @@ export const feriasService = {
       dataInicio: dataInicio,
       dataFim: dataFim,
       status: absence.status === 'PENDING' ? 'PENDENTE' :
-              absence.status === 'APPROVED' ? 'APROVADO' :
-              absence.status === 'REJECTED' ? 'CANCELADO' :
-              absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+        absence.status === 'APPROVED' ? 'APROVADO' :
+          absence.status === 'REJECTED' ? 'CANCELADO' :
+            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
       motivo: absence.reason || '',
       documento: absence.documentUrl || '',
       observacoes: absence.coverageNotes || '',
@@ -292,7 +292,7 @@ export const feriasService = {
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
       medicalCertificateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }
-    
+
     // Converter dados do frontend para o formato do backend
     const backendData = {
       employeeId: data.employeeId,
@@ -305,7 +305,7 @@ export const feriasService = {
       coverageNotes: data.observacoes || null,
       isJustified: true
     };
-    
+
     const response = await api.post('/api/absences', backendData);
     return response.data;
   },
@@ -340,7 +340,7 @@ export const feriasService = {
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
       medicalCertificateDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }
-    
+
     // Converter dados do frontend para o formato do backend (AbsenceDTO)
     // IMPORTANTE: Sempre incluir absenceType quando fornecido
     const backendData: any = {
@@ -352,7 +352,7 @@ export const feriasService = {
       coverageNotes: data.observacoes || undefined,
       isJustified: true
     };
-    
+
     // CRÍTICO: Sempre incluir absenceType quando data.tipo estiver presente
     // O backend precisa receber este campo para atualizar corretamente
     if (data.tipo) {
@@ -362,14 +362,14 @@ export const feriasService = {
     } else {
       console.warn('⚠️ Tipo não fornecido no updateData - campo tipo pode não ser atualizado');
     }
-    
+
     // Sempre incluir status se fornecido
     if (data.status) {
       backendData.status = statusMap[data.status] || 'PENDING';
     }
-    
+
     const response = await api.put(`/api/absences/${id}`, backendData);
-    
+
     // Converter resposta do backend para o formato esperado pelo frontend
     const absence = response.data;
     const tipoMapInverso: Record<string, string> = {
@@ -381,7 +381,7 @@ export const feriasService = {
       'WEDDING': 'OUTROS',
       'FAMILY_EMERGENCY': 'OUTROS'
     };
-    
+
     return {
       id: absence.id,
       employeeId: absence.employeeId || absence.employee?.id || null,
@@ -398,9 +398,9 @@ export const feriasService = {
         return absence.absenceDate; // Se não houver medicalCertificateDays, usar a mesma data
       })(),
       status: absence.status === 'PENDING' ? 'PENDENTE' :
-              absence.status === 'APPROVED' ? 'APROVADO' :
-              absence.status === 'REJECTED' ? 'CANCELADO' :
-              absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+        absence.status === 'APPROVED' ? 'APROVADO' :
+          absence.status === 'REJECTED' ? 'CANCELADO' :
+            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
       motivo: absence.reason || '',
       documento: absence.documentUrl || '',
       observacoes: absence.coverageNotes || '',

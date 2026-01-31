@@ -5,14 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Plus, 
-  Search, 
-  RefreshCw, 
-  FileText, 
+import {
+  Eye,
+  Edit,
+  Trash2,
+  Plus,
+  Search,
+  RefreshCw,
+  FileText,
   Download,
   Calendar,
   User,
@@ -64,26 +64,26 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
   const getStatusProps = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return { 
-          color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', 
+        return {
+          color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
           text: 'Pendente',
           icon: AlertCircle
         };
       case 'APPROVED':
-        return { 
-          color: 'bg-green-500/20 text-green-400 border-green-500/30', 
+        return {
+          color: 'bg-green-500/20 text-green-400 border-green-500/30',
           text: 'Aprovado',
           icon: CheckCircle
         };
       case 'REJECTED':
-        return { 
-          color: 'bg-red-500/20 text-red-400 border-red-500/30', 
+        return {
+          color: 'bg-red-500/20 text-red-400 border-red-500/30',
           text: 'Rejeitado',
           icon: XCircle
         };
       default:
-        return { 
-          color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', 
+        return {
+          color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
           text: 'Desconhecido',
           icon: AlertCircle
         };
@@ -172,7 +172,7 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
 
   const handleConfirmDelete = async () => {
     if (!selectedShiftChange?.id) return;
-    
+
     try {
       await shiftChangeService.deleteShiftChange(selectedShiftChange.id);
       setShowDeleteDialog(false);
@@ -190,7 +190,7 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
   const handleGeneratePDF = async (shiftChange: ShiftChangeFormDTO) => {
     try {
       await pdfService.downloadShiftChangePDF(shiftChange);
-      
+
       toast({
         title: 'Sucesso',
         description: 'PDF da troca de plantão gerado com sucesso!',
@@ -205,14 +205,14 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
   };
 
   const filteredShiftChanges = shiftChanges.filter(shiftChange => {
-    const matchesSearch = 
+    const matchesSearch =
       shiftChange.requesterFullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       shiftChange.replacingFullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       shiftChange.requesterSector.toLowerCase().includes(searchTerm.toLowerCase()) ||
       shiftChange.replacingSector.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || shiftChange.status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -330,7 +330,7 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
                 {filteredShiftChanges.map((shiftChange) => {
                   const statusProps = getStatusProps(shiftChange.status || 'PENDING');
                   const StatusIcon = statusProps.icon;
-                  
+
                   return (
                     <TableRow
                       key={shiftChange.id}
@@ -441,6 +441,7 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
         onOpenChange={setShowViewModal}
         shiftChange={selectedShiftChange}
         onGeneratePDF={handleGeneratePDF}
+        onRefresh={handleRefresh}
       />
 
       <ShiftChangeDeleteDialog

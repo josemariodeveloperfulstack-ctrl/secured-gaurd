@@ -75,7 +75,7 @@ public class SupplierService {
 
     public Supplier create(SupplierDTO supplierDTO) {
         // Verificações prévias para evitar 500 por violação de constraint
-        if (supplierDTO.getCnpj() != null) {
+        if (supplierDTO.getCnpj() != null && !supplierDTO.getCnpj().trim().isEmpty()) {
             String cnpjTrimmed = supplierDTO.getCnpj().trim();
             supplierRepository.findByCnpj(cnpjTrimmed).ifPresent(existing -> {
                 throw new com.z7design.secured_guard.exception.BusinessException(
@@ -93,7 +93,7 @@ public class SupplierService {
                 .map(supplier -> {
                     // Verificar se o CNPJ está sendo alterado e se já existe outro fornecedor com
                     // esse CNPJ
-                    if (supplierDTO.getCnpj() != null) {
+                    if (supplierDTO.getCnpj() != null && !supplierDTO.getCnpj().trim().isEmpty()) {
                         String cnpjTrimmed = supplierDTO.getCnpj().trim();
                         supplierRepository.findByCnpj(cnpjTrimmed).ifPresent(existing -> {
                             // Se o CNPJ encontrado não é o próprio fornecedor, lançar exceção
@@ -139,7 +139,13 @@ public class SupplierService {
 
     private void updateSupplierFromDTO(Supplier supplier, SupplierDTO dto) {
         supplier.setName(dto.getName());
-        supplier.setCnpj(dto.getCnpj());
+
+        String cnpj = dto.getCnpj();
+        if (cnpj != null && cnpj.trim().isEmpty()) {
+            cnpj = null;
+        }
+        supplier.setCnpj(cnpj);
+
         supplier.setCpf(dto.getCpf());
         supplier.setEmail(dto.getEmail());
         supplier.setPhone(dto.getPhone());

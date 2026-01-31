@@ -80,34 +80,77 @@ const Clientes: React.FC = () => {
   // Handle form success
   const handleFormSuccess = async (client?: Client) => {
     await loadClients();
-    
+
     // Se um novo cliente foi criado, enviar notificação
     if (client && !selectedClient) {
       try {
-        const emailData = {
-          to: 'comercial@empresa.com',
-          subject: `Novo Cliente: ${client.name}`,
-          body: `
-            <h2>Novo Cliente Registrado</h2>
-            <p><strong>Nome:</strong> ${client.name}</p>
-            <p><strong>Email:</strong> ${client.email}</p>
-            <p><strong>Telefone:</strong> ${client.phone}</p>
-            <p><strong>Status:</strong> ${client.status}</p>
-            <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
-            
-            <h3>Próximos Passos:</h3>
-            <ul>
-              <li>Analisar perfil do cliente</li>
-              <li>Preparar proposta comercial</li>
-              <li>Agendar reunião de apresentação</li>
-              <li>Definir estratégia de abordagem</li>
-            </ul>
-            
-            <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
-          `,
-          priority: 'media' as const
-        };
+        const config = notificationService.loadDepartamentosConfig();
+        const notifiedDepts = client.notifiedDepartments || [];
 
+        console.log('[DEBUG] Clientes.tsx - Departamentos para notificar:', notifiedDepts);
+
+        const notificationPromises: Promise<any>[] = [];
+
+        // Sempre notifica o comercial (conforme lógica original ou se estiver marcado)
+        if (notifiedDepts.includes('comercial') || notifiedDepts.length === 0) {
+          const emailData = {
+            to: 'comercial@empresa.com',
+            subject: `Novo Cliente: ${client.name}`,
+            body: `
+              <h2>Novo Cliente Registrado</h2>
+              <p><strong>Nome:</strong> ${client.name}</p>
+              <p><strong>Email:</strong> ${client.email}</p>
+              <p><strong>Telefone:</strong> ${client.phone}</p>
+              <p><strong>Status:</strong> ${client.status}</p>
+              <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+              
+              <h3>Próximos Passos:</h3>
+              <ul>
+                <li>Analisar perfil do cliente</li>
+                <li>Preparar proposta comercial</li>
+                <li>Agendar reunião de apresentação</li>
+                <li>Definir estratégia de abordagem</li>
+              </ul>
+              
+              <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+            `,
+            priority: 'media' as const
+          };
+
+          notificationPromises.push(notificationService.sendEmailNotification(emailData));
+        }
+
+        // Notifica outros departamentos marcados
+        for (const deptId of notifiedDepts) {
+          if (deptId === 'comercial') continue; // Já tratado acima
+
+          const deptEmail = config[deptId as keyof typeof config];
+          if (!deptEmail) continue;
+
+          const deptName = deptId.charAt(0).toUpperCase() + deptId.slice(1);
+
+          const emailData = {
+            to: deptEmail,
+            subject: `[${deptName}] Novo Cliente: ${client.name}`,
+            body: `
+              <h2>Novo Cliente Registrado - Notificação para ${deptName}</h2>
+              <p><strong>Nome:</strong> ${client.name}</p>
+              <p><strong>Empresa:</strong> SecuredGuard</p>
+              <p><strong>Status:</strong> ${client.status}</p>
+              <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+              
+              <h3>Ação Requerida - ${deptName}:</h3>
+              <p>Um novo cliente foi registrado no sistema. Por favor, revise os dados e tome as providências necessárias inerentes ao seu departamento.</p>
+              
+              <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+            `,
+            priority: 'media' as const
+          };
+
+          notificationPromises.push(notificationService.sendEmailNotification(emailData));
+        }
+
+        // Notificação de painel (geral ou para os departamentos)
         const panelNotification = {
           id: Date.now().toString(),
           tipo: 'novo_cliente' as const,
@@ -119,14 +162,13 @@ const Clientes: React.FC = () => {
           cliente: client.name
         };
 
-        await Promise.all([
-          notificationService.sendEmailNotification(emailData),
-          notificationService.createPanelNotification(panelNotification)
-        ]);
+        notificationPromises.push(notificationService.createPanelNotification(panelNotification));
+
+        await Promise.all(notificationPromises);
 
         toast({
           title: 'Cliente Criado!',
-          description: `Cliente ${client.name} criado com sucesso. Notificação enviada ao departamento comercial.`,
+          description: `Cliente ${client.name} criado com sucesso. Notificações enviadas aos departamentos selecionados.`,
         });
       } catch (error) {
         console.error('Erro ao enviar notificação:', error);
@@ -187,11 +229,11 @@ const Clientes: React.FC = () => {
   // Handle report generation
   const handleGenerateReport = async (filters: ReportFilters) => {
     setIsGeneratingReport(true);
-    
+
     try {
       let blob: Blob;
       let filename: string;
-      
+
       if (filters.format === 'pdf') {
         blob = await clientReportService.generatePdfReport(filters);
         filename = `relatorio_clientes_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -199,14 +241,14 @@ const Clientes: React.FC = () => {
         blob = await clientReportService.generateExcelReport(filters);
         filename = `relatorio_clientes_${new Date().toISOString().split('T')[0]}.xlsx`;
       }
-      
+
       clientReportService.downloadFile(blob, filename);
-      
+
       toast({
         title: "✅ Relatório gerado",
         description: `Relatório ${filters.format.toUpperCase()} baixado com sucesso!`,
       });
-      
+
     } catch (error: any) {
       console.error("Erro ao gerar relatório:", error);
       toast({
@@ -229,9 +271,9 @@ const Clientes: React.FC = () => {
   };
 
   return (
-    <StandardLayout 
+    <StandardLayout
       title="Gestão de Clientes"
-      subtitle={totalElements > 0 
+      subtitle={totalElements > 0
         ? `${totalElements} cliente${totalElements > 1 ? 's' : ''} cadastrado${totalElements > 1 ? 's' : ''} no sistema`
         : 'Gerencie todos os clientes da empresa'
       }
@@ -299,8 +341,8 @@ const Clientes: React.FC = () => {
         {/* Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-animate="fadeDown">
           <div className="flex flex-wrap gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleRefresh}
               disabled={isLoading}
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50"
@@ -308,7 +350,7 @@ const Clientes: React.FC = () => {
               <RefreshCw size={20} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
-            <Button 
+            <Button
               className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20"
               onClick={handleNewClient}
             >
@@ -329,8 +371,8 @@ const Clientes: React.FC = () => {
               <p className="text-sm text-gray-400">Gere relatórios personalizados em PDF ou Excel</p>
             </div>
           </div>
-          
-          <ClientReportFilters 
+
+          <ClientReportFilters
             onGenerate={handleGenerateReport}
             isLoading={isGeneratingReport}
           />
@@ -361,7 +403,7 @@ const Clientes: React.FC = () => {
                 className="pl-12 pr-4 py-3 bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 rounded-xl"
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={handleStatusFilter}>
               <SelectTrigger className="lg:w-[220px] py-3 bg-seguranca-black/50 border-gray-600/30 text-white focus:border-seguranca-red/50 focus:ring-seguranca-red/20 rounded-xl">
                 <SelectValue placeholder="Filtrar por status" />
@@ -384,8 +426,8 @@ const Clientes: React.FC = () => {
                 </SelectItem>
               </SelectContent>
             </Select>
-            
-            <Button 
+
+            <Button
               onClick={handleSearch}
               disabled={isLoading}
               className="px-6 py-3 bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20 lg:w-auto w-full rounded-xl font-semibold"
@@ -412,12 +454,12 @@ const Clientes: React.FC = () => {
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious 
+                    <PaginationPrevious
                       onClick={() => handlePageChange(currentPage - 1)}
                       className={currentPage === 0 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />
                   </PaginationItem>
-                  
+
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const page = Math.max(0, Math.min(totalPages - 5, currentPage - 2)) + i;
                     return (
@@ -432,9 +474,9 @@ const Clientes: React.FC = () => {
                       </PaginationItem>
                     );
                   })}
-                  
+
                   <PaginationItem>
-                    <PaginationNext 
+                    <PaginationNext
                       onClick={() => handlePageChange(currentPage + 1)}
                       className={currentPage === totalPages - 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                     />

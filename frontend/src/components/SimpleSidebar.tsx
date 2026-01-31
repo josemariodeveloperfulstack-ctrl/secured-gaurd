@@ -4,6 +4,7 @@ import {
   Home, Shield, FileText, Calendar, Building2, Users, ClipboardList, DollarSign, FileSpreadsheet, Truck, Settings, Briefcase
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import Logo from './Logo';
 
 const menu = [
   { icon: Home, label: 'Dashboard', to: '/dashboard', permission: 'DASHBOARD_READ' },
@@ -38,11 +39,8 @@ export const SimpleSidebar = () => {
     >
       {/* Topo apenas com ícone e título */}
       <div>
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-zinc-800">
-          <div className="bg-red-600 rounded-lg p-2">
-            <Briefcase size={28} className="text-white" />
-          </div>
-          {open && <span className="text-xl font-bold tracking-wide">Secure Guard</span>}
+        <div className="flex items-center justify-center px-4 py-5 border-b border-zinc-800">
+          <Logo size={open ? "md" : "sm"} />
         </div>
         <nav className="flex flex-col gap-1 mt-2">
           {filteredMenu.map(item => {

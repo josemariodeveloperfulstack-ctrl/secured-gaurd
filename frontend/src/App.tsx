@@ -33,13 +33,13 @@ import UnificadosPorSetor from '@/pages/UnificadosPorSetor';
 const lazyWithRetry = (componentImport: () => Promise<any>, componentName: string, maxRetries = 3) => {
   return lazy(async () => {
     let lastError: any = null;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`🔄 Tentativa ${attempt}/${maxRetries} de carregar ${componentName}...`);
         const module = await Promise.race([
           componentImport(),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout após 30 segundos')), 30000)
           )
         ]);
@@ -48,7 +48,7 @@ const lazyWithRetry = (componentImport: () => Promise<any>, componentName: strin
       } catch (error: any) {
         lastError = error;
         console.error(`❌ Erro na tentativa ${attempt}/${maxRetries} ao carregar ${componentName}:`, error);
-        
+
         // Se for erro de rede/timeout, aguarda antes de tentar novamente
         if (
           (error instanceof TypeError && error.message.includes('Failed to fetch')) ||
@@ -68,10 +68,10 @@ const lazyWithRetry = (componentImport: () => Promise<any>, componentName: strin
         }
       }
     }
-    
+
     // Se todas as tentativas falharam
     console.error(`❌ Falha ao carregar ${componentName} após ${maxRetries} tentativas`);
-    
+
     return {
       default: () => (
         <div className="flex items-center justify-center min-h-screen bg-seguranca-black">
@@ -177,6 +177,9 @@ const EnvioHolerites = lazy(() => import('@/pages/EnvioHolerites'));
 const Payroll = lazy(() => import('@/pages/Payroll'));
 const PayslipView = lazy(() => import('@/pages/PayslipView'));
 const MeusHolerites = lazy(() => import('@/pages/MeusHolerites'));
+const MeuPonto = lazy(() => import('@/pages/MeuPonto'));
+const MinhasFerias = lazy(() => import('@/pages/MinhasFerias'));
+const MeusPlantoes = lazy(() => import('@/pages/MeusPlantoes'));
 const Mensagens = lazy(() => import('@/pages/Mensagens'));
 const GestaoMensagens = lazy(() => import('@/pages/GestaoMensagens'));
 const GestaoAtendimento = lazy(() => import('@/pages/GestaoAtendimento'));
@@ -192,8 +195,8 @@ const EstoqueSimplificado = lazy(() => import('@/pages/EstoqueSimplificado'));
 const Estoque = lazy(() => import('@/pages/Estoque'));
 const Produtos = lazy(() => import('@/pages/Produtos'));
 const Movimentacoes = lazy(() => import('@/pages/Movimentacoes'));
- const EstoqueRelatorios = lazy(() => import('@/pages/EstoqueRelatorios'));
- const Empresas = lazy(() => import('@/pages/Empresas'));
+const EstoqueRelatorios = lazy(() => import('@/pages/EstoqueRelatorios'));
+const Empresas = lazy(() => import('@/pages/Empresas'));
 const Compras = lazy(() => import('@/pages/Compras'));
 const CotacoesCompras = lazy(() => import('@/pages/CotacoesCompras'));
 // const Suporte = lazy(() => import('@/pages/Suporte')); // REMOVIDO - substituído por Gestão de Atendimento
@@ -297,7 +300,7 @@ function App() {
                     <Route path="/contato" element={<Contato />} />
                     <Route path="/politicas-privacidade" element={<PoliticasPrivacidade />} />
                     <Route path="/termos-condicoes" element={<TermosCondicoes />} />
-                    
+
                     {/* Sistema Administrativo */}
                     <Route path="/admin" element={<Navigate to="/login" replace />} />
                     <Route path="/sistema" element={
@@ -376,7 +379,7 @@ function App() {
                         <LgpdConsent />
                       </Suspense>
                     } />
-                    
+
                     {/* Rotas Protegidas */}
                     <Route path="/dashboard" element={
                       <ProtectedRoute>
@@ -458,7 +461,7 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Funcionários e Operacional */}
                     <Route path="/employees" element={
                       <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
@@ -491,7 +494,7 @@ function App() {
                         <GuiaTransporte />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Clientes e Filiais */}
                     <Route path="/clients" element={
                       <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
@@ -513,7 +516,7 @@ function App() {
                         <Filiais />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Contratos e Serviços */}
                     <Route path="/contracts" element={
                       <ProtectedRoute requiredPermissions={['CONTRACTS_READ']}>
@@ -532,7 +535,7 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Financeiro */}
                     <Route path="/financial" element={
                       <ProtectedRoute requiredPermissions={['FINANCIAL_READ']}>
@@ -602,14 +605,14 @@ function App() {
                         <Medicao />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Contas a Pagar */}
                     <Route path="/contas-a-pagar" element={
                       <ProtectedRoute requiredPermissions={['FINANCIAL_WRITE']}>
                         <ContasAPagar />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Frota */}
                     <Route path="/fleet" element={
                       <ProtectedRoute requiredPermissions={['EQUIPMENTS_READ']}>
@@ -621,7 +624,7 @@ function App() {
                         <Frota />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Estoque */}
                     <Route path="/inventory" element={
                       <ProtectedRoute requiredPermissions={['STOCK_READ']}>
@@ -658,14 +661,14 @@ function App() {
                         <Fornecedores />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Estoque Simplificado */}
                     <Route path="/estoque-simplificado" element={
                       <ProtectedRoute requiredPermissions={['STOCK_READ']}>
                         <EstoqueSimplificado />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Compras */}
                     <Route path="/compras" element={
                       <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
@@ -702,7 +705,7 @@ function App() {
                         <Compras />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Suporte - REMOVIDO (substituído por Gestão de Atendimento) */}
                     {/* <Route path="/suporte" element={
                       <ProtectedRoute>
@@ -714,7 +717,7 @@ function App() {
                         <Suporte />
                       </ProtectedRoute>
                     } /> */}
-                    
+
                     {/* Documentos */}
                     <Route path="/documents" element={
                       <ProtectedRoute>
@@ -726,42 +729,42 @@ function App() {
                         <Documentos />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Documentos Unificados */}
                     <Route path="/documentos-unificados" element={
                       <ProtectedRoute>
                         <DocumentosUnificados />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Unificados por Setor */}
                     <Route path="/unificados-por-setor" element={
                       <ProtectedRoute>
                         <UnificadosPorSetor />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* EPIs */}
                     <Route path="/epis" element={
                       <ProtectedRoute>
                         <EPIs />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Fichas de Entrega de EPI */}
                     <Route path="/fichas-entrega-epi" element={
                       <ProtectedRoute>
                         <FichasEntregaEPI />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Certificações */}
                     <Route path="/certificacoes" element={
                       <ProtectedRoute>
                         <Certificacoes />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* RH / Departamento Pessoal */}
                     <Route path="/rh" element={
                       <ProtectedRoute>
@@ -907,7 +910,7 @@ function App() {
                         <Vagas />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Rotas RH faltantes - temporariamente redirecionando para páginas existentes */}
                     <Route path="/rh/remanejamentos" element={
                       <ProtectedRoute>
@@ -974,7 +977,7 @@ function App() {
                         <EPIs />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Relatórios */}
                     <Route path="/reports" element={
                       <ProtectedRoute>
@@ -986,7 +989,7 @@ function App() {
                         <Relatorios />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Módulo Comercial */}
                     <Route path="/leads" element={
                       <ProtectedRoute requiredPermissions={['LEADS_READ']}>
@@ -1003,21 +1006,21 @@ function App() {
                         <Orcamentos />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Gestão de Atividades - Exclusivo SUPER_ADMIN */}
                     <Route path="/atividades" element={
                       <ProtectedRoute>
                         <ActivityManagement />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Grupos */}
                     <Route path="/grupos" element={
                       <ProtectedRoute>
                         <Grupos />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Configurações */}
                     <Route path="/settings" element={
                       <ProtectedRoute>
@@ -1036,7 +1039,7 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Perfil */}
                     <Route path="/profile" element={
                       <ProtectedRoute>
@@ -1048,7 +1051,7 @@ function App() {
                         <Profile />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Holerites */}
                     <Route path="/payslips" element={
                       <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']}>
@@ -1071,6 +1074,27 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
+                    <Route path="/meu-ponto" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <MeuPonto />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/minhas-ferias" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <MinhasFerias />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/meus-plantoes" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <MeusPlantoes />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
                     <Route path="/envio-holerites" element={
                       <ProtectedRoute>
                         <EnvioHolerites />
@@ -1090,28 +1114,28 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Usuarios */}
                     <Route path="/usuarios" element={
                       <ProtectedRoute>
                         <Usuarios />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Roles */}
                     <Route path="/roles" element={
                       <ProtectedRoute>
                         <Roles />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* CRM Comercial */}
                     <Route path="/crm" element={
                       <ProtectedRoute requiredPermissions={['LEADS_READ']}>
                         <CrmKanban />
                       </ProtectedRoute>
                     } />
-                    
+
 
 
                     {/* Controle de Visitas Avançado */}
@@ -1120,21 +1144,21 @@ function App() {
                         <ControleVisitasAvancado />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Gestão de Visitas de Supervisor */}
                     <Route path="/gestao-visitas-supervisor" element={
                       <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
                         <GestaoVisitasSupervisor />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Rota Semanal de Supervisão */}
                     <Route path="/rota-semanal-supervisao" element={
                       <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
                         <RotaSemanalSupervisao />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* ===== SISTEMA DE SUPERVISÃO ===== */}
                     <Route path="/supervisao" element={
                       <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
@@ -1161,35 +1185,35 @@ function App() {
                         <Configuracoes />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Login Facial */}
                     <Route path="/facial-login" element={
                       <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
                         <Supervisao />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Perfil do Usuário */}
                     <Route path="/user-profile" element={
                       <ProtectedRoute>
                         <UserProfile />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* RH - Gestão de Funcionários */}
                     <Route path="/rh/gestao-funcionarios" element={
                       <ProtectedRoute>
                         <GestaoFuncionarios />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Contas a Pagar */}
                     <Route path="/contas-a-pagar" element={
                       <ProtectedRoute>
                         <ContasAPagar />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Empresas */}
                     <Route path="/empresas" element={
                       <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
@@ -1202,14 +1226,14 @@ function App() {
                         <CentrosDeCusto />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Movimentações */}
                     <Route path="/movimentacoes" element={
                       <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
                         <Movimentacoes />
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Módulo Operacional */}
                     <Route path="/operacional-dashboard" element={
                       <ProtectedRoute>
@@ -1253,7 +1277,7 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
-                    
+
                     {/* Rota 404 */}
                     <Route path="*" element={
                       <Suspense fallback={<LoadingSpinner />}>

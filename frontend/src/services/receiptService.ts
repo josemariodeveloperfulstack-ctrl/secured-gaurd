@@ -28,7 +28,7 @@ export const receiptService = {
       if (userStr) {
         const user = JSON.parse(userStr);
         console.log('👤 ReceiptService - Usuário logado:', user.name, 'Role:', user.role);
-        
+
         // Se for COLABORADOR, filtrar por CPF (username é o CPF)
         if (user.role === 'COLABORADOR' && user.username) {
           console.log('🔒 ReceiptService - Filtrando por CPF:', user.username);
@@ -36,7 +36,7 @@ export const receiptService = {
           return response.data;
         }
       }
-      
+
       const response = await api.get('/receipts');
       return response.data;
     } catch (error) {
@@ -105,6 +105,26 @@ export const receiptService = {
       window.open(fileURL, '_blank');
     } catch (error) {
       console.error('Erro ao visualizar comprovante:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Retorna o blob do comprovante para pré-visualização ou download
+   */
+  async downloadReceiptBlob(receiptId: string): Promise<Blob> {
+    try {
+      if (!receiptId) {
+        throw new Error('ID do comprovante não informado.');
+      }
+
+      const response = await api.get(`/receipts/${encodeURIComponent(receiptId)}/download`, {
+        responseType: 'blob'
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar blob do comprovante:', error);
       throw error;
     }
   },

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, MessageSquare, Check, RefreshCw, Settings, Filter } from 'lucide-react';
+import { Bell, MessageSquare, Check, RefreshCw, Settings, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 // Removido Popover do Radix UI devido a problemas com PopperAnchor
 // Usando componente customizado simples
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import { useNotificationBell } from '@/hooks/useNotificationBell';
 import MessageItem from '@/components/MessageItem';
 import '@/styles/notifications.css';
@@ -58,7 +59,7 @@ export const NotificationBell: React.FC = () => {
   // Handler para fechar quando clicar fora
   useEffect(() => {
     if (!isOpen) return;
-    
+
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest('.notification-popover-container')) {
@@ -76,9 +77,8 @@ export const NotificationBell: React.FC = () => {
         variant="ghost"
         size="sm"
         onClick={handleToggle}
-        className={`relative h-10 w-10 p-0 hover:bg-seguranca-graphite/50 text-seguranca-lightgray transition-all duration-200 ${
-          isAnimating ? 'animate-pulse' : ''
-        }`}
+        className={`relative h-10 w-10 p-0 hover:bg-seguranca-graphite/50 text-seguranca-lightgray transition-all duration-200 ${isAnimating ? 'animate-pulse' : ''
+          }`}
       >
         <Bell className={`h-5 w-5 transition-transform duration-200 ${isAnimating ? 'animate-bounce' : ''}`} />
         {unreadCount > 0 && (
@@ -93,128 +93,147 @@ export const NotificationBell: React.FC = () => {
 
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-2 z-[10050] w-[400px] sm:w-[450px] max-h-[600px] bg-gradient-to-br from-seguranca-graphite to-seguranca-black border border-gray-600 text-seguranca-lightgray shadow-2xl backdrop-blur-sm rounded-lg overflow-hidden"
+          className={cn(
+            "z-[10050] bg-gradient-to-br from-seguranca-graphite to-seguranca-black border border-gray-600 text-seguranca-lightgray shadow-2xl backdrop-blur-sm rounded-lg overflow-hidden",
+            // Mobile (Fixed/Centered)
+            "fixed inset-x-4 top-20 sm:top-full mt-2 sm:absolute sm:right-0 sm:left-auto sm:inset-x-auto sm:w-[450px]",
+            // Largura e altura máxima
+            "max-h-[80vh] sm:max-h-[600px]",
+            "animate-slide-in-top"
+          )}
         >
-        {/* Header com gradiente */}
-        <div className="relative p-4 border-b border-gray-600 bg-gradient-to-r from-seguranca-graphite to-seguranca-black">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-seguranca-yellow/10">
-                <MessageSquare className="h-5 w-5 text-seguranca-yellow" />
+          {/* Header com gradiente */}
+          <div className="relative p-4 border-b border-gray-600 bg-gradient-to-r from-seguranca-graphite to-seguranca-black">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-seguranca-yellow/10">
+                  <MessageSquare className="h-5 w-5 text-seguranca-yellow" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-seguranca-lightgray text-lg">Mensagens</h3>
+                  {unreadCount > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-gradient-to-r from-red-500 to-red-600 text-white text-xs px-2 py-1 mt-1 animate-pulse"
+                    >
+                      {unreadCount} não lidas
+                    </Badge>
+                  )}
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-seguranca-lightgray text-lg">Mensagens</h3>
-                {unreadCount > 0 && (
-                  <Badge 
-                    variant="secondary" 
-                    className="bg-gradient-to-r from-red-500 to-red-600 text-white text-xs px-2 py-1 mt-1 animate-pulse"
-                  >
-                    {unreadCount} não lidas
-                  </Badge>
-                )}
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="text-gray-400 hover:bg-seguranca-black/50 hover:text-seguranca-yellow transition-colors duration-200"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={isLoading}
+                  className="text-gray-400 hover:bg-seguranca-black/50 hover:text-seguranca-yellow transition-colors duration-200"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:bg-seguranca-black/50 hover:text-seguranca-yellow transition-colors duration-200"
-              >
-                <Filter className="h-4 w-4" />
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:bg-seguranca-black/50 hover:text-seguranca-yellow transition-colors duration-200"
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
 
-              {unreadCount > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={markAllAsRead}
-                  disabled={isLoading}
-                  className="text-seguranca-yellow hover:bg-seguranca-black/50 transition-colors duration-200"
+                  disabled={isLoading || unreadCount === 0}
+                  className={cn(
+                    "transition-colors duration-200",
+                    unreadCount > 0 ? "text-seguranca-yellow hover:bg-seguranca-black/50" : "text-gray-600 cursor-not-allowed"
+                  )}
+                  title="Marcar todas como lidas"
                 >
                   <Check className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Marcar todas</span>
+                  <span className="hidden sm:inline">Limpar</span>
                 </Button>
-              )}
+
+                {/* Botão de Fechar para Mobile */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsOpen(false)}
+                  className="sm:hidden text-gray-400 hover:bg-seguranca-black/50 transition-colors duration-200"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Lista de Mensagens */}
-        <div className="max-h-[400px] overflow-y-auto">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center p-12">
-              <div className="relative">
-                <RefreshCw className="h-8 w-8 animate-spin text-seguranca-yellow" />
-                <div className="absolute inset-0 rounded-full border-2 border-seguranca-yellow/20"></div>
+          {/* Lista de Mensagens */}
+          <div className="max-h-[400px] overflow-y-auto">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center p-12">
+                <div className="relative">
+                  <RefreshCw className="h-8 w-8 animate-spin text-seguranca-yellow" />
+                  <div className="absolute inset-0 rounded-full border-2 border-seguranca-yellow/20"></div>
+                </div>
+                <div className="text-gray-400 mt-4 text-sm">Carregando mensagens...</div>
               </div>
-              <div className="text-gray-400 mt-4 text-sm">Carregando mensagens...</div>
-            </div>
-          ) : systemMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-12 text-gray-400">
-              <div className="p-4 rounded-full bg-gray-600/20 mb-4">
-                <MessageSquare className="h-12 w-12 text-gray-500" />
+            ) : systemMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 text-gray-400">
+                <div className="p-4 rounded-full bg-gray-600/20 mb-4">
+                  <MessageSquare className="h-12 w-12 text-gray-500" />
+                </div>
+                <p className="text-center text-lg font-medium mb-2">Nenhuma mensagem encontrada</p>
+                <p className="text-center text-sm mb-4">Você está em dia com suas notificações!</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className="text-seguranca-yellow hover:bg-seguranca-black/50 transition-colors duration-200"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Recarregar
+                </Button>
               </div>
-              <p className="text-center text-lg font-medium mb-2">Nenhuma mensagem encontrada</p>
-              <p className="text-center text-sm mb-4">Você está em dia com suas notificações!</p>
+            ) : (
+              <div className="p-3 space-y-3">
+                {systemMessages.map((message, index) => (
+                  <div key={message.id} className="notification-item animate-slide-in-top">
+                    <MessageItem
+                      message={message}
+                      onMarkAsRead={markAsRead}
+                      formatDate={formatDate}
+                      getPriorityConfig={getPriorityConfig}
+                      isCompact={true}
+                    />
+                    {index < systemMessages.length - 1 && (
+                      <Separator className="my-3 bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer com gradiente */}
+          {systemMessages.length > 0 && (
+            <div className="p-4 border-t border-gray-600 bg-gradient-to-r from-seguranca-graphite to-seguranca-black">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleRefresh}
-                className="text-seguranca-yellow hover:bg-seguranca-black/50 transition-colors duration-200"
+                onClick={() => {
+                  setIsOpen(false);
+                  // Aqui você pode navegar para a página completa de mensagens
+                  window.location.href = '/mensagens';
+                }}
+                className="w-full text-seguranca-yellow hover:bg-seguranca-black/50 transition-colors duration-200 font-medium"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Recarregar
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Ver todas as mensagens
               </Button>
             </div>
-          ) : (
-            <div className="p-3 space-y-3">
-              {systemMessages.map((message, index) => (
-                <div key={message.id} className="notification-item animate-slide-in-top">
-                  <MessageItem
-                    message={message}
-                    onMarkAsRead={markAsRead}
-                    formatDate={formatDate}
-                    getPriorityConfig={getPriorityConfig}
-                    isCompact={true}
-                  />
-                  {index < systemMessages.length - 1 && (
-                    <Separator className="my-3 bg-gradient-to-r from-transparent via-gray-600 to-transparent" />
-                  )}
-                </div>
-              ))}
-            </div>
           )}
-        </div>
-
-        {/* Footer com gradiente */}
-        {systemMessages.length > 0 && (
-          <div className="p-4 border-t border-gray-600 bg-gradient-to-r from-seguranca-graphite to-seguranca-black">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setIsOpen(false);
-                // Aqui você pode navegar para a página completa de mensagens
-                window.location.href = '/mensagens';
-              }}
-              className="w-full text-seguranca-yellow hover:bg-seguranca-black/50 transition-colors duration-200 font-medium"
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Ver todas as mensagens
-            </Button>
-          </div>
-        )}
         </div>
       )}
     </div>

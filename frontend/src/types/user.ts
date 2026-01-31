@@ -39,6 +39,12 @@ export interface UserPermissions {
   FINANCIAL_DELETE: boolean;
   FINANCIAL_CREATE: boolean;
 
+  // Permissões Financeiras Granulares
+  FINANCIAL_PAYABLE_READ: boolean;
+  FINANCIAL_PAYABLE_WRITE: boolean;
+  FINANCIAL_RECEIVABLE_READ: boolean;
+  FINANCIAL_RECEIVABLE_WRITE: boolean;
+
   // Permissões de Holerites
   PAYSLIPS_READ: boolean;
   PAYSLIPS_WRITE: boolean;
@@ -287,19 +293,35 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
     { label: 'Meu Perfil', path: '/profile', icon: 'User', color: '🟨' },
     { label: 'Configurações', path: '/settings', icon: 'Settings', color: '🟨' },
   ],
-  COMERCIAL: [
-    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟥' },
-    { label: 'Leads', path: '/leads', icon: 'Target', color: '🟥' },
-    { label: 'Propostas', path: '/proposals', icon: 'FileText', color: '🟥' },
-    { label: 'Orçamentos', path: '/quotes', icon: 'DollarSign', color: '🟥' },
-    { label: 'Clientes', path: '/clients', icon: 'Building', color: '🟥' },
-    { label: 'Contratos', path: '/contracts', icon: 'FileContract', color: '🟥' },
-    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟥' },
-    { label: 'Configurações', path: '/settings', icon: 'Settings', color: '🟥' },
+  ASSISTENCIA_RH: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Colaboradores', path: '/employees', icon: 'Users', color: '🟨' },
+    { label: 'Holerites', path: '/payslips', icon: 'FileText', color: '🟨' },
+    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
   ],
-  ASSISTENCIA_RH: [],
-  DEPARTAMENTO_PESSOAL: [],
-  OPERACIONAL: [],
+  DEPARTAMENTO_PESSOAL: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Colaboradores', path: '/employees', icon: 'Users', color: '🟨' },
+    { label: 'Holerites', path: '/payslips', icon: 'FileText', color: '🟨' },
+    { label: 'Folha de Pagamento', path: '/payroll', icon: 'DollarSign', color: '🟨' },
+  ],
+  COMERCIAL: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'CRM / Leads', path: '/leads', icon: 'Target', color: '🟨' },
+    { label: 'Propostas', path: '/propostas', icon: 'FileText', color: '🟨' },
+    { label: 'Orçamentos', path: '/orcamentos', icon: 'Calculator', color: '🟨' },
+    { label: 'Contratos', path: '/contratos', icon: 'FileContract', color: '🟨' },
+    { label: 'Clientes', path: '/clientes', icon: 'Building2', color: '🟨' },
+  ],
+  OPERACIONAL: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟧' },
+    { label: 'Escalas', path: '/gestao-escalas', icon: 'Calendar', color: '🟧' },
+    { label: 'Postos', path: '/rh/postos', icon: 'MapPin', color: '🟧' },
+    { label: 'Operacional', path: '/operacional', icon: 'Shield', color: '🟧' },
+    { label: 'Rondas', path: '/controle-rondas', icon: 'Activity', color: '🟧' },
+    { label: 'Frota', path: '/frota', icon: 'Truck', color: '🟧' },
+    { label: 'Equipamentos', path: '/epis', icon: 'Package', color: '🟧' },
+  ],
   VIGILANTE: [],
   AUXI_ADMINISTRATIVO: [],
   AUX_DEP: [],

@@ -16,6 +16,7 @@ export interface Client {
   contactPhone?: string;
   status: ClientStatus;
   notes?: string;
+  notifiedDepartments?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +43,7 @@ export interface ClientFormData {
   contactPhone?: string;
   status?: ClientStatus;
   notes?: string;
+  notifiedDepartments?: string[];
 }
 
 export interface ClientSearchParams {

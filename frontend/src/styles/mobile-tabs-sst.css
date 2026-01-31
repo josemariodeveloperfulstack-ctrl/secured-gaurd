@@ -1,32 +1,16 @@
-/* Padrão SST - Mobile First Tabs */
+/* Padrão SST - Mobile First Tabs (Sharp Stream) */
 
 /* Esconder scrollbar mas manter funcionalidade */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari, Opera */
-}
-
-/* Indicador visual de scroll no mobile */
-@media (max-width: 768px) {
-  .scrollbar-hide::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 40px;
-    background: linear-gradient(
-      to left,
-      rgba(15, 23, 42, 0.9),
-      transparent
-    );
-    pointer-events: none;
-    z-index: 10;
-  }
+  display: none;
+  /* Chrome, Safari, Opera */
 }
 
 /* Smooth scroll behavior */
@@ -35,44 +19,63 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Padrão SST: Tap Targets mínimos de 48x48px */
+/* Padrão SST: Tap Targets mínimos de 48x48px + Sharp Geometry */
 @media (max-width: 768px) {
-  .modern-tab {
-    min-width: 85px !important;
-    min-height: 85px !important;
+  .sharp-tab {
+    min-width: 100px !important;
+    min-height: 52px !important;
+    border-radius: 2px !important;
+    /* Sharp geometry */
     touch-action: manipulation;
+    text-transform: uppercase;
+    font-size: 11px !important;
+    letter-spacing: 0.05em;
+    font-weight: 700 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   }
-}
 
-/* Garantir que tabs no mobile sejam acessíveis */
-@media (max-width: 768px) {
-  .modern-tab:first-child {
-    margin-left: 4px;
+  /* Aba ativa - Mantendo cores do sistema dinamicamente */
+  .sharp-tab[data-state='active'] {
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
   }
-  
-  .modern-tab:last-child {
-    margin-right: 4px;
-  }
-}
 
-/* Feedback visual aprimorado para touch */
-.modern-tab:active {
-  transform: scale(0.95);
-  transition: transform 0.1s ease;
-}
-
-/* Indicador de tab ativa no mobile */
-@media (max-width: 768px) {
-  .modern-tab[data-state='active']::after {
+  .sharp-tab[data-state='active']::after {
     content: '';
     position: absolute;
-    bottom: -2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40px;
+    bottom: 0;
+    left: 0;
+    right: 0;
     height: 3px;
-    background: linear-gradient(90deg, transparent, #ef4444, transparent);
-    border-radius: 2px 2px 0 0;
+    background: rgba(255, 255, 255, 0.8);
+    /* Barra indicadora branca discreta */
+    z-index: 10;
   }
 }
 
+/* Feedback visual para touch */
+.sharp-tab:active {
+  transform: scale(0.96);
+}
+
+/* Container de abas sharp - Forçando scroll horizontal no Mobile */
+@media (max-width: 768px) {
+  .sharp-tabs-list {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    justify-content: flex-start !important;
+    background-color: rgba(10, 10, 10, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 6px !important;
+    gap: 8px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sharp-tab {
+    flex: 0 0 auto !important;
+    /* Impede que as abas encolham */
+  }
+}

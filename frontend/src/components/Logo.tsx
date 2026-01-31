@@ -16,9 +16,9 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', type = 'full', className = '' 
 
   return (
     <img
-      src="/promover-logo.png"
+      src="/logo-sistema.png"
       alt="Promover Vigilância Patrimonial"
-      className={`${sizeClasses[size]} w-auto ${className}`}
+      className={`${sizeClasses[size]} w-auto object-contain ${className}`}
     />
   );
 

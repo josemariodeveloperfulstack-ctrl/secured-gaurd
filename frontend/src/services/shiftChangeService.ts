@@ -117,6 +117,44 @@ class ShiftChangeService {
             throw error;
         }
     }
+
+    async approveShiftChange(id: number, observations?: string): Promise<ShiftChangeFormDTO> {
+        try {
+            const response = await axios.put<ShiftChangeFormDTO>(
+                `${API_URL}/operational/shift-changes/${id}/approve`,
+                { observations },
+                { headers: this.getAuthHeaders() }
+            );
+            return response.data;
+        } catch (error: any) {
+            const errorMessage = error.response?.data?.message || "Erro ao aprovar troca de plantão.";
+            toast({
+                title: "Erro",
+                description: errorMessage,
+                variant: "destructive",
+            });
+            throw error;
+        }
+    }
+
+    async rejectShiftChange(id: number, observations?: string): Promise<ShiftChangeFormDTO> {
+        try {
+            const response = await axios.put<ShiftChangeFormDTO>(
+                `${API_URL}/operational/shift-changes/${id}/reject`,
+                { observations },
+                { headers: this.getAuthHeaders() }
+            );
+            return response.data;
+        } catch (error: any) {
+            const errorMessage = error.response?.data?.message || "Erro ao rejeitar troca de plantão.";
+            toast({
+                title: "Erro",
+                description: errorMessage,
+                variant: "destructive",
+            });
+            throw error;
+        }
+    }
 }
 
 export default new ShiftChangeService();

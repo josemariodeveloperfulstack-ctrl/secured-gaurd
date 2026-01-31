@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  FileText, 
-  Download, 
-  MessageSquare, 
-  User, 
+import {
+  FileText,
+  Download,
+  MessageSquare,
+  User,
   Calendar,
   File,
   CheckCircle,
@@ -25,15 +25,17 @@ import { payslipService } from '@/services/payslipService';
 import { receiptService } from '@/services/receiptService';
 import { unifiedDocumentService } from '@/services/unifiedDocumentService';
 import { useNavigate } from 'react-router-dom';
+import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
+import holeriteService from '@/services/holeriteService';
 
 interface Payslip {
-  id: string;
+  id: string; // Mantendo string por compatibilidade com o estado local, mas o serviço suporta number
   employeeName: string;
   cpf: string;
   month: number;
   year: number;
   fileName: string;
-  filePath: string;
+  filePath?: string;
   createdAt: string;
 }
 
@@ -100,70 +102,86 @@ const DashboardColaborador: React.FC = () => {
     }
   };
 
-  const handleDownloadPayslip = async (fileName: string) => {
+  // Preview State
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<any>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const handleOpenPreview = async (item: any, type: 'holerite' | 'receipt' | 'unified') => {
     try {
-      await payslipService.downloadPayslip(fileName);
+      setPreviewLoading(true);
+      setPreviewDoc({ ...item, docType: type });
+      setPreviewOpen(true);
+
+      let blob: Blob;
+      if (type === 'holerite') {
+        // Usar downloadByID se disponível para maior precisão
+        blob = await holeriteService.downloadHoleriteById(item.id);
+      } else if (type === 'receipt') {
+        blob = await receiptService.downloadReceiptBlob(item.id);
+      } else {
+        blob = await unifiedDocumentService.downloadUnifiedDocumentBlob(item.fileName || item.unifiedFileName);
+      }
+
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      setPreviewUrl(url);
+    } catch (err: any) {
+      console.error('Erro ao visualizar documento', err);
       toast({
-        title: 'Sucesso',
-        description: 'Holerite baixado com sucesso!',
-        variant: 'default'
+        title: 'Erro ao visualizar',
+        description: 'Não foi possível carregar a pré-visualização.',
+        variant: 'destructive',
       });
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível baixar o holerite',
-        variant: 'destructive'
-      });
+      setPreviewOpen(false);
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
-  const handleDownloadReceipt = async (receipt: Receipt) => {
-    if (!receipt?.id) {
-      toast({
-        title: 'Documento inválido',
-        description: 'Não foi possível identificar o comprovante.',
-        variant: 'destructive',
-      });
-      return;
+  const handleClosePreview = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
     }
-
-    try {
-      await receiptService.downloadReceipt(receipt.id, receipt.fileName);
-      toast({
-        title: 'Sucesso',
-        description: 'Comprovante baixado com sucesso!',
-        variant: 'default'
-      });
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível baixar o comprovante',
-        variant: 'destructive'
-      });
-    }
+    setPreviewUrl('');
+    setPreviewOpen(false);
+    setPreviewDoc(null);
   };
 
-  const handleDownloadUnified = async (fileName?: string) => {
-    if (!fileName) {
-      toast({
-        title: 'Documento inválido',
-        description: 'Não foi possível identificar o arquivo para download.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+  const handleDownloadFile = async (item: any, type: 'holerite' | 'receipt' | 'unified') => {
     try {
-      await unifiedDocumentService.downloadUnifiedDocument(fileName);
+      let blob: Blob;
+      if (type === 'holerite') {
+        blob = await holeriteService.downloadHoleriteById(item.id);
+      } else if (type === 'receipt') {
+        blob = await receiptService.downloadReceiptBlob(item.id);
+      } else {
+        blob = await unifiedDocumentService.downloadUnifiedDocumentBlob(item.fileName || item.unifiedFileName);
+      }
+
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', item.fileName || item.unifiedFileName || `documento_${item.id}.pdf`);
+      link.setAttribute('target', '_blank');
+
+      document.body.appendChild(link);
+      link.click();
+
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
       toast({
         title: 'Sucesso',
-        description: 'Documento unificado baixado com sucesso!',
-        variant: 'default'
+        description: 'Documento baixado com sucesso!',
       });
-    } catch (error) {
+    } catch (err: any) {
+      console.error('Erro ao baixar documento', err);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível baixar o documento',
+        title: 'Erro ao baixar',
+        description: 'Não foi possível baixar o arquivo.',
         variant: 'destructive'
       });
     }
@@ -197,396 +215,158 @@ const DashboardColaborador: React.FC = () => {
 
   return (
     <StandardLayout>
-      <div className="space-y-6 p-6">
-        {/* Cabeçalho com dados do colaborador */}
-        <div className="bg-seguranca-black/60 border border-gray-800 rounded-2xl shadow-sm p-5 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-seguranca-yellow/15 rounded-full flex items-center justify-center">
-                <User className="h-6 w-6 sm:h-7 sm:w-7 text-seguranca-yellow" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs uppercase tracking-wide text-gray-500">Portal do Colaborador</p>
-                <h1 className="text-xl sm:text-2xl font-semibold text-seguranca-lightgray">
-                  Bem-vindo, {user?.name}!
-                </h1>
-                <p className="text-sm text-gray-400">
-                  Acompanhe seus holerites, comprovantes e documentos unificados em um só lugar.
-                </p>
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <Badge className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/30">
-                    Colaborador
-                  </Badge>
-                  <Badge variant="outline" className="border-gray-700 text-gray-300">
-                    {payslips.length + receipts.length + unifiedDocs.length} documentos disponíveis
-                  </Badge>
-                </div>
-              </div>
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-8 pb-24 md:pb-8">
+        {/* Cabeçalho Minimalista */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-seguranca-yellow rounded-full flex items-center justify-center text-seguranca-black text-2xl font-bold border-4 border-seguranca-graphite shadow-lg">
+              {user?.name?.charAt(0)}
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm text-gray-400 w-full sm:w-auto">
-              <div>
-                <span className="block text-xs uppercase text-gray-500">CPF</span>
-                <span className="font-medium text-seguranca-lightgray break-all">
-                  {user?.username}
-                </span>
-              </div>
-              {user?.email && (
-                <div>
-                  <span className="block text-xs uppercase text-gray-500">Email</span>
-                  <span className="font-medium text-seguranca-lightgray break-all">
-                    {user.email}
-                  </span>
-                </div>
-              )}
+            <div>
+              <h1 className="text-xl font-bold text-seguranca-lightgray leading-tight">Olá, {user?.name?.split(' ')[0]}</h1>
+              <p className="text-sm text-gray-500">Unidade: {user?.unidadeName || 'Geral'}</p>
             </div>
+          </div>
+          <div className="relative" onClick={() => navigate('/mensagens')}>
+            <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 bg-seguranca-red flex items-center justify-center border-2 border-seguranca-black">
+              2
+            </Badge>
+            <Button size="icon" variant="ghost" className="rounded-full bg-seguranca-black/40 border border-gray-800 text-gray-400">
+              <Mail className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
-        {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-400" />
-                Holerites
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">
-                {payslips.length}
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Disponíveis para download</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-                <File className="w-4 h-4 text-green-400" />
-                Comprovantes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">
-                {receipts.length}
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Disponíveis para download</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-400 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-purple-400" />
-                Unificados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl sm:text-3xl font-bold text-seguranca-lightgray">
-                {unifiedDocs.length}
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Documentos completos</p>
-            </CardContent>
-          </Card>
+        {/* Quick Action Grid - Brutalist Theme */}
+        <div className="grid grid-cols-2 gap-4">
+          <Button
+            className="h-28 flex flex-col items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-white/10 rounded-3xl shadow-lg transition-transform active:scale-95"
+            onClick={() => navigate('/meu-ponto')}
+          >
+            <Clock className="w-8 h-8" />
+            <span className="font-bold text-lg">PONTO</span>
+          </Button>
+          <Button
+            className="h-28 flex flex-col items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-white/10 rounded-3xl shadow-lg transition-transform active:scale-95"
+            onClick={() => navigate('/meus-holerites')}
+          >
+            <FileText className="w-8 h-8" />
+            <span className="font-bold text-lg">DOCS</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center gap-1 bg-seguranca-black/40 border-gray-800 text-gray-400 rounded-2xl transition-transform active:scale-95"
+            onClick={() => navigate('/minhas-ferias')}
+          >
+            <Calendar className="w-5 h-5 text-indigo-400" />
+            <span className="text-xs font-semibold">FÉRIAS</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center gap-1 bg-seguranca-black/40 border-gray-800 text-gray-400 rounded-2xl transition-transform active:scale-95"
+            onClick={() => navigate('/meus-plantoes')}
+          >
+            <CheckCircle className="w-5 h-5 text-amber-400" />
+            <span className="text-xs font-semibold">PLANTÕES</span>
+          </Button>
         </div>
 
-        {/* Tabs com conteúdo */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="flex w-full flex-wrap gap-2 bg-[#08080F]/90 border border-gray-900/60 rounded-2xl p-1.5 shadow-[0_18px_45px_rgba(0,0,0,0.45)]">
-            <TabsTrigger
-              value="overview"
-              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
-            >
-              Visão Geral
-              {/* {treinamentosPendentes.length > 0 && (
-                <Badge className="ml-2 bg-orange-500 text-white text-[10px]">
-                  {treinamentosPendentes.length}
-                </Badge>
-              )} */}
-            </TabsTrigger>
-            <TabsTrigger
-              value="payslips"
-              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
-            >
-              Holerites
-            </TabsTrigger>
-            <TabsTrigger
-              value="receipts"
-              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
-            >
-              Comprovantes
-            </TabsTrigger>
-            <TabsTrigger
-              value="unified"
-              className="flex-1 min-w-[140px] justify-center whitespace-nowrap rounded-xl border border-transparent bg-transparent text-xs sm:text-sm font-medium text-gray-400 transition-all data-[state='active']:border-seguranca-red data-[state='active']:bg-seguranca-red data-[state='active']:text-white data-[state='active']:shadow-[0_12px_32px_rgba(236,28,36,0.45)]"
-            >
-              Unificados
-            </TabsTrigger>
-          </TabsList>
+        {/* Action Stream - Section Title */}
+        <div className="space-y-4">
+          <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-600 pl-1">Próximas Ações</h2>
 
-          {/* Visão Geral */}
-          <TabsContent value="overview" className="space-y-4 mt-5">
-            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-seguranca-yellow" />
-                  Comunicação Interna
-                </CardTitle>
-                <CardDescription>
-                  Acesse suas mensagens e comunicados
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  onClick={() => navigate('/comunicacao/mensagens')}
-                  className="w-full bg-seguranca-yellow hover:bg-seguranca-yellow/80 text-seguranca-black"
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Abrir Mensagens
-                </Button>
+          <div className="space-y-4">
+            {/* Action Card: LGPD Priority (Action Stream Approach) */}
+            {!user?.lgpdAccepted && (
+              <Card className="bg-seguranca-red/10 border-seguranca-red/30 rounded-3xl overflow-hidden group">
+                <CardContent className="p-5 flex items-start gap-4">
+                  <div className="h-12 w-12 rounded-2xl bg-seguranca-red flex items-center justify-center shrink-0">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">LGPD Obrigatória</h3>
+                      <p className="text-sm text-gray-400">Temos novos termos de privacidade para você assinar.</p>
+                    </div>
+                    <Button
+                      className="w-full bg-white text-seguranca-red hover:bg-gray-100 font-bold rounded-2xl"
+                      onClick={() => navigate('/lgpd-consent')}
+                    >
+                      Assinar Termos AGORA
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Action Card: Documents */}
+            <Card className="bg-seguranca-black/60 border-gray-800 rounded-3xl border-l-4 border-l-blue-500 overflow-hidden">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-blue-400" />
+                    <h3 className="font-bold text-gray-200">Holerite mais recente</h3>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] border-gray-700">Out/25</Badge>
+                </div>
+                {payslips.length > 0 ? (
+                  <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                        <File className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div className="text-sm">
+                        <p className="font-medium text-gray-100">Holerite Mensal</p>
+                        <p className="text-xs text-gray-500">{payslips[0].fileName}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-white hover:bg-white/10"
+                      onClick={() => handleOpenPreview(payslips[0], 'holerite')}
+                    >
+                      <Eye className="w-5 h-5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 text-center py-2 italic font-medium">Nenhum documento novo liberado hoje.</p>
+                )}
               </CardContent>
             </Card>
 
-            {/* Documentos Recentes */}
-            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-blue-400" />
-                  Documentos Recentes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            {/* Action Card: Messages (Simplified) */}
+            <Card className="bg-seguranca-black/40 border-gray-800 rounded-3xl border-l-4 border-l-seguranca-yellow overflow-hidden">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <MessageSquare className="w-5 h-5 text-seguranca-yellow" />
+                    <h3 className="font-bold text-gray-200">Mensagens Internas</h3>
+                  </div>
+                  <Button variant="link" className="text-xs text-seguranca-yellow p-0 h-auto" onClick={() => navigate('/mensagens')}>Ver todas</Button>
+                </div>
                 <div className="space-y-2">
-                  {payslips.slice(0, 3).map((payslip) => {
-                    const payslipKey =
-                      payslip.id ??
-                      payslip.fileName ??
-                      `${payslip.employeeName}-${payslip.year}-${payslip.month}`;
-                    return (
-                    <div
-                      key={payslipKey}
-                      className="flex items-center justify-between p-3 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-4 h-4 text-blue-400" />
-                        <div>
-                          <p className="text-sm font-medium text-seguranca-lightgray">
-                            Holerite {getMonthName(payslip.month)}/{payslip.year}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {formatDate(payslip.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownloadPayslip(payslip.fileName)}
-                        className="border-seguranca-yellow/30 text-seguranca-yellow hover:bg-seguranca-yellow/10"
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  );
-                  })}
-                  {payslips.length === 0 && (
-                    <p className="text-center text-gray-400 py-4">
-                      Nenhum documento disponível
-                    </p>
-                  )}
+                  <div className="p-3 bg-white/5 rounded-2xl flex items-center gap-3 border border-transparent hover:border-gray-700 transition-colors cursor-pointer" onClick={() => navigate('/mensagens')}>
+                    <div className="w-2 h-2 rounded-full bg-seguranca-yellow shrink-0" />
+                    <p className="text-sm text-gray-300 truncate font-medium">Lembrete: Entrega de EPI amanhã na sede...</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* Holerites */}
-          <TabsContent value="payslips" className="mt-5">
-            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-seguranca-lightgray text-base sm:text-lg flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-blue-400" />
-                  Meus Holerites
-                </CardTitle>
-                <CardDescription>
-                  {payslips.length} {payslips.length === 1 ? 'holerite disponível' : 'holerites disponíveis'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {payslips.map((payslip) => {
-                    const payslipKey =
-                      payslip.id ??
-                      payslip.fileName ??
-                      `${payslip.employeeName}-${payslip.year}-${payslip.month}`;
-                    return (
-                    <div
-                      key={payslipKey}
-                      className="flex items-center justify-between p-4 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                          <FileText className="w-5 h-5 text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-seguranca-lightgray">
-                            Holerite {getMonthName(payslip.month)}/{payslip.year}
-                          </p>
-                          <p className="text-sm text-gray-400">
-                            Emitido em {formatDate(payslip.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDownloadPayslip(payslip.fileName)}
-                          className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Baixar
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                  })}
-                  {payslips.length === 0 && (
-                    <div className="text-center py-12">
-                      <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-400">Nenhum holerite disponível</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Comprovantes */}
-          <TabsContent value="receipts" className="mt-5">
-            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-seguranca-lightgray text-base sm:text-lg flex items-center gap-2">
-                  <File className="w-5 h-5 text-green-400" />
-                  Meus Comprovantes
-                </CardTitle>
-                <CardDescription>
-                  {receipts.length} {receipts.length === 1 ? 'comprovante disponível' : 'comprovantes disponíveis'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {receipts.map((receipt) => {
-                    const receiptKey =
-                      receipt.id ??
-                      receipt.fileName ??
-                      `${receipt.employeeName}-${receipt.year}-${receipt.month}`;
-                    return (
-                    <div
-                      key={receiptKey}
-                      className="flex items-center justify-between p-4 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
-                          <File className="w-5 h-5 text-green-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-seguranca-lightgray">
-                            Comprovante {getMonthName(receipt.month)}/{receipt.year}
-                          </p>
-                          <p className="text-sm text-gray-400">
-                            Transferência em {formatDate(receipt.transferDate)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDownloadReceipt(receipt)}
-                          className="border-green-500/30 text-green-400 hover:bg-green-500/10"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Baixar
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                  })}
-                  {receipts.length === 0 && (
-                    <div className="text-center py-12">
-                      <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-400">Nenhum comprovante disponível</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Unificados */}
-          <TabsContent value="unified" className="mt-5">
-            <Card className="bg-seguranca-black/60 border border-gray-800 rounded-xl shadow-sm">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-seguranca-lightgray text-base sm:text-lg flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-purple-400" />
-                  Documentos Unificados
-                </CardTitle>
-                <CardDescription>
-                  {unifiedDocs.length} {unifiedDocs.length === 1 ? 'documento disponível' : 'documentos disponíveis'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {unifiedDocs.map((doc) => {
-                    const docKey =
-                      doc.id ??
-                      doc.fileName ??
-                      doc.unifiedFileName ??
-                      `${doc.employeeName}-${doc.year}-${doc.month}`;
-                    return (
-                    <div
-                      key={docKey}
-                      className="flex items-center justify-between p-4 bg-seguranca-graphite rounded-lg hover:bg-seguranca-graphite/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
-                          <CheckCircle className="w-5 h-5 text-purple-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-seguranca-lightgray">
-                            Documento {getMonthName(doc.month)}/{doc.year}
-                          </p>
-                          <p className="text-sm text-gray-400">
-                            Holerite + Comprovante | {formatDate(doc.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDownloadUnified(doc.fileName ?? doc.unifiedFileName)}
-                          className="border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Baixar
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                  })}
-                  {unifiedDocs.length === 0 && (
-                    <div className="text-center py-12">
-                      <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-400">Nenhum documento unificado disponível</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
       </div>
+
+      {/* Modal de Pré-visualização */}
+      <DocumentPreviewModal
+        isOpen={previewOpen}
+        onClose={handleClosePreview}
+        title={previewDoc?.docType === 'holerite' ? 'Holerite' : 'Comprovante'}
+        fileName={previewDoc?.fileName || ''}
+        fileUrl={previewUrl}
+        onDownload={() => handleDownloadFile(previewDoc, previewDoc?.docType)}
+        loading={previewLoading}
+      />
     </StandardLayout>
   );
 };

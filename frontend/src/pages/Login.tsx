@@ -18,7 +18,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { user, login } = useAuth();
   const { toast } = useToast();
-  
+
   // Estados para Funcionário (aba atual)
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +26,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  
+
   // Estados para Supervisor
   const [supervisorCpf, setSupervisorCpf] = useState('');
   const [supervisorLoading, setSupervisorLoading] = useState(false);
@@ -48,7 +48,7 @@ const Login = () => {
   useEffect(() => {
     const savedUsername = localStorage.getItem('rememberedUsername');
     const savedRememberMe = localStorage.getItem('rememberMe') === 'true';
-    
+
     if (savedRememberMe && savedUsername) {
       setUsername(savedUsername);
       setRememberMe(true);
@@ -66,14 +66,14 @@ const Login = () => {
         navigate('/dashboard');
       }
     }, 200);
-    
+
     return () => clearTimeout(timer);
   }, [user, navigate, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (!username || !password) {
       setError('Por favor, preencha todos os campos.');
       return;
@@ -85,11 +85,11 @@ const Login = () => {
       console.log('🔐 Iniciando login...');
       console.log('👤 Usuário:', username);
       console.log('🔗 API URL:', window.location.origin);
-      
+
       await login(username, password);
-      
+
       console.log('✅ Login bem-sucedido!');
-      
+
       // Gerenciar Remember Me
       if (rememberMe) {
         localStorage.setItem('rememberedUsername', username);
@@ -107,10 +107,10 @@ const Login = () => {
         response: error?.response?.data,
         status: error?.response?.status
       });
-      
+
       // Mensagem de erro mais específica
       let errorMessage = 'Falha na autenticação. Verifique seu usuário e senha.';
-      
+
       if (error?.response?.status === 401) {
         errorMessage = error?.response?.data?.message || 'Usuário ou senha incorretos.';
       } else if (error?.response?.status === 403) {
@@ -122,7 +122,7 @@ const Login = () => {
       } else if (error?.message) {
         errorMessage = error.message;
       }
-      
+
       setError(errorMessage);
       toast({
         title: 'Erro ao fazer login',
@@ -138,7 +138,7 @@ const Login = () => {
   const handleSupervisorCpfLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setSupervisorError('');
-    
+
     if (!supervisorCpf) {
       setSupervisorError('Por favor, informe o CPF.');
       return;
@@ -159,7 +159,7 @@ const Login = () => {
 
       if (data.success) {
         setSupervisorData(data.supervisor);
-        
+
         if (data.needsConsent) {
           setNeedsConsent(true);
         } else {
@@ -221,7 +221,7 @@ const Login = () => {
 
   return (
     <>
-      <SEO 
+      <SEO
         title="Login - Área Administrativa"
         description="Acesse o sistema administrativo da Promover Vigilância. Área restrita para funcionários e administradores."
         keywords="login, acesso, sistema, administrativo, promover vigilância"
@@ -241,7 +241,7 @@ const Login = () => {
             </span>
             <h2 className="text-2xl font-semibold text-seguranca-lightgray">Acesso ao Sistema</h2>
             <p className="text-sm text-gray-400">
-              Escolha seu perfil de acesso para entrar na plataforma Secure Guard.
+              Escolha seu perfil de acesso para entrar na plataforma Promover Vigilância.
             </p>
           </div>
 
@@ -312,8 +312,8 @@ const Login = () => {
 
                 <div className="flex items-center justify-between text-sm flex-wrap gap-3">
                   <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="remember" 
+                    <Checkbox
+                      id="remember"
                       checked={rememberMe}
                       onCheckedChange={(checked) => setRememberMe(checked === true)}
                       className="h-4 w-4 rounded border-gray-600 bg-seguranca-graphite text-seguranca-yellow focus:ring-seguranca-yellow"
@@ -322,9 +322,9 @@ const Login = () => {
                       Lembrar-me
                     </label>
                   </div>
-                  <button 
+                  <button
                     type="button"
-                    onClick={() => navigate('/forgot-password')} 
+                    onClick={() => navigate('/forgot-password')}
                     className="text-seguranca-lightgray hover:text-seguranca-yellow transition-colors"
                   >
                     Esqueci minha senha
@@ -365,7 +365,7 @@ const Login = () => {
                         {supervisorData?.name} - {supervisorData?.cpf}
                       </p>
                     </div>
-                    
+
                     <div className="p-6 overflow-y-auto max-h-[50vh] bg-seguranca-black text-sm">
                       <div className="space-y-4">
                         <h4 className="font-semibold text-seguranca-yellow">Termos de Uso</h4>
@@ -378,7 +378,7 @@ const Login = () => {
                           <li>Confidencialidade das informações acessadas</li>
                           <li>Respeito à privacidade dos funcionários e visitantes</li>
                         </ul>
-                        
+
                         <h4 className="font-semibold text-seguranca-yellow mt-6">Política de Privacidade</h4>
                         <p>
                           Seus dados pessoais são tratados de acordo com a Lei Geral de Proteção de Dados (LGPD):
@@ -391,7 +391,7 @@ const Login = () => {
                         </ul>
                       </div>
                     </div>
-                    
+
                     <div className="p-6 border-t border-gray-600">
                       <Button
                         onClick={handleAcceptTerms}
@@ -452,7 +452,7 @@ const Login = () => {
         </div>
 
         <div className="mt-6 text-sm text-gray-500" data-animate="fadeUp" data-delay="500">
-          Secure Guard Control © {new Date().getFullYear()}
+          Promover Vigilância Patrimonial © {new Date().getFullYear()}
         </div>
       </div>
     </>

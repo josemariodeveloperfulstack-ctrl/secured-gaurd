@@ -85,6 +85,9 @@ public class Client {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Transient
+    private List<String> notifiedDepartments;
+
     @OneToMany(mappedBy = "client", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnoreProperties("client")
     private List<Unit> units = new ArrayList<>();

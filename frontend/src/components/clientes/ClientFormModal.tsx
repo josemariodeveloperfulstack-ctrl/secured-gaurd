@@ -6,19 +6,32 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Building2, Mail, Phone, MapPin, User, Hash, 
-  FileText, Save, X, Smartphone, Home, CreditCard 
+import {
+  Building2, Mail, Phone, MapPin, User, Hash,
+  FileText, Save, X, Smartphone, Home, CreditCard, CheckCircle,
+  Briefcase, Plus, Edit, Trash2, Eye
 } from 'lucide-react';
 import { Client, ClientFormData, ClientStatus } from '@/types/client';
 import { clientService } from '@/services/clientService';
+import { workPostService, WorkPost } from '@/services/workPostService';
 import { useToast } from '@/hooks/use-toast';
+import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
+import WorkPostDeleteDialog from '@/components/postos/WorkPostDeleteDialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 // Funções de máscara
 const formatCNPJ = (value: string): string => {
   // Remove todos os caracteres não numéricos
   const numbers = value.replace(/\D/g, '');
-  
+
   // Aplica a máscara do CNPJ: 00.000.000/0000-00
   if (numbers.length <= 2) {
     return numbers;
@@ -36,7 +49,7 @@ const formatCNPJ = (value: string): string => {
 const formatPhone = (value: string): string => {
   // Remove todos os caracteres não numéricos
   const numbers = value.replace(/\D/g, '');
-  
+
   // Aplica a máscara do telefone: (00) 0000-0000 ou (00) 00000-0000
   if (numbers.length <= 2) {
     return numbers;
@@ -52,7 +65,7 @@ const formatPhone = (value: string): string => {
 const formatZipCode = (value: string): string => {
   // Remove todos os caracteres não numéricos
   const numbers = value.replace(/\D/g, '');
-  
+
   // Aplica a máscara do CEP: 00000-000
   if (numbers.length <= 5) {
     return numbers;
@@ -93,6 +106,32 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     status: ClientStatus.ACTIVE,
     notes: ''
   });
+
+  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [isPostFormOpen, setIsPostFormOpen] = useState(false);
+  const [isPostDeleteDialogOpen, setIsPostDeleteDialogOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<WorkPost | null>(null);
+  const [editingPost, setEditingPost] = useState<WorkPost | null>(null);
+
+  const loadWorkPosts = async () => {
+    if (!client?.id) return;
+    try {
+      setLoadingPosts(true);
+      const posts = await workPostService.getWorkPostsByClient(client.id);
+      setWorkPosts(posts);
+    } catch (error) {
+      console.error('Erro ao carregar postos:', error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && client?.id && activeTab === 'postos-de-trabalho') {
+      loadWorkPosts();
+    }
+  }, [isOpen, client, activeTab]);
 
   useEffect(() => {
     if (client) {
@@ -135,7 +174,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
   const handleInputChange = (field: keyof ClientFormData, value: string) => {
     let formattedValue = value;
-    
+
     // Aplicar máscaras específicas
     if (field === 'cnpj') {
       formattedValue = formatCNPJ(value);
@@ -144,7 +183,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
     } else if (field === 'zipCode') {
       formattedValue = formatZipCode(value);
     }
-    
+
     setFormData(prev => ({
       ...prev,
       [field]: formattedValue
@@ -157,7 +196,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
 
     try {
       console.log('[DEBUG] ClientFormModal - Dados do formulário:', formData);
-      
+
       if (client) {
         // Limpar campos vazios e remover máscaras antes de enviar
         const cleanData = {
@@ -175,7 +214,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           contactPhone: formData.contactPhone?.replace(/\D/g, '') || undefined,
           notes: formData.notes?.trim() || undefined
         };
-        
+
         const saved = await clientService.updateClient(client.id, cleanData);
         toast({
           title: "✅ Cliente atualizado",
@@ -184,7 +223,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         onSuccess();
       } else {
         console.log('[DEBUG] ClientFormModal - Criando novo cliente com dados:', formData);
-        
+
         // Limpar campos vazios e remover máscaras antes de enviar
         const cleanData = {
           ...formData,
@@ -201,7 +240,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
           contactPhone: formData.contactPhone?.replace(/\D/g, '') || undefined,
           notes: formData.notes?.trim() || undefined
         };
-        
+
         console.log('[DEBUG] ClientFormModal - Dados limpos:', cleanData);
         const saved = await clientService.createClient(cleanData);
         console.log('[DEBUG] ClientFormModal - Cliente criado com sucesso:', saved);
@@ -211,7 +250,7 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         });
         onSuccess(saved);
       }
-      
+
       onClose();
     } catch (error: any) {
       console.error('[ERROR] ClientFormModal - Erro ao salvar cliente:', error);
@@ -270,27 +309,41 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-seguranca-black/50 border border-gray-600/30 p-1">
-                <TabsTrigger 
+              <TabsList className="flex w-full overflow-x-auto bg-seguranca-black/50 border border-gray-600/30 p-1 no-scrollbar space-x-1">
+                <TabsTrigger
                   value="dados-basicos"
-                  className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400"
+                  className="min-w-fit px-4 flex-1 data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400 whitespace-nowrap"
                 >
                   <Building2 className="h-4 w-4 mr-2" />
                   Dados Básicos
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="endereco"
-                  className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400"
+                  className="min-w-fit px-4 flex-1 data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400 whitespace-nowrap"
                 >
                   <MapPin className="h-4 w-4 mr-2" />
                   Endereço
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="contato"
-                  className="data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400"
+                  className="min-w-fit px-4 flex-1 data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400 whitespace-nowrap"
                 >
                   <User className="h-4 w-4 mr-2" />
                   Contato
+                </TabsTrigger>
+                <TabsTrigger
+                  value="notificacoes"
+                  className="min-w-fit px-4 flex-1 data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400 whitespace-nowrap"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Notificações
+                </TabsTrigger>
+                <TabsTrigger
+                  value="postos-de-trabalho"
+                  className="min-w-fit px-4 flex-1 data-[state='active']:bg-seguranca-red data-[state='active']:text-white text-gray-400 whitespace-nowrap"
+                >
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  Postos de Trabalho
                 </TabsTrigger>
               </TabsList>
 
@@ -530,6 +583,169 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                   </div>
                 </div>
               </TabsContent>
+
+              {/* Notificações */}
+              <TabsContent value="notificacoes" className="space-y-4 mt-4">
+                <div className="bg-seguranca-black/50 border border-gray-600/30 rounded-xl p-6">
+                  <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-seguranca-red" />
+                    Departamentos para Notificar
+                  </h4>
+                  <p className="text-sm text-gray-400 mb-6">
+                    Selecione quais departamentos devem receber uma notificação sobre este novo cliente.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { id: 'comercial', label: 'Comercial' },
+                      { id: 'operacional', label: 'Operacional' },
+                      { id: 'pessoal', label: 'DP / Pessoal' },
+                      { id: 'rh', label: 'Recursos Humanos' },
+                      { id: 'financeiro', label: 'Financeiro' }
+                    ].map((dept) => (
+                      <div
+                        key={dept.id}
+                        className={`flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer ${formData.notifiedDepartments?.includes(dept.id)
+                          ? 'bg-seguranca-red/10 border-seguranca-red/50 text-white'
+                          : 'bg-seguranca-black/30 border-gray-600/30 text-gray-400 hover:border-gray-600'
+                          }`}
+                        onClick={() => {
+                          const currentDepts = formData.notifiedDepartments || [];
+                          const nextDepts = currentDepts.includes(dept.id)
+                            ? currentDepts.filter(id => id !== dept.id)
+                            : [...currentDepts, dept.id];
+                          setFormData(prev => ({ ...prev, notifiedDepartments: nextDepts }));
+                        }}
+                      >
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.notifiedDepartments?.includes(dept.id)
+                          ? 'bg-seguranca-red border-seguranca-red'
+                          : 'border-gray-600'
+                          }`}>
+                          {formData.notifiedDepartments?.includes(dept.id) && (
+                            <CheckCircle className="h-3.5 w-3.5 text-white" />
+                          )}
+                        </div>
+                        <span className="font-medium">{dept.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Postos de Trabalho */}
+              <TabsContent value="postos-de-trabalho" className="space-y-4 mt-4">
+                <div className="bg-seguranca-black/50 border border-gray-600/30 rounded-xl p-6 min-h-[400px]">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <h4 className="text-lg font-semibold flex items-center gap-2">
+                        <Briefcase className="h-5 w-5 text-seguranca-red" />
+                        Postos de Trabalho Vinculados
+                      </h4>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Gerencie os postos de serviço deste cliente.
+                      </p>
+                    </div>
+                    {client?.id && (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setEditingPost(null);
+                          setIsPostFormOpen(true);
+                        }}
+                        className="bg-seguranca-red hover:bg-seguranca-darkred"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Novo Posto
+                      </Button>
+                    )}
+                  </div>
+
+                  {!client?.id ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="p-4 rounded-full bg-gray-600/10 mb-4">
+                        <Save className="h-10 w-10 text-gray-500" />
+                      </div>
+                      <h5 className="text-white font-medium">Cliente ainda não salvo</h5>
+                      <p className="text-gray-400 max-w-xs mt-2">
+                        Salve o cliente primeiro para poder cadastrar postos de trabalho para ele.
+                      </p>
+                    </div>
+                  ) : loadingPosts ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-seguranca-red"></div>
+                      <p className="text-gray-400 mt-4">Carregando postos...</p>
+                    </div>
+                  ) : workPosts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed border-gray-600/30 rounded-xl">
+                      <Briefcase className="h-10 w-10 text-gray-600 mb-4" />
+                      <h5 className="text-white font-medium">Nenhum posto encontrado</h5>
+                      <p className="text-gray-400 max-w-xs mt-2">
+                        Este cliente ainda não possui postos de trabalho cadastrados.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-gray-600/30 overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-seguranca-black/80">
+                          <TableRow className="hover:bg-transparent border-gray-600/30">
+                            <TableHead className="text-gray-300 font-bold">Código</TableHead>
+                            <TableHead className="text-gray-300 font-bold">Nome</TableHead>
+                            <TableHead className="text-gray-300 font-bold">Tipo</TableHead>
+                            <TableHead className="text-gray-300 font-bold">Status</TableHead>
+                            <TableHead className="text-right text-gray-300 font-bold">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {workPosts.map((post) => (
+                            <TableRow key={post.id} className="hover:bg-white/5 border-gray-600/30">
+                              <TableCell className="font-mono text-seguranca-yellow text-xs">{post.postCode}</TableCell>
+                              <TableCell className="font-medium text-white">{post.name}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-[10px] uppercase border-gray-600">
+                                  {post.type?.replace('POSTO_', '')}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={`text-[10px] ${post.status === 'ATIVO' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                  {post.status?.replace('_', ' ')}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-gray-400 hover:text-white"
+                                    onClick={() => {
+                                      setEditingPost(post);
+                                      setIsPostFormOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-gray-400 hover:text-seguranca-red"
+                                    onClick={() => {
+                                      setSelectedPost(post);
+                                      setIsPostDeleteDialogOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
             </Tabs>
           </div>
 
@@ -540,19 +756,19 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                 <span className="text-seguranca-red">*</span> Campos obrigatórios
               </p>
               <div className="flex gap-3">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={onClose} 
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
                   className="border-gray-600 text-white hover:bg-seguranca-black hover:text-white px-6"
                   disabled={isLoading}
                 >
                   <X className="h-4 w-4 mr-2" />
                   Cancelar
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isLoading} 
+                <Button
+                  type="submit"
+                  disabled={isLoading}
                   className="bg-seguranca-red hover:bg-seguranca-darkred px-6 shadow-lg shadow-seguranca-red/20"
                 >
                   <Save className="h-4 w-4 mr-2" />
@@ -562,6 +778,51 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
             </div>
           </div>
         </form>
+
+        {/* WorkPost Modals */}
+        {client?.id && (
+          <>
+            <WorkPostFormModal
+              open={isPostFormOpen}
+              onOpenChange={setIsPostFormOpen}
+              workPost={editingPost}
+              clients={[]}
+              onSubmit={() => {
+                setIsPostFormOpen(false);
+                loadWorkPosts();
+              }}
+              forcedClientId={client?.id}
+              defaultAddress={formData.address}
+              defaultCity={formData.city}
+              defaultState={formData.state}
+              defaultZipCode={formData.zipCode}
+            />
+
+            <WorkPostDeleteDialog
+              open={isPostDeleteDialogOpen}
+              onOpenChange={setIsPostDeleteDialogOpen}
+              workPost={selectedPost}
+              onConfirm={async () => {
+                if (!selectedPost) return;
+                try {
+                  await workPostService.deleteWorkPost(selectedPost.id);
+                  loadWorkPosts();
+                  setIsPostDeleteDialogOpen(false);
+                  toast({
+                    title: "✅ Posto removido",
+                    description: "O posto de trabalho foi excluído com sucesso.",
+                  });
+                } catch (error) {
+                  toast({
+                    title: "❌ Erro",
+                    description: "Erro ao excluir posto de trabalho.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            />
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

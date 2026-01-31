@@ -2,16 +2,16 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  BarChart3, 
-  FileText, 
-  Calendar, 
-  Users, 
-  User2, 
-  ClipboardList, 
-  DollarSign, 
-  FileSpreadsheet, 
-  Building2, 
+import {
+  BarChart3,
+  FileText,
+  Calendar,
+  Users,
+  User2,
+  ClipboardList,
+  DollarSign,
+  FileSpreadsheet,
+  Building2,
   Settings,
   Truck,
   Shield,
@@ -95,48 +95,28 @@ import {
   FileImage,
   FileVideo,
   FileAudio,
-  FilePdf,
-  FileWord,
-  FileExcel,
-  FilePowerpoint,
   FileArchive,
   FileCode,
   FileJson,
-  FileXml,
-  FileCsv,
-  FileDatabase,
   FileLock,
   FileMinus,
   FilePlus,
   FileSearch,
-  FileSlash,
-  FileText2,
-  FileType,
   FileUp,
   FileX,
-  FileZip,
   FolderPlus,
   FolderMinus,
-  FolderX,
   FolderCheck,
   FolderClock,
   FolderEdit,
   FolderHeart,
   FolderKey,
   FolderLock,
-  FolderOpen2,
-  FolderPause,
-  FolderPlay,
-  FolderQuestion,
+  FolderOpen,
   FolderSearch,
-  FolderSettings,
-  FolderStar,
   FolderSync,
   FolderTree,
   FolderUp,
-  FolderUser,
-  FolderWarning,
-  FolderX2
 } from 'lucide-react';
 import {
   Sidebar,
@@ -228,29 +208,29 @@ const departamentoPessoalMenuItems = [
   { icon: Banknote, text: 'Importar Dados Bancários', to: '/rh/funcionarios/importar-dados-bancarios', id: 'dp-funcionarios-importar-bancarios' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
-  
+
   // Gestão de Tempo e Frequência
   { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
   { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'dp-ponto-eletronico' },
   { icon: FileText, text: 'Fechamento de Horas', to: '/rh/fechamento-horas', id: 'rh-fechamento-horas' },
-  
+
   // Gestão de Ocorrências e Eventos
   { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'dp-ocorrencias' },
-  
+
   // Benefícios (agrupados)
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'dp-beneficios' },
-  
+
   // Estrutura Organizacional
   { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'dp-funcoes' },
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'dp-cargos' },
   { icon: MapPin, text: 'Postos', to: '/rh/postos', id: 'dp-postos' },
-  
+
   // Segurança e Compliance
   { icon: Shield, text: 'EPIs', to: '/rh/epis', id: 'dp-epis' },
-  
+
   // Documentos e Contratos
   { icon: FileSignature, text: 'Documentos', to: '/rh/documentos', id: 'dp-documentos' },
-  
+
   // Operações
   { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico', id: 'dp-ordens-servico' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'dp-vagas' },
@@ -323,8 +303,8 @@ const administrativoMenuItems = [
 export function AppSidebar() {
   const location = useLocation();
   const { user } = useAuth();
-  
-  
+
+
 
   // Menu principal - incluir Roles apenas para SUPER_ADMIN
   const getMainMenuItems = () => {
@@ -347,7 +327,7 @@ export function AppSidebar() {
   };
 
   const mainMenuItems = getMainMenuItems();
-  
+
   const getActiveId = () => {
     const path = location.pathname;
     const allItems = [
@@ -366,10 +346,10 @@ export function AppSidebar() {
       ...gestaoMensagensInternasMenuItems,
       ...administrativoMenuItems,
     ];
-    
+
     // Primeiro tenta encontrar uma correspondência exata
     let activeItem = allItems.find(item => item.to === path);
-    
+
     // Se não encontrar, tenta corresponder apenas o pathname (sem parâmetros)
     if (!activeItem) {
       activeItem = allItems.find(item => {
@@ -377,24 +357,24 @@ export function AppSidebar() {
         return itemPath === path;
       });
     }
-    
+
     return activeItem?.id || 'dashboard';
   };
 
   const isActive = (id: string) => getActiveId() === id;
 
   return (
-    <div className="bg-seguranca-graphite border-r border-gray-700 w-64 h-screen overflow-y-auto" style={{minHeight: '100vh'}}>
-      <div className="p-4 border-b border-gray-700">
-        <div className="text-white font-bold">Secure Guard</div>
+    <div className="bg-seguranca-graphite border-r border-gray-700 w-64 h-screen overflow-y-auto" style={{ minHeight: '100vh' }}>
+      <div className="p-4 border-b border-gray-700 flex items-center justify-center">
+        <Logo size="md" />
       </div>
-      
-      <div className="p-4" style={{minHeight: 'calc(100vh - 80px)'}}>
+
+      <div className="p-4" style={{ minHeight: 'calc(100vh - 80px)' }}>
         <div className="text-seguranca-lightgray mb-4">Menu Principal</div>
         {mainMenuItems.map(item => (
           <div className="mb-2" key={item.id}>
-            <a 
-              href={item.to} 
+            <a
+              href={item.to}
               className="flex items-center p-3 rounded-lg text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
             >
               <item.icon size={20} className="text-seguranca-yellow mr-3" />
@@ -410,8 +390,8 @@ export function AppSidebar() {
         </div>
         {financeiroMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
+            <a
+              href={item.to}
               className="flex items-center p-3 rounded-lg text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
@@ -427,13 +407,12 @@ export function AppSidebar() {
         </div>
         {empresasMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -448,13 +427,12 @@ export function AppSidebar() {
         </div>
         {comercialMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -469,13 +447,12 @@ export function AppSidebar() {
         </div>
         {estoqueMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -490,13 +467,12 @@ export function AppSidebar() {
         </div>
         {estoqueSimplificadoMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -511,13 +487,12 @@ export function AppSidebar() {
         </div>
         {comprasMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -532,13 +507,12 @@ export function AppSidebar() {
         </div>
         {rhMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -553,13 +527,12 @@ export function AppSidebar() {
         </div>
         {sstMenuItems.map(item => (
           <div className="mb-2 ml-8" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -574,13 +547,12 @@ export function AppSidebar() {
         </div>
         {departamentoPessoalMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -595,13 +567,12 @@ export function AppSidebar() {
         </div>
         {operacionalMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -616,13 +587,12 @@ export function AppSidebar() {
         </div>
         {mensagensMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -637,13 +607,12 @@ export function AppSidebar() {
         </div>
         {suporteMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -658,13 +627,12 @@ export function AppSidebar() {
         </div>
         {gestaoAtendimentoMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>
@@ -679,13 +647,12 @@ export function AppSidebar() {
         </div>
         {gestaoMensagensInternasMenuItems.map(item => (
           <div className="mb-2 ml-4" key={item.id}>
-            <a 
-              href={item.to} 
-              className={`flex items-center p-3 rounded-lg transition-colors ${
-                isActive(item.id) 
-                  ? 'bg-seguranca-black text-seguranca-yellow' 
-                  : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-              }`}
+            <a
+              href={item.to}
+              className={`flex items-center p-3 rounded-lg transition-colors ${isActive(item.id)
+                ? 'bg-seguranca-black text-seguranca-yellow'
+                : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                }`}
             >
               <item.icon size={18} className="text-seguranca-yellow mr-3" />
               <span>{item.text}</span>

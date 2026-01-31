@@ -106,8 +106,8 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
       const normalized: CreateSupplierRequest = {
         ...form,
         name: (form.name || '').trim(),
-        cnpj: formatCnpj(form.cnpj || ''),
-        cpf: form.cpf ? formatCpf(form.cpf) : undefined, // Send undefined if empty to avoid regex mismatch
+        cnpj: form.cnpj && form.cnpj.trim() ? formatCnpj(form.cnpj) : undefined,
+        cpf: form.cpf && form.cpf.trim() ? formatCpf(form.cpf) : undefined,
         email: form.email ? (form.email || '').trim() : undefined,
         phone: form.phone ? formatPhone(form.phone) : undefined,
         zipCode: form.zipCode ? formatZipCode(form.zipCode) : undefined,
@@ -123,14 +123,11 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
         throw new Error('Nome é obrigatório');
       }
 
-      // CNPJ ou CPF deve ser informado
-      if (!normalized.cnpj) {
-        throw new Error('CNPJ é obrigatório');
-      }
-
-      // Validação estrita de CNPJ
-      if (!validateCNPJ(normalized.cnpj)) {
-        throw new Error('CNPJ inválido. Verifique os dígitos informados.');
+      // Validar CNPJ se preenchido
+      if (normalized.cnpj) {
+        if (!validateCNPJ(normalized.cnpj)) {
+          throw new Error('CNPJ inválido. Verifique os dígitos informados.');
+        }
       }
 
       // Validar CPF se preenchido
@@ -201,7 +198,6 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
               <span className="text-red-500 text-sm font-medium">Campos obrigatórios:</span>
               <div className="flex gap-2">
                 <Badge variant="secondary" className="bg-red-500 hover:bg-red-600 text-white border-0 text-xs font-medium">Nome</Badge>
-                <Badge variant="secondary" className="bg-red-500 hover:bg-red-600 text-white border-0 text-xs font-medium">CNPJ</Badge>
               </div>
             </div>
           </div>
@@ -233,12 +229,11 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                 <div className="space-y-2 col-span-1 md:col-span-1">
                   <Label className="text-gray-300 text-sm flex items-center gap-2">
                     <Hash className="h-3.5 w-3.5 text-red-500" />
-                    CNPJ *
+                    CNPJ
                   </Label>
                   <Input
                     value={form.cnpj}
                     onChange={e => update('cnpj', formatCnpj(e.target.value))}
-                    required
                     className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="00.000.000/0000-00"
                   />

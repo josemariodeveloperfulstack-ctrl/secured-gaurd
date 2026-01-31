@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  BarChart3, 
+import {
   LogOut,
   User,
   Menu,
@@ -17,6 +16,8 @@ import { useSidebar } from '@/hooks/useSidebar';
 import { Breadcrumb } from './Breadcrumb';
 import { NotificationBell } from './NotificationBell';
 import UserProfileModal from './UserProfileModal';
+import Logo from './Logo';
+import { MobileNavbar } from './MobileNavbar';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -24,10 +25,10 @@ interface MainLayoutProps {
   subtitle?: string;
 }
 
-export const MainLayout: React.FC<MainLayoutProps> = ({ 
-  children, 
+export const MainLayout: React.FC<MainLayoutProps> = ({
+  children,
   title,
-  subtitle 
+  subtitle
 }) => {
   const { user, logout } = useAuth();
   const { collapsed, isMobile, toggleSidebar } = useSidebar();
@@ -48,16 +49,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   return (
     <div className="flex min-h-screen bg-seguranca-graphite">
       {/* Sidebar colapsível */}
-      <CollapsibleSidebar 
-        collapsed={collapsed} 
+      <CollapsibleSidebar
+        collapsed={collapsed}
         isMobile={isMobile}
         onToggle={toggleSidebar}
       />
 
       {/* Conteúdo principal */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 min-w-0 ${
-        isMobile ? 'ml-0' : (collapsed ? 'ml-16' : 'ml-64')
-      }`}>
+      <div className={`flex-1 flex flex-col transition-all duration-300 min-w-0 ${isMobile ? 'ml-0' : (collapsed ? 'ml-16' : 'ml-64')
+        }`}>
         {/* Header com botão de toggle */}
         <header className="bg-seguranca-black shadow-lg border-b border-gray-700 sticky top-0 z-40">
           <div className="flex items-center justify-between px-2 md:px-4 py-2 md:py-3">
@@ -77,18 +77,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                   <ChevronLeft className="h-5 w-5" />
                 )}
               </Button>
-              
-              <div className="flex items-center space-x-1 md:space-x-2">
-                <BarChart3 className="h-5 w-5 md:h-6 md:w-6 text-seguranca-yellow" />
-                <span className="text-sm md:text-lg font-bold text-seguranca-lightgray">
-                  Secure Guard
-                </span>
+
+              <div className="flex items-center">
+                <Logo size="md" />
               </div>
             </div>
 
             {/* Lado direito - Informações do usuário */}
             <div className="flex items-center space-x-2 md:space-x-4">
-              <div 
+              <div
                 className="flex items-center space-x-1 md:space-x-2 cursor-pointer hover:bg-seguranca-black p-1 md:p-2 rounded-lg transition-colors"
                 onClick={handleProfileClick}
               >
@@ -101,10 +98,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                   {user.role === 'SUPER_ADMIN' && ' 🟥'}
                 </Badge>
               </div>
-              
+
               {/* Ícone de Notificações */}
               <NotificationBell />
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -119,10 +116,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         </header>
 
         {/* Conteúdo da página */}
-        <main className="flex-1 p-4 md:p-6 overflow-visible">
+        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 overflow-visible">
           {/* Breadcrumb */}
           <Breadcrumb />
-          
+
           {/* Título da página (se fornecido) */}
           {(title || subtitle) && (
             <div className="mb-6">
@@ -149,10 +146,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       </div>
 
       {/* Modal de Perfil */}
-      <UserProfileModal 
-        isOpen={isProfileModalOpen} 
-        onClose={() => setIsProfileModalOpen(false)} 
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
       />
+
+      {/* Navegação Mobile (Bottom) */}
+      <MobileNavbar />
     </div>
   );
 }; 

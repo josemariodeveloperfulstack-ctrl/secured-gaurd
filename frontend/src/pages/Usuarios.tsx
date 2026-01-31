@@ -296,7 +296,7 @@ const Usuarios: React.FC = () => {
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="bg-seguranca-black border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray"
               >
-                <option value="all">Todos os cargos</option>
+                <option value="all">Todas as permissões</option>
                 {roles.map(role => (
                   <option key={role} value={role}>{getRoleDisplayName(role)}</option>
                 ))}
@@ -372,7 +372,7 @@ const Usuarios: React.FC = () => {
                     <TableRow className="border-gray-600">
                       <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
                       <TableHead className="text-seguranca-lightgray">Email</TableHead>
-                      <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Permissões</TableHead>
                       <TableHead className="text-seguranca-lightgray text-right w-[200px]">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -444,7 +444,7 @@ const Usuarios: React.FC = () => {
                     <TableRow className="border-gray-600">
                       <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
                       <TableHead className="text-seguranca-lightgray">Email</TableHead>
-                      <TableHead className="text-seguranca-lightgray">Cargo</TableHead>
+                      <TableHead className="text-seguranca-lightgray">Permissões</TableHead>
                       <TableHead className="text-seguranca-lightgray">Status</TableHead>
                       <TableHead className="text-seguranca-lightgray">Grupos</TableHead>
                       <TableHead className="text-seguranca-lightgray text-right w-[200px]">Ações</TableHead>

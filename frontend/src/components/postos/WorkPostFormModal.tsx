@@ -4,18 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { workPostService, WorkPost, CreateWorkPostRequest } from '@/services/workPostService';
@@ -27,6 +27,11 @@ interface WorkPostFormModalProps {
   workPost?: WorkPost | null;
   clients: Client[];
   onSubmit: () => void;
+  forcedClientId?: string;
+  defaultAddress?: string;
+  defaultCity?: string;
+  defaultState?: string;
+  defaultZipCode?: string;
 }
 
 const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
@@ -34,7 +39,12 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
   onOpenChange,
   workPost,
   clients,
-  onSubmit
+  onSubmit,
+  forcedClientId,
+  defaultAddress,
+  defaultCity,
+  defaultState,
+  defaultZipCode
 }) => {
   const [formData, setFormData] = useState<CreateWorkPostRequest>({
     postCode: '',
@@ -172,12 +182,24 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
         implementationTime: '',
         observations: ''
       });
+
+      // Se houver um ID forçado, aplicar ao criar novo
+      if (forcedClientId && !workPost) {
+        setFormData(prev => ({
+          ...prev,
+          clientId: forcedClientId,
+          address: defaultAddress || prev.address,
+          city: defaultCity || prev.city,
+          state: defaultState || prev.state,
+          zipCode: defaultZipCode || prev.zipCode
+        }));
+      }
     }
-  }, [workPost]);
+  }, [workPost, forcedClientId, defaultAddress, defaultCity, defaultState, defaultZipCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.clientId) {
       toast({
         title: "Erro",
@@ -199,9 +221,9 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
 
     try {
       setLoading(true);
-      
+
       console.log('Dados do formulário antes do envio:', formData);
-      
+
       if (workPost) {
         await workPostService.updateWorkPost(workPost.id, formData);
         toast({
@@ -215,7 +237,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
           description: "Posto de trabalho criado com sucesso",
         });
       }
-      
+
       onSubmit();
     } catch (error: any) {
       console.error('Erro ao salvar posto:', error);
@@ -242,7 +264,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
       handleInputChange(field, 0);
       return;
     }
-    
+
     // Para campos decimais como costAllowanceValue
     if (field === 'costAllowanceValue') {
       const numValue = parseFloat(value);
@@ -264,7 +286,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
             {workPost ? 'Editar Posto de Trabalho' : 'Novo Posto de Trabalho'}
           </DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações Básicas */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -297,7 +319,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 </Button>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="name">Nome do Posto *</Label>
               <Input
@@ -308,7 +330,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="type">Tipo *</Label>
               <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
@@ -326,7 +348,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
@@ -346,22 +368,24 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
             </div>
           </div>
 
-          {/* Cliente */}
-          <div className="space-y-2">
-            <Label htmlFor="clientId">Cliente *</Label>
-            <Select value={formData.clientId} onValueChange={(value) => handleInputChange('clientId', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id.toString()}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Cliente - Só exibe se não houver um ID forçado */}
+          {!forcedClientId && (
+            <div className="space-y-2">
+              <Label htmlFor="clientId">Cliente *</Label>
+              <Select value={formData.clientId} onValueChange={(value) => handleInputChange('clientId', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id.toString()}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Localização */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -375,7 +399,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="city">Cidade</Label>
               <Input
@@ -385,7 +409,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 placeholder="Cidade"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="state">Estado</Label>
               <Input
@@ -396,7 +420,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 maxLength={2}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="zipCode">CEP</Label>
               <Input
@@ -421,7 +445,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="workSchedule">Escala de Trabalho *</Label>
               <Input
@@ -432,7 +456,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="shiftDescription">Descrição do Turno</Label>
               <Input
@@ -456,7 +480,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="shiftEnd">Fim do Turno *</Label>
               <Input
@@ -480,7 +504,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 onChange={(e) => handleInputChange('implementationDate', e.target.value)}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="implementationTime">Horário de Implantação</Label>
               <Input
@@ -519,7 +543,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
           {/* Benefícios e Condições */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Benefícios e Condições</h3>
-            
+
             <div className="grid gap-4 md:grid-cols-3">
               <div className="flex items-center space-x-2">
                 <input
@@ -530,7 +554,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
                 <Label htmlFor="transportVoucher">Vale Transporte</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -540,7 +564,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
                 <Label htmlFor="costAllowance">Ajuda de Custo</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -550,7 +574,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
                 <Label htmlFor="intrajourney">Intrajornada</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -560,7 +584,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
                 <Label htmlFor="localMeal">Alimentação Local</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -570,7 +594,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
                 <Label htmlFor="mealTicket">Ticket Alimentação</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -580,7 +604,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
                 <Label htmlFor="healthPlan">Plano de Saúde</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -591,7 +615,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 <Label htmlFor="dentalPlan">Plano Odontológico</Label>
               </div>
             </div>
-            
+
             {formData.costAllowance && (
               <div className="space-y-2">
                 <Label htmlFor="costAllowanceValue">Valor da Ajuda de Custo (R$)</Label>
@@ -611,7 +635,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
           {/* Recursos e Equipamentos */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Recursos e Equipamentos</h3>
-            
+
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="cars">Carros</Label>
@@ -624,7 +648,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                   placeholder="0"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="motorcycles">Motos</Label>
                 <Input
@@ -636,7 +660,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                   placeholder="0"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="radios">Rádios</Label>
                 <Input
@@ -648,7 +672,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                   placeholder="0"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="corporates">Corporativos</Label>
                 <Input
@@ -661,7 +685,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -676,7 +700,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
           {/* Conformidade Legal */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Conformidade Legal</h3>
-            
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="flex items-center space-x-2">
                 <input
@@ -687,7 +711,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 />
                 <Label htmlFor="pgr">PGR (Programa de Gerenciamento de Riscos)</Label>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -698,7 +722,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 <Label htmlFor="pcmso">PCMSO (Programa de Controle Médico)</Label>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="nrs">Normas Regulamentadoras (NRs)</Label>
               <Input
@@ -708,7 +732,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 placeholder="Ex: NR-1, NR-5, NR-6, NR-23"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="epis">EPIs Necessários</Label>
               <Input
@@ -718,7 +742,7 @@ const WorkPostFormModal: React.FC<WorkPostFormModalProps> = ({
                 placeholder="Ex: Uniforme, Colete à prova de balas, Rádio comunicador"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="trainings">Treinamentos Necessários</Label>
               <Input

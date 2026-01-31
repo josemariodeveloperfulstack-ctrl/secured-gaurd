@@ -22,22 +22,19 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping("/summary")
-    @Operation(
-        summary = "Obter resumo do dashboard", 
-        description = "Retorna estatísticas gerais do sistema para o dashboard principal"
-    )
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','CLIENTE','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_CLIENTE','ROLE_COLABORADOR')")
+    @Operation(summary = "Obter resumo do dashboard", description = "Retorna estatísticas gerais do sistema para o dashboard principal")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','CLIENTE','COLABORADOR','COMERCIAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_CLIENTE','ROLE_COLABORADOR','ROLE_COMERCIAL')")
     public ResponseEntity<DashboardSummaryDTO> getDashboardSummary() {
         try {
             log.info("Solicitando resumo do dashboard");
-            
+
             DashboardSummaryDTO summary = dashboardService.getDashboardSummary();
-            
-            log.info("Dashboard summary gerado com sucesso - {} usuários, {} contratos ativos", 
-                summary.getTotalUsers(), summary.getActiveContracts());
-            
+
+            log.info("Dashboard summary gerado com sucesso - {} usuários, {} contratos ativos",
+                    summary.getTotalUsers(), summary.getActiveContracts());
+
             return ResponseEntity.ok(summary);
-            
+
         } catch (Exception e) {
             log.error("Erro ao gerar resumo do dashboard", e);
             // Fallback: evitar 500 para o frontend
@@ -46,17 +43,14 @@ public class DashboardController {
     }
 
     @GetMapping("/stats/quick")
-    @Operation(
-        summary = "Obter estatísticas rápidas", 
-        description = "Retorna estatísticas básicas para widgets do dashboard"
-    )
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','CLIENTE','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_CLIENTE','ROLE_COLABORADOR')")
+    @Operation(summary = "Obter estatísticas rápidas", description = "Retorna estatísticas básicas para widgets do dashboard")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','CLIENTE','COLABORADOR','COMERCIAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_CLIENTE','ROLE_COLABORADOR','ROLE_COMERCIAL')")
     public ResponseEntity<Object> getQuickStats() {
         try {
             log.info("Solicitando estatísticas rápidas do dashboard");
-            
+
             DashboardSummaryDTO summary = dashboardService.getDashboardSummary();
-            
+
             Map<String, Object> payload = new java.util.HashMap<>();
             payload.put("totalUsers", summary.getTotalUsers());
             payload.put("activeUsers", summary.getActiveUsers());
@@ -68,7 +62,7 @@ public class DashboardController {
             payload.put("unreadAlerts", summary.getUnreadAlerts());
             payload.put("lastUpdate", summary.getLastUpdate());
             return ResponseEntity.ok(payload);
-            
+
         } catch (Exception e) {
             log.error("Erro ao gerar estatísticas rápidas", e);
             Map<String, Object> fallback = new java.util.HashMap<>();
@@ -86,84 +80,71 @@ public class DashboardController {
     }
 
     @GetMapping("/health")
-    @Operation(
-        summary = "Verificar saúde do dashboard", 
-        description = "Endpoint para verificar se o dashboard está funcionando corretamente"
-    )
+    @Operation(summary = "Verificar saúde do dashboard", description = "Endpoint para verificar se o dashboard está funcionando corretamente")
     public ResponseEntity<Object> getDashboardHealth() {
         try {
             log.debug("Verificando saúde do dashboard");
-            
+
             return ResponseEntity.ok(Map.of(
-                "status", "UP",
-                "timestamp", java.time.LocalDateTime.now(),
-                "service", "dashboard"
-            ));
-            
+                    "status", "UP",
+                    "timestamp", java.time.LocalDateTime.now(),
+                    "service", "dashboard"));
+
         } catch (Exception e) {
             log.error("Erro ao verificar saúde do dashboard", e);
             return ResponseEntity.internalServerError().body(Map.of(
-                "status", "DOWN",
-                "timestamp", java.time.LocalDateTime.now(),
-                "service", "dashboard",
-                "error", e.getMessage()
-            ));
+                    "status", "DOWN",
+                    "timestamp", java.time.LocalDateTime.now(),
+                    "service", "dashboard",
+                    "error", e.getMessage()));
         }
     }
 
     @GetMapping("/alerts")
-    @Operation(
-        summary = "Obter alertas do sistema", 
-        description = "Retorna alertas e notificações importantes do sistema"
-    )
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','DEPARTAMENTO_PESSOAL','FINANCEIRO','OPERACIONAL','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_DEPARTAMENTO_PESSOAL','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR')")
+    @Operation(summary = "Obter alertas do sistema", description = "Retorna alertas e notificações importantes do sistema")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','DEPARTAMENTO_PESSOAL','FINANCEIRO','OPERACIONAL','COLABORADOR','COMERCIAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_DEPARTAMENTO_PESSOAL','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR','ROLE_COMERCIAL')")
     public ResponseEntity<Object> getAlerts() {
         try {
             log.info("Solicitando alertas do dashboard");
-            
+
             DashboardSummaryDTO summary = dashboardService.getDashboardSummary();
-            
+
             return ResponseEntity.ok(Map.of(
-                "totalAlerts", summary.getTotalAlerts(),
-                "unreadAlerts", summary.getUnreadAlerts(),
-                "alerts", summary.getSystemAlerts() != null ? summary.getSystemAlerts() : new java.util.ArrayList<>(),
-                "timestamp", java.time.LocalDateTime.now()
-            ));
-            
+                    "totalAlerts", summary.getTotalAlerts(),
+                    "unreadAlerts", summary.getUnreadAlerts(),
+                    "alerts",
+                    summary.getSystemAlerts() != null ? summary.getSystemAlerts() : new java.util.ArrayList<>(),
+                    "timestamp", java.time.LocalDateTime.now()));
+
         } catch (Exception e) {
             log.error("Erro ao buscar alertas do dashboard", e);
             return ResponseEntity.ok(Map.of(
-                "totalAlerts", 0,
-                "unreadAlerts", 0,
-                "alerts", new java.util.ArrayList<>(),
-                "timestamp", java.time.LocalDateTime.now()
-            ));
+                    "totalAlerts", 0,
+                    "unreadAlerts", 0,
+                    "alerts", new java.util.ArrayList<>(),
+                    "timestamp", java.time.LocalDateTime.now()));
         }
     }
 
     @GetMapping("/activities")
-    @Operation(
-        summary = "Obter atividades recentes", 
-        description = "Retorna atividades recentes do sistema"
-    )
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','DEPARTAMENTO_PESSOAL','FINANCEIRO','OPERACIONAL','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_DEPARTAMENTO_PESSOAL','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR')")
+    @Operation(summary = "Obter atividades recentes", description = "Retorna atividades recentes do sistema")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','DEPARTAMENTO_PESSOAL','FINANCEIRO','OPERACIONAL','COLABORADOR','COMERCIAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_DEPARTAMENTO_PESSOAL','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COLABORADOR','ROLE_COMERCIAL')")
     public ResponseEntity<Object> getActivities() {
         try {
             log.info("Solicitando atividades recentes do dashboard");
-            
+
             DashboardSummaryDTO summary = dashboardService.getDashboardSummary();
-            
+
             return ResponseEntity.ok(Map.of(
-                "activities", summary.getRecentActivities() != null ? summary.getRecentActivities() : new java.util.ArrayList<>(),
-                "timestamp", java.time.LocalDateTime.now()
-            ));
-            
+                    "activities",
+                    summary.getRecentActivities() != null ? summary.getRecentActivities() : new java.util.ArrayList<>(),
+                    "timestamp", java.time.LocalDateTime.now()));
+
         } catch (Exception e) {
             log.error("Erro ao buscar atividades do dashboard", e);
             return ResponseEntity.ok(Map.of(
-                "activities", new java.util.ArrayList<>(),
-                "timestamp", java.time.LocalDateTime.now()
-            ));
+                    "activities", new java.util.ArrayList<>(),
+                    "timestamp", java.time.LocalDateTime.now()));
         }
     }
 }

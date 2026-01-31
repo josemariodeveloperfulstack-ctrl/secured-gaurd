@@ -58,6 +58,12 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     FINANCIAL_DELETE: false,
     FINANCIAL_CREATE: false,
 
+    // Permissões Financeiras Granulares
+    FINANCIAL_PAYABLE_READ: false,
+    FINANCIAL_PAYABLE_WRITE: false,
+    FINANCIAL_RECEIVABLE_READ: false,
+    FINANCIAL_RECEIVABLE_WRITE: false,
+
     // Permissões de Holerites
     PAYSLIPS_READ: false,
     PAYSLIPS_WRITE: false,
@@ -213,6 +219,12 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         FINANCIAL_WRITE: true,
         FINANCIAL_DELETE: true,
         FINANCIAL_CREATE: true,
+
+        // Permissões Financeiras Granulares
+        FINANCIAL_PAYABLE_READ: true,
+        FINANCIAL_PAYABLE_WRITE: true,
+        FINANCIAL_RECEIVABLE_READ: true,
+        FINANCIAL_RECEIVABLE_WRITE: true,
 
         // Permissões de Holerites
         PAYSLIPS_READ: true,
@@ -370,6 +382,12 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         FINANCIAL_WRITE: true,
         FINANCIAL_CREATE: true,
         FINANCIAL_DELETE: true,
+
+        // Permissões Financeiras Granulares
+        FINANCIAL_PAYABLE_READ: true,
+        FINANCIAL_PAYABLE_WRITE: true,
+        FINANCIAL_RECEIVABLE_READ: true,
+        FINANCIAL_RECEIVABLE_WRITE: true,
         PAYSLIPS_READ: true,
         PAYSLIPS_WRITE: true,
         REPORTS_READ: true,
@@ -438,6 +456,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         EMPLOYEES_READ: true,
         CONTRACTS_READ: true,
         FINANCIAL_READ: true,
+
+        // Permissões Financeiras Granulares (Leitura)
+        FINANCIAL_PAYABLE_READ: true,
+        FINANCIAL_RECEIVABLE_READ: true,
+
         PAYSLIPS_READ: true,
         REPORTS_READ: true,
         LEADS_READ: true,
@@ -715,6 +738,12 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     FINANCIAL_WRITE: false,
     FINANCIAL_DELETE: false,
     FINANCIAL_CREATE: false,
+
+    // Permissões Financeiras Granulares
+    FINANCIAL_PAYABLE_READ: false,
+    FINANCIAL_PAYABLE_WRITE: false,
+    FINANCIAL_RECEIVABLE_READ: false,
+    FINANCIAL_RECEIVABLE_WRITE: false,
 
     // Permissões de Holerites
     PAYSLIPS_READ: false,

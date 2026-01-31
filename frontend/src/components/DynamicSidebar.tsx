@@ -45,8 +45,10 @@ import {
   ShoppingCart,
   CheckCircle,
   FolderTree,
-  Files
+  Files,
+  GraduationCap
 } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -64,7 +66,7 @@ import { hasPermission } from '@/utils/permissions';
 import { UserRole } from '@/types/user';
 
 interface MenuItem {
-  icon: React.ComponentType<unknown>;
+  icon: LucideIcon;
   text: string;
   to: string;
   id: string;
@@ -76,7 +78,6 @@ interface MenuItem {
 const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   COLABORADOR: new Set([
     'dashboard',
-    'holerites',
     'meus-holerites',
     'mensagens',
     'chat-interno',
@@ -238,14 +239,14 @@ export function DynamicSidebar() {
       text: 'Contas a Pagar',
       to: '/gestao-financeira/contas-pagar',
       id: 'gestao-financeira-contas-pagar',
-      requiredPermission: 'FINANCIAL_WRITE'
+      requiredPermission: 'FINANCIAL_PAYABLE_WRITE'
     },
     {
       icon: Receipt,
       text: 'Contas a Receber',
       to: '/gestao-financeira/contas-receber',
       id: 'gestao-financeira-contas-receber',
-      requiredPermission: 'FINANCIAL_WRITE'
+      requiredPermission: 'FINANCIAL_RECEIVABLE_WRITE'
     },
     {
       icon: ArrowUpDown,
@@ -299,7 +300,7 @@ export function DynamicSidebar() {
     },
     {
       icon: Receipt,
-      text: 'Meus Holerites',
+      text: 'Meus Documentos',
       to: '/meus-holerites',
       id: 'meus-holerites',
       requiredPermission: 'PAYSLIPS_READ',
@@ -735,11 +736,11 @@ export function DynamicSidebar() {
 
       // Se tem permissão específica, verificar se o usuário tem essa permissão
       if (item.requiredPermission) {
-        const hasPermission = hasPermission(user.permissions, item.requiredPermission as unknown);
-        console.log(`🔍 Item ${item.text} (${item.requiredPermission}): ${hasPermission ? '✅' : '❌'}`);
+        const isAllowed = hasPermission(user.permissions, item.requiredPermission as any);
+        console.log(`🔍 Item ${item.text} (${item.requiredPermission}): ${isAllowed ? '✅' : '❌'}`);
 
 
-        return hasPermission;
+        return isAllowed;
       }
 
       return true;

@@ -4,12 +4,14 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Input } from '../ui/input';
+import { cn } from '../../lib/utils';
+import '../../styles/mobile-tabs-sst.css';
 import { Alert, AlertDescription } from '../ui/alert';
-import { 
-  MessageSquare, 
-  Send, 
-  Inbox, 
-  Search, 
+import {
+  MessageSquare,
+  Send,
+  Inbox,
+  Search,
   Plus,
   Clock,
   AlertCircle,
@@ -49,7 +51,7 @@ const MessageDashboard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'reply'>('create');
-  
+
   // Estatísticas de mensagens do backend
   const [messageStats, setMessageStats] = useState({
     total: 0,
@@ -76,21 +78,21 @@ const MessageDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Carregar estatísticas do backend
       const stats = await messageService.getMessageStatistics();
       setMessageStats(stats);
-      
+
       // Carregar mensagens baseado na aba ativa (excluindo arquivadas)
       await loadMessages(activeTab, 0);
-      
+
       console.log('✅ [MessageDashboard] Dashboard carregado:', {
         stats,
         activeTab
       });
     } catch (error) {
       console.error('❌ [MessageDashboard] Erro ao carregar dashboard:', error);
-      
+
       if (error instanceof MessageServiceError) {
         setError(error.message);
         toast({
@@ -114,9 +116,9 @@ const MessageDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       let messagesData;
-      
+
       // Buscar mensagens baseado na aba selecionada
       if (tab === 'sent') {
         messagesData = await messageService.getSentMessages(page, 10);
@@ -133,18 +135,18 @@ const MessageDashboard: React.FC = () => {
         // 'received' - todas as mensagens recebidas
         messagesData = await messageService.getSystemMessages(page, 10);
       }
-      
+
       if (page === 0) {
         setSystemMessages(messagesData.messages);
       } else {
         setSystemMessages([...systemMessages, ...messagesData.messages]);
       }
-      
+
       setHasMore(messagesData.hasNext);
       setCurrentPage(page);
     } catch (error) {
       console.error('❌ [MessageDashboard] Erro ao carregar mensagens:', error);
-      
+
       if (error instanceof MessageServiceError) {
         setError(error.message);
       }
@@ -157,7 +159,7 @@ const MessageDashboard: React.FC = () => {
     setActiveTab(tab);
     setCurrentPage(0);
     setHasMore(true);
-    
+
     // Recarregar estatísticas ao mudar de aba
     try {
       const stats = await messageService.getMessageStatistics();
@@ -165,7 +167,7 @@ const MessageDashboard: React.FC = () => {
     } catch (error) {
       console.error('❌ [MessageDashboard] Erro ao carregar estatísticas:', error);
     }
-    
+
     loadMessages(tab, 0);
   };
 
@@ -178,13 +180,13 @@ const MessageDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const searchResults = await messageService.searchMessages(searchQuery, 'system') as SystemMessage[];
       setSystemMessages(searchResults);
       setHasMore(false);
     } catch (error) {
       console.error('❌ [MessageDashboard] Erro na busca:', error);
-      
+
       if (error instanceof MessageServiceError) {
         setError(error.message);
       }
@@ -197,18 +199,18 @@ const MessageDashboard: React.FC = () => {
     try {
       await messageService.markSystemMessageAsRead(messageId);
       updateSystemMessage(messageId, { status: 'READ', readAt: new Date().toISOString() });
-      
+
       // Atualizar estatísticas após marcar como lida
       const stats = await messageService.getMessageStatistics();
       setMessageStats(stats);
-      
+
       toast({
         title: "Sucesso",
         description: "Mensagem marcada como lida"
       });
     } catch (error) {
       console.error('❌ [MessageDashboard] Erro ao marcar como lida:', error);
-      
+
       if (error instanceof MessageServiceError) {
         toast({
           title: "Erro",
@@ -224,7 +226,7 @@ const MessageDashboard: React.FC = () => {
 
     try {
       await messageService.deleteSystemMessage(messageToDelete.id, reason);
-      
+
       toast({
         title: "Sucesso",
         description: "Mensagem excluída com sucesso"
@@ -235,7 +237,7 @@ const MessageDashboard: React.FC = () => {
       setMessageToDelete(null);
     } catch (error: any) {
       console.error('❌ [MessageDashboard] Erro ao deletar:', error);
-      
+
       toast({
         title: "Erro",
         description: error.message || "Erro ao deletar mensagem",
@@ -248,7 +250,7 @@ const MessageDashboard: React.FC = () => {
     try {
       await messageService.archiveSystemMessage(messageId);
       updateSystemMessage(messageId, { status: 'ARCHIVED' });
-      
+
       toast({
         title: "Sucesso",
         description: "Mensagem arquivada com sucesso"
@@ -260,7 +262,7 @@ const MessageDashboard: React.FC = () => {
       loadMessages(activeTab, 0);
     } catch (error: any) {
       console.error('❌ [MessageDashboard] Erro ao arquivar:', error);
-      
+
       if (error instanceof MessageServiceError) {
         toast({
           title: "Erro",
@@ -275,7 +277,7 @@ const MessageDashboard: React.FC = () => {
     try {
       await messageService.restoreSystemMessage(messageId);
       updateSystemMessage(messageId, { status: 'READ' });
-      
+
       toast({
         title: "Sucesso",
         description: "Mensagem restaurada com sucesso"
@@ -287,7 +289,7 @@ const MessageDashboard: React.FC = () => {
       loadMessages(activeTab, 0);
     } catch (error: any) {
       console.error('❌ [MessageDashboard] Erro ao restaurar:', error);
-      
+
       if (error instanceof MessageServiceError) {
         toast({
           title: "Erro",
@@ -358,7 +360,7 @@ const MessageDashboard: React.FC = () => {
               <p className="text-gray-400 text-sm md:text-base">Gerencie sua comunicação interna</p>
             </div>
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-3">
             {unreadSystemCount > 0 && (
               <Badge className="bg-red-600 text-white px-3 py-1 animate-pulse shadow-lg">
@@ -366,14 +368,14 @@ const MessageDashboard: React.FC = () => {
                 {unreadSystemCount} não lidas
               </Badge>
             )}
-            <Button 
+            <Button
               onClick={handleNewMessage}
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200 hover:scale-105"
             >
               <Plus className="w-4 h-4 mr-2" />
               Nova Mensagem
             </Button>
-            <Button 
+            <Button
               onClick={loadDashboard}
               variant="outline"
               disabled={loading}
@@ -466,9 +468,9 @@ const MessageDashboard: React.FC = () => {
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               className="flex-1 bg-seguranca-black border-gray-600 text-white placeholder:text-gray-500"
             />
-            <Button 
-              onClick={handleSearch} 
-              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto" 
+            <Button
+              onClick={handleSearch}
+              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
               disabled={loading}
             >
               {loading ? (
@@ -497,51 +499,69 @@ const MessageDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 bg-seguranca-black p-2">
-              <TabsTrigger 
-                value="received" 
-                className="data-[state='active']:bg-blue-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
+            <TabsList className={cn(
+              "flex sm:grid w-full sm:grid-cols-3 md:grid-cols-5 gap-2 bg-seguranca-black p-2",
+              "sharp-tabs-list overflow-x-auto scrollbar-hide flex-nowrap"
+            )}>
+              <TabsTrigger
+                value="received"
+                className={cn(
+                  "data-[state='active']:bg-blue-600 data-[state='active']:text-white transition-all text-xs sm:text-sm",
+                  "sharp-tab"
+                )}
               >
                 <Inbox className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Recebidas</span>
-                <span className="sm:hidden">Inbox</span>
+                <span className="sm:hidden text-[10px] font-black">ENTRADA</span>
               </TabsTrigger>
-              <TabsTrigger 
+              <TabsTrigger
                 value="sent"
-                className="data-[state='active']:bg-cyan-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
+                className={cn(
+                  "data-[state='active']:bg-cyan-600 data-[state='active']:text-white transition-all text-xs sm:text-sm",
+                  "sharp-tab"
+                )}
               >
                 <SendHorizontal className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Enviadas</span>
-                <span className="sm:hidden">Enviadas</span>
+                <span className="sm:hidden text-[10px] font-black">ENVIADAS</span>
               </TabsTrigger>
-              <TabsTrigger 
+              <TabsTrigger
                 value="unread"
-                className="data-[state='active']:bg-red-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
+                className={cn(
+                  "data-[state='active']:bg-red-600 data-[state='active']:text-white transition-all text-xs sm:text-sm",
+                  "sharp-tab"
+                )}
               >
                 <Eye className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Não Lidas</span>
-                <span className="sm:hidden">Novas</span>
+                <span className="sm:hidden text-[10px] font-black">NOVAS</span>
               </TabsTrigger>
-              <TabsTrigger 
+              <TabsTrigger
                 value="read"
-                className="data-[state='active']:bg-green-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
+                className={cn(
+                  "data-[state='active']:bg-green-600 data-[state='active']:text-white transition-all text-xs sm:text-sm",
+                  "sharp-tab"
+                )}
               >
                 <CheckCircle className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Lidas</span>
-                <span className="sm:hidden">Lidas</span>
+                <span className="sm:hidden text-[10px] font-black">LIDAS</span>
               </TabsTrigger>
-              <TabsTrigger 
+              <TabsTrigger
                 value="archived"
-                className="data-[state='active']:bg-purple-600 data-[state='active']:text-white transition-all text-xs sm:text-sm"
+                className={cn(
+                  "data-[state='active']:bg-purple-600 data-[state='active']:text-white transition-all text-xs sm:text-sm",
+                  "sharp-tab"
+                )}
               >
                 <Archive className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Arquivadas</span>
-                <span className="sm:hidden">Arquiv.</span>
+                <span className="sm:hidden text-[10px] font-black">ARQUIV.</span>
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value={activeTab} className="mt-6">
-              <MessageList 
+              <MessageList
                 messages={filteredMessages}
                 onMarkAsRead={handleMarkAsRead}
                 onDelete={handleDeleteClick}
@@ -558,7 +578,7 @@ const MessageDashboard: React.FC = () => {
 
           {hasMore && filteredMessages.length > 0 && (
             <div className="mt-6 text-center">
-              <Button 
+              <Button
                 onClick={() => loadMessages(activeTab, currentPage + 1)}
                 variant="outline"
                 disabled={loading}
@@ -650,12 +670,14 @@ const MessageList: React.FC<MessageListProps> = ({
 
   if (messages.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="p-4 rounded-full bg-gray-600/20 inline-block mb-4">
-          <MessageSquare className="w-12 h-12 text-gray-500" />
+      <div className="text-center py-16 px-4 bg-seguranca-black/20 rounded-3xl border border-gray-800/50 backdrop-blur-sm">
+        <div className="p-6 rounded-3xl bg-gradient-to-br from-gray-800/40 to-gray-900/40 inline-block mb-6 shadow-inner">
+          <MessageSquare className="w-16 h-16 text-gray-600" />
         </div>
-        <p className="text-gray-400 text-lg font-medium">Nenhuma mensagem encontrada</p>
-        <p className="text-gray-500 text-sm mt-2">Suas mensagens aparecerão aqui quando você tiver alguma</p>
+        <h3 className="text-gray-200 text-xl font-bold mb-2">Nenhuma mensagem encontrada</h3>
+        <p className="text-gray-500 text-sm max-w-xs mx-auto">
+          Sua caixa de entrada está limpa! Novas comunicações aparecerão aqui em breve.
+        </p>
       </div>
     );
   }
@@ -736,11 +758,10 @@ const MessageList: React.FC<MessageListProps> = ({
       {messages.map((message) => (
         <div
           key={message.id}
-          className={`group p-4 md:p-5 border rounded-xl hover:shadow-xl transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
-            message.status === 'UNREAD' 
-              ? 'bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-blue-500/30 shadow-lg' 
-              : 'bg-seguranca-black border-gray-700'
-          }`}
+          className={`group p-4 md:p-5 border rounded-xl hover:shadow-xl transition-all duration-200 cursor-pointer hover:scale-[1.02] ${message.status === 'UNREAD'
+            ? 'bg-gradient-to-r from-blue-500/10 to-blue-600/5 border-blue-500/30 shadow-lg'
+            : 'bg-seguranca-black border-gray-700'
+            }`}
           onClick={() => onView(message)}
         >
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -759,17 +780,17 @@ const MessageList: React.FC<MessageListProps> = ({
                   </Badge>
                 )}
               </div>
-              
+
               <p className="text-gray-400 text-sm md:text-base mb-3 line-clamp-2">
                 {message.content}
               </p>
-              
+
               <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                 {activeTab === 'sent' ? (
                   <>
                     <div className="flex items-center gap-1">
                       <Users className="w-3 h-3" />
-                      <span>Para: {message.recipients && message.recipients.length > 0 
+                      <span>Para: {message.recipients && message.recipients.length > 0
                         ? `${message.recipients.length} ${message.recipients.length === 1 ? 'destinatário' : 'destinatários'}`
                         : message.type === 'GLOBAL' ? 'Todos' : 'Nenhum'}</span>
                     </div>
@@ -779,7 +800,7 @@ const MessageList: React.FC<MessageListProps> = ({
                         <span>{message.recipients.map((r: any) => r.name || r.email).join(', ')}</span>
                       </div>
                     )}
-                  </> 
+                  </>
                 ) : (
                   <>
                     <div className="flex items-center gap-1">
@@ -800,7 +821,7 @@ const MessageList: React.FC<MessageListProps> = ({
                 </div>
               </div>
             </div>
-            
+
             <div className="flex md:flex-col gap-2">
               {message.status === 'UNREAD' && (
                 <Button

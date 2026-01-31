@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollPreservingLink } from './ScrollPreservingLink';
 import UserProfileModal from './UserProfileModal';
 import { UserRole } from '@/types/user';
+import Logo from './Logo';
 import {
   BarChart3,
   FileText,
@@ -72,7 +73,8 @@ import {
   Heart,
   GraduationCap,
   Car,
-  Database
+  Database,
+  LayoutDashboard
 } from 'lucide-react';
 
 interface CollapsibleSidebarProps {
@@ -87,23 +89,24 @@ const mainMenuItems = [
   { icon: FileSpreadsheet, text: 'Holerites', to: '/holerites', id: 'holerites' },
   { icon: Truck, text: 'Frota', to: '/frota', id: 'frota' },
   { icon: Building2, text: 'Filiais', to: '/filiais', id: 'filiais' },
+  { icon: FileSpreadsheet, text: 'Meus Documentos', to: '/meus-holerites', id: 'meus-holerites' },
 ];
 
-  // Módulo Operacional - Correspondente às abas da página
-  const operacionalMenuItems = [
-    { icon: BarChart3, text: 'Dashboard', to: '/operacional?tab=dashboard', id: 'operacional-dashboard' },
-    { icon: ClipboardList, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
-    { icon: Shield, text: 'Equipamentos', to: '/operacional?tab=equipamentos', id: 'operacional-equipamentos' },
-    { icon: MapPin, text: 'Controle de Visitas', to: '/operacional?tab=controle-visitas', id: 'operacional-controle-visitas' },
-    { icon: Clock, text: 'Escalas', to: '/operacional?tab=escalas', id: 'operacional-escalas' },
-    { icon: AlertTriangle, text: 'Notificações', to: '/operacional?tab=notificacoes', id: 'operacional-notificacoes' },
-    { icon: Eye, text: 'Ocorrências', to: '/operacional?tab=ocorrencias', id: 'operacional-ocorrencias' },
-    { icon: Activity, text: 'Registro de Atividade', to: '/operacional?tab=atividades', id: 'operacional-atividades' },
-    { icon: Clock, text: 'Troca de Plantão', to: '/operacional?tab=troca-plantao', id: 'operacional-troca-plantao' },
-    { icon: Route, text: 'Controle de Rondas', to: '/controle-rondas', id: 'controle-rondas' },
-    { icon: FileText, text: 'Guia de Transporte', to: '/operacional?tab=guia-transporte', id: 'operacional-guia-transporte' },
-    { icon: ClipboardCheck, text: 'Gestão Operacional', to: '/operacional?tab=gestao-operacional', id: 'operacional-gestao' },
-  ];
+// Módulo Operacional - Rotas diretas para facilitar acesso e evitar redirecionamentos
+const operacionalMenuItems = [
+  { icon: LayoutDashboard, text: 'Dashboard', to: '/operacional?tab=dashboard', id: 'operacional-dashboard' },
+  { icon: ClipboardList, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
+  { icon: Package, text: 'Equipamentos', to: '/operacional?tab=equipamentos', id: 'operacional-equipamentos' },
+  { icon: MapPin, text: 'Controle de Visitas', to: '/operacional?tab=controle-visitas', id: 'operacional-controle-visitas' },
+  { icon: Clock, text: 'Escalas', to: '/operacional?tab=escalas', id: 'operacional-escalas' },
+  { icon: Bell, text: 'Notificações', to: '/operacional?tab=notificacoes', id: 'operacional-notificacoes' },
+  { icon: Eye, text: 'Ocorrências', to: '/operacional?tab=ocorrencias', id: 'operacional-ocorrencias' },
+  { icon: Activity, text: 'Registro de Atividade', to: '/operacional?tab=atividades', id: 'operacional-atividades' },
+  { icon: UserCheck, text: 'Troca de Plantão', to: '/operacional?tab=troca-plantao', id: 'operacional-troca-plantao' },
+  { icon: Route, text: 'Controle de Rondas', to: '/controle-rondas', id: 'controle-rondas' },
+  { icon: Truck, text: 'Guia de Transporte', to: '/operacional?tab=guia-transporte', id: 'operacional-guia-transporte' },
+  { icon: BarChart3, text: 'Gestão Operacional', to: '/operacional?tab=gestao-operacional', id: 'operacional-gestao-operacional' },
+];
 
 // Módulo RH - Menu principal
 const rhMenuItems = [
@@ -136,29 +139,29 @@ const departamentoPessoalMenuItems = [
   { icon: Banknote, text: 'Importar Dados Bancários', to: '/rh/funcionarios/importar-dados-bancarios', id: 'dp-funcionarios-importar-bancarios' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
-  
+
   // Gestão de Tempo e Frequência
   { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
   { icon: CalendarDays, text: 'Ponto Eletrônico', to: '/rh/ponto-eletronico', id: 'dp-ponto-eletronico' },
   { icon: FileText, text: 'Fechamento de Horas', to: '/rh/fechamento-horas', id: 'rh-fechamento-horas' },
-  
+
   // Gestão de Ocorrências e Eventos
   { icon: FileText, text: 'Ocorrências', to: '/rh/ocorrencias', id: 'dp-ocorrencias' },
-  
+
   // Benefícios (agrupados)
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'dp-beneficios' },
-  
+
   // Estrutura Organizacional
   { icon: Settings, text: 'Funções', to: '/rh/funcoes', id: 'dp-funcoes' },
   { icon: Briefcase, text: 'Cargos', to: '/rh/cargos', id: 'dp-cargos' },
   { icon: MapPin, text: 'Postos', to: '/rh/postos', id: 'dp-postos' },
-  
+
   // Segurança e Compliance
   { icon: Shield, text: 'EPIs', to: '/rh/epis', id: 'dp-epis' },
-  
+
   // Documentos e Contratos
   { icon: FileSignature, text: 'Documentos', to: '/rh/documentos', id: 'dp-documentos' },
-  
+
   // Operações
   { icon: FileCheck, text: 'Ordens de Serviço', to: '/rh/ordens-servico', id: 'dp-ordens-servico' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'dp-vagas' },
@@ -248,11 +251,9 @@ const sistemaMenuItems = [
 const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   COLABORADOR: new Set([
     'dashboard',
-    'holerites',
+    'meus-holerites',
     'chat-interno',
-    'gestao-mensagens-enviar',
-    'gestao-mensagens-grupos',
-    'gestao-mensagens-notificacoes',
+    'mensagens',
   ]),
   // RH e Departamento Pessoal NÃO veem módulo Operacional
   RH: new Set([
@@ -335,6 +336,35 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
   ]),
+  COMERCIAL: new Set([
+    'dashboard',
+    'leads',
+    'empresas',
+    'clientes',
+    'propostas',
+    'orcamentos',
+    'contratos',
+    'crm',
+    'chat-interno',
+    'mensagens',
+  ]),
+  OPERACIONAL: new Set([
+    'dashboard',
+    'operacional-dashboard',
+    'operacional-servicos',
+    'operacional-equipamentos',
+    'operacional-controle-visitas',
+    'operacional-escalas',
+    'operacional-notificacoes',
+    'operacional-ocorrencias',
+    'operacional-atividades',
+    'operacional-troca-plantao',
+    'controle-rondas',
+    'operacional-guia-transporte',
+    'operacional-gestao-operacional',
+    'chat-interno',
+    'mensagens',
+  ]),
 };
 
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
@@ -351,18 +381,48 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     () => (user?.role ?? '').replace(/^ROLE_/, '').toUpperCase() as UserRole,
     [user?.role]
   );
-  const allowedItemIds = useMemo(() => ROLE_ALLOWED_ITEM_IDS[normalizedRole], [normalizedRole]);
+
+  const allowedItemIds = useMemo(() => {
+    const roles: UserRole[] = [];
+
+    // Adicionar papel principal
+    if (normalizedRole) roles.push(normalizedRole);
+
+    // Adicionar outros papéis se houver
+    if (user?.roles && Array.isArray(user.roles)) {
+      user.roles.forEach(r => {
+        const roleName = typeof r === 'string' ? r : r.name;
+        const norm = roleName.replace(/^ROLE_/, '').toUpperCase() as UserRole;
+        if (!roles.includes(norm)) roles.push(norm);
+      });
+    }
+
+    const combinedSet = new Set<string>();
+    roles.forEach(role => {
+      const roleSet = ROLE_ALLOWED_ITEM_IDS[role];
+      if (roleSet) {
+        roleSet.forEach(id => combinedSet.add(id));
+      }
+    });
+
+    return combinedSet;
+  }, [user?.roles, normalizedRole]);
 
   // Referências para controlar o scroll da própria sidebar
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const activeItemRef = useRef<HTMLAnchorElement | null>(null);
 
   const filterItemsForRole = useCallback(<T extends { id: string }>(items: T[]): T[] => {
-    if (!allowedItemIds) {
+    // SUPER_ADMIN sempre vê todos os itens
+    if (normalizedRole === 'SUPER_ADMIN') {
+      return items;
+    }
+
+    if (!allowedItemIds || allowedItemIds.size === 0) {
       return items;
     }
     return items.filter(item => allowedItemIds.has(item.id));
-  }, [allowedItemIds]);
+  }, [allowedItemIds, normalizedRole]);
 
   const handleProfileClick = () => {
     setIsProfileModalOpen(true);
@@ -371,33 +431,33 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   // Função para verificar se usuário tem permissão
   const hasPermission = useCallback((permission: string): boolean => {
     // SUPER_ADMIN tem acesso a tudo
-    if (user?.role === 'SUPER_ADMIN' || user?.role === 'ROLE_SUPER_ADMIN') {
+    if (normalizedRole === 'SUPER_ADMIN') {
       return true;
     }
-    
+
     // Se for COLABORADOR, verifica permissões customizadas concedidas pelo SUPER_ADMIN
-    if (user?.role === 'ROLE_COLABORADOR' || user?.role === 'COLABORADOR') {
+    if (normalizedRole === 'COLABORADOR') {
       // Sempre tem acesso à comunicação interna
       if (permission === 'MESSAGES_READ') {
         return true;
       }
-      
+
       // Verificar se tem permissão customizada
       if (user?.customPermissions && Array.isArray(user.customPermissions) && user.customPermissions.includes(permission)) {
         return true;
       }
-      
+
       return false;
     }
-    
+
     // Para outros roles, verificar permissões específicas no objeto permissions
     if (!user?.permissions) return false;
-    
+
     // Se ALL_PERMISSIONS for true, tem acesso a tudo
     if (user.permissions.ALL_PERMISSIONS) {
       return true;
     }
-    
+
     // Verificar permissão específica no objeto (não é array!)
     return user.permissions[permission as keyof typeof user.permissions] === true;
   }, [user]);
@@ -421,7 +481,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     () => filterItemsForRole(comunicacaoInternaMenuItems).filter(item => {
       // Regras por permissão para cada item de comunicação interna
       if (item.id === 'mensagens' || item.id === 'chat-interno') {
-        return hasPermission('MESSAGES_READ');
+        return true; // Sempre visível para roles permitidos (incluindo colaborador)
       }
       if (item.id === 'gestao-mensagens-grupos' || item.id === 'gestao-mensagens-notificacoes') {
         return hasPermission('MESSAGES_MANAGE');
@@ -447,7 +507,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     const path = location.pathname;
     const search = location.search;
     const fullPath = path + search;
-    
+
     const allItems = [
       ...mainMenuItems,
       ...financeiroMenuItems,
@@ -511,19 +571,14 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         <div className="p-4 border-b border-gray-700">
           <div className="flex items-center justify-between">
             {!collapsed && (
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-seguranca-red rounded-lg flex items-center justify-center">
-                  <Shield size={20} className="text-white" />
-                </div>
-                <span className="text-lg font-bold text-seguranca-lightgray">
-                  Secure Guard
-                </span>
+              <div className="flex items-center px-1">
+                <Logo size="md" />
               </div>
             )}
 
             {collapsed && (
-              <div className="w-8 h-8 bg-seguranca-red rounded-lg flex items-center justify-center mx-auto">
-                <Shield size={20} className="text-white" />
+              <div className="flex items-center justify-center mx-auto pr-1">
+                <Logo size="sm" />
               </div>
             )}
 
@@ -555,28 +610,28 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             )}
             <nav className="space-y-1 px-4">
               {filteredMainMenuItems.map((item) => (
-                  <ScrollPreservingLink
-                    key={item.id}
-                    to={item.to}
-                    preserveScroll={true}
+                <ScrollPreservingLink
+                  key={item.id}
+                  to={item.to}
+                  preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
-                    className={`
+                  className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
+                      ${isActive(item.id)
+                      ? 'bg-seguranca-black text-seguranca-yellow'
+                      : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                    }
                     `}
-                  >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
-                    />
-                    {!collapsed && (
-                      <span className="truncate">{item.text}</span>
-                    )}
-                  </ScrollPreservingLink>
-                ))}
+                >
+                  <item.icon
+                    size={18}
+                    className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
+                  />
+                  {!collapsed && (
+                    <span className="truncate">{item.text}</span>
+                  )}
+                </ScrollPreservingLink>
+              ))}
             </nav>
           </div>
 
@@ -597,15 +652,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -633,15 +688,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -669,15 +724,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -705,15 +760,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -741,15 +796,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -777,15 +832,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -813,15 +868,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -849,15 +904,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -920,15 +975,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -956,15 +1011,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -976,7 +1031,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           )}
 
           {/* Módulo Sistema - SUPER_ADMIN */}
-          {user?.role === 'SUPER_ADMIN' && filteredSistemaItems.length > 0 && (
+          {normalizedRole === 'SUPER_ADMIN' && filteredSistemaItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -992,15 +1047,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     ref={isActive(item.id) ? activeItemRef : undefined}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id) 
-                        ? 'bg-seguranca-black text-seguranca-yellow' 
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
                         : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
                       }
                     `}
                   >
-                    <item.icon 
-                      size={18} 
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`} 
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
                     />
                     {!collapsed && (
                       <span className="truncate">{item.text}</span>
@@ -1015,7 +1070,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
         {/* Footer */}
         <div className="p-4 border-t border-gray-700">
           {!collapsed && user && (
-            <div 
+            <div
               className="flex items-center space-x-3 cursor-pointer hover:bg-seguranca-black p-2 rounded-lg transition-colors"
               onClick={handleProfileClick}
             >
@@ -1036,9 +1091,9 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       </aside>
 
       {/* Modal de Perfil */}
-      <UserProfileModal 
-        isOpen={isProfileModalOpen} 
-        onClose={() => setIsProfileModalOpen(false)} 
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
       />
     </>
   );

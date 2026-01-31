@@ -3,22 +3,28 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Eye, 
-  FileText, 
-  Calendar, 
-  User, 
-  Clock, 
-  Building2, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Eye,
+  FileText,
+  Calendar,
+  User,
+  Clock,
+  Building2,
+  CheckCircle,
+  XCircle,
   AlertCircle,
   Edit,
-  Trash2
+  Trash2,
+  Check,
+  X,
+  MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ShiftChangeFormDTO } from '@/services/shiftChangeService';
+import shiftChangeService, { ShiftChangeFormDTO } from '@/services/shiftChangeService';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 interface ShiftChangeViewModalProps {
   open: boolean;
@@ -27,6 +33,7 @@ interface ShiftChangeViewModalProps {
   onGeneratePDF?: (shiftChange: ShiftChangeFormDTO) => void;
   onEdit?: (shiftChange: ShiftChangeFormDTO) => void;
   onDelete?: (shiftChange: ShiftChangeFormDTO) => void;
+  onRefresh?: () => void;
 }
 
 const ShiftChangeViewModal: React.FC<ShiftChangeViewModalProps> = ({
@@ -35,8 +42,14 @@ const ShiftChangeViewModal: React.FC<ShiftChangeViewModalProps> = ({
   shiftChange,
   onGeneratePDF,
   onEdit,
-  onDelete
+  onDelete,
+  onRefresh
 }) => {
+  const [action, setAction] = React.useState<'approve' | 'reject' | null>(null);
+  const [observations, setObservations] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { toast } = useToast();
+
   if (!shiftChange) return null;
 
   const shiftTimeLabels = {
@@ -49,26 +62,26 @@ const ShiftChangeViewModal: React.FC<ShiftChangeViewModalProps> = ({
   const getStatusProps = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return { 
-          color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', 
+        return {
+          color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
           text: 'Pendente',
           icon: AlertCircle
         };
       case 'APPROVED':
-        return { 
-          color: 'bg-green-500/20 text-green-400 border-green-500/30', 
+        return {
+          color: 'bg-green-500/20 text-green-400 border-green-500/30',
           text: 'Aprovado',
           icon: CheckCircle
         };
       case 'REJECTED':
-        return { 
-          color: 'bg-red-500/20 text-red-400 border-red-500/30', 
+        return {
+          color: 'bg-red-500/20 text-red-400 border-red-500/30',
           text: 'Rejeitado',
           icon: XCircle
         };
       default:
-        return { 
-          color: 'bg-gray-500/20 text-gray-400 border-gray-500/30', 
+        return {
+          color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
           text: 'Desconhecido',
           icon: AlertCircle
         };
@@ -110,7 +123,7 @@ const ShiftChangeViewModal: React.FC<ShiftChangeViewModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 rounded-3xl">
         <DialogHeader>
           <DialogTitle className="text-seguranca-lightgray flex items-center gap-2">
             <Eye className="h-5 w-5 text-blue-500" />
@@ -282,6 +295,89 @@ const ShiftChangeViewModal: React.FC<ShiftChangeViewModalProps> = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Seção de Aprovação/Rejeição (DP Only/Pending Only) */}
+          {shiftChange.status === 'PENDING' && (
+            <div className="space-y-4 pt-4 border-t border-gray-600">
+              <h4 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-seguranca-yellow" />
+                Decisão do Departamento Pessoal
+              </h4>
+
+              {!action ? (
+                <div className="flex gap-4">
+                  <Button
+                    onClick={() => setAction('approve')}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    Aprovar Troca
+                  </Button>
+                  <Button
+                    onClick={() => setAction('reject')}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Rejeitar Troca
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4 bg-seguranca-black/40 p-4 rounded-xl border border-gray-700 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-300 font-bold uppercase text-[10px] tracking-widest">
+                      Observações da {action === 'approve' ? 'Aprovação' : 'Rejeição'}
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setAction(null)}
+                      className="h-6 text-gray-500 hover:text-white"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+
+                  <div className="relative">
+                    <MessageSquare className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                    <Textarea
+                      placeholder="Descreva o motivo ou observações pertinentes..."
+                      className="bg-seguranca-black border-gray-600 pl-10 min-h-[100px] text-white focus:border-seguranca-yellow transition-colors"
+                      value={observations}
+                      onChange={(e) => setObservations(e.target.value)}
+                    />
+                  </div>
+
+                  <Button
+                    className={`w-full font-bold ${action === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'} text-white shadow-lg`}
+                    onClick={async () => {
+                      if (!shiftChange.id) return;
+                      setIsSubmitting(true);
+                      try {
+                        if (action === 'approve') {
+                          await shiftChangeService.approveShiftChange(shiftChange.id, observations);
+                          toast({ title: "Sucesso!", description: "Troca de plantão aprovada." });
+                        } else {
+                          await shiftChangeService.rejectShiftChange(shiftChange.id, observations);
+                          toast({ title: "Sucesso!", description: "Troca de plantão rejeitada." });
+                        }
+                        onRefresh?.();
+                        onOpenChange(false);
+                      } catch (error) {
+                        // Toast já mostrado pelo serviço
+                      } finally {
+                        setIsSubmitting(false);
+                        setAction(null);
+                        setObservations('');
+                      }
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? 'Processando...' : `Confirmar ${action === 'approve' ? 'Aprovação' : 'Rejeição'}`}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Botões de Ação */}

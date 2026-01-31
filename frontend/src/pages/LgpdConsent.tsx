@@ -14,7 +14,7 @@ const LgpdConsent = () => {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
-  
+
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [acceptedDataProcessing, setAcceptedDataProcessing] = useState(false);
@@ -56,14 +56,15 @@ const LgpdConsent = () => {
 
       for (const consent of consents) {
         await api.post('/lgpd/consent', {
+          userId: user.id,
           consentType: consent.consentType,
           latitude: null,
           longitude: null
         });
       }
 
-      // Marcar primeiro acesso como completo (sem userId no path)
-      await api.post('/lgpd/complete-first-access');
+      // Marcar primeiro acesso como completo
+      await api.post(`/lgpd/complete-first-access/${user.id}`);
 
       toast({
         title: 'Consentimentos registrados',
@@ -80,9 +81,10 @@ const LgpdConsent = () => {
       navigate('/dashboard');
     } catch (error: any) {
       console.error('Erro ao registrar consentimentos:', error);
+      const detail = error?.response?.data?.error || error?.response?.data?.message || 'Não foi possível registrar os consentimentos. Tente novamente.';
       toast({
         title: 'Erro ao registrar consentimentos',
-        description: error?.response?.data?.message || 'Não foi possível registrar os consentimentos. Tente novamente.',
+        description: detail,
         variant: 'destructive',
       });
     } finally {
@@ -165,7 +167,7 @@ const LgpdConsent = () => {
                   <div className="text-xs sm:text-sm text-gray-300 space-y-2">
                     <p><strong>1. Aceitação dos Termos</strong></p>
                     <p>Ao acessar e usar o Secured Guard, você concorda em cumprir estes Termos de Uso.</p>
-                    
+
                     <p className="mt-3"><strong>2. Uso do Sistema</strong></p>
                     <ul className="list-disc list-inside space-y-1 ml-2">
                       <li>O sistema é de uso exclusivo para colaboradores autorizados</li>
@@ -194,8 +196,8 @@ const LgpdConsent = () => {
                       }}
                       className="border-gray-600 mt-1 flex-shrink-0"
                     />
-                    <label 
-                      htmlFor="terms" 
+                    <label
+                      htmlFor="terms"
                       className="text-xs sm:text-sm text-seguranca-lightgray cursor-pointer flex-1"
                       onClick={(e) => {
                         e.preventDefault();
@@ -260,8 +262,8 @@ const LgpdConsent = () => {
                       }}
                       className="border-gray-600 mt-1 flex-shrink-0"
                     />
-                    <label 
-                      htmlFor="privacy" 
+                    <label
+                      htmlFor="privacy"
                       className="text-xs sm:text-sm text-seguranca-lightgray cursor-pointer flex-1"
                       onClick={(e) => {
                         e.preventDefault();
@@ -302,7 +304,7 @@ const LgpdConsent = () => {
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                         <p className="text-xs text-gray-400">
-                          Este consentimento é necessário para o funcionamento adequado do sistema e cumprimento das obrigações trabalhistas. 
+                          Este consentimento é necessário para o funcionamento adequado do sistema e cumprimento das obrigações trabalhistas.
                           Você pode revogar este consentimento a qualquer momento através das configurações do sistema.
                         </p>
                       </div>
@@ -320,8 +322,8 @@ const LgpdConsent = () => {
                       }}
                       className="border-gray-600 mt-1 flex-shrink-0"
                     />
-                    <label 
-                      htmlFor="dataProcessing" 
+                    <label
+                      htmlFor="dataProcessing"
                       className="text-xs sm:text-sm text-seguranca-lightgray cursor-pointer flex-1"
                       onClick={(e) => {
                         e.preventDefault();
@@ -362,11 +364,10 @@ const LgpdConsent = () => {
                 <Button
                   onClick={handleAcceptAll}
                   disabled={!canProceed || isSubmitting}
-                  className={`w-full sm:w-auto sm:min-w-[200px] text-white ${
-                    canProceed 
-                      ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer' 
-                      : 'bg-gray-600 opacity-50 cursor-not-allowed'
-                  }`}
+                  className={`w-full sm:w-auto sm:min-w-[200px] text-white ${canProceed
+                    ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer'
+                    : 'bg-gray-600 opacity-50 cursor-not-allowed'
+                    }`}
                 >
                   {isSubmitting ? (
                     <>

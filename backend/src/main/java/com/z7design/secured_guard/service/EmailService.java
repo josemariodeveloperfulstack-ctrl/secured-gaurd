@@ -25,11 +25,51 @@ public class EmailService {
     @Value("${spring.mail.properties.mail.smtp.auth:true}")
     private boolean smtpAuth;
 
+    @Value("${app.email.mock:false}")
+    private boolean mockEmail;
+
+    /**
+     * Envia email genérico (HTML)
+     */
+    public boolean sendEmail(String toEmail, String subject, String htmlBody) {
+        if (mockEmail) {
+            log.info("📧 [MOCK] Simulação de envio de email para: {}", toEmail);
+            log.info("📝 [MOCK] Assunto: {}", subject);
+            log.info("📄 [MOCK] Conteúdo (HTML omitido): {} caracteres", htmlBody != null ? htmlBody.length() : 0);
+            return true;
+        }
+
+        try {
+            log.info("📧 Enviando email para: {} - Assunto: {}", toEmail, subject);
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+
+            mailSender.send(message);
+            log.info("✅ Email enviado com sucesso para {}", toEmail);
+            return true;
+        } catch (Exception e) {
+            log.error("💥 Erro ao enviar email para {}: {}", toEmail, e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Envia documento unificado por email
      */
     public boolean sendUnifiedDocument(String toEmail, String employeeName, String month, String year,
             String filePath) {
+        if (mockEmail) {
+            log.info("📧 [MOCK] Simulação de envio de Documento Unificado para: {}", toEmail);
+            log.info("📝 [MOCK] Funcionário: {} - {}/{}", employeeName, month, year);
+            log.info("📎 [MOCK] Arquivo: {}", filePath);
+            return true;
+        }
+
         try {
             log.info("📧 Enviando documento unificado por email para: {}", toEmail);
             log.info("Funcionário: {} - {}/{}", employeeName, month, year);
@@ -98,6 +138,14 @@ public class EmailService {
      */
     public boolean sendEmailWithAttachment(String toEmail, String subject, String htmlBody, byte[] attachmentBytes,
             String attachmentFileName) {
+        if (mockEmail) {
+            log.info("📧 [MOCK] Simulação de envio com anexo para: {}", toEmail);
+            log.info("📝 [MOCK] Assunto: {}", subject);
+            log.info("📎 [MOCK] Anexo: {} ({} bytes)", attachmentFileName,
+                    attachmentBytes != null ? attachmentBytes.length : 0);
+            return true;
+        }
+
         try {
             MimeMessage message = mailSender.createMimeMessage();
             // Se não há anexo, não precisa de multipart
@@ -221,6 +269,12 @@ public class EmailService {
      * Testa configuração de email
      */
     public boolean testEmailConfiguration() {
+        if (mockEmail) {
+            log.info("🧪 [MOCK] Teste de configuração: MODO MOCK ATIVADO");
+            log.info("✅ [MOCK] Configuração de email considerada válida (simulação)");
+            return true;
+        }
+
         try {
             log.info("🧪 Testando configuração de email...");
             log.info("📧 Host: {}", mailSender);

@@ -73,23 +73,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const token = localStorage.getItem('token');
         const savedUser = localStorage.getItem('user');
-        
+
         console.log('🔍 AuthContext: Carregando usuário...');
         console.log('🔍 Token encontrado:', !!token);
         console.log('🔍 Usuário salvo:', !!savedUser);
-        
+
         if (token && savedUser) {
           const userData = JSON.parse(savedUser);
           console.log('🔍 Usuário carregado:', userData.name, userData.role);
-          
+
           // Gerar permissões a partir do role principal
           const rolePermissions = generatePermissions(userData.role);
-          const userWithPermissions = { 
-            ...userData, 
+          const userWithPermissions = {
+            ...userData,
             permissions: rolePermissions,
             firstAccessCompleted: userData.firstAccessCompleted ?? false
           };
-          
+
           console.log('🔍 AuthContext - Usuário carregado:', {
             name: userData.name,
             role: userData.role,
@@ -98,11 +98,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             isSuperAdmin: userData.role === 'SUPER_ADMIN',
             allPermissions: rolePermissions.ALL_PERMISSIONS
           });
-          
+
           setUser(userWithPermissions);
           console.log('🔍 Usuário definido no estado');
           localStorage.setItem('user', JSON.stringify(userWithPermissions));
-          
+
           setRefreshToken(token);
 
           const roleKey = (userWithPermissions.role ?? '').toUpperCase();
@@ -142,7 +142,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (savedUser) {
         const userData = JSON.parse(savedUser);
         const updatedUser = { ...userData, groups };
-        
+
         // Gerar permissões combinadas
         const rolePermissions = generatePermissions(userData.role);
         const groupPermissions = generatePermissionsFromGroups(groups);
@@ -151,25 +151,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Ajustar função exibida de acordo com os grupos (ex.: GRUPO_DPE -> Departamento Pessoal)
         const effectiveRole = determineEffectiveRole(updatedUser.role as UserRole, groups);
         const userWithPermissions = { ...updatedUser, role: effectiveRole, permissions: combinedPermissions };
-        
+
         setUser(userWithPermissions);
         localStorage.setItem('user', JSON.stringify(userWithPermissions));
       }
     } catch (error: any) {
       const status = error?.response?.status;
-      
+
       // Tratamento específico para erro 522 (servidor indisponível)
       if (status === 522 || (error as any)?.is522Error) {
         console.warn('⚠️ [AuthContext] Erro 522 ao carregar grupos - servidor temporariamente indisponível. Continuando sem grupos.');
         console.warn('⚠️ [AuthContext] O retry automático do axios já foi tentado. Continuando sem grupos para não bloquear o login.');
         return;
       }
-      
+
       if (error?.isConnectionError) {
         console.warn('⚠️ [AuthContext] Backend não está disponível. Continuando sem grupos.');
         return;
       }
-      
+
       if (status === 403) {
         console.info('[AuthContext] Grupo não carregado (403) - usuário sem permissão para /groups, continuando sem grupos.');
       } else if (status === 401) {
@@ -184,16 +184,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      
+
       console.log('🔍 Tentando fazer login com:', email);
       console.log('🔍 Base URL:', getApiUrl());
-      
+
       // Removido teste de comunicação para evitar erros desnecessários
-      
+
       // Enviar username em vez de email para corresponder ao backend
       // Usar caminho completo com /api para garantir que o proxy funcione
       const response = await api.post('/api/auth/login', { username: email, password });
-      
+
       console.log('✅ Resposta do login recebida:', response.status);
       console.log('📦 Dados da resposta:', {
         hasToken: !!response.data?.token,
@@ -205,7 +205,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         requires2FA: response.data?.requires2FA,
         requiresLgpdConsent: response.data?.requiresLgpdConsent
       });
-      
+
       // Obter os roles do backend (array ou string)
       let userRoles: string[] = [];
       if (response.data.user) {
@@ -215,15 +215,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           userRoles = [response.data.user.role];
         }
       }
+
+      console.log('🔍 Roles recebidos do backend:', userRoles);
+
+      // Normalizar roles (remover prefixo ROLE_ se existir)
+      const normalizedRoles = userRoles.map(r => r.replace(/^ROLE_/, '').toUpperCase());
+      console.log('🔍 Roles normalizados:', normalizedRoles);
+
       // Definir o role principal por prioridade
       const rolePriority: UserRole[] = [
         'SUPER_ADMIN',
         'ADMIN',
         'RH',
+        'ASSISTENCIA_RH',
         'DEPARTAMENTO_PESSOAL',
         'GESTOR',
         'SUPERVISOR',
         'FINANCEIRO',
+        'COMERCIAL',
         'OPERACIONAL',
         'TI_SUPORTE',
         'AUDITOR',
@@ -232,10 +241,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         'AUX_DEP',
         'COLABORADOR',
       ];
+
       let userRole: User['role'] = 'COLABORADOR';
+
+      // Encontrar o role de maior prioridade que o usuário possui
       for (const role of rolePriority) {
-        if (userRoles.includes(role)) {
-          userRole = role as User['role'];
+        // Verificar se o role está na lista de roles normalizados
+        if (normalizedRoles.includes(role)) {
+          userRole = role;
+          console.log(`✅ Role selecionado por prioridade: ${role}`);
           break;
         }
       }
@@ -244,14 +258,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🔍 Login: Pulando carregamento de grupos para evitar loop');
       const userGroups = [];
 
-      // Gerar permissões apenas do role por enquanto
-      const rolePermissions = generatePermissions(userRole);
-      const combinedPermissions = rolePermissions; // Apenas permissões do role
+      // Gerar permissões de todos os roles
+      const allRolePermissions = normalizedRoles.map(role => {
+        // Garantir que passamos um UserRole válido para generatePermissions
+        const validRole = role as UserRole;
+        return generatePermissions(validRole);
+      });
+      const combinedPermissions = combinePermissions(allRolePermissions);
 
-      // Log para debug do SUPER_ADMIN
+      // Log para debug do SUPER_ADMIN e outros roles
+      console.log(`🔍 Role final definido: ${userRole}`);
       if (userRole === 'SUPER_ADMIN') {
         console.log('🔴 SUPER_ADMIN detectado!');
-        console.log('Permissões do role:', rolePermissions);
+        console.log('Permissões de todos os roles:', allRolePermissions);
         console.log('Permissões combinadas:', combinedPermissions);
       }
 
@@ -276,7 +295,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('❌ ID do usuário não encontrado na resposta do login!');
         throw new Error('ID do usuário não encontrado na resposta do login');
       }
-      
+
       console.log('✅ ID do usuário obtido:', userData.id);
 
       // Salvar token e dados do usuário
@@ -293,7 +312,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // para garantir que o ProtectedRoute veja o usuário autenticado
       setUser(userData);
       setRefreshToken(response.data.token);
-      
+
       console.log('✅ Usuário setado no estado:', userData.name, userData.role);
 
       // Carregar grupos em background (não bloquear navegação)
@@ -354,10 +373,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           baseURL: error?.config?.baseURL
         }
       });
-      
+
       // Mensagem de erro mais específica
       let errorMessage = 'Verifique suas credenciais e tente novamente.';
-      
+
       if (error?.response?.status === 401) {
         errorMessage = error?.response?.data?.message || 'Usuário ou senha incorretos.';
       } else if (error?.response?.status === 403) {
@@ -371,7 +390,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else if (!error?.response) {
         errorMessage = 'Erro de conexão. Verifique se o servidor está rodando.';
       }
-      
+
       toast({
         title: 'Erro ao fazer login',
         description: errorMessage,
