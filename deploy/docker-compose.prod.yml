@@ -18,7 +18,7 @@ services:
     networks:
       - secured-guard-prod
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -38,7 +38,7 @@ services:
       - secured-guard-prod
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD_PROD}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -55,7 +55,6 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard_prod
-      SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_PROD}
       SPRING_REDIS_HOST: redis
@@ -80,7 +79,7 @@ services:
     networks:
       - secured-guard-prod
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -95,7 +94,6 @@ services:
       dockerfile: Dockerfile.prod
     container_name: secured-guard-frontend-prod
     environment:
-    environment:
       VITE_API_URL: https://securedguard.z7botsolutions.com.br/api
       VITE_WS_URL: wss://securedguard.z7botsolutions.com.br/ws
       NODE_ENV: production
@@ -106,7 +104,7 @@ services:
     networks:
       - secured-guard-prod
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: [ "CMD", "curl", "-f", "http://localhost" ]
       interval: 30s
       timeout: 10s
       retries: 3
