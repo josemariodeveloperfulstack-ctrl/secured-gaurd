@@ -48,9 +48,7 @@ services:
   # BACKEND API (PROD)
   # ========================================
   backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile.prod
+    image: z7design/secured-guard-backend:prod
     container_name: secured-guard-backend-prod
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -101,9 +99,7 @@ services:
   # FRONTEND (PROD)
   # ========================================
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile.prod
+    image: z7design/secured-guard-frontend:prod
     container_name: secured-guard-frontend-prod
     environment:
       VITE_API_URL: https://securedguard.z7botsolutions.com.br/api
