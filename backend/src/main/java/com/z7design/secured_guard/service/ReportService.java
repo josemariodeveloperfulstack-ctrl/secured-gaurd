@@ -178,14 +178,82 @@ public class ReportService {
     public byte[] generateCompanyReportPdf(Map<String, Object> filters) {
         try {
             List<CompanyDTO> companies = companyService.getAllCompanies();
-            Map<String, Object> parameters = createCompanyReportParameters(filters);
+            log.info("Gerando relatório iText para {} empresas", companies.size());
 
-            return jasperReportsConfig.generatePdfReport(
-                    "reports/company_report.jrxml",
-                    companies,
-                    parameters);
-        } catch (JRException | IOException e) {
-            log.error("Erro ao gerar relatório de empresas em PDF", e);
+            // 1. Determinar empresa para layout (fallback para primeira ativa)
+            java.util.UUID companyId = null;
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+            } else {
+                List<Company> all = companyRepository.findAll();
+                if (all != null && !all.isEmpty()) {
+                    companyId = all.get(0).getId();
+                } else {
+                    throw new ReportGenerationException("Nenhuma empresa cadastrada para gerar o relatório.");
+                }
+            }
+
+            // 2. Configurar Layout
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter writer = new PdfWriter(baos);
+
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO DE EMPRESAS")
+                    .topMargin(130f)
+                    .bottomMargin(80f)
+                    .leftMargin(20f)
+                    .rightMargin(20f)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+
+            // 3. Cabeçalho extra
+            document.add(new Paragraph(
+                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT).setFontSize(9).setMarginBottom(10));
+
+            // 4. Tabela
+            if (companies.isEmpty()) {
+                document.add(new Paragraph("Nenhuma empresa encontrada.").setTextAlignment(TextAlignment.CENTER));
+            } else {
+                // Colunas: Nome (35%), CNPJ (20%), Email (25%), Telefone (10%), Status (10%)
+                Table table = new Table(UnitValue.createPercentArray(new float[] { 35, 20, 25, 10, 10 }))
+                        .setWidth(UnitValue.createPercentValue(100));
+
+                String[] headers = { "Nome", "CNPJ", "Email", "Telefone", "Status" };
+                for (String h : headers) {
+                    table.addHeaderCell(createHeaderCell(h));
+                }
+
+                for (CompanyDTO c : companies) {
+                    table.addCell(createCell(c.getName() != null ? c.getName().toUpperCase() : ""));
+                    table.addCell(createCell(c.getCnpj() != null
+                            ? com.z7design.secured_guard.util.CompanyDataFormatter.formatCnpj(c.getCnpj())
+                            : "")).setTextAlignment(TextAlignment.CENTER);
+                    table.addCell(createCell(c.getEmail() != null ? c.getEmail().toLowerCase() : ""));
+                    table.addCell(createCell(c.getPhone() != null ? c.getPhone() : ""))
+                            .setTextAlignment(TextAlignment.CENTER);
+
+                    String status = c.getStatus() != null ? c.getStatus().toString() : "-";
+                    table.addCell(createCell(status)).setTextAlignment(TextAlignment.CENTER);
+                }
+
+                document.add(table);
+
+                document.add(new Paragraph(String.format("Total de empresas: %d", companies.size()))
+                        .setFontSize(10).setBold().setMarginTop(10));
+            }
+
+            // 5. Finalizar
+            document.close();
+            return baos.toByteArray();
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório iText de empresas", e);
             throw new ReportGenerationException("Erro ao gerar relatório de empresas", e);
         }
     }
@@ -196,14 +264,80 @@ public class ReportService {
     public byte[] generateProductReportPdf(Map<String, Object> filters) {
         try {
             List<ProductDTO> products = productService.getAllProducts();
-            Map<String, Object> parameters = createProductReportParameters(filters);
+            log.info("Gerando relatório iText para {} produtos", products.size());
 
-            return jasperReportsConfig.generatePdfReport(
-                    "reports/product_report.jrxml",
-                    products,
-                    parameters);
-        } catch (JRException | IOException e) {
-            log.error("Erro ao gerar relatório de produtos em PDF", e);
+            // 1. Determinar empresa para layout
+            java.util.UUID companyId = null;
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+            } else {
+                List<Company> all = companyRepository.findAll();
+                if (all != null && !all.isEmpty()) {
+                    companyId = all.get(0).getId();
+                } else {
+                    throw new ReportGenerationException("Nenhuma empresa cadastrada para gerar o relatório.");
+                }
+            }
+
+            // 2. Configurar Layout
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter writer = new PdfWriter(baos);
+
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO DE PRODUTOS")
+                    .topMargin(130f)
+                    .bottomMargin(80f)
+                    .leftMargin(20f)
+                    .rightMargin(20f)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+
+            // 3. Cabeçalho extra
+            document.add(new Paragraph(
+                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT).setFontSize(9).setMarginBottom(10));
+
+            // 4. Tabela
+            if (products.isEmpty()) {
+                document.add(new Paragraph("Nenhum produto encontrado.").setTextAlignment(TextAlignment.CENTER));
+            } else {
+                // Colunas: Nome (40%), Código (15%), Categoria (20%), Localização (15%),
+                // Estoque (10%)
+                Table table = new Table(UnitValue.createPercentArray(new float[] { 40, 15, 20, 15, 10 }))
+                        .setWidth(UnitValue.createPercentValue(100));
+
+                String[] headers = { "Nome", "Código", "Categoria", "Localização", "Estoque" };
+                for (String h : headers) {
+                    table.addHeaderCell(createHeaderCell(h));
+                }
+
+                for (ProductDTO p : products) {
+                    table.addCell(createCell(p.getName() != null ? p.getName().toUpperCase() : ""));
+                    table.addCell(createCell(p.getCode() != null ? p.getCode() : ""))
+                            .setTextAlignment(TextAlignment.CENTER);
+                    table.addCell(createCell(p.getCategory() != null ? p.getCategory() : ""));
+                    table.addCell(createCell(p.getLocation() != null ? p.getLocation() : ""));
+                    table.addCell(createCell(p.getCurrentStock() != null ? String.valueOf(p.getCurrentStock()) : "0"))
+                            .setTextAlignment(TextAlignment.RIGHT);
+                }
+
+                document.add(table);
+
+                document.add(new Paragraph(String.format("Total de produtos: %d", products.size()))
+                        .setFontSize(10).setBold().setMarginTop(10));
+            }
+
+            // 5. Finalizar
+            document.close();
+            return baos.toByteArray();
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório iText de produtos", e);
             throw new ReportGenerationException("Erro ao gerar relatório de produtos", e);
         }
     }
@@ -214,14 +348,89 @@ public class ReportService {
     public byte[] generateInventoryReportPdf(Map<String, Object> filters) {
         try {
             List<InventoryItem> items = inventoryItemService.findAll();
-            Map<String, Object> parameters = createInventoryReportParameters(filters);
+            log.info("Gerando relatório iText para {} itens de estoque", items.size());
 
-            return jasperReportsConfig.generatePdfReport(
-                    "reports/inventory_report.jrxml",
-                    items,
-                    parameters);
-        } catch (JRException | IOException e) {
-            log.error("Erro ao gerar relatório de estoque em PDF", e);
+            // 1. Determinar empresa para layout
+            java.util.UUID companyId = null;
+            List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+            if (activeCompanies != null && !activeCompanies.isEmpty()) {
+                companyId = activeCompanies.get(0).getId();
+            } else {
+                List<Company> all = companyRepository.findAll();
+                if (all != null && !all.isEmpty()) {
+                    companyId = all.get(0).getId();
+                } else {
+                    throw new ReportGenerationException("Nenhuma empresa cadastrada para gerar o relatório.");
+                }
+            }
+
+            // 2. Configurar Layout
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PdfWriter writer = new PdfWriter(baos);
+
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO DE ESTOQUE")
+                    .topMargin(130f)
+                    .bottomMargin(80f)
+                    .leftMargin(20f)
+                    .rightMargin(20f)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+
+            // 3. Cabeçalho extra
+            document.add(new Paragraph(
+                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT).setFontSize(9).setMarginBottom(10));
+
+            // 4. Tabela
+            if (items.isEmpty()) {
+                document.add(
+                        new Paragraph("Nenhum item de estoque encontrado.").setTextAlignment(TextAlignment.CENTER));
+            } else {
+                // Colunas: Item (35%), Código (15%), Esp. (10%), Cont. (10%), Dif. (10%),
+                // Status (20%)
+                Table table = new Table(UnitValue.createPercentArray(new float[] { 35, 15, 10, 10, 10, 20 }))
+                        .setWidth(UnitValue.createPercentValue(100));
+
+                String[] headers = { "Item", "Código", "Esp.", "Cont.", "Dif.", "Status" };
+                for (String h : headers) {
+                    table.addHeaderCell(createHeaderCell(h));
+                }
+
+                for (InventoryItem i : items) {
+                    table.addCell(createCell(i.getItemName() != null ? i.getItemName().toUpperCase()
+                            : (i.getProduct() != null ? i.getProduct().getName().toUpperCase() : "")));
+                    table.addCell(createCell(i.getCode() != null ? i.getCode() : ""))
+                            .setTextAlignment(TextAlignment.CENTER);
+                    table.addCell(
+                            createCell(i.getExpectedQuantity() != null ? String.valueOf(i.getExpectedQuantity()) : "0"))
+                            .setTextAlignment(TextAlignment.RIGHT);
+                    table.addCell(
+                            createCell(i.getCountedQuantity() != null ? String.valueOf(i.getCountedQuantity()) : "0"))
+                            .setTextAlignment(TextAlignment.RIGHT);
+                    table.addCell(
+                            createCell(i.getVarianceQuantity() != null ? String.valueOf(i.getVarianceQuantity()) : "0"))
+                            .setTextAlignment(TextAlignment.RIGHT);
+                    table.addCell(createCell(i.getStatus() != null ? i.getStatus() : "-"))
+                            .setTextAlignment(TextAlignment.CENTER);
+                }
+
+                document.add(table);
+
+                document.add(new Paragraph(String.format("Total de itens: %d", items.size()))
+                        .setFontSize(10).setBold().setMarginTop(10));
+            }
+
+            // 5. Finalizar
+            document.close();
+            return baos.toByteArray();
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório iText de estoque", e);
             throw new ReportGenerationException("Erro ao gerar relatório de estoque", e);
         }
     }

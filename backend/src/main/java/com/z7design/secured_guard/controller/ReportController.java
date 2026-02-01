@@ -513,8 +513,16 @@ public class ReportController {
         }
     }
 
+    @GetMapping("/financial/pdf")
+    @Operation(summary = "Relatório Financeiro em PDF (Alias)", description = "Gera relatório financeiro em PDF")
+    public ResponseEntity<byte[]> generateFinancialPdfAlias(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return generateFinancialSummaryReportPdf(startDate, endDate);
+    }
+
     @GetMapping("/summary/pdf")
-    @Operation(summary = "Resumo Financeiro em PDF", description = "Gera resumo financeiro em PDF")
+    @Operation(summary = "Relatório Financeiro em PDF", description = "Gera relatório financeiro em PDF")
     public ResponseEntity<byte[]> generateFinancialSummaryReportPdf(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
