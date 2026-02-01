@@ -46,44 +46,42 @@ jobs:
           GIT_USER: ${{ secrets.USER_GITHUB }}
           GIT_TOKEN: ${{ secrets.TOKEN_GITHUB }}
         run: |
-          echo "🔍 Step 1: Connectivity check (Port 22)"
-          nc -zv -w 5 $VPS_HOST 22 || echo "⚠️ Warning: Cannot connect to $VPS_HOST on port 22. This might explain the timeout/reset."
+          # 1. Create .env file locally on runner
+          # Use printf to avoid shell expansion issues with sensitive characters
+          {
+            printf "POSTGRES_PASSWORD_PROD=%s\n" "$PG_PASS"
+            printf "REDIS_PASSWORD_PROD=%s\n" "$RD_PASS"
+            printf "JWT_SECRET_PROD=%s\n" "$JWT_SEC"
+            printf "MAIL_HOST=%s\n" "$ML_HOST"
+            printf "MAIL_PORT=%s\n" "$ML_PORT"
+            printf "MAIL_USERNAME=%s\n" "$ML_USER"
+            printf "MAIL_PASSWORD=%s\n" "$ML_PASS"
+          } > .prod.env
+
+          # 2. Transfer .env file and run deployment commands
+          # SSH_OPTS to handle known_hosts and connection stability
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30"
           
-          echo "🔍 Step 2: Detailed SSH Debug Handshake"
-          sshpass -p "$VPS_PASSWORD" ssh -vvv -o StrictHostKeyChecking=no -o ConnectTimeout=15 "$VPS_USER@$VPS_HOST" "echo 'SSH Connection Successful!'" || {
-            echo "❌ Detailed SSH Handshake failed. Check logs above for 'connection reset' or 'denied' messages."
-          }
+          echo "📤 Transferring .env file to VPS..."
+          sshpass -p "$VPS_PASSWORD" scp $SSH_OPTS .prod.env "$VPS_USER@$VPS_HOST:/var/www/secured_guard/prod/deploy/.env"
 
-          echo "🚀 Step 3: Executing Deployment Script"
-          sshpass -p "$VPS_PASSWORD" ssh -o StrictHostKeyChecking=no "$VPS_USER@$VPS_HOST" \
-            PG_PASS="$PG_PASS" RD_PASS="$RD_PASS" JWT_SEC="$JWT_SEC" \
-            ML_HOST="$ML_HOST" ML_PORT="$ML_PORT" ML_USER="$ML_USER" ML_PASS="$ML_PASS" \
-            GIT_USER="$GIT_USER" GIT_TOKEN="$GIT_TOKEN" \
-            'bash -s' << 'EOF'
-              set -e
-              cd /var/www/secured_guard/prod
+          echo "🚀 Executing remote deployment commands..."
+          sshpass -p "$VPS_PASSWORD" ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" << 'EOF'
+            set -e
+            cd /var/www/secured_guard/prod
 
-              # 1. Update .env safely using printf to handle any character
-              printf "POSTGRES_PASSWORD_PROD=%s\n" "$PG_PASS" > deploy/.env
-              printf "REDIS_PASSWORD_PROD=%s\n" "$RD_PASS" >> deploy/.env
-              printf "JWT_SECRET_PROD=%s\n" "$JWT_SEC" >> deploy/.env
-              printf "MAIL_HOST=%s\n" "$ML_HOST" >> deploy/.env
-              printf "MAIL_PORT=%s\n" "$ML_PORT" >> deploy/.env
-              printf "MAIL_USERNAME=%s\n" "$ML_USER" >> deploy/.env
-              printf "MAIL_PASSWORD=%s\n" "$ML_PASS" >> deploy/.env
+            # Update latest code
+            git pull https://${GIT_USER}:${GIT_TOKEN}@github.com/zmarioramos/secured-guard.git prod
 
-              # 2. Get latest code
-              git pull https://$GIT_USER:$GIT_TOKEN@github.com/zmarioramos/secured-guard.git prod
+            # Ensure network exists
+            if ! docker network ls | grep -q "secured-guard"; then
+              docker network create secured-guard
+            fi
 
-              # 3. Create network if missing
-              if ! docker network ls | grep -q "secured-guard"; then
-                docker network create secured-guard
-              fi
-
-              # 4. Build and Restart
-              cd deploy
-              docker-compose -f docker-compose.prod.yml build --no-cache
-              docker-compose -f docker-compose.prod.yml up -d --force-recreate
+            # Build and Restart
+            cd deploy
+            docker-compose -f docker-compose.prod.yml build --no-cache
+            docker-compose -f docker-compose.prod.yml up -d --force-recreate
           EOF
       - name: 🏥 Health Check
         run: |
