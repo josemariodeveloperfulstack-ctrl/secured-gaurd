@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -25,10 +26,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Empresas", description = "API para gerenciamento de empresas")
+@CrossOrigin(origins = "*")
 public class CompanyController {
-    
+
     private final CompanyService companyService;
-    
+
+    @GetMapping("/diagnostic")
+    @Operation(summary = "Diagnóstico do controller", description = "Verifica se o controller está respondendo")
+    public ResponseEntity<Object> diagnostic() {
+        log.info("Diagnóstico do CompanyController acessado");
+        return ResponseEntity.ok(java.util.Map.of(
+                "status", "UP",
+                "controller", "CompanyController",
+                "timestamp", java.time.LocalDateTime.now().toString()));
+    }
+
     @GetMapping
     @Operation(summary = "Listar todas as empresas", description = "Retorna uma lista de todas as empresas")
     @ApiResponses(value = {
@@ -48,7 +60,7 @@ public class CompanyController {
             return ResponseEntity.ok(java.util.Collections.emptyList());
         }
     }
-    
+
     @GetMapping("/search")
     @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
     @Operation(summary = "Buscar empresas", description = "Busca empresas por nome com filtro dinâmico")
@@ -74,16 +86,15 @@ public class CompanyController {
             log.debug("Teste básico de empresas");
             List<CompanyDTO> companies = companyService.getAllCompanies();
             return ResponseEntity.ok(java.util.Map.of(
-                "count", companies.size(),
-                "message", "Teste de empresas funcionando",
-                "companies", companies
-            ));
+                    "count", companies.size(),
+                    "message", "Teste de empresas funcionando",
+                    "companies", companies));
         } catch (Exception e) {
             log.error("Erro no teste de empresas: ", e);
             return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
         }
     }
-    
+
     @GetMapping("/active")
     @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Listar empresas ativas", description = "Retorna uma lista de empresas ativas")
@@ -96,7 +107,7 @@ public class CompanyController {
         List<CompanyDTO> companies = companyService.getActiveCompanies();
         return ResponseEntity.ok(companies);
     }
-    
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Buscar empresa por ID", description = "Retorna uma empresa específica pelo ID")
@@ -111,7 +122,7 @@ public class CompanyController {
         CompanyDTO company = companyService.getCompanyById(id);
         return ResponseEntity.ok(company);
     }
-    
+
     @GetMapping("/sigla/{sigla}")
     @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
     @Operation(summary = "Buscar empresa por sigla", description = "Retorna uma empresa específica pela sigla")
@@ -126,7 +137,7 @@ public class CompanyController {
         CompanyDTO company = companyService.getCompanyBySigla(sigla);
         return ResponseEntity.ok(company);
     }
-    
+
     @PostMapping
     @PreAuthorize("hasAnyAuthority('HR_WRITE','SUPER_ADMIN','ROLE_SUPER_ADMIN','ADMIN','ROLE_ADMIN')")
     @Operation(summary = "Criar nova empresa", description = "Cria uma nova empresa")
@@ -141,7 +152,7 @@ public class CompanyController {
         CompanyDTO createdCompany = companyService.createCompany(companyDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdCompany);
     }
-    
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('HR_WRITE','SUPER_ADMIN','ROLE_SUPER_ADMIN','ADMIN','ROLE_ADMIN')")
     @Operation(summary = "Atualizar empresa", description = "Atualiza uma empresa existente")
@@ -158,10 +169,10 @@ public class CompanyController {
         CompanyDTO updatedCompany = companyService.updateCompany(id, companyDTO);
         return ResponseEntity.ok(updatedCompany);
     }
-    
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('HR_DELETE','SUPER_ADMIN','ROLE_SUPER_ADMIN','ADMIN','ROLE_ADMIN')")
-    @Operation(summary = "Excluir empresa", description = "Exclui uma empresa")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @Operation(summary = "Excluir empresa", description = "Exclui uma empresa pelo ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Empresa excluída com sucesso"),
             @ApiResponse(responseCode = "404", description = "Empresa não encontrada"),
@@ -170,8 +181,19 @@ public class CompanyController {
     })
     public ResponseEntity<Void> deleteCompany(
             @Parameter(description = "ID da empresa") @PathVariable UUID id) {
-        log.debug("Recebida requisição para excluir empresa ID: {}", id);
+        log.info("Recebida requisição para excluir empresa ID: {}", id);
         companyService.deleteCompany(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Object> handleException(Exception e, HttpServletRequest request) {
+        log.error("🔴 DIAGNÓSTICO DE ERRO NO CompanyController [{} {}]: {}",
+                request.getMethod(), request.getRequestURI(), e.getMessage(), e);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(java.util.Map.of(
+                "error", "Bad Request (Captured by Diagnostic)",
+                "message", e.getMessage() != null ? e.getMessage() : "No message",
+                "path", request.getRequestURI(),
+                "type", e.getClass().getName()));
     }
 }

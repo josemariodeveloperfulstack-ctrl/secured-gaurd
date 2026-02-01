@@ -6,10 +6,9 @@ import { propostaService, PropostaParams } from '@/services/propostaService';
 import { PropostaComercial } from '@/types/proposta';
 import { FileText, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+import { reportLayoutService } from '@/services/reportLayoutService';
+import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
 
 const valoresPadrao: PropostaParams = {
   quantidadePorteiros: 4,
@@ -52,155 +51,20 @@ export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) 
     return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, style: 'currency', currency: 'BRL' });
   };
 
-  const handleGeneratePDF = () => {
-    if (!proposta) {
-      toast({
-        title: "Erro",
-        description: "Calcule a proposta antes de gerar o PDF.",
-        variant: "destructive"
-      });
-      return;
-    }
+  const handleGeneratePDF = async () => {
+    if (!proposta) return;
 
     try {
-      const doc = new jsPDF();
-      
-      // Título
-      doc.setFontSize(18);
-      doc.setTextColor(40, 40, 40);
-      doc.text('PROPOSTA COMERCIAL DE ACORDO', 105, 20, { align: 'center' });
-      
-      // Data
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Data: ${new Date().toLocaleDateString('pt-BR')}`, 105, 30, { align: 'center' });
-      
-      let yPos = 45;
+      const printElement = document.getElementById('proposta-acordo-printable');
+      if (!printElement) {
+        throw new Error('Elemento de impressão não encontrado');
+      }
 
-      // Valor Final
-      doc.setFontSize(16);
-      doc.setTextColor(255, 193, 7);
-      doc.text('VALOR FINAL', 105, yPos, { align: 'center' });
-      yPos += 10;
-      
-      doc.setFontSize(14);
-      doc.text(`Mensal: ${formatCurrency(proposta.resultado.valorMensal)}`, 105, yPos, { align: 'center' });
-      yPos += 8;
-      doc.text(`Anual: ${formatCurrency(proposta.resultado.valorAnual)}`, 105, yPos, { align: 'center' });
-      yPos += 15;
-
-      // Descrição do Serviço
-      doc.setFontSize(12);
-      doc.setTextColor(40, 40, 40);
-      doc.text('DESCRIÇÃO DO SERVIÇO', 14, yPos);
-      yPos += 8;
-      doc.setFontSize(10);
-      doc.setTextColor(80, 80, 80);
-      const descLines = doc.splitTextToSize(proposta.descricaoServico, 180);
-      doc.text(descLines, 14, yPos);
-      yPos += descLines.length * 6 + 10;
-
-      // I. Mão de Obra
-      doc.setFontSize(12);
-      doc.setTextColor(40, 40, 40);
-      doc.text('I. MÃO DE OBRA', 14, yPos);
-      yPos += 8;
-      
-      const maoDeObraData = [
-        ['Item', 'Descrição', 'Valor'],
-        ['1', `Salário do Porteiro (R$ ${formatCurrency(proposta.maoDeObra.salarioPorteiro)} x ${proposta.maoDeObra.quantidadePorteiros})`, formatCurrency(proposta.maoDeObra.salarioPorteiro * proposta.maoDeObra.quantidadePorteiros)],
-        ['2', `Adicional Noturno (${proposta.maoDeObra.adicionalNoturnoPercent}%)`, formatCurrency(proposta.maoDeObra.adicionalNoturnoValor)],
-        ['3', 'Reflexo Adicional Noturno/HE/DSR', formatCurrency(proposta.maoDeObra.reflexoAdicional)],
-        ['4', 'Subtotal', formatCurrency(proposta.maoDeObra.subtotal)],
-        ['5', `Encargos (${proposta.maoDeObra.encargosPercent}%)`, formatCurrency(proposta.maoDeObra.encargosValor)],
-        ['', 'TOTAL MÃO DE OBRA', formatCurrency(proposta.maoDeObra.total)]
-      ];
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [maoDeObraData[0]],
-        body: maoDeObraData.slice(1),
-        theme: 'striped',
-        headStyles: { fillColor: [40, 40, 40], textColor: 255 },
-        styles: { fontSize: 9 }
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-
-      // II. Materiais
-      doc.setFontSize(12);
-      doc.setTextColor(40, 40, 40);
-      doc.text('II. MATERIAIS / EQUIPAMENTOS / UNIFORMES, EPI\'s', 14, yPos);
-      yPos += 8;
-      
-      const materiaisData = [
-        ['Item', 'Descrição', 'Valor'],
-        ['1', `Uniformes (${proposta.materiais.uniformeQuantidade} x ${formatCurrency(proposta.materiais.uniformeUnitario)})`, formatCurrency(proposta.materiais.uniformeQuantidade * proposta.materiais.uniformeUnitario)],
-        ['2', `Equipamentos (${proposta.materiais.equipamentosQuantidade} x ${formatCurrency(proposta.materiais.equipamentosUnitario)})`, formatCurrency(proposta.materiais.equipamentosQuantidade * proposta.materiais.equipamentosUnitario)],
-        ['', 'SUBTOTAL MATERIAIS', formatCurrency(proposta.materiais.subtotal)]
-      ];
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [materiaisData[0]],
-        body: materiaisData.slice(1),
-        theme: 'striped',
-        headStyles: { fillColor: [40, 40, 40], textColor: 255 },
-        styles: { fontSize: 9 }
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-
-      // III. BDI
-      doc.setFontSize(12);
-      doc.setTextColor(40, 40, 40);
-      doc.text('III. BDI (BASE DE CÁLCULO DO LUCRO)', 14, yPos);
-      yPos += 8;
-      
-      const bdiData = [
-        ['Item', 'Descrição', 'Valor'],
-        ['1', `Taxa de Administração (${proposta.bdi.taxaAdministracaoPercent}%)`, formatCurrency(proposta.bdi.taxaAdministracaoValor)],
-        ['2', `Lucro (${proposta.bdi.lucroPercent}%)`, formatCurrency(proposta.bdi.lucroValor)],
-        ['', 'SUBTOTAL BDI', formatCurrency(proposta.bdi.subtotal)]
-      ];
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [bdiData[0]],
-        body: bdiData.slice(1),
-        theme: 'striped',
-        headStyles: { fillColor: [40, 40, 40], textColor: 255 },
-        styles: { fontSize: 9 }
-      });
-      yPos = (doc as any).lastAutoTable.finalY + 10;
-
-      // IV. Impostos
-      doc.setFontSize(12);
-      doc.setTextColor(40, 40, 40);
-      doc.text('IV. IMPOSTOS', 14, yPos);
-      yPos += 8;
-      
-      const impostosData = [
-        ['Item', 'Descrição', 'Valor'],
-        ['1', `COFINS (${proposta.impostos.cofinsPercent}%)`, formatCurrency(proposta.impostos.cofinsValor)],
-        ['2', `PIS (${proposta.impostos.pisPercent}%)`, formatCurrency(proposta.impostos.pisValor)],
-        ['3', `ISSQN (${proposta.impostos.issqnPercent}%)`, formatCurrency(proposta.impostos.issqnValor)],
-        ['4', `IR (${proposta.impostos.irPercent}%)`, formatCurrency(proposta.impostos.irValor)],
-        ['5', `CSLL (${proposta.impostos.csllPercent}%)`, formatCurrency(proposta.impostos.csllValor)],
-        ['', 'TOTAL IMPOSTOS', formatCurrency(proposta.impostos.total)]
-      ];
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [impostosData[0]],
-        body: impostosData.slice(1),
-        theme: 'striped',
-        headStyles: { fillColor: [40, 40, 40], textColor: 255 },
-        styles: { fontSize: 9 }
+      await reportLayoutService.generatePremiumPDF(printElement, {
+        title: 'Proposta Comercial de Acordo',
+        filename: `proposta_acordo_${new Date().toISOString().split('T')[0]}.pdf`
       });
 
-      // Salvar PDF
-      const fileName = `proposta_acordo_${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
-      
       toast({
         title: "Sucesso",
         description: "PDF gerado com sucesso!",
@@ -292,7 +156,7 @@ export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) 
       // Salvar Excel
       const fileName = `proposta_acordo_${new Date().toISOString().split('T')[0]}.xlsx`;
       XLSX.writeFile(workbook, fileName);
-      
+
       toast({
         title: "Sucesso",
         description: "Excel gerado com sucesso!",
@@ -437,7 +301,7 @@ export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) 
                 <li><b>Total Impostos: R$ {proposta.impostos.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</b></li>
               </ul>
             </div>
-            
+
             {/* Botões de Exportação e Salvar */}
             <div className="border-t border-gray-700 pt-6 flex justify-end gap-3">
               {onSaveProposal && (
@@ -470,6 +334,179 @@ export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) 
           </CardContent>
         </Card>
       )}
+
+      {/* Printable Area (Hidden) */}
+      {proposta && (
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+          <div id="proposta-acordo-printable">
+            <StandardReportTemplate title="Proposta Comercial de Acordo">
+              <div className="space-y-8 text-black">
+                {/* Cabeçalho de Valores */}
+                <div className="border-b-2 border-seguranca-yellow pb-4">
+                  <h3 className="text-seguranca-yellow font-bold text-2xl mb-2">Resumo da Proposta</h3>
+                  <div className="flex gap-10">
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase font-bold">Valor Mensal</p>
+                      <p className="text-2xl font-bold text-black">{formatCurrency(proposta.resultado.valorMensal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase font-bold">Valor Anual</p>
+                      <p className="text-2xl font-bold text-black">{formatCurrency(proposta.resultado.valorAnual)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Descrição do Serviço */}
+                <div>
+                  <h4 className="text-sm font-bold bg-gray-100 p-2 border-l-4 border-seguranca-yellow uppercase">Descrição do Serviço</h4>
+                  <p className="mt-2 text-sm text-gray-700 leading-relaxed">{proposta.descricaoServico}</p>
+                </div>
+
+                {/* Tabelas de Detalhamento */}
+                <div className="space-y-6">
+                  {/* Mão de Obra */}
+                  <div>
+                    <h4 className="text-xs font-bold mb-2 uppercase">I. Mão de Obra</h4>
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-800 text-white">
+                          <th className="p-2 text-left">Item</th>
+                          <th className="p-2 text-left">Descrição</th>
+                          <th className="p-2 text-right">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2">1</td>
+                          <td className="p-2">Salário base ({proposta.maoDeObra.quantidadePorteiros} funcionário(s))</td>
+                          <td className="p-2 text-right">{formatCurrency(proposta.maoDeObra.salarioPorteiro * proposta.maoDeObra.quantidadePorteiros)}</td>
+                        </tr>
+                        <tr className="border-b bg-gray-50">
+                          <td className="p-2">2</td>
+                          <td className="p-2">Adicional Noturno ({proposta.maoDeObra.adicionalNoturnoPercent}%)</td>
+                          <td className="p-2 text-right">{formatCurrency(proposta.maoDeObra.adicionalNoturnoValor)}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2">3</td>
+                          <td className="p-2">Reflexo Adicional Noturno/HE/DSR</td>
+                          <td className="p-2 text-right">{formatCurrency(proposta.maoDeObra.reflexoAdicional)}</td>
+                        </tr>
+                        <tr className="border-b bg-gray-50 font-bold">
+                          <td className="p-2">4</td>
+                          <td className="p-2">Subtotal</td>
+                          <td className="p-2 text-right">{formatCurrency(proposta.maoDeObra.subtotal)}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="p-2">5</td>
+                          <td className="p-2">Encargos ({proposta.maoDeObra.encargosPercent}%)</td>
+                          <td className="p-2 text-right">{formatCurrency(proposta.maoDeObra.encargosValor)}</td>
+                        </tr>
+                        <tr className="bg-gray-200 font-extrabold text-sm">
+                          <td className="p-2" colSpan={2}>TOTAL MÃO DE OBRA</td>
+                          <td className="p-2 text-right">{formatCurrency(proposta.maoDeObra.total)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Materiais e BDI (Lado a Lado) */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-xs font-bold mb-2 uppercase">II. Materiais</h4>
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead>
+                          <tr className="bg-gray-800 text-white">
+                            <th className="p-2 text-left">Descrição</th>
+                            <th className="p-2 text-right">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2">Uniformes ({proposta.materiais.uniformeQuantidade})</td>
+                            <td className="p-2 text-right">{formatCurrency(proposta.materiais.uniformeQuantidade * proposta.materiais.uniformeUnitario)}</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2">Equipamentos ({proposta.materiais.equipamentosQuantidade})</td>
+                            <td className="p-2 text-right">{formatCurrency(proposta.materiais.equipamentosQuantidade * proposta.materiais.equipamentosUnitario)}</td>
+                          </tr>
+                          <tr className="bg-gray-100 font-bold">
+                            <td className="p-2">Total Materiais</td>
+                            <td className="p-2 text-right">{formatCurrency(proposta.materiais.subtotal)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold mb-2 uppercase">III. BDI / Lucro</h4>
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead>
+                          <tr className="bg-gray-800 text-white">
+                            <th className="p-2 text-left">Descrição</th>
+                            <th className="p-2 text-right">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="p-2">Taxa de Adm ({proposta.bdi.taxaAdministracaoPercent}%)</td>
+                            <td className="p-2 text-right">{formatCurrency(proposta.bdi.taxaAdministracaoValor)}</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="p-2">Lucro Proposto ({proposta.bdi.lucroPercent}%)</td>
+                            <td className="p-2 text-right">{formatCurrency(proposta.bdi.lucroValor)}</td>
+                          </tr>
+                          <tr className="bg-gray-100 font-bold">
+                            <td className="p-2">Total BDI</td>
+                            <td className="p-2 text-right">{formatCurrency(proposta.bdi.subtotal)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Impostos */}
+                  <div>
+                    <h4 className="text-xs font-bold mb-2 uppercase">IV. Impostos</h4>
+                    <table className="w-full text-[10px] border-collapse">
+                      <thead>
+                        <tr className="bg-gray-800 text-white">
+                          <th className="p-2 text-left">COFINS</th>
+                          <th className="p-2 text-left">PIS</th>
+                          <th className="p-2 text-left">ISSQN</th>
+                          <th className="p-2 text-left">IR</th>
+                          <th className="p-2 text-left">CSLL</th>
+                          <th className="p-2 text-right">TOTAL IMPOSTOS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="p-2">{formatCurrency(proposta.impostos.cofinsValor)}</td>
+                          <td className="p-2">{formatCurrency(proposta.impostos.pisValor)}</td>
+                          <td className="p-2">{formatCurrency(proposta.impostos.issqnValor)}</td>
+                          <td className="p-2">{formatCurrency(proposta.impostos.irValor)}</td>
+                          <td className="p-2">{formatCurrency(proposta.impostos.csllValor)}</td>
+                          <td className="p-2 text-right font-bold bg-gray-100">{formatCurrency(proposta.impostos.total)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Assinaturas */}
+                <div className="mt-20 flex justify-between gap-10">
+                  <div className="flex-1 text-center border-t border-gray-300 pt-2">
+                    <p className="text-xs font-bold">SECURED GUARD</p>
+                    <p className="text-[10px] text-gray-500 uppercase">Responsável Comercial</p>
+                  </div>
+                  <div className="flex-1 text-center border-t border-gray-300 pt-2">
+                    <p className="text-xs font-bold">CLIENTE / INTERESSADO</p>
+                    <p className="text-[10px] text-gray-500 uppercase">Aceite e Assinatura</p>
+                  </div>
+                </div>
+              </div>
+            </StandardReportTemplate>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}

@@ -10,14 +10,15 @@ import { useToast } from '@/hooks/use-toast';
 import { feriasService } from '@/services/feriasService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  FileSpreadsheet, 
-  Download, 
-  BarChart3, 
+import {
+  FileSpreadsheet,
+  Download,
+  BarChart3,
   Calendar,
   Users,
   TrendingUp,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 
 interface FeriasReportModalProps {
@@ -64,10 +65,10 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
     }));
   };
 
-  const generateReport = async (type: 'ferias' | 'afastamentos' | 'consolidado') => {
+  const generateReport = async (format: 'excel' | 'pdf', type: 'ferias' | 'afastamentos' | 'consolidado') => {
     try {
       setIsGenerating(true);
-      
+
       const reportFilters = {
         employeeId: filters.employeeId || undefined,
         status: filters.status || undefined,
@@ -78,20 +79,38 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
 
       let blob: Blob;
       let filename: string;
+      const extension = format === 'pdf' ? 'pdf' : 'xlsx';
 
-      switch (type) {
-        case 'ferias':
-          blob = await feriasService.exportFerias(reportFilters);
-          filename = 'relatorio_ferias.xlsx';
-          break;
-        case 'afastamentos':
-          blob = await feriasService.exportAfastamentos(reportFilters);
-          filename = 'relatorio_afastamentos.xlsx';
-          break;
-        case 'consolidado':
-          blob = await feriasService.exportConsolidado(reportFilters);
-          filename = 'relatorio_consolidado.xlsx';
-          break;
+      if (format === 'excel') {
+        switch (type) {
+          case 'ferias':
+            blob = await feriasService.exportFerias(reportFilters);
+            filename = `relatorio_ferias_${new Date().getTime()}.xlsx`;
+            break;
+          case 'afastamentos':
+            blob = await feriasService.exportAfastamentos(reportFilters);
+            filename = `relatorio_afastamentos_${new Date().getTime()}.xlsx`;
+            break;
+          case 'consolidado':
+            blob = await feriasService.exportConsolidado(reportFilters);
+            filename = `relatorio_consolidado_${new Date().getTime()}.xlsx`;
+            break;
+          default:
+            throw new Error('Tipo de relatório inválido');
+        }
+      } else {
+        switch (type) {
+          case 'ferias':
+            blob = await feriasService.exportFeriasPDF(reportFilters);
+            filename = `relatorio_ferias_${new Date().getTime()}.pdf`;
+            break;
+          case 'afastamentos':
+            blob = await feriasService.exportAfastamentosPDF(reportFilters);
+            filename = `relatorio_afastamentos_${new Date().getTime()}.pdf`;
+            break;
+          default:
+            throw new Error('Tipo de relatório PDF não disponível para consolidado');
+        }
       }
 
       // Download do arquivo
@@ -106,7 +125,7 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
 
       toast({
         title: "Sucesso",
-        description: `Relatório ${type} gerado com sucesso!`,
+        description: `Relatório ${type} (${format.toUpperCase()}) gerado com sucesso!`,
         variant: "default"
       });
 
@@ -341,33 +360,70 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
           </Card>
 
           {/* Botões de Relatório */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button
-              onClick={() => generateReport('ferias')}
-              disabled={isGenerating}
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              Relatório de Férias
-            </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+            <Card className="bg-gray-800 border-gray-600">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-seguranca-lightgray text-sm">Férias</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                <Button
+                  onClick={() => generateReport('excel', 'ferias')}
+                  disabled={isGenerating}
+                  className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 w-full"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Excel de Férias
+                </Button>
+                <Button
+                  onClick={() => generateReport('pdf', 'ferias')}
+                  disabled={isGenerating}
+                  className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 w-full"
+                >
+                  <FileText className="h-4 w-4" />
+                  PDF de Férias (Premium)
+                </Button>
+              </CardContent>
+            </Card>
 
-            <Button
-              onClick={() => generateReport('afastamentos')}
-              disabled={isGenerating}
-              className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              Relatório de Afastamentos
-            </Button>
+            <Card className="bg-gray-800 border-gray-600">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-seguranca-lightgray text-sm">Afastamentos</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                <Button
+                  onClick={() => generateReport('excel', 'afastamentos')}
+                  disabled={isGenerating}
+                  className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 w-full"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Excel de Afastamentos
+                </Button>
+                <Button
+                  onClick={() => generateReport('pdf', 'afastamentos')}
+                  disabled={isGenerating}
+                  className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-2 w-full"
+                >
+                  <FileText className="h-4 w-4" />
+                  PDF de Afastamentos (Premium)
+                </Button>
+              </CardContent>
+            </Card>
 
-            <Button
-              onClick={() => generateReport('consolidado')}
-              disabled={isGenerating}
-              className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Relatório Consolidado
-            </Button>
+            <Card className="bg-gray-800 border-gray-600 md:col-span-2 lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-seguranca-lightgray text-sm">Outros</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  onClick={() => generateReport('excel', 'consolidado')}
+                  disabled={isGenerating}
+                  className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2 w-full"
+                >
+                  <Download className="h-4 w-4" />
+                  Relatório Consolidado (Excel)
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           {isGenerating && (

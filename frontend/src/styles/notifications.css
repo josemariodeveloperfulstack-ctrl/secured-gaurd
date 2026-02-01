@@ -170,3 +170,51 @@
 .notification-item:nth-child(5) {
   animation-delay: 400ms;
 }
+
+/* Custom Scrollbar for Notifications */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(251, 191, 36, 0.2);
+  border-radius: 0px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(251, 191, 36, 0.4);
+}
+
+/* Floating Island Styles */
+.lg\:rounded-none {
+  border-radius: 0px !important;
+}
+
+/* Terminal Glow Effect */
+.animate-pulse-glow-yellow {
+  animation: pulseGlowYellow 3s ease-in-out infinite;
+}
+
+@keyframes pulseGlowYellow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(251, 191, 36, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
+  }
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}

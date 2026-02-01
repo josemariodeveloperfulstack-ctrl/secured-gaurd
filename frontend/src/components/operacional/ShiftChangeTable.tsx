@@ -29,7 +29,6 @@ import ShiftChangeFormModal from './ShiftChangeFormModal';
 import ShiftChangeViewModal from './ShiftChangeViewModal';
 import ShiftChangeDeleteDialog from './ShiftChangeDeleteDialog';
 import shiftChangeService, { ShiftChangeFormDTO } from '@/services/shiftChangeService';
-import pdfService from '@/services/pdfService';
 
 interface ShiftChangeTableProps {
   onRefresh?: () => void;
@@ -189,18 +188,12 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
 
   const handleGeneratePDF = async (shiftChange: ShiftChangeFormDTO) => {
     try {
-      await pdfService.downloadShiftChangePDF(shiftChange);
+      if (!shiftChange.id) return;
 
-      toast({
-        title: 'Sucesso',
-        description: 'PDF da troca de plantão gerado com sucesso!',
-      });
+      await shiftChangeService.downloadPDF(shiftChange.id, shiftChange.requesterFullName);
     } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Erro ao gerar PDF da troca de plantão.',
-        variant: 'destructive',
-      });
+      // O toast de erro já é exibido no service
+      console.error('Erro ao gerar PDF:', error);
     }
   };
 

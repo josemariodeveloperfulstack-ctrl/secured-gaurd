@@ -41,6 +41,10 @@ import kmControlService from '@/services/kmControlService';
 import { Vehicle, FuelRecord, Fine, KmControl } from '@/types/fleet';
 import { Driver } from '@/types/driver';
 import { VehicleMaintenance } from '@/types/maintenance';
+import { reportLayoutService } from '@/services/reportLayoutService';
+import { StandardReportTemplate } from '@/components/reporting/StandardReportTemplate';
+import { Company } from '@/types/company';
+import { companyService } from '@/services/companyService';
 
 // Tipos para os componentes existentes (mantendo compatibilidade)
 interface VeiculoComponent {
@@ -193,9 +197,26 @@ const Frota: React.FC = () => {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
   const [selectedKmControl, setSelectedKmControl] = useState<KmControl | null>(null);
-  
+
   // Estados para relatórios
   const [showMultaSelection, setShowMultaSelection] = useState(false);
+  const [fineToDownload, setFineToDownload] = useState<any>(null);
+  const [empresa, setEmpresa] = useState<Company | undefined>(undefined);
+
+  useEffect(() => {
+    // Carregar dados da empresa para o layout premium
+    const fetchCompany = async () => {
+      try {
+        const companies = await companyService.getCompanies();
+        if (companies && companies.length > 0) {
+          setEmpresa(companies[0]);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados da empresa:', error);
+      }
+    };
+    fetchCompany();
+  }, []);
 
   // Buscar veículos
   const {
@@ -208,7 +229,7 @@ const Frota: React.FC = () => {
     queryFn: async () => {
       try {
         console.log('🔍 Iniciando busca de veículos...');
-        
+
         // Debug authentication
         const token = localStorage.getItem('token');
         const user = localStorage.getItem('user');
@@ -219,7 +240,7 @@ const Frota: React.FC = () => {
           console.log('🔍 Debug Auth - User role:', userData.role);
           console.log('🔍 Debug Auth - User permissions:', userData.permissions);
         }
-        
+
         const data = await fleetService.getVehicles();
         console.log('✅ Veículos carregados:', data);
         return data;
@@ -356,7 +377,7 @@ const Frota: React.FC = () => {
       driverName: fine.driverName,
       driverLicenseNumber: fine.driverLicenseNumber
     });
-    
+
     // Encontrar o veículo correspondente
     const vehicle = vehicles?.find(v => v.id === fine.vehicleId);
     console.log('🚗 Veículo encontrado para multa:', vehicle);
@@ -381,7 +402,7 @@ const Frota: React.FC = () => {
       created_at: fine.createdAt,
       updated_at: fine.createdAt
     };
-    
+
     console.log('✅ Multa mapeada:', mappedMulta);
     console.log('✅ Dados do motorista mapeados:', {
       motorista_id: mappedMulta.motorista_id,
@@ -404,7 +425,7 @@ const Frota: React.FC = () => {
   const veiculosComponent = veiculosFiltrados?.map(mapVehicleToComponent) || [];
   const abastecimentosComponent = fuelRecords?.map(mapFuelRecordToComponent) || [];
   const multasComponent = fines?.map(mapFineToComponent) || [];
-  
+
   // Log para debug das multas
   console.log('🔍 Debug Multas:');
   console.log('  - fines (dados brutos):', fines);
@@ -423,7 +444,7 @@ const Frota: React.FC = () => {
   const totalFines = fines?.length || 0;
   const totalFinesAmount = fines?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
   const pendingFines = fines?.filter(f => f.status === 'PENDING').length || 0;
-  
+
   // Calcular multas próximas do vencimento (7 dias)
   const finesNearDue = multasComponent.filter(multa => {
     if (multa.status === 'paga') return false;
@@ -433,7 +454,7 @@ const Frota: React.FC = () => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays <= 7 && diffDays >= 0;
   });
-  
+
   // Calcular multas vencidas
   const overdueFines = multasComponent.filter(multa => {
     if (multa.status === 'paga') return false;
@@ -476,23 +497,23 @@ const Frota: React.FC = () => {
 
   const handleMultaSuccess = async () => {
     console.log('✅ Multa salva com sucesso! Atualizando lista...');
-    
+
     try {
       // Pequeno delay para garantir que o backend processou a operação
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       // Invalidar queries para forçar atualização
       await queryClient.invalidateQueries({ queryKey: ['fines'], exact: true });
-      
+
       // Refetch explícito e aguardar conclusão
       const result = await refetchFines();
       console.log('🔄 Refetch concluído. Novos dados:', result.data);
       console.log('📊 Total de multas após atualização:', result.data?.length || 0);
-      
+
       // Fechar modal após atualizar os dados
       setIsMultaModalOpen(false);
       setSelectedMulta(null);
-      
+
       // Mostrar toast de sucesso
       toast({
         title: 'Sucesso!',
@@ -524,12 +545,12 @@ const Frota: React.FC = () => {
   const handleDeleteMultipleMultas = async (selectedIds: string[]) => {
     try {
       console.log('🗑️ Excluindo multas:', selectedIds);
-      
+
       // Confirmar exclusão
       const confirmed = window.confirm(
         `Tem certeza que deseja excluir ${selectedIds.length} multa(s) selecionada(s)?\n\nEsta ação não pode ser desfeita.`
       );
-      
+
       if (!confirmed) {
         return;
       }
@@ -540,15 +561,15 @@ const Frota: React.FC = () => {
       }
 
       console.log('✅ Multas excluídas! Atualizando lista...');
-      
+
       // Invalidar queries para forçar atualização
       queryClient.invalidateQueries({ queryKey: ['fines'] });
-      
+
       // Atualizar lista
       await refetchFines();
-      
+
       console.log('🔄 Lista de multas atualizada após exclusão múltipla!');
-      
+
       toast({
         title: 'Sucesso!',
         description: `${selectedIds.length} multa(s) excluída(s) com sucesso.`,
@@ -564,143 +585,35 @@ const Frota: React.FC = () => {
   };
 
   const generatePDFReport = async (multa: any) => {
-    try {
-      // Criar elemento temporário para renderizar o relatório
-      const reportElement = document.createElement('div');
-      reportElement.style.position = 'absolute';
-      reportElement.style.left = '-9999px';
-      reportElement.style.top = '-9999px';
-      reportElement.style.width = '800px';
-      reportElement.style.backgroundColor = 'white';
-      reportElement.style.padding = '20px';
-      reportElement.style.fontFamily = 'Arial, sans-serif';
-      
-      const currentDate = new Date().toLocaleDateString('pt-BR');
-      
-      reportElement.innerHTML = `
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #333; margin-bottom: 10px;">RELATÓRIO DE MULTA</h1>
-          <h2 style="color: #666; font-size: 18px; margin: 0;">PROMOVER - Vigilância Patrimonial LTDA</h2>
-          <p style="color: #888; margin: 5px 0;">Data de Geração: ${currentDate}</p>
-        </div>
-        
-        <div style="border: 2px solid #333; padding: 20px; margin-bottom: 20px;">
-          <h3 style="color: #333; margin-top: 0; border-bottom: 1px solid #ccc; padding-bottom: 10px;">INFORMAÇÕES DA MULTA</h3>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Placa do Veículo:</strong><br>
-              <span style="font-size: 18px; color: #d32f2f; font-weight: bold;">${multa.placa}</span>
-            </div>
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Status:</strong><br>
-              <span style="color: ${multa.status === 'paga' ? '#2e7d32' : multa.status === 'pendente' ? '#f57c00' : '#d32f2f'}; font-weight: bold;">
-                ${multa.status === 'paga' ? 'PAGA' : multa.status === 'pendente' ? 'PENDENTE' : 'VENCIDA'}
-              </span>
-            </div>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Marca/Modelo:</strong><br>
-              <span style="color: #000000; font-weight: 500;">${multa.marca} ${multa.modelo}</span>
-            </div>
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Motorista:</strong><br>
-              <span style="color: #000000; font-weight: 500;">${multa.motorista_nome || 'Não informado'}</span>
-            </div>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Data da Infração:</strong><br>
-              <span style="color: #000000; font-weight: 500;">${new Date(multa.data_infracao).toLocaleDateString('pt-BR')}</span>
-            </div>
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Data de Vencimento:</strong><br>
-              <span style="color: #000000; font-weight: 500;">${new Date(multa.data_vencimento).toLocaleDateString('pt-BR')}</span>
-            </div>
-          </div>
-          
-          <div style="margin-bottom: 20px;">
-            <strong style="color: #000000; font-weight: bold;">Tipo de Infração:</strong><br>
-            <span style="color: #000000; font-weight: 500;">${multa.tipo_infracao}</span>
-          </div>
-          
-          <div style="margin-bottom: 20px;">
-            <strong style="color: #000000; font-weight: bold;">Local da Infração:</strong><br>
-            <span style="color: #000000; font-weight: 500;">${multa.local_infracao}</span>
-          </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Valor da Multa:</strong><br>
-              <span style="font-size: 20px; color: #d32f2f; font-weight: bold;">
-                R$ ${multa.valor.toFixed(2).replace('.', ',')}
-              </span>
-            </div>
-            <div>
-              <strong style="color: #000000; font-weight: bold;">Pontos na CNH:</strong><br>
-              <span style="color: #000000; font-weight: 500;">${multa.pontos || 0} pontos</span>
-            </div>
-          </div>
-        </div>
-        
-        <div style="text-align: center; margin-top: 30px; color: #666; font-size: 12px;">
-          <p>Relatório gerado automaticamente pelo Sistema Secured Guard</p>
-          <p>Data: ${currentDate} | Hora: ${new Date().toLocaleTimeString('pt-BR')}</p>
-        </div>
-      `;
-      
-      document.body.appendChild(reportElement);
-      
-      // Capturar como imagem
-      const canvas = await html2canvas(reportElement, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true
-      });
-      
-      // Remover elemento temporário
-      document.body.removeChild(reportElement);
-      
-      // Criar PDF
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      
-      let position = 0;
-      
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-      
-      // Salvar PDF
-      const filename = `relatorio_multa_${multa.placa}_${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(filename);
-      
-      return true;
-    } catch (error: any) {
-      console.error('❌ Erro ao gerar PDF:', error);
-      console.error('❌ Stack trace:', error.stack);
-      throw new Error(`Erro ao gerar PDF: ${error.message || 'Erro desconhecido'}`);
-    }
+    setFineToDownload(multa);
+    // Wait for state to update and layout to render
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const printElement = document.getElementById('frota-multa-printable');
+          if (!printElement) throw new Error('Elemento de impressão não encontrado');
+
+          await reportLayoutService.generatePremiumPDF(printElement, {
+            title: 'Relatório de Multa de Trânsito',
+            filename: `relatorio_multa_${multa.placa}_${new Date().toISOString().split('T')[0]}.pdf`,
+            company: empresa
+          });
+
+          setFineToDownload(null);
+          resolve(true);
+        } catch (error: any) {
+          console.error('❌ Erro ao gerar PDF:', error);
+          setFineToDownload(null);
+          reject(error);
+        }
+      }, 100);
+    });
   };
 
   const handleGenerateSingleFineReport = async (multaId: string, format: 'pdf' | 'excel') => {
     try {
       console.log(`📄 Gerando relatório ${format.toUpperCase()} para multa:`, multaId);
-      
+
       // Encontrar a multa específica nos dados mapeados
       const multa = multasComponent?.find(m => m.id === multaId);
       if (!multa) {
@@ -720,11 +633,11 @@ const Frota: React.FC = () => {
         console.log('📊 Gerando Excel para multa:', multaId);
         // Para Excel, usar o serviço original
         const response = await fleetService.generateFineReportExcel({ selectedIds: [multaId] });
-        
+
         // Criar blob e fazer download
         const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const filename = `relatorio_multa_${multa.placa}_${new Date().toISOString().split('T')[0]}.xlsx`;
-        
+
         // Criar URL do blob e fazer download
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -736,7 +649,7 @@ const Frota: React.FC = () => {
         window.URL.revokeObjectURL(url);
         console.log('✅ Excel gerado com sucesso');
       }
-      
+
       toast({
         title: 'Sucesso!',
         description: `Relatório ${format.toUpperCase()} da multa gerado com sucesso.`,
@@ -771,7 +684,7 @@ const Frota: React.FC = () => {
   // Funções para ações de manutenção
   const handleViewManutencao = (maintenance: VehicleMaintenance) => {
     console.log('🔍 handleViewManutencao - Dados originais:', maintenance);
-    
+
     // Usar apenas os dados reais da manutenção
     setSelectedManutencao(maintenance);
     setIsManutencaoViewModalOpen(true);
@@ -783,11 +696,11 @@ const Frota: React.FC = () => {
       isManutencaoModalOpen: isManutencaoModalOpen,
       isManutencaoViewModalOpen: isManutencaoViewModalOpen
     });
-    
+
     setSelectedManutencao(maintenance);
     setIsManutencaoViewModalOpen(false);
     setIsManutencaoModalOpen(true);
-    
+
     console.log('🔧 handleEditManutencao - Estados após mudança:', {
       selectedManutencao: maintenance,
       isManutencaoModalOpen: true,
@@ -953,7 +866,7 @@ const Frota: React.FC = () => {
   // Função para gerar HTML do relatório
   const generateHTMLReport = (finesData: any[]) => {
     const currentDate = new Date().toLocaleDateString('pt-BR');
-    
+
     let html = `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -1053,12 +966,12 @@ const Frota: React.FC = () => {
                 </tr>
             </thead>
             <tbody>`;
-    
+
     finesData.forEach(fine => {
-        const statusClass = fine.status === 'Paga' ? 'status-paga' : 
-                          fine.status === 'Pendente' ? 'status-pendente' : 'status-cancelada';
-        
-        html += `
+      const statusClass = fine.status === 'Paga' ? 'status-paga' :
+        fine.status === 'Pendente' ? 'status-pendente' : 'status-cancelada';
+
+      html += `
                 <tr>
                     <td>${fine.vehiclePlate}</td>
                     <td>${fine.driverName || 'Não informado'}</td>
@@ -1069,7 +982,7 @@ const Frota: React.FC = () => {
                     <td>${fine.dueDate}</td>
                 </tr>`;
     });
-    
+
     html += `
             </tbody>
         </table>
@@ -1080,7 +993,7 @@ const Frota: React.FC = () => {
     </div>
 </body>
 </html>`;
-    
+
     return html;
   };
 
@@ -1088,7 +1001,7 @@ const Frota: React.FC = () => {
   const handleGenerateFineReport = async (format: 'pdf' | 'excel') => {
     try {
       console.log(`🔍 Gerando relatório ${format.toUpperCase()} de multas...`);
-      
+
       const params = {
         // Adicionar filtros se necessário
         startDate: undefined,
@@ -1097,10 +1010,10 @@ const Frota: React.FC = () => {
         driverFilter: undefined,
         statusFilter: undefined
       };
-      
+
       let blob: Blob;
       let filename: string;
-      
+
       if (format === 'pdf') {
         // Usar dados das multas já carregadas
         const finesData = fines?.map(fine => ({
@@ -1120,14 +1033,14 @@ const Frota: React.FC = () => {
           createdAt: fine.created_at,
           overdue: false
         })) || [];
-        
+
         // Gerar HTML do relatório
         const htmlContent = generateHTMLReport(finesData);
-        
+
         // Criar blob com HTML
         const blob = new Blob([htmlContent], { type: 'text/html' });
         filename = `relatorio_multas_${new Date().toISOString().split('T')[0]}.html`;
-        
+
         // Criar URL do blob e fazer download
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1140,7 +1053,7 @@ const Frota: React.FC = () => {
       } else {
         blob = await fleetService.generateFineReportExcel(params);
         filename = `relatorio_multas_${new Date().toISOString().split('T')[0]}.xlsx`;
-        
+
         // Criar URL do blob e fazer download
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1151,7 +1064,7 @@ const Frota: React.FC = () => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       }
-      
+
       console.log(`✅ Relatório ${format.toUpperCase()} gerado com sucesso:`, filename);
     } catch (error) {
       console.error(`❌ Erro ao gerar relatório ${format.toUpperCase()}:`, error);
@@ -1171,9 +1084,9 @@ const Frota: React.FC = () => {
       reportElement.style.backgroundColor = 'white';
       reportElement.style.padding = '20px';
       reportElement.style.fontFamily = 'Arial, sans-serif';
-      
+
       const currentDate = new Date().toLocaleDateString('pt-BR');
-      
+
       // Gerar HTML para múltiplas multas
       let multasHTML = '';
       multas.forEach((multa, index) => {
@@ -1243,7 +1156,7 @@ const Frota: React.FC = () => {
           </div>
         `;
       });
-      
+
       reportElement.innerHTML = `
         <div style="text-align: center; margin-bottom: 30px;">
           <h1 style="color: #333; margin-bottom: 10px;">RELATÓRIO DE MULTAS</h1>
@@ -1259,44 +1172,44 @@ const Frota: React.FC = () => {
           <p>Data: ${currentDate} | Hora: ${new Date().toLocaleTimeString('pt-BR')}</p>
         </div>
       `;
-      
+
       document.body.appendChild(reportElement);
-      
+
       // Capturar como imagem
       const canvas = await html2canvas(reportElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true
       });
-      
+
       // Remover elemento temporário
       document.body.removeChild(reportElement);
-      
+
       // Criar PDF
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
+
       const imgWidth = 210;
       const pageHeight = 295;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
-      
+
       let position = 0;
-      
+
       pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
-      
+
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-      
+
       // Salvar PDF
       const filename = `relatorio_multas_selecionadas_${new Date().toISOString().split('T')[0]}.pdf`;
       pdf.save(filename);
-      
+
       return true;
     } catch (error) {
       console.error('❌ Erro ao gerar PDF múltiplo:', error);
@@ -1308,10 +1221,10 @@ const Frota: React.FC = () => {
   const handleGenerateReportWithSelection = async (selectedIds: string[], format: 'pdf' | 'excel') => {
     try {
       console.log(`Gerando relatório ${format} para multas selecionadas:`, selectedIds);
-      
+
       // Filtrar multas selecionadas
       const selectedFines = fines?.filter(fine => selectedIds.includes(fine.id)) || [];
-      
+
       if (selectedFines.length === 0) {
         toast({
           title: 'Atenção!',
@@ -1339,12 +1252,12 @@ const Frota: React.FC = () => {
           points: fine.pontos || 0,
           createdAt: fine.created_at
         }));
-        
+
         await generateMultiplePDFReport(multasData);
       } else {
         // Gerar relatório Excel
         const response = await fleetService.generateFineReportExcel({ selectedIds });
-        
+
         // Criar blob e fazer download
         const blob = new Blob([response], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const url = window.URL.createObjectURL(blob);
@@ -1356,7 +1269,7 @@ const Frota: React.FC = () => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       }
-      
+
       toast({
         title: 'Sucesso!',
         description: `Relatório ${format.toUpperCase()} gerado com ${selectedFines.length} multa(s) selecionada(s).`,
@@ -1690,11 +1603,11 @@ const Frota: React.FC = () => {
                       <span className="text-sm text-gray-400">KM Total</span>
                     </div>
                     <div className="text-2xl font-bold text-seguranca-lightgray mt-1">
-                      {kmControls && Array.isArray(kmControls) && kmControls.length > 0 
+                      {kmControls && Array.isArray(kmControls) && kmControls.length > 0
                         ? kmControls.reduce((total, km) => {
-                            const kmTotal = km.totalKm || 0;
-                            return total + (isNaN(kmTotal) ? 0 : kmTotal);
-                          }, 0).toLocaleString() 
+                          const kmTotal = km.totalKm || 0;
+                          return total + (isNaN(kmTotal) ? 0 : kmTotal);
+                        }, 0).toLocaleString()
                         : 0} km
                     </div>
                   </div>
@@ -1721,7 +1634,7 @@ const Frota: React.FC = () => {
                     kmControlsType: typeof kmControls,
                     isArray: Array.isArray(kmControls)
                   });
-                  
+
                   if (kmControls && kmControls.length > 0) {
                     console.log('🔍 Frota: Primeiro KM Control:', kmControls[0]);
                     console.log('🔍 Frota: Calculando KM Total...');
@@ -1841,7 +1754,7 @@ const Frota: React.FC = () => {
                             const today = new Date();
                             const diffTime = dueDate.getTime() - today.getTime();
                             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                            
+
                             return (
                               <div key={multa.id} className="flex justify-between items-center p-2 bg-white rounded border">
                                 <div>
@@ -2027,17 +1940,17 @@ const Frota: React.FC = () => {
           }}
           onDelete={() => {
             console.log('🗑️ Multa excluída! Atualizando lista...');
-            
+
             // Invalidar queries para forçar atualização
             queryClient.invalidateQueries({ queryKey: ['fines'] });
-            
+
             // Refetch explícito
             refetchFines();
-            
+
             // Fechar dialog
             setIsMultaDeleteDialogOpen(false);
             setSelectedMulta(null);
-            
+
             console.log('✅ Lista de multas atualizada após exclusão!');
           }}
         />
@@ -2108,6 +2021,50 @@ const Frota: React.FC = () => {
         />
 
       </div>
+      {/* Printable Area (Hidden) */}
+      {fineToDownload && (
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+          <div id="frota-multa-printable">
+            <StandardReportTemplate title="Relatório de Multa de Trânsito" company={empresa}>
+              <div className="space-y-8 text-black">
+                <div className="border-b-2 border-seguranca-red pb-4">
+                  <h3 className="text-seguranca-red font-bold text-xl uppercase">Informações da Infração</h3>
+                  <p className="text-sm text-gray-600 mt-1">Status: <span className="font-bold uppercase">{fineToDownload.status}</span></p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h4 className="font-bold border-b pb-1 text-xs uppercase text-gray-500">Dados do Veículo</h4>
+                    <p className="text-sm"><strong>Placa:</strong> <span className="text-lg font-bold text-seguranca-red">{fineToDownload.placa}</span></p>
+                    <p className="text-sm"><strong>Marca/Modelo:</strong> {fineToDownload.marca} {fineToDownload.modelo}</p>
+                    <p className="text-sm"><strong>Motorista:</strong> {fineToDownload.motorista_nome || 'Não informado'}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold border-b pb-1 text-xs uppercase text-gray-500">Detalhes da Multa</h4>
+                    <p className="text-sm"><strong>Data da Infração:</strong> {new Date(fineToDownload.data_infracao).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-sm"><strong>Vencimento:</strong> {new Date(fineToDownload.data_vencimento).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-sm"><strong>Valor:</strong> <span className="text-lg font-bold">R$ {fineToDownload.valor.toFixed(2).replace('.', ',')}</span></p>
+                    <p className="text-sm"><strong>Pontos:</strong> {fineToDownload.pontos || 0} pontos</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-bold border-b pb-1 text-xs uppercase text-gray-500">Infração</h4>
+                  <p className="text-sm"><strong>Tipo:</strong> {fineToDownload.tipo_infracao}</p>
+                  <p className="text-sm"><strong>Local:</strong> {fineToDownload.local_infracao}</p>
+                </div>
+
+                <div className="mt-20 p-6 bg-gray-50 border-2 border-dashed rounded-lg text-center">
+                  <p className="text-sm text-gray-500 mb-8">Responsável pela Frota</p>
+                  <div className="w-64 h-px bg-gray-400 mx-auto"></div>
+                  <p className="text-[10px] text-gray-400 mt-2">Assinatura</p>
+                </div>
+              </div>
+            </StandardReportTemplate>
+          </div>
+        </div>
+      )}
     </StandardLayout>
   );
 };

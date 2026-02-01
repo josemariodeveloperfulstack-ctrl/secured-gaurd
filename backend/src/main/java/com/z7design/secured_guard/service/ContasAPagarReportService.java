@@ -273,7 +273,7 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
@@ -283,7 +283,6 @@ public class ContasAPagarReportService {
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
                 table.addHeaderCell(createHeaderCell("Empresa"));
-                table.addHeaderCell(createHeaderCell("Nº Fatura"));
 
                 // Dados
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -310,7 +309,6 @@ public class ContasAPagarReportService {
                     table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
                     table.addCell(createCell(
                             invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
-                    table.addCell(createCell(invoice.getInvoiceNumber() != null ? invoice.getInvoiceNumber() : ""));
                 }
 
                 document.add(table);
@@ -505,7 +503,7 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
@@ -515,7 +513,6 @@ public class ContasAPagarReportService {
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
                 table.addHeaderCell(createHeaderCell("Empresa"));
-                table.addHeaderCell(createHeaderCell("Nº Fatura"));
 
                 // Dados
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -551,7 +548,6 @@ public class ContasAPagarReportService {
                     table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
                     table.addCell(createCell(
                             invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
-                    table.addCell(createCell(invoice.getInvoiceNumber() != null ? invoice.getInvoiceNumber() : ""));
                 }
 
                 document.add(table);
@@ -739,7 +735,7 @@ public class ContasAPagarReportService {
                         .setMarginTop(20);
                 document.add(noData);
             } else {
-                Table table = new Table(8).setWidth(UnitValue.createPercentValue(100));
+                Table table = new Table(7).setWidth(UnitValue.createPercentValue(100));
 
                 // Cabeçalhos
                 table.addHeaderCell(createHeaderCell("Vencimento"));
@@ -749,7 +745,6 @@ public class ContasAPagarReportService {
                 table.addHeaderCell(createHeaderCell("Valor"));
                 table.addHeaderCell(createHeaderCell("Status"));
                 table.addHeaderCell(createHeaderCell("Empresa"));
-                table.addHeaderCell(createHeaderCell("Nº Fatura"));
 
                 // Dados
                 DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -776,7 +771,6 @@ public class ContasAPagarReportService {
                     table.addCell(createCell(getStatusDisplayName(invoice.getStatus())));
                     table.addCell(createCell(
                             invoice.getCompanySigla() != null ? invoice.getCompanySigla() : "Não informado"));
-                    table.addCell(createCell(invoice.getInvoiceNumber() != null ? invoice.getInvoiceNumber() : ""));
                 }
 
                 document.add(table);

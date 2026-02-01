@@ -10,9 +10,20 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 
 @Service
 @Transactional
@@ -25,14 +36,21 @@ public class AbsenceService {
     @Autowired
     private EmployeeRepository employeeRepository;
 
+    @Autowired
+    private StandardReportLayoutService layoutService;
+
+    @Autowired
+    private CompanyRepository companyRepository;
+
     @Transactional(readOnly = true)
     public List<Absence> getAllAbsences() {
         try {
             log.info("🔍 Buscando todas as faltas com relacionamentos");
             List<Absence> absences = absenceRepository.findAllWithRelationships();
             log.info("✅ Faltas encontradas: {} registros", absences.size());
-            
-            // Inicializar objetos necessários dentro da transação para evitar LazyInitializationException
+
+            // Inicializar objetos necessários dentro da transação para evitar
+            // LazyInitializationException
             for (Absence absence : absences) {
                 if (absence.getEmployee() != null) {
                     // Forçar inicialização de campos básicos do Employee dentro da transação
@@ -49,7 +67,7 @@ public class AbsenceService {
                     absence.getApprovedBy().getId();
                 }
             }
-            
+
             return absences;
         } catch (Exception e) {
             log.error("❌ Erro ao buscar faltas com relacionamentos", e);
@@ -145,11 +163,12 @@ public class AbsenceService {
         // IMPORTANTE: Atualizar absenceType sempre que fornecido (não null)
         if (updatedAbsence.getAbsenceType() != null) {
             existingAbsence.setAbsenceType(updatedAbsence.getAbsenceType());
-            log.info("✅ Atualizando absenceType de '{}' para '{}'", existingAbsence.getAbsenceType(), updatedAbsence.getAbsenceType());
+            log.info("✅ Atualizando absenceType de '{}' para '{}'", existingAbsence.getAbsenceType(),
+                    updatedAbsence.getAbsenceType());
         } else {
             log.warn("⚠️ absenceType é null no update - mantendo valor atual: {}", existingAbsence.getAbsenceType());
         }
-        
+
         if (updatedAbsence.getAbsenceDate() != null) {
             existingAbsence.setAbsenceDate(updatedAbsence.getAbsenceDate());
         }
@@ -192,13 +211,12 @@ public class AbsenceService {
     public Absence updateStatus(UUID id, Absence.AbsenceStatus status) {
         Absence absence = absenceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Falta não encontrada"));
-        
+
         absence.setStatus(status);
         absence.setUpdatedAt(java.time.LocalDateTime.now());
-        
+
         return absenceRepository.save(absence);
     }
-
 
     public List<Absence> getPendingAbsences() {
         return absenceRepository.findByStatus(Absence.AbsenceStatus.PENDING);
@@ -215,18 +233,19 @@ public class AbsenceService {
     @Transactional
     public Absence approveAbsence(UUID absenceId, String observacoes) {
         Absence absence = absenceRepository.findById(absenceId)
-            .orElseThrow(() -> new RuntimeException("Afastamento não encontrado"));
-        
+                .orElseThrow(() -> new RuntimeException("Afastamento não encontrado"));
+
         if (absence.getStatus() != Absence.AbsenceStatus.PENDING) {
             throw new IllegalArgumentException("Apenas afastamentos pendentes podem ser aprovados");
         }
-        
+
         absence.setStatus(Absence.AbsenceStatus.APPROVED);
         // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
-        
+
         Absence savedAbsence = absenceRepository.save(absence);
-        
-        // Inicializar relacionamentos lazy dentro da transação para evitar LazyInitializationException
+
+        // Inicializar relacionamentos lazy dentro da transação para evitar
+        // LazyInitializationException
         try {
             if (savedAbsence.getEmployee() != null) {
                 savedAbsence.getEmployee().getName();
@@ -244,25 +263,26 @@ public class AbsenceService {
         } catch (Exception e) {
             log.warn("Erro ao inicializar relacionamentos do afastamento {}: {}", absenceId, e.getMessage());
         }
-        
+
         return savedAbsence;
     }
 
     @Transactional
     public Absence rejectAbsence(UUID absenceId, String motivo) {
         Absence absence = absenceRepository.findById(absenceId)
-            .orElseThrow(() -> new RuntimeException("Afastamento não encontrado"));
-        
+                .orElseThrow(() -> new RuntimeException("Afastamento não encontrado"));
+
         if (absence.getStatus() != Absence.AbsenceStatus.PENDING) {
             throw new IllegalArgumentException("Apenas afastamentos pendentes podem ser rejeitados");
         }
-        
+
         absence.setStatus(Absence.AbsenceStatus.REJECTED);
         // TODO: Buscar o usuário atual do contexto de segurança para setar approvedBy
-        
+
         Absence savedAbsence = absenceRepository.save(absence);
-        
-        // Inicializar relacionamentos lazy dentro da transação para evitar LazyInitializationException
+
+        // Inicializar relacionamentos lazy dentro da transação para evitar
+        // LazyInitializationException
         try {
             if (savedAbsence.getEmployee() != null) {
                 savedAbsence.getEmployee().getName();
@@ -280,7 +300,193 @@ public class AbsenceService {
         } catch (Exception e) {
             log.warn("Erro ao inicializar relacionamentos do afastamento {}: {}", absenceId, e.getMessage());
         }
-        
+
         return savedAbsence;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(UUID employeeId, LocalDate startDate, LocalDate endDate,
+            Absence.AbsenceStatus status) throws IOException {
+        log.info(
+                "Gerando relatório PDF de faltas e afastamentos - EmployeeId: {}, StartDate: {}, EndDate: {}, Status: {}",
+                employeeId, startDate, endDate, status);
+
+        List<Absence> absences;
+        if (employeeId != null && startDate != null && endDate != null) {
+            absences = absenceRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate);
+        } else if (startDate != null && endDate != null) {
+            absences = absenceRepository.findByDateRange(startDate, endDate);
+        } else if (employeeId != null) {
+            absences = absenceRepository.findByEmployeeId(employeeId);
+        } else {
+            absences = absenceRepository.findAllWithRelationships();
+        }
+
+        if (status != null) {
+            absences = absences.stream()
+                    .filter(a -> a.getStatus() == status)
+                    .toList();
+        }
+
+        log.info("Total de faltas encontradas para o relatório: {}", absences.size());
+
+        // Determinar companyId
+        UUID companyId = resolveCompanyId(absences, employeeId);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        try (PdfWriter writer = new PdfWriter(baos)) {
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .reportTitle("RELATÓRIO DE FALTAS E AFASTAMENTOS")
+                    .companyId(companyId)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer,
+                    config);
+            Document document = docWithPdf.getDocument();
+
+            // Filtros aplicados
+            if (employeeId != null || startDate != null || endDate != null || status != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+
+                if (startDate != null && endDate != null) {
+                    document.add(
+                            new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                                    " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10)
+                                    .setMarginBottom(2));
+                }
+                if (employeeId != null && !absences.isEmpty()) {
+                    String employeeName = absences.stream()
+                            .filter(a -> a.getEmployee() != null && a.getEmployee().getId().equals(employeeId))
+                            .map(a -> a.getEmployee().getName())
+                            .findFirst().orElse("ID: " + employeeId);
+                    document.add(new Paragraph("Funcionário: " + employeeName).setFontSize(10).setMarginBottom(2));
+                }
+                if (status != null) {
+                    document.add(new Paragraph("Status: " + status).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+
+            // Tabela de faltas
+            if (absences.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhum registro encontrado com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(new float[] { 3, 2, 2, 2, 4 }).useAllAvailableWidth();
+
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Funcionário"));
+                table.addHeaderCell(createHeaderCell("Data"));
+                table.addHeaderCell(createHeaderCell("Tipo"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Motivo/Observações"));
+
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (Absence absence : absences) {
+                    table.addCell(createCell(absence.getEmployee() != null ? absence.getEmployee().getName() : ""));
+                    table.addCell(createCell(
+                            absence.getAbsenceDate() != null ? absence.getAbsenceDate().format(dateFormatter) : ""));
+                    table.addCell(createCell(
+                            absence.getAbsenceType() != null ? getAbsenceTypeLabel(absence.getAbsenceType()) : ""));
+                    table.addCell(
+                            createCell(absence.getStatus() != null ? getAbsenceStatusLabel(absence.getStatus()) : ""));
+                    table.addCell(createCell(absence.getReason() != null ? absence.getReason() : ""));
+                }
+
+                document.add(table);
+            }
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de faltas: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        }
+
+        return baos.toByteArray();
+    }
+
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(9))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(8))
+                .setTextAlignment(TextAlignment.LEFT);
+    }
+
+    private String getAbsenceTypeLabel(Absence.AbsenceType type) {
+        if (type == null)
+            return "";
+        switch (type) {
+            case SICK_LEAVE:
+                return "Atestado Médico";
+            case PERSONAL_LEAVE:
+                return "Falta Pessoal/Justificada";
+            case UNAUTHORIZED:
+                return "Falta não autorizada";
+            case MEDICAL_APPOINTMENT:
+                return "Consulta Médica";
+            case FAMILY_EMERGENCY:
+                return "Emergência Familiar";
+            case WEDDING:
+                return "Casamento";
+            case OTHER:
+                return "Outros";
+            default:
+                return type.toString();
+        }
+    }
+
+    private String getAbsenceStatusLabel(Absence.AbsenceStatus status) {
+        if (status == null)
+            return "";
+        switch (status) {
+            case PENDING:
+                return "Pendente";
+            case APPROVED:
+                return "Aprovado";
+            case REJECTED:
+                return "Rejeitado";
+            case CANCELLED:
+                return "Cancelado";
+            default:
+                return status.toString();
+        }
+    }
+
+    private UUID resolveCompanyId(List<Absence> absences, UUID employeeId) {
+        if (employeeId != null) {
+            Employee employee = employeeRepository.findById(employeeId).orElse(null);
+            if (employee != null && employee.getCompany() != null) {
+                return employee.getCompany().getId();
+            }
+        }
+        if (!absences.isEmpty()) {
+            for (Absence a : absences) {
+                if (a.getEmployee() != null && a.getEmployee().getCompany() != null) {
+                    return a.getEmployee().getCompany().getId();
+                }
+            }
+        }
+
+        // Fallback for company resolution
+        return companyRepository.findAll().stream()
+                .filter(c -> c.getStatus() == Company.CompanyStatus.ACTIVE)
+                .findFirst()
+                .map(Company::getId)
+                .orElse(null);
     }
 }

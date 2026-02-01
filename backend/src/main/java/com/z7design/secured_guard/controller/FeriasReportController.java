@@ -77,24 +77,25 @@ public class FeriasReportController {
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) LocalDate dataInicio,
             @RequestParam(required = false) LocalDate dataFim) {
-        
+
         try {
             log.info("Gerando relatório Excel de férias");
-            
+
             FeriasReportDTO filters = FeriasReportDTO.builder()
-                .employeeId(employeeId)
-                .status(status)
-                .tipo(tipo)
-                .dataInicio(dataInicio)
-                .dataFim(dataFim)
-                .build();
-            
+                    .employeeId(employeeId)
+                    .status(status)
+                    .tipo(tipo)
+                    .dataInicio(dataInicio)
+                    .dataFim(dataFim)
+                    .build();
+
             byte[] excelBytes = feriasReportService.generateFeriasExcelReport(filters);
             ByteArrayResource resource = new ByteArrayResource(excelBytes);
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=relatorio_ferias.xlsx")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .contentLength(excelBytes.length)
                     .body(resource);
         } catch (Exception e) {
@@ -112,24 +113,25 @@ public class FeriasReportController {
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) LocalDate dataInicio,
             @RequestParam(required = false) LocalDate dataFim) {
-        
+
         try {
             log.info("Gerando relatório Excel de afastamentos");
-            
+
             FeriasReportDTO filters = FeriasReportDTO.builder()
-                .employeeId(employeeId)
-                .status(status)
-                .tipo(tipo)
-                .dataInicio(dataInicio)
-                .dataFim(dataFim)
-                .build();
-            
+                    .employeeId(employeeId)
+                    .status(status)
+                    .tipo(tipo)
+                    .dataInicio(dataInicio)
+                    .dataFim(dataFim)
+                    .build();
+
             byte[] excelBytes = feriasReportService.generateAfastamentosExcelReport(filters);
             ByteArrayResource resource = new ByteArrayResource(excelBytes);
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=relatorio_afastamentos.xlsx")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .contentLength(excelBytes.length)
                     .body(resource);
         } catch (Exception e) {
@@ -145,26 +147,96 @@ public class FeriasReportController {
             @RequestParam(required = false) UUID employeeId,
             @RequestParam(required = false) LocalDate dataInicio,
             @RequestParam(required = false) LocalDate dataFim) {
-        
+
         try {
             log.info("Gerando relatório Excel consolidado");
-            
+
             FeriasReportDTO filters = FeriasReportDTO.builder()
-                .employeeId(employeeId)
-                .dataInicio(dataInicio)
-                .dataFim(dataFim)
-                .build();
-            
+                    .employeeId(employeeId)
+                    .dataInicio(dataInicio)
+                    .dataFim(dataFim)
+                    .build();
+
             byte[] excelBytes = feriasReportService.generateConsolidadoExcelReport(filters);
             ByteArrayResource resource = new ByteArrayResource(excelBytes);
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=relatorio_consolidado_ferias_afastamentos.xlsx")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment;filename=relatorio_consolidado_ferias_afastamentos.xlsx")
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .contentLength(excelBytes.length)
                     .body(resource);
         } catch (Exception e) {
             log.error("Erro ao gerar relatório Excel consolidado: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/ferias/pdf")
+    @Operation(summary = "Relatório de férias em PDF", description = "Gera relatório detalhado de férias em PDF")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    public ResponseEntity<byte[]> generateFeriasPDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim) {
+
+        try {
+            log.info("Gerando relatório PDF de férias");
+
+            FeriasReportDTO filters = FeriasReportDTO.builder()
+                    .employeeId(employeeId)
+                    .status(status)
+                    .tipo(tipo)
+                    .dataInicio(dataInicio)
+                    .dataFim(dataFim)
+                    .build();
+
+            byte[] pdfBytes = feriasReportService.generateFeriasPDFReport(filters);
+            String fileName = "relatorio_ferias_" + java.time.LocalDate.now().toString() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF de férias: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/afastamentos/pdf")
+    @Operation(summary = "Relatório de afastamentos em PDF", description = "Gera relatório detalhado de afastamentos em PDF")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    public ResponseEntity<byte[]> generateAfastamentosPDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) LocalDate dataInicio,
+            @RequestParam(required = false) LocalDate dataFim) {
+
+        try {
+            log.info("Gerando relatório PDF de afastamentos");
+
+            FeriasReportDTO filters = FeriasReportDTO.builder()
+                    .employeeId(employeeId)
+                    .status(status)
+                    .tipo(tipo)
+                    .dataInicio(dataInicio)
+                    .dataFim(dataFim)
+                    .build();
+
+            byte[] pdfBytes = feriasReportService.generateAfastamentosPDFReport(filters);
+            String fileName = "relatorio_afastamentos_" + java.time.LocalDate.now().toString() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF de afastamentos: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

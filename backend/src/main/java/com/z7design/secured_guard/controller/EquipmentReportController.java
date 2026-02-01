@@ -105,6 +105,31 @@ public class EquipmentReportController {
         }
     }
 
+    @GetMapping("/report/pdf")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String equipmentType) {
+        try {
+            log.info("Gerando relatório PDF premium de equipamentos");
+            byte[] pdfBytes = equipmentReportService.generatePDFReport(startDate, endDate, status, equipmentType);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("inline",
+                    "relatorio_equipamentos_" + LocalDate.now() + ".pdf");
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF premium de equipamentos", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @PostMapping("/export/pdf")
     @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
     public ResponseEntity<byte[]> exportToPdf(@RequestBody Map<String, Object> requestBody) {
@@ -114,29 +139,39 @@ public class EquipmentReportController {
             String endDateStr = (String) requestBody.get("endDate");
             String status = (String) requestBody.get("status");
             String equipmentType = (String) requestBody.get("equipmentType");
-            
+
             log.info("Exportando relatório para PDF: {}", reportType);
-            
+
             // Criar DTO simples inline
             var reportRequest = new Object() {
-                public String getReportType() { return reportType; }
-                public LocalDate getStartDate() { 
-                    return startDateStr != null ? LocalDate.parse(startDateStr) : null; 
+                public String getReportType() {
+                    return reportType;
                 }
-                public LocalDate getEndDate() { 
-                    return endDateStr != null ? LocalDate.parse(endDateStr) : null; 
+
+                public LocalDate getStartDate() {
+                    return startDateStr != null ? LocalDate.parse(startDateStr) : null;
                 }
-                public String getStatus() { return status; }
-                public String getEquipmentType() { return equipmentType; }
+
+                public LocalDate getEndDate() {
+                    return endDateStr != null ? LocalDate.parse(endDateStr) : null;
+                }
+
+                public String getStatus() {
+                    return status;
+                }
+
+                public String getEquipmentType() {
+                    return equipmentType;
+                }
             };
-            
+
             byte[] pdfBytes = equipmentReportService.exportToPdf(reportRequest);
-            
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", 
-                "equipment_report_" + reportType + "_" + LocalDate.now() + ".pdf");
-            
+            headers.setContentDispositionFormData("attachment",
+                    "equipment_report_" + reportType + "_" + LocalDate.now() + ".pdf");
+
             return ResponseEntity.ok()
                     .headers(headers)
                     .body(pdfBytes);
@@ -160,23 +195,33 @@ public class EquipmentReportController {
 
             // Criar DTO simples inline
             var reportRequest = new Object() {
-                public String getReportType() { return reportType; }
-                public LocalDate getStartDate() { 
-                    return startDateStr != null ? LocalDate.parse(startDateStr) : null; 
+                public String getReportType() {
+                    return reportType;
                 }
-                public LocalDate getEndDate() { 
-                    return endDateStr != null ? LocalDate.parse(endDateStr) : null; 
+
+                public LocalDate getStartDate() {
+                    return startDateStr != null ? LocalDate.parse(startDateStr) : null;
                 }
-                public String getStatus() { return status; }
-                public String getEquipmentType() { return equipmentType; }
+
+                public LocalDate getEndDate() {
+                    return endDateStr != null ? LocalDate.parse(endDateStr) : null;
+                }
+
+                public String getStatus() {
+                    return status;
+                }
+
+                public String getEquipmentType() {
+                    return equipmentType;
+                }
             };
 
             byte[] excelBytes = equipmentReportService.exportToExcel(reportRequest);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", 
-                "equipment_report_" + reportType + "_" + LocalDate.now() + ".xlsx");
+            headers.setContentDispositionFormData("attachment",
+                    "equipment_report_" + reportType + "_" + LocalDate.now() + ".xlsx");
 
             return ResponseEntity.ok()
                     .headers(headers)
@@ -201,23 +246,33 @@ public class EquipmentReportController {
 
             // Criar DTO simples inline
             var reportRequest = new Object() {
-                public String getReportType() { return reportType; }
-                public LocalDate getStartDate() { 
-                    return startDateStr != null ? LocalDate.parse(startDateStr) : null; 
+                public String getReportType() {
+                    return reportType;
                 }
-                public LocalDate getEndDate() { 
-                    return endDateStr != null ? LocalDate.parse(endDateStr) : null; 
+
+                public LocalDate getStartDate() {
+                    return startDateStr != null ? LocalDate.parse(startDateStr) : null;
                 }
-                public String getStatus() { return status; }
-                public String getEquipmentType() { return equipmentType; }
+
+                public LocalDate getEndDate() {
+                    return endDateStr != null ? LocalDate.parse(endDateStr) : null;
+                }
+
+                public String getStatus() {
+                    return status;
+                }
+
+                public String getEquipmentType() {
+                    return equipmentType;
+                }
             };
 
             byte[] csvBytes = equipmentReportService.exportToCsv(reportRequest);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.TEXT_PLAIN);
-            headers.setContentDispositionFormData("attachment", 
-                "equipment_report_" + reportType + "_" + LocalDate.now() + ".csv");
+            headers.setContentDispositionFormData("attachment",
+                    "equipment_report_" + reportType + "_" + LocalDate.now() + ".csv");
 
             return ResponseEntity.ok()
                     .headers(headers)

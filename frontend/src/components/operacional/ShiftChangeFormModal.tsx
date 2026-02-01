@@ -10,7 +10,7 @@ import { formatDateForBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUti
 import { ShiftChangeFormDTO } from '@/services/shiftChangeService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { workPostService, WorkPost } from '@/services/workPostService';
-import ShiftChangePDFGenerator from './ShiftChangePDFGenerator';
+
 
 interface ShiftChangeFormModalProps {
   open: boolean;
@@ -190,7 +190,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
     try {
       // Remover campos auxiliares que o backend não precisa
       const { requesterEmployeeId, requesterWorkPostId, replacingEmployeeId, replacingWorkPostId, ...restFormData } = formData;
-      
+
       const submitData = {
         ...restFormData,
         dateOfRequest: formatDateForBackend(formData.dateOfRequest),
@@ -253,12 +253,12 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
               <User className="h-5 w-5" />
               Dados do Solicitante
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Nome Completo *</label>
-                <Select 
-                  value={formData.requesterEmployeeId} 
+                <Select
+                  value={formData.requesterEmployeeId}
                   onValueChange={(value) => {
                     const employee = employees.find(emp => emp.id === value);
                     if (employee) {
@@ -272,9 +272,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
                     {employees.map((employee, index) => (
-                      <SelectItem 
-                        key={employee.id || `requester-employee-${index}-${employee.name}`} 
-                        value={employee.id} 
+                      <SelectItem
+                        key={employee.id || `requester-employee-${index}-${employee.name}`}
+                        value={employee.id}
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
                         {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
@@ -289,8 +289,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Setor *</label>
-                <Select 
-                  value={formData.requesterWorkPostId} 
+                <Select
+                  value={formData.requesterWorkPostId}
                   onValueChange={(value) => {
                     const workPost = workPosts.find(wp => wp.id === value);
                     if (workPost) {
@@ -304,9 +304,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
                     {workPosts.map((workPost) => (
-                      <SelectItem 
-                        key={workPost.id} 
-                        value={workPost.id} 
+                      <SelectItem
+                        key={workPost.id}
+                        value={workPost.id}
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
                         {workPost.name} {workPost.postCode && `(${workPost.postCode})`}
@@ -354,12 +354,12 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
               <User className="h-5 w-5" />
               Dados do Colega
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Nome Completo *</label>
-                <Select 
-                  value={formData.replacingEmployeeId} 
+                <Select
+                  value={formData.replacingEmployeeId}
                   onValueChange={(value) => {
                     const employee = employees.find(emp => emp.id === value);
                     if (employee) {
@@ -373,9 +373,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
                     {employees.map((employee, index) => (
-                      <SelectItem 
-                        key={employee.id || `replacing-employee-${index}-${employee.name}`} 
-                        value={employee.id} 
+                      <SelectItem
+                        key={employee.id || `replacing-employee-${index}-${employee.name}`}
+                        value={employee.id}
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
                         {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
@@ -390,8 +390,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Setor *</label>
-                <Select 
-                  value={formData.replacingWorkPostId} 
+                <Select
+                  value={formData.replacingWorkPostId}
                   onValueChange={(value) => {
                     const workPost = workPosts.find(wp => wp.id === value);
                     if (workPost) {
@@ -405,9 +405,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
                     {workPosts.map((workPost) => (
-                      <SelectItem 
-                        key={workPost.id} 
-                        value={workPost.id} 
+                      <SelectItem
+                        key={workPost.id}
+                        value={workPost.id}
                         className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                       >
                         {workPost.name} {workPost.postCode && `(${workPost.postCode})`}
@@ -477,8 +477,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
               <label className="text-sm font-medium text-seguranca-lightgray">
                 Status
               </label>
-              <Select 
-                value={formData.status || 'PENDING'} 
+              <Select
+                value={formData.status || 'PENDING'}
                 onValueChange={(value) => handleInputChange('status', value)}
               >
                 <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
@@ -486,8 +486,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-black border-gray-600">
                   {statusOptions.map(option => (
-                    <SelectItem 
-                      key={option.value} 
+                    <SelectItem
+                      key={option.value}
                       value={option.value}
                       className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                     >
@@ -502,8 +502,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
               <label className="text-sm font-medium text-seguranca-lightgray">
                 Aprovado por:
               </label>
-              <Select 
-                value={formData.approvedBy || ''} 
+              <Select
+                value={formData.approvedBy || ''}
                 onValueChange={(value) => handleInputChange('approvedBy', value)}
                 disabled={formData.status !== 'APPROVED' && !shiftChange}
               >
@@ -512,8 +512,8 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
                 </SelectTrigger>
                 <SelectContent className="bg-seguranca-black border-gray-600">
                   {employees.map((employee, index) => (
-                    <SelectItem 
-                      key={employee.id || `approved-by-${index}-${employee.name}`} 
+                    <SelectItem
+                      key={employee.id || `approved-by-${index}-${employee.name}`}
                       value={employee.name}
                       className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                     >
@@ -531,23 +531,7 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
           {/* Botões */}
           <div className="flex justify-between items-center pt-4 border-t border-gray-600">
             <div>
-              <ShiftChangePDFGenerator
-                data={{
-                  dateOfRequest: formatDateForBackend(formData.dateOfRequest),
-                  requesterFullName: formData.requesterFullName,
-                  requesterSector: formData.requesterSector,
-                  requesterDayOffDate: formData.requesterDayOffDate ? formatDateForBackend(formData.requesterDayOffDate) : undefined,
-                  requesterShiftDate: formData.requesterShiftDate ? formatDateForBackend(formData.requesterShiftDate) : '',
-                  replacingFullName: formData.replacingFullName,
-                  replacingSector: formData.replacingSector,
-                  replacingShiftDate: formData.replacingShiftDate ? formatDateForBackend(formData.replacingShiftDate) : '',
-                  replacingDayOffDate: formData.replacingDayOffDate ? formatDateForBackend(formData.replacingDayOffDate) : undefined,
-                  shiftTime: formData.shiftTime,
-                }}
-                onGenerate={() => {
-                  console.log('PDF gerado com sucesso!');
-                }}
-              />
+              {/* PDF generation only available after saving */}
             </div>
             <div className="flex gap-3">
               <Button

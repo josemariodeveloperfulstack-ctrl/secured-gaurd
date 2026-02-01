@@ -52,7 +52,7 @@ const OperationalDashboard: React.FC = () => {
   const [remanejamentos, setRemanejamentos] = useState<Remanejamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
-  
+
   // Estados para modais
   const [showVacationCoverageModal, setShowVacationCoverageModal] = useState(false);
   const [selectedVacationCoverage, setSelectedVacationCoverage] = useState<VacationCoverage | null>(null);
@@ -78,7 +78,7 @@ const OperationalDashboard: React.FC = () => {
   const [selectedRemanejamento, setSelectedRemanejamento] = useState<Remanejamento | null>(null);
   const [showDeleteRemanejamentoModal, setShowDeleteRemanejamentoModal] = useState(false);
   const [remanejamentoToDelete, setRemanejamentoToDelete] = useState<Remanejamento | null>(null);
-  
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -155,7 +155,7 @@ const OperationalDashboard: React.FC = () => {
 
   const confirmDeleteVacationCoverage = async () => {
     if (!vacationCoverageToDelete) return;
-    
+
     try {
       await operationalService.deleteVacationCoverage(vacationCoverageToDelete.id);
       setVacationCoverages(prev => prev.filter(v => v.id !== vacationCoverageToDelete.id));
@@ -218,14 +218,14 @@ const OperationalDashboard: React.FC = () => {
         'COMPLETED': 'COMPLETED',
         'CANCELLED': 'CANCELLED'
       };
-      
+
       const backendStatus = statusMap[newStatus] || newStatus;
       await operationalService.updateVacationCoverageStatus(vacationCoverageToChangeStatus.id, backendStatus);
 
       // Atualizar lista
       const updatedCoverages = await operationalService.getAllVacationCoverages();
       setVacationCoverages(updatedCoverages);
-      
+
       // Mapear label do status para exibição
       const statusLabels: Record<string, string> = {
         'PENDING': 'Pendente',
@@ -256,7 +256,7 @@ const OperationalDashboard: React.FC = () => {
 
   const confirmDeleteAbsence = async () => {
     if (!absenceToDelete) return;
-    
+
     try {
       await operationalService.deleteAbsence(absenceToDelete.id);
       setAbsences(prev => prev.filter(a => a.id !== absenceToDelete.id));
@@ -276,7 +276,7 @@ const OperationalDashboard: React.FC = () => {
   const handleSubmitAbsence = async (data: CreateAbsenceDTO) => {
     try {
       console.log('📤 Enviando dados da falta:', data);
-      
+
       if (selectedAbsence) {
         // Atualizar
         console.log('🔄 Atualizando falta:', selectedAbsence.id);
@@ -292,11 +292,11 @@ const OperationalDashboard: React.FC = () => {
       }
     } catch (error: any) {
       console.error('❌ Erro ao salvar falta:', error);
-      const errorMessage = error?.response?.data?.message || 
-                          error?.response?.data?.error || 
-                          error?.message || 
-                          'Erro ao salvar falta. Verifique os dados e tente novamente.';
-      
+      const errorMessage = error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'Erro ao salvar falta. Verifique os dados e tente novamente.';
+
       toast({
         title: 'Erro',
         description: errorMessage,
@@ -324,7 +324,7 @@ const OperationalDashboard: React.FC = () => {
 
   const confirmDeleteAssignment = async () => {
     if (!assignmentToDelete) return;
-    
+
     try {
       await operationalService.deleteWorkPostAssignment(assignmentToDelete.id);
       // Atualizar apenas a lista de atribuições sem mudar de aba
@@ -360,7 +360,7 @@ const OperationalDashboard: React.FC = () => {
 
   const confirmDeleteActivity = async () => {
     if (!activityToDelete) return;
-    
+
     try {
       await operationalService.deleteSpecificActivity(activityToDelete.id);
       setSpecificActivities(prev => prev.filter(a => a.id !== activityToDelete.id));
@@ -424,7 +424,7 @@ const OperationalDashboard: React.FC = () => {
 
   const confirmDeleteRemanejamento = async () => {
     if (!remanejamentoToDelete) return;
-    
+
     try {
       await remanejamentoService.deleteRemanejamento(remanejamentoToDelete.id);
       setRemanejamentos(prev => prev.filter(r => r.id !== remanejamentoToDelete.id));
@@ -471,18 +471,23 @@ const OperationalDashboard: React.FC = () => {
   };
 
   // Funções para gerar relatórios em PDF
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
   const handleGenerateVacationCoverageReport = async () => {
     try {
-      const blob = await operationalReportGenerator.generateVacationCoverageReport(vacationCoverages);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-cobertura-ferias-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      toast({ title: 'Aguarde', description: 'Gerando relatório PDF...' });
+      const blob = await operationalService.generateVacationCoveragePDF({});
+      downloadBlob(blob, `relatorio-cobertura-ferias-${new Date().toISOString().split('T')[0]}.pdf`);
+
       toast({
         title: 'Sucesso',
         description: 'Relatório de Cobertura de Férias gerado com sucesso.',
@@ -499,16 +504,10 @@ const OperationalDashboard: React.FC = () => {
 
   const handleGenerateAbsenceReport = async () => {
     try {
-      const blob = await operationalReportGenerator.generateAbsenceReport(absences);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-controle-faltas-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      toast({ title: 'Aguarde', description: 'Gerando relatório PDF...' });
+      const blob = await operationalService.generateAbsencePDF({});
+      downloadBlob(blob, `relatorio-controle-faltas-${new Date().toISOString().split('T')[0]}.pdf`);
+
       toast({
         title: 'Sucesso',
         description: 'Relatório de Controle de Faltas gerado com sucesso.',
@@ -525,16 +524,10 @@ const OperationalDashboard: React.FC = () => {
 
   const handleGenerateWorkPostAssignmentReport = async () => {
     try {
-      const blob = await operationalReportGenerator.generateWorkPostAssignmentReport(workPostAssignments);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-atribuicoes-posto-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      toast({ title: 'Aguarde', description: 'Gerando relatório PDF...' });
+      const blob = await operationalService.generateWorkPostAssignmentPDF({});
+      downloadBlob(blob, `relatorio-atribuicoes-posto-${new Date().toISOString().split('T')[0]}.pdf`);
+
       toast({
         title: 'Sucesso',
         description: 'Relatório de Atribuições de Posto gerado com sucesso.',
@@ -551,16 +544,10 @@ const OperationalDashboard: React.FC = () => {
 
   const handleGenerateSpecificActivityReport = async () => {
     try {
-      const blob = await operationalReportGenerator.generateSpecificActivityReport(specificActivities);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-atividades-especificas-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      toast({ title: 'Aguarde', description: 'Gerando relatório PDF...' });
+      const blob = await operationalService.generateSpecificActivityPDF({});
+      downloadBlob(blob, `relatorio-atividades-especificas-${new Date().toISOString().split('T')[0]}.pdf`);
+
       toast({
         title: 'Sucesso',
         description: 'Relatório de Atividades Específicas gerado com sucesso.',
@@ -577,16 +564,10 @@ const OperationalDashboard: React.FC = () => {
 
   const handleGenerateRemanejamentoReport = async () => {
     try {
-      const blob = await operationalReportGenerator.generateRemanejamentoReport(remanejamentos);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-remanejamentos-${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
+      toast({ title: 'Aguarde', description: 'Gerando relatório PDF...' });
+      const blob = await remanejamentoService.exportRemanejamentosReportPDF({});
+      downloadBlob(blob, `relatorio-remanejamentos-${new Date().toISOString().split('T')[0]}.pdf`);
+
       toast({
         title: 'Sucesso',
         description: 'Relatório de Remanejamentos gerado com sucesso.',
@@ -636,69 +617,69 @@ const OperationalDashboard: React.FC = () => {
     // Mapeamento de status para exibição com ícones
     const statusConfig: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
       // Status de Atribuições de Posto
-      'SCHEDULED': { 
-        label: 'Pendente', 
+      'SCHEDULED': {
+        label: 'Pendente',
         className: 'bg-yellow-500 hover:bg-yellow-600 text-white font-medium shadow-md',
         icon: <Clock className="h-3.5 w-3.5" />
       },
-      'CONFIRMED': { 
-        label: 'Confirmado', 
+      'CONFIRMED': {
+        label: 'Confirmado',
         className: 'bg-green-500 hover:bg-green-600 text-white font-medium shadow-md',
         icon: <CheckCircle className="h-3.5 w-3.5" />
       },
-      'ACTIVE': { 
-        label: 'Ativo', 
+      'ACTIVE': {
+        label: 'Ativo',
         className: 'bg-blue-500 hover:bg-blue-600 text-white font-medium shadow-md',
         icon: <PlayCircle className="h-3.5 w-3.5" />
       },
-      'COMPLETED': { 
-        label: 'Concluído', 
+      'COMPLETED': {
+        label: 'Concluído',
         className: 'bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-md',
         icon: <CheckCircle className="h-3.5 w-3.5" />
       },
-      'CANCELLED': { 
-        label: 'Cancelado', 
+      'CANCELLED': {
+        label: 'Cancelado',
         className: 'bg-red-500 hover:bg-red-600 text-white font-medium shadow-md',
         icon: <XCircle className="h-3.5 w-3.5" />
       },
-      
+
       // Status de Cobertura de Férias e outros
-      'PENDING': { 
-        label: 'Pendente', 
+      'PENDING': {
+        label: 'Pendente',
         className: 'bg-yellow-500 hover:bg-yellow-600 text-white font-medium shadow-md',
         icon: <Clock className="h-3.5 w-3.5" />
       },
-      'NO_COVERAGE': { 
-        label: 'Sem Cobertura', 
+      'NO_COVERAGE': {
+        label: 'Sem Cobertura',
         className: 'bg-red-500 hover:bg-red-600 text-white font-medium shadow-md',
         icon: <AlertTriangle className="h-3.5 w-3.5" />
       },
-      'APPROVED': { 
-        label: 'Aprovado', 
+      'APPROVED': {
+        label: 'Aprovado',
         className: 'bg-green-500 hover:bg-green-600 text-white font-medium shadow-md',
         icon: <CheckCircle className="h-3.5 w-3.5" />
       },
-      'REJECTED': { 
-        label: 'Rejeitado', 
+      'REJECTED': {
+        label: 'Rejeitado',
         className: 'bg-red-500 hover:bg-red-600 text-white font-medium shadow-md',
         icon: <XCircle className="h-3.5 w-3.5" />
       },
-      'IN_PROGRESS': { 
-        label: 'Em Andamento', 
+      'IN_PROGRESS': {
+        label: 'Em Andamento',
         className: 'bg-blue-500 hover:bg-blue-600 text-white font-medium shadow-md',
         icon: <PlayCircle className="h-3.5 w-3.5" />
       },
     };
 
-    const config = statusConfig[status] || { 
-      label: status, 
+    const config = statusConfig[status] || {
+      label: status,
       className: 'bg-gray-500 hover:bg-gray-600 text-white font-medium shadow-md',
       icon: <AlertTriangle className="h-3.5 w-3.5" />
     };
 
     return (
-      <Badge 
-        variant="default" 
+      <Badge
+        variant="default"
         className={`${config.className} transition-colors cursor-pointer px-3 py-1.5 flex items-center gap-1.5`}
       >
         {config.icon}
@@ -775,7 +756,7 @@ const OperationalDashboard: React.FC = () => {
       // Atualizar apenas as atribuições ao invés de recarregar tudo
       const updatedAssignments = await operationalService.getAllWorkPostAssignments();
       setWorkPostAssignments(updatedAssignments);
-      
+
       // Mapear label do status para exibição
       const statusLabels: Record<string, string> = {
         'SCHEDULED': 'Pendente',
@@ -836,11 +817,11 @@ const OperationalDashboard: React.FC = () => {
               min-h-[100px] md:min-h-[80px]
               scrollbar-hide
             ">
-              
+
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
-                    value="vacations" 
+                  <TabsTrigger
+                    value="vacations"
                     className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
                   >
                     <Calendar className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
@@ -855,8 +836,8 @@ const OperationalDashboard: React.FC = () => {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
-                    value="absences" 
+                  <TabsTrigger
+                    value="absences"
                     className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
                   >
                     <UserX className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
@@ -871,8 +852,8 @@ const OperationalDashboard: React.FC = () => {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
-                    value="assignments" 
+                  <TabsTrigger
+                    value="assignments"
                     className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
                   >
                     <MapPin className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
@@ -887,8 +868,8 @@ const OperationalDashboard: React.FC = () => {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
-                    value="activities" 
+                  <TabsTrigger
+                    value="activities"
                     className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
                   >
                     <Activity className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
@@ -903,8 +884,8 @@ const OperationalDashboard: React.FC = () => {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
-                    value="remanejamentos" 
+                  <TabsTrigger
+                    value="remanejamentos"
                     className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
                   >
                     <ArrowRightLeft className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
@@ -984,23 +965,23 @@ const OperationalDashboard: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <div 
+                        <div
                           className="cursor-pointer"
                           onClick={() => handleChangeVacationCoverageStatus(coverage)}
                           title="Clique para alterar o status"
                         >
                           {getStatusBadge(coverage.status)}
                         </div>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleEditVacationCoverage(coverage)}
                           title="Editar cobertura"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteVacationCoverage(coverage)}
                           title="Excluir cobertura"
@@ -1051,7 +1032,7 @@ const OperationalDashboard: React.FC = () => {
                           {absence.employee?.name || 'Funcionário não definido'} ({formatDate(absence.absenceDate)})
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          Tipo: {absence.absenceType.replace('_', ' ')} | 
+                          Tipo: {absence.absenceType.replace('_', ' ')} |
                           Motivo: {absence.reason}
                           {absence.medicalCertificateDays && ` | Dias: ${absence.medicalCertificateDays}`}
                         </p>
@@ -1068,15 +1049,15 @@ const OperationalDashboard: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         {getStatusBadge(absence.status)}
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleEditAbsence(absence)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteAbsence(absence)}
                         >
@@ -1153,23 +1134,23 @@ const OperationalDashboard: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <div 
+                        <div
                           className="cursor-pointer"
                           onClick={() => handleChangeAssignmentStatus(assignment)}
                           title="Clique para alterar o status"
                         >
                           {getStatusBadge(assignment.status)}
                         </div>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleEditAssignment(assignment)}
                           title="Editar atribuição"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteAssignment(assignment)}
                           title="Excluir atribuição"
@@ -1261,16 +1242,16 @@ const OperationalDashboard: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         {getStatusBadge(activity.status)}
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleEditActivity(activity)}
                           title="Editar atividade"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteActivity(activity)}
                           title="Excluir atividade"
@@ -1342,16 +1323,16 @@ const OperationalDashboard: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleEditRemanejamento(remanejamento)}
                           title="Editar remanejamento"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteRemanejamento(remanejamento)}
                           title="Excluir remanejamento"

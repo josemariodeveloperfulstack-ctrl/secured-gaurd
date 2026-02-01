@@ -11,11 +11,29 @@ import com.z7design.secured_guard.repository.VacationCoverageRepository;
 import com.z7design.secured_guard.repository.VacationRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.UUID;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
@@ -23,6 +41,7 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@Slf4j
 public class VacationCoverageService {
 
     @Autowired
@@ -36,6 +55,12 @@ public class VacationCoverageService {
 
     @Autowired
     private WorkPostRepository workPostRepository;
+
+    @Autowired
+    private StandardReportLayoutService layoutService;
+
+    @Autowired
+    private CompanyRepository companyRepository;
 
     @Transactional(readOnly = true)
     public List<VacationCoverageResponse> getAllVacationCoverages() {
@@ -90,9 +115,10 @@ public class VacationCoverageService {
         } else {
             // Criar vacation temporária para esta cobertura
             // Calcular dias de férias
-            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
+            long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate())
+                    + 1;
             int daysTaken = (int) daysBetween;
-            
+
             vacation = Vacation.builder()
                     .employee(employee)
                     .startDate(request.getStartDate())
@@ -122,8 +148,8 @@ public class VacationCoverageService {
         VacationCoverage.ShiftType shiftType = VacationCoverage.ShiftType.valueOf(request.getShift());
 
         // Determinar status inicial
-        VacationCoverage.CoverageStatus status = substitute != null 
-                ? VacationCoverage.CoverageStatus.PENDING 
+        VacationCoverage.CoverageStatus status = substitute != null
+                ? VacationCoverage.CoverageStatus.PENDING
                 : VacationCoverage.CoverageStatus.NO_COVERAGE;
 
         // Criar cobertura
@@ -152,7 +178,7 @@ public class VacationCoverageService {
         if (request.getStartDate() != null) {
             existingCoverage.setCoverageStartDate(request.getStartDate());
         }
-        
+
         if (request.getEndDate() != null) {
             existingCoverage.setCoverageEndDate(request.getEndDate());
         }
@@ -199,17 +225,17 @@ public class VacationCoverageService {
     public VacationCoverageResponse updateStatus(UUID id, VacationCoverage.CoverageStatus status) {
         VacationCoverage coverage = vacationCoverageRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cobertura de férias não encontrada"));
-        
+
         coverage.setStatus(status);
-        
+
         // Se confirmar, registrar data e confirmação
         if (status == VacationCoverage.CoverageStatus.CONFIRMED) {
             coverage.setIsConfirmed(true);
             coverage.setConfirmationDate(java.time.LocalDateTime.now());
         }
-        
+
         coverage.setUpdatedAt(java.time.LocalDateTime.now());
-        
+
         return mapToResponse(vacationCoverageRepository.save(coverage));
     }
 
@@ -217,10 +243,10 @@ public class VacationCoverageService {
     public List<VacationCoverageResponse> getVacationCoveragesNeedingAttention() {
         LocalDate today = LocalDate.now();
         LocalDate nextWeek = today.plusWeeks(1);
-        
+
         return vacationCoverageRepository.findByDateRange(today, nextWeek).stream()
                 .filter(coverage -> coverage.getStatus() == VacationCoverage.CoverageStatus.PENDING ||
-                                  coverage.getStatus() == VacationCoverage.CoverageStatus.NO_COVERAGE)
+                        coverage.getStatus() == VacationCoverage.CoverageStatus.NO_COVERAGE)
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -230,24 +256,21 @@ public class VacationCoverageService {
         if (coverage.getVacation() != null && coverage.getVacation().getEmployee() != null) {
             employeeData = new VacationCoverageResponse.SimpleEmployee(
                     coverage.getVacation().getEmployee().getId(),
-                    coverage.getVacation().getEmployee().getName()
-            );
+                    coverage.getVacation().getEmployee().getName());
         }
 
         VacationCoverageResponse.SimpleEmployee substituteData = null;
         if (coverage.getSubstituteEmployee() != null) {
             substituteData = new VacationCoverageResponse.SimpleEmployee(
                     coverage.getSubstituteEmployee().getId(),
-                    coverage.getSubstituteEmployee().getName()
-            );
+                    coverage.getSubstituteEmployee().getName());
         }
 
         VacationCoverageResponse.SimpleWorkPost locationData = null;
         if (coverage.getLocation() != null) {
             locationData = new VacationCoverageResponse.SimpleWorkPost(
                     coverage.getLocation().getId(),
-                    coverage.getLocation().getName()
-            );
+                    coverage.getLocation().getName());
         }
 
         return VacationCoverageResponse.builder()
@@ -266,5 +289,162 @@ public class VacationCoverageService {
                 .createdAt(coverage.getCreatedAt())
                 .updatedAt(coverage.getUpdatedAt())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(LocalDate startDate, LocalDate endDate, VacationCoverage.CoverageStatus status)
+            throws IOException {
+        log.info("Gerando relatório PDF de coberturas de férias - StartDate: {}, EndDate: {}, Status: {}",
+                startDate, endDate, status);
+
+        List<VacationCoverage> coverages;
+        if (startDate != null && endDate != null) {
+            coverages = vacationCoverageRepository.findByDateRange(startDate, endDate);
+        } else {
+            coverages = vacationCoverageRepository.findAll();
+        }
+
+        if (status != null) {
+            coverages = coverages.stream()
+                    .filter(c -> c.getStatus() == status)
+                    .collect(Collectors.toList());
+        }
+
+        log.info("Total de coberturas encontradas para o relatório: {}", coverages.size());
+
+        // Determinar companyId
+        UUID companyId = resolveCompanyId(coverages);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        try (PdfWriter writer = new PdfWriter(baos)) {
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .reportTitle("RELATÓRIO DE COBERTURA DE FÉRIAS")
+                    .companyId(companyId)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer,
+                    config);
+            Document document = docWithPdf.getDocument();
+
+            // Filtros aplicados
+            if (startDate != null || endDate != null || status != null) {
+                Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
+                        .setFontSize(10)
+                        .setBold()
+                        .setMarginBottom(5);
+                document.add(filtersInfo);
+
+                if (startDate != null && endDate != null) {
+                    document.add(
+                            new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                                    " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10)
+                                    .setMarginBottom(2));
+                }
+                if (status != null) {
+                    document.add(new Paragraph("Status: " + status).setFontSize(10).setMarginBottom(2));
+                }
+                document.add(new Paragraph("").setMarginBottom(10));
+            }
+
+            // Tabela de coberturas
+            if (coverages.isEmpty()) {
+                Paragraph noData = new Paragraph("Nenhum registro encontrado com os filtros aplicados.")
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setMarginTop(20);
+                document.add(noData);
+            } else {
+                Table table = new Table(new float[] { 3, 3, 2, 2, 2, 3 }).useAllAvailableWidth();
+
+                // Cabeçalhos
+                table.addHeaderCell(createHeaderCell("Funcionário (Férias)"));
+                table.addHeaderCell(createHeaderCell("Substituto"));
+                table.addHeaderCell(createHeaderCell("Início"));
+                table.addHeaderCell(createHeaderCell("Fim"));
+                table.addHeaderCell(createHeaderCell("Status"));
+                table.addHeaderCell(createHeaderCell("Posto/Local"));
+
+                // Dados
+                DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                for (VacationCoverage coverage : coverages) {
+                    table.addCell(
+                            createCell(coverage.getVacation() != null && coverage.getVacation().getEmployee() != null
+                                    ? coverage.getVacation().getEmployee().getName()
+                                    : ""));
+                    table.addCell(createCell(
+                            coverage.getSubstituteEmployee() != null ? coverage.getSubstituteEmployee().getName()
+                                    : "Sem substituto"));
+                    table.addCell(createCell(coverage.getCoverageStartDate() != null
+                            ? coverage.getCoverageStartDate().format(dateFormatter)
+                            : ""));
+                    table.addCell(createCell(
+                            coverage.getCoverageEndDate() != null ? coverage.getCoverageEndDate().format(dateFormatter)
+                                    : ""));
+                    table.addCell(createCell(
+                            coverage.getStatus() != null ? getCoverageStatusLabel(coverage.getStatus()) : ""));
+                    table.addCell(createCell(coverage.getLocation() != null ? coverage.getLocation().getName() : ""));
+                }
+
+                document.add(table);
+            }
+
+            document.close();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de coberturas: {}", e.getMessage(), e);
+            throw new IOException("Erro ao gerar relatório PDF: " + e.getMessage(), e);
+        }
+
+        return baos.toByteArray();
+    }
+
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(9))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(8))
+                .setTextAlignment(TextAlignment.LEFT);
+    }
+
+    private String getCoverageStatusLabel(VacationCoverage.CoverageStatus status) {
+        if (status == null)
+            return "";
+        switch (status) {
+            case PENDING:
+                return "Pendente";
+            case CONFIRMED:
+                return "Confirmado";
+            case CANCELLED:
+                return "Cancelado";
+            case NO_COVERAGE:
+                return "Sem Cobertura";
+            case COMPLETED:
+                return "Concluído";
+            default:
+                return status.toString();
+        }
+    }
+
+    private UUID resolveCompanyId(List<VacationCoverage> coverages) {
+        if (!coverages.isEmpty()) {
+            for (VacationCoverage c : coverages) {
+                if (c.getVacation() != null && c.getVacation().getEmployee() != null
+                        && c.getVacation().getEmployee().getCompany() != null) {
+                    return c.getVacation().getEmployee().getCompany().getId();
+                }
+            }
+        }
+
+        // Fallback for company resolution
+        return companyRepository.findAll().stream()
+                .filter(c -> c.getStatus() == Company.CompanyStatus.ACTIVE)
+                .findFirst()
+                .map(Company::getId)
+                .orElse(null);
     }
 }

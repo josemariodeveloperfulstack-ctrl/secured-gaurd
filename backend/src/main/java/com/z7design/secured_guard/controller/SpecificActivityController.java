@@ -4,10 +4,16 @@ import com.z7design.secured_guard.dto.CreateSpecificActivityRequest;
 import com.z7design.secured_guard.dto.SpecificActivityResponse;
 import com.z7design.secured_guard.model.SpecificActivity;
 import com.z7design.secured_guard.service.SpecificActivityService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +22,8 @@ import java.util.UUID;
 @RequestMapping("/api/specific-activities")
 @CrossOrigin(origins = "*")
 public class SpecificActivityController {
+
+    private static final Logger log = LoggerFactory.getLogger(SpecificActivityController.class);
 
     @Autowired
     private SpecificActivityService specificActivityService;
@@ -34,13 +42,15 @@ public class SpecificActivityController {
     }
 
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByEmployee(@PathVariable UUID employeeId) {
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByEmployee(
+            @PathVariable UUID employeeId) {
         List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByEmployee(employeeId);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/location/{locationId}")
-    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByLocation(@PathVariable UUID locationId) {
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByLocation(
+            @PathVariable UUID locationId) {
         List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByLocation(locationId);
         return ResponseEntity.ok(activities);
     }
@@ -52,13 +62,15 @@ public class SpecificActivityController {
     }
 
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByStatus(@PathVariable SpecificActivity.ActivityStatus status) {
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByStatus(
+            @PathVariable SpecificActivity.ActivityStatus status) {
         List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByStatus(status);
         return ResponseEntity.ok(activities);
     }
 
     @GetMapping("/type/{type}")
-    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByType(@PathVariable SpecificActivity.ActivityType type) {
+    public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByType(
+            @PathVariable SpecificActivity.ActivityType type) {
         List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByType(type);
         return ResponseEntity.ok(activities);
     }
@@ -67,7 +79,8 @@ public class SpecificActivityController {
     public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByDateRange(
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByDateRange(startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByDateRange(startDate,
+                endDate);
         return ResponseEntity.ok(activities);
     }
 
@@ -76,7 +89,8 @@ public class SpecificActivityController {
             @PathVariable UUID employeeId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByEmployeeAndDateRange(employeeId, startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService
+                .getSpecificActivitiesByEmployeeAndDateRange(employeeId, startDate, endDate);
         return ResponseEntity.ok(activities);
     }
 
@@ -85,7 +99,8 @@ public class SpecificActivityController {
             @PathVariable UUID locationId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByLocationAndDateRange(locationId, startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService
+                .getSpecificActivitiesByLocationAndDateRange(locationId, startDate, endDate);
         return ResponseEntity.ok(activities);
     }
 
@@ -94,7 +109,8 @@ public class SpecificActivityController {
             @PathVariable SpecificActivity.ActivityType type,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByTypeAndDateRange(type, startDate, endDate);
+        List<SpecificActivityResponse> activities = specificActivityService
+                .getSpecificActivitiesByTypeAndDateRange(type, startDate, endDate);
         return ResponseEntity.ok(activities);
     }
 
@@ -129,7 +145,8 @@ public class SpecificActivityController {
     }
 
     @PostMapping
-    public ResponseEntity<SpecificActivityResponse> createSpecificActivity(@RequestBody CreateSpecificActivityRequest request) {
+    public ResponseEntity<SpecificActivityResponse> createSpecificActivity(
+            @RequestBody CreateSpecificActivityRequest request) {
         try {
             SpecificActivityResponse createdActivity = specificActivityService.createSpecificActivity(request);
             return ResponseEntity.ok(createdActivity);
@@ -139,7 +156,8 @@ public class SpecificActivityController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SpecificActivityResponse> updateSpecificActivity(@PathVariable UUID id, @RequestBody CreateSpecificActivityRequest request) {
+    public ResponseEntity<SpecificActivityResponse> updateSpecificActivity(@PathVariable UUID id,
+            @RequestBody CreateSpecificActivityRequest request) {
         try {
             SpecificActivityResponse updatedActivity = specificActivityService.updateSpecificActivity(id, request);
             return ResponseEntity.ok(updatedActivity);
@@ -149,7 +167,8 @@ public class SpecificActivityController {
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<SpecificActivityResponse> updateStatus(@PathVariable UUID id, @RequestParam SpecificActivity.ActivityStatus status) {
+    public ResponseEntity<SpecificActivityResponse> updateStatus(@PathVariable UUID id,
+            @RequestParam SpecificActivity.ActivityStatus status) {
         try {
             SpecificActivityResponse updatedActivity = specificActivityService.updateStatus(id, status);
             return ResponseEntity.ok(updatedActivity);
@@ -169,7 +188,8 @@ public class SpecificActivityController {
     }
 
     @PutMapping("/{id}/complete")
-    public ResponseEntity<SpecificActivityResponse> completeActivity(@PathVariable UUID id, @RequestParam(required = false) String observations) {
+    public ResponseEntity<SpecificActivityResponse> completeActivity(@PathVariable UUID id,
+            @RequestParam(required = false) String observations) {
         try {
             SpecificActivityResponse completedActivity = specificActivityService.completeActivity(id, observations);
             return ResponseEntity.ok(completedActivity);
@@ -185,6 +205,30 @@ public class SpecificActivityController {
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) UUID locationId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) SpecificActivity.ActivityStatus status,
+            @RequestParam(required = false) SpecificActivity.ActivityType type) {
+
+        try {
+            log.info("Recebida requisição para gerar PDF de atividades específicas");
+            byte[] pdfBytes = specificActivityService.generatePDFReport(employeeId, locationId, startDate, endDate,
+                    status, type);
+            String fileName = "relatorio-atividades-" + LocalDate.now().toString() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (IOException e) {
+            log.error("Erro ao gerar PDF de atividades específicas", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

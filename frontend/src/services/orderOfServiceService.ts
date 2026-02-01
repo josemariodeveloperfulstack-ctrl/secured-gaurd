@@ -121,14 +121,14 @@ export const orderOfServiceService = {
   async getOrders(filters: OrderOfServiceFilters = {}): Promise<OrderOfService[]> {
     try {
       const params = new URLSearchParams();
-      
+
       if (filters.employeeId) params.append('employeeId', filters.employeeId);
       if (filters.signed !== undefined) params.append('signed', filters.signed.toString());
       if (filters.search) params.append('search', filters.search);
-      
+
       const queryString = params.toString();
       const url = queryString ? `/api/orders-of-service?${queryString}` : '/api/orders-of-service';
-      
+
       console.log('🔗 Tentando buscar ordens de serviço no backend:', url);
       const response = await api.get(url);
       console.log('📦 Resposta completa do backend:', {
@@ -138,7 +138,7 @@ export const orderOfServiceService = {
         dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
         data: response.data
       });
-      
+
       // Verificar se os dados são um array válido
       if (Array.isArray(response.data)) {
         console.log('✅ Ordens de serviço carregadas do backend:', response.data.length);
@@ -159,14 +159,14 @@ export const orderOfServiceService = {
       console.error('❌ Data:', error.response?.data);
       console.error('❌ Message:', error.message);
       console.error('❌ Is Connection Error:', isConnectionError(error));
-      
+
       // Verificar se é erro de conexão (backend não disponível)
       if (isConnectionError(error) || !error.response) {
         console.warn('⚠️ Erro de conexão, usando dados de fallback:', error);
-        
+
         // Aplicar filtros nos dados de fallback
         let filteredData = [...fallbackOrders];
-        
+
         if (filters.employeeId) {
           filteredData = filteredData.filter(o => o.employeeId === filters.employeeId);
         }
@@ -175,31 +175,31 @@ export const orderOfServiceService = {
         }
         if (filters.search) {
           const searchTerm = filters.search.toLowerCase();
-          filteredData = filteredData.filter(o => 
+          filteredData = filteredData.filter(o =>
             o.employeeName.toLowerCase().includes(searchTerm) ||
             o.client.toLowerCase().includes(searchTerm) ||
             o.workplace.toLowerCase().includes(searchTerm) ||
             o.role.toLowerCase().includes(searchTerm)
           );
         }
-        
+
         console.log('📱 Usando dados de fallback - Ordens de serviço:', filteredData.length);
         return filteredData;
       }
-      
+
       // Se o erro for 404, retornar array vazio (recurso não encontrado)
       if (error.response?.status === 404) {
         console.warn('⚠️ Recurso não encontrado (404), retornando array vazio');
         return [];
       }
-      
+
       // Se o erro for 500 ou outro erro do servidor, retornar array vazio
       // para não confundir o usuário com dados falsos
       if (error.response?.status >= 500) {
         console.warn('⚠️ Erro do servidor, retornando array vazio');
         return [];
       }
-      
+
       // Para outros erros (400, 401, 403), retornar array vazio
       return [];
     }
@@ -213,12 +213,12 @@ export const orderOfServiceService = {
       return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, buscando nos dados de fallback:', error);
-      
+
       const order = fallbackOrders.find(o => o.id === id);
       if (!order) {
         throw new Error('Ordem de serviço não encontrada');
       }
-      
+
       console.log('📱 Ordem de serviço encontrada nos dados de fallback');
       return order;
     }
@@ -235,37 +235,37 @@ export const orderOfServiceService = {
       console.error('❌ Status:', error.response?.status);
       console.error('❌ Data:', error.response?.data);
       console.error('❌ Message:', error.message);
-      
+
       // Se houver erro de validação (400), extrair mensagens de erro
       if (error.response?.status === 400) {
         const errorData = error.response?.data;
         let errorMessage = 'Erro ao criar ordem de serviço';
-        
+
         // Tentar extrair mensagem de validação
         if (errorData?.message) {
           errorMessage = errorData.message;
         } else if (errorData?.errors) {
           // Se houver múltiplos erros de validação
-          const errors = Array.isArray(errorData.errors) 
+          const errors = Array.isArray(errorData.errors)
             ? errorData.errors.map((e: any) => e.defaultMessage || e.message).join(', ')
             : Object.values(errorData.errors).flat().join(', ');
           errorMessage = errors || errorMessage;
         } else if (typeof errorData === 'string') {
           errorMessage = errorData;
         }
-        
+
         throw new Error(errorMessage);
       }
-      
+
       // Se houver erro do servidor (500)
       if (error.response?.status === 500) {
         throw new Error(error.response?.data?.message || 'Erro interno do servidor ao criar ordem de serviço');
       }
-      
+
       // Apenas simular se for erro de conexão
       if (!error.response) {
         console.warn('⚠️ Erro de conexão, simulando criação:', error);
-        
+
         // Simular criação local
         const newOrder: OrderOfService = {
           ...data,
@@ -274,11 +274,11 @@ export const orderOfServiceService = {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
-        
+
         console.log('📱 Ordem de serviço simulada localmente');
         return newOrder;
       }
-      
+
       // Para outros erros, lançar
       throw error;
     }
@@ -292,17 +292,17 @@ export const orderOfServiceService = {
       return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando atualização:', error);
-      
+
       // Simular atualização local
       const order = fallbackOrders.find(o => o.id === id);
       if (!order) {
         throw new Error('Ordem de serviço não encontrada');
       }
-      
-      const updatedOrder = { 
-        ...order, 
-        ...data, 
-        updatedAt: new Date().toISOString() 
+
+      const updatedOrder = {
+        ...order,
+        ...data,
+        updatedAt: new Date().toISOString()
       };
       console.log('📱 Ordem de serviço atualizada localmente');
       return updatedOrder;
@@ -317,17 +317,17 @@ export const orderOfServiceService = {
       return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando assinatura:', error);
-      
+
       // Simular assinatura local
       const order = fallbackOrders.find(o => o.id === id);
       if (!order) {
         throw new Error('Ordem de serviço não encontrada');
       }
-      
-      const signedOrder = { 
-        ...order, 
+
+      const signedOrder = {
+        ...order,
         signed: true,
-        updatedAt: new Date().toISOString() 
+        updatedAt: new Date().toISOString()
       };
       console.log('📱 Ordem de serviço assinada localmente');
       return signedOrder;
@@ -342,17 +342,17 @@ export const orderOfServiceService = {
       return normalizeOrderOfService(response.data);
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando atualização de URL:', error);
-      
+
       // Simular atualização local
       const order = fallbackOrders.find(o => o.id === id);
       if (!order) {
         throw new Error('Ordem de serviço não encontrada');
       }
-      
-      const updatedOrder = { 
-        ...order, 
+
+      const updatedOrder = {
+        ...order,
         documentUrl,
-        updatedAt: new Date().toISOString() 
+        updatedAt: new Date().toISOString()
       };
       console.log('📱 URL do documento atualizada localmente');
       return updatedOrder;
@@ -367,6 +367,23 @@ export const orderOfServiceService = {
     } catch (error) {
       console.warn('⚠️ Backend não disponível, simulando exclusão:', error);
       console.log('📱 Ordem de serviço excluída localmente (simulado)');
+    }
+  },
+
+  async exportOrdersReportPDF(filters: OrderOfServiceFilters): Promise<Blob> {
+    try {
+      const params = new URLSearchParams();
+      if (filters.employeeId) params.append('employeeId', filters.employeeId);
+      if (filters.signed !== undefined) params.append('signed', filters.signed.toString());
+      if (filters.search) params.append('search', filters.search);
+
+      const response = await api.get(`/api/orders-of-service/report/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar PDF de ordens de serviço:', error);
+      throw new Error('Falha ao gerar relatório PDF');
     }
   }
 };

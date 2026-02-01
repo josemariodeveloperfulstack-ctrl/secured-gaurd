@@ -20,17 +20,17 @@ export const equipmentReportService = {
   async getEquipmentByEmployeeReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
     try {
       console.log('🔗 Gerando relatório de equipamentos por funcionário:', filters);
-      
+
       const params = new URLSearchParams();
       if (filters?.startDate) params.append('startDate', filters.startDate);
       if (filters?.endDate) params.append('endDate', filters.endDate);
       if (filters?.status) params.append('status', filters.status);
       if (filters?.equipmentType) params.append('equipmentType', filters.equipmentType);
-      
+
       const response = await api.get(`/api/equipment-reports/equipment-by-employee?${params.toString()}`);
-      
+
       console.log('✅ Relatório de equipamentos por funcionário gerado:', response.data);
-      
+
       return {
         data: response.data,
         generatedAt: new Date().toISOString()
@@ -45,15 +45,15 @@ export const equipmentReportService = {
   async getWeaponValidityReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
     try {
       console.log('🔗 Gerando relatório de validade de armas:', filters);
-      
+
       const params = new URLSearchParams();
       if (filters?.startDate) params.append('startDate', filters.startDate);
       if (filters?.endDate) params.append('endDate', filters.endDate);
-      
+
       const response = await api.get(`/api/equipment-reports/weapon-validity?${params.toString()}`);
-      
+
       console.log('✅ Relatório de validade de armas gerado:', response.data);
-      
+
       return {
         data: response.data,
         generatedAt: new Date().toISOString()
@@ -68,15 +68,15 @@ export const equipmentReportService = {
   async getUsageReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
     try {
       console.log('🔗 Gerando relatório de uso:', filters);
-      
+
       const params = new URLSearchParams();
       if (filters?.startDate) params.append('startDate', filters.startDate);
       if (filters?.endDate) params.append('endDate', filters.endDate);
-      
+
       const response = await api.get(`/api/equipment-reports/usage-report?${params.toString()}`);
-      
+
       console.log('✅ Relatório de uso gerado:', response.data);
-      
+
       return {
         data: response.data,
         generatedAt: new Date().toISOString()
@@ -91,15 +91,15 @@ export const equipmentReportService = {
   async getExpirationReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
     try {
       console.log('🔗 Gerando relatório de vencimento:', filters);
-      
+
       const params = new URLSearchParams();
       if (filters?.startDate) params.append('startDate', filters.startDate);
       if (filters?.endDate) params.append('endDate', filters.endDate);
-      
+
       const response = await api.get(`/api/equipment-reports/expiration-report?${params.toString()}`);
-      
+
       console.log('✅ Relatório de vencimento gerado:', response.data);
-      
+
       return {
         data: response.data,
         generatedAt: new Date().toISOString()
@@ -114,17 +114,17 @@ export const equipmentReportService = {
   async getGeneralReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
     try {
       console.log('🔗 Gerando relatório geral:', filters);
-      
+
       const params = new URLSearchParams();
       if (filters?.startDate) params.append('startDate', filters.startDate);
       if (filters?.endDate) params.append('endDate', filters.endDate);
       if (filters?.status) params.append('status', filters.status);
       if (filters?.equipmentType) params.append('equipmentType', filters.equipmentType);
-      
+
       const response = await api.get(`/api/equipment-reports/general-report?${params.toString()}`);
-      
+
       console.log('✅ Relatório geral gerado:', response.data);
-      
+
       return {
         data: response.data,
         generatedAt: new Date().toISOString()
@@ -135,17 +135,41 @@ export const equipmentReportService = {
     }
   },
 
+  // Gerar PDF com layout premium
+  async generatePremiumPdf(filters?: Partial<EquipmentReportRequest>): Promise<Blob> {
+    try {
+      console.log('🔗 Gerando PDF premium de equipamentos:', filters);
+
+      const params = new URLSearchParams();
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.equipmentType) params.append('equipmentType', filters.equipmentType);
+
+      const response = await api.get(`/api/equipment-reports/report/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+
+      console.log('✅ PDF premium gerado com sucesso');
+
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao gerar PDF premium:', error);
+      throw error;
+    }
+  },
+
   // Exportar relatório para PDF
   async exportToPdf(reportRequest: EquipmentReportRequest): Promise<Blob> {
     try {
       console.log('🔗 Exportando relatório para PDF:', reportRequest);
-      
+
       const response = await api.post('/api/equipment-reports/export/pdf', reportRequest, {
         responseType: 'blob'
       });
-      
+
       console.log('✅ Relatório PDF exportado com sucesso');
-      
+
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao exportar relatório para PDF:', error);
@@ -157,13 +181,13 @@ export const equipmentReportService = {
   async exportToExcel(reportRequest: EquipmentReportRequest): Promise<Blob> {
     try {
       console.log('🔗 Exportando relatório para Excel:', reportRequest);
-      
+
       const response = await api.post('/api/equipment-reports/export/excel', reportRequest, {
         responseType: 'blob'
       });
-      
+
       console.log('✅ Relatório Excel exportado com sucesso');
-      
+
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao exportar relatório para Excel:', error);
@@ -175,13 +199,13 @@ export const equipmentReportService = {
   async exportToCsv(reportRequest: EquipmentReportRequest): Promise<Blob> {
     try {
       console.log('🔗 Exportando relatório para CSV:', reportRequest);
-      
+
       const response = await api.post('/api/equipment-reports/export/csv', reportRequest, {
         responseType: 'blob'
       });
-      
+
       console.log('✅ Relatório CSV exportado com sucesso');
-      
+
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao exportar relatório para CSV:', error);

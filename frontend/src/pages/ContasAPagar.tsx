@@ -1298,6 +1298,36 @@ const ContasAPagar: React.FC = () => {
                       <p className="text-gray-400 text-sm mt-2">{reportData.subtitle}</p>
                       <p className="text-gray-500 text-sm">Período: {reportData.period}</p>
                     </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={exportToCSV}
+                        className="flex items-center gap-2 border-gray-600 text-gray-300 hover:bg-seguranca-black"
+                      >
+                        <FileSpreadsheet size={16} />
+                        CSV
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={exportToExcel}
+                        className="flex items-center gap-2 border-gray-600 text-gray-300 hover:bg-seguranca-black"
+                      >
+                        <FileImage size={16} />
+                        Excel
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={exportToPDF}
+                        disabled={reportLoading}
+                        className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white border-none"
+                      >
+                        {reportLoading ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                        PDF
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

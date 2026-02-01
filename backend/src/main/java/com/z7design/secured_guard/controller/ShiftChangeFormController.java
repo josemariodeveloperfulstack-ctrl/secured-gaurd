@@ -45,7 +45,8 @@ public class ShiftChangeFormController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ShiftChangeFormDTO> updateShiftChange(@PathVariable Long id, @Valid @RequestBody ShiftChangeFormDTO dto) {
+    public ResponseEntity<ShiftChangeFormDTO> updateShiftChange(@PathVariable Long id,
+            @Valid @RequestBody ShiftChangeFormDTO dto) {
         log.info("PUT /api/operational/shift-changes/{} - Atualizando solicitação de troca de plantão", id);
         ShiftChangeFormDTO updatedDto = shiftChangeFormService.updateShiftChangeForm(id, dto);
         log.info("✅ Solicitação de troca de plantão ID {} atualizada com sucesso.", id);
@@ -58,5 +59,21 @@ public class ShiftChangeFormController {
         shiftChangeFormService.deleteShiftChangeForm(id);
         log.info("✅ Solicitação de troca de plantão ID {} excluída com sucesso.", id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> generatePDF(@PathVariable Long id) {
+        log.info("GET /api/operational/shift-changes/{}/pdf - Gerando PDF de troca de plantão", id);
+        try {
+            byte[] pdfBytes = shiftChangeFormService.generatePDFReport(id);
+
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "attachment; filename=Troca_Plantao_" + id + ".pdf")
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de troca de plantão ID {}", id, e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }

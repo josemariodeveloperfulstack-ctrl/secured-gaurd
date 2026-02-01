@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  FileText, 
-  Download, 
-  Calendar, 
+import {
+  FileText,
+  Download,
+  Calendar,
   BarChart3,
   PieChart,
   TrendingUp,
@@ -26,6 +26,9 @@ import { RelatorioOperacional } from '@/types/operacional';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { reportLayoutService } from '@/services/reportLayoutService';
+import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
+import { RelatorioOperacional as IRelatorioOperacional } from '@/types/operacional';
 
 const RelatoriosOperacionais: React.FC = () => {
   const { toast } = useToast();
@@ -35,6 +38,7 @@ const RelatoriosOperacionais: React.FC = () => {
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
   const [tipoRelatorio, setTipoRelatorio] = useState<string>('DIARIO');
   const [periodoRelatorio, setPeriodoRelatorio] = useState<string>('');
+  const [reportToDownload, setReportToDownload] = useState<IRelatorioOperacional | null>(null);
 
   const loadData = async () => {
     try {
@@ -43,7 +47,7 @@ const RelatoriosOperacionais: React.FC = () => {
         operacionalService.getRelatorios(),
         operacionalService.getEstatisticas()
       ]);
-      
+
       setRelatorios(relatoriosData);
       setEstatisticas(estatisticasData);
     } catch (error) {
@@ -113,6 +117,36 @@ const RelatoriosOperacionais: React.FC = () => {
     }
   };
 
+  const handleDownloadPDF = async (relatorio: IRelatorioOperacional) => {
+    setReportToDownload(relatorio);
+    // Wait for state to update and layout to render
+    setTimeout(async () => {
+      try {
+        const printElement = document.getElementById('operacional-relatorio-printable');
+        if (!printElement) throw new Error('Elemento de impressão não encontrado');
+
+        await reportLayoutService.generatePremiumPDF(printElement, {
+          title: getTipoRelatorioLabel(relatorio.tipo),
+          filename: `relatorio-operacional-${relatorio.tipo.toLowerCase()}-${relatorio.periodo}.pdf`
+        });
+
+        toast({
+          title: 'Sucesso',
+          description: 'Relatório baixado com sucesso!'
+        });
+      } catch (error) {
+        console.error('Erro ao baixar PDF:', error);
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível gerar o PDF.',
+          variant: 'destructive'
+        });
+      } finally {
+        setReportToDownload(null);
+      }
+    }, 100);
+  };
+
   if (loading) {
     return (
       <StandardLayout>
@@ -133,7 +167,7 @@ const RelatoriosOperacionais: React.FC = () => {
             <h1 className="text-3xl font-bold text-seguranca-lightgray">Relatórios Operacionais</h1>
             <p className="text-seguranca-lightgray/70 mt-1">Gere e visualize relatórios operacionais da empresa</p>
           </div>
-          <Button 
+          <Button
             onClick={loadData}
             disabled={loading}
             className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-seguranca-black"
@@ -181,7 +215,7 @@ const RelatoriosOperacionais: React.FC = () => {
                 />
               </div>
               <div className="flex items-end">
-                <Button 
+                <Button
                   onClick={handleGerarRelatorio}
                   disabled={gerandoRelatorio || !periodoRelatorio}
                   className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-seguranca-black w-full"
@@ -410,7 +444,7 @@ const RelatoriosOperacionais: React.FC = () => {
                       {getPeriodoLabel(relatorio.periodo)}
                     </Badge>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div className="text-sm text-seguranca-lightgray/70">
                       <span className="font-medium">Postos Ativos:</span> {relatorio.dados.postosAtivos}
@@ -448,6 +482,7 @@ const RelatoriosOperacionais: React.FC = () => {
                     <Button
                       size="sm"
                       variant="outline"
+                      onClick={() => handleDownloadPDF(relatorio)}
                       className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
                     >
                       <Download className="h-3 w-3 mr-1" />
@@ -468,6 +503,69 @@ const RelatoriosOperacionais: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Printable Area (Hidden) */}
+      {reportToDownload && (
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+          <div id="operacional-relatorio-printable">
+            <StandardReportTemplate title={getTipoRelatorioLabel(reportToDownload.tipo)}>
+              <div className="space-y-8 text-black">
+                <div className="border-b-2 border-seguranca-yellow pb-4">
+                  <h3 className="text-seguranca-yellow font-bold text-xl uppercase">Resumo Operacional</h3>
+                  <p className="text-sm text-gray-600 mt-1">Período: {getPeriodoLabel(reportToDownload.periodo)}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <h4 className="font-bold border-b pb-1 text-xs uppercase text-gray-500">Postos e Equipe</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <span className="text-sm">Postos Ativos</span>
+                        <span className="font-bold">{reportToDownload.dados.postosAtivos}</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <span className="text-sm">Funcionários Ativos</span>
+                        <span className="font-bold">{reportToDownload.dados.funcionariosAtivos}</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <span className="text-sm">Coberturas Ativas</span>
+                        <span className="font-bold">{reportToDownload.dados.coberturasAtivas}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold border-b pb-1 text-xs uppercase text-gray-500">Tarefas e Status</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <span className="text-sm">Tarefas Pendentes</span>
+                        <span className="font-bold text-red-600">{reportToDownload.dados.tarefasPendentes}</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <span className="text-sm">Tarefas Concluídas</span>
+                        <span className="font-bold text-green-600">{reportToDownload.dados.tarefasConcluidas}</span>
+                      </div>
+                      <div className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                        <span className="text-sm">Funcionários em Férias</span>
+                        <span className="font-bold">{reportToDownload.dados.funcionariosFerias}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-10 p-4 bg-gray-50 border rounded-lg italic text-sm text-gray-600">
+                  <p>Este relatório contém informações consolidadas sobre as atividades operacionais, incluindo gestão de postos, escalas de funcionários e progresso de tarefas agendadas para o período especificado.</p>
+                </div>
+
+                <div className="mt-32 border-t border-gray-300 pt-2 text-center w-64 mx-auto">
+                  <p className="text-xs font-bold uppercase">Gestor Operacional</p>
+                  <p className="text-[10px] text-gray-500">Assinatura e Carimbo</p>
+                </div>
+              </div>
+            </StandardReportTemplate>
+          </div>
+        </div>
+      )}
     </StandardLayout>
   );
 };

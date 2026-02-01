@@ -4853,35 +4853,25 @@ const Holerites: React.FC = () => {
       setProcessedHolerites([]);
       setProcessedRecibos([]);
 
-      // Carregar holerites processados via API (sempre buscar do backend, não usar cache)
+      // Carregar holerites processados via Service
       try {
-        console.log('🔄 Tentando carregar holerites processados via API...');
-        const holeritesResponse = await api.get('/api/payslips/processed-files');
-        console.log('📥 Resposta da API de holerites:', holeritesResponse.data);
+        console.log('🔄 Tentando carregar holerites processados via Service...');
+        const holeritesProcessadosData = await holeriteService.getProcessedHolerites();
+        console.log('📥 Holerites processados carregados:', holeritesProcessadosData.length);
 
-        if (holeritesResponse.data && holeritesResponse.data.success) {
-          const files = holeritesResponse.data.files || [];
-          const holeritesProcessados = files.map((file: any) => ({
-            id: `hol-${file.id || Math.random()}`,
-            name: file.fileName || file.name || '',
-            employeeName: file.employeeName || '',
-            cpf: file.cpf || '',
-            month: file.month?.toString() || '',
-            year: file.year?.toString() || '',
-            path: file.filePath || file.path || ''
-          }));
-          setProcessedHolerites(holeritesProcessados);
-          console.log('✅ Holerites carregados via API:', holeritesProcessados.length);
-        } else {
-          console.warn('⚠️ Resposta da API não contém success=true ou files vazio');
-          console.warn('   Resposta completa:', holeritesResponse.data);
-          setProcessedHolerites([]);
-        }
-      } catch (apiError: any) {
-        console.error('❌ Erro ao carregar holerites via API:', apiError);
-        console.error('   Status:', apiError?.response?.status);
-        console.error('   Mensagem:', apiError?.message);
-        console.error('   Dados:', apiError?.response?.data);
+        const holeritesProcessados = holeritesProcessadosData.map((file: any) => ({
+          id: `hol-${file.id || Math.random()}`,
+          name: file.fileName || file.name || '',
+          employeeName: file.employeeName || '',
+          cpf: file.cpf || '',
+          month: file.month?.toString() || '',
+          year: file.year?.toString() || '',
+          path: file.filePath || file.path || ''
+        }));
+        setProcessedHolerites(holeritesProcessados);
+        console.log('✅ Holerites processados mapeados:', holeritesProcessados.length);
+      } catch (serviceError: any) {
+        console.error('❌ Erro ao carregar holerites via Service:', serviceError);
         setProcessedHolerites([]);
       }
 
@@ -4909,47 +4899,7 @@ const Holerites: React.FC = () => {
         console.warn('⚠️ Erro ao carregar comprovantes do backend, usando dados locais:', backendError);
       }
 
-      // Carregar recibos dos dados já disponíveis
-      // REMOVIDO: Código que usava dados em cache - sempre buscar do backend
-      if (false && Array.isArray(receipts) && receipts.length > 0) {
-        const recibosProcessados = receipts.map(receipt => ({
-          id: `rec-${receipt.id || Math.random()}`,
-          name: receipt.fileName || `recibo_${receipt.employeeName}_${receipt.month}_${receipt.year}.pdf`,
-          employeeName: receipt.employeeName,
-          month: receipt.month.toString(),
-          year: receipt.year.toString(),
-          path: `uploads/receipts/${receipt.month}_${receipt.year}/${receipt.fileName}`
-        }));
-        setProcessedRecibos(recibosProcessados);
-        console.log('✅ Comprovantes carregados dos dados existentes:', recibosProcessados.length);
-      } else {
-        console.log('⚠️ Nenhum recibo disponível nos dados existentes');
-      }
-
-      // REMOVIDO: Código duplicado - já carregamos via API acima
-      if (false && holerites.length === 0) {
-        try {
-          const holeritesResponse = await api.get('/api/payslips/processed-files');
-          if (holeritesResponse.data.success) {
-            setProcessedHolerites(holeritesResponse.data.files || []);
-            console.log('✅ Holerites carregados via API:', holeritesResponse.data.files?.length || 0);
-          }
-        } catch (apiError) {
-          console.log('⚠️ Erro ao carregar holerites via API, usando dados simulados');
-        }
-      }
-
-      if (!Array.isArray(receipts) || receipts.length === 0) {
-        try {
-          const recibosResponse = await api.get('/api/payment-receipts/processed-files');
-          if (recibosResponse.data.success) {
-            setProcessedRecibos(recibosResponse.data.files || []);
-            console.log('✅ Comprovantes carregados via API:', recibosResponse.data.files?.length || 0);
-          }
-        } catch (apiError) {
-          console.log('⚠️ Erro ao carregar comprovantes via API, usando dados simulados');
-        }
-      }
+      // Código legado limpo
     } catch (error) {
       console.error('❌ Erro ao carregar arquivos processados:', error);
       // Garantir que as listas ficam vazias em caso de erro
@@ -6689,8 +6639,8 @@ const Holerites: React.FC = () => {
                               }
                             }}
                             className={`group relative px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${activeYear === year.toString()
-                                ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105'
-                                : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
+                              ? 'bg-gradient-to-r from-seguranca-yellow to-yellow-500 text-seguranca-black shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 transform hover:scale-105'
+                              : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-seguranca-yellow/50 hover:bg-seguranca-yellow/10 hover:text-seguranca-yellow'
                               }`}
                           >
                             {activeYear === year.toString() && (
@@ -6713,8 +6663,8 @@ const Holerites: React.FC = () => {
                               variant={activeMonth === month.toString() ? "default" : "outline"}
                               onClick={() => setActiveMonth(month.toString())}
                               className={`group relative px-4 py-3 rounded-xl font-medium transition-all duration-300 ${activeMonth === month.toString()
-                                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105'
-                                  : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400'
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transform hover:scale-105'
+                                : 'border-2 border-gray-600/50 text-seguranca-lightgray hover:border-blue-500/50 hover:bg-blue-500/10 hover:text-blue-400'
                                 }`}
                             >
                               {activeMonth === month.toString() && (

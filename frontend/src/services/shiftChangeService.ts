@@ -155,6 +155,42 @@ class ShiftChangeService {
             throw error;
         }
     }
+
+    async downloadPDF(id: number, requesterName: string): Promise<void> {
+        try {
+            const response = await axios.get(
+                `${API_URL}/operational/shift-changes/${id}/pdf`,
+                {
+                    headers: this.getAuthHeaders(),
+                    responseType: 'blob'
+                }
+            );
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            const dateStr = new Date().toISOString().split('T')[0];
+            link.setAttribute('download', `Solicitacao_Troca_Plantao_${requesterName.replace(/\s+/g, '_')}_${dateStr}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            toast({
+                title: "Sucesso!",
+                description: "PDF gerado com sucesso.",
+                variant: "default",
+            });
+        } catch (error: any) {
+            console.error("Erro ao gerar PDF:", error);
+            const errorMessage = error.response?.data?.message || "Erro ao gerar PDF da troca de plantão.";
+            toast({
+                title: "Erro",
+                description: errorMessage,
+                variant: "destructive",
+            });
+            throw error;
+        }
+    }
 }
 
 export default new ShiftChangeService();

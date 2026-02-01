@@ -11,6 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import java.io.IOException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -25,7 +28,7 @@ public class AbsenceController {
 
     @Autowired
     private AbsenceService absenceService;
-    
+
     @Autowired
     private EmployeeService employeeService;
 
@@ -35,8 +38,8 @@ public class AbsenceController {
             log.info("GET /api/absences - Buscando todas as faltas");
             List<Absence> absences = absenceService.getAllAbsences();
             List<AbsenceResponse> absenceResponses = absences.stream()
-                .map(AbsenceResponse::fromEntity)
-                .toList();
+                    .map(AbsenceResponse::fromEntity)
+                    .toList();
             log.info("✅ Faltas retornadas: {} registros", absenceResponses.size());
             return ResponseEntity.ok(absenceResponses);
         } catch (Exception e) {
@@ -61,8 +64,8 @@ public class AbsenceController {
     public ResponseEntity<List<AbsenceResponse>> getAbsencesByEmployee(@PathVariable UUID employeeId) {
         List<Absence> absences = absenceService.getAbsencesByEmployee(employeeId);
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -70,8 +73,8 @@ public class AbsenceController {
     public ResponseEntity<List<AbsenceResponse>> getAbsencesByDate(@PathVariable LocalDate date) {
         List<Absence> absences = absenceService.getAbsencesByDate(date);
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -79,8 +82,8 @@ public class AbsenceController {
     public ResponseEntity<List<AbsenceResponse>> getAbsencesByStatus(@PathVariable Absence.AbsenceStatus status) {
         List<Absence> absences = absenceService.getAbsencesByStatus(status);
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -88,8 +91,8 @@ public class AbsenceController {
     public ResponseEntity<List<AbsenceResponse>> getAbsencesByType(@PathVariable Absence.AbsenceType absenceType) {
         List<Absence> absences = absenceService.getAbsencesByType(absenceType);
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -99,8 +102,8 @@ public class AbsenceController {
             @RequestParam LocalDate endDate) {
         List<Absence> absences = absenceService.getAbsencesByDateRange(startDate, endDate);
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -111,8 +114,8 @@ public class AbsenceController {
             @RequestParam LocalDate endDate) {
         List<Absence> absences = absenceService.getAbsencesByEmployeeAndDateRange(employeeId, startDate, endDate);
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -120,8 +123,8 @@ public class AbsenceController {
     public ResponseEntity<List<AbsenceResponse>> getPendingAbsences() {
         List<Absence> absences = absenceService.getPendingAbsences();
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -129,8 +132,8 @@ public class AbsenceController {
     public ResponseEntity<List<AbsenceResponse>> getTodayAbsences() {
         List<Absence> absences = absenceService.getTodayAbsences();
         List<AbsenceResponse> absenceResponses = absences.stream()
-            .map(AbsenceResponse::fromEntity)
-            .toList();
+                .map(AbsenceResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(absenceResponses);
     }
 
@@ -150,24 +153,24 @@ public class AbsenceController {
             if (absenceDTO.getEmployeeId() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "ID do funcionário é obrigatório"));
             }
-            
+
             if (absenceDTO.getAbsenceDate() == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Data da falta é obrigatória"));
             }
-            
+
             if (absenceDTO.getReason() == null || absenceDTO.getReason().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Motivo da falta é obrigatório"));
             }
-            
+
             // Buscar o funcionário pelo ID
             Employee employee = employeeService.findById(absenceDTO.getEmployeeId());
             if (employee == null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Funcionário não encontrado"));
             }
-            
+
             Absence absence = absenceDTO.toEntity();
             absence.setEmployee(employee);
-            
+
             // Buscar funcionário de cobertura se fornecido
             if (absenceDTO.getCoverageEmployeeId() != null) {
                 Employee coverageEmployee = employeeService.findById(absenceDTO.getCoverageEmployeeId());
@@ -175,7 +178,7 @@ public class AbsenceController {
                     absence.setCoverageEmployee(coverageEmployee);
                 }
             }
-            
+
             Absence createdAbsence = absenceService.createAbsence(absence);
             return ResponseEntity.ok(AbsenceResponse.fromEntity(createdAbsence));
         } catch (IllegalArgumentException e) {
@@ -186,30 +189,31 @@ public class AbsenceController {
             return ResponseEntity.badRequest().body(Map.of("error", "Erro ao criar falta: " + e.getMessage()));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.internalServerError().body(Map.of("error", "Erro interno ao criar falta: " + e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Erro interno ao criar falta: " + e.getMessage()));
         }
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<AbsenceResponse> updateAbsence(@PathVariable UUID id, @RequestBody AbsenceDTO absenceDTO) {
         try {
-            log.info("🔄 Atualizando afastamento {} com dados: absenceType={}, status={}, reason={}", 
-                id, absenceDTO.getAbsenceType(), absenceDTO.getStatus(), absenceDTO.getReason());
-            
+            log.info("🔄 Atualizando afastamento {} com dados: absenceType={}, status={}, reason={}",
+                    id, absenceDTO.getAbsenceType(), absenceDTO.getStatus(), absenceDTO.getReason());
+
             // Buscar o funcionário pelo ID
             Employee employee = employeeService.findById(absenceDTO.getEmployeeId());
             Absence absence = absenceDTO.toEntity();
             absence.setEmployee(employee);
-            
+
             // Log para debug
             log.info("📝 Absence entity criado com absenceType: {}", absence.getAbsenceType());
-            
+
             // Buscar funcionário de cobertura se fornecido
             if (absenceDTO.getCoverageEmployeeId() != null) {
                 Employee coverageEmployee = employeeService.findById(absenceDTO.getCoverageEmployeeId());
                 absence.setCoverageEmployee(coverageEmployee);
             }
-            
+
             Absence updatedAbsence = absenceService.updateAbsence(id, absence);
             log.info("✅ Afastamento atualizado com sucesso. Novo absenceType: {}", updatedAbsence.getAbsenceType());
             return ResponseEntity.ok(AbsenceResponse.fromEntity(updatedAbsence));
@@ -229,8 +233,6 @@ public class AbsenceController {
             return ResponseEntity.badRequest().build();
         }
     }
-
-
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAbsence(@PathVariable UUID id) {
@@ -261,9 +263,9 @@ public class AbsenceController {
             @PathVariable UUID id,
             @RequestBody(required = false) ApprovalRequest request) {
         try {
-            String observacoes = (request != null && request.getObservacoes() != null) 
-                ? request.getObservacoes() 
-                : null;
+            String observacoes = (request != null && request.getObservacoes() != null)
+                    ? request.getObservacoes()
+                    : null;
             Absence absence = absenceService.rejectAbsence(id, observacoes);
             return ResponseEntity.ok(AbsenceResponse.fromEntity(absence));
         } catch (RuntimeException e) {
@@ -285,6 +287,25 @@ public class AbsenceController {
 
         public void setObservacoes(String observacoes) {
             this.observacoes = observacoes;
+        }
+    }
+
+    @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Absence.AbsenceStatus status) {
+        try {
+            byte[] pdfBytes = absenceService.generatePDFReport(employeeId, startDate, endDate, status);
+            String fileName = "relatorio-faltas-" + java.time.LocalDate.now().toString() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (IOException e) {
+            log.error("Erro ao gerar PDF de faltas", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

@@ -12,6 +12,8 @@ import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
+import { reportLayoutService } from '@/services/reportLayoutService';
 
 interface FichaRegistroFuncionarioFormProps {
   employeeId?: string;
@@ -162,59 +164,27 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
     try {
       setLoading(true);
 
-      const addressValue = typeof fullEmployee.address === 'string'
-        ? fullEmployee.address
-        : fullEmployee.address?.street || '';
+      // We will render the content to a temporary div or use a hidden one
+      const printElement = document.getElementById('ficha-registro-printable');
+      if (!printElement) {
+        throw new Error('Elemento de impressão não encontrado');
+      }
 
-      const payload = {
-        templateName: 'ficha-registro-funcionario.html',
-        // Dados do Funcionário
-        funcionario: fullEmployee.name,
-        cpf: fullEmployee.cpf || fullEmployee.document || '',
-        rg: fullEmployee.rg || '',
-        pis: fullEmployee.pis || '',
-        ctps: fullEmployee.ctps || '',
-        dataNascimento: formatDateToBR(fullEmployee.birthDate),
-        nacionalidade: fullEmployee.nationality || 'Brasileira',
-        naturalidade: fullEmployee.localNascimento || '',
-        estadoCivil: fullEmployee.maritalStatus || '',
-        escolaridade: fullEmployee.grauInstrucao || '',
-        telefone: fullEmployee.phone || '',
-        email: fullEmployee.email || '',
-        endereco: addressValue,
-        // Dados da Empresa
-        empresa: empresa.name,
-        cnpj: empresa.cnpj || '',
-        enderecoEmpresa: empresa.address || '',
-        // Dados do Registro
-        dataAdmissao: formatDateToBR(fullEmployee.hireDate),
-        cargo: (fullEmployee as any).position?.name || '',
-        setor: (fullEmployee as any).unit?.name || '',
-        dataRegistro: formatDateToBR(form.dataRegistro),
-        responsavelRegistro: responsavel?.name || '',
-        documentosEntregues: form.documentosEntregues || [],
-        observacoes: form.observacoes || '',
-        dataAtual: new Date().toLocaleDateString('pt-BR')
-      };
-
-      // Gerar PDF para visualização
-      const response = await api.get(`/api/employees/${fullEmployee.id}/generate-record-pdf`, {
-        responseType: 'blob'
+      await reportLayoutService.generatePremiumPDF(printElement, {
+        title: 'Ficha de Registro do Funcionário',
+        filename: `ficha-registro-${fullEmployee.name.replace(/\s+/g, '-').toLowerCase()}.pdf`,
+        company: empresa
       });
 
-      // Abrir PDF em nova aba para visualização
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-
-      // Limpar URL após um tempo
-      setTimeout(() => window.URL.revokeObjectURL(url), 100);
-
+      toast({
+        title: 'Sucesso',
+        description: 'Prévia gerada com sucesso!',
+      });
     } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar preview da ficha. Tente novamente.',
+        description: err.message || 'Erro ao gerar preview da ficha.',
         variant: 'destructive'
       });
     } finally {
@@ -224,98 +194,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
 
   const handleGerarPDF = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!funcionario || !empresa) {
-      toast({
-        title: 'Atenção',
-        description: 'Selecione funcionário e empresa!',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (!form.dataRegistro) {
-      toast({
-        title: 'Atenção',
-        description: 'Preencha a data de registro!',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Buscar dados completos do funcionário
-      const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-      if (!fullEmployee) {
-        throw new Error('Funcionário não encontrado');
-      }
-
-      const addressValue = typeof fullEmployee.address === 'string'
-        ? fullEmployee.address
-        : fullEmployee.address?.street || '';
-
-      const payload = {
-        templateName: 'ficha-registro-funcionario.html',
-        // Dados do Funcionário
-        funcionario: fullEmployee.name,
-        cpf: fullEmployee.cpf || fullEmployee.document || '',
-        rg: fullEmployee.rg || '',
-        pis: fullEmployee.pis || '',
-        ctps: fullEmployee.ctps || '',
-        dataNascimento: formatDateToBR(fullEmployee.birthDate),
-        nacionalidade: fullEmployee.nationality || 'Brasileira',
-        naturalidade: fullEmployee.localNascimento || '',
-        estadoCivil: fullEmployee.maritalStatus || '',
-        escolaridade: fullEmployee.grauInstrucao || '',
-        telefone: fullEmployee.phone || '',
-        email: fullEmployee.email || '',
-        endereco: addressValue,
-        // Dados da Empresa
-        empresa: empresa.name,
-        cnpj: empresa.cnpj || '',
-        enderecoEmpresa: empresa.address || '',
-        // Dados do Registro
-        dataAdmissao: formatDateToBR(fullEmployee.hireDate),
-        cargo: (fullEmployee as any).position?.name || '',
-        setor: (fullEmployee as any).unit?.name || '',
-        dataRegistro: formatDateToBR(form.dataRegistro),
-        responsavelRegistro: responsavel?.name || '',
-        documentosEntregues: form.documentosEntregues || [],
-        observacoes: form.observacoes || '',
-        dataAtual: new Date().toLocaleDateString('pt-BR')
-      };
-
-      // Gerar PDF
-      const response = await api.get(`/api/employees/${fullEmployee.id}/generate-record-pdf`, {
-        responseType: 'blob'
-      });
-
-      // Fazer download do PDF
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ficha-registro-${fullEmployee.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: 'Sucesso',
-        description: 'Ficha de Registro gerada com sucesso!',
-      });
-    } catch (err: any) {
-      console.error('Erro ao gerar PDF:', err);
-      toast({
-        title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar PDF. Tente novamente.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
+    handlePreview(); // reusing the same client-side logic
   };
 
   return (
@@ -664,8 +543,8 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                   size="sm"
                   onClick={() => handleDocumentoToggle(documento)}
                   className={`justify-start h-10 transition-all ${form.documentosEntregues.includes(documento)
-                      ? 'border-primary'
-                      : 'hover:border-primary/50 text-muted-foreground'
+                    ? 'border-primary'
+                    : 'hover:border-primary/50 text-muted-foreground'
                     }`}
                 >
                   <div className={`mr-2 h-4 w-4 rounded-full border flex items-center justify-center ${form.documentosEntregues.includes(documento) ? 'border-primary-foreground bg-primary-foreground text-primary' : 'border-muted-foreground'
@@ -731,6 +610,69 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
           </div>
         </CardContent>
       </Card>
+      {/* Printable Area (Hidden) */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
+        <div id="ficha-registro-printable">
+          <StandardReportTemplate title="Ficha de Registro do Funcionário" company={empresa}>
+            <div className="space-y-6 text-black">
+              <div className="grid grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <h3 className="font-bold border-b pb-1 text-sm uppercase">Dados Pessoais</h3>
+                  <p className="text-sm"><strong>Nome:</strong> {fullEmployee?.name}</p>
+                  <p className="text-sm"><strong>CPF:</strong> {fullEmployee?.cpf || fullEmployee?.document}</p>
+                  <p className="text-sm"><strong>RG:</strong> {fullEmployee?.rg || '-'}</p>
+                  <p className="text-sm"><strong>Data de Nascimento:</strong> {formatDateToBR(fullEmployee?.birthDate)}</p>
+                  <p className="text-sm"><strong>Telefone:</strong> {fullEmployee?.phone || '-'}</p>
+                  <p className="text-sm"><strong>E-mail:</strong> {fullEmployee?.email || '-'}</p>
+                  <p className="text-sm"><strong>Endereço:</strong> {typeof fullEmployee?.address === 'string' ? fullEmployee?.address : fullEmployee?.address?.street || '-'}</p>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="font-bold border-b pb-1 text-sm uppercase">Dados Profissionais</h3>
+                  <p className="text-sm"><strong>Cargo:</strong> {(fullEmployee as any)?.position?.name || '-'}</p>
+                  <p className="text-sm"><strong>Setor:</strong> {(fullEmployee as any)?.unit?.name || '-'}</p>
+                  <p className="text-sm"><strong>Data de Admissão:</strong> {formatDateToBR(fullEmployee?.hireDate)}</p>
+                  <p className="text-sm"><strong>PIS/PASEP:</strong> {fullEmployee?.pis || '-'}</p>
+                  <p className="text-sm"><strong>CTPS:</strong> {fullEmployee?.ctps || '-'}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-bold border-b pb-1 text-sm uppercase">Dados do Registro</h3>
+                <p className="text-sm"><strong>Data do Registro:</strong> {formatDateToBR(form.dataRegistro)}</p>
+                <p className="text-sm"><strong>Responsável pelo Registro:</strong> {responsavel?.name || '-'}</p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-bold border-b pb-1 text-sm uppercase">Documentos Entregues</h3>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {documentosOptions.map(doc => (
+                    <div key={doc} className="flex items-center gap-2 text-xs">
+                      <div className={`w-3 h-3 border ${form.documentosEntregues.includes(doc) ? 'bg-black' : ''}`}></div>
+                      <span>{doc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-bold border-b pb-1 text-sm uppercase">Observações</h3>
+                <p className="text-sm border p-2 rounded bg-gray-50 min-h-[60px]">{form.observacoes || 'Nenhuma observação informada.'}</p>
+              </div>
+
+              <div className="mt-20 grid grid-cols-2 gap-20 pt-10">
+                <div className="text-center border-t pt-2">
+                  <p className="text-xs font-bold">{fullEmployee?.name}</p>
+                  <p className="text-[10px]">Assinatura do Funcionário</p>
+                </div>
+                <div className="text-center border-t pt-2">
+                  <p className="text-xs font-bold">{responsavel?.name || 'Responsável'}</p>
+                  <p className="text-[10px]">Assinatura da Empresa</p>
+                </div>
+              </div>
+            </div>
+          </StandardReportTemplate>
+        </div>
+      </div>
     </div>
   );
 };

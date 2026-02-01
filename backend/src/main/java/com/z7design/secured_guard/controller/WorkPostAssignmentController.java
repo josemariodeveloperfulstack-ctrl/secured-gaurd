@@ -4,10 +4,16 @@ import com.z7design.secured_guard.dto.CreateWorkPostAssignmentRequest;
 import com.z7design.secured_guard.dto.WorkPostAssignmentResponse;
 import com.z7design.secured_guard.model.WorkPostAssignment;
 import com.z7design.secured_guard.service.WorkPostAssignmentService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +22,8 @@ import java.util.UUID;
 @RequestMapping("/api/work-post-assignments")
 @CrossOrigin(origins = "*")
 public class WorkPostAssignmentController {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkPostAssignmentController.class);
 
     @Autowired
     private WorkPostAssignmentService workPostAssignmentService;
@@ -34,14 +42,18 @@ public class WorkPostAssignmentController {
     }
 
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<WorkPostAssignmentResponse>> getWorkPostAssignmentsByEmployee(@PathVariable UUID employeeId) {
-        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService.getWorkPostAssignmentsByEmployee(employeeId);
+    public ResponseEntity<List<WorkPostAssignmentResponse>> getWorkPostAssignmentsByEmployee(
+            @PathVariable UUID employeeId) {
+        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService
+                .getWorkPostAssignmentsByEmployee(employeeId);
         return ResponseEntity.ok(assignments);
     }
 
     @GetMapping("/work-post/{workPostId}")
-    public ResponseEntity<List<WorkPostAssignmentResponse>> getWorkPostAssignmentsByWorkPost(@PathVariable UUID workPostId) {
-        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService.getWorkPostAssignmentsByWorkPost(workPostId);
+    public ResponseEntity<List<WorkPostAssignmentResponse>> getWorkPostAssignmentsByWorkPost(
+            @PathVariable UUID workPostId) {
+        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService
+                .getWorkPostAssignmentsByWorkPost(workPostId);
         return ResponseEntity.ok(assignments);
     }
 
@@ -52,7 +64,8 @@ public class WorkPostAssignmentController {
     }
 
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<WorkPostAssignmentResponse>> getWorkPostAssignmentsByStatus(@PathVariable WorkPostAssignment.AssignmentStatus status) {
+    public ResponseEntity<List<WorkPostAssignmentResponse>> getWorkPostAssignmentsByStatus(
+            @PathVariable WorkPostAssignment.AssignmentStatus status) {
         List<WorkPostAssignmentResponse> assignments = workPostAssignmentService.getWorkPostAssignmentsByStatus(status);
         return ResponseEntity.ok(assignments);
     }
@@ -61,7 +74,8 @@ public class WorkPostAssignmentController {
     public ResponseEntity<List<WorkPostAssignmentResponse>> getWorkPostAssignmentsByDateRange(
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService.getWorkPostAssignmentsByDateRange(startDate, endDate);
+        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService
+                .getWorkPostAssignmentsByDateRange(startDate, endDate);
         return ResponseEntity.ok(assignments);
     }
 
@@ -70,7 +84,8 @@ public class WorkPostAssignmentController {
             @PathVariable UUID employeeId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService.getWorkPostAssignmentsByEmployeeAndDateRange(employeeId, startDate, endDate);
+        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService
+                .getWorkPostAssignmentsByEmployeeAndDateRange(employeeId, startDate, endDate);
         return ResponseEntity.ok(assignments);
     }
 
@@ -79,7 +94,8 @@ public class WorkPostAssignmentController {
             @PathVariable UUID workPostId,
             @RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
-        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService.getWorkPostAssignmentsByWorkPostAndDateRange(workPostId, startDate, endDate);
+        List<WorkPostAssignmentResponse> assignments = workPostAssignmentService
+                .getWorkPostAssignmentsByWorkPostAndDateRange(workPostId, startDate, endDate);
         return ResponseEntity.ok(assignments);
     }
 
@@ -102,7 +118,8 @@ public class WorkPostAssignmentController {
     }
 
     @PostMapping
-    public ResponseEntity<WorkPostAssignmentResponse> createWorkPostAssignment(@RequestBody CreateWorkPostAssignmentRequest request) {
+    public ResponseEntity<WorkPostAssignmentResponse> createWorkPostAssignment(
+            @RequestBody CreateWorkPostAssignmentRequest request) {
         try {
             WorkPostAssignmentResponse createdAssignment = workPostAssignmentService.createWorkPostAssignment(request);
             return ResponseEntity.ok(createdAssignment);
@@ -112,9 +129,11 @@ public class WorkPostAssignmentController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<WorkPostAssignmentResponse> updateWorkPostAssignment(@PathVariable UUID id, @RequestBody CreateWorkPostAssignmentRequest request) {
+    public ResponseEntity<WorkPostAssignmentResponse> updateWorkPostAssignment(@PathVariable UUID id,
+            @RequestBody CreateWorkPostAssignmentRequest request) {
         try {
-            WorkPostAssignmentResponse updatedAssignment = workPostAssignmentService.updateWorkPostAssignment(id, request);
+            WorkPostAssignmentResponse updatedAssignment = workPostAssignmentService.updateWorkPostAssignment(id,
+                    request);
             return ResponseEntity.ok(updatedAssignment);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
@@ -122,7 +141,8 @@ public class WorkPostAssignmentController {
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<WorkPostAssignmentResponse> updateStatus(@PathVariable UUID id, @RequestParam WorkPostAssignment.AssignmentStatus status) {
+    public ResponseEntity<WorkPostAssignmentResponse> updateStatus(@PathVariable UUID id,
+            @RequestParam WorkPostAssignment.AssignmentStatus status) {
         try {
             WorkPostAssignmentResponse updatedAssignment = workPostAssignmentService.updateStatus(id, status);
             return ResponseEntity.ok(updatedAssignment);
@@ -158,6 +178,29 @@ public class WorkPostAssignmentController {
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generatePDFReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) UUID workPostId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) WorkPostAssignment.AssignmentStatus status) {
+
+        try {
+            log.info("Recebida requisição para gerar PDF de atribuições de posto");
+            byte[] pdfBytes = workPostAssignmentService.generatePDFReport(employeeId, workPostId, startDate, endDate,
+                    status);
+            String fileName = "relatorio-postos-" + LocalDate.now().toString() + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(pdfBytes);
+        } catch (IOException e) {
+            log.error("Erro ao gerar PDF de atribuições de posto", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

@@ -16,6 +16,8 @@ import com.itextpdf.layout.Canvas;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
@@ -697,6 +699,25 @@ public class StandardReportLayoutService {
             return base + logoUrl;
         }
         return base + "/" + logoUrl;
+    }
+
+    /**
+     * Cria célula de cabeçalho padronizada
+     */
+    public Cell createHeaderCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text != null ? text : "").setBold().setFontSize(9))
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBackgroundColor(ColorConstants.LIGHT_GRAY);
+    }
+
+    /**
+     * Cria célula de dados padronizada
+     */
+    public Cell createDataCell(String text) {
+        return new Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(8))
+                .setTextAlignment(TextAlignment.LEFT);
     }
 
 }

@@ -1,4 +1,4 @@
-export type FeriasStatus = 'PENDENTE' | 'APROVADO' | 'REJECTED' | 'CANCELADO';
+export type FeriasStatus = 'PENDENTE' | 'APROVADO' | 'REJECTED' | 'CANCELADO' | 'REJEITADO' | 'EM_ANDAMENTO' | 'CONCLUIDO';
 export type FeriasTipo = 'FERIAS_NORMAIS' | 'FERIAS_VENDIDAS' | 'ABONO_PECUNIARIO';
 export type AfastamentoTipo = 'ATESTADO' | 'LICENCA_MEDICA' | 'LICENCA_MATERNIDADE' | 'LICENCA_PATERNIDADE' | 'SUSPENSAO' | 'OUTROS';
 

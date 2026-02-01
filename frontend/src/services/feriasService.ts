@@ -7,7 +7,9 @@ import {
   CreateAfastamentoRequest,
   UpdateAfastamentoRequest,
   FeriasFilters,
-  AfastamentoFilters
+  AfastamentoFilters,
+  FeriasStatus,
+  AfastamentoTipo
 } from '../types/ferias';
 
 export const feriasService = {
@@ -26,10 +28,10 @@ export const feriasService = {
       periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
-      status: vacation.status === 'PENDING' ? 'PENDENTE' :
+      status: (vacation.status === 'PENDING' ? 'PENDENTE' :
         vacation.status === 'APPROVED' ? 'APROVADO' :
           vacation.status === 'REJECTED' ? 'REJEITADO' :
-            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
       tipo: vacation.vacationType === 'SOLD' ? 'FERIAS_VENDIDAS' :
         vacation.vacationType === 'PECUNIARY_BONUS' ? 'ABONO_PECUNIARIO' :
           vacation.vacationType === 'NORMAL' ? 'FERIAS_NORMAIS' : 'FERIAS_NORMAIS', // Valor padrão
@@ -49,10 +51,10 @@ export const feriasService = {
       periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
-      status: vacation.status === 'PENDING' ? 'PENDENTE' :
+      status: (vacation.status === 'PENDING' ? 'PENDENTE' :
         vacation.status === 'APPROVED' ? 'APROVADO' :
           vacation.status === 'REJECTED' ? 'REJEITADO' :
-            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
       tipo: vacation.vacationType === 'SOLD' ? 'FERIAS_VENDIDAS' :
         vacation.vacationType === 'PECUNIARY_BONUS' ? 'ABONO_PECUNIARIO' : 'FERIAS_NORMAIS', // Valor padrão
       observacoes: vacation.observacoes || vacation.notes || '',
@@ -153,10 +155,10 @@ export const feriasService = {
       periodoAquisitivo: `${new Date(vacation.startDate).getFullYear()}/${new Date(vacation.startDate).getFullYear() + 1}`,
       dataInicio: vacation.startDate,
       dataFim: vacation.endDate,
-      status: vacation.status === 'PENDING' ? 'PENDENTE' :
+      status: (vacation.status === 'PENDING' ? 'PENDENTE' :
         vacation.status === 'APPROVED' ? 'APROVADO' :
           vacation.status === 'REJECTED' ? 'REJECTED' :
-            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+            vacation.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
       tipo: data.tipo || existingVacation.tipo || 'FERIAS_NORMAIS', // Preservar tipo do formulário ou existente
       observacoes: data.observacoes || existingVacation.observacoes || '',
       createdAt: vacation.createdAt,
@@ -203,7 +205,7 @@ export const feriasService = {
       id: absence.id,
       employeeId: absence.employee?.id || absence.employeeId || null,
       employeeName: absence.employee?.name || absence.employeeName || 'Funcionário não encontrado',
-      tipo: tipoMapInverso[absence.absenceType] || 'OUTROS',
+      tipo: (tipoMapInverso[absence.absenceType] || 'OUTROS') as AfastamentoTipo,
       dataInicio: absence.absenceDate, // Usar absenceDate em vez de startDate
       dataFim: (() => {
         // Calcular data fim baseado em medicalCertificateDays
@@ -214,14 +216,15 @@ export const feriasService = {
         }
         return absence.absenceDate; // Se não houver medicalCertificateDays, usar a mesma data
       })(),
-      status: absence.status === 'PENDING' ? 'PENDENTE' :
+      status: (absence.status === 'PENDING' ? 'PENDENTE' :
         absence.status === 'APPROVED' ? 'APROVADO' :
           absence.status === 'REJECTED' ? 'CANCELADO' :
-            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
       motivo: absence.reason || '',
       documento: absence.documentUrl || '',
       observacoes: absence.coverageNotes || '',
-      createdAt: absence.createdAt
+      createdAt: absence.createdAt,
+      updatedAt: absence.updatedAt || absence.createdAt
     }));
   },
 
@@ -253,13 +256,13 @@ export const feriasService = {
       id: absence.id,
       employeeId: absence.employee?.id || absence.employeeId || null,
       employeeName: absence.employee?.name || absence.employeeName || 'Funcionário não encontrado',
-      tipo: tipoMapInverso[absence.absenceType] || 'OUTROS',
+      tipo: (tipoMapInverso[absence.absenceType] || 'OUTROS') as AfastamentoTipo,
       dataInicio: dataInicio,
       dataFim: dataFim,
-      status: absence.status === 'PENDING' ? 'PENDENTE' :
+      status: (absence.status === 'PENDING' ? 'PENDENTE' :
         absence.status === 'APPROVED' ? 'APROVADO' :
           absence.status === 'REJECTED' ? 'CANCELADO' :
-            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
       motivo: absence.reason || '',
       documento: absence.documentUrl || '',
       observacoes: absence.coverageNotes || '',
@@ -386,7 +389,7 @@ export const feriasService = {
       id: absence.id,
       employeeId: absence.employeeId || absence.employee?.id || null,
       employeeName: absence.employeeName || absence.employee?.name || 'Funcionário não encontrado',
-      tipo: tipoMapInverso[absence.absenceType] || 'OUTROS',
+      tipo: (tipoMapInverso[absence.absenceType] || 'OUTROS') as AfastamentoTipo,
       dataInicio: absence.absenceDate,
       dataFim: (() => {
         // Calcular data fim baseado em medicalCertificateDays
@@ -397,14 +400,15 @@ export const feriasService = {
         }
         return absence.absenceDate; // Se não houver medicalCertificateDays, usar a mesma data
       })(),
-      status: absence.status === 'PENDING' ? 'PENDENTE' :
+      status: (absence.status === 'PENDING' ? 'PENDENTE' :
         absence.status === 'APPROVED' ? 'APROVADO' :
           absence.status === 'REJECTED' ? 'CANCELADO' :
-            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE',
+            absence.status === 'CANCELLED' ? 'CANCELADO' : 'PENDENTE') as FeriasStatus,
       motivo: absence.reason || '',
       documento: absence.documentUrl || '',
       observacoes: absence.coverageNotes || '',
-      createdAt: absence.createdAt
+      createdAt: absence.createdAt,
+      updatedAt: absence.updatedAt || absence.createdAt
     };
   },
 
@@ -483,6 +487,28 @@ export const feriasService = {
       if (value) params.append(key, value);
     });
     const response = await api.get(`/api/reports/ferias/consolidado/excel?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  async exportFeriasPDF(filters: FeriasFilters = {}): Promise<Blob> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    const response = await api.get(`/api/reports/ferias/ferias/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  async exportAfastamentosPDF(filters: AfastamentoFilters = {}): Promise<Blob> {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+    const response = await api.get(`/api/reports/ferias/afastamentos/pdf?${params.toString()}`, {
       responseType: 'blob'
     });
     return response.data;

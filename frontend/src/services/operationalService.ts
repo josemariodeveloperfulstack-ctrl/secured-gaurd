@@ -204,6 +204,24 @@ class OperationalService {
     await api.delete(`/api/vacation-coverages/${id}`);
   }
 
+  async generateVacationCoveragePDF(filters: {
+    employeeId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.status) params.append('status', filters.status);
+
+    const response = await api.get(`/api/vacation-coverages/report/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
   // Absence Methods
   async getAllAbsences(): Promise<Absence[]> {
     const response = await api.get('/api/absences');
@@ -252,6 +270,24 @@ class OperationalService {
 
   async deleteAbsence(id: string): Promise<void> {
     await api.delete(`/api/absences/${id}`);
+  }
+
+  async generateAbsencePDF(filters: {
+    employeeId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.status) params.append('status', filters.status);
+
+    const response = await api.get(`/api/absences/report/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 
   // Work Post Assignment Methods
@@ -310,7 +346,7 @@ class OperationalService {
       observations: data.observations || null,
       specialInstructions: null,
     };
-    
+
     const response = await api.put(`/api/work-post-assignments/${id}`, payload);
     return response.data;
   }
@@ -324,7 +360,7 @@ class OperationalService {
       'COMPLETED': 'COMPLETED',
       'CANCELLED': 'CANCELLED'
     };
-    
+
     const backendStatus = statusMap[status] || status;
     const response = await api.put(`/api/work-post-assignments/${id}/status?status=${backendStatus}`);
     return response.data;
@@ -342,6 +378,26 @@ class OperationalService {
 
   async deleteWorkPostAssignment(id: string): Promise<void> {
     await api.delete(`/api/work-post-assignments/${id}`);
+  }
+
+  async generateWorkPostAssignmentPDF(filters: {
+    employeeId?: string;
+    workPostId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+  }): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters.workPostId) params.append('workPostId', filters.workPostId);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.status) params.append('status', filters.status);
+
+    const response = await api.get(`/api/work-post-assignments/report/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 
   // Specific Activity Methods
@@ -420,6 +476,62 @@ class OperationalService {
 
   async deleteSpecificActivity(id: string): Promise<void> {
     await api.delete(`/api/specific-activities/${id}`);
+  }
+
+  async generateSpecificActivityPDF(filters: {
+    employeeId?: string;
+    locationId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+    type?: string;
+  }): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters.locationId) params.append('locationId', filters.locationId);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.type) params.append('type', filters.type);
+
+    const response = await api.get(`/api/specific-activities/report/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  async generateFeriasPDF(filters: any): Promise<Blob> {
+    const response = await api.get('/api/ferias/pdf', {
+      params: filters,
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  async generateAfastamentosPDF(filters: any): Promise<Blob> {
+    const response = await api.get('/api/ferias/afastamentos/pdf', {
+      params: filters,
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  async generateActivityReportPDF(filters: {
+    employeeId?: string;
+    clientId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.employeeId) params.append('employeeId', filters.employeeId);
+    if (filters.clientId) params.append('clientId', filters.clientId);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+
+    const response = await api.get(`/api/activity-reports/pdf?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    return response.data;
   }
 }
 

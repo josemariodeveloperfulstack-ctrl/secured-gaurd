@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Search, 
-  Plus, 
+import {
+  Eye,
+  Edit,
+  Trash2,
+  Search,
+  Plus,
   RefreshCw,
   FileText,
   CheckCircle,
@@ -20,7 +20,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { OrderOfService } from '@/services/orderOfServiceService';
+import { OrderOfService, orderOfServiceService } from '@/services/orderOfServiceService';
 
 interface OrderOfServiceTableProps {
   orders: OrderOfService[];
@@ -65,19 +65,19 @@ const OrderOfServiceTable: React.FC<OrderOfServiceTableProps> = ({
 
   // Verificar se orders é um array válido
   const safeOrders = Array.isArray(orders) ? orders : [];
-  
+
   const filteredOrders = safeOrders.filter(order => {
     const searchTermLower = searchTerm.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       order.employeeName.toLowerCase().includes(searchTermLower) ||
       order.client.toLowerCase().includes(searchTermLower) ||
       order.workplace.toLowerCase().includes(searchTermLower) ||
       order.role.toLowerCase().includes(searchTermLower);
-    
-    const matchesStatus = statusFilter === 'all' || 
+
+    const matchesStatus = statusFilter === 'all' ||
       (statusFilter === 'signed' && order.signed) ||
       (statusFilter === 'pending' && !order.signed);
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -97,6 +97,41 @@ const OrderOfServiceTable: React.FC<OrderOfServiceTableProps> = ({
     }
   };
 
+  const handleGeneratePDF = async () => {
+    try {
+      toast({
+        title: 'Gerando PDF...',
+        description: 'Por favor, aguarde enquanto o relatório é preparado.',
+      });
+
+      const blob = await orderOfServiceService.exportOrdersReportPDF({
+        search: searchTerm,
+        signed: statusFilter === 'all' ? undefined : statusFilter === 'signed'
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `relatorio-ordens-servico-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Sucesso!',
+        description: 'Relatório PDF gerado com sucesso.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar o relatório PDF.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (safeOrders.length === 0) {
     return (
       <Card className="bg-seguranca-graphite border-gray-600">
@@ -107,7 +142,7 @@ const OrderOfServiceTable: React.FC<OrderOfServiceTableProps> = ({
               Nenhuma ordem de serviço encontrada
             </h3>
             <p className="text-gray-400 mb-4">
-              {searchTerm || statusFilter !== 'all' 
+              {searchTerm || statusFilter !== 'all'
                 ? 'Tente ajustar os filtros de busca.'
                 : 'Comece criando uma nova ordem de serviço.'}
             </p>
@@ -134,9 +169,9 @@ const OrderOfServiceTable: React.FC<OrderOfServiceTableProps> = ({
               <Plus className="h-4 w-4 mr-2" />
               Nova Ordem
             </Button>
-            <Button 
-              onClick={handleRefresh} 
-              variant="outline" 
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
               size="sm"
               disabled={isLoading}
               className="border-gray-500 text-gray-200 hover:bg-gray-700"
@@ -144,9 +179,18 @@ const OrderOfServiceTable: React.FC<OrderOfServiceTableProps> = ({
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
+            <Button
+              onClick={handleGeneratePDF}
+              variant="outline"
+              size="sm"
+              className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Gerar Relatório PDF
+            </Button>
           </div>
         </div>
-        
+
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
           <div className="relative flex-1">
@@ -169,7 +213,7 @@ const OrderOfServiceTable: React.FC<OrderOfServiceTableProps> = ({
           </select>
         </div>
       </CardHeader>
-      
+
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>

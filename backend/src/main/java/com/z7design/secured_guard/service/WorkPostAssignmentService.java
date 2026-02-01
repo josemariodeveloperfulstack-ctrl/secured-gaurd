@@ -5,14 +5,29 @@ import com.z7design.secured_guard.dto.WorkPostAssignmentResponse;
 import com.z7design.secured_guard.model.WorkPostAssignment;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.WorkPost;
+import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.WorkPostAssignmentRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.Optional;
@@ -22,6 +37,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class WorkPostAssignmentService {
 
+    private static final Logger log = LoggerFactory.getLogger(WorkPostAssignmentService.class);
+
     @Autowired
     private WorkPostAssignmentRepository workPostAssignmentRepository;
 
@@ -30,6 +47,12 @@ public class WorkPostAssignmentService {
 
     @Autowired
     private WorkPostRepository workPostRepository;
+
+    @Autowired
+    private StandardReportLayoutService standardReportLayoutService;
+
+    @Autowired
+    private CompanyRepository companyRepository;
 
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getAllWorkPostAssignments() {
@@ -79,14 +102,16 @@ public class WorkPostAssignmentService {
     }
 
     @Transactional(readOnly = true)
-    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByEmployeeAndDateRange(UUID employeeId, LocalDate startDate, LocalDate endDate) {
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByEmployeeAndDateRange(UUID employeeId,
+            LocalDate startDate, LocalDate endDate) {
         return workPostAssignmentRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByWorkPostAndDateRange(UUID workPostId, LocalDate startDate, LocalDate endDate) {
+    public List<WorkPostAssignmentResponse> getWorkPostAssignmentsByWorkPostAndDateRange(UUID workPostId,
+            LocalDate startDate, LocalDate endDate) {
         return workPostAssignmentRepository.findByWorkPostAndDateRange(workPostId, startDate, endDate).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -104,7 +129,7 @@ public class WorkPostAssignmentService {
         // Verificar conflitos de horário para o mesmo funcionário na mesma data
         List<WorkPostAssignment> existingAssignments = workPostAssignmentRepository
                 .findActiveAssignmentsByDateAndEmployee(request.getAssignmentDate(), employee.getId());
-        
+
         if (!existingAssignments.isEmpty()) {
             throw new RuntimeException("Funcionário já possui atribuição ativa nesta data");
         }
@@ -112,7 +137,7 @@ public class WorkPostAssignmentService {
         // Verificar conflitos de horário para o mesmo posto na mesma data
         List<WorkPostAssignment> existingPostAssignments = workPostAssignmentRepository
                 .findActiveAssignmentsByDateAndPost(request.getAssignmentDate(), workPost.getId());
-        
+
         if (!existingPostAssignments.isEmpty()) {
             throw new RuntimeException("Posto de trabalho já possui atribuição ativa nesta data");
         }
@@ -148,25 +173,25 @@ public class WorkPostAssignmentService {
         if (request.getAssignmentDate() != null) {
             existingAssignment.setAssignmentDate(request.getAssignmentDate());
         }
-        
+
         if (request.getShiftType() != null) {
             WorkPostAssignment.ShiftType shiftType = WorkPostAssignment.ShiftType.valueOf(request.getShiftType());
             existingAssignment.setShiftType(shiftType);
         }
-        
+
         existingAssignment.setStartTime(request.getStartTime());
         existingAssignment.setEndTime(request.getEndTime());
         existingAssignment.setObservations(request.getObservations());
         existingAssignment.setSpecialInstructions(request.getSpecialInstructions());
-        
+
         if (request.getIsPrimaryAssignment() != null) {
             existingAssignment.setIsPrimaryAssignment(request.getIsPrimaryAssignment());
         }
-        
+
         if (request.getIsBackupAssignment() != null) {
             existingAssignment.setIsBackupAssignment(request.getIsBackupAssignment());
         }
-        
+
         existingAssignment.setUpdatedAt(java.time.LocalDateTime.now());
 
         // Validar e atualizar funcionário se fornecido
@@ -196,30 +221,30 @@ public class WorkPostAssignmentService {
     public WorkPostAssignmentResponse updateStatus(UUID id, WorkPostAssignment.AssignmentStatus status) {
         WorkPostAssignment assignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
-        
+
         assignment.setStatus(status);
         assignment.setUpdatedAt(java.time.LocalDateTime.now());
-        
+
         return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
     public WorkPostAssignmentResponse confirmAssignment(UUID id) {
         WorkPostAssignment assignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
-        
+
         assignment.setStatus(WorkPostAssignment.AssignmentStatus.CONFIRMED);
         assignment.setUpdatedAt(java.time.LocalDateTime.now());
-        
+
         return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
     public WorkPostAssignmentResponse completeAssignment(UUID id) {
         WorkPostAssignment assignment = workPostAssignmentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Atribuição de posto não encontrada"));
-        
+
         assignment.setStatus(WorkPostAssignment.AssignmentStatus.COMPLETED);
         assignment.setUpdatedAt(java.time.LocalDateTime.now());
-        
+
         return mapToResponse(workPostAssignmentRepository.save(assignment));
     }
 
@@ -244,21 +269,141 @@ public class WorkPostAssignmentService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public byte[] generatePDFReport(UUID employeeId, UUID workPostId, LocalDate startDate, LocalDate endDate,
+            WorkPostAssignment.AssignmentStatus status) throws IOException {
+        log.info(
+                "Gerando relatório PDF de atribuições de posto - EmployeeId: {}, WorkPostId: {}, StartDate: {}, EndDate: {}, Status: {}",
+                employeeId, workPostId, startDate, endDate, status);
+
+        List<WorkPostAssignment> assignments;
+        if (startDate != null && endDate != null) {
+            if (employeeId != null) {
+                assignments = workPostAssignmentRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate);
+            } else if (workPostId != null) {
+                assignments = workPostAssignmentRepository.findByWorkPostAndDateRange(workPostId, startDate, endDate);
+            } else {
+                assignments = workPostAssignmentRepository.findByDateRange(startDate, endDate);
+            }
+        } else {
+            assignments = workPostAssignmentRepository.findAll();
+        }
+
+        if (status != null) {
+            assignments = assignments.stream()
+                    .filter(a -> a.getStatus() == status)
+                    .collect(Collectors.toList());
+        }
+
+        // Determinar companyId
+        UUID companyId = resolveCompanyId(assignments, employeeId);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (PdfWriter writer = new PdfWriter(baos)) {
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .reportTitle("RELATÓRIO DE ATRIBUIÇÕES DE POSTO")
+                    .companyId(companyId)
+                    .build();
+
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+
+            // Adicionar conteúdo ao PDF
+            Paragraph info = new Paragraph(
+                    "Gerado em: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10);
+            document.add(info);
+
+            Table table = new Table(UnitValue.createPercentArray(new float[] { 15, 25, 25, 10, 10, 15 }))
+                    .useAllAvailableWidth()
+                    .setMarginTop(10);
+
+            table.addHeaderCell(createHeaderCell("Data"));
+            table.addHeaderCell(createHeaderCell("Funcionário"));
+            table.addHeaderCell(createHeaderCell("Posto"));
+            table.addHeaderCell(createHeaderCell("Turno"));
+            table.addHeaderCell(createHeaderCell("Horário"));
+            table.addHeaderCell(createHeaderCell("Status"));
+
+            DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            for (WorkPostAssignment assignment : assignments) {
+                table.addCell(createCell(assignment.getAssignmentDate().format(dtf)));
+                table.addCell(
+                        createCell(assignment.getEmployee() != null ? assignment.getEmployee().getName() : "N/A"));
+                table.addCell(
+                        createCell(assignment.getWorkPost() != null ? assignment.getWorkPost().getName() : "N/A"));
+                table.addCell(createCell(assignment.getShiftType() != null ? assignment.getShiftType().name() : "N/A"));
+
+                String time = "N/A";
+                if (assignment.getStartTime() != null && assignment.getEndTime() != null) {
+                    time = assignment.getStartTime().toString() + " - " + assignment.getEndTime().toString();
+                }
+                table.addCell(createCell(time));
+                table.addCell(createCell(assignment.getStatus() != null ? assignment.getStatus().name() : "N/A"));
+            }
+
+            document.add(table);
+            standardReportLayoutService.finalizeDocumentLayout(docWithPdf);
+            document.close();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF de atribuições de posto", e);
+            throw new IOException("Erro ao gerar PDF", e);
+        }
+
+        return baos.toByteArray();
+    }
+
+    private UUID resolveCompanyId(List<WorkPostAssignment> assignments, UUID employeeId) {
+        if (employeeId != null) {
+            Employee employee = employeeRepository.findById(employeeId).orElse(null);
+            if (employee != null && employee.getCompany() != null) {
+                return employee.getCompany().getId();
+            }
+        }
+        if (!assignments.isEmpty()) {
+            for (WorkPostAssignment a : assignments) {
+                if (a.getEmployee() != null && a.getEmployee().getCompany() != null) {
+                    return a.getEmployee().getCompany().getId();
+                }
+            }
+        }
+
+        // Fallback for company resolution
+        return companyRepository.findAll().stream()
+                .filter(c -> c.getStatus() == Company.CompanyStatus.ACTIVE)
+                .findFirst()
+                .map(Company::getId)
+                .orElse(null);
+    }
+
+    private com.itextpdf.layout.element.Cell createHeaderCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text).setBold().setFontSize(10))
+                .setPadding(5)
+                .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY);
+    }
+
+    private com.itextpdf.layout.element.Cell createCell(String text) {
+        return new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(text != null ? text : "").setFontSize(9))
+                .setPadding(5);
+    }
+
     private WorkPostAssignmentResponse mapToResponse(WorkPostAssignment assignment) {
         WorkPostAssignmentResponse.SimpleEmployee employeeData = null;
         if (assignment.getEmployee() != null) {
             employeeData = new WorkPostAssignmentResponse.SimpleEmployee(
                     assignment.getEmployee().getId(),
-                    assignment.getEmployee().getName()
-            );
+                    assignment.getEmployee().getName());
         }
 
         WorkPostAssignmentResponse.SimpleWorkPost workPostData = null;
         if (assignment.getWorkPost() != null) {
             workPostData = new WorkPostAssignmentResponse.SimpleWorkPost(
                     assignment.getWorkPost().getId(),
-                    assignment.getWorkPost().getName()
-            );
+                    assignment.getWorkPost().getName());
         }
 
         String shift = assignment.getShiftType() != null ? assignment.getShiftType().name() : null;

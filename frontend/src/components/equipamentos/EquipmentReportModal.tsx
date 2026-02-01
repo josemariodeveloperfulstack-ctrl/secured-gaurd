@@ -3,12 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  FileText, 
-  Users, 
-  Shield, 
-  BarChart3, 
-  Clock, 
+import {
+  FileText,
+  Users,
+  Shield,
+  BarChart3,
+  Clock,
   Download,
   Filter,
   X,
@@ -74,16 +74,16 @@ const reportTypes: ReportTypeConfig[] = [
 ];
 
 const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
-  isOpen = false, 
+  isOpen = false,
   onClose,
-  onReportGenerated 
+  onReportGenerated
 }) => {
   const [open, setOpen] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState<ReportType>('general_report');
   const [currentStep, setCurrentStep] = useState<'type' | 'filters' | 'export'>('type');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  
+
   // Encontrar a configuração do relatório selecionado
   const selectedReportConfig = reportTypes.find(type => type.id === selectedReportType);
 
@@ -120,11 +120,11 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
   };
 
   const handleGenerateReport = async () => {
-      setLoading(true);
-      
+    setLoading(true);
+
     try {
       console.log('🔗 Gerando relatório:', selectedReportType);
-      
+
       const reportRequest: EquipmentReportRequest = {
         reportType: selectedReportType,
         startDate: '2025-01-01', // Valores padrão para demonstração
@@ -133,7 +133,7 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
       };
 
       let reportData;
-      
+
       // Chamar o serviço apropriado baseado no tipo de relatório
       switch (selectedReportType) {
         case 'equipment_by_employee':
@@ -154,16 +154,16 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
         default:
           throw new Error('Tipo de relatório não suportado');
       }
-      
+
       console.log('✅ Relatório gerado com sucesso:', reportData);
-      
+
       // Armazenar o relatório gerado e mostrar o visualizador
       setGeneratedReport({
         type: selectedReportType,
         data: reportData.data,
         generatedAt: reportData.generatedAt
       });
-      
+
       setShowReportViewer(true);
       handleClose();
       setCurrentStep('type');
@@ -179,7 +179,7 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
         data: reportData.data,
         generatedAt: reportData.generatedAt
       });
-      
+
     } catch (error) {
       console.error('❌ Erro ao gerar relatório:', error);
       toast({
@@ -198,10 +198,10 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
 
   const handleExportReport = async (format: 'pdf' | 'excel' | 'csv') => {
     setLoading(true);
-    
+
     try {
       console.log('🔗 Exportando relatório:', selectedReportType, 'formato:', format);
-      
+
       const reportRequest: EquipmentReportRequest = {
         reportType: selectedReportType,
         startDate: '2025-01-01',
@@ -210,49 +210,34 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
       };
 
       let blob;
-      
-      // Para PDF, usar o gerador do frontend quando há dados gerados
-      if (format === 'pdf' && generatedReport && generatedReport.data && generatedReport.data.length > 0) {
-        console.log('📄 Gerando PDF no frontend usando dados do relatório:', generatedReport.type);
-        blob = await equipmentReportGenerator.generatePDF(
-          generatedReport.type,
-          generatedReport.data,
-          {
-            startDate: reportRequest.startDate,
-            endDate: reportRequest.endDate,
-            status: reportRequest.status,
-            equipmentType: reportRequest.equipmentType
-          }
-        );
-      } else {
-        // Para outros formatos ou quando não há dados gerados, usar o backend
-        switch (format) {
-          case 'pdf':
-            blob = await equipmentReportService.exportToPdf(reportRequest);
-            break;
-          case 'excel':
-            blob = await equipmentReportService.exportToExcel(reportRequest);
-            break;
-          case 'csv':
-            blob = await equipmentReportService.exportToCsv(reportRequest);
-            break;
-          default:
-            throw new Error('Formato de exportação não suportado');
-        }
+
+      // Sempre usar o backend premium para PDFs
+      switch (format) {
+        case 'pdf':
+          blob = await equipmentReportService.generatePremiumPdf(reportRequest);
+          break;
+        case 'excel':
+          blob = await equipmentReportService.exportToExcel(reportRequest);
+          break;
+        case 'csv':
+          blob = await equipmentReportService.exportToCsv(reportRequest);
+          break;
+        default:
+          throw new Error('Formato de exportação não suportado');
       }
-      
+
       // Fazer download do arquivo
       const filename = `equipment_report_${selectedReportType}_${new Date().toISOString().split('T')[0]}.${format}`;
       equipmentReportService.downloadFile(blob, filename);
-      
+
       console.log('✅ Relatório exportado com sucesso:', filename);
-      
+
       toast({
         title: "Relatório Exportado",
         description: `Relatório exportado como ${format.toUpperCase()} com sucesso!`,
         variant: "default"
       });
-      
+
     } catch (error) {
       console.error('❌ Erro ao exportar relatório:', error);
       toast({
@@ -277,16 +262,16 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-seguranca-red/20 rounded-lg flex items-center justify-center">
                 <FileText className="w-5 h-5 text-seguranca-red" />
-      </div>
-      <div>
+              </div>
+              <div>
                 <DialogTitle className="text-xl font-semibold">
                   Gerar Relatório de Equipamentos
                 </DialogTitle>
                 <p className="text-gray-400 mt-1">
                   Selecione o tipo de relatório e configure os filtros
                 </p>
-      </div>
-    </div>
+              </div>
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -295,43 +280,40 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
             >
               <X className="w-5 h-5" />
             </Button>
-      </div>
-      
+          </div>
+
           {/* Navegação por etapas */}
           <div className="flex items-center gap-2 mt-6">
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-              currentStep === 'type' 
-                ? 'bg-seguranca-red/20 text-seguranca-red border border-seguranca-red/30' 
-                : 'bg-gray-700/50 text-gray-400'
-            }`}>
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${currentStep === 'type'
+              ? 'bg-seguranca-red/20 text-seguranca-red border border-seguranca-red/30'
+              : 'bg-gray-700/50 text-gray-400'
+              }`}>
               <div className="w-6 h-6 rounded-full bg-current flex items-center justify-center text-xs font-semibold">
                 1
               </div>
               <span className="font-medium">Tipo de Relatório</span>
-      </div>
-      
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-              currentStep === 'filters' 
-                ? 'bg-seguranca-red/20 text-seguranca-red border border-seguranca-red/30' 
-                : 'bg-gray-700/50 text-gray-400'
-            }`}>
+            </div>
+
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${currentStep === 'filters'
+              ? 'bg-seguranca-red/20 text-seguranca-red border border-seguranca-red/30'
+              : 'bg-gray-700/50 text-gray-400'
+              }`}>
               <div className="w-6 h-6 rounded-full bg-current flex items-center justify-center text-xs font-semibold">
                 2
               </div>
               <span className="font-medium">Filtros</span>
-      </div>
-      
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-              currentStep === 'export' 
-                ? 'bg-seguranca-red/20 text-seguranca-red border border-seguranca-red/30' 
-                : 'bg-gray-700/50 text-gray-400'
-            }`}>
+            </div>
+
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${currentStep === 'export'
+              ? 'bg-seguranca-red/20 text-seguranca-red border border-seguranca-red/30'
+              : 'bg-gray-700/50 text-gray-400'
+              }`}>
               <div className="w-6 h-6 rounded-full bg-current flex items-center justify-center text-xs font-semibold">
                 3
               </div>
               <span className="font-medium">Exportar</span>
-      </div>
-    </div>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -339,40 +321,39 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
           {currentStep === 'type' && (
             <div>
               <h3 className="text-lg font-semibold mb-4">Selecione o tipo de relatório:</h3>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {reportTypes.map((reportType) => (
-        <Card 
+                  <Card
                     key={reportType.id}
-                    className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
-                      selectedReportType === reportType.id
-                        ? 'ring-2 ring-seguranca-red bg-seguranca-red/10'
-                        : 'bg-seguranca-black border-gray-600 hover:border-gray-500'
-                    }`}
+                    className={`cursor-pointer transition-all duration-200 hover:scale-105 ${selectedReportType === reportType.id
+                      ? 'ring-2 ring-seguranca-red bg-seguranca-red/10'
+                      : 'bg-seguranca-black border-gray-600 hover:border-gray-500'
+                      }`}
                     onClick={() => handleReportTypeSelect(reportType.id)}
-        >
-          <CardContent className="p-4">
+                  >
+                    <CardContent className="p-4">
                       <div className="flex items-start gap-3">
                         <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${reportType.color}`}>
                           {reportType.icon}
-              </div>
+                        </div>
                         <div className="flex-1">
                           <h4 className="font-semibold text-seguranca-lightgray mb-1">
                             {reportType.title}
                           </h4>
                           <p className="text-sm text-gray-400">
                             {reportType.description}
-                </p>
-              </div>
+                          </p>
+                        </div>
                         {selectedReportType === reportType.id && (
                           <div className="w-6 h-6 rounded-full bg-seguranca-red flex items-center justify-center">
                             <CheckCircle2 className="w-4 h-4 text-white" />
                           </div>
                         )}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           )}
 
@@ -458,12 +439,11 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                       <h4 className="font-semibold">Formato de Exportação</h4>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div 
-                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedExportFormat === 'pdf'
-                            ? 'border-seguranca-red bg-seguranca-red/10'
-                            : 'border-gray-600 hover:border-seguranca-red'
-                        }`}
+                      <div
+                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${selectedExportFormat === 'pdf'
+                          ? 'border-seguranca-red bg-seguranca-red/10'
+                          : 'border-gray-600 hover:border-seguranca-red'
+                          }`}
                         onClick={() => setSelectedExportFormat('pdf')}
                       >
                         <FileText className="w-6 h-6 text-red-400" />
@@ -475,33 +455,31 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                           <CheckCircle2 className="w-5 h-5 text-seguranca-red" />
                         )}
                       </div>
-                      <div 
-                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedExportFormat === 'excel'
-                            ? 'border-seguranca-red bg-seguranca-red/10'
-                            : 'border-gray-600 hover:border-seguranca-red'
-                        }`}
+                      <div
+                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${selectedExportFormat === 'excel'
+                          ? 'border-seguranca-red bg-seguranca-red/10'
+                          : 'border-gray-600 hover:border-seguranca-red'
+                          }`}
                         onClick={() => setSelectedExportFormat('excel')}
                       >
                         <BarChart3 className="w-6 h-6 text-green-400" />
-          <div>
+                        <div>
                           <div className="font-medium">Excel</div>
                           <div className="text-sm text-gray-400">Planilha Excel</div>
                         </div>
                         {selectedExportFormat === 'excel' && (
                           <CheckCircle2 className="w-5 h-5 text-seguranca-red" />
                         )}
-          </div>
-                      <div 
-                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedExportFormat === 'csv'
-                            ? 'border-seguranca-red bg-seguranca-red/10'
-                            : 'border-gray-600 hover:border-seguranca-red'
-                        }`}
+                      </div>
+                      <div
+                        className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-colors ${selectedExportFormat === 'csv'
+                          ? 'border-seguranca-red bg-seguranca-red/10'
+                          : 'border-gray-600 hover:border-seguranca-red'
+                          }`}
                         onClick={() => setSelectedExportFormat('csv')}
                       >
                         <FileText className="w-6 h-6 text-blue-400" />
-          <div>
+                        <div>
                           <div className="font-medium">CSV</div>
                           <div className="text-sm text-gray-400">Arquivo CSV</div>
                         </div>
@@ -509,7 +487,7 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                           <CheckCircle2 className="w-5 h-5 text-seguranca-red" />
                         )}
                       </div>
-          </div>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -535,13 +513,13 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
               </div>
             </div>
           )}
-          </div>
+        </div>
 
         {/* Rodapé com botões de navegação */}
         <div className="flex justify-between pt-6 border-t border-gray-600">
           <div>
             {currentStep !== 'type' && (
-              <Button 
+              <Button
                 variant="outline"
                 onClick={handlePreviousStep}
                 className="bg-seguranca-black border-gray-600 hover:bg-seguranca-graphite hover:border-gray-500"
@@ -550,20 +528,20 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
               </Button>
             )}
           </div>
-              
+
           <div className="flex gap-3">
-              <Button 
-                variant="outline"
+            <Button
+              variant="outline"
               onClick={() => setOpen(false)}
               className="bg-seguranca-black border-gray-600 hover:bg-seguranca-graphite hover:border-gray-500"
             >
-          Cancelar
-        </Button>
-              
+              Cancelar
+            </Button>
+
             {currentStep === 'export' ? (
-        <Button 
-          onClick={handleGenerateReport} 
-          disabled={loading}
+              <Button
+                onClick={handleGenerateReport}
+                disabled={loading}
                 className="bg-seguranca-red hover:bg-seguranca-red/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
@@ -574,7 +552,7 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                 ) : (
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
-          Gerar Relatório
+                    Gerar Relatório
                   </div>
                 )}
               </Button>
@@ -584,12 +562,12 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                 className="bg-seguranca-red hover:bg-seguranca-red/80 transition-colors"
               >
                 Próximo
-        </Button>
+              </Button>
             )}
           </div>
-      </div>
-    </DialogContent>
-      
+        </div>
+      </DialogContent>
+
       {/* Visualizador de Relatórios */}
       {showReportViewer && generatedReport && (
         <ReportViewer
