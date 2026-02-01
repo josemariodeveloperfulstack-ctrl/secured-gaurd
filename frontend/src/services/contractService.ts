@@ -185,7 +185,7 @@ export const contractService = {
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + days);
     const endDateStr = endDate.toISOString().split('T')[0];
-    
+
     return this.getContractsByDateRange(new Date().toISOString().split('T')[0], endDateStr);
   },
 
@@ -198,7 +198,7 @@ export const contractService = {
   // Gerar relatório de contratos
   async generateContractsReport(filters: ContractFilters = {}): Promise<any> {
     const contracts = await this.getContracts(filters);
-    
+
     const report = {
       totalContracts: contracts.length,
       totalValue: contracts.reduce((total, contract) => total + contract.value, 0),
@@ -207,13 +207,22 @@ export const contractService = {
         return acc;
       }, {} as Record<string, number>),
       byClient: contracts.reduce((acc, contract) => {
-        acc[contract.client.name] = (acc[contract.client.name] || 0) + 1;
+        const clientName = contract.clientName || 'N/A';
+        acc[clientName] = (acc[clientName] || 0) + 1;
         return acc;
       }, {} as Record<string, number>),
       contracts
     };
 
     return report;
+  },
+
+  // Gerar PDF do contrato (backend)
+  async generateContractPdf(contractData: any): Promise<Blob> {
+    const response = await api.post('/contracts/pdf', contractData, {
+      responseType: 'blob'
+    });
+    return response.data;
   },
 
   // Método para retornar dados mockados temporariamente

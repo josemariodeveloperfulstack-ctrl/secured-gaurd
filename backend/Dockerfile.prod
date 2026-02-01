@@ -13,55 +13,55 @@ WORKDIR /build
 # Configurar Maven para usar retry e repositórios alternativos
 RUN mkdir -p /root/.m2 && \
     printf '%s\n' \
-      '<settings>' \
-      '  <profiles>' \
-      '    <profile>' \
-      '      <id>retry</id>' \
-      '      <properties>' \
-      '        <maven.wagon.http.retryHandler.count>5</maven.wagon.http.retryHandler.count>' \
-      '        <maven.wagon.httpconnectionManager.ttlSeconds>120</maven.wagon.httpconnectionManager.ttlSeconds>' \
-      '        <maven.wagon.http.readTimeout>60000</maven.wagon.http.readTimeout>' \
-      '      </properties>' \
-      '      <repositories>' \
-      '        <repository>' \
-      '          <id>central</id>' \
-      '          <name>Maven Central</name>' \
-      '          <url>https://repo1.maven.org/maven2</url>' \
-      '          <releases><enabled>true</enabled></releases>' \
-      '          <snapshots><enabled>false</enabled></snapshots>' \
-      '        </repository>' \
-      '        <repository>' \
-      '          <id>central-alt</id>' \
-      '          <name>Maven Central Alternative</name>' \
-      '          <url>https://repo.maven.apache.org/maven2</url>' \
-      '          <releases><enabled>true</enabled></releases>' \
-      '          <snapshots><enabled>false</enabled></snapshots>' \
-      '        </repository>' \
-      '      </repositories>' \
-      '      <pluginRepositories>' \
-      '        <pluginRepository>' \
-      '          <id>central</id>' \
-      '          <name>Maven Central</name>' \
-      '          <url>https://repo1.maven.org/maven2</url>' \
-      '          <releases><enabled>true</enabled></releases>' \
-      '          <snapshots><enabled>false</enabled></snapshots>' \
-      '        </pluginRepository>' \
-      '      </pluginRepositories>' \
-      '    </profile>' \
-      '  </profiles>' \
-      '  <activeProfiles>' \
-      '    <activeProfile>retry</activeProfile>' \
-      '  </activeProfiles>' \
-      '</settings>' > /root/.m2/settings.xml
+    '<settings>' \
+    '  <profiles>' \
+    '    <profile>' \
+    '      <id>retry</id>' \
+    '      <properties>' \
+    '        <maven.wagon.http.retryHandler.count>5</maven.wagon.http.retryHandler.count>' \
+    '        <maven.wagon.httpconnectionManager.ttlSeconds>120</maven.wagon.httpconnectionManager.ttlSeconds>' \
+    '        <maven.wagon.http.readTimeout>60000</maven.wagon.http.readTimeout>' \
+    '      </properties>' \
+    '      <repositories>' \
+    '        <repository>' \
+    '          <id>central</id>' \
+    '          <name>Maven Central</name>' \
+    '          <url>https://repo1.maven.org/maven2</url>' \
+    '          <releases><enabled>true</enabled></releases>' \
+    '          <snapshots><enabled>false</enabled></snapshots>' \
+    '        </repository>' \
+    '        <repository>' \
+    '          <id>central-alt</id>' \
+    '          <name>Maven Central Alternative</name>' \
+    '          <url>https://repo.maven.apache.org/maven2</url>' \
+    '          <releases><enabled>true</enabled></releases>' \
+    '          <snapshots><enabled>false</enabled></snapshots>' \
+    '        </repository>' \
+    '      </repositories>' \
+    '      <pluginRepositories>' \
+    '        <pluginRepository>' \
+    '          <id>central</id>' \
+    '          <name>Maven Central</name>' \
+    '          <url>https://repo1.maven.org/maven2</url>' \
+    '          <releases><enabled>true</enabled></releases>' \
+    '          <snapshots><enabled>false</enabled></snapshots>' \
+    '        </pluginRepository>' \
+    '      </pluginRepositories>' \
+    '    </profile>' \
+    '  </profiles>' \
+    '  <activeProfiles>' \
+    '    <activeProfile>retry</activeProfile>' \
+    '  </activeProfiles>' \
+    '</settings>' > /root/.m2/settings.xml
 
 # Copiar pom.xml primeiro (para cache de dependências)
 COPY pom.xml .
 
 # Tentar baixar dependências com retry
 RUN for i in 1 2 3; do \
-      echo "🔄 Tentativa $i de baixar dependências..." && \
-      mvn dependency:go-offline -B && break || \
-      (echo "⚠️ Tentativa $i falhou, aguardando 5 segundos..." && sleep 5); \
+    echo "🔄 Tentativa $i de baixar dependências..." && \
+    mvn dependency:go-offline -B && break || \
+    (echo "⚠️ Tentativa $i falhou, aguardando 5 segundos..." && sleep 5); \
     done || echo "⚠️ Aviso: Algumas dependências podem não ter sido baixadas"
 
 # Copiar código fonte
@@ -69,9 +69,9 @@ COPY src ./src
 
 # Build do projeto com retry (skip tests em produção)
 RUN for i in 1 2 3; do \
-      echo "🔨 Tentativa $i de build..." && \
-      mvn clean package -DskipTests -B -Dmaven.test.skip=true && break || \
-      (echo "⚠️ Tentativa $i falhou, aguardando 10 segundos..." && sleep 10); \
+    echo "🔨 Tentativa $i de build..." && \
+    mvn clean package -DskipTests -B -Dmaven.test.skip=true && break || \
+    (echo "⚠️ Tentativa $i falhou, aguardando 10 segundos..." && sleep 10); \
     done && \
     find target -name "*.jar" -not -name "*sources.jar" -not -name "*javadoc.jar" -not -name "*-original.jar" | head -1 | xargs -I {} sh -c 'mv "{}" app.jar' || \
     (echo "❌ Erro: Nenhum JAR encontrado após build" && ls -la target/ && exit 1)
@@ -109,11 +109,11 @@ RUN mkdir -p /app/holerites && \
 USER spring
 
 # Expor porta
-EXPOSE 8083
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8083/api/health || exit 1
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 # JVM otimizada para container
 ENV JAVA_OPTS="-XX:+UseContainerSupport \

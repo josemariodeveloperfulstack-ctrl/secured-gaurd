@@ -7,12 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  FileText, 
-  Download, 
-  Eye, 
-  Printer, 
-  Mail, 
+import {
+  FileText,
+  Download,
+  Eye,
+  Printer,
+  Mail,
   Settings,
   CheckCircle,
   Loader2
@@ -78,7 +78,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     if (open) {
       loadCompanyConfig();
       loadClients();
-      
+
       // Carregar dados do contrato se fornecido
       if (contract) {
         setContractData({
@@ -404,7 +404,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     try {
       // Simular geração de PDF (em produção, seria uma chamada para o backend)
       const htmlContent = generateContractHTML();
-      
+
       // Para um MVP, vamos abrir uma nova janela com o conteúdo formatado para impressão
       const printWindow = window.open('', '_blank');
       if (printWindow) {
@@ -417,7 +417,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
         title: "Contrato Gerado",
         description: "O contrato foi gerado com sucesso. Use Ctrl+P para imprimir ou salvar como PDF.",
       });
-      
+
       setStep('generated');
     } catch (error) {
       console.error('Erro ao gerar contrato:', error);
