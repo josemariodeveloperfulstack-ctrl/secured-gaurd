@@ -75,7 +75,7 @@ export const UserDeleteDialog: React.FC<UserDeleteDialogProps> = ({
 
   if (!user) return null;
 
-  const isConfirmed = confirmationText === user.name;
+  const isConfirmed = confirmationText.trim().toLowerCase() === user.name.trim().toLowerCase();
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>

@@ -29,14 +29,14 @@ public class RoleMigrationService {
     public void migrateRolesOnStartup() {
         try {
             log.info("Iniciando migração de roles do enum para entidades JPA (assíncrono)...");
-            
+
             // Verificar se existem usuários antes de tentar migrar
             long userCount = userRepository.count();
             if (userCount == 0) {
                 log.info("Nenhum usuário encontrado no banco. Pulando migração de roles.");
                 return;
             }
-            
+
             migrateExistingUsers();
             log.info("Migração de roles concluída com sucesso!");
         } catch (Exception e) {
@@ -52,11 +52,11 @@ public class RoleMigrationService {
         int pageSize = 100;
         int page = 0;
         List<User> users;
-        
+
         do {
             users = userRepository.findAll(org.springframework.data.domain.PageRequest.of(page, pageSize)).getContent();
             page++;
-            
+
             for (User user : users) {
                 try {
                     // Se o usuário já tem role_id, pular
@@ -68,10 +68,10 @@ public class RoleMigrationService {
                     // Tentar migrar baseado no campo role enum (se ainda existir)
                     // Como o modelo foi refatorado, vamos buscar o role pelo nome do usuário
                     // ou criar um role padrão
-                    
+
                     String roleName = determineUserRoleName(user);
                     Optional<Role> roleOpt = roleRepository.findByName(roleName);
-                    
+
                     if (roleOpt.isPresent()) {
                         user.setRoles(new java.util.HashSet<>(java.util.List.of(roleOpt.get())));
                         userRepository.save(user);
@@ -84,10 +84,11 @@ public class RoleMigrationService {
                             userRepository.save(user);
                             log.warn("Usuário {} migrado para role padrão SUPER_ADMIN", user.getUsername());
                         } else {
-                            log.error("Não foi possível encontrar role SUPER_ADMIN para usuário: {}", user.getUsername());
+                            log.error("Não foi possível encontrar role SUPER_ADMIN para usuário: {}",
+                                    user.getUsername());
                         }
                     }
-                    
+
                 } catch (Exception e) {
                     log.error("Erro ao migrar usuário {}: {}", user.getUsername(), e.getMessage(), e);
                 }
@@ -98,11 +99,11 @@ public class RoleMigrationService {
     private String determineUserRoleName(User user) {
         // Como o modelo foi refatorado, vamos usar uma lógica baseada no username
         // ou grupos do usuário para determinar o role
-        
+
         if (user.getUsername().equals("jose.ramos")) {
             return "SUPER_ADMIN";
         }
-        
+
         // Verificar grupos do usuário
         if (user.getGroups() != null && !user.getGroups().isEmpty()) {
             for (var group : user.getGroups()) {
@@ -124,7 +125,7 @@ public class RoleMigrationService {
                 }
             }
         }
-        
+
         // Role padrão
         return "USER";
     }
@@ -135,45 +136,52 @@ public class RoleMigrationService {
     public void createDefaultRolesIfNotExist() {
         try {
             log.info("Verificando e criando roles padrão (assíncrono)...");
-            
-            // Verificar se já existem roles
-            long roleCount = roleRepository.count();
-            if (roleCount > 0) {
-                log.info("Roles já existem no banco. Pulando criação de roles padrão.");
-                return;
-            }
-            
+
+            // Verificar se já existem roles - REMOVIDO para permitir adição de novos roles
+            // long roleCount = roleRepository.count();
+            // if (roleCount > 0) {
+            // log.info("Roles já existem no banco. Pulando criação de roles padrão.");
+            // return;
+            // }
+
             createDefaultRoles();
-            log.info("Roles padrão criadas com sucesso!");
+            log.info("Verificação de roles padrão concluída!");
         } catch (Exception e) {
-            log.error("❌ Erro durante criação de roles padrão: {}", e.getMessage(), e);
+            log.error("❌ Erro durante verificação de roles padrão: {}", e.getMessage(), e);
             // Não re-lançar exceção para não crashar a aplicação
-            // A criação de roles padrão não é crítica para o funcionamento básico
         }
     }
 
     private void createDefaultRoles() {
         // Criar roles padrão se não existirem
         String[] defaultRoles = {
-            "SUPER_ADMIN",
-            "ADMIN", 
-            "RH",
-            "FINANCEIRO",
-            "SUPERVISOR",
-            "TI_SUPORTE",
-            "AUDITOR",
-            "USER"
+                "SUPER_ADMIN",
+                "ADMIN",
+                "RH",
+                "FINANCEIRO",
+                "SUPERVISOR",
+                "TI_SUPORTE",
+                "AUDITOR",
+                "USER",
+                "ASSISTENTE_ADMINISTRATIVO",
+                "AUXI_ADMINISTRATIVO",
+                "GESTOR",
+                "OPERACIONAL",
+                "CLIENTE",
+                "COLABORADOR",
+                "COMERCIAL",
+                "DEPARTAMENTO_PESSOAL"
         };
-        
+
         for (String roleName : defaultRoles) {
             if (!roleRepository.findByName(roleName).isPresent()) {
                 Role role = Role.builder()
-                    .name(roleName)
-                    .description("Role " + roleName)
-                    .build();
+                        .name(roleName)
+                        .description("Role " + roleName)
+                        .build();
                 roleRepository.save(role);
                 log.info("Role criada: {}", roleName);
             }
         }
     }
-} 
+}

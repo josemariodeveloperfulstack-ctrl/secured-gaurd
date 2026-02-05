@@ -237,6 +237,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         'TI_SUPORTE',
         'AUDITOR',
         'VIGILANTE',
+        'ASSISTENTE_ADMINISTRATIVO',
         'AUXI_ADMINISTRATIVO',
         'AUX_DEP',
         'COLABORADOR',

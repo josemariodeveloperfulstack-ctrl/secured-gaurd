@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+import com.z7design.secured_guard.model.Permission;
 
 @RestController
 @RequestMapping("/api/users")
@@ -386,6 +389,42 @@ public class UserController {
         }
 
         return dto;
+    }
+
+    @PostMapping("/{id}/permissions")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @Operation(summary = "Adicionar permissões ao usuário", description = "Adiciona permissões individuais ao usuário")
+    public ResponseEntity<?> addUserPermissions(@PathVariable String id, @RequestBody List<UUID> permissionIds) {
+        try {
+            UUID userId = UUID.fromString(id);
+            Set<Permission> updated = userService.addUserPermissionsByIds(userId, permissionIds);
+            return ResponseEntity.ok(updated.stream()
+                    .map(com.z7design.secured_guard.dto.PermissionDTO::fromEntity)
+                    .collect(java.util.stream.Collectors.toList()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "ID inválido"));
+        } catch (Exception e) {
+            log.error("Erro ao adicionar permissões: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}/permissions")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @Operation(summary = "Remover permissões do usuário", description = "Remove permissões individuais do usuário")
+    public ResponseEntity<?> removeUserPermissions(@PathVariable String id, @RequestBody List<UUID> permissionIds) {
+        try {
+            UUID userId = UUID.fromString(id);
+            Set<Permission> updated = userService.removeUserPermissionsByIds(userId, permissionIds);
+            return ResponseEntity.ok(updated.stream()
+                    .map(com.z7design.secured_guard.dto.PermissionDTO::fromEntity)
+                    .collect(java.util.stream.Collectors.toList()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "ID inválido"));
+        } catch (Exception e) {
+            log.error("Erro ao remover permissões: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/{id}")

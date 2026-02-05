@@ -9,5 +9,6 @@ public enum UserRole {
     TI_SUPORTE, // 🟪 Gerencia configuração técnica
     AUDITOR, // 🟫 Acesso somente leitura
     COLABORADOR,
-    COMERCIAL // 🟥 Departamento Comercial
+    COMERCIAL, // 🟥 Departamento Comercial
+    ASSISTENTE_ADMINISTRATIVO // 🟨 Assistente Administrativo (Financeiro/Medição)
 }

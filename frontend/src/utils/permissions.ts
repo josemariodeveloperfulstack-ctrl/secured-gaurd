@@ -16,6 +16,7 @@ export const USER_ROLE_LIST: UserRole[] = [
   'COLABORADOR',
   'VIGILANTE',
   'AUXI_ADMINISTRATIVO',
+  'ASSISTENTE_ADMINISTRATIVO',
   'AUX_DEP',
 ];
 
@@ -626,6 +627,34 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         VISITS_READ: true,
       };
 
+    case 'ASSISTENTE_ADMINISTRATIVO':
+      return {
+        ...basePermissions,
+        // Assistente Administrativo
+        FINANCIAL_READ: true,
+        FINANCIAL_PAYABLE_READ: true,
+        FINANCIAL_RECEIVABLE_READ: true,
+        STOCK_READ: true,
+        STOCK_WRITE: true,
+        STOCK_CREATE: true,
+        STOCK_MANAGE: true,
+        // Compras (usando permissionamento de estoque ou criando específico se houver - assumindo uso de STOCK/FINANCIAL)
+        // Relatórios
+        REPORTS_READ: true,
+        REPORTS_GENERATE: true,
+        // Dashboard
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        // Leitura geral
+        EMPLOYEES_READ: true,
+        CLIENTS_READ: true,
+        CONTRACTS_READ: true,
+      };
+
     case 'AUXI_ADMINISTRATIVO':
       return {
         ...basePermissions,
@@ -646,6 +675,8 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         LEADS_READ: true,
         PROPOSALS_READ: true,
       };
+
+
 
     case 'AUX_DEP':
       return {
@@ -698,6 +729,164 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     default:
       return basePermissions;
   }
+};
+
+// Função para gerar permissões baseadas em grupos
+// Traduções de Permissões para Português
+export const PERMISSION_TRANSLATIONS: Record<keyof UserPermissions, string> = {
+  // Usuários
+  USERS_READ: 'Visualizar Usuários',
+  USERS_WRITE: 'Editar Usuários',
+  USERS_DELETE: 'Excluir Usuários',
+  USERS_CREATE: 'Criar Usuários',
+
+  // Grupos
+  GROUPS_READ: 'Visualizar Grupos',
+  GROUPS_WRITE: 'Editar Grupos',
+  GROUPS_DELETE: 'Excluir Grupos',
+  GROUPS_CREATE: 'Criar Grupos',
+
+  // Clientes
+  CLIENTS_READ: 'Visualizar Clientes',
+  CLIENTS_WRITE: 'Editar Clientes',
+  CLIENTS_DELETE: 'Excluir Clientes',
+  CLIENTS_CREATE: 'Criar Clientes',
+
+  // Funcionários
+  EMPLOYEES_READ: 'Visualizar Funcionários',
+  EMPLOYEES_WRITE: 'Editar Funcionários',
+  EMPLOYEES_DELETE: 'Excluir Funcionários',
+  EMPLOYEES_CREATE: 'Criar Funcionários',
+
+  // Contratos
+  CONTRACTS_READ: 'Visualizar Contratos',
+  CONTRACTS_WRITE: 'Editar Contratos',
+  CONTRACTS_DELETE: 'Excluir Contratos',
+  CONTRACTS_CREATE: 'Criar Contratos',
+
+  // Financeiro Geral
+  FINANCIAL_READ: 'Visualizar Financeiro',
+  FINANCIAL_WRITE: 'Editar Financeiro',
+  FINANCIAL_DELETE: 'Excluir Registros Financeiros',
+  FINANCIAL_CREATE: 'Criar Registros Financeiros',
+
+  // Financeiro Granular
+  FINANCIAL_PAYABLE_READ: 'Visualizar Contas a Pagar',
+  FINANCIAL_PAYABLE_WRITE: 'Editar Contas a Pagar',
+  FINANCIAL_RECEIVABLE_READ: 'Visualizar Contas a Receber',
+  FINANCIAL_RECEIVABLE_WRITE: 'Editar Contas a Receber',
+
+  // Holerites
+  PAYSLIPS_READ: 'Visualizar Holerites',
+  PAYSLIPS_WRITE: 'Editar Holerites',
+  PAYSLIPS_DELETE: 'Excluir Holerites',
+  PAYSLIPS_CREATE: 'Gerar Holerites',
+  PAYSLIPS_PUBLISH: 'Publicar Holerites',
+
+  // Estoque
+  STOCK_READ: 'Visualizar Estoque',
+  STOCK_WRITE: 'Editar Estoque',
+  STOCK_DELETE: 'Excluir Itens de Estoque',
+  STOCK_CREATE: 'Adicionar Itens ao Estoque',
+  STOCK_MANAGE: 'Gerenciar Estoque',
+
+  // Equipamentos/Frota
+  EQUIPMENTS_READ: 'Visualizar Equipamentos',
+  EQUIPMENTS_WRITE: 'Editar Equipamentos',
+  EQUIPMENTS_DELETE: 'Excluir Equipamentos',
+  EQUIPMENTS_CREATE: 'Cadastrar Equipamentos',
+  EQUIPMENTS_ASSIGN: 'Atribuir Equipamentos',
+
+  // Empresas
+  COMPANIES_READ: 'Visualizar Empresas',
+  COMPANIES_WRITE: 'Editar Empresas',
+  COMPANIES_DELETE: 'Excluir Empresas',
+  COMPANIES_CREATE: 'Cadastrar Empresas',
+  COMPANIES_MANAGE: 'Gerenciar Empresas',
+
+  // Relatórios
+  REPORTS_READ: 'Visualizar Relatórios',
+  REPORTS_GENERATE: 'Gerar Relatórios',
+  REPORTS_EXPORT: 'Exportar Relatórios',
+
+  // Comercial (Leads)
+  LEADS_READ: 'Visualizar Leads',
+  LEADS_WRITE: 'Editar Leads',
+  LEADS_DELETE: 'Excluir Leads',
+  LEADS_CREATE: 'Cadastrar Leads',
+
+  // Comercial (Propostas)
+  PROPOSALS_READ: 'Visualizar Propostas',
+  PROPOSALS_WRITE: 'Editar Propostas',
+  PROPOSALS_DELETE: 'Excluir Propostas',
+  PROPOSALS_CREATE: 'Criar Propostas',
+
+  // Comercial (Cotações)
+  QUOTES_READ: 'Visualizar Cotações',
+  QUOTES_WRITE: 'Editar Cotações',
+  QUOTES_DELETE: 'Excluir Cotações',
+  QUOTES_CREATE: 'Criar Cotações',
+
+  // Sistema
+  SYSTEM_CONFIG: 'Configurar Sistema',
+  SYSTEM_LOGS: 'Visualizar Logs',
+  SYSTEM_BACKUP: 'Realizar Backup',
+  SYSTEM_INTEGRATION: 'Gerenciar Integrações',
+
+  // Auditoria
+  AUDIT_READ: 'Leitura de Auditoria',
+  AUDIT_WRITE: 'Escrita de Auditoria',
+
+  // Dashboard
+  DASHBOARD_READ: 'Visualizar Dashboard',
+  DASHBOARD_WRITE: 'Configurar Dashboard',
+
+  // Perfil
+  PROFILE_READ: 'Visualizar Perfil',
+  PROFILE_WRITE: 'Editar Perfil',
+
+  // Suporte
+  SUPPORT_READ: 'Visualizar Suporte',
+  SUPPORT_WRITE: 'Responder Suporte',
+  SUPPORT_DELETE: 'Excluir Tickets',
+  SUPPORT_CREATE: 'Abrir Ticket',
+  SUPPORT_MANAGE: 'Gerenciar Suporte',
+
+  // Mensagens
+  MESSAGES_READ: 'Ler Mensagens',
+  MESSAGES_WRITE: 'Enviar Mensagens',
+  MESSAGES_DELETE: 'Excluir Mensagens',
+  MESSAGES_CREATE: 'Criar Mensagens',
+  MESSAGES_MANAGE: 'Gerenciar Mensagens',
+
+  // Atendimento
+  ATTENDANCE_READ: 'Visualizar Atendimentos',
+  ATTENDANCE_WRITE: 'Realizar Atendimentos',
+  ATTENDANCE_MANAGE: 'Gerenciar Atendimentos',
+
+  // Visitas
+  VISITS_READ: 'Visualizar Visitas',
+  VISITS_WRITE: 'Editar Visitas',
+  VISITS_CREATE: 'Agendar Visitas',
+  VISITS_UPDATE: 'Atualizar Visitas',
+  VISITS_DELETE: 'Excluir Visitas',
+  VISITS_MANAGE: 'Gerenciar Visitas',
+
+  // Ponto Eletrônico
+  TIME_RECORD_READ: 'Visualizar Ponto',
+  TIME_RECORD_CREATE: 'Registrar Ponto',
+  TIME_RECORD_UPDATE: 'Corrigir Ponto',
+  TIME_RECORD_DELETE: 'Excluir Registro de Ponto',
+  TIME_RECORD_MANAGE: 'Gerenciar Ponto Eletrônico',
+
+  // Folha de Pagamento
+  PAYROLL_READ: 'Visualizar Folha',
+  PAYROLL_CREATE: 'Gerar Folha',
+  PAYROLL_MANAGE: 'Gerenciar Folha',
+
+  // Outros
+  ALL_PERMISSIONS: 'Acesso Total (Admin)',
+  ASSISTENTE_ADMINISTRATIVO: 'Assistente Administrativo (Permissão)'
 };
 
 // Função para gerar permissões baseadas em grupos
@@ -1050,6 +1239,7 @@ export const getRoleDisplayName = (role: UserRole): string => {
     COLABORADOR: 'Colaborador',
     GESTOR: 'Gestor',
     COMERCIAL: 'Comercial',
+    ASSISTENTE_ADMINISTRATIVO: 'Assistente Administrativo',
   };
   return roleNames[role] || role;
 };
@@ -1073,6 +1263,7 @@ export const getRoleColor = (role: UserRole): string => {
     COLABORADOR: 'bg-indigo-100 text-indigo-800',
     GESTOR: 'bg-teal-100 text-teal-800',
     COMERCIAL: 'bg-indigo-100 text-indigo-800',
+    ASSISTENTE_ADMINISTRATIVO: 'bg-yellow-100 text-yellow-800',
   };
   return roleColors[role] || 'bg-gray-100 text-gray-800';
 };
@@ -1089,6 +1280,12 @@ export const getGroupDisplayName = (groupName: string): string => {
     'GRUPO_COLABORADORES': 'Colaboradores',
     'GRUPO_OPERACIONAL': 'Operacional',
     'GRUPO_VIGILANTES': 'Vigilantes',
+    'GRUPO_FINANCEIRO': 'Financeiro',
+    'GRUPO_TI_SUPORTE': 'TI / Suporte',
+    'GRUPO_AUDITOR': 'Auditor',
+    'GRUPO_AUXILIARES': 'Auxiliares',
+    'GRUPO_COMERCIAL': 'Comercial',
+    'GRUPO_ASSISTENTE_ADMINISTRATIVO': 'Assistente Administrativo',
   };
   return groupNames[groupName] || groupName;
 };
@@ -1105,6 +1302,12 @@ export const getGroupColor = (groupName: string): string => {
     'GRUPO_COLABORADORES': 'bg-blue-100 text-blue-800',
     'GRUPO_OPERACIONAL': 'bg-cyan-100 text-cyan-800',
     'GRUPO_VIGILANTES': 'bg-gray-100 text-gray-800',
+    'GRUPO_FINANCEIRO': 'bg-orange-100 text-orange-800',
+    'GRUPO_TI_SUPORTE': 'bg-purple-100 text-purple-800',
+    'GRUPO_AUDITOR': 'bg-gray-100 text-gray-800',
+    'GRUPO_AUXILIARES': 'bg-pink-100 text-pink-800',
+    'GRUPO_COMERCIAL': 'bg-indigo-100 text-indigo-800',
+    'GRUPO_ASSISTENTE_ADMINISTRATIVO': 'bg-yellow-100 text-yellow-800',
   };
   return groupColors[groupName] || 'bg-gray-100 text-gray-800';
 };

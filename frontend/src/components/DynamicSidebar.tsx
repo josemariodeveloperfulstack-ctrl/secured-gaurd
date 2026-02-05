@@ -772,6 +772,7 @@ export function DynamicSidebar() {
       'TI_SUPORTE': 'TI / Suporte',
       'AUDITOR': 'Auditor',
       'COLABORADOR': 'Colaborador',
+      'ASSISTENTE_ADMINISTRATIVO': 'Assistente Administrativo',
     };
     return roleNames[role] || role;
   };
@@ -786,6 +787,7 @@ export function DynamicSidebar() {
       'TI_SUPORTE': 'bg-purple-100 text-purple-800',
       'AUDITOR': 'bg-gray-100 text-gray-800',
       'COLABORADOR': 'bg-indigo-100 text-indigo-800',
+      'ASSISTENTE_ADMINISTRATIVO': 'bg-yellow-100 text-yellow-800',
     };
     return roleColors[role] || 'bg-gray-100 text-gray-800';
   };

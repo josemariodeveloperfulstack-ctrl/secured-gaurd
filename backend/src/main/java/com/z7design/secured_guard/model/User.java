@@ -45,7 +45,7 @@ public class User implements UserDetails {
     private String password;
 
     @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
+    // @Email(message = "Invalid email format")
     @Column(nullable = false)
     private String email;
 

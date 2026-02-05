@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { User as UserType, UserRole } from '@/types/user';
-import { getRoleDisplayName, getRoleColor, USER_ROLE_LIST } from '@/utils/permissions';
+import { getRoleDisplayName, getRoleColor, USER_ROLE_LIST, PERMISSION_TRANSLATIONS } from '@/utils/permissions';
 import { userService } from '@/services/userService';
 import { useToast } from '@/hooks/use-toast';
 import { permissionService } from '@/services/permissionService';
@@ -106,7 +106,46 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      permissionService.getAllPermissions().then(setAllPermissions);
+      permissionService.getAllPermissions().then((perms) => {
+        // If empty (backend issue) or just to ensure full list is available for Super Admin
+        // We merge backend DTOs with our known keys if backend returns empty or partial?
+        // Simplest fix: Use our known keys to generate the list if backend is empty.
+        // Or map the backend list to include our translations.
+
+        let enhancedPerms: PermissionDTO[] = [];
+
+        if (!perms || perms.length === 0) {
+          // Fallback: Generate from local keys
+          enhancedPerms = Object.keys(PERMISSION_TRANSLATIONS).map(key => ({
+            id: key,
+            name: key,
+            description: PERMISSION_TRANSLATIONS[key as keyof UserPermissions]
+          }));
+        } else {
+          // Translate existing
+          enhancedPerms = perms.map(p => ({
+            ...p,
+            description: PERMISSION_TRANSLATIONS[p.name as keyof UserPermissions] || p.description || p.name
+          }));
+        }
+
+        // Sort alphabetically
+        enhancedPerms.sort((a, b) => a.description.localeCompare(b.description));
+
+        setAllPermissions(enhancedPerms);
+      })
+        .catch(err => {
+          console.error("Failed to load permissions", err);
+          // Fallback on error too
+          const fallback = Object.keys(PERMISSION_TRANSLATIONS).map(key => ({
+            id: key,
+            name: key,
+            description: PERMISSION_TRANSLATIONS[key as keyof UserPermissions]
+          }));
+          fallback.sort((a, b) => a.description.localeCompare(b.description));
+          setAllPermissions(fallback);
+        });
+
       // Carregar todos os grupos disponíveis para SUPER_ADMIN gerenciar grupos do usuário
       groupService.getGroups()
         .then(setAllGroups)
@@ -727,45 +766,49 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                   ))}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={isComboboxOpen}
-                          className="w-full justify-between bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black/80 hover:text-white"
-                        >
-                          {selectedPermissionIds.length > 0
-                            ? `${selectedPermissionIds.length} permissões selecionadas`
-                            : "Selecione permissões para adicionar..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0 bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                        <Command className="bg-seguranca-black text-seguranca-lightgray">
+                  <div className="flex flex-col gap-2">
+                    {!isComboboxOpen ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsComboboxOpen(true)}
+                        className="w-full justify-between bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black/80 hover:text-white"
+                      >
+                        Adicionar Permissões...
+                        <Users className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    ) : (
+                      <div className="border border-gray-600 rounded-md p-2 bg-seguranca-black">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs text-gray-400">Selecione as permissões:</span>
+                          <Button variant="ghost" size="sm" onClick={() => setIsComboboxOpen(false)} className="h-6 text-gray-400 hover:text-white">
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <Command className="bg-seguranca-black text-seguranca-lightgray border border-gray-700 rounded-md">
                           <CommandInput placeholder="Buscar permissão..." className="h-9" />
-                          <CommandList>
+                          <CommandList className="max-h-[200px] overflow-y-auto">
                             <CommandEmpty>Nenhuma permissão encontrada.</CommandEmpty>
-                            <CommandGroup className="max-h-[300px] overflow-auto">
+                            <CommandGroup>
                               {allPermissions
                                 .filter(p => !individualPermissions.some(ip => ip.id === p.id))
-                                .map((perm) => (
-                                  <CommandItem
-                                    key={perm.id}
-                                    value={perm.name} // Search by name
-                                    onSelect={() => {
-                                      setSelectedPermissionIds(prev =>
-                                        prev.includes(perm.id)
-                                          ? prev.filter(id => id !== perm.id)
-                                          : [...prev, perm.id]
-                                      );
-                                    }}
-                                    className="cursor-pointer hover:bg-gray-800 aria-selected:bg-gray-800"
-                                  >
-                                    <div className="flex items-center gap-2 w-full">
+                                .map((perm) => {
+                                  const translatedDesc = PERMISSION_TRANSLATIONS[perm.name as keyof UserPermissions] || perm.description || perm.name;
+                                  const searchTerms = `${perm.name} ${translatedDesc}`.toLowerCase();
+                                  return (
+                                    <CommandItem
+                                      key={perm.id}
+                                      value={searchTerms}
+                                      onSelect={() => {
+                                        setSelectedPermissionIds(prev =>
+                                          prev.includes(perm.id)
+                                            ? prev.filter(id => id !== perm.id)
+                                            : [...prev, perm.id]
+                                        );
+                                      }}
+                                      className="cursor-pointer hover:bg-gray-800 aria-selected:bg-gray-800 flex items-center gap-2 p-2"
+                                    >
                                       <div className={cn(
-                                        "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                        "flex h-4 w-4 items-center justify-center rounded-sm border border-primary shrink-0",
                                         selectedPermissionIds.includes(perm.id)
                                           ? "bg-primary text-primary-foreground"
                                           : "opacity-50 [&_svg]:invisible"
@@ -773,31 +816,44 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
                                         <Check className={cn("h-4 w-4", selectedPermissionIds.includes(perm.id) ? "opacity-100" : "opacity-0")} />
                                       </div>
                                       <div className="flex flex-col">
-                                        <span>{perm.description || perm.name}</span>
-                                        <span className="text-xs text-gray-500">{perm.name}</span>
+                                        <span className="text-sm">{translatedDesc}</span>
+                                        <span className="text-[10px] text-gray-500">{perm.name}</span>
                                       </div>
-                                    </div>
-                                  </CommandItem>
-                                ))}
+                                    </CommandItem>
+                                  );
+                                })}
                             </CommandGroup>
                           </CommandList>
                         </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <Button
-                      onClick={handleAddSelectedPermissions}
-                      disabled={selectedPermissionIds.length === 0 || isPermLoading}
-                      className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-500"
-                    >
-                      {isPermLoading ? '...' : <Check className="h-4 w-4" />}
-                    </Button>
+                        <div className="mt-2 flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedPermissionIds([]);
+                              setIsComboboxOpen(false);
+                            }}
+                            className="text-gray-400"
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleAddSelectedPermissions}
+                            disabled={selectedPermissionIds.length === 0 || isPermLoading}
+                            className="bg-seguranca-yellow text-seguranca-black hover:bg-yellow-500"
+                          >
+                            {isPermLoading ? 'Adicionando...' : `Adicionar ${selectedPermissionIds.length} Permissões`}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Debug Info (Only if list is empty to diagnose) */}
+                    {allPermissions.length === 0 && (
+                      <p className="text-xs text-red-500">Aviso: Nenhuma permissão carregada do sistema.</p>
+                    )}
                   </div>
-                  {/* Feedback selection */}
-                  {selectedPermissionIds.length > 0 && (
-                    <p className="text-xs text-gray-400">
-                      Clique no botão amarelo para confirmar a adição de {selectedPermissionIds.length} permissões.
-                    </p>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -816,7 +872,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isLoading || !formData.name || !formData.email || !formData.username || formData.roles.length === 0}
+            disabled={isLoading || !formData.name || !formData.email || !formData.username}
             className="bg-seguranca-red hover:bg-seguranca-darkred"
           >
             <Save className="h-4 w-4 mr-2" />

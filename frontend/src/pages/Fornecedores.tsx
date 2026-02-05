@@ -63,9 +63,30 @@ export default function Fornecedores() {
       }
       setShowModal(false);
     } catch (e: any) {
+      // Handle 409 Conflict (Duplicate CNPJ)
+      if (e?.response?.status === 409 && data.cnpj) {
+        try {
+          // Check if the conflict is with an inactive supplier
+          const existing = await contasAPagarService.getFornecedorByCnpj(data.cnpj);
+
+          if (existing && existing.isActive === false) {
+            if (confirm(`Já existe um fornecedor inativo com o CNPJ ${data.cnpj} (${existing.name}). Deseja reativá-lo?`)) {
+              await contasAPagarService.toggleFornecedorStatus(existing.id);
+              toast({ title: 'Sucesso', description: 'Fornecedor reativado com sucesso.' });
+              load(); // Reload the list to show the reactivated supplier
+              setShowModal(false);
+              return;
+            }
+          }
+        } catch (checkErr) {
+          // If check fails, fall through to generic error
+          console.error("Failed to check for existing supplier", checkErr);
+        }
+      }
+
       const msg = e?.response?.data?.message || 'Não foi possível salvar.';
       toast({ title: 'Erro', description: msg, variant: 'destructive' });
-      throw e; // Re-throw to let modal handle loading state if needed, though modal handles error toast too.
+      throw e; // Re-throw to let modal handle loading state if needed
     }
   };
 

@@ -119,9 +119,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
       };
 
       // Validações obrigatórias
-      if (!normalized.name) {
-        throw new Error('Nome é obrigatório');
-      }
+      // (Nenhum campo é obrigatório)
 
       // Validar CNPJ se preenchido
       if (normalized.cnpj) {
@@ -215,12 +213,11 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                 <div className="space-y-2 col-span-1 md:col-span-1">
                   <Label className="text-gray-300 text-sm flex items-center gap-2">
                     <User className="h-3.5 w-3.5 text-red-500" />
-                    Nome *
+                    Nome
                   </Label>
                   <Input
                     value={form.name}
                     onChange={e => update('name', e.target.value)}
-                    required
                     className="bg-[#111315] border-gray-700 text-white placeholder-gray-500 focus:border-red-500/50 focus:ring-red-500/20"
                     placeholder="Nome do fornecedor"
                   />

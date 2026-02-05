@@ -71,14 +71,14 @@ export const userService = {
   },
 
   async addUserPermissions(userId: string, permissionIds: string[]): Promise<any[]> {
-    const response = await api.post(`/api/users/${userId}/permissions`, { permissionIds });
+    const response = await api.post(`/api/users/${userId}/permissions`, permissionIds);
     return response.data;
   },
 
   async removeUserPermissions(userId: string, permissionIds: string[]): Promise<any[]> {
     // Axios delete with body requires 'data' property
     const response = await api.delete(`/api/users/${userId}/permissions`, {
-      data: { permissionIds }
+      data: permissionIds
     });
     return response.data;
   }
