@@ -311,7 +311,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
         // Se a data está no formato "YYYY-MM-DD", adicionar hora
         dataToSend.requiredDate = `${dataToSend.requiredDate}T00:00:00`;
       }
-      
+
       const savedRequest = await onSave(dataToSend);
       // Atualizar número da requisição após salvar
       if (savedRequest && typeof savedRequest === 'object' && 'requestNumber' in savedRequest) {
@@ -358,612 +358,612 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
 
   return (
     <>
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
-        <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
-          <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Calendar className="h-6 w-6" />
-            </div>
-            {request ? 'Editar Requisição de Compra' : 'Nova Requisição de Compra'}
-          </DialogTitle>
-          <DialogDescription className="text-white/80 text-sm">
-            {request ? 'Atualize as informações da requisição' : 'Preencha os dados da nova requisição de compra'}
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+          <DialogHeader className="bg-gradient-to-r from-seguranca-red to-red-600 p-6 -m-6 mb-4 rounded-t-lg">
+            <DialogTitle className="text-white text-2xl font-bold flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg">
+                <Calendar className="h-6 w-6" />
+              </div>
+              {request ? 'Editar Requisição de Compra' : 'Nova Requisição de Compra'}
+            </DialogTitle>
+            <DialogDescription className="text-white/80 text-sm">
+              {request ? 'Atualize as informações da requisição' : 'Preencha os dados da nova requisição de compra'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Informações Básicas */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
-                <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
-                  <FileText className="h-5 w-5 text-seguranca-red" />
-                </div>
-                Informações Básicas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title" className="text-seguranca-lightgray font-medium">
-                    Título da Requisição <span className="text-seguranca-red">*</span>
-                  </Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => handleInputChange('title', e.target.value)}
-                    placeholder="Título da requisição"
-                    required
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="requestNumber" className="text-seguranca-lightgray font-medium">
-                    Número da Requisição
-                  </Label>
-                  <Input
-                    id="requestNumber"
-                    value={requestNumber || request?.requestNumber || ''}
-                    disabled
-                    placeholder="Gerado automaticamente"
-                    className="bg-seguranca-graphite/50 border-gray-600 text-seguranca-lightgray/70 h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="priority" className="text-seguranca-lightgray font-medium">Prioridade</Label>
-                  <Select value={formData.priority} onValueChange={(value) => handleInputChange('priority', value)}>
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione a prioridade" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      <SelectItem value="LOW" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Baixa</SelectItem>
-                      <SelectItem value="MEDIUM" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Média</SelectItem>
-                      <SelectItem value="HIGH" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Alta</SelectItem>
-                      <SelectItem value="URGENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Urgente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status" className="text-seguranca-lightgray font-medium">Status</Label>
-                  <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione o status" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      <SelectItem value="PENDING" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Pendente</SelectItem>
-                      <SelectItem value="DRAFT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Rascunho</SelectItem>
-                      <SelectItem value="SUBMITTED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Enviada</SelectItem>
-                      <SelectItem value="APPROVED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Aprovada</SelectItem>
-                      <SelectItem value="REJECTED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Rejeitada</SelectItem>
-                      <SelectItem value="IN_PROCESS" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Em Processo</SelectItem>
-                      <SelectItem value="COMPLETED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Completada</SelectItem>
-                      <SelectItem value="CANCELLED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cancelada</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="urgency" className="text-seguranca-lightgray font-medium">Urgência</Label>
-                  <Select value={formData.urgency} onValueChange={(value) => handleInputChange('urgency', value)}>
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione a urgência" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      <SelectItem value="NORMAL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Normal</SelectItem>
-                      <SelectItem value="URGENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Urgente</SelectItem>
-                      <SelectItem value="CRITICAL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Crítico</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="department" className="text-seguranca-lightgray font-medium">Departamento</Label>
-                  <Select 
-                    value={formData.department || ''} 
-                    onValueChange={(value) => {
-                      const selectedCostCenter = costCenters.find(cc => cc.name === value || cc.code === value);
-                      handleInputChange('department', selectedCostCenter?.name || value);
-                    }}
-                  >
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione o centro de custo" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      <div className="p-2 border-b border-gray-600">
-                        <Input
-                          placeholder="Buscar centro de custo..."
-                          value={departmentSearchTerm}
-                          onChange={(e) => setDepartmentSearchTerm(e.target.value)}
-                          className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {filteredCostCenters.length === 0 ? (
-                        <div className="p-4 text-center text-gray-400 text-sm">
-                          {departmentSearchTerm ? 'Nenhum centro de custo encontrado' : 'Nenhum centro de custo cadastrado'}
-                        </div>
-                      ) : (
-                        filteredCostCenters.map((costCenter) => (
-                          <SelectItem 
-                            key={costCenter.id} 
-                            value={costCenter.name || ''}
-                            className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                          >
-                            {costCenter.code} - {costCenter.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="requesterName" className="text-seguranca-lightgray font-medium">Solicitante</Label>
-                  <Select 
-                    value={formData.requesterId ? String(formData.requesterId) : ''} 
-                    onValueChange={(value) => {
-                      const selectedEmployee = employees.find(emp => String(emp.id) === String(value));
-                      handleInputChange('requesterId', value);
-                      handleInputChange('requesterName', selectedEmployee?.name || '');
-                    }}
-                  >
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione o solicitante" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      <div className="p-2 border-b border-gray-600">
-                        <Input
-                          placeholder="Buscar funcionário..."
-                          value={requesterSearchTerm}
-                          onChange={(e) => setRequesterSearchTerm(e.target.value)}
-                          className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {filteredRequesters.length === 0 ? (
-                        <div className="p-4 text-center text-gray-400 text-sm">
-                          {requesterSearchTerm ? 'Nenhum funcionário encontrado' : 'Nenhum funcionário cadastrado'}
-                        </div>
-                      ) : (
-                        filteredRequesters.map((employee) => (
-                          <SelectItem 
-                            key={employee.id} 
-                            value={String(employee.id)}
-                            className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                          >
-                            {employee.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="unitId" className="text-seguranca-lightgray font-medium">Unidade Organizacional</Label>
-                  <Select value={formData.unitId ? String(formData.unitId) : ''} onValueChange={(value) => handleInputChange('unitId', value)}>
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione a unidade" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      {units.map((unit) => (
-                        <SelectItem key={unit.id} value={String(unit.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                          {unit.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="requiredDate" className="text-seguranca-lightgray font-medium">Data Necessária</Label>
-                  <Input
-                    id="requiredDate"
-                    type="date"
-                    value={formData.requiredDate}
-                    onChange={(e) => handleInputChange('requiredDate', e.target.value)}
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="estimatedTotal" className="text-seguranca-lightgray font-medium">Valor Estimado</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-bold z-10">R$</span>
-                    <CurrencyInput
-                      id="estimatedTotal"
-                      name="estimatedTotal"
-                      prefix=""
-                      decimalSeparator=","
-                      groupSeparator="."
-                      decimalsLimit={2}
-                      fixedDecimalLength={2}
-                      value={estimatedTotalDisplay}
-                      onValueChange={(value, name, values) => {
-                        const displayValue = value || '';
-                        setEstimatedTotalDisplay(displayValue);
-                        const numValue = values?.floatValue ?? parseCurrencyToNumber(displayValue);
-                        handleInputChange('estimatedTotal', numValue || 0);
-                      }}
-                      placeholder="0,00"
-                      className="w-full pl-10 pr-3 py-2.5 bg-seguranca-graphite border border-gray-600 text-seguranca-lightgray rounded-md focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent h-11"
-                    />
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Informações Básicas */}
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                    <FileText className="h-5 w-5 text-seguranca-red" />
                   </div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <Label htmlFor="description" className="text-seguranca-lightgray font-medium">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Descrição detalhada da requisição"
-                  rows={3}
-                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
-                />
-              </div>
-
-              <div className="mt-4">
-                <Label htmlFor="justification" className="text-seguranca-lightgray font-medium">Justificativa</Label>
-                <Textarea
-                  id="justification"
-                  value={formData.justification}
-                  onChange={(e) => handleInputChange('justification', e.target.value)}
-                  placeholder="Justificativa para a compra"
-                  rows={3}
-                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Informações de Fornecedor */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
-                <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
-                  <Building2 className="h-5 w-5 text-seguranca-red" />
-                </div>
-                Informações de Fornecedor
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="supplier" className="text-seguranca-lightgray font-medium">Fornecedor</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsSupplierModalOpen(true)}
-                      className="h-7 px-2 text-xs text-seguranca-red hover:text-seguranca-red hover:bg-seguranca-red/10"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Novo
-                    </Button>
-                  </div>
-                  <Select 
-                    value={formData.supplier || ''} 
-                    onValueChange={(value) => handleInputChange('supplier', value)}
-                  >
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione o fornecedor" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      <div className="p-2 border-b border-gray-600">
-                        <Input
-                          placeholder="Buscar fornecedor..."
-                          value={supplierSearchTerm}
-                          onChange={(e) => setSupplierSearchTerm(e.target.value)}
-                          className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {filteredSuppliers.length === 0 ? (
-                        <div className="p-4 text-center text-gray-400 text-sm">
-                          {supplierSearchTerm ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor cadastrado'}
-                        </div>
-                      ) : (
-                        filteredSuppliers.map((supplier) => (
-                          <SelectItem 
-                            key={supplier.id} 
-                            value={supplier.name || ''}
-                            className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                          >
-                            {supplier.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="paymentMethod" className="text-seguranca-lightgray font-medium">Método de Pagamento</Label>
-                  <Select value={formData.paymentMethod || ''} onValueChange={(value) => {
-                    handleInputChange('paymentMethod', value);
-                    // Limpar parcelas se não for cartão de crédito
-                    if (value !== 'CREDIT_CARD') {
-                      handleInputChange('installments', undefined);
-                    }
-                  }}>
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione o método" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      <SelectItem value="PIX" className="text-seguranca-lightgray hover:bg-seguranca-red/20">PIX</SelectItem>
-                      <SelectItem value="BANK_TRANSFER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Transferência Bancária</SelectItem>
-                      <SelectItem value="CREDIT_CARD" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cartão de Crédito</SelectItem>
-                      <SelectItem value="DEBIT_CARD" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cartão de Débito</SelectItem>
-                      <SelectItem value="CASH" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Dinheiro</SelectItem>
-                      <SelectItem value="CHECK" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cheque</SelectItem>
-                      <SelectItem value="OTHER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {formData.paymentMethod === 'CREDIT_CARD' && (
+                  Informações Básicas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="installments" className="text-seguranca-lightgray font-medium">
-                      Número de Parcelas <span className="text-seguranca-red">*</span>
+                    <Label htmlFor="title" className="text-seguranca-lightgray font-medium">
+                      Título da Requisição <span className="text-seguranca-red">*</span>
                     </Label>
                     <Input
-                      id="installments"
-                      type="number"
-                      min="1"
-                      max="24"
-                      value={formData.installments || ''}
-                      onChange={(e) => handleInputChange('installments', e.target.value ? parseInt(e.target.value) : undefined)}
-                      placeholder="Ex: 1, 3, 6, 12"
-                      required={formData.paymentMethod === 'CREDIT_CARD'}
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => handleInputChange('title', e.target.value)}
+                      placeholder="Título da requisição"
+                      required
                       className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
                     />
                   </div>
-                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="deliveryMethod" className="text-seguranca-lightgray font-medium">Método de Entrega</Label>
-                  <Select value={formData.deliveryMethod || ''} onValueChange={(value) => handleInputChange('deliveryMethod', value)}>
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione o método" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600">
-                      <SelectItem value="PICKUP" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Retirada</SelectItem>
-                      <SelectItem value="DELIVERY" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Entrega</SelectItem>
-                      <SelectItem value="COURIER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Correio</SelectItem>
-                      <SelectItem value="TRANSPORT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Transportadora</SelectItem>
-                      <SelectItem value="OTHER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="requestNumber" className="text-seguranca-lightgray font-medium">
+                      Número da Requisição
+                    </Label>
+                    <Input
+                      id="requestNumber"
+                      value={requestNumber || request?.requestNumber || ''}
+                      disabled
+                      placeholder="Gerado automaticamente"
+                      className="bg-seguranca-graphite/50 border-gray-600 text-seguranca-lightgray/70 h-11"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="contactPerson" className="text-seguranca-lightgray font-medium">Pessoa de Contato</Label>
-                  <Input
-                    id="contactPerson"
-                    value={formData.contactPerson}
-                    onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                    placeholder="Nome do contato"
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="priority" className="text-seguranca-lightgray font-medium">Prioridade</Label>
+                    <Select value={formData.priority} onValueChange={(value) => handleInputChange('priority', value)}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione a prioridade" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="LOW" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Baixa</SelectItem>
+                        <SelectItem value="MEDIUM" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Média</SelectItem>
+                        <SelectItem value="HIGH" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Alta</SelectItem>
+                        <SelectItem value="URGENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="contactPhone" className="text-seguranca-lightgray font-medium">Telefone</Label>
-                  <Input
-                    id="contactPhone"
-                    value={formData.contactPhone}
-                    onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                    placeholder="Telefone"
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status" className="text-seguranca-lightgray font-medium">Status</Label>
+                    <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="PENDING" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Pendente</SelectItem>
+                        <SelectItem value="DRAFT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Rascunho</SelectItem>
+                        <SelectItem value="SUBMITTED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Enviada</SelectItem>
+                        <SelectItem value="APPROVED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Aprovada</SelectItem>
+                        <SelectItem value="REJECTED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Rejeitada</SelectItem>
+                        <SelectItem value="IN_PROCESS" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Em Processo</SelectItem>
+                        <SelectItem value="COMPLETED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Completada</SelectItem>
+                        <SelectItem value="CANCELLED" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cancelada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="contactEmail" className="text-seguranca-lightgray font-medium">E-mail</Label>
-                  <Input
-                    id="contactEmail"
-                    type="email"
-                    value={formData.contactEmail}
-                    onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                    placeholder="E-mail"
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                  />
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="urgency" className="text-seguranca-lightgray font-medium">Urgência</Label>
+                    <Select value={formData.urgency} onValueChange={(value) => handleInputChange('urgency', value)}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione a urgência" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="NORMAL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Normal</SelectItem>
+                        <SelectItem value="URGENT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Urgente</SelectItem>
+                        <SelectItem value="CRITICAL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Crítico</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="mt-4">
-                <Label htmlFor="deliveryAddress" className="text-seguranca-lightgray font-medium">Endereço de Entrega</Label>
-                <Textarea
-                  id="deliveryAddress"
-                  value={formData.deliveryAddress}
-                  onChange={(e) => handleInputChange('deliveryAddress', e.target.value)}
-                  placeholder="Endereço completo para entrega"
-                  rows={3}
-                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Informações de Aprovação */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
-                <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-seguranca-red" />
-                </div>
-                Informações de Aprovação
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="approvedBy" className="text-seguranca-lightgray font-medium">Aprovado Por</Label>
-                  <Select 
-                    value={formData.approverId ? String(formData.approverId) : ''} 
-                    onValueChange={(value) => {
-                      const selectedEmployee = employees.find(emp => String(emp.id) === String(value));
-                      handleInputChange('approverId', value);
-                      handleInputChange('approvedBy', selectedEmployee?.name || '');
-                    }}
-                  >
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder="Selecione o aprovador" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      <div className="p-2 border-b border-gray-600">
-                        <Input
-                          placeholder="Buscar funcionário..."
-                          value={employeeSearchTerm}
-                          onChange={(e) => setEmployeeSearchTerm(e.target.value)}
-                          className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {filteredEmployees.length === 0 ? (
-                        <div className="p-4 text-center text-gray-400 text-sm">
-                          {employeeSearchTerm ? 'Nenhum funcionário encontrado' : 'Nenhum funcionário cadastrado'}
+                  <div className="space-y-2">
+                    <Label htmlFor="department" className="text-seguranca-lightgray font-medium">Departamento</Label>
+                    <Select
+                      value={formData.department || ''}
+                      onValueChange={(value) => {
+                        const selectedCostCenter = costCenters.find(cc => cc.name === value || cc.code === value);
+                        handleInputChange('department', selectedCostCenter?.name || value);
+                      }}
+                    >
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o centro de custo" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
+                        <div className="p-2 border-b border-gray-600">
+                          <Input
+                            placeholder="Buscar centro de custo..."
+                            value={departmentSearchTerm}
+                            onChange={(e) => setDepartmentSearchTerm(e.target.value)}
+                            className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
+                            onClick={(e) => e.stopPropagation()}
+                          />
                         </div>
-                      ) : (
-                        filteredEmployees.map((employee) => (
-                          <SelectItem 
-                            key={employee.id} 
-                            value={String(employee.id)}
-                            className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                          >
-                            {employee.name}
+                        {filteredCostCenters.length === 0 ? (
+                          <div className="p-4 text-center text-gray-400 text-sm">
+                            {departmentSearchTerm ? 'Nenhum centro de custo encontrado' : 'Nenhum centro de custo cadastrado'}
+                          </div>
+                        ) : (
+                          filteredCostCenters.filter(cc => cc.name).map((costCenter) => (
+                            <SelectItem
+                              key={costCenter.id}
+                              value={costCenter.name || 'unknown'}
+                              className="text-seguranca-lightgray hover:bg-seguranca-red/20"
+                            >
+                              {costCenter.code} - {costCenter.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="requesterName" className="text-seguranca-lightgray font-medium">Solicitante</Label>
+                    <Select
+                      value={formData.requesterId ? String(formData.requesterId) : ''}
+                      onValueChange={(value) => {
+                        const selectedEmployee = employees.find(emp => String(emp.id) === String(value));
+                        handleInputChange('requesterId', value);
+                        handleInputChange('requesterName', selectedEmployee?.name || '');
+                      }}
+                    >
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o solicitante" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
+                        <div className="p-2 border-b border-gray-600">
+                          <Input
+                            placeholder="Buscar funcionário..."
+                            value={requesterSearchTerm}
+                            onChange={(e) => setRequesterSearchTerm(e.target.value)}
+                            className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        {filteredRequesters.length === 0 ? (
+                          <div className="p-4 text-center text-gray-400 text-sm">
+                            {requesterSearchTerm ? 'Nenhum funcionário encontrado' : 'Nenhum funcionário cadastrado'}
+                          </div>
+                        ) : (
+                          filteredRequesters.map((employee) => (
+                            <SelectItem
+                              key={employee.id}
+                              value={String(employee.id)}
+                              className="text-seguranca-lightgray hover:bg-seguranca-red/20"
+                            >
+                              {employee.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="unitId" className="text-seguranca-lightgray font-medium">Unidade Organizacional</Label>
+                    <Select value={formData.unitId ? String(formData.unitId) : ''} onValueChange={(value) => handleInputChange('unitId', value)}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione a unidade" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        {units.map((unit) => (
+                          <SelectItem key={unit.id} value={String(unit.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                            {unit.name}
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="requiredDate" className="text-seguranca-lightgray font-medium">Data Necessária</Label>
+                    <Input
+                      id="requiredDate"
+                      type="date"
+                      value={formData.requiredDate}
+                      onChange={(e) => handleInputChange('requiredDate', e.target.value)}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="estimatedTotal" className="text-seguranca-lightgray font-medium">Valor Estimado</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-bold z-10">R$</span>
+                      <CurrencyInput
+                        id="estimatedTotal"
+                        name="estimatedTotal"
+                        prefix=""
+                        decimalSeparator=","
+                        groupSeparator="."
+                        decimalsLimit={2}
+                        fixedDecimalLength={2}
+                        value={estimatedTotalDisplay}
+                        onValueChange={(value, name, values) => {
+                          const displayValue = value || '';
+                          setEstimatedTotalDisplay(displayValue);
+                          const numValue = values?.floatValue ?? parseCurrencyToNumber(displayValue);
+                          handleInputChange('estimatedTotal', numValue || 0);
+                        }}
+                        placeholder="0,00"
+                        className="w-full pl-10 pr-3 py-2.5 bg-seguranca-graphite border border-gray-600 text-seguranca-lightgray rounded-md focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent h-11"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="approvalNotes" className="text-seguranca-lightgray font-medium">Observações da Aprovação</Label>
+                <div className="mt-4">
+                  <Label htmlFor="description" className="text-seguranca-lightgray font-medium">Descrição</Label>
                   <Textarea
-                    id="approvalNotes"
-                    value={formData.approvalNotes}
-                    onChange={(e) => handleInputChange('approvalNotes', e.target.value)}
-                    placeholder="Observações sobre a aprovação"
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange('description', e.target.value)}
+                    placeholder="Descrição detalhada da requisição"
                     rows={3}
                     className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
                   />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Observações */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
-                <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
-                  <FileText className="h-5 w-5 text-seguranca-red" />
-                </div>
-                Observações
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="notes" className="text-seguranca-lightgray font-medium">Observações Adicionais</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                  placeholder="Observações adicionais sobre a requisição"
-                  rows={4}
-                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Status da Requisição (se editando) */}
-          {request && (
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-4">Status da Requisição</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Label>Status:</Label>
-                    <Badge className={getStatusColor(request.status)}>
-                      {request.status}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Label>Prioridade:</Label>
-                    <Badge className={getPriorityColor(request.priority)}>
-                      {request.priority}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Label>Urgência:</Label>
-                    <Badge className={getUrgencyColor(request.urgency)}>
-                      {request.urgency}
-                    </Badge>
-                  </div>
-
-                  {request.urgent && (
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="destructive">Urgente</Badge>
-                    </div>
-                  )}
-
-                  {request.overdue && (
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">Em Atraso</Badge>
-                    </div>
-                  )}
-
-                  {request.canBeApproved && (
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">Aguardando Aprovação</Badge>
-                    </div>
-                  )}
+                <div className="mt-4">
+                  <Label htmlFor="justification" className="text-seguranca-lightgray font-medium">Justificativa</Label>
+                  <Textarea
+                    id="justification"
+                    value={formData.justification}
+                    onChange={(e) => handleInputChange('justification', e.target.value)}
+                    placeholder="Justificativa para a compra"
+                    rows={3}
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
+                  />
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Botões */}
-          <div className="flex justify-end space-x-2 pt-4 border-t border-gray-600/30">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose}
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={loading}
-              className="bg-gradient-to-r from-seguranca-red to-red-600 hover:from-seguranca-red/90 hover:to-red-600/90 text-white font-semibold shadow-lg"
-            >
-              {loading ? 'Salvando...' : (request ? 'Atualizar' : 'Criar')}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
+            {/* Informações de Fornecedor */}
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                    <Building2 className="h-5 w-5 text-seguranca-red" />
+                  </div>
+                  Informações de Fornecedor
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="supplier" className="text-seguranca-lightgray font-medium">Fornecedor</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsSupplierModalOpen(true)}
+                        className="h-7 px-2 text-xs text-seguranca-red hover:text-seguranca-red hover:bg-seguranca-red/10"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Novo
+                      </Button>
+                    </div>
+                    <Select
+                      value={formData.supplier || ''}
+                      onValueChange={(value) => handleInputChange('supplier', value)}
+                    >
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o fornecedor" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
+                        <div className="p-2 border-b border-gray-600">
+                          <Input
+                            placeholder="Buscar fornecedor..."
+                            value={supplierSearchTerm}
+                            onChange={(e) => setSupplierSearchTerm(e.target.value)}
+                            className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        {filteredSuppliers.length === 0 ? (
+                          <div className="p-4 text-center text-gray-400 text-sm">
+                            {supplierSearchTerm ? 'Nenhum fornecedor encontrado' : 'Nenhum fornecedor cadastrado'}
+                          </div>
+                        ) : (
+                          filteredSuppliers.filter(s => s.name).map((supplier) => (
+                            <SelectItem
+                              key={supplier.id}
+                              value={supplier.name || 'unknown'}
+                              className="text-seguranca-lightgray hover:bg-seguranca-red/20"
+                            >
+                              {supplier.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-      {/* Modal de Fornecedor - Renderizado fora do Dialog principal para evitar conflitos de z-index */}
-      <SupplierFormModal
-        isOpen={isSupplierModalOpen}
-        onClose={() => setIsSupplierModalOpen(false)}
-        supplier={null}
-        onSave={handleSaveSupplier}
-      />
-    </Dialog>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentMethod" className="text-seguranca-lightgray font-medium">Método de Pagamento</Label>
+                    <Select value={formData.paymentMethod || ''} onValueChange={(value) => {
+                      handleInputChange('paymentMethod', value);
+                      // Limpar parcelas se não for cartão de crédito
+                      if (value !== 'CREDIT_CARD') {
+                        handleInputChange('installments', undefined);
+                      }
+                    }}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o método" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="PIX" className="text-seguranca-lightgray hover:bg-seguranca-red/20">PIX</SelectItem>
+                        <SelectItem value="BANK_TRANSFER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Transferência Bancária</SelectItem>
+                        <SelectItem value="CREDIT_CARD" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cartão de Crédito</SelectItem>
+                        <SelectItem value="DEBIT_CARD" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cartão de Débito</SelectItem>
+                        <SelectItem value="CASH" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Dinheiro</SelectItem>
+                        <SelectItem value="CHECK" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Cheque</SelectItem>
+                        <SelectItem value="OTHER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.paymentMethod === 'CREDIT_CARD' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="installments" className="text-seguranca-lightgray font-medium">
+                        Número de Parcelas <span className="text-seguranca-red">*</span>
+                      </Label>
+                      <Input
+                        id="installments"
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={formData.installments || ''}
+                        onChange={(e) => handleInputChange('installments', e.target.value ? parseInt(e.target.value) : undefined)}
+                        placeholder="Ex: 1, 3, 6, 12"
+                        required={formData.paymentMethod === 'CREDIT_CARD'}
+                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="deliveryMethod" className="text-seguranca-lightgray font-medium">Método de Entrega</Label>
+                    <Select value={formData.deliveryMethod || ''} onValueChange={(value) => handleInputChange('deliveryMethod', value)}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o método" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="PICKUP" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Retirada</SelectItem>
+                        <SelectItem value="DELIVERY" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Entrega</SelectItem>
+                        <SelectItem value="COURIER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Correio</SelectItem>
+                        <SelectItem value="TRANSPORT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Transportadora</SelectItem>
+                        <SelectItem value="OTHER" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contactPerson" className="text-seguranca-lightgray font-medium">Pessoa de Contato</Label>
+                    <Input
+                      id="contactPerson"
+                      value={formData.contactPerson}
+                      onChange={(e) => handleInputChange('contactPerson', e.target.value)}
+                      placeholder="Nome do contato"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contactPhone" className="text-seguranca-lightgray font-medium">Telefone</Label>
+                    <Input
+                      id="contactPhone"
+                      value={formData.contactPhone}
+                      onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+                      placeholder="Telefone"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contactEmail" className="text-seguranca-lightgray font-medium">E-mail</Label>
+                    <Input
+                      id="contactEmail"
+                      type="email"
+                      value={formData.contactEmail}
+                      onChange={(e) => handleInputChange('contactEmail', e.target.value)}
+                      placeholder="E-mail"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <Label htmlFor="deliveryAddress" className="text-seguranca-lightgray font-medium">Endereço de Entrega</Label>
+                  <Textarea
+                    id="deliveryAddress"
+                    value={formData.deliveryAddress}
+                    onChange={(e) => handleInputChange('deliveryAddress', e.target.value)}
+                    placeholder="Endereço completo para entrega"
+                    rows={3}
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Informações de Aprovação */}
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-seguranca-red" />
+                  </div>
+                  Informações de Aprovação
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="approvedBy" className="text-seguranca-lightgray font-medium">Aprovado Por</Label>
+                    <Select
+                      value={formData.approverId ? String(formData.approverId) : ''}
+                      onValueChange={(value) => {
+                        const selectedEmployee = employees.find(emp => String(emp.id) === String(value));
+                        handleInputChange('approverId', value);
+                        handleInputChange('approvedBy', selectedEmployee?.name || '');
+                      }}
+                    >
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione o aprovador" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
+                        <div className="p-2 border-b border-gray-600">
+                          <Input
+                            placeholder="Buscar funcionário..."
+                            value={employeeSearchTerm}
+                            onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                            className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        {filteredEmployees.length === 0 ? (
+                          <div className="p-4 text-center text-gray-400 text-sm">
+                            {employeeSearchTerm ? 'Nenhum funcionário encontrado' : 'Nenhum funcionário cadastrado'}
+                          </div>
+                        ) : (
+                          filteredEmployees.map((employee) => (
+                            <SelectItem
+                              key={employee.id}
+                              value={String(employee.id)}
+                              className="text-seguranca-lightgray hover:bg-seguranca-red/20"
+                            >
+                              {employee.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="approvalNotes" className="text-seguranca-lightgray font-medium">Observações da Aprovação</Label>
+                    <Textarea
+                      id="approvalNotes"
+                      value={formData.approvalNotes}
+                      onChange={(e) => handleInputChange('approvalNotes', e.target.value)}
+                      placeholder="Observações sobre a aprovação"
+                      rows={3}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Observações */}
+            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
+                  <div className="p-1.5 bg-seguranca-red/20 rounded-lg">
+                    <FileText className="h-5 w-5 text-seguranca-red" />
+                  </div>
+                  Observações
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="notes" className="text-seguranca-lightgray font-medium">Observações Adicionais</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => handleInputChange('notes', e.target.value)}
+                    placeholder="Observações adicionais sobre a requisição"
+                    rows={4}
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Status da Requisição (se editando) */}
+            {request && (
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="text-lg font-semibold mb-4">Status da Requisição</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Label>Status:</Label>
+                      <Badge className={getStatusColor(request.status)}>
+                        {request.status}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Label>Prioridade:</Label>
+                      <Badge className={getPriorityColor(request.priority)}>
+                        {request.priority}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Label>Urgência:</Label>
+                      <Badge className={getUrgencyColor(request.urgency)}>
+                        {request.urgency}
+                      </Badge>
+                    </div>
+
+                    {request.urgent && (
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="destructive">Urgente</Badge>
+                      </div>
+                    )}
+
+                    {request.overdue && (
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="secondary">Em Atraso</Badge>
+                      </div>
+                    )}
+
+                    {request.canBeApproved && (
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline">Aguardando Aprovação</Badge>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Botões */}
+            <div className="flex justify-end space-x-2 pt-4 border-t border-gray-600/30">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="bg-gradient-to-r from-seguranca-red to-red-600 hover:from-seguranca-red/90 hover:to-red-600/90 text-white font-semibold shadow-lg"
+              >
+                {loading ? 'Salvando...' : (request ? 'Atualizar' : 'Criar')}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+
+        {/* Modal de Fornecedor - Renderizado fora do Dialog principal para evitar conflitos de z-index */}
+        <SupplierFormModal
+          isOpen={isSupplierModalOpen}
+          onClose={() => setIsSupplierModalOpen(false)}
+          supplier={null}
+          onSave={handleSaveSupplier}
+        />
+      </Dialog>
     </>
   );
 }

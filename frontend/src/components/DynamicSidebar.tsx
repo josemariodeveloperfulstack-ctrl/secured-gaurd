@@ -239,7 +239,7 @@ export function DynamicSidebar() {
       text: 'Contas a Pagar',
       to: '/gestao-financeira/contas-pagar',
       id: 'gestao-financeira-contas-pagar',
-      requiredPermission: 'FINANCIAL_PAYABLE_WRITE'
+      requiredPermission: 'FINANCIAL_READ'
     },
     {
       icon: Receipt,

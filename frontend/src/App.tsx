@@ -612,6 +612,11 @@ function App() {
                         <ContasAPagar />
                       </ProtectedRoute>
                     } />
+                    <Route path="/gestao-financeira/contas-pagar" element={
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ']}>
+                        <ContasAPagar />
+                      </ProtectedRoute>
+                    } />
 
                     {/* Frota */}
                     <Route path="/fleet" element={

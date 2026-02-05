@@ -47,7 +47,7 @@ public class CompanyController {
             @ApiResponse(responseCode = "200", description = "Empresas listadas com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','ASSISTENTE_ADMINISTRATIVO','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_ASSISTENTE_ADMINISTRATIVO')")
     public ResponseEntity<List<CompanyDTO>> getAllCompanies() {
         try {
             log.info("Buscando todas as empresas");
@@ -62,7 +62,7 @@ public class CompanyController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ASSISTENTE_ADMINISTRATIVO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
     @Operation(summary = "Buscar empresas", description = "Busca empresas por nome com filtro dinâmico")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Empresas encontradas com sucesso"),
@@ -96,7 +96,7 @@ public class CompanyController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ASSISTENTE_ADMINISTRATIVO')")
     @Operation(summary = "Listar empresas ativas", description = "Retorna uma lista de empresas ativas")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Empresas ativas listadas com sucesso"),
@@ -109,7 +109,7 @@ public class CompanyController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ASSISTENTE_ADMINISTRATIVO')")
     @Operation(summary = "Buscar empresa por ID", description = "Retorna uma empresa específica pelo ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Empresa encontrada"),
@@ -124,7 +124,7 @@ public class CompanyController {
     }
 
     @GetMapping("/sigla/{sigla}")
-    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('HR_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ASSISTENTE_ADMINISTRATIVO')")
     @Operation(summary = "Buscar empresa por sigla", description = "Retorna uma empresa específica pela sigla")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Empresa encontrada"),

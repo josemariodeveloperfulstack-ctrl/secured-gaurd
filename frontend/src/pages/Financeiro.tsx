@@ -1,5 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserPermissions } from '@/types/user';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -19,8 +21,23 @@ import MedicoesTab from '@/components/financeiro/MedicoesTab';
 
 const FinanceiroSimple: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Função para verificar se usuário tem permissão para uma aba
+  const hasTabPermission = (permission?: keyof UserPermissions): boolean => {
+    if (!user) return false;
+    // SUPER_ADMIN tem acesso a tudo
+    const normalizedRole = user.role.replace(/^ROLE_/, '').toUpperCase();
+    if (normalizedRole === 'SUPER_ADMIN') return true;
+
+    // Se ALL_PERMISSIONS for true, tem acesso a tudo
+    if (user.permissions?.ALL_PERMISSIONS) return true;
+
+    if (!permission) return true;
+    return !!user.permissions?.[permission];
+  };
 
   // Dados mock para teste
   const mockTransactions = [
@@ -70,79 +87,97 @@ const FinanceiroSimple: React.FC = () => {
           <Tabs defaultValue="dashboard" className="w-full">
             {/* Tabs - Padrão SST Simplificado */}
             <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-9 bg-seguranca-graphite border-gray-600">
-              <TabsTrigger value="dashboard" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="contas-pagar" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Contas a Pagar
-              </TabsTrigger>
-              <TabsTrigger value="contas-receber" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Contas a Receber
-              </TabsTrigger>
-              <TabsTrigger value="fluxo-caixa" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Fluxo de Caixa
-              </TabsTrigger>
-              <TabsTrigger value="pagamentos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Pagamentos
-              </TabsTrigger>
-              <TabsTrigger value="relatorios-financeiros" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Relatórios
-              </TabsTrigger>
-              <TabsTrigger value="centro-custos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Centro Custos
-              </TabsTrigger>
-              <TabsTrigger value="faturas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Faturas
-              </TabsTrigger>
-              <TabsTrigger value="medicoes" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                Medições
-              </TabsTrigger>
+              {hasTabPermission('DASHBOARD_READ') && (
+                <TabsTrigger value="dashboard" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Dashboard
+                </TabsTrigger>
+              )}
+              {hasTabPermission('FINANCIAL_PAYABLE_READ') && (
+                <TabsTrigger value="contas-pagar" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Contas a Pagar
+                </TabsTrigger>
+              )}
+              {hasTabPermission('FINANCIAL_RECEIVABLE_READ') && (
+                <TabsTrigger value="contas-receber" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Contas a Receber
+                </TabsTrigger>
+              )}
+              {hasTabPermission('FINANCIAL_CASHFLOW_READ') && (
+                <TabsTrigger value="fluxo-caixa" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Fluxo de Caixa
+                </TabsTrigger>
+              )}
+              {hasTabPermission('FINANCIAL_READ') && (
+                <TabsTrigger value="pagamentos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Pagamentos
+                </TabsTrigger>
+              )}
+              {hasTabPermission('REPORTS_READ') && (
+                <TabsTrigger value="relatorios-financeiros" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Relatórios
+                </TabsTrigger>
+              )}
+              {hasTabPermission('FINANCIAL_READ') && (
+                <TabsTrigger value="centro-custos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Centro Custos
+                </TabsTrigger>
+              )}
+              {hasTabPermission('FINANCIAL_INVOICE_READ') && (
+                <TabsTrigger value="faturas" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Faturas
+                </TabsTrigger>
+              )}
+              {hasTabPermission('FINANCIAL_MEASUREMENT_READ') && (
+                <TabsTrigger value="medicoes" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
+                  Medições
+                </TabsTrigger>
+              )}
             </TabsList>
 
-          <TabsContent value="dashboard" className="mt-6">
-            <FinanceiroDashboard 
-              transactions={mockTransactions} 
-              invoices={mockInvoices}
-              refreshData={() => {
-                toast({
-                  title: "Atualizado",
-                  description: "Dashboard atualizado com sucesso",
-                });
-              }}
-            />
-          </TabsContent>
+            <TabsContent value="dashboard" className="mt-6">
+              <FinanceiroDashboard
+                transactions={mockTransactions}
+                invoices={mockInvoices}
+                refreshData={() => {
+                  toast({
+                    title: "Atualizado",
+                    description: "Dashboard atualizado com sucesso",
+                  });
+                }}
+              />
+            </TabsContent>
 
-          <TabsContent value="contas-pagar">
-            <ContasAPagarTab />
-          </TabsContent>
+            <TabsContent value="contas-pagar">
+              <ContasAPagarTab />
+            </TabsContent>
 
-          <TabsContent value="contas-receber">
-            <ContasAReceberTab />
-          </TabsContent>
+            <TabsContent value="contas-receber">
+              <ContasAReceberTab />
+            </TabsContent>
 
-          <TabsContent value="fluxo-caixa">
-            <FluxoCaixaTab />
-          </TabsContent>
+            <TabsContent value="fluxo-caixa">
+              <FluxoCaixaTab />
+            </TabsContent>
 
-          <TabsContent value="pagamentos">
-            <PagamentosTab />
-          </TabsContent>
+            <TabsContent value="pagamentos">
+              <PagamentosTab />
+            </TabsContent>
 
-          <TabsContent value="relatorios-financeiros">
-            <RelatoriosTab />
-          </TabsContent>
+            <TabsContent value="relatorios-financeiros">
+              <RelatoriosTab />
+            </TabsContent>
 
-          <TabsContent value="centro-custos">
-            <CentroCustosTab />
-          </TabsContent>
+            <TabsContent value="centro-custos">
+              <CentroCustosTab />
+            </TabsContent>
 
-          <TabsContent value="faturas">
-            <FaturasTab />
-          </TabsContent>
+            <TabsContent value="faturas">
+              <FaturasTab />
+            </TabsContent>
 
-          <TabsContent value="medicoes">
-            <MedicoesTab />
-          </TabsContent>
+            <TabsContent value="medicoes">
+              <MedicoesTab />
+            </TabsContent>
           </Tabs>
         </div>
       </div>

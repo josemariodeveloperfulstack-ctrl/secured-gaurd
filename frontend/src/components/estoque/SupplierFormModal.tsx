@@ -190,14 +190,6 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
               </DialogPrimitive.Close>
             </div>
 
-            {/* Required Fields Banner */}
-            <div className="bg-[#2A1515] border border-red-900/20 rounded-lg p-3 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-red-500" />
-              <span className="text-red-500 text-sm font-medium">Campos obrigatórios:</span>
-              <div className="flex gap-2">
-                <Badge variant="secondary" className="bg-red-500 hover:bg-red-600 text-white border-0 text-xs font-medium">Nome</Badge>
-              </div>
-            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-6">
@@ -213,7 +205,7 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({ isOpen, on
                 <div className="space-y-2 col-span-1 md:col-span-1">
                   <Label className="text-gray-300 text-sm flex items-center gap-2">
                     <User className="h-3.5 w-3.5 text-red-500" />
-                    Nome
+                    Nome (Opcional)
                   </Label>
                   <Input
                     value={form.name}

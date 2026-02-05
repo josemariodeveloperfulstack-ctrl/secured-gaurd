@@ -44,6 +44,9 @@ export interface UserPermissions {
   FINANCIAL_PAYABLE_WRITE: boolean;
   FINANCIAL_RECEIVABLE_READ: boolean;
   FINANCIAL_RECEIVABLE_WRITE: boolean;
+  FINANCIAL_CASHFLOW_READ: boolean;
+  FINANCIAL_INVOICE_READ: boolean;
+  FINANCIAL_MEASUREMENT_READ: boolean;
 
   // Permissões de Holerites
   PAYSLIPS_READ: boolean;

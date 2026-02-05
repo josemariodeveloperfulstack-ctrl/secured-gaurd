@@ -16,37 +16,38 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class PurchaseRequestController {
-    
+
     private final PurchaseRequestService purchaseRequestService;
-    
+
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
     public ResponseEntity<List<PurchaseRequestDTO>> getAllPurchaseRequests() {
         log.info("Buscando todas as requisições de compra");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getAllPurchaseRequests();
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
     public ResponseEntity<PurchaseRequestDTO> getPurchaseRequestById(@PathVariable UUID id) {
         log.info("Buscando requisição de compra com ID: {}", id);
         return purchaseRequestService.getPurchaseRequestById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-    
+
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
     public ResponseEntity<PurchaseRequestDTO> createPurchaseRequest(@RequestBody PurchaseRequestDTO requestDTO) {
         log.info("Criando nova requisição de compra: {}", requestDTO.getTitle());
         PurchaseRequestDTO createdRequest = purchaseRequestService.createPurchaseRequest(requestDTO);
         return ResponseEntity.ok(createdRequest);
     }
-    
+
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS')")
-    public ResponseEntity<PurchaseRequestDTO> updatePurchaseRequest(@PathVariable UUID id, @RequestBody PurchaseRequestDTO requestDTO) {
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
+    public ResponseEntity<PurchaseRequestDTO> updatePurchaseRequest(@PathVariable UUID id,
+            @RequestBody PurchaseRequestDTO requestDTO) {
         log.info("Atualizando requisição de compra com ID: {}", id);
         try {
             PurchaseRequestDTO updatedRequest = purchaseRequestService.updatePurchaseRequest(id, requestDTO);
@@ -55,7 +56,7 @@ public class PurchaseRequestController {
             return ResponseEntity.notFound().build();
         }
     }
-    
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<Void> deletePurchaseRequest(@PathVariable UUID id) {
@@ -63,7 +64,7 @@ public class PurchaseRequestController {
         purchaseRequestService.deletePurchaseRequest(id);
         return ResponseEntity.noContent().build();
     }
-    
+
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
     public ResponseEntity<PurchaseRequestDTO> approveRequest(
@@ -78,7 +79,7 @@ public class PurchaseRequestController {
             return ResponseEntity.notFound().build();
         }
     }
-    
+
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
     public ResponseEntity<PurchaseRequestDTO> rejectRequest(
@@ -87,13 +88,14 @@ public class PurchaseRequestController {
             @RequestParam String rejectionReason) {
         log.info("Rejeitando requisição de compra com ID: {}", id);
         try {
-            PurchaseRequestDTO rejectedRequest = purchaseRequestService.rejectRequest(id, rejectorName, rejectionReason);
+            PurchaseRequestDTO rejectedRequest = purchaseRequestService.rejectRequest(id, rejectorName,
+                    rejectionReason);
             return ResponseEntity.ok(rejectedRequest);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
     }
-    
+
     @PostMapping("/{id}/complete")
     public ResponseEntity<PurchaseRequestDTO> completeRequest(@PathVariable UUID id) {
         log.info("Completando requisição de compra com ID: {}", id);
@@ -104,84 +106,84 @@ public class PurchaseRequestController {
             return ResponseEntity.notFound().build();
         }
     }
-    
+
     @GetMapping("/status/{status}")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByStatus(@PathVariable String status) {
         log.info("Buscando requisições de compra com status: {}", status);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByStatus(status);
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/priority/{priority}")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByPriority(@PathVariable String priority) {
         log.info("Buscando requisições de compra com prioridade: {}", priority);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByPriority(priority);
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/requester/{requesterId}")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByRequester(@PathVariable UUID requesterId) {
         log.info("Buscando requisições de compra do solicitante: {}", requesterId);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByRequester(requesterId);
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/approver/{approverId}")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByApprover(@PathVariable UUID approverId) {
         log.info("Buscando requisições de compra do aprovador: {}", approverId);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByApprover(approverId);
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/unit/{unitId}")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByUnit(@PathVariable UUID unitId) {
         log.info("Buscando requisições de compra da unidade: {}", unitId);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByUnit(unitId);
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/overdue")
     public ResponseEntity<List<PurchaseRequestDTO>> getOverdueRequests() {
         log.info("Buscando requisições de compra em atraso");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getOverdueRequests();
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/urgent")
     public ResponseEntity<List<PurchaseRequestDTO>> getUrgentRequests() {
         log.info("Buscando requisições de compra urgentes");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getUrgentRequests();
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/pending-approval")
     public ResponseEntity<List<PurchaseRequestDTO>> getPendingApprovalRequests() {
         log.info("Buscando requisições de compra pendentes de aprovação");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getPendingApprovalRequests();
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/search")
     public ResponseEntity<List<PurchaseRequestDTO>> searchRequests(@RequestParam String searchTerm) {
         log.info("Buscando requisições de compra com termo: {}", searchTerm);
         List<PurchaseRequestDTO> requests = purchaseRequestService.searchRequests(searchTerm);
         return ResponseEntity.ok(requests);
     }
-    
+
     @GetMapping("/stats/count/{status}")
     public ResponseEntity<Long> getRequestsCountByStatus(@PathVariable String status) {
         log.info("Buscando contagem de requisições com status: {}", status);
         long count = purchaseRequestService.getRequestsCountByStatus(status);
         return ResponseEntity.ok(count);
     }
-    
+
     @GetMapping("/stats/urgent-count")
     public ResponseEntity<Long> getUrgentRequestsCount() {
         log.info("Buscando contagem de requisições urgentes");
         long count = purchaseRequestService.getUrgentRequestsCount();
         return ResponseEntity.ok(count);
     }
-    
+
     @GetMapping("/stats/overdue-count")
     public ResponseEntity<Long> getOverdueRequestsCount() {
         log.info("Buscando contagem de requisições em atraso");

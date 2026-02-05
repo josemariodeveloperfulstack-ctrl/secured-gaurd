@@ -34,6 +34,7 @@ import { ptBR } from 'date-fns/locale';
 import { ReportGenerator, ReportData, ReportType, ReportFilters, REPORT_CONFIGS } from '@/utils/reportGenerator';
 import { contasAPagarService } from '@/services/contasAPagarService';
 import { contasAReceberService } from '@/services/contasAReceberService';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface RelatorioConfig {
   tipo: ReportType;
@@ -52,6 +53,10 @@ interface ViewState {
 
 const RelatoriosTab: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Verificar se é ASSISTENTE_ADMINISTRATIVO - restringir alguns relatórios
+  const isAssistenteAdministrativo = user?.role === 'ASSISTENTE_ADMINISTRATIVO';
 
   // Estados
   const [loading, setLoading] = useState(false);
@@ -194,6 +199,18 @@ const RelatoriosTab: React.FC = () => {
       cor: 'indigo'
     }
   ];
+
+  // Relatórios restritos para ASSISTENTE_ADMINISTRATIVO
+  const relatoriosRestritos = [
+    ReportType.CONTAS_RECEBER,
+    ReportType.FLUXO_CAIXA,
+    ReportType.RESUMO_FINANCEIRO
+  ];
+
+  // Filtrar relatórios baseado no role do usuário
+  const relatoriosFiltrados = isAssistenteAdministrativo
+    ? relatorios.filter(r => !relatoriosRestritos.includes(r.tipo))
+    : relatorios;
 
   const carregarDadosRelatorio = async (tipo: ReportType): Promise<ReportData> => {
     try {
@@ -797,7 +814,7 @@ const RelatoriosTab: React.FC = () => {
 
         {/* Grid de Relatórios */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {relatorios.map((relatorio) => (
+          {relatoriosFiltrados.map((relatorio) => (
             <Card key={relatorio.tipo} className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-all duration-200 hover:shadow-lg hover:shadow-gray-900/20 group">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">

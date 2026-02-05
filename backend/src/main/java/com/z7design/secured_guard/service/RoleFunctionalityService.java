@@ -278,13 +278,15 @@ public class RoleFunctionalityService {
                                                         "/financeiro", "financial", 2),
                                         new Functionality("receivables", "Contas a Receber", "Recebimentos",
                                                         "TrendingUp", "/contas-receber", "financial", 3),
+                                        new Functionality("invoices", "Contas a Pagar", "Faturas e contas", "FileText",
+                                                        "/contas-pagar", "financial", 4),
                                         // Fluxo de Caixa geralmente está dentro de Financeiro ou Relatórios
                                         new Functionality("inventory", "Estoque", "Controle de estoque", "Package",
-                                                        "/estoque", "inventory", 4),
+                                                        "/estoque", "inventory", 5),
                                         new Functionality("purchases", "Compras", "Solicitações de compra",
-                                                        "ShoppingCart", "/compras", "inventory", 5),
+                                                        "ShoppingCart", "/compras", "inventory", 6),
                                         new Functionality("reports", "Relatórios", "Relatórios financeiros", "BarChart",
-                                                        "/relatorios", "reports", 6));
+                                                        "/relatorios", "reports", 7));
 
                         default -> Arrays.asList(
                                         new Functionality("dashboard", "Dashboard", "Dashboard principal",

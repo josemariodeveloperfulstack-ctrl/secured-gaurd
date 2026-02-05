@@ -5,6 +5,8 @@ import { financialService, FinancialTransaction, Invoice } from '@/services/fina
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { TrendingUp, TrendingDown, DollarSign, Calendar, AlertTriangle, BarChart3, PieChart as PieChartIcon, Activity, Users } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserPermissions } from '@/types/user';
 
 interface FinanceiroDashboardProps {
   transactions: FinancialTransaction[];
@@ -12,11 +14,12 @@ interface FinanceiroDashboardProps {
   refreshData: () => void;
 }
 
-export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({ 
-  transactions, 
-  invoices, 
-  refreshData 
+export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
+  transactions,
+  invoices,
+  refreshData
 }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [dadosGraficos, setDadosGraficos] = useState({
     receitasDespesas: [] as any[],
@@ -39,20 +42,31 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
     ATRASADA: '#f97316'      // laranja
   };
 
+  const canViewMetric = (permission: keyof UserPermissions): boolean => {
+    if (!user) return false;
+    const normalizedRole = user.role.replace(/^ROLE_/, '').toUpperCase();
+    if (normalizedRole === 'SUPER_ADMIN') return true;
+    if (user.permissions?.ALL_PERMISSIONS) return true;
+    return !!user.permissions?.[permission];
+  };
+
+  const canViewReceitas = canViewMetric('FINANCIAL_RECEIVABLE_READ');
+  const canViewLucro = canViewMetric('FINANCIAL_CASHFLOW_READ');
+
   useEffect(() => {
     processarDadosGraficos();
   }, [transactions, invoices]);
 
   const processarDadosGraficos = () => {
     setLoading(true);
-    
+
     // 1. Receitas vs Despesas (últimos 6 meses)
     const receitasDespesas = [];
     for (let i = 5; i >= 0; i--) {
       const mes = subMonths(new Date(), i);
       const inicioMes = startOfMonth(mes);
       const fimMes = endOfMonth(mes);
-      
+
       const transacoesMes = transactions.filter(t => {
         const data = new Date(t.date);
         return data >= inicioMes && data <= fimMes;
@@ -61,7 +75,7 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
       const receitas = transacoesMes
         .filter(t => t.type === 'INCOME')
         .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-      
+
       const despesas = transacoesMes
         .filter(t => t.type === 'EXPENSE')
         .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -77,16 +91,16 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
     // 2. Status das Transações
     const statusMap = {
       'PENDING': 'Pendente',
-      'CONFIRMED': 'Confirmado', 
+      'CONFIRMED': 'Confirmado',
       'CANCELLED': 'Cancelado'
     };
-    
+
     const porStatus = Object.entries(statusMap).map(([status, label]) => {
       const count = transactions.filter(t => t.status === status).length;
       const valor = transactions
         .filter(t => t.status === status)
         .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-      
+
       return {
         name: label,
         quantidade: count,
@@ -124,7 +138,7 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
         name: nome,
         receitas: dados.receitas,
         despesas: dados.despesas,
-        total: dados.receitas + dados.despesas,
+        total: canViewReceitas ? (dados.receitas + dados.despesas) : dados.despesas,
         quantidade: dados.quantidade
       }))
       .sort((a, b) => b.total - a.total)
@@ -136,7 +150,7 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
       const mes = subMonths(new Date(), i);
       const inicioMes = startOfMonth(mes);
       const fimMes = endOfMonth(mes);
-      
+
       const transacoesMes = transactions.filter(t => {
         const data = new Date(t.date);
         return data >= inicioMes && data <= fimMes;
@@ -145,7 +159,7 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
       const receitas = transacoesMes
         .filter(t => t.type === 'INCOME')
         .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-      
+
       const despesas = transacoesMes
         .filter(t => t.type === 'EXPENSE')
         .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
@@ -178,7 +192,7 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
       fluxoCaixa,
       topTransacoes
     });
-    
+
     setLoading(false);
   };
 
@@ -197,19 +211,21 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
     <div className="space-y-6">
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-gray-400 truncate">Receitas (Mês)</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-500 truncate">
-                  {formatarMoeda(dadosGraficos.receitasDespesas[dadosGraficos.receitasDespesas.length - 1]?.receitas || 0)}
-                </p>
+        {canViewReceitas && (
+          <Card className="bg-seguranca-graphite border-gray-600">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-gray-400 truncate">Receitas (Mês)</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-500 truncate">
+                    {formatarMoeda(dadosGraficos.receitasDespesas[dadosGraficos.receitasDespesas.length - 1]?.receitas || 0)}
+                  </p>
+                </div>
+                <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 flex-shrink-0 ml-2" />
               </div>
-              <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 flex-shrink-0 ml-2" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-3 sm:p-4">
@@ -225,19 +241,21 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-gray-400 truncate">Lucro (Mês)</p>
-                <p className={`text-lg sm:text-xl lg:text-2xl font-bold truncate ${(dadosGraficos.receitasDespesas[dadosGraficos.receitasDespesas.length - 1]?.lucro || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {formatarMoeda(dadosGraficos.receitasDespesas[dadosGraficos.receitasDespesas.length - 1]?.lucro || 0)}
-                </p>
+        {canViewLucro && (
+          <Card className="bg-seguranca-graphite border-gray-600">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-gray-400 truncate">Lucro (Mês)</p>
+                  <p className={`text-lg sm:text-xl lg:text-2xl font-bold truncate ${(dadosGraficos.receitasDespesas[dadosGraficos.receitasDespesas.length - 1]?.lucro || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {formatarMoeda(dadosGraficos.receitasDespesas[dadosGraficos.receitasDespesas.length - 1]?.lucro || 0)}
+                  </p>
+                </div>
+                <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500 flex-shrink-0 ml-2" />
               </div>
-              <DollarSign className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500 flex-shrink-0 ml-2" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-3 sm:p-4">
@@ -261,7 +279,7 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
           <CardHeader className="p-3 sm:p-6">
             <CardTitle className="text-seguranca-lightgray flex items-center gap-2 text-sm sm:text-base">
               <DollarSign size={18} className="text-seguranca-yellow flex-shrink-0" />
-              <span className="truncate">Receitas vs Despesas (6 meses)</span>
+              <span className="truncate">{canViewReceitas ? 'Receitas vs Despesas (6 meses)' : 'Despesas (6 meses)'}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
@@ -270,18 +288,18 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="#555" />
                 <XAxis dataKey="mes" stroke="#999" />
                 <YAxis stroke="#999" />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => [formatarMoeda(value), '']}
-                  contentStyle={{ 
-                    backgroundColor: '#333', 
+                  contentStyle={{
+                    backgroundColor: '#333',
                     border: '1px solid #555',
                     borderRadius: '4px',
                     color: '#ccc'
                   }}
                 />
                 <Legend />
-                <Bar dataKey="receitas" fill={CORES.RECEITA} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesas" fill={CORES.DESPESA} radius={[4, 4, 0, 0]} />
+                {canViewReceitas && <Bar dataKey="receitas" fill={CORES.RECEITA} radius={[4, 4, 0, 0]} name="Receitas" />}
+                <Bar dataKey="despesas" fill={CORES.DESPESA} radius={[4, 4, 0, 0]} name="Despesas" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -311,10 +329,10 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => [formatarMoeda(value), 'Valor']}
-                  contentStyle={{ 
-                    backgroundColor: '#333', 
+                  contentStyle={{
+                    backgroundColor: '#333',
                     border: '1px solid #555',
                     borderRadius: '4px',
                     color: '#ccc'
@@ -340,41 +358,45 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="#555" />
                 <XAxis dataKey="mes" stroke="#999" />
                 <YAxis stroke="#999" />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => [formatarMoeda(value), '']}
-                  contentStyle={{ 
-                    backgroundColor: '#333', 
+                  contentStyle={{
+                    backgroundColor: '#333',
                     border: '1px solid #555',
                     borderRadius: '4px',
                     color: '#ccc'
                   }}
                 />
                 <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="receitas" 
-                  stroke={CORES.RECEITA} 
-                  strokeWidth={2}
-                  name="Receitas"
-                  dot={{ fill: CORES.RECEITA, strokeWidth: 2, r: 3 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="despesas" 
-                  stroke={CORES.DESPESA} 
+                {canViewReceitas && (
+                  <Line
+                    type="monotone"
+                    dataKey="receitas"
+                    stroke={CORES.RECEITA}
+                    strokeWidth={2}
+                    name="Receitas"
+                    dot={{ fill: CORES.RECEITA, strokeWidth: 2, r: 3 }}
+                  />
+                )}
+                <Line
+                  type="monotone"
+                  dataKey="despesas"
+                  stroke={CORES.DESPESA}
                   strokeWidth={2}
                   name="Despesas"
                   dot={{ fill: CORES.DESPESA, strokeWidth: 2, r: 3 }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="saldo" 
-                  stroke="#ffd700" 
-                  strokeWidth={2}
-                  name="Saldo"
-                  strokeDasharray="5 5"
-                  dot={{ fill: '#ffd700', strokeWidth: 2, r: 2 }}
-                />
+                {canViewLucro && (
+                  <Line
+                    type="monotone"
+                    dataKey="saldo"
+                    stroke="#ffd700"
+                    strokeWidth={2}
+                    name="Saldo"
+                    strokeDasharray="5 5"
+                    dot={{ fill: '#ffd700', strokeWidth: 2, r: 2 }}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -394,31 +416,35 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="#555" />
                 <XAxis dataKey="mes" stroke="#999" />
                 <YAxis stroke="#999" />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => [formatarMoeda(value), '']}
-                  contentStyle={{ 
-                    backgroundColor: '#333', 
+                  contentStyle={{
+                    backgroundColor: '#333',
                     border: '1px solid #555',
                     borderRadius: '4px',
                     color: '#ccc'
                   }}
                 />
                 <Legend />
-                <Area 
-                  type="monotone" 
-                  dataKey="receitas" 
+                {canViewReceitas && (
+                  <Area
+                    type="monotone"
+                    dataKey="receitas"
+                    stackId="1"
+                    stroke={CORES.RECEITA}
+                    fill={CORES.RECEITA}
+                    fillOpacity={0.6}
+                    name="Receitas"
+                  />
+                )}
+                <Area
+                  type="monotone"
+                  dataKey="despesas"
                   stackId="1"
-                  stroke={CORES.RECEITA} 
-                  fill={CORES.RECEITA}
-                  fillOpacity={0.6}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="despesas" 
-                  stackId="1"
-                  stroke={CORES.DESPESA} 
+                  stroke={CORES.DESPESA}
                   fill={CORES.DESPESA}
                   fillOpacity={0.6}
+                  name="Despesas"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -438,10 +464,10 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="#555" />
                 <XAxis type="number" stroke="#999" />
                 <YAxis dataKey="name" type="category" stroke="#999" width={100} />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => [formatarMoeda(value), 'Valor']}
-                  contentStyle={{ 
-                    backgroundColor: '#333', 
+                  contentStyle={{
+                    backgroundColor: '#333',
                     border: '1px solid #555',
                     borderRadius: '4px',
                     color: '#ccc'
@@ -466,10 +492,10 @@ export const FinanceiroDashboard: React.FC<FinanceiroDashboardProps> = ({
                 <CartesianGrid strokeDasharray="3 3" stroke="#555" />
                 <XAxis type="number" stroke="#999" />
                 <YAxis dataKey="name" type="category" stroke="#999" width={120} />
-                <Tooltip 
+                <Tooltip
                   formatter={(value: number) => [formatarMoeda(value), 'Valor']}
-                  contentStyle={{ 
-                    backgroundColor: '#333', 
+                  contentStyle={{
+                    backgroundColor: '#333',
                     border: '1px solid #555',
                     borderRadius: '4px',
                     color: '#ccc'

@@ -64,6 +64,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     FINANCIAL_PAYABLE_WRITE: false,
     FINANCIAL_RECEIVABLE_READ: false,
     FINANCIAL_RECEIVABLE_WRITE: false,
+    FINANCIAL_CASHFLOW_READ: false,
+    FINANCIAL_INVOICE_READ: false,
+    FINANCIAL_MEASUREMENT_READ: false,
 
     // Permissões de Holerites
     PAYSLIPS_READ: false,
@@ -632,8 +635,13 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         ...basePermissions,
         // Assistente Administrativo
         FINANCIAL_READ: true,
+        FINANCIAL_WRITE: true,
         FINANCIAL_PAYABLE_READ: true,
-        FINANCIAL_RECEIVABLE_READ: true,
+        FINANCIAL_PAYABLE_WRITE: true,
+        FINANCIAL_RECEIVABLE_READ: false,
+        FINANCIAL_CASHFLOW_READ: false,
+        FINANCIAL_INVOICE_READ: false,
+        FINANCIAL_MEASUREMENT_READ: false,
         STOCK_READ: true,
         STOCK_WRITE: true,
         STOCK_CREATE: true,
@@ -775,6 +783,9 @@ export const PERMISSION_TRANSLATIONS: Record<keyof UserPermissions, string> = {
   FINANCIAL_PAYABLE_WRITE: 'Editar Contas a Pagar',
   FINANCIAL_RECEIVABLE_READ: 'Visualizar Contas a Receber',
   FINANCIAL_RECEIVABLE_WRITE: 'Editar Contas a Receber',
+  FINANCIAL_CASHFLOW_READ: 'Visualizar Fluxo de Caixa',
+  FINANCIAL_INVOICE_READ: 'Visualizar Faturas',
+  FINANCIAL_MEASUREMENT_READ: 'Visualizar Medições',
 
   // Holerites
   PAYSLIPS_READ: 'Visualizar Holerites',
@@ -933,6 +944,9 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     FINANCIAL_PAYABLE_WRITE: false,
     FINANCIAL_RECEIVABLE_READ: false,
     FINANCIAL_RECEIVABLE_WRITE: false,
+    FINANCIAL_CASHFLOW_READ: false,
+    FINANCIAL_INVOICE_READ: false,
+    FINANCIAL_MEASUREMENT_READ: false,
 
     // Permissões de Holerites
     PAYSLIPS_READ: false,

@@ -260,13 +260,32 @@ public class SecurityConfig {
                                                                 "ROLE_OPERATIONAL_MANAGER",
                                                                 "ROLE_OPERATIONAL_SUPERVISOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO")
+                                                // Endpoints de requisições de compras - requerem permissões financeiras
+                                                // ou administrativas
+                                                .requestMatchers("/api/purchase-requests", "/api/purchase-requests/**")
+                                                .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
+                                                                "FINANCIAL_CREATE", "FINANCIAL_DELETE",
+                                                                "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
+                                                                "ASSISTENTE_ADMINISTRATIVO")
+                                                // Endpoints de cotações de compras - requerem permissões financeiras ou
+                                                // administrativas
+                                                .requestMatchers("/api/purchase-quotations/**")
+                                                .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
+                                                                "FINANCIAL_CREATE", "FINANCIAL_DELETE",
+                                                                "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
+                                                                "ASSISTENTE_ADMINISTRATIVO")
                                                 // Endpoints de compras - requerem permissões financeiras ou de estoque
                                                 .requestMatchers("/api/purchases/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
                                                                 "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO")
+                                                                "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
+                                                                "ASSISTENTE_ADMINISTRATIVO")
                                                 // Endpoints de propostas e leads - requerem permissões comerciais
                                                 .requestMatchers("/api/leads/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
@@ -484,22 +503,19 @@ public class SecurityConfig {
                                                                 "/api/measurements/**")
                                                 .hasAnyAuthority("FINANCIAL_WRITE", "FINANCIAL_CREATE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO")
+                                                                "ROLE_FINANCEIRO")
                                                 .requestMatchers(org.springframework.http.HttpMethod.PUT,
                                                                 "/api/measurements/**")
                                                 .hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_FINANCEIRO",
-                                                                "ROLE_ASSISTENTE_ADMINISTRATIVO")
+                                                                "ROLE_FINANCEIRO")
                                                 .requestMatchers(org.springframework.http.HttpMethod.PATCH,
                                                                 "/api/measurements/**")
                                                 .hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_FINANCEIRO",
-                                                                "ROLE_ASSISTENTE_ADMINISTRATIVO")
+                                                                "ROLE_FINANCEIRO")
                                                 .requestMatchers(org.springframework.http.HttpMethod.DELETE,
                                                                 "/api/measurements/**")
                                                 .hasAnyAuthority("FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_FINANCEIRO",
-                                                                "ROLE_ASSISTENTE_ADMINISTRATIVO")
+                                                                "ROLE_FINANCEIRO")
                                                 // Endpoints de estoque - requerem permissões específicas ou
                                                 // autenticação
                                                 .requestMatchers("/api/stock/**")
