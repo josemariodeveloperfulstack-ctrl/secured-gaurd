@@ -138,7 +138,11 @@ public class SupplierService {
     }
 
     private void updateSupplierFromDTO(Supplier supplier, SupplierDTO dto) {
-        supplier.setName(dto.getName());
+        String name = dto.getName();
+        if (name != null && name.trim().isEmpty()) {
+            name = null;
+        }
+        supplier.setName(name);
 
         String cnpj = dto.getCnpj();
         if (cnpj != null && cnpj.trim().isEmpty()) {
