@@ -7,7 +7,10 @@ import com.z7design.secured_guard.model.enums.StockCategory;
 import com.z7design.secured_guard.model.enums.MovementType;
 import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.service.StockService;
+import com.z7design.secured_guard.service.StockReportService;
 import com.z7design.secured_guard.repository.UserRepository;
+import java.io.IOException;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -37,6 +40,7 @@ import java.util.HashMap;
 public class StockController {
 
     private final StockService stockService;
+    private final StockReportService stockReportService;
     private final UserRepository userRepository;
 
     // ===== ITENS DE ESTOQUE =====
@@ -62,7 +66,7 @@ public class StockController {
             @Parameter(description = "Apenas itens com baixo estoque") @RequestParam(required = false) Boolean lowStock,
             @Parameter(description = "Termo de busca") @RequestParam(required = false) String searchTerm,
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
-        
+
         log.info("GET /api/stock/items/search - Buscando itens com filtros");
         Page<StockItemDTO> items = stockService.getItemsWithFilters(
                 category, active, unitId, lowStock, searchTerm, pageable);
@@ -73,7 +77,7 @@ public class StockController {
     @Operation(summary = "Buscar item por ID", description = "Retorna um item específico")
     public ResponseEntity<StockItemDTO> getItemById(
             @Parameter(description = "ID do item") @PathVariable UUID id) {
-        
+
         log.info("GET /api/stock/items/{} - Buscando item por ID", id);
         StockItemDTO item = stockService.getItemById(id);
         return ResponseEntity.ok(item);
@@ -83,7 +87,7 @@ public class StockController {
     @Operation(summary = "Buscar item por código", description = "Retorna um item pelo código")
     public ResponseEntity<StockItemDTO> getItemByCode(
             @Parameter(description = "Código do item") @PathVariable String code) {
-        
+
         log.info("GET /api/stock/items/code/{} - Buscando item por código", code);
         StockItemDTO item = stockService.getItemByCode(code);
         return ResponseEntity.ok(item);
@@ -93,7 +97,7 @@ public class StockController {
     @Operation(summary = "Buscar item por QR Code", description = "Retorna um item pelo QR Code")
     public ResponseEntity<StockItemDTO> getItemByQrCode(
             @Parameter(description = "QR Code do item") @PathVariable String qrCode) {
-        
+
         log.info("GET /api/stock/items/qr/{} - Buscando item por QR Code", qrCode);
         StockItemDTO item = stockService.getItemByQrCode(qrCode);
         return ResponseEntity.ok(item);
@@ -103,7 +107,7 @@ public class StockController {
     @Operation(summary = "Criar novo item", description = "Cria um novo item de estoque")
     public ResponseEntity<StockItemDTO> createItem(
             @Valid @RequestBody StockItemDTO itemDTO) {
-        
+
         log.info("POST /api/stock/items - Criando novo item de estoque");
         StockItemDTO createdItem = stockService.createItem(itemDTO);
         return ResponseEntity.status(201).body(createdItem);
@@ -114,7 +118,7 @@ public class StockController {
     public ResponseEntity<StockItemDTO> updateItem(
             @Parameter(description = "ID do item") @PathVariable UUID id,
             @Valid @RequestBody StockItemDTO itemDTO) {
-        
+
         log.info("PUT /api/stock/items/{} - Atualizando item", id);
         StockItemDTO updatedItem = stockService.updateItem(id, itemDTO);
         return ResponseEntity.ok(updatedItem);
@@ -124,7 +128,7 @@ public class StockController {
     @Operation(summary = "Excluir item", description = "Marca um item como inativo")
     public ResponseEntity<Void> deleteItem(
             @Parameter(description = "ID do item") @PathVariable UUID id) {
-        
+
         log.info("DELETE /api/stock/items/{} - Excluindo item", id);
         stockService.deleteItem(id);
         return ResponseEntity.noContent().build();
@@ -134,7 +138,7 @@ public class StockController {
     @Operation(summary = "Buscar itens por categoria", description = "Retorna itens de uma categoria específica")
     public ResponseEntity<List<StockItemDTO>> getItemsByCategory(
             @Parameter(description = "Categoria") @PathVariable StockCategory category) {
-        
+
         log.info("GET /api/stock/items/category/{} - Buscando itens por categoria", category);
         List<StockItemDTO> items = stockService.getItemsByCategory(category);
         return ResponseEntity.ok(items);
@@ -155,11 +159,11 @@ public class StockController {
     public ResponseEntity<?> createMovement(
             @Valid @RequestBody StockMovementDTO movementDTO,
             Authentication authentication) {
-        
+
         try {
             log.info("POST /api/stock/movements - Criando movimentação");
             log.info("Dados recebidos: {}", movementDTO);
-            
+
             // Obter ID do usuário logado
             UUID userId;
             if (authentication != null && authentication.getPrincipal() != null) {
@@ -171,7 +175,8 @@ public class StockController {
                     userId = user.getId();
                     log.info("Usuário autenticado: {} (ID: {})", username, userId);
                 } catch (Exception e) {
-                    log.warn("Erro ao obter usuário do contexto de autenticação: {}. Usando placeholder.", e.getMessage());
+                    log.warn("Erro ao obter usuário do contexto de autenticação: {}. Usando placeholder.",
+                            e.getMessage());
                     // Fallback para placeholder se não conseguir obter o usuário
                     userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
                 }
@@ -179,7 +184,7 @@ public class StockController {
                 log.warn("Autenticação não disponível. Usando placeholder.");
                 userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
             }
-            
+
             StockMovementDTO createdMovement = stockService.createMovement(movementDTO, userId);
             log.info("Movimentação criada com sucesso: {}", createdMovement.getId());
             return ResponseEntity.status(201).body(createdMovement);
@@ -207,11 +212,11 @@ public class StockController {
             @Parameter(description = "Data final") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @Parameter(description = "Termo de busca") @RequestParam(required = false) String searchTerm,
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
-        
+
         try {
             log.info("GET /api/stock/movements/search - Buscando movimentações com filtros");
             Page<StockMovementDTO> movements = stockService.getMovementsWithFilters(
-                    stockItemId, employeeId, movementType, reason, unitId, 
+                    stockItemId, employeeId, movementType, reason, unitId,
                     startDate, endDate, searchTerm, pageable);
             return ResponseEntity.ok(movements);
         } catch (Exception e) {
@@ -224,7 +229,7 @@ public class StockController {
     @Operation(summary = "Histórico de movimentações do item", description = "Retorna todas as movimentações de um item")
     public ResponseEntity<List<StockMovementDTO>> getMovementsByItem(
             @Parameter(description = "ID do item") @PathVariable UUID itemId) {
-        
+
         log.info("GET /api/stock/movements/item/{} - Buscando movimentações do item", itemId);
         List<StockMovementDTO> movements = stockService.getMovementsByItem(itemId);
         return ResponseEntity.ok(movements);
@@ -234,7 +239,7 @@ public class StockController {
     @Operation(summary = "Histórico de entregas do funcionário", description = "Retorna todas as entregas feitas a um funcionário")
     public ResponseEntity<List<StockMovementDTO>> getDeliveryHistoryByEmployee(
             @Parameter(description = "ID do funcionário") @PathVariable UUID employeeId) {
-        
+
         log.info("GET /api/stock/movements/employee/{}/deliveries - Histórico de entregas", employeeId);
         List<StockMovementDTO> deliveries = stockService.getDeliveryHistoryByEmployee(employeeId);
         return ResponseEntity.ok(deliveries);
@@ -244,7 +249,7 @@ public class StockController {
     @Operation(summary = "Movimentações recentes", description = "Retorna as últimas movimentações")
     public ResponseEntity<List<StockMovementDTO>> getRecentMovements(
             @Parameter(description = "Limite de registros") @RequestParam(defaultValue = "10") int limit) {
-        
+
         log.info("GET /api/stock/movements/recent - Buscando movimentações recentes");
         List<StockMovementDTO> movements = stockService.getRecentMovements(limit);
         return ResponseEntity.ok(movements);
@@ -272,7 +277,7 @@ public class StockController {
     @Operation(summary = "Marcar alerta como lido", description = "Marca um alerta como lido")
     public ResponseEntity<Void> markAlertAsRead(
             @Parameter(description = "ID do alerta") @PathVariable UUID alertId) {
-        
+
         log.info("PATCH /api/stock/alerts/{}/read - Marcando alerta como lido", alertId);
         stockService.markAlertAsRead(alertId);
         return ResponseEntity.ok().build();
@@ -283,12 +288,12 @@ public class StockController {
     public ResponseEntity<Void> resolveAlert(
             @Parameter(description = "ID do alerta") @PathVariable UUID alertId,
             Authentication authentication) {
-        
+
         log.info("PATCH /api/stock/alerts/{}/resolve - Resolvendo alerta", alertId);
-        
+
         // Obter ID do usuário logado
         UUID userId = UUID.fromString("11111111-1111-1111-1111-111111111111"); // Placeholder
-        
+
         stockService.resolveAlert(alertId, userId);
         return ResponseEntity.ok().build();
     }
@@ -357,7 +362,8 @@ public class StockController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
         log.info("GET /api/stock/reports/date-range - Gerando relatório por período de {} até {}", startDate, endDate);
         try {
-            com.z7design.secured_guard.dto.DateRangeReportDTO report = stockService.getDateRangeReport(startDate, endDate);
+            com.z7design.secured_guard.dto.DateRangeReportDTO report = stockService.getDateRangeReport(startDate,
+                    endDate);
             return ResponseEntity.ok(report);
         } catch (Exception e) {
             log.error("Erro ao gerar relatório por período: {}", e.getMessage(), e);
@@ -391,17 +397,17 @@ public class StockController {
     @Operation(summary = "Teste de conectividade", description = "Endpoint simples para testar se o backend está funcionando")
     public ResponseEntity<Map<String, Object>> testConnection() {
         Map<String, Object> response = new HashMap<>();
-        
+
         try {
             log.info("=== TESTE DE CONECTIVIDADE DO ESTOQUE ===");
-            
+
             // Teste 1: Verificar se o controller está funcionando
             response.put("controller", "OK");
             response.put("timestamp", LocalDateTime.now().toString());
-            
+
             // Teste 2: Verificar se o service está acessível
             response.put("service", "OK");
-            
+
             // Teste 3: Verificar se o repositório está acessível
             try {
                 long totalItems = stockService.getAllItems().size();
@@ -411,10 +417,10 @@ public class StockController {
                 response.put("repository", "ERRO: " + e.getMessage());
                 response.put("repositoryError", e.getClass().getSimpleName());
             }
-            
+
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
-            
+
         } catch (Exception e) {
             log.error("Erro no teste de conectividade: {}", e.getMessage(), e);
             response.put("status", "ERROR");
@@ -422,5 +428,43 @@ public class StockController {
             response.put("type", e.getClass().getSimpleName());
             return ResponseEntity.ok(response);
         }
+    }
+
+    @GetMapping("/reports/low-stock/pdf")
+    @Operation(summary = "Gerar PDF de baixo estoque")
+    public ResponseEntity<byte[]> getLowStockReportPDF(@RequestParam UUID companyId) throws IOException {
+        log.info("GET /api/stock/reports/low-stock/pdf - Gerando relatório PDF");
+        byte[] pdf = stockReportService.generateLowStockPDFReport(companyId);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=estoque-baixo.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/general/pdf")
+    @Operation(summary = "Gerar PDF geral de estoque")
+    public ResponseEntity<byte[]> getGeneralStockReportPDF(
+            @RequestParam UUID companyId,
+            @RequestParam(required = false) StockCategory category) throws IOException {
+        log.info("GET /api/stock/reports/general/pdf - Gerando relatório PDF");
+        byte[] pdf = stockReportService.generateGeneralStockPDFReport(companyId, category);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=estoque-geral.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/movements/pdf")
+    @Operation(summary = "Gerar PDF de movimentações")
+    public ResponseEntity<byte[]> getMovementsReportPDF(
+            @RequestParam UUID companyId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) throws IOException {
+        log.info("GET /api/stock/reports/movements/pdf - Gerando relatório PDF");
+        byte[] pdf = stockReportService.generateMovementsPDFReport(companyId, start, end);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=movimentacoes-estoque.pdf")
+                .body(pdf);
     }
 }

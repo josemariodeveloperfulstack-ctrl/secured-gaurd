@@ -48,6 +48,18 @@ export interface UpdateQuotationRequest extends Partial<CreateQuotationRequest> 
   status?: QuotationStatus;
 }
 
+export interface QuotationReportFilters {
+  quoteNumber?: string;
+  title?: string;
+  supplierId?: string;
+  status?: string;
+  startValidUntil?: string;
+  endValidUntil?: string;
+  assignedToId?: string;
+  minValue?: number;
+  maxValue?: number;
+}
+
 class QuotationService {
   private base = '/api/purchase-quotations';
 
@@ -97,6 +109,25 @@ class QuotationService {
 
   async updateStatus(id: string, status: QuotationStatus): Promise<Quotation> {
     const { data } = await api.patch(`${this.base}/${id}/status`, { status });
+    return data;
+  }
+
+  async generateReportPDF(filters: QuotationReportFilters): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.quoteNumber?.trim()) params.append('quoteNumber', filters.quoteNumber.trim());
+    if (filters.title?.trim()) params.append('title', filters.title.trim());
+    if (filters.supplierId) params.append('supplierId', filters.supplierId);
+    if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters.startValidUntil) params.append('startValidUntil', filters.startValidUntil);
+    if (filters.endValidUntil) params.append('endValidUntil', filters.endValidUntil);
+    if (filters.assignedToId) params.append('assignedToId', filters.assignedToId);
+    if (filters.minValue != null && filters.minValue > 0) params.append('minValue', filters.minValue.toString());
+    if (filters.maxValue != null && filters.maxValue > 0) params.append('maxValue', filters.maxValue.toString());
+
+    const query = params.toString();
+    const url = query ? `${this.base}/reports/pdf?${query}` : `${this.base}/reports/pdf`;
+
+    const { data } = await api.get(url, { responseType: 'blob' });
     return data;
   }
 }

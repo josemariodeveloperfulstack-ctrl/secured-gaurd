@@ -1,5 +1,37 @@
 import api from '@/lib/axios';
 
+export type ContractStatusType = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'TERMINATED' | 'PENDING' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED';
+export type ContractOriginType = 'PROPOSAL' | 'RENEWAL' | 'MANUAL';
+export type ContractTypeType = 'VIGILANCIA_PATRIMONIAL' | 'PORTARIA' | 'FACILITIES';
+export type AdjustmentTypeType = 'INPC' | 'IPCA' | 'MANUAL';
+export type AmendmentTypeType = 'INCLUSAO_POSTO' | 'ALTERACAO_ESCALA' | 'REAJUSTE_EXTRAORDINARIO' | 'REDUCAO_POSTO' | 'MUDANCA_LOCAL';
+export type AmendmentStatusType = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface ContractAmendment {
+  id: string;
+  contractId: string;
+  type: AmendmentTypeType;
+  description?: string;
+  effectiveDate?: string;
+  financialImpact?: number;
+  approvedById?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  status: AmendmentStatusType;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractAdjustment {
+  id: string;
+  contractId: string;
+  adjustmentType: AdjustmentTypeType;
+  previousValue: number;
+  newValue: number;
+  adjustmentDate: string;
+  createdAt: string;
+}
+
 export interface Contract {
   id: string;
   contractNumber: string;
@@ -7,12 +39,35 @@ export interface Contract {
   startDate: string;
   endDate?: string;
   value: number;
-  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED' | 'PENDING';
+  status: ContractStatusType;
   notes?: string;
   // Dados do cliente vêm como campos separados do backend
   clientId: string;
   clientName: string;
   clientCnpj?: string;
+  // Campos PRD
+  contractOrigin?: ContractOriginType;
+  contractType?: ContractTypeType;
+  responsibleCommercialId?: string;
+  responsibleCommercialName?: string;
+  responsibleManagerId?: string;
+  responsibleManagerName?: string;
+  proposalId?: string;
+  monthlyValue?: number;
+  annualValue?: number;
+  adjustmentType?: AdjustmentTypeType;
+  nextAdjustmentDate?: string;
+  autoRenewal?: boolean;
+  replacementTimeHours?: number;
+  maxAbsenceMinutes?: number;
+  patrolFrequency?: string;
+  reportsRequired?: string;
+  obligationsContractor?: string;
+  obligationsContracted?: string;
+  penalties?: string;
+  terminationReason?: string;
+  terminationDate?: string;
+  terminationChecklist?: string;
   // Campos adicionais para relacionamentos
   client?: {
     id: string;
@@ -36,9 +91,62 @@ export interface CreateContractRequest {
   startDate: string;
   endDate?: string;
   value: number;
-  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED' | 'PENDING';
+  status: ContractStatusType;
   clientId: string;
   notes?: string;
+  contractOrigin?: ContractOriginType;
+  contractType?: ContractTypeType;
+  responsibleCommercialId?: string;
+  responsibleManagerId?: string;
+  proposalId?: string;
+  monthlyValue?: number;
+  annualValue?: number;
+  adjustmentType?: AdjustmentTypeType;
+  nextAdjustmentDate?: string;
+  autoRenewal?: boolean;
+  replacementTimeHours?: number;
+  maxAbsenceMinutes?: number;
+  patrolFrequency?: string;
+  reportsRequired?: string;
+  obligationsContractor?: string;
+  obligationsContracted?: string;
+  penalties?: string;
+}
+
+export type ContractDocumentTypeType = 'CONTRACT' | 'AMENDMENT' | 'LEGAL_ATTACHMENT';
+export type DocumentSignatureStatusType = 'PENDING' | 'SIGNED' | 'REJECTED';
+
+export interface ContractDocument {
+  id: string;
+  contractId: string;
+  type: ContractDocumentTypeType;
+  fileUrl?: string;
+  fileName?: string;
+  signatureStatus: DocumentSignatureStatusType;
+  signedAt?: string;
+  signedByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractExpiringAlert {
+  contractId: string;
+  contractNumber: string;
+  clientName: string;
+  endDate: string;
+  daysRemaining: number;
+  urgencyLevel: string;
+  value: number;
+}
+
+export interface ContractDashboardStats {
+  activeCount: number;
+  expiringCount: number;
+  suspendedCount: number;
+  mrr: number;
+  byType: Record<string, number>;
+  byClient: Record<string, number>;
+  amendmentsThisMonth: number;
 }
 
 export interface UpdateContractRequest extends Partial<CreateContractRequest> {
@@ -123,7 +231,83 @@ export const contractService = {
 
   // Criar novo contrato
   async createContract(contractData: CreateContractRequest): Promise<Contract> {
-    const response = await api.post('/contracts', contractData);
+    const response = await api.post('/api/contracts', contractData);
+    return response.data;
+  },
+
+  // Criar contrato a partir de proposta aprovada
+  async createFromProposal(proposalId: string): Promise<Contract> {
+    const response = await api.post(`/api/contracts/from-proposal/${proposalId}`);
+    return response.data;
+  },
+
+  // Aditivos
+  async getAmendments(contractId: string): Promise<ContractAmendment[]> {
+    const response = await api.get(`/api/contracts/${contractId}/amendments`);
+    return response.data;
+  },
+  async createAmendment(contractId: string, data: { type: AmendmentTypeType; description?: string; effectiveDate?: string; financialImpact?: number }): Promise<ContractAmendment> {
+    const response = await api.post(`/api/contracts/${contractId}/amendments`, data);
+    return response.data;
+  },
+  async approveAmendment(contractId: string, amendmentId: string): Promise<ContractAmendment> {
+    const response = await api.post(`/api/contracts/${contractId}/amendments/${amendmentId}/approve`);
+    return response.data;
+  },
+  async rejectAmendment(contractId: string, amendmentId: string): Promise<ContractAmendment> {
+    const response = await api.post(`/api/contracts/${contractId}/amendments/${amendmentId}/reject`);
+    return response.data;
+  },
+  async deleteAmendment(contractId: string, amendmentId: string): Promise<void> {
+    await api.delete(`/api/contracts/${contractId}/amendments/${amendmentId}`);
+  },
+
+  // Histórico de Reajustes
+  async getAdjustments(contractId: string): Promise<ContractAdjustment[]> {
+    const response = await api.get(`/api/contracts/${contractId}/adjustments`);
+    return response.data;
+  },
+  async createAdjustment(contractId: string, data: { adjustmentType: AdjustmentTypeType; previousValue: number; newValue: number; adjustmentDate?: string }): Promise<ContractAdjustment> {
+    const response = await api.post(`/api/contracts/${contractId}/adjustments`, data);
+    return response.data;
+  },
+
+  // Documentos
+  async getDocuments(contractId: string): Promise<ContractDocument[]> {
+    const response = await api.get(`/api/contracts/${contractId}/documents`);
+    return response.data;
+  },
+  async createDocument(contractId: string, data: { type: ContractDocumentTypeType; fileUrl?: string; fileName?: string }): Promise<ContractDocument> {
+    const response = await api.post(`/api/contracts/${contractId}/documents`, data);
+    return response.data;
+  },
+  async deleteDocument(contractId: string, documentId: string): Promise<void> {
+    await api.delete(`/api/contracts/${contractId}/documents/${documentId}`);
+  },
+
+  // Alertas e Renovação
+  async getDashboardStats(): Promise<ContractDashboardStats> {
+    const response = await api.get('/api/contracts/dashboard/stats');
+    return response.data;
+  },
+  async getExpiringAlerts(): Promise<ContractExpiringAlert[]> {
+    const response = await api.get('/api/contracts/expiring-alerts');
+    return response.data;
+  },
+  async renewContract(contractId: string, newValue?: number): Promise<Contract> {
+    const params = newValue != null ? `?newValue=${newValue}` : '';
+    const response = await api.post(`/api/contracts/${contractId}/renew${params}`);
+    return response.data;
+  },
+  async terminateContract(contractId: string, data: {
+    terminationReason: string;
+    terminationDate: string;
+    avisoPrevio: boolean;
+    desmobilizacaoEquipe: boolean;
+    encerramentoFinanceiro: boolean;
+    notes?: string;
+  }): Promise<Contract> {
+    const response = await api.post(`/api/contracts/${contractId}/terminate`, data);
     return response.data;
   },
 
@@ -140,7 +324,7 @@ export const contractService = {
 
   // Atualizar status do contrato
   async updateContractStatus(id: string, status: string): Promise<Contract> {
-    const response = await api.put(`/api/contracts/${id}/status?status=${status}`);
+    const response = await api.patch(`/api/contracts/${id}/status?status=${status}`);
     return response.data;
   },
 
@@ -217,7 +401,7 @@ export const contractService = {
     return report;
   },
 
-  // Gerar PDF do contrato (backend)
+  // Gerar PDF do contrato (backend - layout corporativo)
   async generateContractPdf(contractData: any): Promise<Blob> {
     const response = await api.post('/contracts/pdf', contractData, {
       responseType: 'blob'

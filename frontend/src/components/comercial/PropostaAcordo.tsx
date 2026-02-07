@@ -2,13 +2,28 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { propostaService, PropostaParams } from '@/services/propostaService';
 import { PropostaComercial } from '@/types/proposta';
 import { FileText, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { reportLayoutService } from '@/services/reportLayoutService';
+import { proposalService } from '@/services/proposalService';
 import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
+import { saveAs } from 'file-saver';
+
+export interface ClientOption {
+  id: number | string;
+  name: string;
+  cnpj?: string;
+}
 
 const valoresPadrao: PropostaParams = {
   quantidadePorteiros: 4,
@@ -29,12 +44,15 @@ const valoresPadrao: PropostaParams = {
 };
 
 interface PropostaAcordoProps {
-  onSaveProposal?: (proposalData: PropostaComercial) => Promise<void>;
+  clients?: ClientOption[];
+  loadingClients?: boolean;
+  onSaveProposal?: (proposalData: PropostaComercial, clientId?: string) => Promise<void>;
 }
 
-export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) {
+export default function PropostaAcordo({ clients = [], loadingClients = false, onSaveProposal }: PropostaAcordoProps) {
   const { toast } = useToast();
   const [params, setParams] = useState<PropostaParams>(valoresPadrao);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [proposta, setProposta] = useState<PropostaComercial | null>(
     propostaService.calcularProposta(valoresPadrao)
   );
@@ -55,15 +73,20 @@ export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) 
     if (!proposta) return;
 
     try {
-      const printElement = document.getElementById('proposta-acordo-printable');
-      if (!printElement) {
-        throw new Error('Elemento de impressão não encontrado');
-      }
+      const clientName = selectedClientId ? clients.find(c => String(c.id) === selectedClientId)?.name : undefined;
 
-      await reportLayoutService.generatePremiumPDF(printElement, {
-        title: 'Proposta Comercial de Acordo',
-        filename: `proposta_acordo_${new Date().toISOString().split('T')[0]}.pdf`
+      const blob = await proposalService.generatePdfFromSimulation({
+        descricaoServico: proposta.descricaoServico,
+        maoDeObra: proposta.maoDeObra,
+        materiais: proposta.materiais,
+        bdi: proposta.bdi,
+        impostos: proposta.impostos,
+        resultado: proposta.resultado,
+        clientName,
       });
+
+      const filename = `proposta_acordo_${new Date().toISOString().split('T')[0]}.pdf`;
+      saveAs(blob, filename);
 
       toast({
         title: "Sucesso",
@@ -178,6 +201,23 @@ export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) 
           <CardTitle className="text-seguranca-lightgray text-lg">Simulação de Proposta de Acordo</CardTitle>
         </CardHeader>
         <CardContent>
+          {onSaveProposal && (
+            <div className="mb-6">
+              <Label className="text-seguranca-lightgray mb-2 block">Cliente (para salvar proposta)</Label>
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-w-md">
+                  <SelectValue placeholder={loadingClients ? 'Carregando...' : clients.length === 0 ? 'Nenhum cliente' : 'Selecione o cliente'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={String(client.id)} value={String(client.id)}>
+                      {client.name} {client.cnpj ? `- ${client.cnpj}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-seguranca-lightgray mb-1">Quantidade de Porteiros</label>
@@ -308,7 +348,7 @@ export default function PropostaAcordo({ onSaveProposal }: PropostaAcordoProps) 
                 <Button
                   onClick={async () => {
                     if (proposta && onSaveProposal) {
-                      await onSaveProposal(proposta);
+                      await onSaveProposal(proposta, selectedClientId || undefined);
                     }
                   }}
                   className="bg-seguranca-yellow text-black hover:bg-yellow-500"

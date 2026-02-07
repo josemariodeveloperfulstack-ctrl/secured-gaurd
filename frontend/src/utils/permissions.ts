@@ -131,6 +131,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     DASHBOARD_READ: false,
     DASHBOARD_WRITE: false,
 
+    // Permissões do Dashboard Comercial
+    COMMERCIAL_DASHBOARD_READ: false,
+    SALES_GOALS_READ: false,
+    SALES_GOALS_WRITE: false,
+
     // Permissões de Perfil
     PROFILE_READ: false,
     PROFILE_WRITE: false,
@@ -296,6 +301,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         ATTENDANCE_READ: true,
         ATTENDANCE_WRITE: true,
         ATTENDANCE_MANAGE: true,
+
+        // Dashboard Comercial e Metas
+        COMMERCIAL_DASHBOARD_READ: true,
+        SALES_GOALS_READ: true,
+        SALES_GOALS_WRITE: true,
       };
 
     case 'SUPERVISOR':
@@ -522,6 +532,22 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         PROFILE_READ: true,
         PROFILE_WRITE: true,
 
+        // Permissões do Módulo Comercial
+        LEADS_READ: true,
+        LEADS_WRITE: true,
+        LEADS_CREATE: true,
+        PROPOSALS_READ: true,
+        PROPOSALS_WRITE: true,
+        PROPOSALS_CREATE: true,
+        QUOTES_READ: true,
+        QUOTES_WRITE: true,
+        QUOTES_CREATE: true,
+
+        // Dashboard Comercial e Metas
+        COMMERCIAL_DASHBOARD_READ: true,
+        SALES_GOALS_READ: true,
+        SALES_GOALS_WRITE: true,
+
         // Permissões de Mensagens
         MESSAGES_READ: true,
         MESSAGES_WRITE: true,
@@ -732,6 +758,10 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         MESSAGES_READ: true,
         MESSAGES_WRITE: true,
         MESSAGES_CREATE: true,
+
+        // Dashboard Comercial (somente leitura, sem metas)
+        COMMERCIAL_DASHBOARD_READ: true,
+        SALES_GOALS_READ: true,
       };
 
     default:
@@ -851,6 +881,11 @@ export const PERMISSION_TRANSLATIONS: Record<keyof UserPermissions, string> = {
   // Dashboard
   DASHBOARD_READ: 'Visualizar Dashboard',
   DASHBOARD_WRITE: 'Configurar Dashboard',
+
+  // Dashboard Comercial
+  COMMERCIAL_DASHBOARD_READ: 'Visualizar Dashboard Comercial',
+  SALES_GOALS_READ: 'Visualizar Metas Comerciais',
+  SALES_GOALS_WRITE: 'Gerenciar Metas Comerciais',
 
   // Perfil
   PROFILE_READ: 'Visualizar Perfil',
@@ -1011,6 +1046,11 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     DASHBOARD_READ: false,
     DASHBOARD_WRITE: false,
 
+    // Permissões do Dashboard Comercial
+    COMMERCIAL_DASHBOARD_READ: false,
+    SALES_GOALS_READ: false,
+    SALES_GOALS_WRITE: false,
+
     // Permissões de Perfil
     PROFILE_READ: false,
     PROFILE_WRITE: false,
@@ -1122,6 +1162,9 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     'AUDIT_WRITE': 'AUDIT_WRITE',
     'DASHBOARD_READ': 'DASHBOARD_READ',
     'DASHBOARD_WRITE': 'DASHBOARD_WRITE',
+    'COMMERCIAL_DASHBOARD_READ': 'COMMERCIAL_DASHBOARD_READ',
+    'SALES_GOALS_READ': 'SALES_GOALS_READ',
+    'SALES_GOALS_WRITE': 'SALES_GOALS_WRITE',
     'PROFILE_READ': 'PROFILE_READ',
     'PROFILE_WRITE': 'PROFILE_WRITE',
     'SUPPORT_READ': 'SUPPORT_READ',

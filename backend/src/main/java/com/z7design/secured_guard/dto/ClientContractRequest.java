@@ -15,6 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class ClientContractRequest {
     private UUID companyId;
+    private UUID companyConfigId; // Config escolhida para cabeçalho, rodapé e cláusulas
 
     // Dados do Cliente
     private String clientName;

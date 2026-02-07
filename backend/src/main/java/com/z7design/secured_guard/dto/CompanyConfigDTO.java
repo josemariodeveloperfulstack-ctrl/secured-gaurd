@@ -19,6 +19,9 @@ public class CompanyConfigDTO {
 
     private UUID id;
 
+    /** ID da empresa na tabela companies (fonte para cabeçalho/rodapé) */
+    private UUID companyId;
+
     @NotBlank(message = "Nome da empresa é obrigatório")
     @Size(min = 3, max = 200, message = "Nome deve ter entre 3 e 200 caracteres")
     private String name;

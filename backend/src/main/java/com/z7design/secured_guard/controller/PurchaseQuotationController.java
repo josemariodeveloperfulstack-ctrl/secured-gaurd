@@ -2,6 +2,7 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.PurchaseQuotationDTO;
 import com.z7design.secured_guard.model.enums.PurchaseQuotationStatus;
+import com.z7design.secured_guard.service.PurchaseQuotationReportService;
 import com.z7design.secured_guard.service.PurchaseQuotationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,9 +13,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import com.z7design.secured_guard.model.User;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +32,7 @@ import java.util.UUID;
 public class PurchaseQuotationController {
 
     private final PurchaseQuotationService purchaseQuotationService;
+    private final PurchaseQuotationReportService purchaseQuotationReportService;
 
     @GetMapping
     @Operation(summary = "Listar todas as cotações", description = "Retorna uma lista de todas as cotações de compras")
@@ -197,5 +203,28 @@ public class PurchaseQuotationController {
                 "REJECTED", purchaseQuotationService.countByStatus(PurchaseQuotationStatus.REJECTED),
                 "EXPIRED", purchaseQuotationService.countByStatus(PurchaseQuotationStatus.EXPIRED));
         return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/reports/pdf")
+    @Operation(summary = "Gerar relatório PDF de cotações", description = "Gera relatório com layout corporativo em formato retrato")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
+    public ResponseEntity<byte[]> generateQuotationsReportPdf(
+            @RequestParam(required = false) String quoteNumber,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) UUID supplierId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startValidUntil,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endValidUntil,
+            @RequestParam(required = false) UUID assignedToId,
+            @RequestParam(required = false) BigDecimal minValue,
+            @RequestParam(required = false) BigDecimal maxValue) throws IOException {
+        log.info("Gerando relatório PDF de cotações de compra");
+        byte[] pdf = purchaseQuotationReportService.generateQuotationsReport(
+                quoteNumber, title, supplierId, status, startValidUntil, endValidUntil,
+                assignedToId, minValue, maxValue);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=relatorio-cotacoes-compra.pdf")
+                .body(pdf);
     }
 }

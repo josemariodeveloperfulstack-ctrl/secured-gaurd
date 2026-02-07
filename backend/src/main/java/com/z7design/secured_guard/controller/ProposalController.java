@@ -1,8 +1,11 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.ProposalDTO;
+import com.z7design.secured_guard.dto.PropostaSimulacaoRequest;
 import com.z7design.secured_guard.model.Proposal;
 import com.z7design.secured_guard.model.enums.ProposalStatus;
+import com.z7design.secured_guard.service.ProposalCommercialPdfService;
+import com.z7design.secured_guard.service.ProposalReportService;
 import com.z7design.secured_guard.service.ProposalService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,11 +13,15 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import com.z7design.secured_guard.model.User;
 
@@ -30,6 +37,12 @@ public class ProposalController {
 
     @Autowired
     private ProposalService proposalService;
+
+    @Autowired
+    private ProposalReportService proposalReportService;
+
+    @Autowired
+    private ProposalCommercialPdfService proposalCommercialPdfService;
 
     @GetMapping
     @Operation(summary = "Listar todas as propostas", description = "Retorna uma lista paginada de todas as propostas")
@@ -58,6 +71,29 @@ public class ProposalController {
     public ResponseEntity<ProposalDTO> getProposalById(@PathVariable String id) {
         Proposal proposal = proposalService.findById(UUID.fromString(id));
         return ResponseEntity.ok(proposalService.mapToDTO(proposal));
+    }
+
+    @GetMapping("/{id}/pdf")
+    @Operation(summary = "Gerar PDF da proposta comercial", description = "Gera PDF da proposta usando o layout padronizado")
+    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    public ResponseEntity<byte[]> generateProposalPdf(@PathVariable String id) {
+        byte[] pdf = proposalCommercialPdfService.generatePdf(UUID.fromString(id));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String filename = "proposta-comercial-" + id + ".pdf";
+        headers.setContentDispositionFormData("attachment", filename);
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @PostMapping("/pdf/from-simulation")
+    @Operation(summary = "Gerar PDF da simulação", description = "Gera PDF da proposta de acordo a partir dos dados da simulação (layout padronizado)")
+    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    public ResponseEntity<byte[]> generatePdfFromSimulation(@RequestBody PropostaSimulacaoRequest request) {
+        byte[] pdf = proposalCommercialPdfService.generatePdfFromSimulation(request);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "proposta-comercial-acordo.pdf");
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
 
     @PostMapping
@@ -181,5 +217,31 @@ public class ProposalController {
                 "EXPIRED", proposalService.getTotalValueByStatus(ProposalStatus.EXPIRED),
                 "CONVERTED", proposalService.getTotalValueByStatus(ProposalStatus.CONVERTED));
         return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/reports/pdf")
+    @Operation(summary = "Gerar relatório PDF de propostas", description = "Gera relatório PDF com filtros opcionais")
+    public ResponseEntity<byte[]> generateReportPdf(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String clientName,
+            @RequestParam(required = false) String searchTerm) {
+        byte[] pdf = proposalReportService.generateProposalPdfReport(status, clientName, searchTerm);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "relatorio-propostas.pdf");
+        return ResponseEntity.ok().headers(headers).body(pdf);
+    }
+
+    @GetMapping("/reports/excel")
+    @Operation(summary = "Gerar relatório Excel de propostas", description = "Gera relatório Excel (CSV) com filtros opcionais")
+    public ResponseEntity<byte[]> generateReportExcel(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String clientName,
+            @RequestParam(required = false) String searchTerm) {
+        byte[] excel = proposalReportService.generateProposalExcelReport(status, clientName, searchTerm);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/csv; charset=UTF-8"));
+        headers.setContentDispositionFormData("attachment", "relatorio-propostas.csv");
+        return ResponseEntity.ok().headers(headers).body(excel);
     }
 }

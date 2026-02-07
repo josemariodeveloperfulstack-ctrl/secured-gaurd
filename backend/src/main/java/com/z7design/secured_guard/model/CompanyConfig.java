@@ -26,6 +26,12 @@ public class CompanyConfig {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
+    /**
+     * ID da empresa na tabela companies (fonte para cabeçalho/rodapé do PDF)
+     */
+    @Column(name = "company_id")
+    private UUID companyId;
+
     @NotBlank(message = "Nome da empresa é obrigatório")
     @Size(min = 3, max = 200, message = "Nome deve ter entre 3 e 200 caracteres")
     @Column(name = "name", nullable = false)
@@ -71,8 +77,7 @@ public class CompanyConfig {
     @Column(name = "website")
     private String website;
 
-    @Lob
-    @Column(name = "logo_url")
+    @Column(name = "logo_url", columnDefinition = "TEXT")
     private String logoUrl;
 
     @Size(max = 200, message = "Texto do cabeçalho não pode exceder 200 caracteres")
@@ -83,8 +88,7 @@ public class CompanyConfig {
     @Column(name = "footer_text")
     private String footerText;
 
-    @Lob
-    @Column(name = "contract_terms")
+    @Column(name = "contract_terms", columnDefinition = "TEXT")
     private String contractTerms;
 
     @Column(name = "active", nullable = false)

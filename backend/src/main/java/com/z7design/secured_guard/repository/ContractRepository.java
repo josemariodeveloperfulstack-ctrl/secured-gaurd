@@ -50,12 +50,17 @@ public interface ContractRepository extends JpaRepository<Contract, java.util.UU
     @Query("SELECT c FROM Contract c WHERE " +
            "(:clientId IS NULL OR c.client.id = :clientId) AND " +
            "(:status IS NULL OR c.status = :status) AND " +
+           "(:responsibleCommercialId IS NULL OR c.responsibleCommercial.id = :responsibleCommercialId) AND " +
            "(:searchTerm IS NULL OR LOWER(c.contractNumber) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
            "LOWER(c.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
-    Page<Contract> findByFilters(@Param("clientId") UUID clientId, 
-                                @Param("status") ContractStatus status, 
-                                @Param("searchTerm") String searchTerm, 
+    Page<Contract> findByFilters(@Param("clientId") UUID clientId,
+                                @Param("status") ContractStatus status,
+                                @Param("responsibleCommercialId") UUID responsibleCommercialId,
+                                @Param("searchTerm") String searchTerm,
                                 Pageable pageable);
+
+    // Buscar contratos por responsável comercial
+    List<Contract> findByResponsibleCommercialId(UUID responsibleCommercialId);
     
     // Contar contratos por status
     long countByStatus(ContractStatus status);
@@ -67,4 +72,17 @@ public interface ContractRepository extends JpaRepository<Contract, java.util.UU
     @Query("SELECT c FROM Contract c WHERE c.endDate BETWEEN :startDate AND :endDate")
     List<Contract> findContractsExpiringBetween(@Param("startDate") LocalDate startDate, 
                                                @Param("endDate") LocalDate endDate);
+
+    // Buscar contratos ativos que vencem em um período
+    @Query("SELECT c FROM Contract c WHERE c.status = 'ACTIVE' AND c.endDate IS NOT NULL AND c.endDate BETWEEN :startDate AND :endDate")
+    List<Contract> findActiveContractsExpiringBetween(@Param("startDate") LocalDate startDate, 
+                                                      @Param("endDate") LocalDate endDate);
+
+    // Contar contratos ativos por responsável comercial
+    @Query("SELECT COUNT(c) FROM Contract c WHERE c.status = :status AND c.responsibleCommercial.id = :userId")
+    long countByResponsibleCommercialIdAndStatus(@Param("userId") java.util.UUID userId, @Param("status") ContractStatus status);
+
+    // Contar contratos ativos por clientes (para listas de clientIds)
+    @Query("SELECT COUNT(c) FROM Contract c WHERE c.status = :status AND c.client.id IN :clientIds")
+    long countByClientIdInAndStatus(@Param("clientIds") java.util.List<java.util.UUID> clientIds, @Param("status") ContractStatus status);
 } 

@@ -354,6 +354,92 @@ public class FileUploadController {
         }
     }
 
+    @PostMapping("/contracts")
+    @Operation(summary = "Upload de documento de contrato", description = "Faz upload de documento vinculado a contrato (PDF, imagens, DOC, DOCX)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Arquivo enviado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Arquivo inválido"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
+    })
+    public ResponseEntity<Map<String, String>> uploadContractDocument(
+            @Parameter(description = "Arquivo do documento") @RequestParam("file") MultipartFile file) {
+
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Arquivo não pode estar vazio"));
+            }
+
+            String contentType = file.getContentType();
+            if (contentType == null || !isValidContractDocumentType(contentType)) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Tipo de arquivo não permitido. Use PDF, JPG, JPEG, PNG, DOC ou DOCX"));
+            }
+
+            if (file.getSize() > 10 * 1024 * 1024) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Arquivo muito grande. Máximo 10MB"));
+            }
+
+            String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
+            String fileExtension = getFileExtension(originalFilename);
+            if (fileExtension.isEmpty()) {
+                fileExtension = "bin";
+            }
+            String uniqueFilename = UUID.randomUUID().toString() + "." + fileExtension;
+
+            Path uploadPath = Paths.get(uploadDir, "contracts");
+            Files.createDirectories(uploadPath);
+
+            Path filePath = uploadPath.resolve(uniqueFilename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String fullUrl = "/api/uploads/contracts/" + uniqueFilename;
+            Map<String, String> response = new HashMap<>();
+            response.put("filename", uniqueFilename);
+            response.put("originalName", originalFilename);
+            response.put("path", "contracts/" + uniqueFilename);
+            response.put("size", String.valueOf(file.getSize()));
+            response.put("contentType", contentType);
+            response.put("url", fullUrl);
+
+            return ResponseEntity.ok(response);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erro ao salvar arquivo: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/contracts/{filename}")
+    @Operation(summary = "Download de documento de contrato", description = "Faz download de um documento vinculado a contrato")
+    public ResponseEntity<Resource> downloadContractDocument(
+            @Parameter(description = "Nome do arquivo") @PathVariable String filename) {
+
+        try {
+            Path filePath = Paths.get(uploadDir, "contracts").resolve(filename);
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() && resource.isReadable()) {
+                String contentType = Files.probeContentType(filePath);
+                if (contentType == null) {
+                    contentType = "application/octet-stream";
+                }
+                return ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                        .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (MalformedURLException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     // REMOVIDO: Endpoint GET removido para evitar conflito com ResourceHandler
     // O ResourceHandler em WebConfig.java serve os arquivos estáticos diretamente
     // que é mais eficiente e não causa conflitos de headers
@@ -370,6 +456,15 @@ public class FileUploadController {
                 contentType.equals("image/jpeg") ||
                 contentType.equals("image/jpg") ||
                 contentType.equals("image/png"));
+    }
+
+    private boolean isValidContractDocumentType(String contentType) {
+        return contentType != null && (contentType.equals("application/pdf") ||
+                contentType.equals("image/jpeg") ||
+                contentType.equals("image/jpg") ||
+                contentType.equals("image/png") ||
+                contentType.equals("application/msword") ||
+                contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
     }
 
     private boolean isValidImageType(String contentType) {

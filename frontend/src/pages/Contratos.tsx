@@ -10,6 +10,9 @@ import { ContractsFilters } from '@/components/contratos/ContractsFilters';
 import { ContractGenerator } from '@/components/contratos/ContractGenerator';
 import { CompanySettings } from '@/components/contratos/CompanySettings';
 import { EditContractModal } from '@/components/contratos/EditContractModal';
+import { ExpiringAlertsWidget } from '@/components/contratos/ExpiringAlertsWidget';
+import { RenewContractModal } from '@/components/contratos/RenewContractModal';
+import { TerminateContractModal } from '@/components/contratos/TerminateContractModal';
 import DepartamentosEmailConfig from '@/components/comercial/DepartamentosEmailConfig';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
@@ -20,6 +23,8 @@ const Contratos = () => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [originFilter, setOriginFilter] = useState('all');
+  const [expiringFilter, setExpiringFilter] = useState('all');
   const [contratos, setContratos] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +36,10 @@ const Contratos = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedContractForGeneration, setSelectedContractForGeneration] = useState<Contract | null>(null);
   const [selectedContractForEdit, setSelectedContractForEdit] = useState<Contract | null>(null);
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [contractToRenew, setContractToRenew] = useState<{ id: string; number: string; value: number } | null>(null);
+  const [terminateModalOpen, setTerminateModalOpen] = useState(false);
+  const [contractToTerminate, setContractToTerminate] = useState<Contract | null>(null);
 
   // Carregar contratos
   const loadContracts = async (filters: ContractFilters = {}) => {
@@ -110,16 +119,32 @@ const Contratos = () => {
       contrato.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
-    // Filtro por status
-    const matchesStatus = statusFilter === 'all' || contrato.status === statusFilter;
+    // Filtro por status (TERMINATED agrupa CANCELLED e EXPIRED)
+    const matchesStatus = statusFilter === 'all' 
+      || contrato.status === statusFilter 
+      || (statusFilter === 'TERMINATED' && (contrato.status === 'CANCELLED' || contrato.status === 'EXPIRED'));
+
+    // Filtro por origem
+    const matchesOrigin = originFilter === 'all' || contrato.contractOrigin === originFilter;
+
+    // Filtro por vencimento (contratos que vencem em 30 dias)
+    const matchesExpiring = expiringFilter === 'all' || (() => {
+      if (!contrato.endDate) return false;
+      const end = new Date(contrato.endDate);
+      const now = new Date();
+      const daysUntil = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return expiringFilter === '30' && daysUntil >= 0 && daysUntil <= 30;
+    })();
     
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesOrigin && matchesExpiring;
   });
 
   // Limpar filtros
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
+    setOriginFilter('all');
+    setExpiringFilter('all');
     loadContracts();
   };
 
@@ -182,12 +207,28 @@ const Contratos = () => {
     setSelectedContractForEdit(null);
   };
 
+  const handleTerminateClick = (contrato: Contract) => {
+    setContractToTerminate(contrato);
+    setTerminateModalOpen(true);
+  };
+
+  const handleRenewClick = (contractId: string, contractNumber?: string, value?: number) => {
+    const c = contratos.find(x => x.id === contractId);
+    setContractToRenew({
+      id: contractId,
+      number: contractNumber || c?.contractNumber || '',
+      value: value ?? c?.value ?? 0
+    });
+    setRenewModalOpen(true);
+  };
+
   const handleGenerateContract = (contract?: Contract) => {
     setSelectedContractForGeneration(contract || null);
     setGeneratorModalOpen(true);
   };
 
   const handleCompanySettings = () => {
+    setGeneratorModalOpen(false); // Fecha o modal de gerar contrato para exibir as configurações
     setCompanySettingsOpen(true);
   };
 
@@ -265,7 +306,7 @@ const Contratos = () => {
 
   return (
     <StandardLayout>
-      <div className="space-y-6 w-full max-w-full overflow-x-hidden px-2 sm:px-4 lg:px-6">
+      <div className="space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden px-3 sm:px-4 lg:px-6 pb-6">
         <div className="space-y-4">
           <div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray">Contratos</h1>
@@ -350,9 +391,16 @@ const Contratos = () => {
           </div>
         </div>
 
-        {/* Dashboard de Estatísticas */}
+        {/* Dashboard de Estatísticas e Alertas */}
         {!loading && (
-          <ContractsDashboard contracts={contratos} />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 w-full">
+            <div className="xl:col-span-2 min-w-0">
+              <ContractsDashboard contracts={contratos} />
+            </div>
+            <div className="min-w-0">
+              <ExpiringAlertsWidget onRenew={handleRenewClick} />
+            </div>
+          </div>
         )}
 
         {/* Filtros */}
@@ -360,6 +408,10 @@ const Contratos = () => {
           <ContractsFilters
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
+            originFilter={originFilter}
+            onOriginFilterChange={setOriginFilter}
+            expiringFilter={expiringFilter}
+            onExpiringFilterChange={setExpiringFilter}
             onClearFilters={clearFilters}
             totalContracts={contratos.length}
             filteredContracts={filteredContratos.length}
@@ -374,6 +426,7 @@ const Contratos = () => {
             onDelete={handleDeleteSuccess}
             onStatusChange={updateContractStatus}
             onGenerateContract={handleGenerateContract}
+            onTerminate={handleTerminateClick}
           />
         )}
 
@@ -401,7 +454,7 @@ const Contratos = () => {
 
         {/* Modal de Configurações da Empresa */}
         {companySettingsOpen && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
             <div className="bg-seguranca-graphite border border-gray-600 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
@@ -433,6 +486,25 @@ const Contratos = () => {
           onOpenChange={setEditModalOpen}
           contract={selectedContractForEdit}
           onSuccess={handleEditSuccess}
+        />
+
+        {/* Modal de Encerramento */}
+        <TerminateContractModal
+          open={terminateModalOpen}
+          onOpenChange={setTerminateModalOpen}
+          contractId={contractToTerminate?.id ?? null}
+          contractNumber={contractToTerminate?.contractNumber}
+          onSuccess={() => { loadContracts(); setContractToTerminate(null); }}
+        />
+
+        {/* Modal de Renovação */}
+        <RenewContractModal
+          open={renewModalOpen}
+          onOpenChange={setRenewModalOpen}
+          contractId={contractToRenew?.id ?? null}
+          contractNumber={contractToRenew?.number}
+          currentValue={contractToRenew?.value}
+          onSuccess={() => { loadContracts(); setContractToRenew(null); }}
         />
       </div>
     </StandardLayout>

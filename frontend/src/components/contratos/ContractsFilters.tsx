@@ -13,6 +13,10 @@ import { Calendar, Filter, X } from 'lucide-react';
 interface ContractsFiltersProps {
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
+  originFilter?: string;
+  onOriginFilterChange?: (origin: string) => void;
+  expiringFilter?: string;
+  onExpiringFilterChange?: (days: string) => void;
   onClearFilters: () => void;
   totalContracts: number;
   filteredContracts: number;
@@ -21,6 +25,10 @@ interface ContractsFiltersProps {
 export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
   statusFilter,
   onStatusFilterChange,
+  originFilter = 'all',
+  onOriginFilterChange,
+  expiringFilter = 'all',
+  onExpiringFilterChange,
   onClearFilters,
   totalContracts,
   filteredContracts
@@ -28,12 +36,23 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
   const statusOptions = [
     { value: 'all', label: 'Todos os Status', count: totalContracts },
     { value: 'ACTIVE', label: 'Ativos', color: 'bg-green-500' },
+    { value: 'DRAFT', label: 'Em elaboração', color: 'bg-gray-400' },
     { value: 'PENDING', label: 'Pendentes', color: 'bg-yellow-500' },
     { value: 'INACTIVE', label: 'Inativos', color: 'bg-gray-500' },
-    { value: 'TERMINATED', label: 'Terminados', color: 'bg-red-500' }
+    { value: 'SUSPENDED', label: 'Suspensos', color: 'bg-orange-500' },
+    { value: 'CANCELLED', label: 'Cancelados', color: 'bg-red-500' },
+    { value: 'EXPIRED', label: 'Expirados', color: 'bg-red-500' },
+    { value: 'TERMINATED', label: 'Terminados (Cancelado/Expirado)', color: 'bg-red-500' }
   ];
 
-  const hasActiveFilters = statusFilter !== 'all';
+  const hasActiveFilters = statusFilter !== 'all' || originFilter !== 'all' || expiringFilter !== 'all';
+
+  const originOptions = [
+    { value: 'all', label: 'Todas as origens' },
+    { value: 'PROPOSAL', label: 'Proposta' },
+    { value: 'RENEWAL', label: 'Renovação' },
+    { value: 'MANUAL', label: 'Manual' }
+  ];
 
   return (
     <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-seguranca-graphite rounded-lg border border-gray-600">
@@ -43,11 +62,28 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Filtro por Origem */}
+        {onOriginFilterChange && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 hidden sm:inline">Origem:</span>
+            <Select value={originFilter} onValueChange={onOriginFilterChange}>
+              <SelectTrigger className="w-full min-w-[120px] sm:w-40 bg-seguranca-black border-gray-600 text-seguranca-lightgray text-xs sm:text-sm">
+                <SelectValue placeholder="Origem" />
+              </SelectTrigger>
+              <SelectContent className="bg-seguranca-graphite border-gray-600">
+                {originOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Filtro por Status */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-400 hidden sm:inline">Status:</span>
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger className="w-32 sm:w-40 bg-seguranca-black border-gray-600 text-seguranca-lightgray text-xs sm:text-sm">
+            <SelectTrigger className="w-full min-w-[120px] sm:w-40 bg-seguranca-black border-gray-600 text-seguranca-lightgray text-xs sm:text-sm">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent className="bg-seguranca-graphite border-gray-600">
@@ -117,17 +153,17 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
         </Button>
         
         <Button
-          variant="outline"
+          variant={expiringFilter !== 'all' ? 'default' : 'outline'}
           size="sm"
-          onClick={() => {
-            // Filtrar contratos que vencem em 30 dias
-            // Esta funcionalidade seria implementada na página pai
-            console.log('Filtrar vencendo em breve');
-          }}
-          className="text-xs border-red-500 text-red-400 hover:bg-red-500/20 flex-shrink-0 whitespace-nowrap"
+          onClick={() => onExpiringFilterChange?.(expiringFilter === '30' ? 'all' : '30')}
+          className={`text-xs flex-shrink-0 whitespace-nowrap ${
+            expiringFilter === '30'
+              ? 'bg-red-500 hover:bg-red-600 text-white'
+              : 'border-red-500 text-red-400 hover:bg-red-500/20'
+          }`}
         >
           <Calendar className="h-3 w-3 mr-1" />
-          <span className="hidden md:inline">Vencendo</span>
+          <span className="hidden md:inline">Vencendo (30d)</span>
           <span className="md:hidden">Venc.</span>
         </Button>
       </div>

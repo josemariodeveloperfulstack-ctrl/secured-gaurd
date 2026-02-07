@@ -29,6 +29,12 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ptBR } from 'date-fns/locale';
 import { clientService } from '@/services/clientService';
+import { userService } from '@/services/userService';
+
+type StatusType = 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'SUSPENDED';
+type OriginType = 'PROPOSAL' | 'RENEWAL' | 'MANUAL';
+type ContractTypeForm = 'VIGILANCIA_PATRIMONIAL' | 'PORTARIA' | 'FACILITIES';
+type AdjustmentTypeForm = 'INPC' | 'IPCA' | 'MANUAL';
 
 interface ContratoFormData {
   clientId: string;
@@ -37,8 +43,17 @@ interface ContratoFormData {
   startDate: Date | null;
   endDate?: Date | null;
   value: number;
-  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED' | 'PENDING';
+  status: StatusType;
   notes?: string;
+  contractOrigin?: OriginType;
+  contractType?: ContractTypeForm;
+  responsibleCommercialId?: string;
+  responsibleManagerId?: string;
+  monthlyValue?: number;
+  annualValue?: number;
+  adjustmentType?: AdjustmentTypeForm;
+  nextAdjustmentDate?: Date | null;
+  autoRenewal?: boolean;
   notificar_rh?: boolean;
   notificar_dp?: boolean;
   notificar_operacional?: boolean;
@@ -62,6 +77,7 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string }[]>([]);
   const [formData, setFormData] = useState<ContratoFormData>({
     clientId: '',
     contractNumber: '',
@@ -69,8 +85,11 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
     startDate: new Date(),
     endDate: null,
     value: 0,
-    status: 'ACTIVE',
+    status: 'DRAFT',
     notes: '',
+    contractOrigin: 'MANUAL',
+    contractType: 'VIGILANCIA_PATRIMONIAL',
+    autoRenewal: false,
     notificar_rh: false,
     notificar_dp: false,
     notificar_operacional: false
@@ -112,12 +131,20 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
     });
   };
 
-  // Carregar clientes quando o modal abrir
+  // Carregar clientes e usuários quando o modal abrir
   useEffect(() => {
     if (open) {
       loadClients();
+      loadUsers();
     }
   }, [open]);
+
+  const loadUsers = async () => {
+    try {
+      const data = await userService.getAllUsers();
+      setUsers(data.map((u: any) => ({ id: u.id, name: u.name || u.username })));
+    } catch { /* ignore */ }
+  };
 
   const loadClients = async () => {
     try {
@@ -148,6 +175,12 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
         ...contrato,
         startDate: contrato.startDate ? new Date(contrato.startDate) : new Date(),
         endDate: contrato.endDate ? new Date(contrato.endDate) : null,
+        status: (contrato.status as StatusType) || 'DRAFT',
+        contractOrigin: (contrato as any).contractOrigin || 'MANUAL',
+        contractType: (contrato as any).contractType || 'VIGILANCIA_PATRIMONIAL',
+        responsibleCommercialId: (contrato as any).responsibleCommercialId,
+        responsibleManagerId: (contrato as any).responsibleManagerId,
+        nextAdjustmentDate: (contrato as any).nextAdjustmentDate ? new Date((contrato as any).nextAdjustmentDate) : null,
         notificar_rh: contrato.notificar_rh || false,
         notificar_dp: contrato.notificar_dp || false,
         notificar_operacional: contrato.notificar_operacional || false
@@ -160,8 +193,11 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
         startDate: new Date(),
         endDate: null,
         value: 0,
-        status: 'ACTIVE',
+        status: 'DRAFT',
         notes: '',
+        contractOrigin: 'MANUAL',
+        contractType: 'VIGILANCIA_PATRIMONIAL',
+        autoRenewal: false,
         notificar_rh: false,
         notificar_dp: false,
         notificar_operacional: false
@@ -234,7 +270,16 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
           value: formData.value,
           status: formData.status,
           clientId: formData.clientId,
-          notes: formData.notes
+          notes: formData.notes,
+          contractOrigin: formData.contractOrigin,
+          contractType: formData.contractType,
+          responsibleCommercialId: formData.responsibleCommercialId || undefined,
+          responsibleManagerId: formData.responsibleManagerId || undefined,
+          monthlyValue: formData.monthlyValue,
+          annualValue: formData.annualValue,
+          adjustmentType: formData.adjustmentType,
+          nextAdjustmentDate: formData.nextAdjustmentDate ? formData.nextAdjustmentDate.toISOString().split('T')[0] : undefined,
+          autoRenewal: formData.autoRenewal
         };
         
         console.log('📤 Enviando dados para backend:', contractData);
@@ -473,6 +518,12 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="DRAFT" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          <div className="flex items-center gap-2">
+                            <FileText size={14} className="text-gray-400" />
+                            Em elaboração
+                          </div>
+                        </SelectItem>
                         <SelectItem value="ACTIVE" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                           <div className="flex items-center gap-2">
                             <CheckCircle size={14} className="text-green-500" />
@@ -491,14 +542,111 @@ export const ContratoFormModal: React.FC<ContratoFormModalProps> = ({
                             Inativo
                           </div>
                         </SelectItem>
-                        <SelectItem value="TERMINATED" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                        <SelectItem value="CANCELLED" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
                           <div className="flex items-center gap-2">
                             <AlertCircle size={14} className="text-red-500" />
-                            Terminado
+                            Cancelado
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="EXPIRED" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle size={14} className="text-red-500" />
+                            Expirado
                           </div>
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Seção: Origem, Tipo e Responsáveis (PRD) */}
+            <Card className="bg-seguranca-black/50 border-gray-600/50 p-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+                  <Building2 size={18} />
+                  Origem e Responsáveis
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-seguranca-lightgray">Origem</Label>
+                    <Select value={formData.contractOrigin || 'MANUAL'} onValueChange={(v) => setFormData({ ...formData, contractOrigin: v as OriginType })}>
+                      <SelectTrigger className="border-gray-600 bg-white text-black h-12">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="PROPOSAL" className="text-seguranca-lightgray">Proposta comercial</SelectItem>
+                        <SelectItem value="RENEWAL" className="text-seguranca-lightgray">Renovação</SelectItem>
+                        <SelectItem value="MANUAL" className="text-seguranca-lightgray">Manual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-seguranca-lightgray">Tipo de contrato</Label>
+                    <Select value={formData.contractType || 'VIGILANCIA_PATRIMONIAL'} onValueChange={(v) => setFormData({ ...formData, contractType: v as ContractTypeForm })}>
+                      <SelectTrigger className="border-gray-600 bg-white text-black h-12">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="VIGILANCIA_PATRIMONIAL" className="text-seguranca-lightgray">Vigilância patrimonial</SelectItem>
+                        <SelectItem value="PORTARIA" className="text-seguranca-lightgray">Portaria</SelectItem>
+                        <SelectItem value="FACILITIES" className="text-seguranca-lightgray">Facilities</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-seguranca-lightgray">Responsável comercial</Label>
+                    <Select value={formData.responsibleCommercialId || '__none__'} onValueChange={(v) => setFormData({ ...formData, responsibleCommercialId: v === '__none__' ? undefined : v })}>
+                      <SelectTrigger className="border-gray-600 bg-white text-black h-12">
+                        <SelectValue placeholder="Nenhum" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="__none__" className="text-seguranca-lightgray">Nenhum</SelectItem>
+                        {users.map(u => <SelectItem key={u.id} value={u.id} className="text-seguranca-lightgray">{u.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-seguranca-lightgray">Gestor do contrato</Label>
+                    <Select value={formData.responsibleManagerId || '__none__'} onValueChange={(v) => setFormData({ ...formData, responsibleManagerId: v === '__none__' ? undefined : v })}>
+                      <SelectTrigger className="border-gray-600 bg-white text-black h-12">
+                        <SelectValue placeholder="Nenhum" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="__none__" className="text-seguranca-lightgray">Nenhum</SelectItem>
+                        {users.map(u => <SelectItem key={u.id} value={u.id} className="text-seguranca-lightgray">{u.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-seguranca-lightgray">Reajuste</Label>
+                    <Select value={formData.adjustmentType || '__none__'} onValueChange={(v) => setFormData({ ...formData, adjustmentType: v === '__none__' ? undefined : (v as AdjustmentTypeForm) })}>
+                      <SelectTrigger className="border-gray-600 bg-white text-black h-12">
+                        <SelectValue placeholder="Nenhum" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="__none__" className="text-seguranca-lightgray">Nenhum</SelectItem>
+                        <SelectItem value="INPC" className="text-seguranca-lightgray">INPC</SelectItem>
+                        <SelectItem value="IPCA" className="text-seguranca-lightgray">IPCA</SelectItem>
+                        <SelectItem value="MANUAL" className="text-seguranca-lightgray">Manual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-seguranca-lightgray">Data do próximo reajuste</Label>
+                    <DatePicker
+                      selected={formData.nextAdjustmentDate || null}
+                      onChange={(date: Date | null) => setFormData({ ...formData, nextAdjustmentDate: date })}
+                      dateFormat="dd/MM/yyyy"
+                      locale={ptBR}
+                      placeholderText="dd/mm/aaaa"
+                      className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black placeholder:text-gray-500 [&_input]:text-black [&_input]:bg-white [&_input]:placeholder-gray-500"
+                    />
+                  </div>
+                  <div className="space-y-2 flex items-center gap-2">
+                    <Checkbox id="autoRenewal" checked={formData.autoRenewal || false} onCheckedChange={(c) => setFormData({ ...formData, autoRenewal: !!c })} />
+                    <Label htmlFor="autoRenewal" className="text-sm font-medium text-seguranca-lightgray">Renovação automática</Label>
                   </div>
                 </div>
               </div>

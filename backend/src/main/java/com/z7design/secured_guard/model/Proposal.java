@@ -67,6 +67,10 @@ public class Proposal {
     @JoinColumn(name = "assigned_to_id")
     private User assignedTo;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contract_id")
+    private Contract contract;
+
     @OneToMany(mappedBy = "proposal", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @com.fasterxml.jackson.annotation.JsonManagedReference
     private List<ProposalItem> items = new ArrayList<>();
@@ -282,6 +286,14 @@ public class Proposal {
 
     public void setAssignedTo(User assignedTo) {
         this.assignedTo = assignedTo;
+    }
+
+    public Contract getContract() {
+        return contract;
+    }
+
+    public void setContract(Contract contract) {
+        this.contract = contract;
     }
 
     public List<ProposalItem> getItems() {

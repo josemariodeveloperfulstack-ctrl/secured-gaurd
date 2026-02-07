@@ -1,28 +1,30 @@
 package com.z7design.secured_guard.service;
 
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.ClientReportFilterDTO;
+import com.z7design.secured_guard.dto.ReportLayoutConfig;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Client;
+import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.repository.ClientRepository;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
-
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.layout.Document;
-import com.itextpdf.layout.element.Cell;
-import com.itextpdf.layout.element.Paragraph;
-import com.itextpdf.layout.element.Table;
-import com.itextpdf.layout.properties.TextAlignment;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-
-// Placeholder for PDF generation library (e.g., iText, Apache PDFBox)
-// Placeholder for Excel generation library (e.g., Apache POI)
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -30,58 +32,34 @@ import java.util.List;
 public class ClientReportService {
 
     private final ClientRepository clientRepository;
+    private final StandardReportLayoutService standardReportLayoutService;
+    private final CompanyRepository companyRepository;
 
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    @Transactional(readOnly = true)
     public byte[] generateClientPdfReport(ClientReportFilterDTO filters) {
         log.info("Gerando relatório PDF para clientes com filtros: {}", filters);
         List<Client> clients = findClientsByFilters(filters);
 
+        UUID companyId = resolveCompanyId();
+
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(baos);
-            PdfDocument pdfDoc = new PdfDocument(writer);
-            Document document = new Document(pdfDoc);
 
-            document.add(new Paragraph("RELATÓRIO DE CLIENTES")
-                    .setBold()
-                    .setFontSize(14)
-                    .setTextAlignment(TextAlignment.CENTER));
+            ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                    .companyId(companyId)
+                    .reportTitle("RELATÓRIO DE CLIENTES")
+                    .landscape(true)
+                    .build();
 
-            document.add(new Paragraph("Filtros aplicados:")
-                    .setBold()
-                    .setFontSize(10));
+            StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService
+                    .createDocumentWithLayout(writer, layoutConfig);
+            Document document = docWithPdf.getDocument();
 
-            document.add(new Paragraph(String.format("Nome: %s",
-                    filters.getName() != null ? filters.getName() : "Todos")).setFontSize(9));
-            document.add(new Paragraph(String.format("CNPJ: %s",
-                    filters.getCnpj() != null ? filters.getCnpj() : "Todos")).setFontSize(9));
-            document.add(new Paragraph(String.format("Status: %s",
-                    filters.getStatus() != null ? filters.getStatus() : "Todos")).setFontSize(9));
-            document.add(new Paragraph(String.format("Data Início: %s",
-                    filters.getStartDate() != null ? filters.getStartDate() : "N/A")).setFontSize(9));
-            document.add(new Paragraph(String.format("Data Fim: %s",
-                    filters.getEndDate() != null ? filters.getEndDate() : "N/A")).setFontSize(9));
+            addReportHeaderInfo(document, filters, clients.size());
+            addClientsTable(document, clients);
 
-            document.add(new Paragraph(String.format("Total de clientes: %d", clients.size()))
-                    .setFontSize(9)
-                    .setMarginTop(8));
-
-            float[] columnWidths = {4, 3, 4, 3, 3};
-            Table table = new Table(columnWidths).useAllAvailableWidth().setMarginTop(10);
-            addHeaderCell(table, "Nome");
-            addHeaderCell(table, "CNPJ");
-            addHeaderCell(table, "Email");
-            addHeaderCell(table, "Status");
-            addHeaderCell(table, "Criado em");
-
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-            for (Client client : clients) {
-                table.addCell(createCell(client.getName()));
-                table.addCell(createCell(client.getCnpj()));
-                table.addCell(createCell(client.getEmail()));
-                table.addCell(createCell(client.getStatus() != null ? client.getStatus().toString() : ""));
-                table.addCell(createCell(client.getCreatedAt() != null ? client.getCreatedAt().toLocalDate().format(formatter) : ""));
-            }
-
-            document.add(table);
             document.close();
 
             return baos.toByteArray();
@@ -91,12 +69,69 @@ public class ClientReportService {
         }
     }
 
-    private void addHeaderCell(Table table, String text) {
-        table.addCell(new Cell().add(new Paragraph(text).setBold()).setTextAlignment(TextAlignment.CENTER));
+    private UUID resolveCompanyId() {
+        List<Company> activeCompanies = companyRepository.findByStatus(CompanyStatus.ACTIVE);
+        if (activeCompanies != null && !activeCompanies.isEmpty()) {
+            return activeCompanies.get(0).getId();
+        }
+        List<Company> allCompanies = companyRepository.findAll();
+        if (allCompanies != null && !allCompanies.isEmpty()) {
+            return allCompanies.get(0).getId();
+        }
+        throw new ResourceNotFoundException("Não foi possível determinar a empresa para o relatório. " +
+                "Nenhuma empresa cadastrada no sistema.");
     }
 
-    private Cell createCell(String text) {
-        return new Cell().add(new Paragraph(text != null ? text : "")).setTextAlignment(TextAlignment.LEFT);
+    private void addReportHeaderInfo(Document document, ClientReportFilterDTO filters, int totalClients) {
+        document.add(new Paragraph("Filtros aplicados:").setBold().setFontSize(10).setMarginBottom(4));
+        document.add(new Paragraph(String.format("Nome: %s", filters.getName() != null ? filters.getName() : "Todos"))
+                .setFontSize(9));
+        document.add(new Paragraph(String.format("CNPJ: %s", filters.getCnpj() != null ? filters.getCnpj() : "Todos"))
+                .setFontSize(9));
+        document.add(new Paragraph(String.format("Status: %s", filters.getStatus() != null ? filters.getStatus() : "Todos"))
+                .setFontSize(9));
+        document.add(new Paragraph(String.format("Data Início: %s", filters.getStartDate() != null ? filters.getStartDate() : "N/A"))
+                .setFontSize(9));
+        document.add(new Paragraph(String.format("Data Fim: %s", filters.getEndDate() != null ? filters.getEndDate() : "N/A"))
+                .setFontSize(9));
+        document.add(new Paragraph(String.format("Total de clientes: %d", totalClients))
+                .setFontSize(10)
+                .setBold()
+                .setMarginTop(8)
+                .setMarginBottom(10));
+    }
+
+    private void addClientsTable(Document document, List<Client> clients) {
+        if (clients.isEmpty()) {
+            document.add(new Paragraph("Nenhum cliente encontrado com os filtros aplicados.")
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(12)
+                    .setMarginTop(20));
+            return;
+        }
+
+        Table table = new Table(UnitValue.createPercentArray(new float[]{30, 15, 25, 12, 18}))
+                .useAllAvailableWidth()
+                .setMarginTop(10);
+
+        table.addHeaderCell(standardReportLayoutService.createHeaderCell("Nome"));
+        table.addHeaderCell(standardReportLayoutService.createHeaderCell("CNPJ"));
+        table.addHeaderCell(standardReportLayoutService.createHeaderCell("Email"));
+        table.addHeaderCell(standardReportLayoutService.createHeaderCell("Status"));
+        table.addHeaderCell(standardReportLayoutService.createHeaderCell("Criado em"));
+
+        for (Client client : clients) {
+            table.addCell(standardReportLayoutService.createDataCell(client.getName()));
+            table.addCell(standardReportLayoutService.createDataCell(client.getCnpj()));
+            table.addCell(standardReportLayoutService.createDataCell(client.getEmail()));
+            table.addCell(standardReportLayoutService.createDataCell(
+                    client.getStatus() != null ? client.getStatus().toString() : ""));
+            table.addCell(standardReportLayoutService.createDataCell(
+                    client.getCreatedAt() != null ? client.getCreatedAt().toLocalDate().format(DATE_FORMATTER) : ""));
+
+        }
+
+        document.add(table);
     }
 
     public byte[] generateClientExcelReport(ClientReportFilterDTO filters) {

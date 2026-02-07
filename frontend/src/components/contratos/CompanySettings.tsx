@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Save, Eye, Download, Loader2 } from 'lucide-react';
-import { companyConfigService, CompanyConfig } from '@/services/companyConfigService';
+import { Save, Eye, Loader2, Building2 } from 'lucide-react';
+import { companyConfigService, CompanyConfig, ContractTemplatePreviewRequest } from '@/services/companyConfigService';
+import { companyService } from '@/services/companyService';
+import { getApiUrl } from '@/config/environment';
 
 interface CompanySettingsProps {
   open: boolean;
@@ -15,6 +18,8 @@ interface CompanySettingsProps {
 
 export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }) => {
   const { toast } = useToast();
+  const [companiesList, setCompaniesList] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [config, setConfig] = useState<CompanyConfig>({
     name: '',
     cnpj: '',
@@ -27,45 +32,62 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
     website: '',
     logoUrl: '',
     headerText: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE SEGURANÇA',
-    footerText: 'Este contrato é regido pelas leis brasileiras e foro da cidade de São Paulo/SP.',
+    footerText: 'Este contrato é regido pelas leis brasileiras e foro da cidade de Contagem/MG.',
     contractTerms: ''
   });
 
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
-      loadCompanyConfig();
+      loadAll();
     }
   }, [open]);
 
-  const loadCompanyConfig = async () => {
+  const loadAll = async () => {
     setLoading(true);
     try {
-      const activeConfig = await companyConfigService.getActiveConfig();
+      const [companies, activeConfig] = await Promise.all([
+        companyService.getAllCompanies(),
+        companyConfigService.getActiveConfig()
+      ]);
+      setCompaniesList(Array.isArray(companies) ? companies : []);
+
+      let companyIdToSet = '';
       if (activeConfig) {
         setConfig(activeConfig);
-        if (activeConfig.logoUrl) {
-          setLogoPreview(activeConfig.logoUrl);
+        if (activeConfig.companyId) {
+          companyIdToSet = activeConfig.companyId;
+        } else if (activeConfig.cnpj && companies?.length) {
+          const match = companies.find((c: any) =>
+            (c.cnpj || '').replace(/\D/g, '') === (activeConfig.cnpj || '').replace(/\D/g, '')
+          );
+          if (match) companyIdToSet = match.id;
         }
-      } else {
-        // Se não existe configuração, usar valores padrão
+      }
+      if (!companyIdToSet && companies?.length > 0) {
+        companyIdToSet = companies[0].id;
+      }
+      setSelectedCompanyId(companyIdToSet);
+
+      if (!activeConfig && companies?.length > 0) {
+        const first = companies[0];
+        const addr = [first.address, first.enderecoRua, first.city, first.state, first.zipCode].filter(Boolean).join(', ');
         setConfig({
-          name: 'Secure Guard Segurança Ltda',
-          cnpj: '12.345.678/0001-90',
-          address: 'Rua da Segurança, 123',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01234-567',
-          phone: '(11) 9999-9999',
-          email: 'contato@secureguard.com.br',
-          website: 'www.secureguard.com.br',
-          logoUrl: '',
+          name: first.name || '',
+          cnpj: first.cnpj || '',
+          address: addr || '',
+          city: first.city || '',
+          state: first.state || '',
+          zipCode: first.zipCode || '',
+          phone: first.phone || '',
+          email: first.email || '',
+          website: first.website || '',
+          logoUrl: first.logoUrl || '',
           headerText: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE SEGURANÇA',
-          footerText: 'Este contrato é regido pelas leis brasileiras e foro da cidade de São Paulo/SP.',
+          footerText: 'Este contrato é regido pelas leis brasileiras e foro da cidade de Contagem/MG.',
           contractTerms: `CLÁUSULAS E CONDIÇÕES:
 
 1. DO OBJETO: A CONTRATADA prestará serviços de segurança patrimonial conforme especificado neste contrato.
@@ -95,8 +117,10 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
    - Pagamento proporcional dos serviços prestados
 
 7. DO FORO:
-   - Foro da comarca de São Paulo/SP para questões judiciais`
+   - Foro da comarca de Contagem/MG para questões judiciais`
         });
+      } else if (!activeConfig && companies?.length === 0) {
+        setConfig(prev => ({ ...prev, name: '', cnpj: '', address: '', city: '', state: '', zipCode: '', phone: '', email: '', website: '' }));
       }
     } catch (error) {
       console.error('Erro ao carregar configuração:', error);
@@ -110,35 +134,53 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
     }
   };
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setLogoPreview(result);
-        setConfig(prev => ({ ...prev, logoUrl: result }));
-      };
-      reader.readAsDataURL(file);
+  const handleSelectCompany = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    const company = companiesList.find((c: any) => c.id === companyId);
+    if (company) {
+      const address = [company.address, company.enderecoRua, company.city, company.state, company.zipCode]
+        .filter(Boolean).join(', ');
+      setConfig(prev => ({
+        ...prev,
+        companyId: companyId,
+        name: company.name || prev.name,
+        cnpj: company.cnpj || prev.cnpj,
+        address: address || prev.address,
+        city: company.city || prev.city,
+        state: company.state || prev.state,
+        zipCode: company.zipCode || prev.zipCode,
+        phone: company.phone || prev.phone,
+        email: company.email || prev.email,
+        website: company.website || prev.website,
+        logoUrl: company.logoUrl || ''
+      }));
     }
+  };
+
+  const getLogoDisplayUrl = (logoUrl: string | undefined): string | null => {
+    if (!logoUrl) return null;
+    const baseUrl = getApiUrl().replace('/api', '');
+    const normalized = logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`;
+    if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) return logoUrl;
+    if (normalized.startsWith('/api/uploads/')) return `${baseUrl}${normalized}`;
+    if (normalized.startsWith('/uploads/')) return `${baseUrl}/api${normalized}`;
+    return `${baseUrl}/api/uploads/companies/logos/${logoUrl.replace(/^\/+/, '')}`;
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Validações básicas
-      if (!config.name || !config.cnpj || !config.address || !config.city || 
-          !config.state || !config.zipCode || !config.phone || !config.email) {
+      if (!selectedCompanyId) {
         toast({
-          title: "Dados Incompletos",
-          description: "Por favor, preencha todos os campos obrigatórios.",
+          title: "Empresa não selecionada",
+          description: "Selecione uma empresa da tabela de empresas cadastradas.",
           variant: "destructive"
         });
         return;
       }
 
-      const savedConfig = await companyConfigService.saveConfig(config);
+      const configToSave = { ...config, companyId: selectedCompanyId };
+      const savedConfig = await companyConfigService.saveConfig(configToSave);
       onSave(savedConfig);
       
       toast({
@@ -157,225 +199,90 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
     }
   };
 
-  const handlePreview = () => {
-    // Abrir preview do template
-    const previewWindow = window.open('', '_blank');
-    if (previewWindow) {
-      previewWindow.document.write(generateContractPreview());
+  const handlePreview = async () => {
+    if (!selectedCompanyId) {
+      toast({
+        title: "Empresa não selecionada",
+        description: "Selecione uma empresa antes de visualizar o preview.",
+        variant: "destructive"
+      });
+      return;
     }
-  };
-
-  const generateContractPreview = () => {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Preview - Contrato</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
-          .logo { max-height: 80px; margin-bottom: 10px; }
-          .company-info { font-size: 12px; margin-bottom: 10px; }
-          .contract-title { font-size: 18px; font-weight: bold; margin: 20px 0; }
-          .content { line-height: 1.6; text-align: justify; }
-          .footer { border-top: 1px solid #000; padding-top: 20px; margin-top: 40px; font-size: 10px; text-align: center; }
-          .signature-section { margin-top: 50px; }
-          .signature-box { border: 1px solid #000; height: 80px; margin: 20px 0; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          ${config.logoUrl ? `<img src="${config.logoUrl}" alt="Logo" class="logo" />` : ''}
-          <div class="company-info">
-            <strong>${config.name}</strong><br>
-            CNPJ: ${config.cnpj}<br>
-            ${config.address}, ${config.city}/${config.state} - CEP: ${config.zipCode}<br>
-            Tel: ${config.phone} | Email: ${config.email}
-            ${config.website ? ` | ${config.website}` : ''}
-          </div>
-          <div class="contract-title">${config.headerText}</div>
-        </div>
-        
-        <div class="content">
-          <p><strong>CONTRATANTE:</strong> [NOME DO CLIENTE]</p>
-          <p><strong>CNPJ/CPF:</strong> [DOCUMENTO DO CLIENTE]</p>
-          <p><strong>ENDEREÇO:</strong> [ENDEREÇO DO CLIENTE]</p>
-          
-          <p><strong>CONTRATADA:</strong> ${config.name}</p>
-          <p><strong>CNPJ:</strong> ${config.cnpj}</p>
-          <p><strong>ENDEREÇO:</strong> ${config.address}, ${config.city}/${config.state}</p>
-          
-          <br>
-          <p><strong>VALOR DO CONTRATO:</strong> R$ [VALOR]</p>
-          <p><strong>PERÍODO:</strong> [DATA INÍCIO] a [DATA FIM]</p>
-          <p><strong>DESCRIÇÃO:</strong> [DESCRIÇÃO DOS SERVIÇOS]</p>
-          
-          <br>
-          <div style="white-space: pre-line;">${config.contractTerms}</div>
-          
-          <div class="signature-section">
-            <p><strong>ASSINATURAS:</strong></p>
-            <div style="display: flex; justify-content: space-between;">
-              <div style="width: 45%;">
-                <div class="signature-box"></div>
-                <p style="text-align: center; margin: 0;"><strong>CONTRATANTE</strong></p>
-              </div>
-              <div style="width: 45%;">
-                <div class="signature-box"></div>
-                <p style="text-align: center; margin: 0;"><strong>CONTRATADA</strong></p>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="footer">
-          ${config.footerText}
-        </div>
-      </body>
-      </html>
-    `;
+    setPreviewLoading(true);
+    try {
+      const request: ContractTemplatePreviewRequest = {
+        companyId: selectedCompanyId,
+        headerText: config.headerText,
+        footerText: config.footerText,
+        contractTerms: config.contractTerms
+      };
+      const blob = await companyConfigService.generatePreviewPdf(request);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error: any) {
+      console.error('Erro ao gerar preview PDF:', error);
+      toast({
+        title: "Erro ao gerar preview",
+        description: error.message || "Não foi possível gerar o PDF do template.",
+        variant: "destructive"
+      });
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   if (!open) return null;
 
   return (
     <div className="space-y-6">
-      {/* Dados da Empresa */}
-      <Card className="bg-seguranca-graphite border-gray-600">
-        <CardHeader>
-          <CardTitle className="text-seguranca-lightgray">Dados da Empresa</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-seguranca-lightgray">Nome da Empresa *</Label>
-              <Input
-                value={config.name}
-                onChange={(e) => setConfig(prev => ({ ...prev, name: e.target.value }))}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-            </div>
-            <div>
-              <Label className="text-seguranca-lightgray">CNPJ *</Label>
-              <Input
-                value={config.cnpj}
-                onChange={(e) => setConfig(prev => ({ ...prev, cnpj: e.target.value }))}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-seguranca-lightgray">Endereço *</Label>
-            <Input
-              value={config.address}
-              onChange={(e) => setConfig(prev => ({ ...prev, address: e.target.value }))}
-              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label className="text-seguranca-lightgray">Cidade *</Label>
-              <Input
-                value={config.city}
-                onChange={(e) => setConfig(prev => ({ ...prev, city: e.target.value }))}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-            </div>
-            <div>
-              <Label className="text-seguranca-lightgray">Estado *</Label>
-              <Input
-                value={config.state}
-                onChange={(e) => setConfig(prev => ({ ...prev, state: e.target.value }))}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-            </div>
-            <div>
-              <Label className="text-seguranca-lightgray">CEP *</Label>
-              <Input
-                value={config.zipCode}
-                onChange={(e) => setConfig(prev => ({ ...prev, zipCode: e.target.value }))}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-seguranca-lightgray">Telefone *</Label>
-              <Input
-                value={config.phone}
-                onChange={(e) => setConfig(prev => ({ ...prev, phone: e.target.value }))}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-            </div>
-            <div>
-              <Label className="text-seguranca-lightgray">Email *</Label>
-              <Input
-                value={config.email}
-                onChange={(e) => setConfig(prev => ({ ...prev, email: e.target.value }))}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-seguranca-lightgray">Website</Label>
-            <Input
-              value={config.website}
-              onChange={(e) => setConfig(prev => ({ ...prev, website: e.target.value }))}
-              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-              placeholder="www.exemplo.com.br"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Logo da Empresa */}
-      <Card className="bg-seguranca-graphite border-gray-600">
-        <CardHeader>
-          <CardTitle className="text-seguranca-lightgray">Logo da Empresa</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label className="text-seguranca-lightgray">Upload da Logo</Label>
-            <div className="flex items-center gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => document.getElementById('logo-upload')?.click()}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Escolher Arquivo
-              </Button>
-              <input
-                id="logo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                className="hidden"
-              />
-              {logoFile && (
-                <span className="text-sm text-gray-400">{logoFile.name}</span>
-              )}
-            </div>
-          </div>
-
-          {logoPreview && (
-            <div className="bg-seguranca-black p-4 rounded border border-gray-600">
-              <p className="text-sm text-gray-400 mb-2">Preview da Logo:</p>
-              <img 
-                src={logoPreview} 
-                alt="Logo Preview" 
-                className="max-h-20 object-contain"
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Seletor de Empresa - tabela Companies */}
+      {companiesList.length > 0 && (
+        <Card className="bg-seguranca-graphite border-gray-600">
+          <CardHeader>
+            <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+              <Building2 size={18} />
+              Empresa no cabeçalho, rodapé e contrato
+            </CardTitle>
+            <p className="text-sm text-gray-400 mt-1">
+              Selecione a empresa da tabela de empresas cadastradas. Os dados vêm da tabela Companies.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedCompanyId || companiesList[0]?.id} onValueChange={handleSelectCompany}>
+              <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent className="bg-seguranca-graphite border-gray-600">
+                {companiesList.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id} className="text-seguranca-lightgray">
+                    {c.name} {c.cnpj ? `- ${c.cnpj}` : c.sigla ? ` (${c.sigla})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedCompanyId && config.name && (
+              <div className="mt-4 p-4 bg-seguranca-black rounded-lg border border-gray-600">
+                <p className="text-xs text-gray-400 mb-2">Dados da empresa selecionada (da tabela Companies):</p>
+                <div className="flex items-start gap-4">
+                  {config.logoUrl && (() => {
+                    const logoDisplayUrl = getLogoDisplayUrl(config.logoUrl);
+                    return logoDisplayUrl ? <img src={logoDisplayUrl} alt="Logo" className="max-h-16 object-contain" /> : null;
+                  })()}
+                  <div>
+                    <p className="text-seguranca-lightgray font-medium">{config.name}</p>
+                    {config.cnpj && <p className="text-gray-300 text-sm">CNPJ: {config.cnpj}</p>}
+                    {config.address && <p className="text-gray-300 text-sm">Endereço: {config.address}</p>}
+                    {(config.phone || config.email) && (
+                      <p className="text-gray-300 text-sm">Tel: {config.phone || '-'} | Email: {config.email || '-'}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Template do Contrato */}
       <Card className="bg-seguranca-graphite border-gray-600">
@@ -418,11 +325,21 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
       <div className="flex justify-between">
         <Button
           onClick={handlePreview}
+          disabled={previewLoading || !selectedCompanyId}
           variant="outline"
           className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
         >
-          <Eye className="h-4 w-4 mr-2" />
-          Preview Template
+          {previewLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Gerando PDF...
+            </>
+          ) : (
+            <>
+              <Eye className="h-4 w-4 mr-2" />
+              Preview Template
+            </>
+          )}
         </Button>
 
         <Button

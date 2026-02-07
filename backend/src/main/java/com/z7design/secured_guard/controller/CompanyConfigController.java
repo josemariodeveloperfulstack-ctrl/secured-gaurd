@@ -1,9 +1,14 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.CompanyConfigDTO;
+import com.z7design.secured_guard.dto.ContractTemplatePreviewRequest;
+import com.z7design.secured_guard.service.ClientContractStandardPdfService;
 import com.z7design.secured_guard.service.CompanyConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +25,7 @@ import java.util.UUID;
 public class CompanyConfigController {
 
     private final CompanyConfigService companyConfigService;
+    private final ClientContractStandardPdfService contractPdfService;
 
     /**
      * Busca a configuração ativa da empresa
@@ -35,6 +41,16 @@ public class CompanyConfigController {
         } else {
             return ResponseEntity.noContent().build();
         }
+    }
+
+    /**
+     * Lista todas as configurações de empresa (para seleção)
+     */
+    @GetMapping("/all")
+    public ResponseEntity<java.util.List<CompanyConfigDTO>> getAllConfigs() {
+        log.info("GET /api/company-config/all - Listando todas as configurações");
+        java.util.List<CompanyConfigDTO> configs = companyConfigService.getAllConfigs();
+        return ResponseEntity.ok(configs);
     }
 
     /**
@@ -88,6 +104,29 @@ public class CompanyConfigController {
         
         companyConfigService.deactivateConfig(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Gera PDF de preview do template de contrato com placeholders.
+     * Usa os dados atuais do formulário (incluindo alterações não salvas).
+     */
+    @PostMapping("/preview-pdf")
+    public ResponseEntity<ByteArrayResource> generatePreviewPdf(@Valid @RequestBody ContractTemplatePreviewRequest request) {
+        log.info("POST /api/company-config/preview-pdf - Gerando preview do template");
+        try {
+            byte[] pdfBytes = contractPdfService.generatePreviewPdf(request);
+            ByteArrayResource resource = new ByteArrayResource(pdfBytes);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=preview_template.pdf")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .contentLength(pdfBytes.length)
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("Erro ao gerar preview PDF: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**

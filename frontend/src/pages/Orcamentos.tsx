@@ -27,6 +27,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
@@ -52,6 +58,7 @@ import { clientService, Client } from '@/services/clientService';
 import leadService from '@/services/leadService';
 import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import { Loader2, Plus as PlusIcon } from 'lucide-react';
+import { saveAs } from 'file-saver';
 
 interface QuoteExtended extends Quote {
   quoteNumber?: string;
@@ -78,6 +85,7 @@ const Orcamentos = () => {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<CreateQuoteRequest & { status?: string }>({
@@ -381,6 +389,30 @@ const Orcamentos = () => {
         description: error.response?.data?.message || "Não foi possível excluir o orçamento.",
         variant: "destructive"
       });
+    }
+  };
+
+  // Handle download PDF
+  const handleDownloadPdf = async (quote: QuoteExtended, includeServices: boolean) => {
+    const quoteId = typeof quote.id === 'string' ? quote.id : String(quote.id);
+    try {
+      setGeneratingPdfId(quoteId);
+      const blob = await quoteService.getQuotePdf(quoteId, includeServices);
+      const fileName = `orcamento_${quote.quoteNumber || quoteId}_${new Date().toISOString().split('T')[0]}.pdf`;
+      saveAs(blob, fileName);
+      toast({
+        title: "Sucesso",
+        description: includeServices ? "PDF gerado com serviços!" : "PDF gerado com sucesso!",
+      });
+    } catch (error: any) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível gerar o PDF.",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingPdfId(null);
     }
   };
 
@@ -736,6 +768,36 @@ const Orcamentos = () => {
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                                      disabled={generatingPdfId === String(quote.id)}
+                                    >
+                                      {generatingPdfId === String(quote.id) ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <FileText className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="bg-seguranca-graphite border-gray-600">
+                                    <DropdownMenuItem
+                                      onClick={() => handleDownloadPdf(quote, false)}
+                                      className="text-seguranca-lightgray focus:bg-gray-700 focus:text-white cursor-pointer"
+                                    >
+                                      Gerar PDF (apenas resumo)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleDownloadPdf(quote, true)}
+                                      className="text-seguranca-lightgray focus:bg-gray-700 focus:text-white cursor-pointer"
+                                    >
+                                      Gerar PDF (com serviços)
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -829,6 +891,36 @@ const Orcamentos = () => {
                 </div>
                 
                 <div className="flex justify-end gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="bg-seguranca-red hover:bg-seguranca-darkred text-white border-0"
+                        disabled={generatingPdfId === String(selectedQuote.id)}
+                      >
+                        {generatingPdfId === String(selectedQuote.id) ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4 mr-2" />
+                        )}
+                        Gerar PDF
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-seguranca-graphite border-gray-600">
+                      <DropdownMenuItem
+                        onClick={() => handleDownloadPdf(selectedQuote, false)}
+                        className="text-seguranca-lightgray focus:bg-gray-700 focus:text-white cursor-pointer"
+                      >
+                        Apenas resumo
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDownloadPdf(selectedQuote, true)}
+                        className="text-seguranca-lightgray focus:bg-gray-700 focus:text-white cursor-pointer"
+                      >
+                        Com serviços
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button
                     variant="outline"
                     className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"

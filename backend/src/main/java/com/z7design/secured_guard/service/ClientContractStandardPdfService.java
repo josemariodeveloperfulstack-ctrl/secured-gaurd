@@ -9,6 +9,7 @@ import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.ClientContractRequest;
+import com.z7design.secured_guard.dto.ContractTemplatePreviewRequest;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
@@ -44,18 +45,29 @@ public class ClientContractStandardPdfService {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
-                        // Buscar configuração ativa para o título e termos
-                        CompanyConfig companyConfig = companyConfigRepository.findActiveConfig()
-                                        .orElseThrow(() -> new ResourceNotFoundException(
-                                                        "Configuração da empresa não encontrada"));
+                        // Buscar configuração: por ID se informado, senão a ativa
+                        CompanyConfig companyConfig;
+                        if (request.getCompanyConfigId() != null) {
+                                companyConfig = companyConfigRepository.findById(request.getCompanyConfigId())
+                                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                                "Configuração da empresa não encontrada"));
+                        } else {
+                                companyConfig = companyConfigRepository.findActiveConfig()
+                                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                                "Configuração da empresa não encontrada"));
+                        }
 
                         String reportTitle = companyConfig.getHeaderText() != null
                                         && !companyConfig.getHeaderText().isEmpty()
                                                         ? companyConfig.getHeaderText()
                                                         : DEFAULT_REPORT_TITLE;
 
-                        // Buscar empresa para o layout
+                        // Buscar empresa para o layout: request > config.companyId > primeira empresa
                         UUID companyId = request.getCompanyId();
+                        if (companyId == null && companyConfig.getCompanyId() != null) {
+                                companyId = companyConfig.getCompanyId();
+                                log.info("Usando companyId da configuração: {}", companyId);
+                        }
                         if (companyId == null) {
                                 log.warn("companyId não fornecido, tentando buscar a primeira empresa cadastrada");
                                 companyId = companyRepository.findAll().stream()
@@ -68,6 +80,7 @@ public class ClientContractStandardPdfService {
                                         .companyId(companyId)
                                         .reportTitle(reportTitle)
                                         .includeEmailInFooter(true)
+                                        .landscape(false)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -82,6 +95,89 @@ public class ClientContractStandardPdfService {
                         log.error("Erro ao gerar PDF do Contrato de Cliente", e);
                         throw new RuntimeException("Erro ao gerar PDF do Contrato de Cliente", e);
                 }
+        }
+
+        /**
+         * Gera PDF de preview do template com placeholders (ex: [NOME DO CLIENTE]).
+         * Suporta overrides de headerText, footerText e contractTerms para alterações não salvas.
+         */
+        public byte[] generatePreviewPdf(ContractTemplatePreviewRequest previewRequest) {
+                UUID companyId = previewRequest.getCompanyId();
+                if (companyId == null) {
+                        throw new IllegalArgumentException("companyId é obrigatório para preview");
+                }
+                Company company = companyRepository.findById(companyId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+
+                CompanyConfig companyConfig = resolveCompanyConfig(previewRequest, company);
+
+                ClientContractRequest request = ClientContractRequest.builder()
+                                .companyId(companyId)
+                                .companyConfigId(previewRequest.getCompanyConfigId())
+                                .clientName("[NOME DO CLIENTE]")
+                                .clientDocument("[DOCUMENTO DO CLIENTE]")
+                                .clientAddress("[ENDEREÇO DO CLIENTE]")
+                                .contractNumber("PREVIEW")
+                                .description("[DESCRIÇÃO DOS SERVIÇOS]")
+                                .value(BigDecimal.ZERO)
+                                .startDate(LocalDate.now())
+                                .endDate(null)
+                                .paymentTerms("Pagamento mensal até o dia 10 de cada mês")
+                                .city(company.getCity())
+                                .contractDate(LocalDate.now())
+                                .build();
+
+                try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                        PdfWriter writer = new PdfWriter(outputStream);
+                        String reportTitle = companyConfig.getHeaderText() != null
+                                        && !companyConfig.getHeaderText().isEmpty()
+                                                        ? companyConfig.getHeaderText()
+                                                        : DEFAULT_REPORT_TITLE;
+
+                        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                                        .companyId(companyId)
+                                        .reportTitle(reportTitle)
+                                        .includeEmailInFooter(true)
+                                        .landscape(false)
+                                        .build();
+
+                        DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
+                        Document document = docWithPdf.getDocument();
+
+                        addContent(document, request, company, companyConfig);
+
+                        document.close();
+                        return outputStream.toByteArray();
+                } catch (Exception e) {
+                        log.error("Erro ao gerar PDF de preview do template", e);
+                        throw new RuntimeException("Erro ao gerar PDF de preview do template", e);
+                }
+        }
+
+        private CompanyConfig resolveCompanyConfig(ContractTemplatePreviewRequest req, Company company) {
+                if (req.getCompanyConfigId() != null) {
+                        return companyConfigRepository.findById(req.getCompanyConfigId())
+                                        .orElseThrow(() -> new ResourceNotFoundException(
+                                                        "Configuração da empresa não encontrada"));
+                }
+                // Config virtual com overrides (alterações não salvas)
+                return CompanyConfig.builder()
+                                .companyId(company.getId())
+                                .name(company.getName())
+                                .cnpj(company.getCnpj() != null ? company.getCnpj() : "00000000000000")
+                                .address(company.getAddress() != null ? company.getAddress() : "-")
+                                .city(company.getCity() != null ? company.getCity() : "-")
+                                .state(company.getState() != null ? company.getState() : "MG")
+                                .zipCode(company.getZipCode() != null ? company.getZipCode() : "00000000")
+                                .phone(company.getPhone() != null ? company.getPhone() : "-")
+                                .email(company.getEmail() != null ? company.getEmail() : "contato@empresa.com")
+                                .website(company.getWebsite())
+                                .logoUrl(company.getLogoUrl())
+                                .headerText(req.getHeaderText() != null ? req.getHeaderText() : DEFAULT_REPORT_TITLE)
+                                .footerText(req.getFooterText() != null ? req.getFooterText() : "")
+                                .contractTerms(req.getContractTerms() != null ? req.getContractTerms() : "")
+                                .active(true)
+                                .build();
         }
 
         private void addContent(Document document, ClientContractRequest request, Company company,

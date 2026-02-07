@@ -37,6 +37,9 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     // Buscar por contrato
     List<WorkPost> findByContractId(UUID contractId);
     Page<WorkPost> findByContractId(UUID contractId, Pageable pageable);
+
+    // Contar postos por contrato
+    long countByContractId(UUID contractId);
     
     // Buscar por cliente e status
     List<WorkPost> findByClientIdAndStatus(UUID clientId, WorkPostStatus status);

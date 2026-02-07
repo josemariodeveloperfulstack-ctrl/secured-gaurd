@@ -1,9 +1,9 @@
 import api from '@/lib/axios';
-import { 
-  StockItem, 
-  StockMovement, 
-  StockAlert, 
-  CreateStockItemDTO, 
+import {
+  StockItem,
+  StockMovement,
+  StockAlert,
+  CreateStockItemDTO,
   CreateStockMovementDTO,
   StockFilters,
   MovementFilters,
@@ -30,16 +30,16 @@ export const stockService = {
   async searchItems(filters: StockFilters, page = 0, size = 20): Promise<{ content: StockItem[], totalElements: number }> {
     try {
       const params = new URLSearchParams();
-      
+
       if (filters.category) params.append('category', filters.category);
       if (filters.active !== undefined) params.append('active', filters.active.toString());
       if (filters.unitId) params.append('unitId', filters.unitId);
       if (filters.lowStock !== undefined) params.append('lowStock', filters.lowStock.toString());
       if (filters.searchTerm) params.append('searchTerm', filters.searchTerm);
-      
+
       params.append('page', page.toString());
       params.append('size', size.toString());
-      
+
       const response = await api.get(`/api/stock/items/search?${params.toString()}`);
       return response.data;
     } catch (error) {
@@ -140,10 +140,10 @@ export const stockService = {
       console.error('❌ Response data:', error?.response?.data);
       console.error('❌ Response status:', error?.response?.status);
       console.error('❌ Response headers:', error?.response?.headers);
-      const errorMessage = error?.response?.data?.error || 
-                          error?.response?.data?.message || 
-                          error?.message || 
-                          'Falha ao criar movimentação';
+      const errorMessage = error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Falha ao criar movimentação';
       throw new Error(errorMessage);
     }
   },
@@ -151,13 +151,13 @@ export const stockService = {
   async searchMovements(filters: MovementFilters, page = 0, size = 20): Promise<{ content: StockMovement[], totalElements: number }> {
     try {
       const params = new URLSearchParams();
-      
+
       if (filters.stockItemId) params.append('stockItemId', filters.stockItemId);
       if (filters.employeeId) params.append('employeeId', filters.employeeId);
       if (filters.movementType) params.append('movementType', filters.movementType);
       if (filters.reason) params.append('reason', filters.reason);
       if (filters.unitId) params.append('unitId', filters.unitId);
-      
+
       // Converter datas do formato dd/mm/aaaa para ISO DateTime
       if (filters.startDate) {
         const isoStartDate = this.convertDateToISO(filters.startDate, true);
@@ -171,12 +171,12 @@ export const stockService = {
           params.append('endDate', isoEndDate);
         }
       }
-      
+
       if (filters.searchTerm) params.append('searchTerm', filters.searchTerm);
-      
+
       params.append('page', page.toString());
       params.append('size', size.toString());
-      
+
       const response = await api.get(`/api/stock/movements/search?${params.toString()}`);
       return {
         content: response.data.content || [],
@@ -195,7 +195,7 @@ export const stockService = {
   // Função auxiliar para converter data dd/mm/aaaa para ISO DateTime
   convertDateToISO(dateString: string, isStartDate: boolean): string | null {
     if (!dateString) return null;
-    
+
     try {
       // Tentar parsear formato dd/mm/aaaa
       const parts = dateString.split('/');
@@ -203,29 +203,29 @@ export const stockService = {
         const day = parseInt(parts[0], 10);
         const month = parseInt(parts[1], 10) - 1; // JavaScript months are 0-indexed
         const year = parseInt(parts[2], 10);
-        
+
         const date = new Date(year, month, day);
         if (isNaN(date.getTime())) {
           console.warn('Data inválida:', dateString);
           return null;
         }
-        
+
         // Se for data inicial, usar 00:00:00, se for final, usar 23:59:59
         if (isStartDate) {
           date.setHours(0, 0, 0, 0);
         } else {
           date.setHours(23, 59, 59, 999);
         }
-        
+
         // Converter para ISO string (formato: YYYY-MM-DDTHH:mm:ss)
         return date.toISOString();
       }
-      
+
       // Se já estiver no formato ISO, retornar como está
       if (dateString.includes('T')) {
         return dateString;
       }
-      
+
       // Tentar parsear como Date ISO
       const date = new Date(dateString);
       if (!isNaN(date.getTime())) {
@@ -236,7 +236,7 @@ export const stockService = {
         }
         return date.toISOString();
       }
-      
+
       console.warn('Formato de data não reconhecido:', dateString);
       return null;
     } catch (error) {
@@ -352,7 +352,7 @@ export const stockService = {
       if (params.itemId) queryParams.append('itemId', params.itemId);
       if (params.employeeId) queryParams.append('employeeId', params.employeeId);
       if (params.movementType) queryParams.append('movementType', params.movementType);
-      
+
       const response = await api.get(`/api/stock/reports/movements?${queryParams.toString()}`);
       return response.data;
     } catch (error) {
@@ -411,5 +411,60 @@ export const stockService = {
       console.error('Erro ao buscar motivos de movimentação:', error);
       return Object.values(MovementReason);
     }
+  },
+
+  // ===== DOWNLOAD DE RELATÓRIOS PDF =====
+
+  async downloadLowStockPDF(companyId: string): Promise<void> {
+    try {
+      const response = await api.get(`/api/stock/reports/low-stock/pdf?companyId=${companyId}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'estoque-baixo.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF de estoque baixo:', error);
+      throw new Error('Falha ao baixar relatório');
+    }
+  },
+
+  async downloadGeneralStockPDF(companyId: string, category?: StockCategory): Promise<void> {
+    try {
+      let url = `/api/stock/reports/general/pdf?companyId=${companyId}`;
+      if (category) url += `&category=${category}`;
+
+      const response = await api.get(url, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'estoque-geral.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF geral de estoque:', error);
+      throw new Error('Falha ao baixar relatório');
+    }
+  },
+
+  async downloadMovementsPDF(companyId: string, startDate: string, endDate: string): Promise<void> {
+    try {
+      const isoStart = this.convertDateToISO(startDate, true);
+      const isoEnd = this.convertDateToISO(endDate, false);
+
+      const response = await api.get(`/api/stock/reports/movements/pdf?companyId=${companyId}&start=${isoStart}&end=${isoEnd}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'movimentacoes-estoque.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF de movimentações:', error);
+      throw new Error('Falha ao baixar relatório');
+    }
+  },
+
+  handleFileDownload(data: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }
 };

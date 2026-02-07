@@ -43,8 +43,6 @@ import { proposalService, Proposal } from '@/services/proposalService';
 import { propostaService, PropostaParams } from '@/services/propostaService';
 import { PropostaComercial } from '@/types/proposta';
 import { clientService } from '@/services/clientService';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -184,67 +182,11 @@ export const AgreementProposalsList: React.FC = () => {
 
   const handleDownloadPDF = async (proposal: AgreementProposal) => {
     try {
-      // Buscar proposta completa do backend para garantir que temos o nome do cliente
-      let clientName = proposal.clientName || 'N/A';
-      try {
-        const proposalId = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
-        const fullProposal = await proposalService.getProposalById(proposalId);
-        clientName = fullProposal.client?.name || (fullProposal as any).clientName || proposal.clientName || 'N/A';
-      } catch (error) {
-        console.error('Erro ao buscar proposta completa para PDF:', error);
-        // Usar o nome que já temos
-      }
-
-      const doc = new jsPDF();
-      
-      // Título
-      doc.setFontSize(18);
-      doc.setTextColor(40, 40, 40);
-      doc.text('PROPOSTA COMERCIAL DE ACORDO', 105, 20, { align: 'center' });
-      
-      // Informações da Proposta
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Número: ${proposal.proposalNumber || 'N/A'}`, 14, 35);
-      doc.text(`Data: ${new Date(proposal.createdAt).toLocaleDateString('pt-BR')}`, 14, 42);
-      doc.text(`Cliente: ${clientName}`, 14, 49);
-      doc.text(`Status: ${getStatusLabel(proposal.status)}`, 14, 56);
-      
-      let yPos = 70;
-
-      // Valor Final
-      doc.setFontSize(16);
-      doc.setTextColor(255, 193, 7);
-      doc.text('VALOR FINAL', 105, yPos, { align: 'center' });
-      yPos += 10;
-      
-      doc.setFontSize(14);
-      doc.text(`Mensal: ${formatCurrency(proposal.totalValue)}`, 105, yPos, { align: 'center' });
-      yPos += 8;
-      doc.text(`Anual: ${formatCurrency(proposal.totalValue * 12)}`, 105, yPos, { align: 'center' });
-      yPos += 15;
-
-      // Descrição
-      if (proposal.description) {
-        doc.setFontSize(12);
-        doc.setTextColor(40, 40, 40);
-        doc.text('DESCRIÇÃO DO SERVIÇO', 14, yPos);
-        yPos += 8;
-        doc.setFontSize(10);
-        doc.setTextColor(80, 80, 80);
-        const descLines = doc.splitTextToSize(proposal.description, 180);
-        doc.text(descLines, 14, yPos);
-        yPos += descLines.length * 6 + 10;
-      }
-
-      // Salvar PDF
+      const proposalId = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
+      const blob = await proposalService.getProposalPdf(proposalId);
       const fileName = `proposta_acordo_${proposal.proposalNumber || proposal.id}_${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
-      
-      toast({
-        title: "Sucesso",
-        description: "PDF gerado com sucesso!",
-      });
+      saveAs(blob, fileName);
+      toast({ title: "Sucesso", description: "PDF gerado com sucesso!" });
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       toast({

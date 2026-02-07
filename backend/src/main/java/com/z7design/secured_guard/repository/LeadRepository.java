@@ -87,4 +87,33 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
            "l.company LIKE %:searchTerm% OR " +
            "l.notes LIKE %:searchTerm%")
     List<Lead> searchLeads(@Param("searchTerm") String searchTerm);
+
+    // --- KPIs por usuário ---
+
+    // Contar leads por responsável e status
+    long countByAssignedToIdAndStatus(UUID assignedToId, LeadStatus status);
+
+    // Contar leads por responsável e status dentro de um período
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.assignedTo.id = :userId AND l.status = :status AND l.createdAt BETWEEN :startDate AND :endDate")
+    long countByAssignedToIdAndStatusAndPeriod(@Param("userId") UUID userId, @Param("status") LeadStatus status,
+                                               @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Contar leads por status dentro de um período (sem filtro de usuário)
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.status = :status AND l.createdAt BETWEEN :startDate AND :endDate")
+    long countByStatusAndPeriod(@Param("status") LeadStatus status,
+                                @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Contar todos os leads de um responsável dentro de um período
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.assignedTo.id = :userId AND l.createdAt BETWEEN :startDate AND :endDate")
+    long countByAssignedToIdAndPeriod(@Param("userId") UUID userId,
+                                      @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Contar todos os leads dentro de um período (sem filtro de usuário)
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.createdAt BETWEEN :startDate AND :endDate")
+    long countByPeriod(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Buscar leads por responsável dentro de um período
+    @Query("SELECT l FROM Lead l WHERE l.assignedTo.id = :userId AND l.createdAt BETWEEN :startDate AND :endDate")
+    List<Lead> findByAssignedToIdAndPeriod(@Param("userId") UUID userId,
+                                           @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 } 

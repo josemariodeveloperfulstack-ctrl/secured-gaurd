@@ -5,10 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, X } from 'lucide-react';
+import { Loader2, Save, X, FileText, TrendingUp, FolderOpen } from 'lucide-react';
 import { Contract, contractService, UpdateContractRequest } from '@/services/contractService';
 import { clientService, Client } from '@/services/clientService';
+import { ContractAmendmentsTab } from './ContractAmendmentsTab';
+import { ContractAdjustmentsTab } from './ContractAdjustmentsTab';
+import { ContractDocumentsTab } from './ContractDocumentsTab';
 
 interface EditContractModalProps {
   open: boolean;
@@ -27,16 +31,32 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
-  const [formData, setFormData] = useState<UpdateContractRequest>({
+  const [formData, setFormData] = useState<UpdateContractRequest & Record<string, any>>({
     id: '',
     contractNumber: '',
     description: '',
     startDate: '',
     endDate: '',
     value: 0,
-    status: 'ACTIVE',
+    status: 'DRAFT',
     clientId: '',
-    notes: ''
+    notes: '',
+    contractOrigin: 'MANUAL',
+    contractType: 'VIGILANCIA_PATRIMONIAL',
+    responsibleCommercialId: undefined,
+    responsibleManagerId: undefined,
+    monthlyValue: undefined,
+    annualValue: undefined,
+    adjustmentType: undefined,
+    nextAdjustmentDate: undefined,
+    autoRenewal: false,
+    replacementTimeHours: undefined,
+    maxAbsenceMinutes: undefined,
+    patrolFrequency: '',
+    reportsRequired: '',
+    obligationsContractor: '',
+    obligationsContracted: '',
+    penalties: ''
   });
 
   useEffect(() => {
@@ -47,12 +67,28 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
           id: contract.id,
           contractNumber: contract.contractNumber,
           description: contract.description,
-          startDate: contract.startDate,
-          endDate: contract.endDate || '',
-          value: contract.value,
-          status: contract.status,
+          startDate: (contract.startDate || '').split('T')[0] || contract.startDate || '',
+          endDate: (contract.endDate || '').split('T')[0] || contract.endDate || '',
+          value: typeof contract.value === 'number' ? contract.value : parseFloat(String(contract.value)) || 0,
+          status: contract.status || 'DRAFT',
           clientId: contract.clientId,
-          notes: contract.notes || ''
+          notes: contract.notes || '',
+          contractOrigin: contract.contractOrigin || 'MANUAL',
+          contractType: contract.contractType || 'VIGILANCIA_PATRIMONIAL',
+          responsibleCommercialId: contract.responsibleCommercialId,
+          responsibleManagerId: contract.responsibleManagerId,
+          monthlyValue: contract.monthlyValue,
+          annualValue: contract.annualValue,
+          adjustmentType: contract.adjustmentType,
+          nextAdjustmentDate: contract.nextAdjustmentDate,
+          autoRenewal: contract.autoRenewal || false,
+          replacementTimeHours: contract.replacementTimeHours,
+          maxAbsenceMinutes: contract.maxAbsenceMinutes,
+          patrolFrequency: contract.patrolFrequency || '',
+          reportsRequired: contract.reportsRequired || '',
+          obligationsContractor: contract.obligationsContractor || '',
+          obligationsContracted: contract.obligationsContracted || '',
+          penalties: contract.penalties || ''
         });
       }
     }
@@ -100,7 +136,23 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
         value: formData.value,
         status: formData.status,
         clientId: formData.clientId,
-        notes: formData.notes || undefined
+        notes: formData.notes || undefined,
+        contractOrigin: formData.contractOrigin,
+        contractType: formData.contractType,
+        responsibleCommercialId: formData.responsibleCommercialId,
+        responsibleManagerId: formData.responsibleManagerId,
+        monthlyValue: formData.monthlyValue,
+        annualValue: formData.annualValue,
+        adjustmentType: formData.adjustmentType,
+        nextAdjustmentDate: formData.nextAdjustmentDate,
+        autoRenewal: formData.autoRenewal,
+        replacementTimeHours: formData.replacementTimeHours,
+        maxAbsenceMinutes: formData.maxAbsenceMinutes,
+        patrolFrequency: formData.patrolFrequency || undefined,
+        reportsRequired: formData.reportsRequired || undefined,
+        obligationsContractor: formData.obligationsContractor || undefined,
+        obligationsContracted: formData.obligationsContracted || undefined,
+        penalties: formData.penalties || undefined
       });
 
       console.log('✅ Contrato atualizado:', updatedContract);
@@ -133,9 +185,25 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
       startDate: '',
       endDate: '',
       value: 0,
-      status: 'ACTIVE',
+      status: 'DRAFT',
       clientId: '',
-      notes: ''
+      notes: '',
+      contractOrigin: 'MANUAL',
+      contractType: 'VIGILANCIA_PATRIMONIAL',
+      responsibleCommercialId: undefined,
+      responsibleManagerId: undefined,
+      monthlyValue: undefined,
+      annualValue: undefined,
+      adjustmentType: undefined,
+      nextAdjustmentDate: undefined,
+      autoRenewal: false,
+      replacementTimeHours: undefined,
+      maxAbsenceMinutes: undefined,
+      patrolFrequency: '',
+      reportsRequired: '',
+      obligationsContractor: '',
+      obligationsContracted: '',
+      penalties: ''
     });
   };
 
@@ -155,6 +223,24 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
           </DialogTitle>
         </DialogHeader>
 
+        <Tabs defaultValue="dados" className="w-full">
+          <TabsList className="bg-seguranca-black border border-gray-600">
+            <TabsTrigger value="dados" className="data-[state=active]:bg-seguranca-graphite">Dados</TabsTrigger>
+            <TabsTrigger value="aditivos" className="data-[state=active]:bg-seguranca-graphite">
+              <FileText className="h-4 w-4 mr-1" />
+              Aditivos
+            </TabsTrigger>
+            <TabsTrigger value="reajustes" className="data-[state=active]:bg-seguranca-graphite">
+              <TrendingUp className="h-4 w-4 mr-1" />
+              Reajustes
+            </TabsTrigger>
+            <TabsTrigger value="documentos" className="data-[state=active]:bg-seguranca-graphite">
+              <FolderOpen className="h-4 w-4 mr-1" />
+              Documentos
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="dados">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Informações Básicas */}
           <div className="space-y-4">
@@ -177,18 +263,20 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
                 <Label className="text-seguranca-lightgray">Status *</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: 'ACTIVE' | 'INACTIVE' | 'TERMINATED' | 'PENDING') => 
-                    setFormData(prev => ({ ...prev, status: value }))
-                  }
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
                 >
                   <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="DRAFT">Em elaboração</SelectItem>
                     <SelectItem value="ACTIVE">Ativo</SelectItem>
                     <SelectItem value="PENDING">Pendente</SelectItem>
                     <SelectItem value="INACTIVE">Inativo</SelectItem>
                     <SelectItem value="TERMINATED">Terminado</SelectItem>
+                    <SelectItem value="EXPIRED">Expirado</SelectItem>
+                    <SelectItem value="SUSPENDED">Suspenso</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -288,6 +376,78 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
             />
           </div>
 
+          {/* SLA e Obrigações */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-seguranca-lightgray">SLA e Obrigações</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-seguranca-lightgray">Tempo de substituição (horas)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.replacementTimeHours ?? ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, replacementTimeHours: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
+                  className="bg-seguranca-black border-gray-600"
+                />
+              </div>
+              <div>
+                <Label className="text-seguranca-lightgray">Ausência máxima (minutos)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.maxAbsenceMinutes ?? ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, maxAbsenceMinutes: e.target.value ? parseInt(e.target.value, 10) : undefined }))}
+                  className="bg-seguranca-black border-gray-600"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-seguranca-lightgray">Frequência de rondas</Label>
+              <Input
+                value={formData.patrolFrequency}
+                onChange={(e) => setFormData(prev => ({ ...prev, patrolFrequency: e.target.value }))}
+                className="bg-seguranca-black border-gray-600"
+                placeholder="Ex: 2h, 4h"
+              />
+            </div>
+            <div>
+              <Label className="text-seguranca-lightgray">Relatórios obrigatórios</Label>
+              <Textarea
+                value={formData.reportsRequired}
+                onChange={(e) => setFormData(prev => ({ ...prev, reportsRequired: e.target.value }))}
+                className="bg-seguranca-black border-gray-600"
+                rows={2}
+              />
+            </div>
+            <div>
+              <Label className="text-seguranca-lightgray">Obrigações do contratado</Label>
+              <Textarea
+                value={formData.obligationsContractor}
+                onChange={(e) => setFormData(prev => ({ ...prev, obligationsContractor: e.target.value }))}
+                className="bg-seguranca-black border-gray-600"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label className="text-seguranca-lightgray">Obrigações do contratante</Label>
+              <Textarea
+                value={formData.obligationsContracted}
+                onChange={(e) => setFormData(prev => ({ ...prev, obligationsContracted: e.target.value }))}
+                className="bg-seguranca-black border-gray-600"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label className="text-seguranca-lightgray">Penalidades</Label>
+              <Textarea
+                value={formData.penalties}
+                onChange={(e) => setFormData(prev => ({ ...prev, penalties: e.target.value }))}
+                className="bg-seguranca-black border-gray-600"
+                rows={2}
+              />
+            </div>
+          </div>
+
           {/* Botões */}
           <div className="flex justify-end gap-3 pt-4">
             <Button
@@ -320,6 +480,24 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
             </Button>
           </div>
         </form>
+          </TabsContent>
+
+          <TabsContent value="aditivos">
+            <ContractAmendmentsTab contractId={contract.id} onAmendmentApproved={onSuccess} />
+          </TabsContent>
+
+          <TabsContent value="reajustes">
+            <ContractAdjustmentsTab
+              contractId={contract.id}
+              currentValue={formData.value}
+              onAdjustmentCreated={onSuccess}
+            />
+          </TabsContent>
+
+          <TabsContent value="documentos">
+            <ContractDocumentsTab contractId={contract.id} />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

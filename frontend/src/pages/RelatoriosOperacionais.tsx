@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -127,7 +127,8 @@ const RelatoriosOperacionais: React.FC = () => {
 
         await reportLayoutService.generatePremiumPDF(printElement, {
           title: getTipoRelatorioLabel(relatorio.tipo),
-          filename: `relatorio-operacional-${relatorio.tipo.toLowerCase()}-${relatorio.periodo}.pdf`
+          filename: `relatorio-operacional-${relatorio.tipo.toLowerCase()}-${relatorio.periodo}.pdf`,
+          elementHasFullLayout: true
         });
 
         toast({

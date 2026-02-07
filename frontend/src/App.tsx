@@ -2,8 +2,10 @@ import React, { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from '@/contexts/AuthContext';
+import WebSocketConnector from '@/components/WebSocketConnector';
 import { NotificationProvider } from '@/components/NotificationSystem';
 import ProtectedRoute from '@/components/ProtectedRoute';
+
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -290,7 +292,9 @@ function App() {
                 }}
               >
                 <AuthProvider>
+                  <WebSocketConnector />
                   <Routes>
+
                     {/* Portal Público */}
                     <Route path="/" element={<PortalHome />} />
                     <Route path="/portal" element={<PortalHome />} />

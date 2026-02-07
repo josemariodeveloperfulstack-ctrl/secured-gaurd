@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   FileText,
+  FileDown,
   Plus,
   Search,
   Filter,
@@ -41,22 +42,61 @@ import {
   Calendar,
   DollarSign,
   User,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { proposalService, Proposal, CreateProposalRequest, UpdateProposalRequest } from '@/services/proposalService';
 import { clientService, Client } from '@/services/clientService';
+import { userService, User as UserType } from '@/services/userService';
 import leadService from '@/services/leadService';
 import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import PropostaAcordo from '@/components/comercial/PropostaAcordo';
 import { AgreementProposalsList } from '@/components/comercial/AgreementProposalsList';
+import { PropostaComercial } from '@/types/proposta';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2, Plus as PlusIcon, Link as LinkIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { contractService } from '@/services/contractService';
+import { saveAs } from 'file-saver';
+
+/** Converte PropostaComercial em itens para o backend (com notes para agrupamento no PDF) */
+function propostaComercialToItems(p: PropostaComercial): { description: string; quantity: number; unitPrice: number; notes: string }[] {
+  const items: { description: string; quantity: number; unitPrice: number; notes: string }[] = [];
+  const mao = p.maoDeObra;
+  const mat = p.materiais;
+  const bdi = p.bdi;
+  const imp = p.impostos;
+
+  items.push({ description: `Salário base (${mao.quantidadePorteiros} funcionário(s))`, quantity: 1, unitPrice: mao.salarioPorteiro * mao.quantidadePorteiros, notes: 'MAO_DE_OBRA' });
+  items.push({ description: `Adicional Noturno (${mao.adicionalNoturnoPercent}%)`, quantity: 1, unitPrice: mao.adicionalNoturnoValor, notes: 'MAO_DE_OBRA' });
+  items.push({ description: 'Reflexo Adicional Noturno/HE/DSR', quantity: 1, unitPrice: mao.reflexoAdicional, notes: 'MAO_DE_OBRA' });
+  items.push({ description: 'Subtotal', quantity: 1, unitPrice: mao.subtotal, notes: 'MAO_DE_OBRA' });
+  items.push({ description: `Encargos (${mao.encargosPercent}%)`, quantity: 1, unitPrice: mao.encargosValor, notes: 'MAO_DE_OBRA' });
+  items.push({ description: 'Total Mão de Obra', quantity: 1, unitPrice: mao.total, notes: 'MAO_DE_OBRA' });
+
+  items.push({ description: `Uniformes (${mat.uniformeQuantidade} x R$ ${mat.uniformeUnitario.toFixed(2)})`, quantity: 1, unitPrice: mat.uniformeQuantidade * mat.uniformeUnitario, notes: 'MATERIAIS' });
+  items.push({ description: `Equipamentos (${mat.equipamentosQuantidade} x R$ ${mat.equipamentosUnitario.toFixed(2)})`, quantity: 1, unitPrice: mat.equipamentosQuantidade * mat.equipamentosUnitario, notes: 'MATERIAIS' });
+  items.push({ description: 'Subtotal Materiais', quantity: 1, unitPrice: mat.subtotal, notes: 'MATERIAIS' });
+
+  items.push({ description: `Taxa de Administração (${bdi.taxaAdministracaoPercent}%)`, quantity: 1, unitPrice: bdi.taxaAdministracaoValor, notes: 'BDI' });
+  items.push({ description: `Lucro (${bdi.lucroPercent}%)`, quantity: 1, unitPrice: bdi.lucroValor, notes: 'BDI' });
+  items.push({ description: 'Subtotal BDI', quantity: 1, unitPrice: bdi.subtotal, notes: 'BDI' });
+
+  items.push({ description: `COFINS (${imp.cofinsPercent}%)`, quantity: 1, unitPrice: imp.cofinsValor, notes: 'IMPOSTOS' });
+  items.push({ description: `PIS (${imp.pisPercent}%)`, quantity: 1, unitPrice: imp.pisValor, notes: 'IMPOSTOS' });
+  items.push({ description: `ISSQN (${imp.issqnPercent}%)`, quantity: 1, unitPrice: imp.issqnValor, notes: 'IMPOSTOS' });
+  items.push({ description: `IR (${imp.irPercent}%)`, quantity: 1, unitPrice: imp.irValor, notes: 'IMPOSTOS' });
+  items.push({ description: `CSLL (${imp.csllPercent}%)`, quantity: 1, unitPrice: imp.csllValor, notes: 'IMPOSTOS' });
+  items.push({ description: 'Total Impostos', quantity: 1, unitPrice: imp.total, notes: 'IMPOSTOS' });
+
+  return items;
+}
 
 const Propostas = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [filteredProposals, setFilteredProposals] = useState<Proposal[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,17 +113,23 @@ const Propostas = () => {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState<'pdf' | 'excel' | null>(null);
+  const [generatingContract, setGeneratingContract] = useState<string | null>(null);
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState<CreateProposalRequest & { clientId?: number | string; leadId?: number | string }>({
+  const [formData, setFormData] = useState<CreateProposalRequest & { clientId?: number | string; leadId?: number | string; assignedToId?: number | string }>({
     title: '',
     clientId: undefined,
     leadId: undefined,
+    assignedToId: undefined,
     totalValue: 0,
     validUntil: undefined,
     description: '',
     status: 'DRAFT'
   });
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   // Load proposals from backend
   const loadProposals = async () => {
@@ -118,7 +164,8 @@ const Propostas = () => {
         createdByName: proposal.createdBy?.name || proposal.createdByName || 'N/A',
         assignedToName: proposal.assignedTo?.name || proposal.assignedToName || 'Não atribuído',
         createdAt: proposal.createdAt ? new Date(proposal.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        updatedAt: proposal.updatedAt ? new Date(proposal.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        updatedAt: proposal.updatedAt ? new Date(proposal.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        contractId: proposal.contractId ?? proposal.contract?.id
       }));
       setProposals(mappedProposals);
       setFilteredProposals(mappedProposals);
@@ -139,13 +186,15 @@ const Propostas = () => {
 
   useEffect(() => {
     loadProposals();
+    loadClients();
   }, []);
 
-  // Load clients and leads when create or edit modal opens
+  // Load clients, leads and users when create or edit modal opens
   useEffect(() => {
     if (isCreateModalOpen || isEditModalOpen) {
       loadClients();
       loadLeads();
+      loadUsers();
     }
   }, [isCreateModalOpen, isEditModalOpen]);
 
@@ -173,6 +222,20 @@ const Propostas = () => {
       setClients([]);
     } finally {
       setLoadingClients(false);
+    }
+  };
+
+  // Load users function
+  const loadUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const data = await userService.getAllUsers();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      console.error('Erro ao carregar usuários:', error);
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
     }
   };
 
@@ -250,6 +313,7 @@ const Propostas = () => {
         ...formData,
         clientId: formData.clientId ? (typeof formData.clientId === 'string' ? Number(formData.clientId) || formData.clientId : formData.clientId) : undefined,
         leadId: formData.leadId ? (typeof formData.leadId === 'string' ? Number(formData.leadId) || formData.leadId : formData.leadId) : undefined,
+        assignedToId: formData.assignedToId ? (typeof formData.assignedToId === 'string' ? formData.assignedToId : String(formData.assignedToId)) : undefined,
       };
       console.log('📤 Enviando proposta:', proposalData);
       await proposalService.createProposal(proposalData);
@@ -294,10 +358,15 @@ const Propostas = () => {
         ? (typeof formData.leadId === 'string' ? formData.leadId : String(formData.leadId))
         : undefined;
 
+      const assignedToId = formData.assignedToId
+        ? (typeof formData.assignedToId === 'string' ? formData.assignedToId : String(formData.assignedToId))
+        : undefined;
+
       const updateData: UpdateProposalRequest = {
         title: formData.title,
         clientId: clientId,
         leadId: leadId,
+        assignedToId: assignedToId,
         totalValue: formData.totalValue,
         validUntil: formData.validUntil,
         description: formData.description,
@@ -330,6 +399,50 @@ const Propostas = () => {
     }
   };
 
+  // Gerar contrato a partir de proposta aprovada
+  const handleGenerateContract = async (proposal: Proposal) => {
+    const id = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
+    if (proposal.contractId) {
+      toast({ title: 'Aviso', description: 'Esta proposta já possui um contrato associado.', variant: 'destructive' });
+      return;
+    }
+    if (proposal.status !== 'APPROVED' && proposal.status !== 'CONVERTED') {
+      toast({ title: 'Aviso', description: 'Apenas propostas aprovadas ou convertidas podem gerar contrato.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setGeneratingContract(id);
+      const contract = await contractService.createFromProposal(id);
+      toast({ title: 'Sucesso', description: 'Contrato criado com sucesso! Redirecionando...' });
+      navigate('/contratos');
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.response?.data?.message || 'Não foi possível gerar o contrato.', variant: 'destructive' });
+    } finally {
+      setGeneratingContract(null);
+    }
+  };
+
+  // Gerar PDF da proposta
+  const handleDownloadPdf = async (proposal: Proposal) => {
+    const id = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
+    try {
+      setGeneratingPdfId(id);
+      const blob = await proposalService.getProposalPdf(id);
+      const fileName = `proposta_${proposal.proposalNumber || proposal.id}_${new Date().toISOString().split('T')[0]}.pdf`;
+      saveAs(blob, fileName);
+      toast({ title: 'Sucesso', description: 'PDF gerado com sucesso!' });
+    } catch (error: any) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: 'Erro',
+        description: error.response?.data?.message || 'Não foi possível gerar o PDF.',
+        variant: 'destructive'
+      });
+    } finally {
+      setGeneratingPdfId(null);
+    }
+  };
+
   // Handle delete proposal
   const handleDeleteProposal = async (proposalId: number | string) => {
     if (!confirm('Tem certeza que deseja excluir esta proposta?')) return;
@@ -358,6 +471,7 @@ const Propostas = () => {
       title: '',
       clientId: undefined,
       leadId: undefined,
+      assignedToId: undefined,
       totalValue: 0,
       validUntil: undefined,
       description: '',
@@ -393,10 +507,15 @@ const Propostas = () => {
         ? String((fullProposal as any).leadId)
         : (fullProposal.lead?.id ? String(fullProposal.lead.id) : undefined);
 
+      const assignedToId = (fullProposal as any).assignedToId
+        ? String((fullProposal as any).assignedToId)
+        : (fullProposal.assignedTo?.id ? String(fullProposal.assignedTo.id) : undefined);
+
       setFormData({
         title: fullProposal.title || proposal.title || '',
         clientId: clientId || undefined,
         leadId: leadId || undefined,
+        assignedToId: assignedToId || undefined,
         totalValue: fullProposal.totalValue ? Number(fullProposal.totalValue) : proposal.totalValue || 0,
         validUntil: fullProposal.validUntil ? new Date(fullProposal.validUntil).toISOString().split('T')[0] : proposal.validUntil || undefined,
         description: fullProposal.description || proposal.description || '',
@@ -413,10 +532,15 @@ const Propostas = () => {
         ? String((proposal as any).leadId)
         : (proposal.lead?.id ? String(proposal.lead.id) : undefined);
 
+      const assignedToId = (proposal as any).assignedToId
+        ? String((proposal as any).assignedToId)
+        : (proposal.assignedTo?.id ? String(proposal.assignedTo.id) : undefined);
+
       setFormData({
         title: proposal.title || '',
         clientId: clientId || undefined,
         leadId: leadId || undefined,
+        assignedToId: assignedToId || undefined,
         totalValue: proposal.totalValue || 0,
         validUntil: proposal.validUntil || undefined,
         description: proposal.description || '',
@@ -457,6 +581,72 @@ const Propostas = () => {
     return Array.from(new Set(proposals.map(p => p.clientName)));
   };
 
+  const handleGeneratePDF = async () => {
+    try {
+      setGeneratingReport('pdf');
+      const filters = {
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        clientName: clientFilter === 'all' ? undefined : clientFilter,
+        searchTerm: searchTerm.trim() || undefined
+      };
+      const blob = await proposalService.generateReportPDF(filters);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-propostas-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório PDF gerado com sucesso.'
+      });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório PDF. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setGeneratingReport(null);
+    }
+  };
+
+  const handleGenerateExcel = async () => {
+    try {
+      setGeneratingReport('excel');
+      const filters = {
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        clientName: clientFilter === 'all' ? undefined : clientFilter,
+        searchTerm: searchTerm.trim() || undefined
+      };
+      const blob = await proposalService.generateReportExcel(filters);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-propostas-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({
+        title: 'Sucesso',
+        description: 'Relatório Excel gerado com sucesso.'
+      });
+    } catch (error) {
+      console.error('Erro ao gerar Excel:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar relatório Excel. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setGeneratingReport(null);
+    }
+  };
+
   return (
     <StandardLayout>
       <Tabs defaultValue="lista" className="w-full">
@@ -473,6 +663,32 @@ const Propostas = () => {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-gray-700"
+                  onClick={handleGeneratePDF}
+                  disabled={generatingReport !== null}
+                >
+                  {generatingReport === 'pdf' ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4 mr-2" />
+                  )}
+                  Gerar PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-gray-700"
+                  onClick={handleGenerateExcel}
+                  disabled={generatingReport !== null}
+                >
+                  {generatingReport === 'excel' ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  Gerar Excel
+                </Button>
                 <Button
                   className="bg-seguranca-red hover:bg-seguranca-darkred"
                   onClick={() => setIsCreateModalOpen(true)}
@@ -702,6 +918,36 @@ const Propostas = () => {
                                 <Button
                                   variant="outline"
                                   size="sm"
+                                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                                  onClick={() => handleDownloadPdf(proposal)}
+                                  disabled={generatingPdfId === (typeof proposal.id === 'string' ? proposal.id : String(proposal.id))}
+                                  title="Gerar PDF"
+                                >
+                                  {generatingPdfId === (typeof proposal.id === 'string' ? proposal.id : String(proposal.id)) ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <FileDown className="h-4 w-4" />
+                                  )}
+                                </Button>
+                                {(proposal.status === 'APPROVED' || proposal.status === 'CONVERTED') && !proposal.contractId && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="bg-seguranca-black border-green-500 text-green-400 hover:bg-green-500/20"
+                                    onClick={() => handleGenerateContract(proposal)}
+                                    disabled={generatingContract === (typeof proposal.id === 'string' ? proposal.id : String(proposal.id))}
+                                    title="Gerar Contrato"
+                                  >
+                                    {generatingContract === (typeof proposal.id === 'string' ? proposal.id : String(proposal.id)) ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <FileText className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
                                   onClick={() => handleDeleteProposal(proposal.id)}
                                 >
@@ -878,7 +1124,7 @@ const Propostas = () => {
                           className="bg-seguranca-black border-gray-600 text-seguranca-yellow hover:text-yellow-400 hover:border-yellow-400 shrink-0"
                           title="Criar novo cliente"
                         >
-                          <PlusIcon className="h-4 w-4" />
+                          <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                       {clients.length === 0 && !loadingClients && (
@@ -966,6 +1212,30 @@ const Propostas = () => {
                           <SelectItem value="DRAFT" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Rascunho</SelectItem>
                           <SelectItem value="SENT" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Enviada</SelectItem>
                           <SelectItem value="UNDER_REVIEW" className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray">Em Análise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="assignedTo" className="text-seguranca-lightgray">Responsável</Label>
+                      <Select
+                        value={formData.assignedToId ? String(formData.assignedToId) : '__NONE__'}
+                        onValueChange={(value) => setFormData({ ...formData, assignedToId: value === '__NONE__' ? undefined : value })}
+                        disabled={loadingUsers}
+                      >
+                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray [&>span[data-placeholder]]:text-gray-400 [&>span:not([data-placeholder])]:text-seguranca-lightgray">
+                          <SelectValue placeholder={loadingUsers ? "Carregando..." : "Selecione o responsável (opcional)"} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
+                          <SelectItem value="__NONE__" className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray">Nenhum</SelectItem>
+                          {users.map((user) => (
+                            <SelectItem
+                              key={user.id}
+                              value={String(user.id)}
+                              className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray"
+                            >
+                              {user.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1101,6 +1371,30 @@ const Propostas = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label htmlFor="edit-assignedTo" className="text-seguranca-lightgray">Responsável</Label>
+                      <Select
+                        value={formData.assignedToId ? String(formData.assignedToId) : '__NONE__'}
+                        onValueChange={(value) => setFormData({ ...formData, assignedToId: value === '__NONE__' ? undefined : value })}
+                        disabled={loadingUsers}
+                      >
+                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                          <SelectValue placeholder={loadingUsers ? "Carregando..." : "Selecione o responsável (opcional)"} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
+                          <SelectItem value="__NONE__" className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray">Nenhum</SelectItem>
+                          {users.map((user) => (
+                            <SelectItem
+                              key={user.id}
+                              value={String(user.id)}
+                              className="text-seguranca-lightgray hover:bg-seguranca-red/20 focus:bg-seguranca-black focus:text-seguranca-lightgray"
+                            >
+                              {user.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div>
@@ -1171,22 +1465,31 @@ const Propostas = () => {
 
               <TabsContent value="simulacao">
                 <PropostaAcordo
-                  onSaveProposal={async (proposalData: any) => {
+                  clients={clients.map(c => ({ id: c.id, name: c.name, cnpj: c.cnpj }))}
+                  loadingClients={loadingClients}
+                  onSaveProposal={async (proposalData: PropostaComercial, clientId?: string) => {
+                    if (!clientId || !clientId.trim()) {
+                      toast({
+                        title: "Cliente obrigatório",
+                        description: "Selecione um cliente para salvar a proposta de acordo.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
                     try {
-                      // Salvar como proposta no backend
-                      const savedProposal = await proposalService.createProposal({
+                      const items = propostaComercialToItems(proposalData);
+                      await proposalService.createProposal({
                         title: `Proposta de Acordo - ${new Date().toLocaleDateString('pt-BR')}`,
                         description: proposalData.descricaoServico || 'Proposta de Acordo Comercial',
                         totalValue: proposalData.resultado.valorMensal,
                         validUntil: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                        status: 'DRAFT',
-                        items: []
+                        clientId: clientId,
+                        items,
                       });
                       toast({
                         title: "Sucesso",
                         description: "Proposta de acordo salva com sucesso!",
                       });
-                      // Recarregar lista de propostas
                       await loadProposals();
                     } catch (error: any) {
                       console.error('Erro ao salvar proposta de acordo:', error);

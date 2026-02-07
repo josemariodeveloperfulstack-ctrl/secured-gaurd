@@ -111,6 +111,11 @@ export interface UserPermissions {
   DASHBOARD_READ: boolean;
   DASHBOARD_WRITE: boolean;
 
+  // Permissões do Dashboard Comercial
+  COMMERCIAL_DASHBOARD_READ: boolean;
+  SALES_GOALS_READ: boolean;
+  SALES_GOALS_WRITE: boolean;
+
   // Permissões de Perfil
   PROFILE_READ: boolean;
   PROFILE_WRITE: boolean;

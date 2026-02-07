@@ -1,9 +1,18 @@
-import axios from 'axios';
+import api from '@/lib/axios';
 
-const API_BASE_URL = '/company-config';
+const API_BASE_URL = '/api/company-config';
+
+export interface ContractTemplatePreviewRequest {
+  companyId: string;
+  companyConfigId?: string;
+  headerText?: string;
+  footerText?: string;
+  contractTerms?: string;
+}
 
 export interface CompanyConfig {
   id?: string;
+  companyId?: string;
   name: string;
   cnpj: string;
   address: string;
@@ -24,12 +33,25 @@ export interface CompanyConfig {
 
 class CompanyConfigService {
   /**
+   * Lista todas as configurações de empresa (para seleção)
+   */
+  async getAllConfigs(): Promise<CompanyConfig[]> {
+    try {
+      const response = await api.get(`${API_BASE_URL}/all`);
+      return response.data || [];
+    } catch (error) {
+      console.error('❌ Erro ao listar configurações:', error);
+      return [];
+    }
+  }
+
+  /**
    * Busca a configuração ativa da empresa
    */
   async getActiveConfig(): Promise<CompanyConfig | null> {
     try {
       console.log('🏢 Buscando configuração ativa da empresa...');
-      const response = await axios.get(`${API_BASE_URL}/active`);
+      const response = await api.get(`${API_BASE_URL}/active`);
       
       if (response.status === 204) {
         console.log('📝 Nenhuma configuração encontrada');
@@ -50,7 +72,7 @@ class CompanyConfigService {
   async hasActiveConfig(): Promise<boolean> {
     try {
       console.log('🔍 Verificando se existe configuração da empresa...');
-      const response = await axios.get(`${API_BASE_URL}/exists`);
+      const response = await api.get(`${API_BASE_URL}/exists`);
       console.log('📊 Existe configuração:', response.data);
       return response.data;
     } catch (error) {
@@ -65,13 +87,13 @@ class CompanyConfigService {
   async saveConfig(config: CompanyConfig): Promise<CompanyConfig> {
     try {
       console.log('💾 Salvando configuração da empresa:', config);
-      const response = await axios.post(API_BASE_URL, config);
+      const response = await api.post(API_BASE_URL, config);
       console.log('✅ Configuração salva com sucesso:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Erro ao salvar configuração:', error);
-      if (axios.isAxiosError(error) && error.response?.data) {
-        throw new Error(error.response.data.message || 'Erro ao salvar configuração');
+      if (error && typeof error === 'object' && 'response' in error && (error as any).response?.data) {
+        throw new Error((error as any).response.data.message || 'Erro ao salvar configuração');
       }
       throw new Error('Erro interno do servidor');
     }
@@ -83,7 +105,7 @@ class CompanyConfigService {
   async getConfigById(id: string): Promise<CompanyConfig | null> {
     try {
       console.log('🔍 Buscando configuração por ID:', id);
-      const response = await axios.get(`${API_BASE_URL}/${id}`);
+      const response = await api.get(`${API_BASE_URL}/${id}`);
       console.log('✅ Configuração encontrada:', response.data);
       return response.data;
     } catch (error) {
@@ -98,12 +120,23 @@ class CompanyConfigService {
   async deactivateConfig(id: string): Promise<void> {
     try {
       console.log('🗑️ Desativando configuração:', id);
-      await axios.delete(`${API_BASE_URL}/${id}`);
+      await api.delete(`${API_BASE_URL}/${id}`);
       console.log('✅ Configuração desativada com sucesso');
     } catch (error) {
       console.error('❌ Erro ao desativar configuração:', error);
       throw new Error('Erro ao desativar configuração');
     }
+  }
+
+  /**
+   * Gera PDF de preview do template de contrato com placeholders.
+   * Retorna o blob do PDF para abrir em nova aba.
+   */
+  async generatePreviewPdf(request: ContractTemplatePreviewRequest): Promise<Blob> {
+    const response = await api.post(`${API_BASE_URL}/preview-pdf`, request, {
+      responseType: 'blob',
+    });
+    return response.data;
   }
 
   /**
@@ -115,7 +148,7 @@ class CompanyConfigService {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await axios.post(`${API_BASE_URL}/${id}/logo`, formData, {
+      const response = await api.post(`${API_BASE_URL}/${id}/logo`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

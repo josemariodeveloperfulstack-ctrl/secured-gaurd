@@ -15,8 +15,12 @@ interface WebSocketConfig {
   onDisconnect?: () => void;
 }
 
+// Singleton state for the physical connection
+let sharedClient: Client | null = null;
+let sharedSubscribers: Set<WebSocketConfig> = new Set();
+let isConnecting = false;
+
 export const useWebSocket = (config: WebSocketConfig) => {
-  const clientRef = useRef<Client | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
@@ -31,21 +35,33 @@ export const useWebSocket = (config: WebSocketConfig) => {
     setError
   } = useMessageStore();
 
+  const notifySubscribers = useCallback((event: string, data: any) => {
+    sharedSubscribers.forEach(sub => {
+      switch (event) {
+        case 'onConnect': sub.onConnect?.(); break;
+        case 'onDisconnect': sub.onDisconnect?.(); break;
+        case 'onMessage': sub.onMessage?.(data); break;
+        case 'onTyping': sub.onTyping?.(data); break;
+        case 'onUserStatus': sub.onUserStatus?.(data); break;
+        case 'onError': sub.onError?.(data); break;
+      }
+    });
+  }, []);
+
   const connect = useCallback(() => {
-    if (clientRef.current?.connected) {
-      console.log('[WebSocket] Já conectado');
+    if (sharedClient?.connected) {
+      console.log('[WebSocket] Já conectado (Shared)');
       return;
     }
 
-    // Evitar múltiplas conexões simultâneas
-    if (clientRef.current) {
-      console.log('[WebSocket] Limpando conexão anterior...');
-      clientRef.current.deactivate();
-      clientRef.current = null;
+    if (isConnecting) {
+      console.log('[WebSocket] Conexão já em andamento...');
+      return;
     }
 
-    console.log('[WebSocket] Iniciando conexão...');
-    
+    isConnecting = true;
+    console.log('[WebSocket] Iniciando conexão única...');
+
     try {
       const socket = new SockJS('/ws');
       const client = new Client({
@@ -55,7 +71,6 @@ export const useWebSocket = (config: WebSocketConfig) => {
           'X-Username': config.username
         },
         debug: (str) => {
-          // Reduzir logs de debug para evitar spam
           if (str.includes('ERROR') || str.includes('CONNECTED') || str.includes('DISCONNECTED')) {
             console.log('[WebSocket Debug]', str);
           }
@@ -66,240 +81,111 @@ export const useWebSocket = (config: WebSocketConfig) => {
       });
 
       client.onConnect = (frame) => {
-        console.log('[WebSocket] Conectado:', frame);
+        console.log('[WebSocket] Conectado (Shared):', frame);
         reconnectAttemptsRef.current = 0;
+        isConnecting = false;
         setIsConnected(true);
         setError(null);
-        config.onConnect?.();
 
-        // Subscrever aos tópicos de mensagens individuais
+        notifySubscribers('onConnect', frame);
+
+        // Subscrever aos tópicos globais uma única vez
         client.subscribe(`/user/${config.username}/queue/messages`, (message) => {
           try {
-            const rawMessage = JSON.parse(message.body);
-            // Garantir que todas as informações do arquivo sejam preservadas
-            const chatMessage: ChatMessage = {
-              ...rawMessage,
-              fileUrl: rawMessage.fileUrl,
-              fileName: rawMessage.fileName,
-              fileSize: rawMessage.fileSize,
-              fileContentType: rawMessage.fileContentType
-            };
-            console.log('[WebSocket] Nova mensagem recebida (individual):', chatMessage);
-            
-            // Log detalhado para mensagens com arquivo
-            if (chatMessage.fileUrl) {
-              console.log('📎 Mensagem com arquivo recebida (individual):', {
-                id: chatMessage.id,
-                type: chatMessage.type,
-                fileUrl: chatMessage.fileUrl,
-                fileName: chatMessage.fileName,
-                fileSize: chatMessage.fileSize,
-                fileContentType: chatMessage.fileContentType
-              });
-            }
-            
+            const chatMessage: ChatMessage = JSON.parse(message.body);
             addChatMessage(chatMessage);
-            config.onMessage?.(chatMessage);
+            notifySubscribers('onMessage', chatMessage);
           } catch (error) {
             console.error('[WebSocket] Erro ao processar mensagem:', error);
           }
         });
 
-        // Subscrever a tópicos de grupos (se o usuário estiver em grupos)
         client.subscribe('/topic/chat/group/*', (message) => {
           try {
-            const rawMessage = JSON.parse(message.body);
-            // Garantir que todas as informações do arquivo sejam preservadas
-            const chatMessage: ChatMessage = {
-              ...rawMessage,
-              fileUrl: rawMessage.fileUrl,
-              fileName: rawMessage.fileName,
-              fileSize: rawMessage.fileSize,
-              fileContentType: rawMessage.fileContentType
-            };
-            console.log('[WebSocket] Nova mensagem recebida (grupo):', chatMessage);
-            
-            // Log detalhado para mensagens com arquivo
-            if (chatMessage.fileUrl) {
-              console.log('📎 Mensagem com arquivo recebida (grupo):', {
-                id: chatMessage.id,
-                type: chatMessage.type,
-                fileUrl: chatMessage.fileUrl,
-                fileName: chatMessage.fileName,
-                fileSize: chatMessage.fileSize,
-                fileContentType: chatMessage.fileContentType
-              });
-            }
-            
+            const chatMessage: ChatMessage = JSON.parse(message.body);
             addChatMessage(chatMessage);
-            config.onMessage?.(chatMessage);
+            notifySubscribers('onMessage', chatMessage);
           } catch (error) {
             console.error('[WebSocket] Erro ao processar mensagem de grupo:', error);
           }
         });
 
-        // Subscrever a tópicos de departamentos (se o usuário estiver em departamentos)
-        client.subscribe('/topic/chat/department/*', (message) => {
-          try {
-            const rawMessage = JSON.parse(message.body);
-            // Garantir que todas as informações do arquivo sejam preservadas
-            const chatMessage: ChatMessage = {
-              ...rawMessage,
-              fileUrl: rawMessage.fileUrl,
-              fileName: rawMessage.fileName,
-              fileSize: rawMessage.fileSize,
-              fileContentType: rawMessage.fileContentType
-            };
-            console.log('[WebSocket] Nova mensagem recebida (departamento):', chatMessage);
-            
-            // Log detalhado para mensagens com arquivo
-            if (chatMessage.fileUrl) {
-              console.log('📎 Mensagem com arquivo recebida (departamento):', {
-                id: chatMessage.id,
-                type: chatMessage.type,
-                fileUrl: chatMessage.fileUrl,
-                fileName: chatMessage.fileName,
-                fileSize: chatMessage.fileSize,
-                fileContentType: chatMessage.fileContentType
-              });
-            }
-            
-            addChatMessage(chatMessage);
-            config.onMessage?.(chatMessage);
-          } catch (error) {
-            console.error('[WebSocket] Erro ao processar mensagem de departamento:', error);
-          }
-        });
-
-        // Subscrever aos eventos de digitação
         client.subscribe(`/user/${config.username}/queue/typing`, (message) => {
           try {
             const typingEvent = JSON.parse(message.body);
-            console.log('[WebSocket] Evento de digitação:', typingEvent);
-            
             if (typingEvent.isTyping) {
               addTypingUser(typingEvent.userId);
-              // Remove automaticamente após 3 segundos
               setTimeout(() => removeTypingUser(typingEvent.userId), 3000);
             } else {
               removeTypingUser(typingEvent.userId);
             }
-            
-            config.onTyping?.(typingEvent);
+            notifySubscribers('onTyping', typingEvent);
           } catch (error) {
             console.error('[WebSocket] Erro ao processar evento de digitação:', error);
           }
         });
 
-        // Subscrever a notificações gerais
-        client.subscribe(`/user/${config.username}/queue/notifications`, (message) => {
-          try {
-            const notification = JSON.parse(message.body);
-            console.log('[WebSocket] Notificação recebida:', notification);
-            // TODO: Implementar notificações do sistema
-          } catch (error) {
-            console.error('[WebSocket] Erro ao processar notificação:', error);
-          }
-        });
-
-        // Subscrever a eventos de status de usuário (online/offline)
         client.subscribe(`/user/${config.username}/queue/user-status`, (message) => {
           try {
-            const userStatusEvent = JSON.parse(message.body);
-            console.log('[WebSocket] Evento de status de usuário:', userStatusEvent);
-            // Atualizar o status online/offline no store
+            const event = JSON.parse(message.body);
             const { updateUserStatus } = useMessageStore.getState();
-            if (updateUserStatus && userStatusEvent.userId) {
-              updateUserStatus(userStatusEvent.userId, userStatusEvent.isOnline);
+            if (updateUserStatus && event.userId) {
+              updateUserStatus(event.userId, event.isOnline);
             }
-            if (userStatusEvent?.userId) {
-              config.onUserStatus?.({
-                userId: userStatusEvent.userId,
-                isOnline: Boolean(userStatusEvent.isOnline),
-                timestamp: userStatusEvent.timestamp
-              });
-            }
+            notifySubscribers('onUserStatus', event);
           } catch (error) {
-            console.error('[WebSocket] Erro ao processar evento de status de usuário:', error);
+            console.error('[WebSocket] Erro ao processar status:', error);
           }
         });
 
-        // Subscrever a tópico público de status de usuários (broadcast)
         client.subscribe('/topic/user-status', (message) => {
           try {
-            const userStatusEvent = JSON.parse(message.body);
-            console.log('[WebSocket] Broadcast de status de usuário:', userStatusEvent);
-            // Atualizar o status online/offline no store
+            const event = JSON.parse(message.body);
             const { updateUserStatus } = useMessageStore.getState();
-            if (updateUserStatus && userStatusEvent.userId) {
-              updateUserStatus(userStatusEvent.userId, userStatusEvent.isOnline);
+            if (updateUserStatus && event.userId) {
+              updateUserStatus(event.userId, event.isOnline);
             }
-            if (userStatusEvent?.userId) {
-              config.onUserStatus?.({
-                userId: userStatusEvent.userId,
-                isOnline: Boolean(userStatusEvent.isOnline),
-                timestamp: userStatusEvent.timestamp
-              });
-            }
+            notifySubscribers('onUserStatus', event);
           } catch (error) {
-            console.error('[WebSocket] Erro ao processar broadcast de status:', error);
+            console.error('[WebSocket] Erro ao processar broadcast status:', error);
           }
         });
       };
 
       client.onStompError = (frame) => {
         console.error('[WebSocket] Erro STOMP:', frame);
+        isConnecting = false;
         setIsConnected(false);
         setError('Erro de conexão WebSocket');
-        config.onError?.(frame);
-        
-        // Tentar reconectar
+        notifySubscribers('onError', frame);
         scheduleReconnect();
       };
 
       client.onWebSocketClose = (event) => {
         console.log('[WebSocket] Conexão fechada:', event);
+        isConnecting = false;
         setIsConnected(false);
-        config.onDisconnect?.();
-        
-        // Tentar reconectar se não foi fechamento intencional
-        if (event.code !== 1000) {
-          scheduleReconnect();
-        }
+        notifySubscribers('onDisconnect', event);
+        if (event.code !== 1000) scheduleReconnect();
       };
 
-      client.onWebSocketError = (error) => {
-        console.error('[WebSocket] Erro de WebSocket:', error);
-        setIsConnected(false);
-        setError('Erro de conexão WebSocket');
-        config.onError?.(error);
-      };
-
-      clientRef.current = client;
+      sharedClient = client;
       client.activate();
 
     } catch (error) {
+      isConnecting = false;
       console.error('[WebSocket] Erro ao criar conexão:', error);
       setError('Erro ao conectar WebSocket');
-      config.onError?.(error);
+      notifySubscribers('onError', error);
       scheduleReconnect();
     }
-  }, [config.token, config.username]);
+  }, [config.token, config.username, setIsConnected, setError, addChatMessage, addTypingUser, removeTypingUser, notifySubscribers]);
 
   const scheduleReconnect = useCallback(() => {
-    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-      console.error('[WebSocket] Máximo de tentativas de reconexão atingido');
-      setError('Falha na conexão. Recarregue a página.');
-      return;
-    }
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) return;
+    if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-
-    const delay = reconnectDelay * Math.pow(2, reconnectAttemptsRef.current); // Backoff exponencial
-    console.log(`[WebSocket] Tentando reconectar em ${delay}ms (tentativa ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`);
-    
+    const delay = reconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
     reconnectTimeoutRef.current = setTimeout(() => {
       reconnectAttemptsRef.current++;
       connect();
@@ -307,50 +193,27 @@ export const useWebSocket = (config: WebSocketConfig) => {
   }, [connect]);
 
   const disconnect = useCallback(() => {
-    console.log('[WebSocket] Desconectando...');
-    
-    // Limpar timeout de reconexão
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    if (sharedSubscribers.size > 0) {
+      console.log('[WebSocket] Mantendo conexão compartilhada (há outros inscritos)');
+      return;
     }
 
-    // Desconectar cliente WebSocket
-    if (clientRef.current) {
-      try {
-        // Desativar todas as subscrições primeiro
-        if (clientRef.current.subscriptions) {
-          Object.values(clientRef.current.subscriptions).forEach(subscription => {
-            subscription.unsubscribe();
-          });
-        }
-        clientRef.current.deactivate();
-      } catch (error) {
-        console.warn('[WebSocket] Erro ao desconectar:', error);
-      } finally {
-        clientRef.current = null;
-      }
+    console.log('[WebSocket] Desconectando conexão física...');
+    if (sharedClient) {
+      sharedClient.deactivate();
+      sharedClient = null;
     }
-
+    isConnecting = false;
     setIsConnected(false);
     setWsConnection(null);
-    config.onDisconnect?.();
-  }, [setIsConnected, setWsConnection, config]);
+  }, [setIsConnected, setWsConnection]);
 
   const sendMessage = useCallback((destination: string, body: any) => {
-    if (!clientRef.current?.connected) {
-      console.warn('[WebSocket] Tentando enviar mensagem sem conexão ativa');
-      return false;
-    }
-
+    if (!sharedClient?.connected) return false;
     try {
-      clientRef.current.publish({
-        destination,
-        body: JSON.stringify(body)
-      });
+      sharedClient.publish({ destination, body: JSON.stringify(body) });
       return true;
     } catch (error) {
-      console.error('[WebSocket] Erro ao enviar mensagem:', error);
       return false;
     }
   }, []);
@@ -367,35 +230,39 @@ export const useWebSocket = (config: WebSocketConfig) => {
     });
   }, [sendMessage, config.username]);
 
-  // Configurar conexão WebSocket no store
+  // Gestão de inscritos
   useEffect(() => {
-    if (clientRef.current) {
+    sharedSubscribers.add(config);
+    return () => {
+      sharedSubscribers.delete(config);
+    };
+  }, [config]);
+
+  // Conectar/Desconectar automático
+  useEffect(() => {
+    if (config.token && config.username && config.token !== 'null') {
+      connect();
+    }
+    return () => {
+      // Opcional: desconectar se for o último? 
+      // Para o modo global, preferimos manter vivo enquanto houver componentes usando.
+    };
+  }, [config.token, config.username, connect]);
+
+  // Atualizar store global
+  useEffect(() => {
+    if (sharedClient) {
       setWsConnection({
-        client: clientRef.current,
+        client: sharedClient,
         sendEvent: sendMessage,
         sendTyping: sendTypingEvent,
-        isConnected: clientRef.current.connected
+        isConnected: sharedClient.connected
       });
     }
   }, [setWsConnection, sendMessage, sendTypingEvent]);
 
-  // Conectar automaticamente quando o hook é montado
-  useEffect(() => {
-    // Só conectar se temos token e username válidos
-    if (config.token && config.username && config.token !== 'null' && config.token !== 'undefined') {
-      connect();
-    } else {
-      console.log('[WebSocket] Não conectando - token ou username inválidos');
-    }
-
-    return () => {
-      disconnect();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.token, config.username]); // Removido connect e disconnect para evitar loop
-
   return {
-    isConnected: clientRef.current?.connected || false,
+    isConnected: sharedClient?.connected || false,
     connect,
     disconnect,
     sendMessage,

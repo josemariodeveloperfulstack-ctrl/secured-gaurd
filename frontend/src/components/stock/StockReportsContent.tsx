@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { stockService } from '@/services/stockService';
-import { ReportGenerator, ReportData } from '@/utils/reportGenerator';
+import { companyService } from '@/services/companyService';
+import { Company } from '@/types/company';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -39,6 +39,7 @@ const StockReportsContent: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState('low-stock');
   const [dateRange, setDateRange] = useState('30');
+  const [empresa, setEmpresa] = useState<Company | undefined>(undefined);
   
   // Estatísticas
   const [stats, setStats] = useState({
@@ -53,7 +54,19 @@ const StockReportsContent: React.FC = () => {
   useEffect(() => {
     loadReports();
     loadStats();
+    fetchCompany();
   }, [reportType, dateRange]);
+
+  const fetchCompany = async () => {
+    try {
+      const companies = await companyService.getAllCompanies();
+      if (companies && companies.length > 0) {
+        setEmpresa(companies[0]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados da empresa para relatórios de estoque:', error);
+    }
+  };
 
   const loadReports = async () => {
     try {
@@ -203,84 +216,49 @@ const StockReportsContent: React.FC = () => {
         return;
       }
 
-      const reportTitle = 
-        reportType === 'low-stock' ? 'Relatório de Produtos com Estoque Baixo' :
-        reportType === 'out-of-stock' ? 'Relatório de Produtos Sem Estoque' :
-        reportType === 'over-stock' ? 'Relatório de Produtos com Estoque Alto' :
-        reportType === 'turnover' ? 'Relatório de Giro de Estoque' :
-        reportType === 'value' ? 'Relatório de Valor por Categoria' :
-        'Relatório de Movimentações de Estoque';
-
-      const periodLabel = 
-        dateRange === '7' ? 'Últimos 7 dias' :
-        dateRange === '30' ? 'Últimos 30 dias' :
-        dateRange === '90' ? 'Últimos 90 dias' :
-        'Último ano';
-
-      const headers = [
-        'Produto',
-        'Categoria',
-        'Estoque Atual',
-        'Estoque Mínimo',
-        'Estoque Máximo',
-        'Consumo Médio',
-        'Giro',
-        'Última Movimentação',
-        'Valor',
-        'Status'
-      ];
-
-      const rows = reports.map(report => [
-        report.productName,
-        report.category,
-        formatNumber(report.currentStock),
-        formatNumber(report.minimumStock),
-        formatNumber(report.maximumStock),
-        `${formatNumber(report.averageConsumption)}/dia`,
-        formatPercentage(report.turnoverRate),
-        formatDate(report.lastMovementDate),
-        formatCurrency(report.totalValue),
-        getStatusLabel(report.status)
-      ]);
-
-      const totalValue = reports.reduce((sum, r) => sum + r.totalValue, 0);
-      const summary = [
-        {
-          label: 'Total de Produtos',
-          value: reports.length,
-          format: 'number' as const
-        },
-        {
-          label: 'Valor Total',
-          value: totalValue,
-          format: 'currency' as const
-        },
-        {
-          label: 'Produtos com Estoque Baixo',
-          value: stats.lowStockProducts,
-          format: 'number' as const
-        },
-        {
-          label: 'Produtos Sem Estoque',
-          value: stats.outOfStockProducts,
-          format: 'number' as const
+      // Garantir que temos a empresa carregada
+      let currentEmpresa = empresa;
+      if (!currentEmpresa) {
+        try {
+          const companies = await companyService.getAllCompanies();
+          if (companies && companies.length > 0) {
+            currentEmpresa = companies[0];
+            setEmpresa(currentEmpresa);
+          }
+        } catch (e) {
+          console.error('Erro ao carregar empresa para o relatório de estoque (componente interno):', e);
         }
-      ];
+      }
 
-      const reportData: ReportData = {
-        title: reportTitle,
-        subtitle: 'Análise e relatórios detalhados do estoque',
-        period: periodLabel,
-        headers,
-        rows,
-        summary
-      };
+      if (!currentEmpresa?.id) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível identificar a empresa para gerar o relatório.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      await ReportGenerator.generatePDF(reportData);
+      const { stockService } = await import('@/services/stockService');
+
+      if (reportType === 'low-stock') {
+        await stockService.downloadLowStockPDF(currentEmpresa.id);
+      } else if (reportType === 'movements') {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(end.getDate() - Number.parseInt(dateRange, 10));
+
+        const startDateISO = start.toISOString();
+        const endDateISO = end.toISOString();
+
+        await stockService.downloadMovementsPDF(currentEmpresa.id, startDateISO, endDateISO);
+      } else {
+        await stockService.downloadGeneralStockPDF(currentEmpresa.id);
+      }
 
       toast({
         title: "Sucesso",
-        description: "Relatório exportado com sucesso.",
+        description: "Relatório exportado com layout profissional.",
       });
     } catch (error) {
       console.error('Erro ao exportar relatório:', error);

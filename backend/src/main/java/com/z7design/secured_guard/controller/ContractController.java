@@ -1,8 +1,22 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.ContractAdjustmentDTO;
+import com.z7design.secured_guard.dto.ContractAmendmentDTO;
+import com.z7design.secured_guard.dto.ContractDocumentDTO;
+import com.z7design.secured_guard.dto.ContractDashboardStatsDTO;
+import com.z7design.secured_guard.dto.ContractExpiringAlertDTO;
 import com.z7design.secured_guard.dto.ContractDTO;
+import com.z7design.secured_guard.dto.CreateContractAdjustmentRequest;
+import com.z7design.secured_guard.dto.CreateContractDocumentRequest;
+import com.z7design.secured_guard.dto.TerminateContractRequest;
+import com.z7design.secured_guard.dto.CreateContractAmendmentRequest;
 import com.z7design.secured_guard.model.Contract;
 import com.z7design.secured_guard.model.enums.ContractStatus;
+import com.z7design.secured_guard.service.ContractAdjustmentService;
+import com.z7design.secured_guard.service.ContractDocumentService;
+import com.z7design.secured_guard.service.ContractDashboardService;
+import com.z7design.secured_guard.service.ContractExpirationService;
+import com.z7design.secured_guard.service.ContractAmendmentService;
 import com.z7design.secured_guard.service.ContractService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,6 +44,11 @@ import java.util.UUID;
 public class ContractController {
     
     private final ContractService contractService;
+    private final ContractAmendmentService amendmentService;
+    private final ContractAdjustmentService adjustmentService;
+    private final ContractDocumentService documentService;
+    private final ContractExpirationService expirationService;
+    private final ContractDashboardService dashboardService;
     
     @GetMapping
     @Operation(summary = "Listar contratos", description = "Retorna uma lista paginada de contratos")
@@ -58,6 +77,21 @@ public class ContractController {
         return ResponseEntity.ok(contractDTO);
     }
     
+    @PostMapping("/from-proposal/{proposalId}")
+    @Operation(summary = "Criar contrato a partir de proposta", description = "Cria um contrato a partir de uma proposta aprovada ou convertida")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Contrato criado com sucesso"),
+        @ApiResponse(responseCode = "400", description = "Proposta não está aprovada ou já possui contrato"),
+        @ApiResponse(responseCode = "404", description = "Proposta não encontrada"),
+        @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<ContractDTO> createFromProposal(
+            @Parameter(description = "ID da proposta") @PathVariable UUID proposalId) {
+        Contract contract = contractService.createFromProposal(proposalId);
+        ContractDTO dto = contractService.convertToDTO(contract);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
     @PostMapping
     @Operation(summary = "Criar contrato", description = "Cria um novo contrato")
     @ApiResponses(value = {
@@ -192,6 +226,39 @@ public class ContractController {
         return ResponseEntity.ok(stats);
     }
     
+    @GetMapping("/dashboard/stats")
+    @Operation(summary = "Estatísticas do dashboard de contratos")
+    public ResponseEntity<ContractDashboardStatsDTO> getDashboardStats() {
+        return ResponseEntity.ok(dashboardService.getStats());
+    }
+
+    @GetMapping("/expiring-alerts")
+    @Operation(summary = "Alertas de contratos a vencer")
+    public ResponseEntity<List<ContractExpiringAlertDTO>> getExpiringAlerts() {
+        List<ContractExpiringAlertDTO> alerts = expirationService.getExpiringAlerts();
+        return ResponseEntity.ok(alerts);
+    }
+
+    @PostMapping("/{id}/terminate")
+    @Operation(summary = "Encerrar contrato")
+    public ResponseEntity<ContractDTO> terminateContract(
+            @PathVariable String id,
+            @Valid @RequestBody TerminateContractRequest request) {
+        Contract contract = contractService.terminateContract(UUID.fromString(id), request);
+        ContractDTO dto = contractService.convertToDTO(contract);
+        return ResponseEntity.ok(dto);
+    }
+
+    @PostMapping("/{id}/renew")
+    @Operation(summary = "Renovar contrato")
+    public ResponseEntity<ContractDTO> renewContract(
+            @PathVariable String id,
+            @RequestParam(required = false) java.math.BigDecimal newValue) {
+        Contract contract = contractService.renewContract(UUID.fromString(id), newValue);
+        ContractDTO dto = contractService.convertToDTO(contract);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
     @GetMapping("/all")
     @Operation(summary = "Listar todos os contratos (sem paginação)", description = "Retorna uma lista completa de todos os contratos")
     @ApiResponses(value = {
@@ -202,6 +269,103 @@ public class ContractController {
         List<Contract> contracts = contractService.findAll();
         List<ContractDTO> contractDTOs = contractService.convertToDTOList(contracts);
         return ResponseEntity.ok(contractDTOs);
+    }
+
+    // === Aditivos ===
+    @GetMapping("/{id}/amendments")
+    @Operation(summary = "Listar aditivos do contrato")
+    public ResponseEntity<List<ContractAmendmentDTO>> getAmendments(@PathVariable String id) {
+        List<ContractAmendmentDTO> amendments = amendmentService.findByContractId(UUID.fromString(id));
+        return ResponseEntity.ok(amendments);
+    }
+
+    @PostMapping("/{id}/amendments")
+    @Operation(summary = "Criar aditivo")
+    public ResponseEntity<ContractAmendmentDTO> createAmendment(
+            @PathVariable String id,
+            @Valid @RequestBody CreateContractAmendmentRequest request) {
+        ContractAmendmentDTO dto = amendmentService.create(
+                UUID.fromString(id),
+                request.getType(),
+                request.getDescription(),
+                request.getEffectiveDate(),
+                request.getFinancialImpact());
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    @PostMapping("/{id}/amendments/{amendmentId}/approve")
+    @Operation(summary = "Aprovar aditivo")
+    public ResponseEntity<ContractAmendmentDTO> approveAmendment(
+            @PathVariable String id,
+            @PathVariable String amendmentId) {
+        ContractAmendmentDTO dto = amendmentService.approve(UUID.fromString(amendmentId));
+        return ResponseEntity.ok(dto);
+    }
+
+    @PostMapping("/{id}/amendments/{amendmentId}/reject")
+    @Operation(summary = "Rejeitar aditivo")
+    public ResponseEntity<ContractAmendmentDTO> rejectAmendment(
+            @PathVariable String id,
+            @PathVariable String amendmentId) {
+        ContractAmendmentDTO dto = amendmentService.reject(UUID.fromString(amendmentId));
+        return ResponseEntity.ok(dto);
+    }
+
+    @DeleteMapping("/{id}/amendments/{amendmentId}")
+    @Operation(summary = "Excluir aditivo pendente")
+    public ResponseEntity<Void> deleteAmendment(
+            @PathVariable String id,
+            @PathVariable String amendmentId) {
+        amendmentService.delete(UUID.fromString(amendmentId));
+        return ResponseEntity.noContent().build();
+    }
+
+    // === Histórico de Reajustes ===
+    @GetMapping("/{id}/adjustments")
+    @Operation(summary = "Listar histórico de reajustes do contrato")
+    public ResponseEntity<List<ContractAdjustmentDTO>> getAdjustments(@PathVariable String id) {
+        List<ContractAdjustmentDTO> adjustments = adjustmentService.findByContractId(UUID.fromString(id));
+        return ResponseEntity.ok(adjustments);
+    }
+
+    // === Documentos ===
+    @GetMapping("/{id}/documents")
+    @Operation(summary = "Listar documentos do contrato")
+    public ResponseEntity<List<ContractDocumentDTO>> getDocuments(@PathVariable String id) {
+        List<ContractDocumentDTO> docs = documentService.findByContractId(UUID.fromString(id));
+        return ResponseEntity.ok(docs);
+    }
+
+    @PostMapping("/{id}/documents")
+    @Operation(summary = "Adicionar documento")
+    public ResponseEntity<ContractDocumentDTO> createDocument(
+            @PathVariable String id,
+            @Valid @RequestBody CreateContractDocumentRequest request) {
+        ContractDocumentDTO dto = documentService.create(UUID.fromString(id), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    @DeleteMapping("/{id}/documents/{documentId}")
+    @Operation(summary = "Excluir documento")
+    public ResponseEntity<Void> deleteDocument(
+            @PathVariable String id,
+            @PathVariable String documentId) {
+        documentService.delete(UUID.fromString(documentId));
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/adjustments")
+    @Operation(summary = "Registrar reajuste")
+    public ResponseEntity<ContractAdjustmentDTO> createAdjustment(
+            @PathVariable String id,
+            @Valid @RequestBody CreateContractAdjustmentRequest request) {
+        ContractAdjustmentDTO dto = adjustmentService.create(
+                UUID.fromString(id),
+                request.getAdjustmentType(),
+                request.getPreviousValue(),
+                request.getNewValue(),
+                request.getAdjustmentDate() != null ? request.getAdjustmentDate() : LocalDate.now());
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
     
     // Classe interna para estatísticas

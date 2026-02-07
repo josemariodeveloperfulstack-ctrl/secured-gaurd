@@ -1,6 +1,9 @@
 package com.z7design.secured_guard.dto;
 
+import com.z7design.secured_guard.model.enums.AdjustmentType;
+import com.z7design.secured_guard.model.enums.ContractOrigin;
 import com.z7design.secured_guard.model.enums.ContractStatus;
+import com.z7design.secured_guard.model.enums.ContractType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -67,4 +70,71 @@ public class ContractDTO {
     
     @Schema(description = "Data de atualização")
     private LocalDateTime updatedAt;
+
+    // Campos do PRD - Gestão de Contratos
+    @Schema(description = "Origem do contrato")
+    private ContractOrigin contractOrigin;
+
+    @Schema(description = "Tipo do contrato")
+    private ContractType contractType;
+
+    @Schema(description = "ID do responsável comercial")
+    private java.util.UUID responsibleCommercialId;
+
+    @Schema(description = "Nome do responsável comercial")
+    private String responsibleCommercialName;
+
+    @Schema(description = "ID do gestor do contrato")
+    private java.util.UUID responsibleManagerId;
+
+    @Schema(description = "Nome do gestor do contrato")
+    private String responsibleManagerName;
+
+    @Schema(description = "ID da proposta originária")
+    private java.util.UUID proposalId;
+
+    @Schema(description = "Valor mensal")
+    private BigDecimal monthlyValue;
+
+    @Schema(description = "Valor anual")
+    private BigDecimal annualValue;
+
+    @Schema(description = "Tipo de reajuste")
+    private AdjustmentType adjustmentType;
+
+    @Schema(description = "Data do próximo reajuste")
+    private LocalDate nextAdjustmentDate;
+
+    @Schema(description = "Renovação automática")
+    private Boolean autoRenewal;
+
+    @Schema(description = "Tempo de substituição (horas)")
+    private Integer replacementTimeHours;
+
+    @Schema(description = "Ausência máxima (minutos)")
+    private Integer maxAbsenceMinutes;
+
+    @Schema(description = "Frequência de rondas")
+    private String patrolFrequency;
+
+    @Schema(description = "Relatórios obrigatórios")
+    private String reportsRequired;
+
+    @Schema(description = "Obrigações do contratado")
+    private String obligationsContractor;
+
+    @Schema(description = "Obrigações do contratante")
+    private String obligationsContracted;
+
+    @Schema(description = "Penalidades")
+    private String penalties;
+
+    @Schema(description = "Motivo de encerramento")
+    private com.z7design.secured_guard.model.enums.TerminationReason terminationReason;
+
+    @Schema(description = "Data de encerramento")
+    private LocalDate terminationDate;
+
+    @Schema(description = "Checklist de encerramento (JSON)")
+    private String terminationChecklist;
 } 

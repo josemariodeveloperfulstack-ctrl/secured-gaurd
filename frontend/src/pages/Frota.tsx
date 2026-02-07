@@ -596,7 +596,8 @@ const Frota: React.FC = () => {
           await reportLayoutService.generatePremiumPDF(printElement, {
             title: 'Relatório de Multa de Trânsito',
             filename: `relatorio_multa_${multa.placa}_${new Date().toISOString().split('T')[0]}.pdf`,
-            company: empresa
+            company: empresa,
+            elementHasFullLayout: true
           });
 
           setFineToDownload(null);

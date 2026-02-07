@@ -6,6 +6,7 @@ export interface ProposalItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  notes?: string;
 }
 
 export interface Proposal {
@@ -39,6 +40,8 @@ export interface Proposal {
   createdAt: string;
   updatedAt: string;
   items?: ProposalItem[];
+  contractId?: number | string;
+  contract?: { id: number | string };
 }
 
 export interface CreateProposalRequest {
@@ -53,6 +56,7 @@ export interface CreateProposalRequest {
     description: string;
     quantity: number;
     unitPrice: number;
+    notes?: string; // Seção: MAO_DE_OBRA, MATERIAIS, BDI, IMPOSTOS
   }[];
 }
 
@@ -162,6 +166,49 @@ export const proposalService = {
 
   async getTotalValueByStatus(): Promise<ProposalStats> {
     const response = await api.get('/api/proposals/stats/total-value-by-status');
+    return response.data;
+  },
+
+  async getProposalPdf(id: number | string): Promise<Blob> {
+    const response = await api.get(`/api/proposals/${id}/pdf`, { responseType: 'blob' });
+    return response.data;
+  },
+
+  async generatePdfFromSimulation(data: {
+    descricaoServico: string;
+    maoDeObra: Record<string, number>;
+    materiais: Record<string, number>;
+    bdi: Record<string, number>;
+    impostos: Record<string, number>;
+    resultado: { valorMensal: number; valorAnual: number };
+    clientName?: string;
+    clientAddress?: string;
+  }): Promise<Blob> {
+    const response = await api.post('/api/proposals/pdf/from-simulation', data, { responseType: 'blob' });
+    return response.data;
+  },
+
+  async generateReportPDF(filters: { status?: string; clientName?: string; searchTerm?: string }): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters.clientName && filters.clientName !== 'all') params.append('clientName', filters.clientName);
+    if (filters.searchTerm?.trim()) params.append('searchTerm', filters.searchTerm.trim());
+
+    const query = params.toString();
+    const url = query ? `/api/proposals/reports/pdf?${query}` : '/api/proposals/reports/pdf';
+    const response = await api.get(url, { responseType: 'blob' });
+    return response.data;
+  },
+
+  async generateReportExcel(filters: { status?: string; clientName?: string; searchTerm?: string }): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filters.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters.clientName && filters.clientName !== 'all') params.append('clientName', filters.clientName);
+    if (filters.searchTerm?.trim()) params.append('searchTerm', filters.searchTerm.trim());
+
+    const query = params.toString();
+    const url = query ? `/api/proposals/reports/excel?${query}` : '/api/proposals/reports/excel';
+    const response = await api.get(url, { responseType: 'blob' });
     return response.data;
   }
 };

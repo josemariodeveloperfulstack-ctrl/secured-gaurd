@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Search, Filter, FileText, Calendar, DollarSign, Building2, User, AlertTriangle, Eye, Edit, Trash, FileDown } from 'lucide-react';
-import { Quotation, QuotationStatus, quotationService } from '@/services/quotationService';
+import { Quotation, QuotationStatus, quotationService, QuotationReportFilters } from '@/services/quotationService';
 import { purchaseRequestService, PurchaseRequest } from '@/services/purchaseRequestService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,7 +16,6 @@ import { QuotationViewModal } from '@/components/compras/QuotationViewModal';
 import { PurchaseRequestViewModal } from '@/components/compras/PurchaseRequestViewModal';
 import { QuotationReportModal } from '@/components/compras/QuotationReportModal';
 import { QuotationReportViewModal } from '@/components/compras/QuotationReportViewModal';
-import { quotationReportGenerator, QuotationReportFilters } from '@/utils/quotationReportGenerator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -323,13 +322,13 @@ const CotacoesCompras: React.FC = () => {
   const handleGenerateReport = async (reportFilters: QuotationReportFilters) => {
     setIsGeneratingReport(true);
     try {
-      const pdfBlob = await quotationReportGenerator.generatePDF(quotations, reportFilters);
+      const pdfBlob = await quotationService.generateReportPDF(reportFilters);
       setReportPdfBlob(pdfBlob);
       setIsReportModalOpen(false);
       setIsReportViewModalOpen(true);
       toast({
         title: "Sucesso",
-        description: "Relatório gerado com sucesso!",
+        description: "Relatório gerado com sucesso com layout profissional.",
       });
     } catch (error) {
       console.error('Erro ao gerar relatório:', error);

@@ -104,4 +104,43 @@ public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
     // Contar propostas por ano
     @Query("SELECT COUNT(p) FROM Proposal p WHERE YEAR(p.createdAt) = :year")
     long countByYear(@Param("year") int year);
+
+    // --- KPIs por usuário ---
+
+    // Contar propostas por responsável e status
+    long countByAssignedToIdAndStatus(UUID assignedToId, ProposalStatus status);
+
+    // Somar valor total por responsável e status
+    @Query("SELECT COALESCE(SUM(p.totalValue), 0) FROM Proposal p WHERE p.assignedTo.id = :userId AND p.status = :status")
+    BigDecimal sumTotalValueByAssignedToIdAndStatus(@Param("userId") UUID userId, @Param("status") ProposalStatus status);
+
+    // Contar propostas por responsável e status dentro de um período
+    @Query("SELECT COUNT(p) FROM Proposal p WHERE p.assignedTo.id = :userId AND p.status = :status AND p.createdAt BETWEEN :startDate AND :endDate")
+    long countByAssignedToIdAndStatusAndPeriod(@Param("userId") UUID userId, @Param("status") ProposalStatus status,
+                                               @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Somar valor total por responsável e status dentro de um período
+    @Query("SELECT COALESCE(SUM(p.totalValue), 0) FROM Proposal p WHERE p.assignedTo.id = :userId AND p.status = :status AND p.createdAt BETWEEN :startDate AND :endDate")
+    BigDecimal sumTotalValueByAssignedToIdAndStatusAndPeriod(@Param("userId") UUID userId, @Param("status") ProposalStatus status,
+                                                             @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Contar propostas por status dentro de um período (sem filtro de usuário)
+    @Query("SELECT COUNT(p) FROM Proposal p WHERE p.status = :status AND p.createdAt BETWEEN :startDate AND :endDate")
+    long countByStatusAndPeriod(@Param("status") ProposalStatus status,
+                                @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Somar valor total por status dentro de um período (sem filtro de usuário)
+    @Query("SELECT COALESCE(SUM(p.totalValue), 0) FROM Proposal p WHERE p.status = :status AND p.createdAt BETWEEN :startDate AND :endDate")
+    BigDecimal sumTotalValueByStatusAndPeriod(@Param("status") ProposalStatus status,
+                                              @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Buscar propostas aprovadas por responsável dentro de um período (para cálculo de tempo)
+    @Query("SELECT p FROM Proposal p WHERE p.assignedTo.id = :userId AND p.status = :status AND p.updatedAt BETWEEN :startDate AND :endDate")
+    List<Proposal> findByAssignedToIdAndStatusAndPeriod(@Param("userId") UUID userId, @Param("status") ProposalStatus status,
+                                                        @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Buscar propostas aprovadas dentro de um período (sem filtro de usuário)
+    @Query("SELECT p FROM Proposal p WHERE p.status = :status AND p.updatedAt BETWEEN :startDate AND :endDate")
+    List<Proposal> findByStatusAndPeriod(@Param("status") ProposalStatus status,
+                                         @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 } 

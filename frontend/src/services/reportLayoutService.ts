@@ -6,6 +6,8 @@ export interface ReportConfig {
     title: string;
     filename: string;
     company?: Company;
+    /** Quando true, o elemento já usa StandardReportTemplate com cabeçalho/rodapé. Evita duplicação. */
+    elementHasFullLayout?: boolean;
 }
 
 class ReportLayoutService {
@@ -24,35 +26,34 @@ class ReportLayoutService {
             container.style.padding = '40px 20px 60px 20px'; // Space for header and footer
             container.style.fontFamily = 'Inter, sans-serif';
 
-            const currentDate = new Date().toLocaleDateString('pt-BR');
-            const currentTime = new Date().toLocaleTimeString('pt-BR');
-
-            // 2. Build Premium Header
-            const header = this.buildHeaderHTML(config, currentDate);
-
-            // 3. Build Premium Footer
-            const footer = this.buildFooterHTML(config, currentDate, currentTime);
-
-            // 4. Assemble HTML
-            container.innerHTML = `
+            if (config.elementHasFullLayout) {
+                container.style.padding = '0';
+                container.innerHTML = element.innerHTML;
+            } else {
+                const currentDate = new Date().toLocaleDateString('pt-BR');
+                const currentTime = new Date().toLocaleTimeString('pt-BR');
+                const header = this.buildHeaderHTML(config, currentDate);
+                const footer = this.buildFooterHTML(config, currentDate, currentTime);
+                container.innerHTML = `
         ${header}
         <div style="margin-top: 20px; min-height: 800px;">
           ${element.innerHTML}
         </div>
         ${footer}
       `;
+            }
 
             document.body.appendChild(container);
 
-            // 5. Capture as Image
             const canvas = await html2canvas(container, {
-                scale: 2,
+                scale: 1.5,
                 useCORS: true,
                 allowTaint: true,
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                logging: false
             });
 
-            document.body.removeChild(container);
+            container.remove();
 
             // 6. Create PDF
             const imgData = canvas.toDataURL('image/png');

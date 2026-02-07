@@ -13,7 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { 
   PurchaseRequest, 
   purchaseRequestService,
-  CreatePurchaseRequestRequest 
+  CreatePurchaseRequestRequest,
+  PurchaseRequestReportFilters,
 } from '@/services/purchaseRequestService';
 import { PurchaseRequestFormModal } from '@/components/compras/PurchaseRequestFormModal';
 import { PurchaseRequestViewModal } from '@/components/compras/PurchaseRequestViewModal';
@@ -43,7 +44,6 @@ import {
 import { MainLayout } from '@/components/MainLayout';
 import { PurchaseRequestReportModal } from '@/components/compras/PurchaseRequestReportModal';
 import { PurchaseRequestReportViewModal } from '@/components/compras/PurchaseRequestReportViewModal';
-import { purchaseRequestReportGenerator, PurchaseRequestReportFilters } from '@/utils/purchaseRequestReportGenerator';
 
 export default function Compras() {
   const { toast } = useToast();
@@ -553,17 +553,17 @@ export default function Compras() {
   const handleGenerateReport = async (filters: PurchaseRequestReportFilters) => {
     try {
       setGeneratingReport(true);
-      const blob = await purchaseRequestReportGenerator.generatePDF(purchaseRequests, filters);
+      const blob = await purchaseRequestService.generateReportPDF(filters);
       const fileName = `relatorio-solicitacoes-compra-${new Date().toISOString().split('T')[0]}.pdf`;
-      
+
       setPdfBlob(blob);
       setReportFileName(fileName);
       setIsReportModalOpen(false);
       setIsReportViewModalOpen(true);
-      
+
       toast({
         title: "Sucesso",
-        description: "Relatório PDF gerado com sucesso!",
+        description: "Relatório PDF gerado com sucesso com layout profissional.",
       });
     } catch (error) {
       console.error('Erro ao gerar relatório:', error);

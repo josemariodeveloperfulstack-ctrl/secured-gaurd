@@ -4,13 +4,16 @@ import com.z7design.secured_guard.dto.QuoteDTO;
 import com.z7design.secured_guard.model.Quote;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.QuoteStatus;
+import com.z7design.secured_guard.service.QuoteCommercialPdfService;
 import com.z7design.secured_guard.service.QuoteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,6 +31,7 @@ import java.util.UUID;
 public class QuoteController {
 
     private final QuoteService quoteService;
+    private final QuoteCommercialPdfService quoteCommercialPdfService;
 
     @GetMapping
     @Operation(summary = "Listar todos os orçamentos", description = "Retorna uma lista paginada de todos os orçamentos")
@@ -51,6 +55,18 @@ public class QuoteController {
         Quote quote = quoteService.findById(UUID.fromString(id));
         QuoteDTO quoteDTO = quoteService.convertToDTO(quote);
         return ResponseEntity.ok(quoteDTO);
+    }
+
+    @GetMapping("/{id}/pdf")
+    @Operation(summary = "Gerar PDF do orçamento", description = "Gera PDF do orçamento com opção de incluir serviços")
+    public ResponseEntity<byte[]> generateQuotePdf(@PathVariable String id,
+            @RequestParam(defaultValue = "false") boolean includeServices) {
+        byte[] pdf = quoteCommercialPdfService.generatePdf(UUID.fromString(id), includeServices);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String filename = "orcamento-" + id + ".pdf";
+        headers.setContentDispositionFormData("attachment", filename);
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
 
     @PostMapping

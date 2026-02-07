@@ -170,6 +170,9 @@ public class ProposalService {
                 item.setQuantity(itemDTO.getQuantity());
                 item.setUnitPrice(itemDTO.getUnitPrice());
                 item.setTotalPrice(BigDecimal.valueOf(itemDTO.getQuantity()).multiply(itemDTO.getUnitPrice()));
+                if (itemDTO.getNotes() != null) {
+                    item.setNotes(itemDTO.getNotes());
+                }
                 proposalItemRepository.save(item);
             }
         }

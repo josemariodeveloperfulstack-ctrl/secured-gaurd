@@ -111,6 +111,14 @@ export interface UpdatePurchaseRequestRequest extends CreatePurchaseRequestReque
   id: string;
 }
 
+export interface PurchaseRequestReportFilters {
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  minValue?: number;
+  maxValue?: number;
+}
+
 class PurchaseRequestService {
   async getAllPurchaseRequests(): Promise<PurchaseRequest[]> {
     const response = await api.get('/api/purchase-requests');
@@ -218,6 +226,37 @@ class PurchaseRequestService {
 
   async getOverdueRequestsCount(): Promise<number> {
     const response = await api.get('/api/purchase-requests/stats/overdue-count');
+    return response.data;
+  }
+
+  async generateReportPDF(filters: PurchaseRequestReportFilters): Promise<Blob> {
+    const params = new URLSearchParams();
+
+    if (filters.startDate) {
+      params.append('startDate', filters.startDate);
+    }
+    if (filters.endDate) {
+      params.append('endDate', filters.endDate);
+    }
+    if (filters.status && filters.status !== 'all') {
+      params.append('status', filters.status);
+    }
+    if (filters.minValue !== undefined && filters.minValue !== null && filters.minValue > 0) {
+      params.append('minValue', filters.minValue.toString());
+    }
+    if (filters.maxValue !== undefined && filters.maxValue !== null && filters.maxValue > 0) {
+      params.append('maxValue', filters.maxValue.toString());
+    }
+
+    const query = params.toString();
+    const url = query
+      ? `/api/purchase-requests/reports/pdf?${query}`
+      : '/api/purchase-requests/reports/pdf';
+
+    const response = await api.get(url, {
+      responseType: 'blob',
+    });
+
     return response.data;
   }
 }

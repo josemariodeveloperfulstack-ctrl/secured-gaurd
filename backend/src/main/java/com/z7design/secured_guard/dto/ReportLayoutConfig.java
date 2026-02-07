@@ -27,6 +27,11 @@ public class ReportLayoutConfig {
     private String reportTitle;
 
     /**
+     * Subtítulo do relatório (ex: Período)
+     */
+    private String reportSubTitle;
+
+    /**
      * Cores personalizadas do gradiente (opcional, usa padrão se null)
      * Estrutura preparada para futura personalização por empresa
      */
@@ -86,4 +91,11 @@ public class ReportLayoutConfig {
      */
     @Builder.Default
     private boolean includeEmailInFooter = true;
+
+    /**
+     * Orientação da página: true = paisagem (landscape), false = retrato (portrait)
+     * Padrão: false (retrato)
+     */
+    @Builder.Default
+    private boolean landscape = false;
 }

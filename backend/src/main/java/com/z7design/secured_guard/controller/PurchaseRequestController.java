@@ -2,12 +2,17 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.PurchaseRequestDTO;
 import com.z7design.secured_guard.service.PurchaseRequestService;
+import com.z7design.secured_guard.service.PurchaseRequestReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,6 +23,7 @@ import java.util.UUID;
 public class PurchaseRequestController {
 
     private final PurchaseRequestService purchaseRequestService;
+    private final PurchaseRequestReportService purchaseRequestReportService;
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
@@ -189,5 +195,28 @@ public class PurchaseRequestController {
         log.info("Buscando contagem de requisições em atraso");
         long count = purchaseRequestService.getOverdueRequestsCount();
         return ResponseEntity.ok(count);
+    }
+
+    /**
+     * Gera relatório PDF de solicitações de compra com layout corporativo padrão,
+     * utilizando os mesmos filtros de data, status e valor do frontend.
+     */
+    @GetMapping("/reports/pdf")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
+    public ResponseEntity<byte[]> generatePurchaseRequestsReportPdf(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) BigDecimal minValue,
+            @RequestParam(required = false) BigDecimal maxValue) throws IOException {
+
+        log.info("Gerando relatório PDF de solicitações de compra");
+        byte[] pdf = purchaseRequestReportService.generatePurchaseRequestsReport(
+                startDate, endDate, status, minValue, maxValue);
+
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=relatorio-solicitacoes-compra.pdf")
+                .body(pdf);
     }
 }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -15,11 +14,17 @@ import {
   Mail,
   Settings,
   CheckCircle,
-  Loader2
+  Loader2,
+  Building2
 } from 'lucide-react';
-import { Contract } from '@/services/contractService';
+import { Contract, contractService } from '@/services/contractService';
 import { companyConfigService, CompanyConfig } from '@/services/companyConfigService';
 import { clientService } from '@/services/clientService';
+import { companyService } from '@/services/companyService';
+import { ClientFormModal } from '@/components/clientes/ClientFormModal';
+import { Client } from '@/types/client';
+import { formatDateForBackend, parseDateFromBackend, parseBrazilianDateString } from '@/utils/dateUtils';
+import { getApiUrl } from '@/config/environment';
 
 interface ContractGeneratorProps {
   open: boolean;
@@ -68,23 +73,32 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   });
 
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null);
+  const [companiesList, setCompaniesList] = useState<any[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [generating, setGenerating] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(false);
-  const [step, setStep] = useState<'form' | 'preview' | 'generated'>('form');
+  const [step, setStep] = useState<'form' | 'preview' | 'generated' | 'viewing'>('form');
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
   const [clients, setClients] = useState<any[]>([]);
   const [clientsLoading, setClientsLoading] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
+      setStep('form'); // Resetar para o formulário ao abrir o modal
+      setGeneratedPdfUrl(null);
       loadCompanyConfig();
+      loadCompaniesList();
       loadClients();
 
       // Carregar dados do contrato se fornecido
       if (contract) {
+        setSelectedClientId(contract.clientId || '');
         setContractData({
           contractNumber: contract.contractNumber,
           clientName: contract.clientName,
-          clientDocument: '', // Buscar do cliente se necessário
+          clientDocument: '',
           clientAddress: '',
           clientPhone: '',
           clientEmail: '',
@@ -96,9 +110,38 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
           paymentTerms: 'Pagamento mensal até o dia 10 de cada mês',
           observations: contract.notes || ''
         });
+      } else {
+        setSelectedClientId('');
       }
     }
   }, [open, contract]);
+
+  // Preencher dados do cliente quando a lista carregar e houver contract com clientId
+  useEffect(() => {
+    if (contract?.clientId && clients.length > 0) {
+      const client = clients.find((c: any) => c.id === contract.clientId);
+      if (client) {
+        const composedAddress = [client.address, client.city, client.state, client.zipCode]
+          .filter(Boolean)
+          .join(', ');
+        setContractData(prev => ({
+          ...prev,
+          clientDocument: client.cnpj || prev.clientDocument,
+          clientAddress: composedAddress || prev.clientAddress,
+          clientPhone: client.phone || client.mobile || prev.clientPhone,
+          clientEmail: client.email || client.contactEmail || prev.clientEmail
+        }));
+      }
+    }
+  }, [clients, contract?.clientId]);
+
+  // Revogar URL do PDF quando o modal fechar
+  useEffect(() => {
+    if (!open && generatedPdfUrl) {
+      window.URL.revokeObjectURL(generatedPdfUrl);
+      setGeneratedPdfUrl(null);
+    }
+  }, [open, generatedPdfUrl]);
 
   const loadCompanyConfig = async () => {
     setLoadingConfig(true);
@@ -111,6 +154,44 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       setLoadingConfig(false);
     }
   };
+
+  const loadCompaniesList = async () => {
+    try {
+      const list = await companyService.getAllCompanies();
+      setCompaniesList(Array.isArray(list) ? list : []);
+      if (list?.length > 0 && !selectedCompanyId) {
+        setSelectedCompanyId(list[0].id || '');
+      }
+    } catch {
+      setCompaniesList([]);
+    }
+  };
+
+  // Sincronizar empresa selecionada com a config (empresa definida em Config. Empresa)
+  useEffect(() => {
+    if (open && companyConfig?.companyId && companiesList.length > 0) {
+      const found = companiesList.some((c: any) => c.id === companyConfig.companyId);
+      if (found) setSelectedCompanyId(companyConfig.companyId);
+    }
+  }, [open, companyConfig?.companyId, companiesList]);
+
+  const handleSelectCompany = (id: string) => {
+    setSelectedCompanyId(id);
+  };
+
+  const selectedCompany = selectedCompanyId
+    ? companiesList.find((c) => c.id === selectedCompanyId)
+    : companiesList[0];
+
+  // Para preview: empresa (cabeçalho) vem da tabela Companies; termos (cláusulas, rodapé) de CompanyConfig
+  const configForContract = selectedCompany
+    ? {
+        ...selectedCompany,
+        headerText: companyConfig?.headerText,
+        contractTerms: companyConfig?.contractTerms,
+        footerText: companyConfig?.footerText
+      }
+    : companyConfig;
 
   const loadClients = async () => {
     setClientsLoading(true);
@@ -126,6 +207,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   };
 
   const handleSelectClient = (clientId: string) => {
+    setSelectedClientId(clientId);
     const selected = clients.find((c: any) => c.id === clientId);
     if (!selected) return;
     const composedAddress = [selected.address, selected.city, selected.state, selected.zipCode]
@@ -141,6 +223,25 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     }));
   };
 
+  const handleClientCreated = (createdClient?: Client) => {
+    setIsClientModalOpen(false);
+    loadClients();
+    if (createdClient?.id) {
+      setSelectedClientId(createdClient.id);
+      const composedAddress = [createdClient.address, createdClient.city, createdClient.state, createdClient.zipCode]
+        .filter(Boolean)
+        .join(', ');
+      setContractData(prev => ({
+        ...prev,
+        clientName: createdClient.name || '',
+        clientDocument: createdClient.cnpj || '',
+        clientAddress: composedAddress,
+        clientPhone: createdClient.phone || createdClient.mobile || '',
+        clientEmail: createdClient.email || createdClient.contactEmail || ''
+      }));
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', {
       style: 'currency',
@@ -152,8 +253,19 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
+  const getLogoDisplayUrl = (logoUrl: string | undefined): string | null => {
+    if (!logoUrl) return null;
+    const baseUrl = getApiUrl().replace('/api', '');
+    const normalized = logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`;
+    if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) return logoUrl;
+    if (normalized.startsWith('/api/uploads/')) return `${baseUrl}${normalized}`;
+    if (normalized.startsWith('/uploads/')) return `${baseUrl}/api${normalized}`;
+    return `${baseUrl}/api/uploads/companies/logos/${logoUrl.replace(/^\/+/, '')}`;
+  };
+
   const generateContractHTML = () => {
-    if (!companyConfig) return '';
+    if (!configForContract) return '';
+    const logoUrl = configForContract?.logoUrl && getLogoDisplayUrl(configForContract.logoUrl);
 
     return `
       <!DOCTYPE html>
@@ -162,10 +274,8 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
         <meta charset="utf-8">
         <title>Contrato ${contractData.contractNumber}</title>
         <style>
-          @page {
-            margin: 2cm;
-            size: A4;
-          }
+          @page { margin: 2cm; size: A4; }
+          * { box-sizing: border-box; }
           body {
             font-family: 'Times New Roman', serif;
             font-size: 12px;
@@ -174,30 +284,47 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
             padding: 0;
             color: #000;
           }
-          .header {
-            text-align: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+          .layout-header {
+            display: flex;
+            align-items: stretch;
+            min-height: 100px;
+            border-top: 4px solid #FF9900;
           }
-          .logo {
-            max-height: 100px;
-            margin-bottom: 15px;
+          .layout-header-left {
+            flex: 0 0 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #FFCC00 0%, #FF9900 50%, #FF3333 100%);
+            padding: 15px;
           }
-          .company-info {
+          .layout-header-left img {
+            max-width: 120px;
+            max-height: 80px;
+            object-fit: contain;
+          }
+          .layout-header-right {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            padding: 15px 25px;
+            background: #1a1a1a;
+            color: #fff;
             font-size: 11px;
-            margin-bottom: 15px;
-            line-height: 1.3;
+            line-height: 1.5;
           }
-          .contract-title {
+          .layout-header-right strong { color: #fff; }
+          .layout-title {
+            text-align: center;
             font-size: 16px;
             font-weight: bold;
-            margin: 20px 0;
+            margin: 25px 0 30px;
             text-transform: uppercase;
+            color: #000;
           }
           .content {
+            padding: 0 50px 80px;
             text-align: justify;
-            text-indent: 2cm;
           }
           .parties {
             margin: 30px 0;
@@ -205,17 +332,9 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
             padding: 15px;
             border: 1px solid #ddd;
           }
-          .clause {
-            margin: 20px 0;
-          }
-          .clause-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-          }
-          .signature-section {
-            margin-top: 60px;
-            page-break-inside: avoid;
-          }
+          .clause { margin: 20px 0; }
+          .clause-title { font-weight: bold; margin-bottom: 10px; }
+          .signature-section { margin-top: 60px; page-break-inside: avoid; }
           .signature-box {
             border: 1px solid #000;
             height: 80px;
@@ -230,13 +349,18 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
             font-weight: bold;
             font-size: 10px;
           }
-          .footer {
-            border-top: 1px solid #000;
-            padding-top: 15px;
+          .layout-footer {
             margin-top: 50px;
             font-size: 10px;
             text-align: center;
+            background: #fafafa;
           }
+          .layout-footer-line {
+            height: 4px;
+            background: linear-gradient(90deg, #FFCC00, #FF9900, #FF3333);
+            margin-bottom: 15px;
+          }
+          .layout-footer-text { padding: 0 50px 30px; }
           .table {
             width: 100%;
             border-collapse: collapse;
@@ -251,31 +375,29 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
             background-color: #f0f0f0;
             font-weight: bold;
           }
-          .highlight {
-            background-color: #ffffcc;
-            padding: 2px;
-          }
+          .highlight { background-color: #ffffcc; padding: 2px; }
           @media print {
-            .no-print {
-              display: none;
-            }
+            .no-print { display: none; }
           }
         </style>
       </head>
       <body>
-        <div class="header">
-          ${companyConfig.logoUrl ? `<img src="${companyConfig.logoUrl}" alt="Logo da Empresa" class="logo" />` : ''}
-          <div class="company-info">
-            <strong>${companyConfig.name}</strong><br>
-            CNPJ: ${companyConfig.cnpj}<br>
-            ${companyConfig.address}<br>
-            ${companyConfig.city}/${companyConfig.state} - CEP: ${companyConfig.zipCode}<br>
-            Telefone: ${companyConfig.phone}<br>
-            Email: ${companyConfig.email}
-            ${companyConfig.website ? `<br>Website: ${companyConfig.website}` : ''}
+        <div class="layout-header">
+          <div class="layout-header-left">
+            ${logoUrl ? `<img src="${logoUrl}" alt="Logo" />` : ''}
           </div>
-          <div class="contract-title">${companyConfig.headerText || 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS'}</div>
+          <div class="layout-header-right">
+            <div>
+              <strong>${configForContract?.name}</strong><br>
+              CNPJ: ${configForContract?.cnpj}<br>
+              ${configForContract?.address}<br>
+              ${configForContract?.city}/${configForContract?.state} - CEP: ${configForContract?.zipCode}<br>
+              Tel: ${configForContract?.phone} | Email: ${configForContract?.email}
+              ${configForContract?.website ? `<br>${configForContract?.website}` : ''}
+            </div>
+          </div>
         </div>
+        <div class="layout-title">${configForContract?.headerText || 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS'}</div>
         
         <div class="content">
           <div class="parties">
@@ -294,12 +416,12 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                 </td>
                 <td style="width: 50%; vertical-align: top;">
                   <strong>CONTRATADA:</strong><br>
-                  <span class="highlight">${companyConfig.name}</span><br>
-                  CNPJ: ${companyConfig.cnpj}<br>
-                  Endereço: ${companyConfig.address}<br>
-                  ${companyConfig.city}/${companyConfig.state} - CEP: ${companyConfig.zipCode}<br>
-                  Telefone: ${companyConfig.phone}<br>
-                  Email: ${companyConfig.email}
+                  <span class="highlight">${configForContract?.name}</span><br>
+                  CNPJ: ${configForContract?.cnpj}<br>
+                  Endereço: ${configForContract?.address}<br>
+                  ${configForContract?.city}/${configForContract?.state} - CEP: ${configForContract?.zipCode}<br>
+                  Telefone: ${configForContract?.phone}<br>
+                  Email: ${configForContract?.email}
                 </td>
               </tr>
             </table>
@@ -344,7 +466,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
           ` : ''}
 
           <div class="clause">
-            <div style="white-space: pre-line;">${companyConfig.contractTerms || ''}</div>
+            <div style="white-space: pre-line;">${configForContract?.contractTerms || ''}</div>
           </div>
 
           ${contractData.observations ? `
@@ -356,7 +478,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
 
           <div class="signature-section">
             <p><strong>LOCAL E DATA:</strong></p>
-            <p>${companyConfig.city}/${companyConfig.state}, ${formatDate(new Date().toISOString())}</p>
+            <p>${configForContract?.city}/${configForContract?.state}, ${formatDate(new Date().toISOString())}</p>
             
             <div style="display: flex; justify-content: space-between; margin-top: 50px;">
               <div style="width: 45%; position: relative;">
@@ -373,16 +495,17 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                   <div class="signature-label">CONTRATADA</div>
                 </div>
                 <p style="text-align: center; margin-top: 30px; font-size: 10px;">
-                  ${companyConfig.name}<br>
-                  CNPJ: ${companyConfig.cnpj}
+                  ${configForContract?.name}<br>
+                  CNPJ: ${configForContract?.cnpj}
                 </p>
               </div>
             </div>
           </div>
         </div>
         
-        <div class="footer">
-          ${companyConfig.footerText || 'Este contrato é regido pelas leis brasileiras.'}
+        <div class="layout-footer">
+          <div class="layout-footer-line"></div>
+          <div class="layout-footer-text">${configForContract?.footerText || 'Este contrato é regido pelas leis brasileiras.'}</div>
         </div>
       </body>
       </html>
@@ -402,20 +525,57 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   const handleGeneratePDF = async () => {
     setGenerating(true);
     try {
-      // Simular geração de PDF (em produção, seria uma chamada para o backend)
-      const htmlContent = generateContractHTML();
-
-      // Para um MVP, vamos abrir uma nova janela com o conteúdo formatado para impressão
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        printWindow.print();
+      let companyId: string | undefined;
+      try {
+        const companies = await companyService.getAllCompanies();
+        if (companies?.length > 0 && companies[0]?.id) {
+          companyId = companies[0].id;
+        }
+      } catch {
+        companyId = undefined;
       }
+
+      const startDateParsed = contractData.startDate
+        ? (parseDateFromBackend(contractData.startDate) || parseBrazilianDateString(contractData.startDate) || new Date(contractData.startDate))
+        : null;
+      const endDateParsed = contractData.endDate
+        ? (parseDateFromBackend(contractData.endDate) || parseBrazilianDateString(contractData.endDate) || new Date(contractData.endDate))
+        : null;
+
+      const payload = {
+        companyId: selectedCompanyId || companyId || null,
+        companyConfigId: companyConfig?.id || null,
+        clientName: contractData.clientName || '',
+        clientDocument: contractData.clientDocument || '',
+        clientAddress: contractData.clientAddress || '',
+        clientPhone: contractData.clientPhone || '',
+        clientEmail: contractData.clientEmail || '',
+        contractNumber: contractData.contractNumber || '',
+        description: contractData.description || '',
+        value: contractData.value ?? 0,
+        startDate: formatDateForBackend(startDateParsed) || null,
+        endDate: formatDateForBackend(endDateParsed) || null,
+        paymentTerms: contractData.paymentTerms || '',
+        additionalTerms: contractData.additionalTerms || '',
+        observations: contractData.observations || '',
+        city: configForContract?.city || '',
+        contractDate: new Date().toISOString().split('T')[0],
+      };
+
+      const blob = await contractService.generateContractPdf(payload);
+      const url = window.URL.createObjectURL(blob);
+      setGeneratedPdfUrl(url);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `contrato_${contractData.contractNumber || 'contrato'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
 
       toast({
         title: "Contrato Gerado",
-        description: "O contrato foi gerado com sucesso. Use Ctrl+P para imprimir ou salvar como PDF.",
+        description: "O contrato foi gerado com sucesso com layout profissional.",
       });
 
       setStep('generated');
@@ -439,6 +599,22 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     });
   };
 
+  const handleViewContract = () => {
+    if (generatedPdfUrl) {
+      setStep('viewing');
+    }
+  };
+
+  const handleDownloadFromView = () => {
+    if (!generatedPdfUrl) return;
+    const link = document.createElement('a');
+    link.href = generatedPdfUrl;
+    link.download = `contrato_${contractData.contractNumber || 'contrato'}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
   if (loadingConfig) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -458,7 +634,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     );
   }
 
-  if (!companyConfig) {
+  if (!companyConfig && companiesList.length === 0) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-sm sm:max-w-md bg-seguranca-graphite border-gray-600 mx-4">
@@ -495,23 +671,65 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
         </DialogHeader>
 
         {step === 'form' && (
-          <div className="space-y-4 sm:space-y-6">
-            {/* Dados do Cliente */}
+          <div className="space-y-4 sm:space-y-6 text-seguranca-lightgray">
+            {/* Empresa para cabeçalho/rodapé/contrato (tabela Companies) */}
+            {companiesList.length > 0 && (
+              <Card className="bg-seguranca-black border-gray-600">
+                <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
+                  <CardTitle className="text-seguranca-lightgray text-xs sm:text-sm flex items-center gap-2">
+                    <Building2 size={16} />
+                    Empresa no cabeçalho, rodapé e cláusulas
+                  </CardTitle>
+                  <p className="text-xs text-gray-400 mt-1">Selecione da lista de empresas cadastradas</p>
+                </CardHeader>
+                <CardContent className="px-3 sm:px-6 pb-3 sm:pb-4">
+                  <Select value={selectedCompanyId || companiesList[0]?.id} onValueChange={handleSelectCompany}>
+                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                      <SelectValue placeholder="Selecione a empresa" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-graphite border-gray-600">
+                      {companiesList.map((c) => (
+                        <SelectItem key={c.id} value={c.id} className="text-seguranca-lightgray">
+                          {c.name} {c.cnpj ? `- ${c.cnpj}` : c.sigla ? ` (${c.sigla})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Dados do Cliente - seleção obrigatória */}
             <Card className="bg-seguranca-black border-gray-600">
-              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
                 <CardTitle className="text-seguranca-lightgray text-xs sm:text-sm">
                   Dados do Cliente
                 </CardTitle>
+                <p className="text-xs text-gray-400 mt-1">Selecione um cliente cadastrado. O cliente deve estar cadastrado antes de gerar o contrato.</p>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6 pb-3 sm:pb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div>
-                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">Cliente (cadastrado)</Label>
-                    <Select onValueChange={handleSelectClient} disabled={clientsLoading}>
+                <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                  <div className="flex-1">
+                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">Cliente *</Label>
+                    <Select
+                      value={selectedClientId || '__none__'}
+                      onValueChange={(v) => {
+                        if (v === '__none__') {
+                          setSelectedClientId('');
+                          setContractData(prev => ({ ...prev, clientName: '', clientDocument: '', clientAddress: '', clientPhone: '', clientEmail: '' }));
+                        } else {
+                          handleSelectClient(v);
+                        }
+                      }}
+                      disabled={clientsLoading}
+                    >
                       <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm mt-1">
                         <SelectValue placeholder={clientsLoading ? 'Carregando...' : 'Selecione um cliente'} />
                       </SelectTrigger>
                       <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="__none__" className="text-gray-500">
+                          Selecione um cliente
+                        </SelectItem>
                         {clients.map((c: any) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name} {c.cnpj ? `- ${c.cnpj}` : ''}
@@ -520,53 +738,36 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">Nome/Razão Social *</Label>
-                    <Input
-                      value={contractData.clientName}
-                      onChange={(e) => setContractData(prev => ({ ...prev, clientName: e.target.value }))}
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">CNPJ/CPF</Label>
-                    <Input
-                      value={contractData.clientDocument}
-                      onChange={(e) => setContractData(prev => ({ ...prev, clientDocument: e.target.value }))}
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm mt-1"
-                    />
-                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsClientModalOpen(true)}
+                    className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black shrink-0"
+                  >
+                    Cadastrar cliente
+                  </Button>
                 </div>
 
-                <div>
-                  <Label className="text-seguranca-lightgray">Endereço</Label>
-                  <Input
-                    value={contractData.clientAddress}
-                    onChange={(e) => setContractData(prev => ({ ...prev, clientAddress: e.target.value }))}
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-seguranca-lightgray">Telefone</Label>
-                    <Input
-                      value={contractData.clientPhone}
-                      onChange={(e) => setContractData(prev => ({ ...prev, clientPhone: e.target.value }))}
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
-                    />
+                {selectedClientId && contractData.clientName && (
+                  <div className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 text-sm">
+                    <p className="text-gray-400 text-xs mb-2">Dados do cliente selecionado:</p>
+                    <p className="text-seguranca-lightgray font-medium">{contractData.clientName}</p>
+                    {contractData.clientDocument && <p className="text-gray-300">CNPJ/CPF: {contractData.clientDocument}</p>}
+                    {contractData.clientAddress && <p className="text-gray-300">Endereço: {contractData.clientAddress}</p>}
+                    {(contractData.clientPhone || contractData.clientEmail) && (
+                      <p className="text-gray-300">Tel: {contractData.clientPhone || '-'} | Email: {contractData.clientEmail || '-'}</p>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-seguranca-lightgray">Email</Label>
-                    <Input
-                      value={contractData.clientEmail}
-                      onChange={(e) => setContractData(prev => ({ ...prev, clientEmail: e.target.value }))}
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
-                    />
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
+
+            <ClientFormModal
+              isOpen={isClientModalOpen}
+              onClose={() => setIsClientModalOpen(false)}
+              onSuccess={handleClientCreated}
+            />
 
             {/* Termos Adicionais */}
             <Card className="bg-seguranca-black border-gray-600">
@@ -611,9 +812,10 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
 
             <div className="flex justify-between">
               <Button
+                type="button"
                 onClick={onConfigureCompany}
                 variant="outline"
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                className="border-blue-500 text-blue-400 hover:bg-blue-500/20 hover:border-blue-400"
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Configurar Empresa
@@ -660,7 +862,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
 
             <div className="flex justify-center gap-4">
               <Button
-                onClick={handlePreview}
+                onClick={handleViewContract}
                 variant="outline"
                 className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
               >
@@ -684,6 +886,39 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                 <FileText className="h-4 w-4 mr-2" />
                 Gerar Outro
               </Button>
+            </div>
+          </div>
+        )}
+
+        {step === 'viewing' && generatedPdfUrl && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-seguranca-lightgray">
+                Visualização do Contrato
+              </h3>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleDownloadFromView}
+                  className="bg-seguranca-red hover:bg-seguranca-darkred text-white"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Baixar PDF
+                </Button>
+                <Button
+                  onClick={() => setStep('generated')}
+                  variant="outline"
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                >
+                  Voltar
+                </Button>
+              </div>
+            </div>
+            <div className="w-full h-[70vh] min-h-[400px] rounded-lg overflow-hidden border border-gray-600 bg-seguranca-black">
+              <iframe
+                src={generatedPdfUrl}
+                title="PDF do Contrato"
+                className="w-full h-full"
+              />
             </div>
           </div>
         )}

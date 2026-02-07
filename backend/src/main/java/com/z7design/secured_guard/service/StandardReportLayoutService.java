@@ -116,7 +116,11 @@ public class StandardReportLayoutService {
         StandardReportLayoutHandler handler = new StandardReportLayoutHandler(company, config, this);
         pdfDoc.addEventHandler(PdfDocumentEvent.END_PAGE, handler);
 
-        Document document = new Document(pdfDoc, PageSize.A4);
+        PageSize pageSize = config.isLandscape()
+                ? PageSize.A4.rotate()
+                : PageSize.A4;
+        pdfDoc.setDefaultPageSize(pageSize);
+        Document document = new Document(pdfDoc, pageSize);
 
         // Configurar margens baseadas na configuração
         document.setMargins(
@@ -297,8 +301,21 @@ public class StandardReportLayoutService {
                     .setFontColor(new DeviceRgb(0, 0, 0)) // Texto preto (fora da barra gradiente)
                     .setMultipliedLeading(1.1f)
                     .setMarginTop(55f) // Margin top de 55pt
-                    .setMarginBottom(45f); // Margin bottom de 45pt
+                    .setMarginBottom(config.getReportSubTitle() != null ? 5f : 45f); // Se tiver subtítulo, margin
+                                                                                     // bottom menor
             canvas.add(title.setFixedPosition(0, titleY, pageWidth));
+
+            // Subtítulo do relatório
+            if (config.getReportSubTitle() != null && !config.getReportSubTitle().isEmpty()) {
+                float subTitleY = titleY - 20f; // 20pt abaixo do título
+                Paragraph subTitle = new Paragraph(config.getReportSubTitle().trim())
+                        .setFontSize(9f) // Fonte menor que o título
+                        .setItalic()
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontColor(new DeviceRgb(80, 80, 80)) // Cinza escuro
+                        .setMarginBottom(45f);
+                canvas.add(subTitle.setFixedPosition(0, subTitleY, pageWidth));
+            }
         }
     }
 

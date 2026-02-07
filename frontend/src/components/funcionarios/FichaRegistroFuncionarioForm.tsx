@@ -173,7 +173,8 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       await reportLayoutService.generatePremiumPDF(printElement, {
         title: 'Ficha de Registro do Funcionário',
         filename: `ficha-registro-${fullEmployee.name.replace(/\s+/g, '-').toLowerCase()}.pdf`,
-        company: empresa
+        company: empresa,
+        elementHasFullLayout: true
       });
 
       toast({

@@ -120,5 +120,15 @@ export const quoteService = {
   async updateQuoteStatus(id: number, status: Quote['status']): Promise<Quote> {
     const response = await api.patch(`/quotes/${id}/status`, { status });
     return response.data;
+  },
+
+  // Gerar PDF do orçamento
+  async getQuotePdf(id: number | string, includeServices = false): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (includeServices) params.append('includeServices', 'true');
+    const query = params.toString();
+    const url = query ? `/api/quotes/${id}/pdf?${query}` : `/api/quotes/${id}/pdf`;
+    const response = await api.get(url, { responseType: 'blob' });
+    return response.data;
   }
 }; 

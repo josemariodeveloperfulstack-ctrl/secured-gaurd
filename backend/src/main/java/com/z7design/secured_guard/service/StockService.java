@@ -69,10 +69,10 @@ public class StockService {
             Boolean lowStock,
             String searchTerm,
             Pageable pageable) {
-        
-        log.info("Buscando itens com filtros - Categoria: {}, Ativo: {}, Baixo estoque: {}", 
+
+        log.info("Buscando itens com filtros - Categoria: {}, Ativo: {}, Baixo estoque: {}",
                 category, active, lowStock);
-        
+
         return stockItemRepository.findByFilters(category, active, unitId, lowStock, searchTerm, pageable)
                 .map(StockItemDTO::fromEntity);
     }
@@ -100,39 +100,39 @@ public class StockService {
 
     public StockItemDTO createItem(StockItemDTO dto) {
         log.info("Criando novo item de estoque: {}", dto.getName());
-        
+
         // Verificar se código já existe
         if (dto.getCode() != null && stockItemRepository.existsByCode(dto.getCode())) {
             throw new IllegalArgumentException("Já existe um item com o código: " + dto.getCode());
         }
-        
+
         StockItem item = StockItemDTO.toEntity(dto);
-        
+
         // Associar unidade se especificada
         if (dto.getUnitId() != null) {
             Unit unit = unitRepository.findById(dto.getUnitId())
                     .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada: " + dto.getUnitId()));
             item.setUnit(unit);
         }
-        
+
         item = stockItemRepository.save(item);
-        
+
         // Criar alerta se quantidade inicial for baixa
         checkAndCreateLowStockAlert(item);
-        
+
         log.info("Item criado com sucesso - ID: {}, Código: {}", item.getId(), item.getCode());
         return StockItemDTO.fromEntity(item);
     }
 
     public StockItemDTO updateItem(UUID id, StockItemDTO dto) {
         log.info("Atualizando item de estoque: {}", id);
-        
+
         StockItem existingItem = stockItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item de estoque não encontrado: " + id));
 
         // Verificar se código já existe em outro item
-        if (dto.getCode() != null && !dto.getCode().equals(existingItem.getCode()) && 
-            stockItemRepository.existsByCodeAndIdNot(dto.getCode(), id)) {
+        if (dto.getCode() != null && !dto.getCode().equals(existingItem.getCode()) &&
+                stockItemRepository.existsByCodeAndIdNot(dto.getCode(), id)) {
             throw new IllegalArgumentException("Já existe outro item com o código: " + dto.getCode());
         }
 
@@ -164,36 +164,36 @@ public class StockService {
         }
 
         existingItem = stockItemRepository.save(existingItem);
-        
+
         // Verificar se precisa criar/resolver alertas
         checkAndCreateLowStockAlert(existingItem);
-        
+
         log.info("Item atualizado com sucesso: {}", id);
         return StockItemDTO.fromEntity(existingItem);
     }
 
     public void deleteItem(UUID id) {
         log.info("Excluindo item de estoque: {}", id);
-        
+
         StockItem item = stockItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item de estoque não encontrado: " + id));
-        
+
         // Marcar como inativo em vez de excluir (para manter histórico)
         item.setActive(false);
         stockItemRepository.save(item);
-        
+
         log.info("Item marcado como inativo: {}", id);
     }
 
     // ===== MOVIMENTAÇÕES =====
 
     public StockMovementDTO createMovement(StockMovementDTO dto, UUID userId) {
-        log.info("Criando movimentação - Tipo: {}, Item: {}, Quantidade: {}", 
+        log.info("Criando movimentação - Tipo: {}, Item: {}, Quantidade: {}",
                 dto.getMovementType(), dto.getStockItemId(), dto.getQuantity());
-        
+
         StockItem item = stockItemRepository.findById(dto.getStockItemId())
                 .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: " + dto.getStockItemId()));
-        
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + userId));
 
@@ -209,16 +209,18 @@ public class StockService {
         } else {
             newQuantity = item.getCurrentQuantity() - dto.getQuantity();
             if (newQuantity < 0) {
-                throw new IllegalArgumentException("Quantidade insuficiente em estoque. Disponível: " + item.getCurrentQuantity());
+                throw new IllegalArgumentException(
+                        "Quantidade insuficiente em estoque. Disponível: " + item.getCurrentQuantity());
             }
         }
-        
+
         movement.setNewQuantity(newQuantity);
 
         // Associar funcionário se for saída
         if (dto.getEmployeeId() != null) {
             Employee employee = employeeRepository.findById(dto.getEmployeeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado: " + dto.getEmployeeId()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Funcionário não encontrado: " + dto.getEmployeeId()));
             movement.setEmployee(employee);
         }
 
@@ -238,7 +240,7 @@ public class StockService {
 
         // Verificar alertas
         checkAndCreateLowStockAlert(item);
-        
+
         log.info("Movimentação criada com sucesso - ID: {}, Nova quantidade: {}", movement.getId(), newQuantity);
         return StockMovementDTO.fromEntity(movement);
     }
@@ -253,87 +255,83 @@ public class StockService {
             LocalDateTime endDate,
             String searchTerm,
             Pageable pageable) {
-        
+
         try {
-            log.info("Buscando movimentações com filtros - Item: {}, Funcionário: {}, Tipo: {}", 
+            log.info("Buscando movimentações com filtros - Item: {}, Funcionário: {}, Tipo: {}",
                     stockItemId, employeeId, movementType);
-            
+
             // Criar Specification dinamicamente
             Specification<StockMovement> spec = (root, query, cb) -> {
                 List<Predicate> predicates = new ArrayList<>();
-                
+
                 // Filtro por item de estoque
                 if (stockItemId != null) {
                     predicates.add(cb.equal(root.get("stockItem").get("id"), stockItemId));
                 }
-                
+
                 // Filtro por funcionário
                 if (employeeId != null) {
                     predicates.add(cb.equal(root.get("employee").get("id"), employeeId));
                 }
-                
+
                 // Filtro por tipo de movimentação
                 if (movementType != null) {
                     predicates.add(cb.equal(root.get("movementType"), movementType));
                 }
-                
+
                 // Filtro por motivo
                 if (reason != null) {
                     predicates.add(cb.equal(root.get("reason"), reason));
                 }
-                
+
                 // Filtro por unidade
                 if (unitId != null) {
                     predicates.add(cb.equal(root.get("unit").get("id"), unitId));
                 }
-                
+
                 // Filtro por data inicial
                 if (startDate != null) {
                     predicates.add(cb.greaterThanOrEqualTo(root.get("movementDate"), startDate));
                 }
-                
+
                 // Filtro por data final
                 if (endDate != null) {
                     predicates.add(cb.lessThanOrEqualTo(root.get("movementDate"), endDate));
                 }
-                
+
                 // Filtro por termo de busca
                 if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                     String searchPattern = "%" + searchTerm.toLowerCase() + "%";
                     Predicate itemNamePred = cb.and(
-                        cb.isNotNull(root.get("stockItem").get("name")),
-                        cb.like(cb.lower(root.get("stockItem").get("name")), searchPattern)
-                    );
+                            cb.isNotNull(root.get("stockItem").get("name")),
+                            cb.like(cb.lower(root.get("stockItem").get("name")), searchPattern));
                     Predicate itemCodePred = cb.and(
-                        cb.isNotNull(root.get("stockItem").get("code")),
-                        cb.like(cb.lower(root.get("stockItem").get("code")), searchPattern)
-                    );
+                            cb.isNotNull(root.get("stockItem").get("code")),
+                            cb.like(cb.lower(root.get("stockItem").get("code")), searchPattern));
                     Predicate employeeNamePred = cb.and(
-                        cb.isNotNull(root.get("employeeName")),
-                        cb.like(cb.lower(root.get("employeeName")), searchPattern)
-                    );
+                            cb.isNotNull(root.get("employeeName")),
+                            cb.like(cb.lower(root.get("employeeName")), searchPattern));
                     Predicate userNamePred = cb.and(
-                        cb.isNotNull(root.get("userName")),
-                        cb.like(cb.lower(root.get("userName")), searchPattern)
-                    );
+                            cb.isNotNull(root.get("userName")),
+                            cb.like(cb.lower(root.get("userName")), searchPattern));
                     Predicate documentNumberPred = cb.and(
-                        cb.isNotNull(root.get("documentNumber")),
-                        cb.like(cb.lower(root.get("documentNumber")), searchPattern)
-                    );
-                    
-                    predicates.add(cb.or(itemNamePred, itemCodePred, employeeNamePred, userNamePred, documentNumberPred));
+                            cb.isNotNull(root.get("documentNumber")),
+                            cb.like(cb.lower(root.get("documentNumber")), searchPattern));
+
+                    predicates
+                            .add(cb.or(itemNamePred, itemCodePred, employeeNamePred, userNamePred, documentNumberPred));
                 }
-                
+
                 // Ordenar por data de movimentação (mais recente primeiro)
                 query.orderBy(cb.desc(root.get("movementDate")));
-                
+
                 return cb.and(predicates.toArray(new Predicate[0]));
             };
-            
+
             Page<StockMovement> movements = stockMovementRepository.findAll(spec, pageable);
-            
+
             log.info("Encontradas {} movimentações", movements.getTotalElements());
-            
+
             // Converter movimentações para DTO, filtrando nulos
             List<StockMovementDTO> dtos = movements.getContent().stream()
                     .map(movement -> {
@@ -346,14 +344,13 @@ public class StockService {
                     })
                     .filter(dto -> dto != null)
                     .collect(Collectors.toList());
-            
+
             // Criar nova página com os DTOs convertidos
             return new PageImpl<>(
                     dtos,
                     pageable,
-                    movements.getTotalElements()
-            );
-            
+                    movements.getTotalElements());
+
         } catch (Exception e) {
             log.error("Erro ao buscar movimentações com filtros: {}", e.getMessage(), e);
             // Return empty page instead of throwing exception
@@ -381,7 +378,7 @@ public class StockService {
             log.info("Buscando alertas ativos...");
             List<StockAlert> alerts = stockAlertRepository.findByIsResolvedFalseOrderByPriorityDescCreatedAtDesc();
             log.info("Encontrados {} alertas ativos", alerts.size());
-            
+
             return alerts.stream()
                     .map(alert -> {
                         try {
@@ -393,7 +390,7 @@ public class StockService {
                     })
                     .filter(alert -> alert != null)
                     .collect(Collectors.toList());
-                    
+
         } catch (Exception e) {
             log.error("Erro ao buscar alertas ativos: {}", e.getMessage(), e);
             return new ArrayList<>();
@@ -405,7 +402,7 @@ public class StockService {
             log.info("Buscando alertas não lidos...");
             List<StockAlert> alerts = stockAlertRepository.findByIsReadFalseOrderByPriorityDescCreatedAtDesc();
             log.info("Encontrados {} alertas não lidos", alerts.size());
-            
+
             return alerts.stream()
                     .map(alert -> {
                         try {
@@ -417,7 +414,7 @@ public class StockService {
                     })
                     .filter(alert -> alert != null)
                     .collect(Collectors.toList());
-                    
+
         } catch (Exception e) {
             log.error("Erro ao buscar alertas não lidos: {}", e.getMessage(), e);
             return new ArrayList<>();
@@ -434,10 +431,10 @@ public class StockService {
     public void resolveAlert(UUID alertId, UUID userId) {
         StockAlert alert = stockAlertRepository.findById(alertId)
                 .orElseThrow(() -> new ResourceNotFoundException("Alerta não encontrado: " + alertId));
-        
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + userId));
-        
+
         alert.resolve(user);
         stockAlertRepository.save(alert);
     }
@@ -446,33 +443,32 @@ public class StockService {
 
     public Map<String, Object> getStockReport() {
         log.info("Gerando relatório de estoque");
-        
+
         List<StockItem> allItems = stockItemRepository.findByActiveTrue();
         List<StockItem> lowStockItems = stockItemRepository.findLowStockItems();
         List<StockItem> outOfStockItems = stockItemRepository.findOutOfStockItems();
-        
+
         Long totalItems = (long) allItems.size();
         Long lowStockCount = (long) lowStockItems.size();
         Long outOfStockCount = (long) outOfStockItems.size();
         Double totalValue = stockItemRepository.getTotalStockValue();
-        
+
         Map<StockCategory, Long> itemsByCategory = allItems.stream()
                 .collect(Collectors.groupingBy(StockItem::getCategory, Collectors.counting()));
-        
+
         Long activeAlerts = stockAlertRepository.countByIsResolvedFalse();
         Long criticalAlerts = stockAlertRepository.countCriticalUnresolvedAlerts();
 
         return Map.of(
-            "totalItems", totalItems,
-            "lowStockCount", lowStockCount,
-            "outOfStockCount", outOfStockCount,
-            "totalValue", totalValue != null ? totalValue : 0.0,
-            "itemsByCategory", itemsByCategory,
-            "activeAlerts", activeAlerts,
-            "criticalAlerts", criticalAlerts,
-            "lowStockItems", lowStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList()),
-            "outOfStockItems", outOfStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList())
-        );
+                "totalItems", totalItems,
+                "lowStockCount", lowStockCount,
+                "outOfStockCount", outOfStockCount,
+                "totalValue", totalValue != null ? totalValue : 0.0,
+                "itemsByCategory", itemsByCategory,
+                "activeAlerts", activeAlerts,
+                "criticalAlerts", criticalAlerts,
+                "lowStockItems", lowStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList()),
+                "outOfStockItems", outOfStockItems.stream().map(StockItemDTO::fromEntity).collect(Collectors.toList()));
     }
 
     // ===== RELATÓRIOS DETALHADOS =====
@@ -480,70 +476,71 @@ public class StockService {
     @Transactional(readOnly = true)
     public StockItemReportDTO getItemReport(UUID itemId) {
         log.info("Gerando relatório detalhado para item: {}", itemId);
-        
+
         StockItem item = stockItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: " + itemId));
-        
+
         List<StockMovement> movements = stockMovementRepository.findByStockItemIdOrderByMovementDateDesc(itemId);
-        
+
         long totalMovements = movements.size();
         long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
         long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
-        
+
         int totalQuantityEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         int totalQuantityExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         BigDecimal totalCostEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         BigDecimal totalCostExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         LocalDateTime lastMovementDate = movements.isEmpty() ? null : movements.get(0).getMovementDate();
-        
-        // Calcular giro de estoque (quantidade média movimentada por mês nos últimos 6 meses)
+
+        // Calcular giro de estoque (quantidade média movimentada por mês nos últimos 6
+        // meses)
         LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
         List<StockMovement> recentMovements = movements.stream()
                 .filter(m -> m.getMovementDate().isAfter(sixMonthsAgo))
                 .collect(Collectors.toList());
-        
+
         int recentQuantityExited = recentMovements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
-        double turnoverRate = recentQuantityExited > 0 && item.getCurrentQuantity() > 0 
-                ? (double) recentQuantityExited / (6.0 * item.getCurrentQuantity()) 
+
+        double turnoverRate = recentQuantityExited > 0 && item.getCurrentQuantity() > 0
+                ? (double) recentQuantityExited / (6.0 * item.getCurrentQuantity())
                 : 0.0;
-        
-        int averageMonthlyConsumption = recentMovements.size() > 0 
-                ? recentQuantityExited / 6 
+
+        int averageMonthlyConsumption = recentMovements.size() > 0
+                ? recentQuantityExited / 6
                 : 0;
-        
-        String status = item.getCurrentQuantity() == 0 ? "OUT" :
-                       item.getCurrentQuantity() <= item.getMinimumQuantity() ? "LOW" :
-                       item.getCurrentQuantity() > (item.getMinimumQuantity() * 3) ? "OVER" : "NORMAL";
-        
+
+        String status = item.getCurrentQuantity() == 0 ? "OUT"
+                : item.getCurrentQuantity() <= item.getMinimumQuantity() ? "LOW"
+                        : item.getCurrentQuantity() > (item.getMinimumQuantity() * 3) ? "OVER" : "NORMAL";
+
         BigDecimal totalValue = item.getUnitCost() != null && item.getCurrentQuantity() != null
                 ? item.getUnitCost().multiply(BigDecimal.valueOf(item.getCurrentQuantity()))
                 : BigDecimal.ZERO;
-        
+
         List<MovementSummaryDTO> recentMovementsDTO = movements.stream()
                 .limit(10)
                 .map(this::convertToMovementSummaryDTO)
                 .collect(Collectors.toList());
-        
+
         return StockItemReportDTO.builder()
                 .id(item.getId())
                 .code(item.getCode())
@@ -572,12 +569,13 @@ public class StockService {
     }
 
     @Transactional(readOnly = true)
-    public MovementsReportDTO getMovementsReport(LocalDateTime startDate, LocalDateTime endDate, UUID itemId, UUID employeeId, MovementType movementType) {
+    public MovementsReportDTO getMovementsReport(LocalDateTime startDate, LocalDateTime endDate, UUID itemId,
+            UUID employeeId, MovementType movementType) {
         log.info("Gerando relatório de movimentações de {} até {}", startDate, endDate);
-        
+
         Specification<StockMovement> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            
+
             if (startDate != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("movementDate"), startDate));
             }
@@ -593,63 +591,59 @@ public class StockService {
             if (movementType != null) {
                 predicates.add(cb.equal(root.get("movementType"), movementType));
             }
-            
+
             query.orderBy(cb.desc(root.get("movementDate")));
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-        
+
         List<StockMovement> movements = stockMovementRepository.findAll(spec);
-        
+
         long totalMovements = movements.size();
         long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
         long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
-        
+
         int totalQuantityEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         int totalQuantityExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         BigDecimal totalCostEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         BigDecimal totalCostExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         Map<String, Long> movementsByType = movements.stream()
                 .collect(Collectors.groupingBy(
                         m -> m.getMovementType().name(),
-                        Collectors.counting()
-                ));
-        
+                        Collectors.counting()));
+
         Map<String, Long> movementsByReason = movements.stream()
                 .collect(Collectors.groupingBy(
                         m -> m.getReason().name(),
-                        Collectors.counting()
-                ));
-        
+                        Collectors.counting()));
+
         DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         Map<String, Integer> movementsByDay = movements.stream()
                 .collect(Collectors.groupingBy(
                         m -> m.getMovementDate().format(dayFormatter),
-                        Collectors.summingInt(StockMovement::getQuantity)
-                ));
-        
+                        Collectors.summingInt(StockMovement::getQuantity)));
+
         DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
         Map<String, Integer> movementsByMonth = movements.stream()
                 .collect(Collectors.groupingBy(
                         m -> m.getMovementDate().format(monthFormatter),
-                        Collectors.summingInt(StockMovement::getQuantity)
-                ));
-        
+                        Collectors.summingInt(StockMovement::getQuantity)));
+
         // Top itens mais movimentados
         Map<UUID, MovementsReportDTO.ItemMovementSummaryDTO> itemMap = new HashMap<>();
         for (StockMovement m : movements) {
@@ -663,7 +657,7 @@ public class StockService {
                             .totalQuantity(0)
                             .totalCost(BigDecimal.ZERO)
                             .build());
-            
+
             summary.setMovementCount(summary.getMovementCount() + 1);
             summary.setTotalQuantity(summary.getTotalQuantity() + m.getQuantity());
             if (m.getTotalCost() != null) {
@@ -671,12 +665,12 @@ public class StockService {
             }
             itemMap.put(itemIdKey, summary);
         }
-        
+
         List<MovementsReportDTO.ItemMovementSummaryDTO> topMovedItems = itemMap.values().stream()
                 .sorted((a, b) -> Long.compare(b.getMovementCount(), a.getMovementCount()))
                 .limit(10)
                 .collect(Collectors.toList());
-        
+
         // Top funcionários
         Map<UUID, MovementsReportDTO.EmployeeMovementSummaryDTO> employeeMap = new HashMap<>();
         for (StockMovement m : movements) {
@@ -690,7 +684,7 @@ public class StockService {
                                 .totalQuantity(0)
                                 .itemsReceived(new ArrayList<>())
                                 .build());
-                
+
                 summary.setMovementCount(summary.getMovementCount() + 1);
                 summary.setTotalQuantity(summary.getTotalQuantity() + m.getQuantity());
                 if (!summary.getItemsReceived().contains(m.getStockItem().getName())) {
@@ -699,16 +693,16 @@ public class StockService {
                 employeeMap.put(empId, summary);
             }
         }
-        
+
         List<MovementsReportDTO.EmployeeMovementSummaryDTO> topEmployees = employeeMap.values().stream()
                 .sorted((a, b) -> Long.compare(b.getMovementCount(), a.getMovementCount()))
                 .limit(10)
                 .collect(Collectors.toList());
-        
+
         List<MovementSummaryDTO> movementsDTO = movements.stream()
                 .map(this::convertToMovementSummaryDTO)
                 .collect(Collectors.toList());
-        
+
         return MovementsReportDTO.builder()
                 .startDate(startDate)
                 .endDate(endDate)
@@ -732,34 +726,34 @@ public class StockService {
     @Transactional(readOnly = true)
     public LowStockReportDTO getLowStockReport() {
         log.info("Gerando relatório de estoque baixo");
-        
+
         List<StockItem> allItems = stockItemRepository.findByActiveTrue();
         List<StockItem> lowStockItems = stockItemRepository.findLowStockItems();
         List<StockItem> outOfStockItems = stockItemRepository.findOutOfStockItems();
-        
+
         // Itens críticos (estoque <= 10% do mínimo)
         List<StockItem> criticalItems = allItems.stream()
-                .filter(item -> item.getMinimumQuantity() > 0 && 
-                               item.getCurrentQuantity() <= (item.getMinimumQuantity() * 0.1))
+                .filter(item -> item.getMinimumQuantity() > 0 &&
+                        item.getCurrentQuantity() <= (item.getMinimumQuantity() * 0.1))
                 .collect(Collectors.toList());
-        
+
         BigDecimal totalValueAtRisk = lowStockItems.stream()
                 .filter(item -> item.getUnitCost() != null)
                 .map(item -> item.getUnitCost().multiply(BigDecimal.valueOf(item.getCurrentQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         List<StockItemReportDTO> itemsDTO = lowStockItems.stream()
                 .map(item -> convertToItemReportDTO(item, false))
                 .collect(Collectors.toList());
-        
+
         List<StockItemReportDTO> criticalItemsDTO = criticalItems.stream()
                 .map(item -> convertToItemReportDTO(item, false))
                 .collect(Collectors.toList());
-        
+
         List<StockItemReportDTO> outOfStockItemsDTO = outOfStockItems.stream()
                 .map(item -> convertToItemReportDTO(item, false))
                 .collect(Collectors.toList());
-        
+
         return LowStockReportDTO.builder()
                 .totalItems((long) allItems.size())
                 .lowStockItems((long) lowStockItems.size())
@@ -775,34 +769,34 @@ public class StockService {
     @Transactional(readOnly = true)
     public DateRangeReportDTO getDateRangeReport(LocalDateTime startDate, LocalDateTime endDate) {
         log.info("Gerando relatório por período de {} até {}", startDate, endDate);
-        
+
         List<StockMovement> movements = stockMovementRepository.findByMovementDateBetweenOrderByMovementDateDesc(
                 startDate, endDate);
-        
+
         long totalMovements = movements.size();
         long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
         long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
-        
+
         int totalQuantityEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         int totalQuantityExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         BigDecimal totalCostEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         BigDecimal totalCostExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         // Resumo diário
         DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         Map<String, DateRangeReportDTO.DailySummaryDTO> dailySummaries = new HashMap<>();
@@ -817,7 +811,7 @@ public class StockService {
                             .costEntered(BigDecimal.ZERO)
                             .costExited(BigDecimal.ZERO)
                             .build());
-            
+
             daily.setMovements(daily.getMovements() + 1);
             if (m.getMovementType() == MovementType.ENTRADA) {
                 daily.setEntries(daily.getEntries() + m.getQuantity());
@@ -832,7 +826,7 @@ public class StockService {
             }
             dailySummaries.put(dateKey, daily);
         }
-        
+
         // Resumo mensal
         DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
         Map<String, DateRangeReportDTO.MonthlySummaryDTO> monthlySummaries = new HashMap<>();
@@ -847,7 +841,7 @@ public class StockService {
                             .costEntered(BigDecimal.ZERO)
                             .costExited(BigDecimal.ZERO)
                             .build());
-            
+
             monthly.setMovements(monthly.getMovements() + 1);
             if (m.getMovementType() == MovementType.ENTRADA) {
                 monthly.setEntries(monthly.getEntries() + m.getQuantity());
@@ -862,12 +856,12 @@ public class StockService {
             }
             monthlySummaries.put(monthKey, monthly);
         }
-        
+
         // Itens com movimentações
         Set<UUID> itemIds = movements.stream()
                 .map(m -> m.getStockItem().getId())
                 .collect(Collectors.toSet());
-        
+
         List<StockItemReportDTO> itemsWithMovements = itemIds.stream()
                 .map(id -> {
                     StockItem item = stockItemRepository.findById(id).orElse(null);
@@ -875,7 +869,7 @@ public class StockService {
                 })
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        
+
         // Resumo por categoria
         Map<StockCategory, DateRangeReportDTO.CategorySummaryDTO> categoryMap = new HashMap<>();
         for (StockMovement m : movements) {
@@ -888,7 +882,7 @@ public class StockService {
                             .totalCost(BigDecimal.ZERO)
                             .itemsCount(0L)
                             .build());
-            
+
             summary.setTotalMovements(summary.getTotalMovements() + 1);
             summary.setTotalQuantity(summary.getTotalQuantity() + m.getQuantity());
             if (m.getTotalCost() != null) {
@@ -896,7 +890,7 @@ public class StockService {
             }
             categoryMap.put(category, summary);
         }
-        
+
         // Contar itens únicos por categoria
         for (StockCategory category : categoryMap.keySet()) {
             long uniqueItems = movements.stream()
@@ -906,9 +900,9 @@ public class StockService {
                     .count();
             categoryMap.get(category).setItemsCount(uniqueItems);
         }
-        
+
         List<DateRangeReportDTO.CategorySummaryDTO> categorySummaries = new ArrayList<>(categoryMap.values());
-        
+
         return DateRangeReportDTO.builder()
                 .startDate(startDate)
                 .endDate(endDate)
@@ -948,51 +942,51 @@ public class StockService {
     }
 
     private StockItemReportDTO convertToItemReportDTO(StockItem item, boolean includeMovements) {
-        List<StockMovement> movements = includeMovements 
+        List<StockMovement> movements = includeMovements
                 ? stockMovementRepository.findByStockItemIdOrderByMovementDateDesc(item.getId())
                 : new ArrayList<>();
-        
+
         long totalMovements = movements.size();
         long totalEntries = movements.stream().filter(m -> m.getMovementType() == MovementType.ENTRADA).count();
         long totalExits = movements.stream().filter(m -> m.getMovementType() == MovementType.SAIDA).count();
-        
+
         int totalQuantityEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         int totalQuantityExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA)
                 .mapToInt(StockMovement::getQuantity)
                 .sum();
-        
+
         BigDecimal totalCostEntered = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.ENTRADA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         BigDecimal totalCostExited = movements.stream()
                 .filter(m -> m.getMovementType() == MovementType.SAIDA && m.getTotalCost() != null)
                 .map(StockMovement::getTotalCost)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
+
         LocalDateTime lastMovementDate = movements.isEmpty() ? null : movements.get(0).getMovementDate();
-        
-        String status = item.getCurrentQuantity() == 0 ? "OUT" :
-                       item.getCurrentQuantity() <= item.getMinimumQuantity() ? "LOW" :
-                       item.getCurrentQuantity() > (item.getMinimumQuantity() * 3) ? "OVER" : "NORMAL";
-        
+
+        String status = item.getCurrentQuantity() == 0 ? "OUT"
+                : item.getCurrentQuantity() <= item.getMinimumQuantity() ? "LOW"
+                        : item.getCurrentQuantity() > (item.getMinimumQuantity() * 3) ? "OVER" : "NORMAL";
+
         BigDecimal totalValue = item.getUnitCost() != null && item.getCurrentQuantity() != null
                 ? item.getUnitCost().multiply(BigDecimal.valueOf(item.getCurrentQuantity()))
                 : BigDecimal.ZERO;
-        
-        List<MovementSummaryDTO> recentMovementsDTO = includeMovements 
+
+        List<MovementSummaryDTO> recentMovementsDTO = includeMovements
                 ? movements.stream()
                         .limit(10)
                         .map(this::convertToMovementSummaryDTO)
                         .collect(Collectors.toList())
                 : new ArrayList<>();
-        
+
         return StockItemReportDTO.builder()
                 .id(item.getId())
                 .code(item.getCode())
@@ -1024,22 +1018,22 @@ public class StockService {
         // Verificar se já existe alerta ativo para este item
         boolean hasActiveAlert = stockAlertRepository.existsByStockItemIdAndAlertTypeAndIsResolvedFalse(
                 item.getId(), "LOW_STOCK");
-        
+
         if (item.isLowStock() && !hasActiveAlert) {
             // Criar alerta de baixo estoque
             StockAlert alert = new StockAlert();
             alert.setStockItem(item);
             alert.setAlertType("LOW_STOCK");
-            alert.setMessage(String.format("Item '%s' com baixo estoque: %d unidades (mínimo: %d)", 
+            alert.setMessage(String.format("Item '%s' com baixo estoque: %d unidades (mínimo: %d)",
                     item.getFullName(), item.getCurrentQuantity(), item.getMinimumQuantity()));
             alert.setCurrentQuantity(item.getCurrentQuantity());
             alert.setMinimumQuantity(item.getMinimumQuantity());
             alert.setPriority(item.getCurrentQuantity() == 0 ? 4 : 3); // Crítica se zerado, alta se baixo
-            
+
             stockAlertRepository.save(alert);
             log.info("Alerta de baixo estoque criado para item: {}", item.getFullName());
         }
-        
+
         // Se não está mais em baixo estoque, resolver alertas ativos
         if (!item.isLowStock() && hasActiveAlert) {
             List<StockAlert> activeAlerts = stockAlertRepository.findByStockItemIdAndIsResolvedFalse(item.getId());
@@ -1073,7 +1067,7 @@ public class StockService {
             log.info("Buscando as {} movimentações mais recentes...", limit);
             List<StockMovement> recentMovements = stockMovementRepository.findTop10ByOrderByMovementDateDesc();
             log.info("Encontrados {} movimentações recentes", recentMovements.size());
-            
+
             return recentMovements.stream()
                     .map(movement -> {
                         try {
@@ -1086,10 +1080,18 @@ public class StockService {
                     .filter(movement -> movement != null)
                     .limit(limit)
                     .collect(Collectors.toList());
-                    
+
         } catch (Exception e) {
             log.error("Erro ao buscar movimentações recentes: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
+    }
+
+    public List<StockMovementDTO> getMovementsByDateRange(LocalDateTime start, LocalDateTime end) {
+        log.info("Buscando movimentações de {} até {}", start, end);
+        return stockMovementRepository.findByMovementDateBetweenOrderByMovementDateDesc(start, end)
+                .stream()
+                .map(StockMovementDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 }

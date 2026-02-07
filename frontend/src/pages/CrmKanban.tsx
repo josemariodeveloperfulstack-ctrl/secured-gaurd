@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import KanbanBoard from '../components/comercial/KanbanBoard';
 import CrmDashboard from '../components/comercial/CrmDashboard';
+import CommercialDashboard from '../components/comercial/CommercialDashboard';
+import TeamDashboard from '../components/comercial/TeamDashboard';
+import SalesGoalManager from '../components/comercial/SalesGoalManager';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { fetchCrmMetrics } from '@/services/crmService';
 import { 
@@ -13,12 +17,18 @@ import {
   TrendingUp, 
   Users, 
   DollarSign,
-  Loader2
+  Loader2,
+  LineChart as LineChartIcon,
+  Trophy,
+  Crosshair
 } from 'lucide-react';
 
 export default function CrmKanban() {
   const [activeTab, setActiveTab] = useState('kanban');
+  const { user } = useAuth();
   const { toast } = useToast();
+
+  const isGestorOrAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'GESTOR';
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -144,13 +154,13 @@ export default function CrmKanban() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
-          <TabsList className="grid w-full grid-cols-2 bg-seguranca-graphite border border-gray-600">
+          <TabsList className={`grid w-full bg-seguranca-graphite border border-gray-600 ${isGestorOrAdmin ? 'grid-cols-5' : 'grid-cols-3'}`}>
             <TabsTrigger 
               value="kanban" 
               className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
             >
               <Trello className="h-4 w-4 mr-2" />
-              Kanban Board
+              Kanban
             </TabsTrigger>
             <TabsTrigger 
               value="dashboard" 
@@ -159,6 +169,31 @@ export default function CrmKanban() {
               <BarChart3 className="h-4 w-4 mr-2" />
               Dashboard
             </TabsTrigger>
+            <TabsTrigger 
+              value="desempenho" 
+              className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
+            >
+              <LineChartIcon className="h-4 w-4 mr-2" />
+              Desempenho
+            </TabsTrigger>
+            {isGestorOrAdmin && (
+              <TabsTrigger 
+                value="equipe" 
+                className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
+              >
+                <Trophy className="h-4 w-4 mr-2" />
+                Equipe
+              </TabsTrigger>
+            )}
+            {isGestorOrAdmin && (
+              <TabsTrigger 
+                value="metas" 
+                className="data-[state='active']:bg-seguranca-yellow data-[state='active']:text-black text-seguranca-lightgray"
+              >
+                <Crosshair className="h-4 w-4 mr-2" />
+                Metas
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="kanban" className="space-y-4 w-full min-w-0">
@@ -168,6 +203,22 @@ export default function CrmKanban() {
           <TabsContent value="dashboard" className="space-y-4">
             <CrmDashboard />
           </TabsContent>
+
+          <TabsContent value="desempenho" className="space-y-4">
+            <CommercialDashboard />
+          </TabsContent>
+
+          {isGestorOrAdmin && (
+            <TabsContent value="equipe" className="space-y-4">
+              <TeamDashboard />
+            </TabsContent>
+          )}
+
+          {isGestorOrAdmin && (
+            <TabsContent value="metas" className="space-y-4">
+              <SalesGoalManager />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </StandardLayout>

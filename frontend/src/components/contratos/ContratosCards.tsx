@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, FileText, Bell, Download, Calendar, DollarSign, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Edit, Trash2, FileText, Bell, Download, Calendar, DollarSign, AlertTriangle, XCircle, ExternalLink } from 'lucide-react';
+import { contractService } from '@/services/contractService';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -23,11 +24,13 @@ interface Contrato {
   startDate: string;
   endDate?: string;
   value: number;
-  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED' | 'PENDING';
+  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED' | 'PENDING' | 'CANCELLED' | 'EXPIRED' | 'DRAFT' | 'SUSPENDED';
   notes?: string;
   clientId: string;
   clientName: string;
   clientCnpj?: string;
+  contractOrigin?: string;
+  proposalId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +41,7 @@ interface ContratosCardsProps {
   onDelete: () => void;
   onStatusChange?: (contractId: string, newStatus: string) => void;
   onGenerateContract?: (contrato: Contrato) => void;
+  onTerminate?: (contrato: Contrato) => void;
 }
 
 export const ContratosCards: React.FC<ContratosCardsProps> = ({
@@ -45,7 +49,8 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
   onEdit,
   onDelete,
   onStatusChange,
-  onGenerateContract
+  onGenerateContract,
+  onTerminate
 }) => {
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -62,12 +67,7 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
 
     setDeleting(true);
     try {
-      const { error } = await supabase
-        .from('contratos')
-        .delete()
-        .eq('id', contratoToDelete.id);
-
-      if (error) throw error;
+      await contractService.deleteContract(contratoToDelete.id);
 
       toast({
         title: "Sucesso",
@@ -81,7 +81,7 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
       console.error('Erro ao excluir contrato:', error);
       toast({
         title: "Erro",
-        description: "Erro ao excluir contrato. Tente novamente.",
+        description: error?.response?.data?.message || "Erro ao excluir contrato. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -94,14 +94,22 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
       ACTIVE: 'bg-green-500',
       INACTIVE: 'bg-gray-500',
       TERMINATED: 'bg-red-500',
-      PENDING: 'bg-yellow-500'
+      PENDING: 'bg-yellow-500',
+      DRAFT: 'bg-gray-400',
+      CANCELLED: 'bg-red-500',
+      EXPIRED: 'bg-red-500',
+      SUSPENDED: 'bg-orange-500'
     };
     
     const labels = {
       ACTIVE: 'Ativo',
       INACTIVE: 'Inativo',
       TERMINATED: 'Terminado',
-      PENDING: 'Pendente'
+      PENDING: 'Pendente',
+      DRAFT: 'Em elaboração',
+      CANCELLED: 'Cancelado',
+      EXPIRED: 'Expirado',
+      SUSPENDED: 'Suspenso'
     };
     
     return (
@@ -152,7 +160,7 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 w-full min-w-0">
         {contratos.map((contrato) => (
           <Card key={contrato.id} className="bg-seguranca-graphite border-gray-600 hover:border-seguranca-yellow/50 transition-colors">
             <CardHeader className="pb-3">
@@ -198,6 +206,17 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
                     {contrato.description}
                   </p>
                 </div>
+              )}
+
+              {/* Link para proposta quando origem é PROPOSAL */}
+              {contrato.proposalId && contrato.contractOrigin === 'PROPOSAL' && (
+                <Link
+                  to={`/propostas`}
+                  className="inline-flex items-center gap-1.5 text-xs text-seguranca-yellow hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Ver proposta associada
+                </Link>
               )}
 
               {/* Valor */}
@@ -271,11 +290,23 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => onEdit(contrato)}
-                  className="text-seguranca-yellow hover:bg-seguranca-black hover:text-yellow-300"
-                  title="Editar contrato"
+                  disabled={contrato.status === 'CANCELLED' || contrato.status === 'EXPIRED' || contrato.status === 'TERMINATED'}
+                  className="text-seguranca-yellow hover:bg-seguranca-black hover:text-yellow-300 disabled:opacity-50"
+                  title={contrato.status === 'CANCELLED' || contrato.status === 'EXPIRED' || contrato.status === 'TERMINATED' ? 'Contrato encerrado' : 'Editar contrato'}
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
+                {onTerminate && (contrato.status === 'ACTIVE' || contrato.status === 'PENDING') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onTerminate(contrato)}
+                    className="text-red-500 hover:bg-seguranca-black hover:text-red-400"
+                    title="Encerrar contrato"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"

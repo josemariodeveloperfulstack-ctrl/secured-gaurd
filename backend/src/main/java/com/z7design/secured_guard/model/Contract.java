@@ -1,6 +1,10 @@
 package com.z7design.secured_guard.model;
 
+import com.z7design.secured_guard.model.enums.AdjustmentType;
+import com.z7design.secured_guard.model.enums.ContractOrigin;
+import com.z7design.secured_guard.model.enums.TerminationReason;
 import com.z7design.secured_guard.model.enums.ContractStatus;
+import com.z7design.secured_guard.model.enums.ContractType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -59,7 +63,74 @@ public class Contract {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
-    
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "contract_origin")
+    private ContractOrigin contractOrigin;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "contract_type")
+    private ContractType contractType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "responsible_commercial_id")
+    private User responsibleCommercial;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "responsible_manager_id")
+    private User responsibleManager;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposal_id")
+    private Proposal proposal;
+
+    @Column(name = "monthly_value", precision = 15, scale = 2)
+    private BigDecimal monthlyValue;
+
+    @Column(name = "annual_value", precision = 15, scale = 2)
+    private BigDecimal annualValue;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "adjustment_type")
+    private AdjustmentType adjustmentType;
+
+    @Column(name = "next_adjustment_date")
+    private LocalDate nextAdjustmentDate;
+
+    @Column(name = "auto_renewal")
+    private Boolean autoRenewal = false;
+
+    @Column(name = "replacement_time_hours")
+    private Integer replacementTimeHours;
+
+    @Column(name = "max_absence_minutes")
+    private Integer maxAbsenceMinutes;
+
+    @Column(name = "patrol_frequency", length = 255)
+    private String patrolFrequency;
+
+    @Column(name = "reports_required", columnDefinition = "TEXT")
+    private String reportsRequired;
+
+    @Column(name = "obligations_contractor", columnDefinition = "TEXT")
+    private String obligationsContractor;
+
+    @Column(name = "obligations_contracted", columnDefinition = "TEXT")
+    private String obligationsContracted;
+
+    @Column(name = "penalties", columnDefinition = "TEXT")
+    private String penalties;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "termination_reason")
+    private TerminationReason terminationReason;
+
+    @Column(name = "termination_date")
+    private LocalDate terminationDate;
+
+    @Column(name = "termination_checklist", columnDefinition = "TEXT")
+    private String terminationChecklist;
+
     // Constructors
     public Contract() {}
     
@@ -159,4 +230,64 @@ public class Contract {
     public void setClient(Client client) {
         this.client = client;
     }
+
+    public ContractOrigin getContractOrigin() { return contractOrigin; }
+    public void setContractOrigin(ContractOrigin contractOrigin) { this.contractOrigin = contractOrigin; }
+
+    public ContractType getContractType() { return contractType; }
+    public void setContractType(ContractType contractType) { this.contractType = contractType; }
+
+    public User getResponsibleCommercial() { return responsibleCommercial; }
+    public void setResponsibleCommercial(User responsibleCommercial) { this.responsibleCommercial = responsibleCommercial; }
+
+    public User getResponsibleManager() { return responsibleManager; }
+    public void setResponsibleManager(User responsibleManager) { this.responsibleManager = responsibleManager; }
+
+    public Proposal getProposal() { return proposal; }
+    public void setProposal(Proposal proposal) { this.proposal = proposal; }
+
+    public BigDecimal getMonthlyValue() { return monthlyValue; }
+    public void setMonthlyValue(BigDecimal monthlyValue) { this.monthlyValue = monthlyValue; }
+
+    public BigDecimal getAnnualValue() { return annualValue; }
+    public void setAnnualValue(BigDecimal annualValue) { this.annualValue = annualValue; }
+
+    public AdjustmentType getAdjustmentType() { return adjustmentType; }
+    public void setAdjustmentType(AdjustmentType adjustmentType) { this.adjustmentType = adjustmentType; }
+
+    public LocalDate getNextAdjustmentDate() { return nextAdjustmentDate; }
+    public void setNextAdjustmentDate(LocalDate nextAdjustmentDate) { this.nextAdjustmentDate = nextAdjustmentDate; }
+
+    public Boolean getAutoRenewal() { return autoRenewal != null ? autoRenewal : false; }
+    public void setAutoRenewal(Boolean autoRenewal) { this.autoRenewal = autoRenewal; }
+
+    public Integer getReplacementTimeHours() { return replacementTimeHours; }
+    public void setReplacementTimeHours(Integer replacementTimeHours) { this.replacementTimeHours = replacementTimeHours; }
+
+    public Integer getMaxAbsenceMinutes() { return maxAbsenceMinutes; }
+    public void setMaxAbsenceMinutes(Integer maxAbsenceMinutes) { this.maxAbsenceMinutes = maxAbsenceMinutes; }
+
+    public String getPatrolFrequency() { return patrolFrequency; }
+    public void setPatrolFrequency(String patrolFrequency) { this.patrolFrequency = patrolFrequency; }
+
+    public String getReportsRequired() { return reportsRequired; }
+    public void setReportsRequired(String reportsRequired) { this.reportsRequired = reportsRequired; }
+
+    public String getObligationsContractor() { return obligationsContractor; }
+    public void setObligationsContractor(String obligationsContractor) { this.obligationsContractor = obligationsContractor; }
+
+    public String getObligationsContracted() { return obligationsContracted; }
+    public void setObligationsContracted(String obligationsContracted) { this.obligationsContracted = obligationsContracted; }
+
+    public String getPenalties() { return penalties; }
+    public void setPenalties(String penalties) { this.penalties = penalties; }
+
+    public TerminationReason getTerminationReason() { return terminationReason; }
+    public void setTerminationReason(TerminationReason terminationReason) { this.terminationReason = terminationReason; }
+
+    public LocalDate getTerminationDate() { return terminationDate; }
+    public void setTerminationDate(LocalDate terminationDate) { this.terminationDate = terminationDate; }
+
+    public String getTerminationChecklist() { return terminationChecklist; }
+    public void setTerminationChecklist(String terminationChecklist) { this.terminationChecklist = terminationChecklist; }
 } 
