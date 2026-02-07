@@ -172,7 +172,8 @@ public class StockReportService {
             table.addCell(layoutService.createDataCell(String.valueOf(movement.getQuantity())));
             table.addCell(layoutService.createDataCell(movement.getStockItemName()));
             table.addCell(layoutService.createDataCell(movement.getUserName()));
-            table.addCell(layoutService.createDataCell(movement.getDestinationName()));
+            table.addCell(layoutService.createDataCell(
+                    movement.getUnitName() != null ? movement.getUnitName() : (movement.getEmployeeName() != null ? movement.getEmployeeName() : "-")));
         }
 
         document.add(table);
