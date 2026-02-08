@@ -1,3 +1,24 @@
+-- Garantir que proposals e users têm PRIMARY KEY em id (fix para CI/ambientes com schema inconsistente)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'proposals')
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.table_constraints
+       WHERE table_schema = 'public' AND table_name = 'proposals' AND constraint_type = 'PRIMARY KEY'
+     ) THEN
+    ALTER TABLE proposals ADD PRIMARY KEY (id);
+    RAISE NOTICE 'PRIMARY KEY adicionada à tabela proposals';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users')
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.table_constraints
+       WHERE table_schema = 'public' AND table_name = 'users' AND constraint_type = 'PRIMARY KEY'
+     ) THEN
+    ALTER TABLE users ADD PRIMARY KEY (id);
+    RAISE NOTICE 'PRIMARY KEY adicionada à tabela users';
+  END IF;
+END $$;
+
 -- Colunas do PRD Fase 1 - Gestão de Contratos (que estavam faltando na tabela contracts)
 DO $$
 BEGIN

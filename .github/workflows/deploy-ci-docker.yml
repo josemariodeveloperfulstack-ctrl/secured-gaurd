@@ -450,8 +450,8 @@ jobs:
               [ $i -eq 12 ] && { echo "⚠️ Timeout aguardando postgres"; exit 1; }
               sleep 5
             done
-            echo "🔧 Removendo registro de migração V424 falha do flyway_schema_history..."
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '424' AND success = false;" 2>/dev/null || echo "⚠️ Tabela flyway_schema_history não existe ou nenhum registro V424 falho (ok em primeiro deploy)"
+            echo "🔧 Removendo registros de migrações falhas do flyway_schema_history..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427') AND success = false;" 2>/dev/null || echo "⚠️ Tabela flyway_schema_history não existe (ok em primeiro deploy)"
             echo "✅ Flyway repair concluído!"
           EOF
 
