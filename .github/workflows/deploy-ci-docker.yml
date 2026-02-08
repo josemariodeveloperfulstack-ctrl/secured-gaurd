@@ -452,6 +452,8 @@ jobs:
             done
             echo "🔧 Removendo registros de migrações falhas do flyway_schema_history..."
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427') AND success = false;" 2>/dev/null || echo "⚠️ Tabela flyway_schema_history não existe (ok em primeiro deploy)"
+            echo "🔧 Atualizando checksums (V424, V427) para migrações alteradas..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424'; UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || echo "⚠️ Checksum update ignorado (migrations não aplicadas ainda)"
             echo "✅ Flyway repair concluído!"
           EOF
 

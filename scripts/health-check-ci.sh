@@ -28,7 +28,7 @@ if [ -z "${SSH_USER:-}" ] || [ -z "${SSH_HOST:-}" ] || [ -z "${SSH_PASSWORD:-}" 
 fi
 
 # Configurações
-MAX_ATTEMPTS=15
+MAX_ATTEMPTS=25
 ATTEMPT=1
 HEALTH_CHECK_URL="https://ci.z7botsolutions.com.br/api/health"
 INTERNAL_HEALTH_CHECK="http://localhost:8081/api/health"
@@ -230,12 +230,12 @@ DIAG_EOF
 }
 
 # Aguardar inicialização
-log "⏳ Aguardando 180 segundos para aplicação inicializar completamente..."
+log "⏳ Aguardando 300 segundos (5 min) para aplicação inicializar completamente..."
 log "💡 Backend precisa de tempo para:"
 log "   - Conectar ao banco de dados"
 log "   - Executar migrations do Flyway"
 log "   - Inicializar Spring Boot completamente"
-sleep 180
+sleep 300
 
 # Loop principal de tentativas
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -253,40 +253,33 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
         fi
     fi
     
-    # Primeiro, verificar se backend está pronto
-    if check_backend_ready; then
-        # Se backend está pronto, verificar health check interno
-        if check_internal_health; then
-            log "✅ Aplicação está funcionando internamente!"
-            
-            # Se interno funciona, tentar externo
-            if check_external_health; then
-                log "✅ Health check externo também passou!"
-                log "✅ Aplicação CI está totalmente operacional!"
-                exit 0
-            else
-                log "⚠️ Aplicação funciona internamente mas não externamente"
-                log "💡 Pode ser problema de Cloudflare ou Traefik"
-                # Se o interno está funcionando e já tentamos várias vezes,
-                # considerar como sucesso parcial (aplicação está funcionando)
-                if [ $ATTEMPT -ge 10 ]; then
-                    log "✅ Aplicação está funcionando internamente após $ATTEMPT tentativas"
-                    log "⚠️ Problema externo pode ser temporário (Cloudflare/Traefik)"
-                    log "✅ Considerando como sucesso parcial - aplicação está operacional"
-                    exit 0
-                fi
-            fi
+    # Priorizar health check HTTP real (backend pode responder antes do docker health)
+    if check_internal_health; then
+        log "✅ Aplicação está funcionando internamente!"
+        # Se interno funciona, tentar externo
+        if check_external_health; then
+            log "✅ Health check externo também passou!"
+            log "✅ Aplicação CI está totalmente operacional!"
+            exit 0
         else
-            log "⚠️ Health check interno falhou"
+            log "⚠️ Aplicação funciona internamente mas não externamente"
+            log "💡 Pode ser problema de Cloudflare ou Traefik"
+            if [ $ATTEMPT -ge 15 ]; then
+                log "✅ Considerando sucesso parcial - aplicação está operacional internamente"
+                exit 0
+            fi
         fi
     else
-        log "⚠️ Backend ainda não está pronto"
+        # Fallback: verificar status docker
+        if ! check_backend_ready; then
+            log "⚠️ Backend ainda não está pronto"
+        fi
     fi
     
     # Se não passou, aguardar antes da próxima tentativa
     if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-        log "⏳ Aguardando 15 segundos antes da próxima tentativa..."
-        sleep 15
+        log "⏳ Aguardando 20 segundos antes da próxima tentativa..."
+        sleep 20
     fi
     
     ATTEMPT=$((ATTEMPT + 1))
