@@ -86,7 +86,7 @@ check_internal_health() {
         return 1
     fi
     
-    local http_code=$(echo "$response" | tail -1)
+    local http_code=$(echo "$response" | tail -1 | tr -d '\r\n' | head -c 3)
     local body=$(echo "$response" | head -n -1)
     
     if [ "$http_code" = "200" ]; then

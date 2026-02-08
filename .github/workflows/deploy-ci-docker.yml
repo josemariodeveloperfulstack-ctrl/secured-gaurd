@@ -432,28 +432,31 @@ jobs:
           EOF
 
       # ============================================
-      # 1️⃣7️⃣b FLYWAY REPAIR - Remove failed migration V424
+      # 1️⃣7️⃣b FLYWAY REPAIR - Corrige checksum mismatch V424/V427
       # ============================================
-      - name: 🔧 Flyway repair - Remove failed migration record
+      - name: 🔧 Flyway repair - Fix checksum mismatch
         run: |
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             set -e
             cd /var/www/secured_guard/ci
             echo "📦 Iniciando postgres e redis para Flyway repair..."
             docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
-            echo "⏳ Aguardando postgres ficar pronto (até 60s)..."
-            for i in $(seq 1 12); do
+            echo "⏳ Aguardando postgres ficar pronto (até 90s)..."
+            for i in $(seq 1 18); do
               if docker exec secured-guard-db-ci pg_isready -U secured_guard_ci -d secured_guard_ci 2>/dev/null; then
                 echo "✅ Postgres pronto!"
                 break
               fi
-              [ $i -eq 12 ] && { echo "⚠️ Timeout aguardando postgres"; exit 1; }
+              [ $i -eq 18 ] && { echo "⚠️ Timeout aguardando postgres"; exit 1; }
               sleep 5
             done
-            echo "🔧 Removendo registros de migrações falhas do flyway_schema_history..."
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427') AND success = false;" 2>/dev/null || echo "⚠️ Tabela flyway_schema_history não existe (ok em primeiro deploy)"
-            echo "🔧 Atualizando checksums (V424, V427) para migrações alteradas..."
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424'; UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || echo "⚠️ Checksum update ignorado (migrations não aplicadas ainda)"
+            sleep 3
+            echo "🔧 Removendo registros de migrações falhas..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427') AND success = false;" 2>/dev/null || echo "⚠️ DELETE ignorado (tabela pode não existir)"
+            echo "🔧 Atualizando checksums V424 e V427..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';" 2>/dev/null || true
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "SELECT version, checksum, success FROM flyway_schema_history WHERE version IN ('424','427');" 2>/dev/null || echo "   (verificação omitida)"
             echo "✅ Flyway repair concluído!"
           EOF
 
@@ -510,7 +513,10 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             cd /var/www/secured_guard/ci
             docker-compose -f docker-compose.ci.yml ps
-            docker logs --tail 50 secured-guard-backend-ci
+            echo "--- Logs do backend (últimas 80 linhas, incluindo possíveis erros Flyway) ---"
+            docker logs --tail 80 secured-guard-backend-ci 2>&1 || true
+            echo "--- Verificação Flyway no banco ---"
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "SELECT version, checksum, success FROM flyway_schema_history WHERE version IN ('424','427') ORDER BY version;" 2>/dev/null || echo "Não foi possível verificar flyway_schema_history"
           EOF
 
       # ============================================

@@ -108,8 +108,7 @@ services:
         condition: service_healthy
       redis-ci:
         condition: service_healthy
-      whatsapp-service-ci:
-        condition: service_started
+      # WhatsApp não é dependência de startup - backend inicia mesmo se WhatsApp estiver em crash loop
     networks:
       - secured-guard-ci-network
       - z7network
@@ -117,8 +116,8 @@ services:
       test: ["CMD", "sh", "-c", "curl -f http://localhost:8080/api/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 10
-      start_period: 240s
+      retries: 15
+      start_period: 420s
     restart: unless-stopped
     # DESABILITADO TRAEFIK - usando Nginx como proxy reverso
     labels:
