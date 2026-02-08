@@ -229,20 +229,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sshpass
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST_CI }} >> ~/.ssh/known_hosts
+          for i in 1 2 3; do
+            ssh-keyscan -H ${{ secrets.VPS_HOST_CI }} >> ~/.ssh/known_hosts 2>/dev/null && break || sleep 10
+          done
 
       # ============================================
-      # 8️⃣ TRANSFER FILES TO VPS
+      # 8️⃣ TRANSFER FILES TO VPS (com retry para Connection reset)
       # ============================================
       - name: 📤 Transfer files to VPS
         run: |
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} \
-            "mkdir -p /var/www/secured_guard/ci/nginx"
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml \
-            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf \
-            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+          do_transfer() {
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} "mkdir -p /var/www/secured_guard/ci/nginx"
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/
+          }
+          for i in 1 2 3 4 5; do
+            echo "📤 Tentativa $i de transferência..."
+            if do_transfer; then echo "✅ Transferência concluída!"; exit 0; fi
+            echo "⚠️ Falha na tentativa $i - aguardando 15s antes de retry..."
+            sleep 15
+          done
+          echo "❌ Transferência falhou após 5 tentativas"
+          exit 1
 
       # ============================================
       # 9️⃣ VALIDATE AND CONFIGURE JWT_SECRET
