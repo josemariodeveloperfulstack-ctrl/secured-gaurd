@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS contract_amendments (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_contract_amendments_contract_id ON contract_amendments(contract_id);
-CREATE INDEX idx_contract_amendments_status ON contract_amendments(status);
+CREATE INDEX IF NOT EXISTS idx_contract_amendments_contract_id ON contract_amendments(contract_id);
+CREATE INDEX IF NOT EXISTS idx_contract_amendments_status ON contract_amendments(status);
 
 -- Tabela de Histórico de Reajustes
 CREATE TABLE IF NOT EXISTS contract_adjustments (
@@ -27,4 +27,4 @@ CREATE TABLE IF NOT EXISTS contract_adjustments (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_contract_adjustments_contract_id ON contract_adjustments(contract_id);
+CREATE INDEX IF NOT EXISTS idx_contract_adjustments_contract_id ON contract_adjustments(contract_id);
