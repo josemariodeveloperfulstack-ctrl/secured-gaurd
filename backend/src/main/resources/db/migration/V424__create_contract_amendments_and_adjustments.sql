@@ -1,3 +1,26 @@
+-- Garantir que contracts e users têm PRIMARY KEY em id (fix para CI/ambientes com schema inconsistente)
+DO $$
+BEGIN
+  -- contracts
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'contracts')
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.table_constraints
+       WHERE table_schema = 'public' AND table_name = 'contracts' AND constraint_type = 'PRIMARY KEY'
+     ) THEN
+    ALTER TABLE contracts ADD PRIMARY KEY (id);
+    RAISE NOTICE 'PRIMARY KEY adicionada à tabela contracts';
+  END IF;
+  -- users
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users')
+     AND NOT EXISTS (
+       SELECT 1 FROM information_schema.table_constraints
+       WHERE table_schema = 'public' AND table_name = 'users' AND constraint_type = 'PRIMARY KEY'
+     ) THEN
+    ALTER TABLE users ADD PRIMARY KEY (id);
+    RAISE NOTICE 'PRIMARY KEY adicionada à tabela users';
+  END IF;
+END $$;
+
 -- Tabela de Aditivos de Contrato
 CREATE TABLE IF NOT EXISTS contract_amendments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

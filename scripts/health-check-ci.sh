@@ -230,12 +230,12 @@ DIAG_EOF
 }
 
 # Aguardar inicialização
-log "⏳ Aguardando 120 segundos para aplicação inicializar completamente..."
+log "⏳ Aguardando 180 segundos para aplicação inicializar completamente..."
 log "💡 Backend precisa de tempo para:"
 log "   - Conectar ao banco de dados"
 log "   - Executar migrations do Flyway"
 log "   - Inicializar Spring Boot completamente"
-sleep 120
+sleep 180
 
 # Loop principal de tentativas
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
