@@ -44,6 +44,11 @@ public class QuoteService {
     private UserRepository userRepository;
 
     @Transactional(readOnly = true)
+    public long count() {
+        return quoteRepository.count();
+    }
+
+    @Transactional(readOnly = true)
     public List<Quote> findAll() {
         List<Quote> quotes = quoteRepository.findAll();
         // Inicializar relacionamentos lazy dentro da transação
@@ -128,6 +133,12 @@ public class QuoteService {
         return quote;
     }
 
+    /** Carrega orçamento e retorna DTO numa única transação (evita LazyInitializationException na resposta). */
+    @Transactional(readOnly = true)
+    public QuoteDTO getQuoteDTOById(UUID id) {
+        return convertToDTO(findById(id));
+    }
+
     public Quote create(QuoteDTO quoteDTO, UUID createdById) {
         Quote quote = new Quote();
         quote.setTitle(quoteDTO.getTitle());
@@ -178,21 +189,26 @@ public class QuoteService {
         quote.setTotalValue(quoteDTO.getTotalValue());
         quote.setValidUntil(quoteDTO.getValidUntil());
         quote.setDescription(quoteDTO.getDescription());
-        
+        quote.setNotes(quoteDTO.getNotes());
+        if (quoteDTO.getStatus() != null) {
+            quote.setStatus(quoteDTO.getStatus());
+        }
+        // Nunca alterar quoteNumber no update (mantém valor existente; evita 409 por unique constraint)
+
         if (quoteDTO.getClientId() != null) {
             quote.setClient(clientRepository.findById(quoteDTO.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado")));
         } else {
             quote.setClient(null);
         }
-        
+
         if (quoteDTO.getLeadId() != null) {
             quote.setLead(leadRepository.findById(quoteDTO.getLeadId())
                     .orElseThrow(() -> new ResourceNotFoundException("Lead não encontrado")));
         } else {
             quote.setLead(null);
         }
-        
+
         if (quoteDTO.getAssignedToId() != null) {
             quote.setAssignedTo(userRepository.findById(UUID.fromString(quoteDTO.getAssignedToId().toString()))
                     .orElseThrow(() -> new ResourceNotFoundException("Usuário responsável não encontrado")));

@@ -76,6 +76,7 @@ import VisitDashboard from '@/components/visits/VisitDashboard';
 import NotificationSettingsModal from '@/components/operacional/NotificationSettingsModal';
 import { orderOfServiceService, OrderOfService, CreateOrderOfServiceRequest } from '@/services/orderOfServiceService';
 import { useToast } from '@/hooks/use-toast';
+import NppsForm from '@/components/funcionarios/NppsForm';
 
 const Operacional: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -944,6 +945,22 @@ const Operacional: React.FC = () => {
                     </TooltipContent>
                   </Tooltip>
 
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger
+                        value="npps"
+                        className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 md:py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                      >
+                        <FileText className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                        <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">NPPS</span>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                      <p className="font-semibold">NPPS</p>
+                      <p className="text-xs text-gray-400">Norma e Procedimento do Posto</p>
+                    </TooltipContent>
+                  </Tooltip>
+
                 </TabsList>
               </div>
             </TooltipProvider>
@@ -1051,6 +1068,12 @@ const Operacional: React.FC = () => {
                     </div>
                   </CardContent>
                 </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="npps" className="mt-6">
+              <div className="space-y-4">
+                <NppsForm />
               </div>
             </TabsContent>
 

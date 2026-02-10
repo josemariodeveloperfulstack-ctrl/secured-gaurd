@@ -7,12 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, X, FileText, TrendingUp, FolderOpen } from 'lucide-react';
+import { Loader2, Save, X, FileText, TrendingUp, FolderOpen, MapPin } from 'lucide-react';
 import { Contract, contractService, UpdateContractRequest } from '@/services/contractService';
 import { clientService, Client } from '@/services/clientService';
 import { ContractAmendmentsTab } from './ContractAmendmentsTab';
 import { ContractAdjustmentsTab } from './ContractAdjustmentsTab';
 import { ContractDocumentsTab } from './ContractDocumentsTab';
+import { ContractPostosTab } from './ContractPostosTab';
 
 interface EditContractModalProps {
   open: boolean;
@@ -60,37 +61,47 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
   });
 
   useEffect(() => {
-    if (open) {
-      loadClients();
-      if (contract) {
-        setFormData({
-          id: contract.id,
-          contractNumber: contract.contractNumber,
-          description: contract.description,
-          startDate: (contract.startDate || '').split('T')[0] || contract.startDate || '',
-          endDate: (contract.endDate || '').split('T')[0] || contract.endDate || '',
-          value: typeof contract.value === 'number' ? contract.value : parseFloat(String(contract.value)) || 0,
-          status: contract.status || 'DRAFT',
-          clientId: contract.clientId,
-          notes: contract.notes || '',
-          contractOrigin: contract.contractOrigin || 'MANUAL',
-          contractType: contract.contractType || 'VIGILANCIA_PATRIMONIAL',
-          responsibleCommercialId: contract.responsibleCommercialId,
-          responsibleManagerId: contract.responsibleManagerId,
-          monthlyValue: contract.monthlyValue,
-          annualValue: contract.annualValue,
-          adjustmentType: contract.adjustmentType,
-          nextAdjustmentDate: contract.nextAdjustmentDate,
-          autoRenewal: contract.autoRenewal || false,
-          replacementTimeHours: contract.replacementTimeHours,
-          maxAbsenceMinutes: contract.maxAbsenceMinutes,
-          patrolFrequency: contract.patrolFrequency || '',
-          reportsRequired: contract.reportsRequired || '',
-          obligationsContractor: contract.obligationsContractor || '',
-          obligationsContracted: contract.obligationsContracted || '',
-          penalties: contract.penalties || ''
-        });
-      }
+    if (!open) return;
+    loadClients();
+    if (!contract) return;
+
+    const applyContractToForm = (c: Contract) => {
+      setFormData({
+        id: c.id,
+        contractNumber: c.contractNumber,
+        description: c.description,
+        startDate: (c.startDate || '').split('T')[0] || c.startDate || '',
+        endDate: (c.endDate || '').split('T')[0] || c.endDate || '',
+        value: typeof c.value === 'number' ? c.value : parseFloat(String(c.value)) || 0,
+        status: c.status || 'DRAFT',
+        clientId: c.clientId || '',
+        notes: c.notes || '',
+        contractOrigin: c.contractOrigin || 'MANUAL',
+        contractType: c.contractType || 'VIGILANCIA_PATRIMONIAL',
+        responsibleCommercialId: c.responsibleCommercialId,
+        responsibleManagerId: c.responsibleManagerId,
+        monthlyValue: c.monthlyValue,
+        annualValue: c.annualValue,
+        adjustmentType: c.adjustmentType,
+        nextAdjustmentDate: c.nextAdjustmentDate,
+        autoRenewal: c.autoRenewal || false,
+        replacementTimeHours: c.replacementTimeHours,
+        maxAbsenceMinutes: c.maxAbsenceMinutes,
+        patrolFrequency: c.patrolFrequency || '',
+        reportsRequired: c.reportsRequired || '',
+        obligationsContractor: c.obligationsContractor || '',
+        obligationsContracted: c.obligationsContracted || '',
+        penalties: c.penalties || ''
+      });
+    };
+
+    // Se a lista veio sem clientId (ex.: lazy não carregou), buscar contrato completo por ID
+    if (!contract.clientId && contract.id) {
+      contractService.getContractById(contract.id)
+        .then(applyContractToForm)
+        .catch(() => applyContractToForm(contract));
+    } else {
+      applyContractToForm(contract);
     }
   }, [open, contract]);
 
@@ -167,9 +178,10 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
       resetForm();
     } catch (error: any) {
       console.error('❌ Erro ao atualizar contrato:', error);
+      const message = error.response?.data?.message || error.message || "Não foi possível atualizar o contrato.";
       toast({
         title: "Erro!",
-        description: error.message || "Não foi possível atualizar o contrato.",
+        description: message,
         variant: "destructive"
       });
     } finally {
@@ -233,6 +245,10 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
             <TabsTrigger value="reajustes" className="data-[state=active]:bg-seguranca-graphite">
               <TrendingUp className="h-4 w-4 mr-1" />
               Reajustes
+            </TabsTrigger>
+            <TabsTrigger value="postos" className="data-[state=active]:bg-seguranca-graphite">
+              <MapPin className="h-4 w-4 mr-1" />
+              Postos
             </TabsTrigger>
             <TabsTrigger value="documentos" className="data-[state=active]:bg-seguranca-graphite">
               <FolderOpen className="h-4 w-4 mr-1" />
@@ -491,6 +507,14 @@ export const EditContractModal: React.FC<EditContractModalProps> = ({
               contractId={contract.id}
               currentValue={formData.value}
               onAdjustmentCreated={onSuccess}
+            />
+          </TabsContent>
+
+          <TabsContent value="postos">
+            <ContractPostosTab
+              contractId={contract.id}
+              clientId={formData.clientId || contract.clientId || ''}
+              onPostosChange={onSuccess}
             />
           </TabsContent>
 

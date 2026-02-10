@@ -304,6 +304,21 @@ public class WorkPostController {
         WorkPostDTO workPostDTO = workPostService.convertToDTO(workPost);
         return ResponseEntity.ok(workPostDTO);
     }
+
+    @PatchMapping("/{id}/contract")
+    @Operation(summary = "Vincular ou desvincular contrato do posto", description = "Atualiza apenas o contrato vinculado ao posto. Envie contractId para vincular ou omita para desvincular.")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Contrato atualizado com sucesso"),
+        @ApiResponse(responseCode = "404", description = "Posto ou contrato não encontrado"),
+        @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<WorkPostDTO> setWorkPostContract(
+            @Parameter(description = "ID do posto") @PathVariable String id,
+            @Parameter(description = "ID do contrato (omitir para desvincular)") @RequestParam(required = false) UUID contractId) {
+        WorkPost workPost = workPostService.setContract(UUID.fromString(id), contractId);
+        WorkPostDTO workPostDTO = workPostService.convertToDTO(workPost);
+        return ResponseEntity.ok(workPostDTO);
+    }
     
     @GetMapping("/stats/count")
     @Operation(summary = "Estatísticas de postos", description = "Retorna contadores de postos por status")

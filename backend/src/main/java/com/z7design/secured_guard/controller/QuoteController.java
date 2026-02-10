@@ -88,9 +88,8 @@ public class QuoteController {
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar orçamento", description = "Atualiza um orçamento existente")
     public ResponseEntity<QuoteDTO> updateQuote(@PathVariable String id, @RequestBody QuoteDTO quoteDTO) {
-        Quote updated = quoteService.update(UUID.fromString(id), quoteDTO);
-        QuoteDTO updatedDTO = quoteService.convertToDTO(updated);
-        return ResponseEntity.ok(updatedDTO);
+        quoteService.update(UUID.fromString(id), quoteDTO);
+        return ResponseEntity.ok(quoteService.getQuoteDTOById(UUID.fromString(id)));
     }
 
     @PatchMapping("/{id}/status")

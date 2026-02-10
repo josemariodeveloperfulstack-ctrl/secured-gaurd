@@ -67,10 +67,9 @@ public class ProposalController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Buscar proposta por ID", description = "Retorna uma proposta específica pelo ID")
+    @Operation(summary = "Buscar proposta por ID", description = "Retorna uma proposta específica pelo ID com todos os campos preenchidos")
     public ResponseEntity<ProposalDTO> getProposalById(@PathVariable String id) {
-        Proposal proposal = proposalService.findById(UUID.fromString(id));
-        return ResponseEntity.ok(proposalService.mapToDTO(proposal));
+        return ResponseEntity.ok(proposalService.getProposalDTOById(UUID.fromString(id)));
     }
 
     @GetMapping("/{id}/pdf")
@@ -114,8 +113,8 @@ public class ProposalController {
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar proposta", description = "Atualiza uma proposta existente")
     public ResponseEntity<ProposalDTO> updateProposal(@PathVariable String id, @RequestBody ProposalDTO proposalDTO) {
-        Proposal updated = proposalService.update(UUID.fromString(id), proposalDTO);
-        return ResponseEntity.ok(proposalService.mapToDTO(updated));
+        proposalService.update(UUID.fromString(id), proposalDTO);
+        return ResponseEntity.ok(proposalService.getProposalDTOById(UUID.fromString(id)));
     }
 
     @PatchMapping("/{id}/status")

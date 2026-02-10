@@ -1,10 +1,11 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.model.Lead;
+import com.z7design.secured_guard.model.enums.LeadStatus;
+import com.z7design.secured_guard.model.enums.ProposalStatus;
 import com.z7design.secured_guard.service.LeadService;
 import com.z7design.secured_guard.service.ProposalService;
 import com.z7design.secured_guard.service.QuoteService;
-import com.z7design.secured_guard.model.enums.LeadStatus;
-import com.z7design.secured_guard.model.enums.ProposalStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -14,8 +15,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -36,82 +39,59 @@ public class CrmController {
         try {
             log.info("Buscando métricas do CRM");
             
-            // Total de leads (contar todos)
-            long totalLeads = leadService.findAll().size();
-            
-            // Leads por status
+            // Totais via count() para evitar carregar todas entidades (evita 500 por lazy/mapping)
+            long totalLeads = leadService.count();
             long qualifiedLeads = leadService.countByStatus(LeadStatus.QUALIFIED);
             long proposalSentLeads = leadService.countByStatus(LeadStatus.PROPOSAL_SENT);
             long negotiationLeads = leadService.countByStatus(LeadStatus.NEGOTIATION);
             long wonLeads = leadService.countByStatus(LeadStatus.WON);
-            
-            // Oportunidades ativas (leads qualificados + em negociação)
             long activeOpportunities = qualifiedLeads + negotiationLeads + proposalSentLeads;
+            long totalProposals = proposalService.count();
+            long totalQuotes = quoteService.count();
             
-            // Total de propostas
-            long totalProposals = proposalService.findAll().size();
-            
-            // Total de orçamentos
-            long totalQuotes = quoteService.findAll().size();
-            
-            // Calcular receita prevista (soma dos valores das propostas enviadas)
             BigDecimal estimatedRevenue = proposalService.getTotalValueByStatus(ProposalStatus.SENT)
                     .add(proposalService.getTotalValueByStatus(ProposalStatus.UNDER_REVIEW));
-            
-            // Taxa de conversão (leads ganhos / total de leads)
             double conversionRate = totalLeads > 0 ? (wonLeads * 100.0 / totalLeads) : 0.0;
             
-            // Contagem por mês (últimos 6 meses) - simplificado
+            // Contagem por mês (últimos 6 meses) - null-safe
             Map<String, Long> monthlyCount = new HashMap<>();
+            List<Lead> recentLeadsList;
+            try {
+                recentLeadsList = leadService.findRecentLeads(30);
+            } catch (Exception e) {
+                log.warn("findRecentLeads falhou, usando lista vazia: {}", e.getMessage());
+                recentLeadsList = Collections.emptyList();
+            }
+            final List<Lead> leadsForMonth = recentLeadsList != null ? recentLeadsList : Collections.emptyList();
             for (int i = 5; i >= 0; i--) {
                 LocalDateTime monthStart = LocalDateTime.now().minusMonths(i).withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
-                long count = leadService.findRecentLeads(30).stream()
-                        .filter(lead -> lead.getCreatedAt() != null && 
-                                lead.getCreatedAt().isAfter(monthStart) && 
-                                lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
+                long count = leadsForMonth.stream()
+                        .filter(lead -> lead.getCreatedAt() != null
+                                && lead.getCreatedAt().isAfter(monthStart)
+                                && lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
                         .count();
                 String monthKey = monthStart.getMonth().name().substring(0, 3) + "/" + monthStart.getYear();
                 monthlyCount.put(monthKey, count);
             }
             
-            // Histórico de status (últimos 6 meses) - simplificado
+            // Histórico de status (últimos 6 meses) - null-safe
             Map<String, Map<String, Long>> statusHistory = new HashMap<>();
             for (int i = 5; i >= 0; i--) {
                 LocalDateTime monthStart = LocalDateTime.now().minusMonths(i).withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
                 String monthKey = monthStart.getMonth().name().substring(0, 3) + "/" + monthStart.getYear();
-                
                 Map<String, Long> statusCount = new HashMap<>();
-                statusCount.put("NEW", leadService.findByStatus(LeadStatus.NEW).stream()
-                        .filter(lead -> lead.getCreatedAt() != null && 
-                                lead.getCreatedAt().isAfter(monthStart) && 
-                                lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
-                        .count());
-                statusCount.put("CONTACTED", leadService.findByStatus(LeadStatus.CONTACTED).stream()
-                        .filter(lead -> lead.getCreatedAt() != null && 
-                                lead.getCreatedAt().isAfter(monthStart) && 
-                                lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
-                        .count());
-                statusCount.put("QUALIFIED", leadService.findByStatus(LeadStatus.QUALIFIED).stream()
-                        .filter(lead -> lead.getCreatedAt() != null && 
-                                lead.getCreatedAt().isAfter(monthStart) && 
-                                lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
-                        .count());
-                statusCount.put("NEGOTIATION", leadService.findByStatus(LeadStatus.NEGOTIATION).stream()
-                        .filter(lead -> lead.getCreatedAt() != null && 
-                                lead.getCreatedAt().isAfter(monthStart) && 
-                                lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
-                        .count());
-                statusCount.put("WON", leadService.findByStatus(LeadStatus.WON).stream()
-                        .filter(lead -> lead.getCreatedAt() != null && 
-                                lead.getCreatedAt().isAfter(monthStart) && 
-                                lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
-                        .count());
-                statusCount.put("LOST", leadService.findByStatus(LeadStatus.LOST).stream()
-                        .filter(lead -> lead.getCreatedAt() != null && 
-                                lead.getCreatedAt().isAfter(monthStart) && 
-                                lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
-                        .count());
-                
+                for (LeadStatus st : new LeadStatus[]{ LeadStatus.NEW, LeadStatus.CONTACTED, LeadStatus.QUALIFIED, LeadStatus.NEGOTIATION, LeadStatus.WON, LeadStatus.LOST }) {
+                    List<Lead> list;
+                    try {
+                        list = leadService.findByStatus(st);
+                    } catch (Exception e) {
+                        list = Collections.emptyList();
+                    }
+                    long c = (list != null ? list : Collections.<Lead>emptyList()).stream()
+                            .filter(lead -> lead.getCreatedAt() != null && lead.getCreatedAt().isAfter(monthStart) && lead.getCreatedAt().isBefore(monthStart.plusMonths(1)))
+                            .count();
+                    statusCount.put(st.name(), c);
+                }
                 statusHistory.put(monthKey, statusCount);
             }
             

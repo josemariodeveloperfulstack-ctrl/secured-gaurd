@@ -203,8 +203,12 @@ const Contratos = () => {
 
   const handleEditSuccess = () => {
     console.log('Contrato editado com sucesso');
-    loadContractsWithFilters(); // Recarregar lista
-    setSelectedContractForEdit(null);
+    loadContractsWithFilters(); // Só atualiza a lista; modal permanece aberto na mesma aba
+  };
+
+  const handleEditModalOpenChange = (open: boolean) => {
+    setEditModalOpen(open);
+    if (!open) setSelectedContractForEdit(null); // Limpa seleção apenas ao fechar o modal
   };
 
   const handleTerminateClick = (contrato: Contract) => {
@@ -483,7 +487,7 @@ const Contratos = () => {
         {/* Modal de Edição de Contrato */}
         <EditContractModal
           open={editModalOpen}
-          onOpenChange={setEditModalOpen}
+          onOpenChange={handleEditModalOpenChange}
           contract={selectedContractForEdit}
           onSuccess={handleEditSuccess}
         />

@@ -62,6 +62,8 @@ export interface CreateProposalRequest {
 
 export interface UpdateProposalRequest extends CreateProposalRequest {
   status?: string;
+  termsConditions?: string;
+  notes?: string;
 }
 
 export interface ProposalStats {

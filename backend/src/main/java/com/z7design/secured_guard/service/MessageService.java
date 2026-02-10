@@ -390,10 +390,10 @@ public class MessageService {
                 break;
                 
             case DEPARTMENT:
+                // Por enquanto, buscar todos os usuários ativos, mesmo que nenhum departamento seja informado
                 if (request.getDepartmentIds() == null || request.getDepartmentIds().isEmpty()) {
-                    throw new BusinessException("Departamentos são obrigatórios para mensagens de departamento");
+                    log.warn("Nenhum departamento informado para mensagem de departamento; enviando para todos usuários ativos");
                 }
-                // Por enquanto, buscar todos os usuários ativos
                 recipients = userRepository.findByActiveTrue()
                     .stream().collect(Collectors.toSet());
                 break;

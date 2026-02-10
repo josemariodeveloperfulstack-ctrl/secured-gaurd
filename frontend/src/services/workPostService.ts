@@ -129,6 +129,26 @@ export const workPostService = {
     }
   },
 
+  // Buscar postos por contrato
+  async getWorkPostsByContract(contractId: string): Promise<WorkPost[]> {
+    try {
+      const response = await api.get(`/api/work-posts/contract/${contractId}`, { params: { size: 500 } });
+      return response.data?.content ?? response.data ?? [];
+    } catch (error) {
+      console.error('Erro ao buscar postos do contrato:', error);
+      return [];
+    }
+  },
+
+  // Vincular ou desvincular contrato do posto (apenas esse campo)
+  async setWorkPostContract(workPostId: string, contractId: string | null): Promise<WorkPost> {
+    const url = contractId
+      ? `/api/work-posts/${workPostId}/contract?contractId=${contractId}`
+      : `/api/work-posts/${workPostId}/contract`;
+    const response = await api.patch(url);
+    return response.data;
+  },
+
   // Buscar posto por ID
   async getWorkPostById(id: string): Promise<WorkPost> {
     try {

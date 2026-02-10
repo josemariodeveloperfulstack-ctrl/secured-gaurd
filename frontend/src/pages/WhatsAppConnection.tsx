@@ -18,7 +18,6 @@ import {
   Phone
 } from 'lucide-react';
 import api from '@/lib/axios';
-import { detectEnvironment } from '@/config/environment';
 
 interface ConnectionStatus {
   connected: boolean;
@@ -39,7 +38,6 @@ const WhatsAppConnection: React.FC = () => {
   const [instanceName, setInstanceName] = useState('securedguard');
   const [testPhone, setTestPhone] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
-  const [environment, setEnvironment] = useState<'local' | 'ci' | 'dev' | 'test' | 'prod'>('local');
 
   // Verificar status da conexão
   const checkConnection = async () => {
@@ -108,17 +106,8 @@ const WhatsAppConnection: React.FC = () => {
     }
   };
 
-  // Gerar QR Code para conexão
+  // Gerar QR Code para conexão (habilitado em todos os ambientes: local, CI e produção)
   const generateQRCode = async () => {
-    // No ambiente CI, não tenta chamar o backend de WhatsApp
-    if (environment === 'ci') {
-      toast({
-        title: "WhatsApp desativado no CI",
-        description: "No ambiente de CI/homologação o serviço de WhatsApp está desabilitado. Gere o QR Code apenas em desenvolvimento ou produção.",
-      });
-      return;
-    }
-
     try {
       setLoading(true);
       setQrCode('');
@@ -221,14 +210,6 @@ const WhatsAppConnection: React.FC = () => {
 
   // Desconectar WhatsApp
   const disconnect = async () => {
-    if (environment === 'ci') {
-      toast({
-        title: "WhatsApp desativado no CI",
-        description: "No ambiente de CI/homologação não há conexão real de WhatsApp para desconectar.",
-      });
-      return;
-    }
-
     try {
       setLoading(true);
       
@@ -258,15 +239,6 @@ const WhatsAppConnection: React.FC = () => {
 
   // Enviar mensagem de teste
   const sendTestMessage = async () => {
-    if (environment === 'ci') {
-      toast({
-        title: "WhatsApp desativado no CI",
-        description: "Envio de mensagens de teste está desabilitado no ambiente CI. Use apenas em desenvolvimento ou produção.",
-        variant: "default",
-      });
-      return;
-    }
-
     if (!testPhone.trim()) {
       toast({
         title: "⚠️ Atenção",
@@ -303,13 +275,9 @@ const WhatsAppConnection: React.FC = () => {
     }
   };
 
-  // Verificar conexão ao montar
+  // Verificar conexão ao montar (em todos os ambientes: local, CI e produção)
   useEffect(() => {
-    const env = detectEnvironment();
-    setEnvironment(env);
-    if (env !== 'ci') {
-      checkConnection();
-    }
+    checkConnection();
   }, []);
 
   return (
@@ -456,11 +424,6 @@ const WhatsAppConnection: React.FC = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {environment === 'ci' && (
-                  <div className="mb-4 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-xs text-yellow-300">
-                    No ambiente CI o serviço de WhatsApp está desativado. Gere o QR Code real apenas em desenvolvimento ou produção.
-                  </div>
-                )}
                 {!connectionStatus.connected && (
                   <div className="space-y-6">
                     {/* Nome da Instância */}
@@ -480,7 +443,7 @@ const WhatsAppConnection: React.FC = () => {
                     <div className="space-y-2">
                       <Button
                         onClick={generateQRCode}
-                        disabled={loading || !instanceName.trim() || environment === 'ci'}
+                        disabled={loading || !instanceName.trim()}
                         className="w-full bg-seguranca-red hover:bg-seguranca-darkred"
                         size="lg"
                       >

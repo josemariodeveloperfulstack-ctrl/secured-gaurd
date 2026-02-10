@@ -1,23 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   FileText,
-  Download,
   MessageSquare,
   User,
   Calendar,
   File,
   CheckCircle,
   Clock,
-  AlertCircle,
   Eye,
   Mail,
-  Phone,
-  MapPin
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +22,7 @@ import { unifiedDocumentService } from '@/services/unifiedDocumentService';
 import { useNavigate } from 'react-router-dom';
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
 import holeriteService from '@/services/holeriteService';
+import api from '@/lib/axios';
 
 interface Payslip {
   id: string; // Mantendo string por compatibilidade com o estado local, mas o serviço suporta number
@@ -39,40 +35,14 @@ interface Payslip {
   createdAt: string;
 }
 
-interface Receipt {
-  id: string;
-  employeeName: string;
-  cpf: string;
-  month: number;
-  year: number;
-  fileName: string;
-  filePath: string;
-  transferDate: string;
-}
-
-interface UnifiedDocument {
-  id: string;
-  employeeName: string;
-  cpf: string;
-  month: number;
-  year: number;
-  payslipFileName: string;
-  receiptFileName: string;
-  unifiedFileName?: string;
-  fileName?: string;
-  createdAt: string;
-}
-
 const DashboardColaborador: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const [payslips, setPayslips] = useState<Payslip[]>([]);
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [unifiedDocs, setUnifiedDocs] = useState<UnifiedDocument[]>([]);
+  // Reservado para futuras integrações (comprovantes / docs unificados)
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     loadData();
@@ -81,15 +51,8 @@ const DashboardColaborador: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [payslipsData, receiptsData, unifiedData] = await Promise.all([
-        payslipService.getAllPayslips(),
-        receiptService.getAllReceipts(),
-        unifiedDocumentService.getAllUnifiedDocuments()
-      ]);
-
+      const payslipsData = await payslipService.getAllPayslips();
       setPayslips(payslipsData);
-      setReceipts(receiptsData);
-      setUnifiedDocs(unifiedData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -124,7 +87,7 @@ const DashboardColaborador: React.FC = () => {
         blob = await unifiedDocumentService.downloadUnifiedDocumentBlob(item.fileName || item.unifiedFileName);
       }
 
-      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const url = globalThis.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       setPreviewUrl(url);
     } catch (err: any) {
       console.error('Erro ao visualizar documento', err);
@@ -141,7 +104,7 @@ const DashboardColaborador: React.FC = () => {
 
   const handleClosePreview = () => {
     if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
+      globalThis.URL.revokeObjectURL(previewUrl);
     }
     setPreviewUrl('');
     setPreviewOpen(false);
@@ -159,7 +122,7 @@ const DashboardColaborador: React.FC = () => {
         blob = await unifiedDocumentService.downloadUnifiedDocumentBlob(item.fileName || item.unifiedFileName);
       }
 
-      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      const url = globalThis.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', item.fileName || item.unifiedFileName || `documento_${item.id}.pdf`);
@@ -169,8 +132,8 @@ const DashboardColaborador: React.FC = () => {
       link.click();
 
       setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        link.remove();
+        globalThis.URL.revokeObjectURL(url);
       }, 100);
 
       toast({
@@ -185,19 +148,6 @@ const DashboardColaborador: React.FC = () => {
         variant: 'destructive'
       });
     }
-  };
-
-  const getMonthName = (month: number) => {
-    const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    return months[month - 1] || 'Desconhecido';
-  };
-
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
   if (loading) {
@@ -227,14 +177,18 @@ const DashboardColaborador: React.FC = () => {
               <p className="text-sm text-gray-500">Unidade: {user?.unidadeName || 'Geral'}</p>
             </div>
           </div>
-          <div className="relative" onClick={() => navigate('/mensagens')}>
+          <button
+            type="button"
+            className="relative cursor-pointer bg-transparent border-0 p-0"
+            onClick={() => navigate('/mensagens')}
+          >
             <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 bg-seguranca-red flex items-center justify-center border-2 border-seguranca-black">
               2
             </Badge>
             <Button size="icon" variant="ghost" className="rounded-full bg-seguranca-black/40 border border-gray-800 text-gray-400">
               <Mail className="w-5 h-5" />
             </Button>
-          </div>
+          </button>
         </div>
 
         {/* Quick Action Grid - Brutalist Theme */}
@@ -268,6 +222,43 @@ const DashboardColaborador: React.FC = () => {
           >
             <CheckCircle className="w-5 h-5 text-amber-400" />
             <span className="text-xs font-semibold">PLANTÕES</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-20 flex flex-col items-center justify-center gap-1 bg-seguranca-black/40 border-gray-800 text-gray-400 rounded-2xl transition-transform active:scale-95"
+            onClick={async () => {
+              try {
+                const response = await api.post('/api/npps/generate-pdf', {}, { responseType: 'blob' });
+                const blob = new Blob([response.data], { type: 'application/pdf' });
+                const url = globalThis.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute(
+                  'download',
+                  'NPPS-Norma-e-Procedimento-do-Posto-de-Servico.pdf',
+                );
+                document.body.appendChild(link);
+                link.click();
+                setTimeout(() => {
+                  link.remove();
+                  globalThis.URL.revokeObjectURL(url);
+                }, 100);
+                toast({
+                  title: 'NPPS baixado',
+                  description: 'Manual de normas do posto gerado com sucesso.',
+                });
+              } catch (err) {
+                console.error('Erro ao gerar NPPS para colaborador:', err);
+                toast({
+                  title: 'Erro ao gerar NPPS',
+                  description: 'Não foi possível gerar o documento. Tente novamente mais tarde.',
+                  variant: 'destructive',
+                });
+              }
+            }}
+          >
+            <FileText className="w-5 h-5 text-seguranca-yellow" />
+            <span className="text-xs font-semibold">NPPS</span>
           </Button>
         </div>
 
@@ -346,10 +337,14 @@ const DashboardColaborador: React.FC = () => {
                   <Button variant="link" className="text-xs text-seguranca-yellow p-0 h-auto" onClick={() => navigate('/mensagens')}>Ver todas</Button>
                 </div>
                 <div className="space-y-2">
-                  <div className="p-3 bg-white/5 rounded-2xl flex items-center gap-3 border border-transparent hover:border-gray-700 transition-colors cursor-pointer" onClick={() => navigate('/mensagens')}>
+                  <button
+                    type="button"
+                    className="w-full text-left p-3 bg-white/5 rounded-2xl flex items-center gap-3 border border-transparent hover:border-gray-700 transition-colors cursor-pointer"
+                    onClick={() => navigate('/mensagens')}
+                  >
                     <div className="w-2 h-2 rounded-full bg-seguranca-yellow shrink-0" />
                     <p className="text-sm text-gray-300 truncate font-medium">Lembrete: Entrega de EPI amanhã na sede...</p>
-                  </div>
+                  </button>
                 </div>
               </CardContent>
             </Card>

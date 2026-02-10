@@ -13,10 +13,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
+
+    /** Busca proposta por ID com itens carregados (evita LazyInitializationException no mapToDTO). DISTINCT evita múltiplas linhas por item. */
+    @Query("SELECT DISTINCT p FROM Proposal p LEFT JOIN FETCH p.items WHERE p.id = :id")
+    Optional<Proposal> findByIdWithItems(@Param("id") UUID id);
     
     // Buscar propostas por status
     List<Proposal> findByStatus(ProposalStatus status);

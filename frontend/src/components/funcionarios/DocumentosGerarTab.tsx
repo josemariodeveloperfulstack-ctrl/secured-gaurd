@@ -14,6 +14,7 @@ import TermoCienciaPrestadorForm from './TermoCienciaPrestadorForm';
 import OrdemServicoForm from './OrdemServicoForm';
 import ModelosDocumentosForm from './ModelosDocumentosForm';
 import TermoResponsabilidadeEspecíficoForm from './TermoResponsabilidadeEspecíficoForm';
+import NppsForm from './NppsForm';
 import { FileText, Shield, FileSignature, FileCheck, UserX, File, ClipboardList, CreditCard } from 'lucide-react';
 
 const tipos = [
@@ -24,6 +25,7 @@ const tipos = [
   { key: 'termo-responsabilidade-especifico', label: 'Termo de Responsabilidade (VT/Celular)', icon: CreditCard, shortLabel: 'Vale/Celular' },
   { key: 'equipamento', label: 'Termo de Responsabilidade de Equipamento', icon: Shield, shortLabel: 'Equipamento' },
   { key: 'lgpd', label: 'Termo de Consentimento LGPD', icon: FileCheck, shortLabel: 'LGPD' },
+  { key: 'npps', label: 'NPPS – Norma e Procedimento do Posto', icon: FileText, shortLabel: 'NPPS' },
   { key: 'contratos', label: 'Contratos de Trabalho', icon: FileSignature, shortLabel: 'Contratos' },
   { key: 'ordens', label: 'Ordem de Serviços', icon: FileText, shortLabel: 'Ordens' },
   { key: 'advertencia', label: 'Advertência Disciplinar', icon: UserX, shortLabel: 'Advertência' },
@@ -99,6 +101,7 @@ const DocumentosGerarTab = () => {
         {tipo === 'vt' && <TermoValeTransporteForm />}
         {tipo === 'epi' && <FichaEntregaEPIForm employeeId={params.get('employeeId') || undefined} />}
         {tipo === 'registro' && <FichaRegistroFuncionarioForm employeeId={params.get('employeeId') || undefined} />}
+        {tipo === 'npps' && <NppsForm />}
         {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecíficoForm />}
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm />}
         {tipo === 'lgpd' && <TermoLGPDForm />}

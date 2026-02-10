@@ -137,10 +137,13 @@ public class GlobalExceptionHandler {
         
         // Tentar extrair uma mensagem mais específica da exceção
         if (ex.getMessage() != null) {
-            if (ex.getMessage().contains("username") || ex.getMessage().contains("UK_") && ex.getMessage().contains("username")) {
+            String msg = ex.getMessage();
+            if (msg.contains("username") || (msg.contains("UK_") && msg.contains("username"))) {
                 message = "Nome de usuário já está em uso";
-            } else if (ex.getMessage().contains("email") || ex.getMessage().contains("UK_") && ex.getMessage().contains("email")) {
+            } else if (msg.contains("email") || (msg.contains("UK_") && msg.contains("email"))) {
                 message = "Email já está em uso";
+            } else if (msg.contains("contract_number") || msg.contains("contracts_contract_number")) {
+                message = "Número do contrato já está em uso por outro contrato.";
             }
         }
         

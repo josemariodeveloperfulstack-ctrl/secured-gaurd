@@ -42,6 +42,11 @@ public class ProposalService {
     @Autowired
     private UserRepository userRepository;
 
+    @Transactional(readOnly = true)
+    public long count() {
+        return proposalRepository.count();
+    }
+
     public List<ProposalDTO> findAll() {
         List<Proposal> proposals = proposalRepository.findAll();
         return proposals.stream()
@@ -133,6 +138,14 @@ public class ProposalService {
                 .orElseThrow(() -> new ResourceNotFoundException("Proposta não encontrada com ID: " + id));
     }
 
+    /** Busca proposta por ID e retorna DTO com todos os campos (itens, cliente, lead, etc.) em uma única transação. */
+    @Transactional(readOnly = true)
+    public ProposalDTO getProposalDTOById(UUID id) {
+        Proposal proposal = proposalRepository.findByIdWithItems(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Proposta não encontrada com ID: " + id));
+        return mapToDTO(proposal);
+    }
+
     public Proposal create(ProposalDTO proposalDTO, UUID createdById) {
         Proposal proposal = new Proposal();
         proposal.setTitle(proposalDTO.getTitle());
@@ -186,6 +199,11 @@ public class ProposalService {
         proposal.setTotalValue(proposalDTO.getTotalValue());
         proposal.setValidUntil(proposalDTO.getValidUntil());
         proposal.setDescription(proposalDTO.getDescription());
+        proposal.setTermsConditions(proposalDTO.getTermsConditions());
+        proposal.setNotes(proposalDTO.getNotes());
+        if (proposalDTO.getStatus() != null) {
+            proposal.setStatus(proposalDTO.getStatus());
+        }
 
         if (proposalDTO.getClientId() != null) {
             proposal.setClient(clientRepository.findById(proposalDTO.getClientId())

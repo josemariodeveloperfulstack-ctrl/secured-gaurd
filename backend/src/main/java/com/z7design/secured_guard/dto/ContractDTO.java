@@ -54,8 +54,7 @@ public class ContractDTO {
     @Size(max = 1000, message = "Observações deve ter no máximo 1000 caracteres")
     private String notes;
     
-    @Schema(description = "ID do cliente", example = "1")
-    @NotNull(message = "ID do cliente é obrigatório")
+    @Schema(description = "ID do cliente (obrigatório na criação; na atualização pode ser omitido e será mantido o existente)", example = "1")
     private java.util.UUID clientId;
     
     // Campos adicionais para resposta

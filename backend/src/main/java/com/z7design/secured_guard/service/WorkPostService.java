@@ -322,6 +322,21 @@ public class WorkPostService {
         workPost.setUpdatedAt(LocalDateTime.now());
         return workPostRepository.save(workPost);
     }
+
+    /**
+     * Atualiza apenas o contrato vinculado ao posto (para vincular/desvincular sem enviar o DTO completo).
+     */
+    public WorkPost setContract(UUID workPostId, java.util.UUID contractId) {
+        WorkPost workPost = getById(workPostId);
+        Contract contract = null;
+        if (contractId != null) {
+            contract = contractRepository.findById(contractId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado com ID: " + contractId));
+        }
+        workPost.setContract(contract);
+        workPost.setUpdatedAt(LocalDateTime.now());
+        return workPostRepository.save(workPost);
+    }
     
     // Métodos de contagem
     public long countByStatus(WorkPostStatus status) {

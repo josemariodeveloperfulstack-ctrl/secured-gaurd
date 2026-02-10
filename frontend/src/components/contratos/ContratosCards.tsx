@@ -290,9 +290,8 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => onEdit(contrato)}
-                  disabled={contrato.status === 'CANCELLED' || contrato.status === 'EXPIRED' || contrato.status === 'TERMINATED'}
-                  className="text-seguranca-yellow hover:bg-seguranca-black hover:text-yellow-300 disabled:opacity-50"
-                  title={contrato.status === 'CANCELLED' || contrato.status === 'EXPIRED' || contrato.status === 'TERMINATED' ? 'Contrato encerrado' : 'Editar contrato'}
+                  className="text-seguranca-yellow hover:bg-seguranca-black hover:text-yellow-300"
+                  title="Editar contrato"
                 >
                   <Edit className="h-4 w-4" />
                 </Button>

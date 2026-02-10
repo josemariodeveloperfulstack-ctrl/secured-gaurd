@@ -75,22 +75,22 @@ export const AgreementProposalsList: React.FC = () => {
         data
           .filter((p: any) => p.title?.includes('Proposta de Acordo') || p.description?.includes('acordo'))
           .map(async (proposal: any) => {
-            // Tentar buscar proposta completa para ter o nome do cliente
             let clientName = proposal.client?.name || proposal.clientName || 'N/A';
+            let clientId: string | number | undefined = proposal.clientId ?? proposal.client?.id;
             try {
               const proposalId = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
               const fullProposal = await proposalService.getProposalById(proposalId);
               clientName = fullProposal.client?.name || (fullProposal as any).clientName || proposal.client?.name || proposal.clientName || 'N/A';
+              clientId = (fullProposal as any).clientId ?? fullProposal.client?.id ?? clientId;
             } catch (error) {
-              // Se falhar, usar o que já temos
               console.warn('Não foi possível buscar proposta completa:', error);
             }
-            
             return {
               id: proposal.id,
               title: proposal.title || '',
               proposalNumber: proposal.proposalNumber || '',
-              clientName: clientName,
+              clientId,
+              clientName,
               status: proposal.status || 'DRAFT',
               totalValue: proposal.totalValue ? Number(proposal.totalValue) : 0,
               validUntil: proposal.validUntil ? new Date(proposal.validUntil).toISOString().split('T')[0] : '',
@@ -418,25 +418,20 @@ export const AgreementProposalsList: React.FC = () => {
                             className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                             onClick={async () => {
                               setSelectedProposal(proposal);
-                              // Carregar clientes se necessário
+                              const proposalClientId = proposal.clientId ?? (proposal as any).client?.id;
+                              setEditClientId(proposalClientId != null ? String(proposalClientId) : undefined);
                               if (clients.length === 0) {
                                 await loadClients();
                               }
-                              // Buscar proposta completa do backend para ter clientId
                               try {
                                 const proposalId = typeof proposal.id === 'string' ? proposal.id : String(proposal.id);
                                 const fullProposal = await proposalService.getProposalById(proposalId);
-                                const clientId = (fullProposal as any).clientId 
+                                const clientId = (fullProposal as any).clientId
                                   ? String((fullProposal as any).clientId)
                                   : (fullProposal.client?.id ? String(fullProposal.client.id) : undefined);
                                 setEditClientId(clientId);
                               } catch (error) {
                                 console.error('Erro ao carregar proposta completa:', error);
-                                // Tentar extrair do objeto atual
-                                const clientId = (proposal as any).clientId 
-                                  ? String((proposal as any).clientId)
-                                  : (proposal.client?.id ? String(proposal.client.id) : undefined);
-                                setEditClientId(clientId);
                               }
                               setIsEditModalOpen(true);
                             }}

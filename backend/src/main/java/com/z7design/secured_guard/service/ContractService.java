@@ -73,12 +73,12 @@ public class ContractService {
                     .anyMatch(r -> r.getName() != null && 
                             (r.getName().equals("COMERCIAL") || r.getName().equals("ROLE_COMERCIAL")));
             if (isComercial) {
-                List<Contract> contracts = contractRepository.findByResponsibleCommercialId(currentUser.getId());
+                List<Contract> contracts = contractRepository.findByResponsibleCommercialIdWithClient(currentUser.getId());
                 initializeClientForContracts(contracts);
                 return contracts;
             }
         }
-        List<Contract> contracts = contractRepository.findAll();
+        List<Contract> contracts = contractRepository.findAllWithClient();
         initializeClientForContracts(contracts);
         return contracts;
     }
@@ -190,6 +190,9 @@ public class ContractService {
             contractDTO.setStatus(ContractStatus.DRAFT);
         }
 
+        if (contractDTO.getClientId() == null) {
+            throw new BusinessException("Cliente é obrigatório para o contrato.");
+        }
         // Buscar o cliente
         Client client = clientRepository.findById(contractDTO.getClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + contractDTO.getClientId()));
@@ -210,22 +213,31 @@ public class ContractService {
         Contract existingContract = contractRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrato não encontrado com ID: " + id));
 
-        // Regra: Contratos CANCELLED ou EXPIRED - apenas notas podem ser editadas
-        if (existingContract.getStatus() == ContractStatus.CANCELLED || existingContract.getStatus() == ContractStatus.EXPIRED) {
-            existingContract.setNotes(contractDTO.getNotes());
-            existingContract.setUpdatedAt(LocalDateTime.now());
-            return convertToDTO(contractRepository.save(existingContract));
+        // Qualquer status (incl. CANCELLED, EXPIRED, SUSPENDED) pode ser editado por completo
+        UUID clientId = contractDTO.getClientId() != null
+                ? contractDTO.getClientId()
+                : (existingContract.getClient() != null ? existingContract.getClient().getId() : null);
+        if (clientId == null) {
+            throw new BusinessException("Cliente é obrigatório para o contrato.");
+        }
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + clientId));
+
+        // Número do contrato: se estiver mudando, não pode ser igual ao de outro contrato
+        String newNumber = contractDTO.getContractNumber();
+        if (newNumber != null && !newNumber.equals(existingContract.getContractNumber())) {
+            contractRepository.findByContractNumber(newNumber).ifPresent(other -> {
+                if (!other.getId().equals(id)) {
+                    throw new BusinessException("Já existe um contrato com o número: " + newNumber);
+                }
+            });
         }
 
-        // Validar se o cliente existe
-        Client client = clientRepository.findById(contractDTO.getClientId())
-                .orElseThrow(() -> new ResourceNotFoundException("Cliente não encontrado com ID: " + contractDTO.getClientId()));
-
-        // Regra: Nenhum contrato ACTIVE sem ao menos um posto válido
-        if (contractDTO.getStatus() == ContractStatus.ACTIVE) {
+        // Regra: ao ativar (transição para ACTIVE), exige ao menos um posto; já ACTIVE pode salvar outros campos
+        if (contractDTO.getStatus() == ContractStatus.ACTIVE && existingContract.getStatus() != ContractStatus.ACTIVE) {
             long postCount = workPostRepository.countByContractId(id);
             if (postCount == 0) {
-                throw new BusinessException("Para ativar um contrato, é necessário vincular ao menos um posto de serviço. Adicione postos ao contrato antes de ativá-lo.");
+                throw new BusinessException("Para ativar o contrato, vincule ao menos um posto de serviço na aba Postos e tente novamente.");
             }
         }
 

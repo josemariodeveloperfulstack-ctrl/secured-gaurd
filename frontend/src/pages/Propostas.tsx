@@ -117,8 +117,8 @@ const Propostas = () => {
   const [generatingContract, setGeneratingContract] = useState<string | null>(null);
   const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState<CreateProposalRequest & { clientId?: number | string; leadId?: number | string; assignedToId?: number | string }>({
+  // Form state (inclui termsConditions e notes para edição completa)
+  const [formData, setFormData] = useState<CreateProposalRequest & { clientId?: number | string; leadId?: number | string; assignedToId?: number | string; termsConditions?: string; notes?: string }>({
     title: '',
     clientId: undefined,
     leadId: undefined,
@@ -126,6 +126,8 @@ const Propostas = () => {
     totalValue: 0,
     validUntil: undefined,
     description: '',
+    termsConditions: '',
+    notes: '',
     status: 'DRAFT'
   });
   const [users, setUsers] = useState<UserType[]>([]);
@@ -150,17 +152,22 @@ const Propostas = () => {
         return;
       }
 
-      // Map backend data to frontend format
+      // Map backend data to frontend format (incluir clientId, leadId, assignedToId para edição)
       const mappedProposals = data.map((proposal: any) => ({
         id: proposal.id,
         title: proposal.title || '',
         proposalNumber: proposal.proposalNumber || '',
+        clientId: proposal.clientId ?? proposal.client?.id,
         clientName: proposal.client?.name || proposal.clientName || 'N/A',
+        leadId: proposal.leadId ?? proposal.lead?.id,
         leadName: proposal.lead?.name || proposal.leadName || '',
+        assignedToId: proposal.assignedToId ?? proposal.assignedTo?.id,
         status: proposal.status || 'DRAFT',
         totalValue: proposal.totalValue ? Number(proposal.totalValue) : 0,
         validUntil: proposal.validUntil ? new Date(proposal.validUntil).toISOString().split('T')[0] : '',
         description: proposal.description || '',
+        termsConditions: proposal.termsConditions || '',
+        notes: proposal.notes || '',
         createdByName: proposal.createdBy?.name || proposal.createdByName || 'N/A',
         assignedToName: proposal.assignedTo?.name || proposal.assignedToName || 'Não atribuído',
         createdAt: proposal.createdAt ? new Date(proposal.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -369,7 +376,9 @@ const Propostas = () => {
         assignedToId: assignedToId,
         totalValue: formData.totalValue,
         validUntil: formData.validUntil,
-        description: formData.description,
+        description: formData.description ?? '',
+        termsConditions: formData.termsConditions ?? '',
+        notes: formData.notes ?? '',
         status: formData.status || selectedProposal.status
       };
 
@@ -475,6 +484,8 @@ const Propostas = () => {
       totalValue: 0,
       validUntil: undefined,
       description: '',
+      termsConditions: '',
+      notes: '',
       status: 'DRAFT'
     });
     setSelectedProposal(null);
@@ -516,9 +527,11 @@ const Propostas = () => {
         clientId: clientId || undefined,
         leadId: leadId || undefined,
         assignedToId: assignedToId || undefined,
-        totalValue: fullProposal.totalValue ? Number(fullProposal.totalValue) : proposal.totalValue || 0,
+        totalValue: fullProposal.totalValue != null ? Number(fullProposal.totalValue) : proposal.totalValue || 0,
         validUntil: fullProposal.validUntil ? new Date(fullProposal.validUntil).toISOString().split('T')[0] : proposal.validUntil || undefined,
-        description: fullProposal.description || proposal.description || '',
+        description: fullProposal.description ?? proposal.description ?? '',
+        termsConditions: (fullProposal as any).termsConditions ?? (proposal as any).termsConditions ?? '',
+        notes: (fullProposal as any).notes ?? (proposal as any).notes ?? '',
         status: fullProposal.status || proposal.status || 'DRAFT'
       });
     } catch (error) {
@@ -541,9 +554,11 @@ const Propostas = () => {
         clientId: clientId || undefined,
         leadId: leadId || undefined,
         assignedToId: assignedToId || undefined,
-        totalValue: proposal.totalValue || 0,
+        totalValue: proposal.totalValue ?? 0,
         validUntil: proposal.validUntil || undefined,
-        description: proposal.description || '',
+        description: proposal.description ?? '',
+        termsConditions: (proposal as any).termsConditions ?? '',
+        notes: (proposal as any).notes ?? '',
         status: proposal.status || 'DRAFT'
       });
     }
@@ -1305,7 +1320,7 @@ const Propostas = () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit-client" className="text-seguranca-lightgray">Cliente</Label>
+                      <Label htmlFor="edit-client" className="text-seguranca-lightgray">Cliente *</Label>
                       <Select
                         value={formData.clientId ? String(formData.clientId) : ''}
                         onValueChange={(value) => {
@@ -1324,6 +1339,26 @@ const Propostas = () => {
                               className="text-seguranca-lightgray hover:bg-seguranca-red/20"
                             >
                               {client.name} {client.cnpj ? `- ${client.cnpj}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-lead" className="text-seguranca-lightgray">Lead</Label>
+                      <Select
+                        value={formData.leadId ? String(formData.leadId) : '__NONE__'}
+                        onValueChange={(value) => setFormData({ ...formData, leadId: value === '__NONE__' ? undefined : (isNaN(Number(value)) ? value : Number(value)) })}
+                        disabled={loadingLeads}
+                      >
+                        <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                          <SelectValue placeholder={loadingLeads ? "Carregando..." : "Selecione o lead (opcional)"} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">
+                          <SelectItem value="__NONE__" className="text-seguranca-lightgray">Nenhum</SelectItem>
+                          {leads.map((lead) => (
+                            <SelectItem key={lead.id} value={String(lead.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                              {lead.name} {lead.company ? `- ${lead.company}` : ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1406,6 +1441,28 @@ const Propostas = () => {
                       className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                       placeholder="Descrição detalhada da proposta..."
                       rows={3}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-termsConditions" className="text-seguranca-lightgray">Termos e Condições</Label>
+                    <Textarea
+                      id="edit-termsConditions"
+                      value={formData.termsConditions || ''}
+                      onChange={(e) => setFormData({ ...formData, termsConditions: e.target.value })}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                      placeholder="Termos e condições..."
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-notes" className="text-seguranca-lightgray">Observações</Label>
+                    <Textarea
+                      id="edit-notes"
+                      value={formData.notes || ''}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                      placeholder="Observações internas..."
+                      rows={2}
                     />
                   </div>
 

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 
 import com.z7design.secured_guard.dto.MessageRequestDTO;
 import com.z7design.secured_guard.dto.MessageResponseDTO;
+import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.model.enums.MessageType;
 import com.z7design.secured_guard.model.enums.MessageStatus;
 import com.z7design.secured_guard.service.MessageService;
@@ -64,8 +65,12 @@ public class MessageController {
             log.info("Mensagem enviada com sucesso: {}", response.getId());
             
             return ResponseEntity.ok(response);
+        } catch (BusinessException e) {
+            // Deixar o GlobalExceptionHandler tratar e retornar 409 com mensagem clara
+            log.warn("Erro de negócio ao enviar mensagem: {}", e.getMessage(), e);
+            throw e;
         } catch (Exception e) {
-            log.error("Erro ao enviar mensagem: {}", e.getMessage(), e);
+            log.error("Erro inesperado ao enviar mensagem: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

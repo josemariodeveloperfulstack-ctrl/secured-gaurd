@@ -61,6 +61,14 @@ public interface ContractRepository extends JpaRepository<Contract, java.util.UU
 
     // Buscar contratos por responsável comercial
     List<Contract> findByResponsibleCommercialId(UUID responsibleCommercialId);
+
+    /** Lista todos com client carregado (evita DTO sem clientId na listagem). */
+    @Query("SELECT DISTINCT c FROM Contract c LEFT JOIN FETCH c.client")
+    List<Contract> findAllWithClient();
+
+    /** Lista por responsável comercial com client carregado. */
+    @Query("SELECT DISTINCT c FROM Contract c LEFT JOIN FETCH c.client WHERE c.responsibleCommercial.id = :userId")
+    List<Contract> findByResponsibleCommercialIdWithClient(@Param("userId") UUID userId);
     
     // Contar contratos por status
     long countByStatus(ContractStatus status);

@@ -440,15 +440,41 @@ public class FileUploadController {
         }
     }
 
-    // REMOVIDO: Endpoint GET removido para evitar conflito com ResourceHandler
-    // O ResourceHandler em WebConfig.java serve os arquivos estáticos diretamente
-    // que é mais eficiente e não causa conflitos de headers
-    // Se necessário, este endpoint pode ser restaurado como fallback
-
-    // @GetMapping("/companies/logos/{filename}")
-    // @Operation(summary = "Download de logo da empresa", description = "Faz
-    // download de um logo de empresa")
-    // public ResponseEntity<Resource> downloadCompanyLogo(...) { ... }
+    /**
+     * Serve logo da empresa. Retorna 404 se o arquivo não existir (evita 500 do ResourceHandler em CI).
+     */
+    @GetMapping("/companies/logos/{filename:.+}")
+    @Operation(summary = "Obter logo da empresa", description = "Retorna o arquivo do logo ou 404 se não existir")
+    public ResponseEntity<Resource> getCompanyLogo(
+            @Parameter(description = "Nome do arquivo (ex: uuid.png)") @PathVariable String filename) {
+        try {
+            if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+                return ResponseEntity.badRequest().build();
+            }
+            Path basePath = Paths.get(uploadDir, "companies", "logos").toAbsolutePath().normalize();
+            Path filePath = basePath.resolve(filename).normalize();
+            if (!filePath.startsWith(basePath)) {
+                return ResponseEntity.notFound().build();
+            }
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                return ResponseEntity.notFound().build();
+            }
+            String contentType = Files.probeContentType(filePath);
+            if (contentType == null) {
+                contentType = "image/png";
+            }
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CACHE_CONTROL, "max-age=3600")
+                    .body(resource);
+        } catch (MalformedURLException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IOException e) {
+            log.debug("Logo não encontrado ou erro ao ler: {}", filename);
+            return ResponseEntity.notFound().build();
+        }
+    }
 
     // Métodos auxiliares
     private boolean isValidFileType(String contentType) {
