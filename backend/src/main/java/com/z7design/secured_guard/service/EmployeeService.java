@@ -650,6 +650,44 @@ public class EmployeeService {
         }
     }
     
+    /**
+     * Versão paginada de findBasicData para ambientes com muitos registros.
+     */
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataPaged(int page, int size) {
+        try {
+            int pageSize = Math.min(Math.max(size, 1), 500); // evitar pageSize muito grande
+            int offset = Math.max(page, 0) * pageSize;
+            System.out.println("🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset);
+            List<Object[]> data = employeeRepository.findBasicDataPaged(pageSize, offset);
+            System.out.println("✅ EmployeeService.findBasicDataPaged - Encontrados " + data.size() + " registros");
+            return data;
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeService.findBasicDataPaged - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar dados básicos paginados: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Versão paginada de findBasicDataBySearchTerm para ambientes com muitos registros.
+     */
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size) {
+        try {
+            int pageSize = Math.min(Math.max(size, 1), 500);
+            int offset = Math.max(page, 0) * pageSize;
+            System.out.println("🔍 EmployeeService.findBasicDataBySearchTermPaged - termo=" + searchTerm + " page=" + page + " size=" + pageSize + " offset=" + offset);
+            List<Object[]> data = employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset);
+            System.out.println("✅ EmployeeService.findBasicDataBySearchTermPaged - Encontrados " + data.size() + " registros");
+            return data;
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeService.findBasicDataBySearchTermPaged - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar dados básicos por termo (paginado): " + e.getMessage(), e);
+        }
+    }
+    
     @Transactional(readOnly = true)
     public List<EmployeeDTO> getAllAsDTOs() {
         try {

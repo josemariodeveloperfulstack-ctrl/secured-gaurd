@@ -13,6 +13,7 @@ import org.springframework.web.context.request.WebRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.apache.catalina.connector.ClientAbortException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -154,6 +155,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
+    /**
+     * SockJS/WebSocket: ao desconectar, o transporte xhr_streaming usa Content-Type application/javascript.
+     * Não há converter para serializar ErrorResponse/Map nesse formato. Retornar 500 vazio evita erro em cascata.
+     */
+    @ExceptionHandler(HttpMessageNotWritableException.class)
+    public ResponseEntity<Void> handleHttpMessageNotWritable(HttpMessageNotWritableException ex, WebRequest request) {
+        String path = request.getDescription(false);
+        if (path.contains("/ws/") || path.contains("/websocket")) {
+            log.debug("WebSocket/SockJS: ignorando erro de serialização (cliente desconectado): {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+        log.warn("Erro de serialização HTTP: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    }
+
     @ExceptionHandler(ClientAbortException.class)
     public ResponseEntity<Void> handleClientAbortException(ClientAbortException ex, WebRequest request) {
         // ClientAbortException é uma exceção normal quando o cliente cancela a conexão
@@ -204,6 +220,11 @@ public class GlobalExceptionHandler {
                     log.error("ERRO NO WORK-POSTS/ALL - Causa da causa: {}", ex.getCause().getCause().getMessage());
                 }
             }
+        }
+        
+        // Em rotas WebSocket/SockJS não retornar body JSON (Content-Type application/javascript incompatível)
+        if (requestPath.contains("/ws/") || requestPath.contains("/websocket")) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
         
         ErrorResponse errorResponse = ErrorResponse.builder()

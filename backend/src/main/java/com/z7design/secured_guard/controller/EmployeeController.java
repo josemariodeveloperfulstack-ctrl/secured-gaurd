@@ -368,6 +368,107 @@ public class EmployeeController {
         }
     }
     
+    @GetMapping("/paged")
+    @Operation(summary = "Listar funcionários (paginado)", description = "Retorna uma lista paginada de funcionários com opção de busca por nome ou CPF")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista paginada de funcionários retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    @Transactional(readOnly = true)
+    public ResponseEntity<Object> getAllPaged(@RequestParam(required = false) String searchTerm,
+                                              @RequestParam(defaultValue = "0") int page,
+                                              @RequestParam(defaultValue = "500") int size) {
+        try {
+            int safePage = Math.max(page, 0);
+            int safeSize = Math.min(Math.max(size, 1), 500);
+            System.out.println("🔍 EmployeeController.getAllPaged - page=" + safePage + " size=" + safeSize + " searchTerm=" + searchTerm);
+            
+            List<Object[]> data;
+            if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize);
+            } else {
+                data = employeeService.findBasicDataPaged(safePage, safeSize);
+            }
+            System.out.println("🔍 EmployeeController.getAllPaged - Encontrados " + data.size() + " funcionários no banco");
+            
+            if (data.isEmpty()) {
+                return ResponseEntity.ok(java.util.Collections.emptyList());
+            }
+            
+            List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
+            for (Object[] row : data) {
+                try {
+                    java.util.Map<String, Object> employee = new java.util.HashMap<>();
+                    employee.put("id", row[0]);
+                    employee.put("name", row[1]);
+                    employee.put("document", row[2]);
+                    employee.put("birthDate", row[3]);
+                    employee.put("registrationNumber", row[4]);
+                    employee.put("hireDate", row[5]);
+                    employee.put("terminationDate", row[6]);
+                    employee.put("status", row[7]);
+                    employee.put("notes", row[8]);
+                    employee.put("address", row[9]);
+                    employee.put("phone", row[10]);
+                    employee.put("email", row[11]);
+                    employee.put("cnhNumber", row[12]);
+                    employee.put("ctps", row[13]);
+                    employee.put("cbo", row[14]);
+                    employee.put("pis", row[15]);
+                    employee.put("salario", row[16]);
+                    employee.put("createdAt", row[17]);
+                    employee.put("updatedAt", row[18]);
+                    
+                    if (row.length > 19 && row[19] != null) {
+                        java.util.Map<String, Object> position = new java.util.HashMap<>();
+                        position.put("name", row[19]); // position_name
+                        employee.put("position", position);
+                    }
+                    
+                    if (row.length > 20 && row[20] != null) {
+                        java.util.Map<String, Object> unit = new java.util.HashMap<>();
+                        unit.put("name", row[20]); // unit_name
+                        employee.put("unit", unit);
+                    }
+                    
+                    if (row.length > 21 && row[21] != null) {
+                        java.util.Map<String, Object> company = new java.util.HashMap<>();
+                        company.put("sigla", row[21]); // company_sigla
+                        employee.put("company", company);
+                    }
+                    
+                    if (row.length > 22 && row[22] != null) {
+                        employee.put("userId", row[22]);
+                    }
+                    
+                    if (row.length > 23 && row[23] != null) {
+                        java.util.Map<String, Object> workPost = new java.util.HashMap<>();
+                        workPost.put("name", row[23]); // work_post_name
+                        employee.put("workPost", workPost);
+                    }
+                    
+                    if (row.length > 24 && row[24] != null) {
+                        java.util.Map<String, Object> department = new java.util.HashMap<>();
+                        department.put("name", row[24]); // department_name
+                        employee.put("department", department);
+                    }
+                    
+                    employees.add(employee);
+                } catch (Exception dtoError) {
+                    System.err.println("❌ EmployeeController.getAllPaged - Erro ao converter funcionário: " + dtoError.getMessage());
+                    dtoError.printStackTrace();
+                }
+            }
+            
+            System.out.println("✅ EmployeeController.getAllPaged - Retornando " + employees.size() + " funcionários (página " + safePage + ")");
+            return ResponseEntity.ok(employees);
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeController.getAllPaged - Erro geral: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(java.util.Collections.emptyList());
+        }
+    }
+    
     @GetMapping("/{id}")
     @Operation(summary = "Buscar funcionário por ID", description = "Retorna um funcionário específico pelo seu ID com todos os relacionamentos")
     @ApiResponses(value = {

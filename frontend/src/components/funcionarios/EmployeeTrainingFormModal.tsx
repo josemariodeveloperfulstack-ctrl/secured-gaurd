@@ -27,6 +27,13 @@ function addYears(dateStr, years) {
   return d.toISOString().split('T')[0];
 }
 
+/** Garante que a data esteja no formato YYYY-MM-DD para inputs e API */
+function toIsoDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const match = String(dateStr).match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : dateStr;
+}
+
 const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => {
   const [form, setForm] = useState({
     employeeId: '',
@@ -64,7 +71,7 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
           employee: editData.employee || '',
           cpf: editData.cpf || '',
           position: editData.position || '',
-          validUntil: editData.validUntil || '',
+          validUntil: toIsoDate(editData.validUntil || ''),
           sector: editData.sector || '',
           workSchedule: editData.workSchedule || '',
           asoDate: editData.asoDate || '',
@@ -73,6 +80,7 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
         };
         
         setForm(safeEditData);
+        setWorkPostSearchTerm(safeEditData.sector || '');
         console.log('✅ Form inicial definido:', safeEditData);
         
         // Se temos employeeId, buscar dados completos do funcionário
@@ -122,6 +130,7 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
       setForm({
         employeeId: '', employee: '', cpf: '', position: '', validUntil: '', sector: '', workSchedule: '', asoDate: '', psicotecnicoDate: '', id: undefined
       });
+      setWorkPostSearchTerm('');
     }
       
     // Resetar selectedEmployee e positionSelectKey quando o modal abrir
@@ -142,7 +151,7 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
         const list = await employeeService.getAllEmployees();
         console.log('📋 Lista de funcionários recebida (RAW):', JSON.stringify(list.slice(0, 2), null, 2));
         
-        const mappedEmployees = list.map((e: any) => {
+        let mappedEmployees = list.map((e: any) => {
           // Extrair CPF (pode vir como cpf ou document)
           const cpfValue = e.cpf || e.document || '';
           
@@ -188,6 +197,29 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
           return mapped;
         });
         
+        // Em modo edição: garantir que o funcionário editado esteja na lista (pode não estar nos primeiros 200)
+        if (editData?.employeeId) {
+          const exists = mappedEmployees.some((e: any) => String(e.id) === String(editData.employeeId));
+          if (!exists) {
+            try {
+              const fullEmployee = await employeeService.getEmployeeById(editData.employeeId);
+              if (fullEmployee) {
+                const cpfValue = fullEmployee.cpf || (fullEmployee as any).document || '';
+                let positionName = '';
+                let positionId = '';
+                if (fullEmployee.position && typeof fullEmployee.position === 'object') {
+                  positionId = (fullEmployee.position as any).id ? String((fullEmployee.position as any).id) : '';
+                  positionName = (fullEmployee.position as any).name || '';
+                }
+                mappedEmployees = [{ id: fullEmployee.id, name: fullEmployee.name, document: cpfValue, cpf: cpfValue, position: positionName, positionId }, ...mappedEmployees];
+                console.log('✅ Funcionário em edição adicionado à lista:', fullEmployee.name);
+              }
+            } catch (err) {
+              console.warn('Erro ao buscar funcionário em edição:', err);
+            }
+          }
+        }
+        
         setEmployees(mappedEmployees);
       } catch (error) {
         console.error('Erro ao carregar funcionários:', error);
@@ -224,7 +256,7 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
       loadPositions();
       loadWorkPosts(); 
     }
-  }, [open]);
+  }, [open, editData]);
 
   // Filtrar postos de trabalho conforme busca
   useEffect(() => {
@@ -786,14 +818,25 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
         
         console.log('✅ Certificação encontrada:', existingCert);
         
+        // Atualizar cargo do funcionário se foi alterado (a certificação não armazena cargo; vem do employee)
+        const positionId = selectedEmployee?.positionId || (form.position && positions.find(p => p.name === form.position)?.id);
+        if (positionId && form.employeeId) {
+          try {
+            await employeeService.updateEmployee(form.employeeId, { position: { id: positionId } });
+            console.log('✅ Cargo do funcionário atualizado');
+          } catch (err) {
+            console.warn('Aviso: não foi possível atualizar cargo do funcionário:', err);
+          }
+        }
+        
         // Atualizar certificação existente
         const certification = await trainingService.updateEmployeeCertification(form.id, {
           employeeId: form.employeeId,
           trainingId: existingCert.trainingId,
           certificationNumber: existingCert.certificationNumber,
           issueDate: existingCert.issueDate,
-          expirationDate: form.validUntil,
-          workPostName: form.sector, // Enviar o nome do posto de trabalho atualizado
+          expirationDate: toIsoDate(form.validUntil) || undefined,
+          workPostName: form.sector || undefined,
         });
         
         console.log('✅ Certificação atualizada:', certification);

@@ -33,23 +33,36 @@ export interface SimpleEmployee {
 
 export const employeeService = {
   /**
-   * Buscar todos os funcionários
+   * Buscar todos os funcionários (paginado - até 500 por página)
    */
-  async getAllEmployees(searchTerm?: string): Promise<Employee[]> {
+  async getAllEmployees(searchTerm?: string, page = 0, size = 500): Promise<Employee[]> {
     try {
-      const params: any = {};
+      const params: any = { page, size };
       if (searchTerm && searchTerm.trim()) {
         params.searchTerm = searchTerm.trim();
         console.log('🔍 [EmployeeService] Buscando com searchTerm:', params.searchTerm);
       } else {
-        console.log('🔍 [EmployeeService] Buscando todos os funcionários (sem searchTerm)');
+        console.log('🔍 [EmployeeService] Buscando funcionários (page=%s, size=%s)', page, size);
       }
-      const response = await api.get('/api/employees', { params });
+      const response = await api.get('/api/employees/paged', { params });
       console.log('🔍 [EmployeeService] Resposta recebida:', response.data?.length || 0, 'funcionários');
       return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
       return [];
+    }
+  },
+
+  /**
+   * Obter contagem total de funcionários no sistema
+   */
+  async getEmployeesCount(): Promise<number> {
+    try {
+      const response = await api.get('/api/employees/count');
+      return response.data?.count ?? 0;
+    } catch (error) {
+      console.error('Erro ao obter contagem de funcionários:', error);
+      return 0;
     }
   },
 

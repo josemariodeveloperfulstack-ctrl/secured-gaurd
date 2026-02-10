@@ -50,6 +50,7 @@ import { FileSpreadsheet } from 'lucide-react';
 
 const Funcionarios: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,10 +86,18 @@ const Funcionarios: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔍 [Funcionarios] Carregando funcionários com searchTerm:', search);
-      const data = await employeeService.getAllEmployees(search);
-      console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length);
+      const term = search?.trim() || undefined;
+      console.log('🔍 [Funcionarios] Carregando funcionários, searchTerm:', term || '(todos)');
+      
+      // Buscar lista e contagem total em paralelo quando não há busca
+      const [data, count] = await Promise.all([
+        employeeService.getAllEmployees(term),
+        term ? Promise.resolve(null) : employeeService.getEmployeesCount()
+      ]);
+      
+      console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length, '| Total no sistema:', count ?? 'N/A');
       setEmployees(data);
+      if (count !== null) setTotalCount(count);
     } catch (err) {
       console.error('Erro ao carregar funcionários:', err);
       setError('Erro ao carregar funcionários. Tente novamente.');
@@ -105,34 +114,14 @@ const Funcionarios: React.FC = () => {
   // Carregar funcionários com filtros
   const loadEmployeesWithFilters = async () => {
     const term = searchTerm?.trim() || undefined;
-    console.log('🔍 [Funcionarios] loadEmployeesWithFilters chamado com searchTerm:', term);
     await loadEmployees(term);
   };
 
-  // Carregar funcionários iniciais
+  // Carregar funcionários (único efeito - evita carregamento duplo)
   useEffect(() => {
-    loadEmployees();
-  }, []);
-
-  // Aplicar busca com debounce
-  useEffect(() => {
-    // Se o searchTerm estiver vazio, recarregar todos os funcionários
-    if (!searchTerm || searchTerm.trim() === '') {
-      const timeoutId = setTimeout(() => {
-        if (!loading) {
-          loadEmployees();
-        }
-      }, 300);
-      return () => clearTimeout(timeoutId);
-    }
-    
-    // Se houver searchTerm, buscar apenas os resultados filtrados
-    const timeoutId = setTimeout(() => {
-      if (!loading) {
-        loadEmployeesWithFilters();
-      }
-    }, 500); // Debounce de 500ms
-
+    const term = searchTerm?.trim() || undefined;
+    const debounceMs = term ? 500 : 0; // sem espera na carga inicial; 500ms debounce na busca
+    const timeoutId = setTimeout(() => loadEmployees(term), debounceMs);
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
@@ -433,9 +422,9 @@ Confirma a exclusão?`)) {
     );
   }
 
-  // Calculate statistics
+  // Calcular estatísticas (total usa contagem real quando disponível)
   const stats = {
-    total: employees.length,
+    total: (totalCount != null && !searchTerm?.trim()) ? totalCount : employees.length,
     active: employees.filter(e => e.status === 'ACTIVE').length,
     vacation: employees.filter(e => e.status === 'VACATION').length,
     medicalCertificate: employees.filter(e => e.status === 'MEDICAL_CERTIFICATE').length,
@@ -443,10 +432,16 @@ Confirma a exclusão?`)) {
     suspended: employees.filter(e => e.status === 'SUSPENDED').length,
   };
 
+  const subtitleLoaded = employees.length;
+  const subtitleTotal = totalCount ?? subtitleLoaded;
+  const subtitleText = subtitleTotal > subtitleLoaded
+    ? `${subtitleTotal} funcionários no sistema (${subtitleLoaded} carregados)`
+    : `${subtitleLoaded} funcionário${subtitleLoaded !== 1 ? 's' : ''} no sistema`;
+
   return (
     <StandardLayout 
       title="Gestão de Funcionários"
-      subtitle={`${filteredEmployees.length} funcionário${filteredEmployees.length !== 1 ? 's' : ''} no sistema`}
+      subtitle={subtitleText}
     >
       <Tabs value={activeTab} onValueChange={(value) => {
         setActiveTab(value);
