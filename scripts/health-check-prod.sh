@@ -31,6 +31,7 @@ MAX_ATTEMPTS=15
 ATTEMPT=1
 HEALTH_CHECK_URL="https://securedguard.z7botsolutions.com.br/api/health"
 INTERNAL_HEALTH_CHECK="http://localhost:8084/api/health"
+CONTAINER_MISSING_DIAG_DONE=0
 
 # Função para log com timestamp
 log() {
@@ -69,6 +70,12 @@ check_backend_ready() {
             "docker logs --tail 5 secured-guard-backend-prod 2>&1 | tail -1" 2>/dev/null || echo "")
         if [ -n "$last_log" ]; then
             log "📋 Última linha do log: $last_log"
+            # Se container não existe, rodar diagnóstico uma vez na primeira tentativa
+            if echo "$last_log" | grep -q "No such container" && [ "${CONTAINER_MISSING_DIAG_DONE}" -eq 0 ]; then
+                CONTAINER_MISSING_DIAG_DONE=1
+                log "🔍 Container não encontrado no servidor - executando diagnóstico..."
+                collect_diagnostics
+            fi
         fi
         return 1
     fi

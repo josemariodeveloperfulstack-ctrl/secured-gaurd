@@ -123,22 +123,47 @@ jobs:
           SSH_OPTS="-o StrictHostKeyChecking=no"
           VPS_STR="${{ secrets.VPS_USER_PROD }}@${{ secrets.VPS_HOST_PROD }}"
           
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << 'EOF'
+          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << 'ENDSSH'
             set -e
             cd /var/www/secured_guard/prod/deploy
             
-            # Login to Docker Hub on VPS to pull private images if needed
+            echo "🔐 Login Docker Hub..."
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             
-            # Ensure network exists
+            echo "🌐 Garantindo rede secured-guard..."
             if ! docker network ls | grep -q "secured-guard"; then
               docker network create secured-guard
             fi
             
-            # Pull and Restart
+            echo "📥 Pull das imagens..."
             docker-compose -f docker-compose.prod.yml pull
+            
+            echo "🚀 Subindo containers..."
             docker-compose -f docker-compose.prod.yml up -d --remove-orphans
-          EOF
+            
+            echo "📋 Status dos containers:"
+            docker-compose -f docker-compose.prod.yml ps -a
+            
+            echo "⏳ Aguardando 15s para containers estabilizarem..."
+            sleep 15
+            
+            if ! docker ps -a --format '{{.Names}}' | grep -qx 'secured-guard-backend-prod'; then
+              echo "❌ Container secured-guard-backend-prod não existe após up!"
+              echo "📋 Containers existentes:"
+              docker ps -a --format 'table {{.Names}}\t{{.Status}}'
+              echo "📋 Logs do backend (se existir com outro nome):"
+              docker-compose -f docker-compose.prod.yml logs --tail=50 backend 2>&1 || true
+              exit 1
+            fi
+            
+            BACKEND_STATE=$(docker inspect secured-guard-backend-prod --format '{{.State.Status}}' 2>/dev/null || echo "missing")
+            if [ "$BACKEND_STATE" = "exited" ] || [ "$BACKEND_STATE" = "dead" ]; then
+              echo "❌ Backend está em estado: $BACKEND_STATE"
+              docker logs --tail=80 secured-guard-backend-prod 2>&1
+              exit 1
+            fi
+            echo "✅ Backend container presente e estado: $BACKEND_STATE"
+          ENDSSH
 
       - name: 🏥 Health Check
         env:
