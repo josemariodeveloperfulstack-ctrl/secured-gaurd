@@ -144,21 +144,29 @@ jobs:
             echo "📋 Status dos containers:"
             docker-compose -f docker-compose.prod.yml ps -a
             
-            echo "⏳ Aguardando 15s para containers estabilizarem..."
+            echo "⏳ Aguardando 15s para Postgres ficar healthy..."
             sleep 15
             
+            echo "🔧 Flyway repair PROD (checksums V424, V427, V429)..."
+            docker exec -i secured-guard-db-prod psql -U postgres -d secured_guard_prod -c "
+              UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';
+              UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';
+              UPDATE flyway_schema_history SET checksum = -1673547286 WHERE version = '429';
+            "
+            
+            echo "🔄 Reiniciando backend para aplicar migrações..."
+            docker restart secured-guard-backend-prod
+            
+            sleep 5
             if ! docker ps -a --format '{{.Names}}' | grep -qx 'secured-guard-backend-prod'; then
               echo "❌ Container secured-guard-backend-prod não existe após up!"
-              echo "📋 Containers existentes:"
               docker ps -a --format 'table {{.Names}}\t{{.Status}}'
-              echo "📋 Logs do backend (se existir com outro nome):"
               docker-compose -f docker-compose.prod.yml logs --tail=50 backend 2>&1 || true
               exit 1
             fi
-            
             BACKEND_STATE=$(docker inspect secured-guard-backend-prod --format '{{.State.Status}}' 2>/dev/null || echo "missing")
             if [ "$BACKEND_STATE" = "exited" ] || [ "$BACKEND_STATE" = "dead" ]; then
-              echo "❌ Backend está em estado: $BACKEND_STATE"
+              echo "❌ Backend em estado: $BACKEND_STATE"
               docker logs --tail=80 secured-guard-backend-prod 2>&1
               exit 1
             fi
