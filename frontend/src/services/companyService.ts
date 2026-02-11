@@ -38,8 +38,14 @@ export const companyService = {
   },
 
   async getAllCompanies() {
-    const response = await api.get('/api/companies');
-    return response.data as Array<any>;
+    try {
+      const response = await api.get('/api/companies');
+      return (response.data as Array<any>) ?? [];
+    } catch (err: any) {
+      // 400/403/500: retornar lista vazia para não quebrar UI (ex: perfil Comercial, ambiente CI)
+      console.warn('Erro ao carregar empresas, usando lista vazia:', err?.response?.status, err?.message);
+      return [];
+    }
   },
 
   async getCompanyById(id: string) {

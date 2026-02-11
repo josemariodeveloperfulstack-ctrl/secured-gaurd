@@ -290,7 +290,11 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/leads/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
                                                                 "LEADS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_COMERCIAL")
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_COMERCIAL")
+                                                // CRM, oportunidades, Kanban, dashboard comercial e metas - Comercial precisa para dashboard completo
+                                                .requestMatchers("/api/crm/**", "/api/opportunities/**", "/api/kanban-status/**",
+                                                                "/api/commercial-dashboard/**", "/api/sales-goals/**")
+                                                .hasAnyRole("SUPER_ADMIN", "ADMIN", "GESTOR", "COMERCIAL")
                                                 .requestMatchers("/api/proposals/**")
                                                 .hasAnyAuthority("PROPOSALS_READ", "PROPOSALS_WRITE",
                                                                 "PROPOSALS_CREATE", "PROPOSALS_DELETE",
@@ -400,29 +404,17 @@ public class SecurityConfig {
                                                                 "FINANCEIRO",
                                                                 "GESTOR",
                                                                 "ASSISTENTE_ADMINISTRATIVO")
-                                                // Endpoints de mensagens - permitir para todos os roles principais,
-                                                // incluindo
-                                                // Departamento Pessoal
-                                                .requestMatchers("/api/v1/messages/**").hasAnyAuthority(
+                                                // Endpoints de mensagens - qualquer usuário autenticado pode enviar/receber
+                                                .requestMatchers("/api/v1/messages/**").authenticated()
+                                                // Emails dos departamentos - Comercial precisa para página de Contratos
+                                                .requestMatchers("/api/department-emails").hasAnyRole(
                                                                 "SUPER_ADMIN",
                                                                 "ADMIN",
-                                                                "SUPERVISOR",
-                                                                "COLABORADOR",
-                                                                "VIGILANTE",
-                                                                "RH",
-                                                                "DEPARTAMENTO_PESSOAL",
-                                                                "FINANCEIRO",
                                                                 "GESTOR",
-                                                                "ROLE_SUPER_ADMIN",
-                                                                "ROLE_ADMIN",
-                                                                "ROLE_SUPERVISOR",
-                                                                "ROLE_COLABORADOR",
-                                                                "ROLE_VIGILANTE",
-                                                                "ROLE_RH",
-                                                                "ROLE_DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_FINANCEIRO",
-                                                                "ROLE_GESTOR",
-                                                                "ROLE_ASSISTENTE_ADMINISTRATIVO")
+                                                                "RH",
+                                                                "FINANCEIRO",
+                                                                "OPERACIONAL",
+                                                                "COMERCIAL")
                                                 // Endpoints de suporte e atendimento - requerem permissões específicas
                                                 .requestMatchers("/api/v1/support/**")
                                                 .hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE",

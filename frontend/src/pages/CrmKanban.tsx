@@ -28,7 +28,7 @@ export default function CrmKanban() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const isGestorOrAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'GESTOR';
+  const isGestorOrAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || user?.role === 'GESTOR' || user?.role === 'COMERCIAL';
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 

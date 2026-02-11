@@ -23,7 +23,7 @@ public class ClientReportController {
     private final ClientReportService clientReportService;
 
     @PostMapping("/pdf")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
     @Operation(summary = "Gerar relatório de clientes em PDF", description = "Gera um relatório detalhado de clientes em formato PDF com base nos filtros fornecidos.")
     public ResponseEntity<ByteArrayResource> generatePdfReport(@RequestBody ClientReportFilterDTO filters) {
         log.info("Gerando relatório PDF de clientes com filtros: {}", filters);
@@ -43,7 +43,7 @@ public class ClientReportController {
     }
 
     @PostMapping("/excel")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
     @Operation(summary = "Gerar relatório de clientes em Excel", description = "Gera um relatório detalhado de clientes em formato Excel com base nos filtros fornecidos.")
     public ResponseEntity<ByteArrayResource> generateExcelReport(@RequestBody ClientReportFilterDTO filters) {
         log.info("Gerando relatório Excel de clientes com filtros: {}", filters);

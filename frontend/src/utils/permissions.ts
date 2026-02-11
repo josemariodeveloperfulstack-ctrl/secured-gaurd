@@ -22,6 +22,8 @@ export const USER_ROLE_LIST: UserRole[] = [
 
 // Função para gerar permissões baseadas no role principal
 export const generatePermissions = (role: UserRole): UserPermissions => {
+  // Normalizar role (remover prefixo ROLE_ para compatibilidade com backend)
+  const normalizedRole = (typeof role === 'string' ? role.replace(/^ROLE_/, '') : role) as UserRole;
   const basePermissions: UserPermissions = {
     // Permissões de Usuários
     USERS_READ: false,
@@ -183,7 +185,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     ALL_PERMISSIONS: false,
   };
 
-  switch (role) {
+  switch (normalizedRole) {
     case 'SUPER_ADMIN':
       // Todas as permissões true para SUPER_ADMIN
       return Object.fromEntries(

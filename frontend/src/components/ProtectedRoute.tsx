@@ -1,11 +1,12 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserPermissions } from '@/types/user';
+import { UserPermissions, UserRole } from '@/types/user';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredPermissions?: (keyof UserPermissions)[];
+  requiredRoles?: UserRole[]; // Permite acesso se usuário tiver qualquer um dos roles
   requireAllPermissions?: boolean;
   allowWithoutFirstAccess?: boolean; // Permite acesso mesmo sem completar primeiro acesso (para a própria página de primeiro acesso)
 }
@@ -13,6 +14,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredPermissions,
+  requiredRoles,
   requireAllPermissions = true,
   allowWithoutFirstAccess = false,
 }) => {
@@ -43,6 +45,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (!firstAccessPaths.includes(location.pathname)) {
       console.log('🔒 ProtectedRoute: Usuário precisa completar primeiro acesso, redirecionando...');
       return <Navigate to="/first-access/change-password" replace />;
+    }
+  }
+
+  // Verificar roles alternativos (ex: COMERCIAL para CRM)
+  if (requiredRoles && requiredRoles.length > 0) {
+    const userRole = (user.role ?? '').replace(/^ROLE_/, '') as UserRole;
+    const hasRole = requiredRoles.some((r) => userRole === r || userRole === (r as string).replace(/^ROLE_/, ''));
+    if (hasRole) {
+      return <>{children}</>;
     }
   }
 

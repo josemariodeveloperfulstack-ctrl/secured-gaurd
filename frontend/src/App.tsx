@@ -1140,7 +1140,7 @@ function App() {
 
                     {/* CRM Comercial */}
                     <Route path="/crm" element={
-                      <ProtectedRoute requiredPermissions={['LEADS_READ']}>
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={['SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL']}>
                         <CrmKanban />
                       </ProtectedRoute>
                     } />

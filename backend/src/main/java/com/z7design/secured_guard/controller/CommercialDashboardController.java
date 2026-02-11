@@ -68,7 +68,7 @@ public class CommercialDashboardController {
 
     @GetMapping("/team-kpis")
     @Operation(summary = "KPIs consolidados da equipe", description = "Retorna KPIs agregados de toda a equipe comercial")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
     public ResponseEntity<TeamKpisDTO> getTeamKpis(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -79,7 +79,7 @@ public class CommercialDashboardController {
 
     @GetMapping("/ranking")
     @Operation(summary = "Ranking de vendedores", description = "Retorna ranking ordenado por receita, conversão ou contratos")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
     public ResponseEntity<List<VendedorRankingDTO>> getRanking(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
@@ -91,14 +91,14 @@ public class CommercialDashboardController {
 
     @GetMapping("/pipeline")
     @Operation(summary = "Pipeline geral", description = "Distribuição de leads/oportunidades por etapa")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
     public ResponseEntity<Map<String, Long>> getPipeline() {
         return ResponseEntity.ok(commercialDashboardService.getPipeline());
     }
 
     @GetMapping("/revenue-by-segment")
     @Operation(summary = "Receita por segmento de cliente", description = "Agrupa receita das propostas aprovadas por nome de cliente")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
     public ResponseEntity<Map<String, Object>> getRevenueBySegment(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -109,7 +109,7 @@ public class CommercialDashboardController {
 
     @GetMapping("/expiring-contracts")
     @Operation(summary = "Contratos a vencer", description = "Lista contratos que vencem nos próximos X dias")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
     public ResponseEntity<List<Map<String, Object>>> getExpiringContracts(
             @RequestParam(defaultValue = "30") int days) {
         return ResponseEntity.ok(commercialDashboardService.getExpiringContracts(days));
