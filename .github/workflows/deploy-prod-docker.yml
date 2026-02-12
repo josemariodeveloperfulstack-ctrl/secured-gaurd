@@ -114,9 +114,10 @@ jobs:
           # Transfer .env
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS .prod.env $VPS_STR:$DEPLOY_PATH/deploy/.env
           
-          # Transfer docker-compose and nginx config
+          # Transfer docker-compose, nginx config e script de diagnóstico
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/docker-compose.prod.yml $VPS_STR:$DEPLOY_PATH/deploy/
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/nginx/nginx-prod.conf $VPS_STR:$DEPLOY_PATH/deploy/nginx/
+          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/diagnose-404-prod.sh $VPS_STR:$DEPLOY_PATH/deploy/ 2>/dev/null || true
 
       - name: 🚀 Pull and Restart on VPS
         run: |
