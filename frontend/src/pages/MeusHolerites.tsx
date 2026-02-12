@@ -309,12 +309,8 @@ const MeusHolerites: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const normalizedRole = (user.role ?? '').replace(/^ROLE_/, '').toUpperCase();
-
-  if (normalizedRole !== 'COLABORADOR') {
-    return <Navigate to="/holerites" replace />;
-  }
-
+  // Sempre mostrar a tela "Meus Documentos" (holerites e comprovantes do usuário logado).
+  // Não redirecionar para Gestão de Holerites; essa é outra tela (/holerites).
   return <MeusHoleritesContent />;
 };
 
