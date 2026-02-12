@@ -403,6 +403,7 @@ public class SecurityConfig {
                                                                 "DEPARTAMENTO_PESSOAL",
                                                                 "FINANCEIRO",
                                                                 "GESTOR",
+                                                                "COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO")
                                                 // Endpoints de mensagens - qualquer usuário autenticado pode enviar/receber
                                                 .requestMatchers("/api/v1/messages/**").authenticated()
