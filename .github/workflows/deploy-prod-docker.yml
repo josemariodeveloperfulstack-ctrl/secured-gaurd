@@ -114,10 +114,11 @@ jobs:
           # Transfer .env
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS .prod.env $VPS_STR:$DEPLOY_PATH/deploy/.env
           
-          # Transfer docker-compose, nginx config e script de diagnóstico
+          # Transfer docker-compose, nginx config e scripts de diagnóstico/correção 404
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/docker-compose.prod.yml $VPS_STR:$DEPLOY_PATH/deploy/
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/nginx/nginx-prod.conf $VPS_STR:$DEPLOY_PATH/deploy/nginx/
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/diagnose-404-prod.sh $VPS_STR:$DEPLOY_PATH/deploy/ 2>/dev/null || true
+          if [ -f deploy/fix-404-prod.sh ]; then sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/fix-404-prod.sh $VPS_STR:$DEPLOY_PATH/deploy/; fi
+          if [ -f deploy/diagnose-404-prod.sh ]; then sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/diagnose-404-prod.sh $VPS_STR:$DEPLOY_PATH/deploy/; fi
 
       - name: 🚀 Pull and Restart on VPS
         run: |
@@ -131,9 +132,12 @@ jobs:
             echo "🔐 Login Docker Hub..."
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             
-            echo "🌐 Garantindo rede secured-guard..."
+            # Ensure networks exist (Traefik usa z7network para descobrir o nginx)
             if ! docker network ls | grep -q "secured-guard"; then
               docker network create secured-guard
+            fi
+            if ! docker network ls | grep -q "z7network"; then
+              docker network create z7network
             fi
             
             echo "📥 Pull das imagens..."
