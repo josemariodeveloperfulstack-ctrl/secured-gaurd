@@ -142,7 +142,9 @@ services:
     restart: unless-stopped
 
   # ========================================
-  # NGINX (PROD)
+  # NGINX (PROD) – igual ao CI: uma rede, porta no host, sem Traefik no compose
+  # No host, configurar o reverse proxy (Traefik/nginx/Caddy) para encaminhar
+  # securedguard.z7botsolutions.com.br → http://127.0.0.1:8085
   # ========================================
   nginx:
     image: nginx:alpine
@@ -156,21 +158,6 @@ services:
       - backend
     networks:
       - secured-guard-prod
-      - z7network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.secured-guard-prod-https.rule=Host(`securedguard.z7botsolutions.com.br`)"
-      - "traefik.http.routers.secured-guard-prod-https.entrypoints=websecure"
-      - "traefik.http.routers.secured-guard-prod-https.tls=true"
-      - "traefik.http.routers.secured-guard-prod-https.tls.certresolver=letsencryptresolver"
-      - "traefik.http.routers.secured-guard-prod-https.service=secured-guard-prod-service"
-      - "traefik.http.routers.secured-guard-prod-https.priority=2000"
-      - "traefik.http.routers.secured-guard-prod-http.rule=Host(`securedguard.z7botsolutions.com.br`)"
-      - "traefik.http.routers.secured-guard-prod-http.entrypoints=web"
-      - "traefik.http.routers.secured-guard-prod-http.middlewares=redirect-https@docker"
-      - "traefik.http.routers.secured-guard-prod-http.priority=2000"
-      - "traefik.http.services.secured-guard-prod-service.loadbalancer.server.port=80"
-      - "traefik.docker.network=z7network"
     restart: unless-stopped
 
 # ========================================
@@ -189,12 +176,9 @@ volumes:
     driver: local
 
 # ========================================
-# NETWORKS
+# NETWORKS (igual ao CI: uma rede só)
 # ========================================
 networks:
   secured-guard-prod:
     external: true
     name: secured-guard
-  z7network:
-    external: true
-    name: z7network
