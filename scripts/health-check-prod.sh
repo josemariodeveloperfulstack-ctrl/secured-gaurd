@@ -200,6 +200,8 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
                 log "⚠️ Aplicação funciona internamente mas não externamente"
                 if [ $ATTEMPT -ge 10 ]; then
                     log "✅ Aplicação está funcionando internamente após $ATTEMPT tentativas"
+                    log "📌 O 404 externo vem do Cloudflare ou Traefik (encaminhamento para o servidor)."
+                    log "   No servidor: bash deploy/diagnose-404-prod.sh e ver deploy/DEPLOY_404_TROUBLESHOOTING.md"
                     exit 0
                 fi
             fi
