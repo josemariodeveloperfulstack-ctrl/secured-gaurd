@@ -60,9 +60,19 @@ const CargoModal: React.FC<CargoModalProps> = ({ open, onClose, onSave, position
       }
       onSave();
       onClose();
-    } catch (err) {
-      setError('Ocorreu um erro ao salvar o cargo. Verifique os dados e tente novamente.');
-      toast({ title: 'Erro', description: 'Não foi possível salvar o cargo.', variant: 'destructive' });
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const serverMessage = err?.response?.data?.message;
+      const isDuplicate = status === 409;
+      const message = isDuplicate
+        ? (serverMessage || 'Já existe um cargo com este nome. Escolha outro nome.')
+        : 'Ocorreu um erro ao salvar o cargo. Verifique os dados e tente novamente.';
+      setError(message);
+      toast({
+        title: isDuplicate ? 'Cargo já cadastrado' : 'Erro',
+        description: message,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

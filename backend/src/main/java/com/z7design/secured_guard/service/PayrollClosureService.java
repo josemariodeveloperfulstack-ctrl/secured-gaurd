@@ -1,10 +1,12 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.model.Absence;
 import com.z7design.secured_guard.model.ContractPayrollConfig;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.PayPeriod;
 import com.z7design.secured_guard.model.PayrollClosure;
 import com.z7design.secured_guard.model.TimeRecord;
+import com.z7design.secured_guard.repository.AbsenceRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.PayrollClosureRepository;
 import com.z7design.secured_guard.model.enums.EmploymentStatus;
@@ -38,6 +40,7 @@ public class PayrollClosureService {
     private final PayPeriodService payPeriodService;
     private final BankHoursService bankHoursService;
     private final PayrollItemService payrollItemService;
+    private final AbsenceRepository absenceRepository;
 
     /**
      * Gera fechamento para um período mensal (compatibilidade com código existente)
@@ -79,8 +82,8 @@ public class PayrollClosureService {
         // Buscar configuração de folha para o funcionário
         ContractPayrollConfig config = contractPayrollConfigService.getConfigForEmployee(employeeId);
 
-        // Calcular métricas usando configurações
-        Map<String, Object> metrics = calculateMetrics(records, startDate, endDate, config);
+        // Calcular métricas usando configurações (inclui faltas justificadas/atestado e horas justificadas)
+        Map<String, Object> metrics = calculateMetrics(employeeId, records, startDate, endDate, config);
 
         // Criar fechamento
         PayrollClosure closure = new PayrollClosure();
@@ -131,7 +134,7 @@ public class PayrollClosureService {
         return saved;
     }
 
-    private Map<String, Object> calculateMetrics(List<TimeRecord> records, LocalDate startDate, LocalDate endDate, ContractPayrollConfig config) {
+    private Map<String, Object> calculateMetrics(UUID employeeId, List<TimeRecord> records, LocalDate startDate, LocalDate endDate, ContractPayrollConfig config) {
         Map<String, Object> metrics = new HashMap<>();
 
         // Agrupar registros por dia
@@ -141,13 +144,20 @@ public class PayrollClosureService {
             recordsByDay.computeIfAbsent(date, k -> new ArrayList<>()).add(record);
         }
 
+        // Faltas aprovadas no período (para atestado abonado e justificação de horas)
+        List<Absence> absences = absenceRepository.findByEmployeeAndDateRange(employeeId, startDate, endDate);
+        Map<LocalDate, Absence> absenceByDate = absences.stream()
+                .filter(a -> a.getStatus() == Absence.AbsenceStatus.APPROVED)
+                .collect(Collectors.toMap(Absence::getAbsenceDate, a -> a, (a1, a2) -> a1));
+
         BigDecimal totalHours = BigDecimal.ZERO;
         BigDecimal regularHours = BigDecimal.ZERO;
         BigDecimal overtime50 = BigDecimal.ZERO;
         BigDecimal overtime100 = BigDecimal.ZERO;
         BigDecimal nightShiftHours = BigDecimal.ZERO;
         int totalDelays = 0;
-        int workedDays = recordsByDay.size();
+        int daysWithRecords = recordsByDay.size();
+        int abonadoDays = 0;
 
         // Processar cada dia
         for (Map.Entry<LocalDate, List<TimeRecord>> entry : recordsByDay.entrySet()) {
@@ -225,9 +235,40 @@ public class PayrollClosureService {
             }
         }
 
-        // Calcular dias úteis esperados no mês
+        // Dias úteis esperados no período
         int expectedDays = calculateWorkingDays(startDate, endDate);
-        int totalAbsences = expectedDays - workedDays;
+        BigDecimal dailyHours = config.getDailyHours() != null ? config.getDailyHours() : BigDecimal.valueOf(8);
+
+        // Processar dias sem registro de ponto: atestado (abonado) ou justificação de horas
+        LocalDate current = startDate;
+        while (!current.isAfter(endDate)) {
+            if (current.getDayOfWeek() == DayOfWeek.SATURDAY || current.getDayOfWeek() == DayOfWeek.SUNDAY) {
+                current = current.plusDays(1);
+                continue;
+            }
+            if (recordsByDay.containsKey(current)) {
+                current = current.plusDays(1);
+                continue;
+            }
+            Absence absence = absenceByDate.get(current);
+            if (absence != null) {
+                boolean isAtestado = isAbsenceWithMedicalCertificate(absence);
+                if (isAtestado) {
+                    // Dia abonado: entra integralmente no cálculo das horas
+                    totalHours = totalHours.add(dailyHours);
+                    regularHours = regularHours.add(dailyHours);
+                    abonadoDays++;
+                } else if (absence.getJustifiedHours() != null && absence.getJustifiedHours().compareTo(BigDecimal.ZERO) > 0) {
+                    // Apenas horas justificadas entram no cálculo; as horas não justificadas do dia contam como falta
+                    totalHours = totalHours.add(absence.getJustifiedHours());
+                    regularHours = regularHours.add(absence.getJustifiedHours());
+                }
+            }
+            current = current.plusDays(1);
+        }
+
+        int workedDays = daysWithRecords + abonadoDays;
+        int totalAbsences = Math.max(0, expectedDays - workedDays);
 
         metrics.put("totalHours", totalHours);
         metrics.put("regularHours", regularHours);
@@ -235,11 +276,25 @@ public class PayrollClosureService {
         metrics.put("overtime100", overtime100);
         metrics.put("nightShiftHours", nightShiftHours);
         metrics.put("totalDelays", totalDelays);
-        metrics.put("totalAbsences", Math.max(0, totalAbsences));
+        metrics.put("totalAbsences", totalAbsences);
         metrics.put("workedDays", workedDays);
         metrics.put("expectedDays", expectedDays);
 
         return metrics;
+    }
+
+    /** Considera atestado: tipo licença médica ou presença de documento/ dias de atestado. */
+    private boolean isAbsenceWithMedicalCertificate(Absence absence) {
+        if (absence.getAbsenceType() == Absence.AbsenceType.SICK_LEAVE) {
+            return true;
+        }
+        if (absence.getMedicalCertificateDays() != null && absence.getMedicalCertificateDays() > 0) {
+            return true;
+        }
+        if (absence.getDocumentUrl() != null && !absence.getDocumentUrl().isBlank()) {
+            return true;
+        }
+        return false;
     }
 
     private BigDecimal calculateNightShiftHours(LocalDateTime start, LocalDateTime end, ContractPayrollConfig config) {
@@ -340,11 +395,14 @@ public class PayrollClosureService {
     }
 
     public List<PayrollClosure> getClosuresByPeriod(int month, int year) {
-        return payrollClosureRepository.findByReferenceMonthAndReferenceYearOrderByEmployeeNameAsc(
-                month, year);
+        return payrollClosureRepository.findByReferenceMonthAndReferenceYearWithEmployee(month, year);
     }
 
-    @Transactional
+    /**
+     * Gera fechamentos em lote para todos os funcionários ativos no período.
+     * Sem transação única: cada fechamento roda em sua própria transação (@Transactional em generateClosure),
+     * para que falha em um não marque o lote como rollback-only.
+     */
     public List<PayrollClosure> generateBatchClosures(int month, int year, UUID closedById) {
         log.info("📊 Gerando fechamentos em lote - Período: {}/{}", month, year);
 
@@ -360,7 +418,7 @@ public class PayrollClosureService {
                 log.info("✅ Fechamento gerado para: {}", employee.getName());
             } catch (Exception e) {
                 log.error("❌ Erro ao gerar fechamento para {}: {}", employee.getName(), e.getMessage());
-                // Continua processando os outros funcionários mesmo se um falhar
+                // Continua processando os outros funcionários; cada um usa sua própria transação
             }
         }
 

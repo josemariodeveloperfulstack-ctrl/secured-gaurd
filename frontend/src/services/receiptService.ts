@@ -46,6 +46,21 @@ export const receiptService = {
   },
 
   /**
+   * Busca apenas os comprovantes do usuário autenticado (baseado no CPF do token).
+   */
+  async getMyReceipts(): Promise<Receipt[]> {
+    try {
+      console.log('🔍 ReceiptService - Buscando comprovantes do usuário autenticado (GET /api/receipts/me)...');
+      const response = await api.get('/receipts/me');
+      console.log('✅ ReceiptService - Comprovantes (meus) carregados:', response.data?.length ?? 0);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar comprovantes do usuário autenticado:', error);
+      return [];
+    }
+  },
+
+  /**
    * Busca comprovantes processados
    */
   async getProcessedFiles(): Promise<Receipt[]> {

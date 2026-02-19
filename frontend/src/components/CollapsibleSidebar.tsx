@@ -225,6 +225,12 @@ const financeiroMenuItems = [
   { icon: BarChart3, text: 'Relatórios Financeiros', to: '/financeiro/relatorios', id: 'financeiro-relatorios', requiredPermission: 'REPORTS_READ' },
   { icon: Wallet, text: 'Centro de Custos', to: '/financeiro/centro-custos', id: 'financeiro-centro-custos', requiredPermission: 'FINANCIAL_READ' },
   { icon: Ruler, text: 'Medição', to: '/financeiro/medicao', id: 'financeiro-medicao', requiredPermission: 'FINANCIAL_MEASUREMENT_READ' },
+  { icon: Package, text: 'Gestão Patrimonial', to: '/gestao-patrimonial', id: 'gestao-patrimonial', requiredPermission: 'PATRIMONIAL_READ' },
+];
+
+// ===== MÓDULO FISCAL (separado do Financeiro; espaço para novas funcionalidades) =====
+const fiscalMenuItems = [
+  { icon: Receipt, text: 'Notas Fiscais', to: '/modulo-fiscal', id: 'modulo-fiscal', requiredPermission: 'FISCAL_READ' },
 ];
 
 // ===== MÓDULO COMPRAS =====
@@ -295,6 +301,8 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'mensagens',
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
+    'gestao-patrimonial',
+    'modulo-fiscal',
   ]),
   DEPARTAMENTO_PESSOAL: new Set([
     'dashboard',
@@ -335,6 +343,8 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'mensagens',
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
+    'gestao-patrimonial',
+    'modulo-fiscal',
   ]),
   COMERCIAL: new Set([
     'dashboard',
@@ -344,6 +354,28 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'propostas',
     'orcamentos',
     'contratos',
+    'crm',
+    'chat-interno',
+    'mensagens',
+  ]),
+  GESTOR_COMERCIAL: new Set([
+    'dashboard',
+    'leads',
+    'empresas',
+    'clientes',
+    'propostas',
+    'orcamentos',
+    'contratos',
+    'crm',
+    'chat-interno',
+    'mensagens',
+  ]),
+  ASSISTENTE_COMERCIAL: new Set([
+    'dashboard',
+    'leads',
+    'clientes',
+    'propostas',
+    'orcamentos',
     'crm',
     'chat-interno',
     'mensagens',
@@ -488,6 +520,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
 
   const filteredMainMenuItems = useMemo(() => filterItemsForRole(mainMenuItems), [filterItemsForRole]);
   const filteredFinanceiroItems = useMemo(() => filterItemsForRole(financeiroMenuItems), [filterItemsForRole]);
+  const visibleFinanceiroItems = useMemo(
+    () => filteredFinanceiroItems.filter(item => shouldShowModule((item as { requiredPermission?: string }).requiredPermission)),
+    [filteredFinanceiroItems, shouldShowModule]
+  );
+  const filteredFiscalItems = useMemo(() => filterItemsForRole(fiscalMenuItems), [filterItemsForRole]);
+  const visibleFiscalItems = useMemo(
+    () => filteredFiscalItems.filter(item => shouldShowModule((item as { requiredPermission?: string }).requiredPermission)),
+    [filteredFiscalItems, shouldShowModule]
+  );
   const filteredOperacionalItems = useMemo(() => filterItemsForRole(operacionalMenuItems), [filterItemsForRole]);
   const filteredRhItems = useMemo(() => filterItemsForRole(rhMenuItems), [filterItemsForRole]);
   const filteredSstItems = useMemo(() => filterItemsForRole(sstMenuItems), [filterItemsForRole]);
@@ -529,6 +570,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     const allItems = [
       ...mainMenuItems,
       ...financeiroMenuItems,
+      ...fiscalMenuItems,
       ...operacionalMenuItems,
       ...rhMenuItems,
       ...departamentoPessoalMenuItems,
@@ -654,7 +696,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
           </div>
 
           {/* Módulo Financeiro */}
-          {shouldShowModule('FINANCIAL_READ') && filteredFinanceiroItems.length > 0 && (
+          {visibleFinanceiroItems.length > 0 && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
@@ -662,7 +704,43 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 </div>
               )}
               <nav className="space-y-1 px-4">
-                {filteredFinanceiroItems.map((item) => (
+                {visibleFinanceiroItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </nav>
+            </div>
+          )}
+
+          {/* Módulo Fiscal */}
+          {visibleFiscalItems.length > 0 && (
+            <div className="mb-6">
+              {!collapsed && (
+                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
+                  Módulo Fiscal
+                </div>
+              )}
+              <nav className="space-y-1 px-4">
+                {visibleFiscalItems.map((item) => (
                   <ScrollPreservingLink
                     key={item.id}
                     to={item.to}

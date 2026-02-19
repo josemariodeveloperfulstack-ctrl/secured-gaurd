@@ -42,6 +42,7 @@ const absenceSchema = z.object({
   reason: z.string().min(1, 'Motivo é obrigatório'),
   medicalCertificateDays: z.number().optional(),
   documentUrl: z.string().optional(),
+  justifiedHours: z.number().min(0).max(24).optional(),
   coverageEmployeeId: z.string().optional(),
   coverageNotes: z.string().optional(),
 });
@@ -103,6 +104,7 @@ export default function AbsenceFormModal({
       setValue('reason', absence.reason);
       setValue('medicalCertificateDays', absence.medicalCertificateDays || undefined);
       setValue('documentUrl', absence.documentUrl || '');
+      setValue('justifiedHours', absence.justifiedHours ?? undefined);
       setUploadedFileUrl(absence.documentUrl || '');
       setValue('coverageEmployeeId', absence.coverageEmployee?.id || '');
       setValue('coverageNotes', absence.coverageNotes || '');
@@ -115,6 +117,7 @@ export default function AbsenceFormModal({
         reason: '',
         medicalCertificateDays: undefined,
         documentUrl: '',
+        justifiedHours: undefined,
         coverageEmployeeId: '',
         coverageNotes: '',
       });
@@ -234,6 +237,7 @@ export default function AbsenceFormModal({
         reason: data.reason,
         medicalCertificateDays: data.medicalCertificateDays,
         documentUrl: data.documentUrl || undefined,
+        justifiedHours: data.justifiedHours != null && !Number.isNaN(data.justifiedHours) ? data.justifiedHours : undefined,
         coverageEmployeeId: data.coverageEmployeeId || undefined,
         coverageNotes: data.coverageNotes || undefined,
       });
@@ -419,6 +423,29 @@ export default function AbsenceFormModal({
                   />
                 </div>
               )}
+
+              {/* Horas justificadas (sem atestado: só essas horas entram no cálculo) */}
+              <div className="space-y-2 max-w-xs">
+                <Label
+                  htmlFor="justifiedHours"
+                  className="text-seguranca-lightgray font-medium"
+                >
+                  Horas justificadas
+                </Label>
+                <Input
+                  id="justifiedHours"
+                  type="number"
+                  min="0"
+                  max="24"
+                  step="0.25"
+                  placeholder="Ex: 4 (apenas horas creditadas)"
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                  {...register('justifiedHours', { valueAsNumber: true })}
+                />
+                <p className="text-xs text-gray-400">
+                  Quando não houver atestado: informe quantas horas do dia serão creditadas. O restante será descontado como falta.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

@@ -116,6 +116,13 @@
             <version>1.11.0</version>
         </dependency>
 
+        <!-- Apache PDFBox for PDF text extraction (Módulo Fiscal - CNPJ). 2.x: PDDocument.load(InputStream). -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>2.0.30</version>
+        </dependency>
+
         <!-- Apache POI for Excel generation -->
         <dependency>
             <groupId>org.apache.poi</groupId>
@@ -224,13 +231,6 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- PDFBox -->
-        <dependency>
-            <groupId>org.apache.pdfbox</groupId>
-            <artifactId>pdfbox</artifactId>
-            <version>2.0.29</version>
-        </dependency>
-        
         <!-- iTextPDF for PDF generation -->
         <dependency>
             <groupId>com.itextpdf</groupId>

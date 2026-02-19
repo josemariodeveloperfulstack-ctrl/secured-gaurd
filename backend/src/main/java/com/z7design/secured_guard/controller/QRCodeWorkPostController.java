@@ -37,7 +37,7 @@ public class QRCodeWorkPostController {
     private final WorkPostRepository workPostRepository;
 
     @PostMapping("/generate")
-    @PreAuthorize("hasAnyAuthority('WORK_POST_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WORK_POST_MANAGE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<?> generateQRCode(@RequestBody Map<String, Object> request) {
         try {
             UUID workPostId = UUID.fromString((String) request.get("workPostId"));
@@ -124,7 +124,7 @@ public class QRCodeWorkPostController {
     }
 
     @GetMapping("/work-post/{workPostId}")
-    @PreAuthorize("hasAnyAuthority('WORK_POST_READ', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WORK_POST_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<?> getQRCodesByWorkPost(@PathVariable UUID workPostId) {
         try {
             List<QRCodeWorkPost> qrCodes = qrCodeWorkPostRepository.findByWorkPostId(workPostId);
@@ -142,7 +142,7 @@ public class QRCodeWorkPostController {
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyAuthority('WORK_POST_READ', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WORK_POST_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<?> getActiveQRCodes() {
         try {
             List<QRCodeWorkPost> qrCodes = qrCodeWorkPostRepository.findByIsActiveTrue();
@@ -161,7 +161,7 @@ public class QRCodeWorkPostController {
     }
 
     @PutMapping("/{id}/toggle")
-    @PreAuthorize("hasAnyAuthority('WORK_POST_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WORK_POST_MANAGE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<?> toggleQRCode(@PathVariable UUID id) {
         try {
             QRCodeWorkPost qrCodeWorkPost = qrCodeWorkPostRepository.findById(id)

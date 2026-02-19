@@ -74,7 +74,7 @@ public class ProposalController {
 
     @GetMapping("/{id}/pdf")
     @Operation(summary = "Gerar PDF da proposta comercial", description = "Gera PDF da proposta usando o layout padronizado")
-    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<byte[]> generateProposalPdf(@PathVariable String id) {
         byte[] pdf = proposalCommercialPdfService.generatePdf(UUID.fromString(id));
         HttpHeaders headers = new HttpHeaders();
@@ -86,7 +86,7 @@ public class ProposalController {
 
     @PostMapping("/pdf/from-simulation")
     @Operation(summary = "Gerar PDF da simulação", description = "Gera PDF da proposta de acordo a partir dos dados da simulação (layout padronizado)")
-    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<byte[]> generatePdfFromSimulation(@RequestBody PropostaSimulacaoRequest request) {
         byte[] pdf = proposalCommercialPdfService.generatePdfFromSimulation(request);
         HttpHeaders headers = new HttpHeaders();

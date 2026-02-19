@@ -5,18 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Edit, 
-  Trash2, 
-  Eye, 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Edit,
+  Trash2,
+  Eye,
+  Search,
+  Filter,
+  Download,
   AlertTriangle,
   CheckCircle,
   Clock,
   XCircle,
-  Calendar
+  Calendar,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { ContaAPagar } from './ContasAPagarFormModal';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
@@ -29,6 +31,8 @@ interface ContasAPagarTableProps {
   onView: (conta: ContaAPagar) => void;
   onRefresh: () => void;
   loading?: boolean;
+  onExportPeriodo?: () => void;
+  exportLoading?: boolean;
 }
 
 export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
@@ -37,7 +41,9 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
   onDelete,
   onView,
   onRefresh,
-  loading = false
+  loading = false,
+  onExportPeriodo,
+  exportLoading = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -123,6 +129,21 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
     return isAfter(vencimento, hoje) && isBefore(vencimento, em7Dias);
   };
 
+  // Paginação local da tabela
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+  const totalPages = Math.ceil(contasFiltradas.length / pageSize) || 1;
+
+  const contasPaginadas = contasFiltradas.slice(
+    (page - 1) * pageSize,
+    page * pageSize
+  );
+
+  // Resetar página ao mudar filtros ou dados
+  React.useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter, tipoFilter, fornecedorFilter, contas.length]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -145,12 +166,14 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
               Listagem de Contas a Pagar
             </CardTitle>
             <Button 
-              variant="outline" 
-              size="sm" 
-              className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
+              variant="outline"
+              size="sm"
+              onClick={onExportPeriodo}
+              disabled={!onExportPeriodo || exportLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download size={16} className="mr-2" />
-              Exportar
+              {exportLoading ? 'Exportando...' : 'Exportar'}
             </Button>
           </div>
         </CardHeader>
@@ -172,7 +195,7 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contasFiltradas.map((conta) => (
+                {contasPaginadas.map((conta) => (
                   <TableRow 
                     key={conta.id} 
                     className={`
@@ -269,6 +292,47 @@ export const ContasAPagarTable: React.FC<ContasAPagarTableProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Paginação */}
+      {contasFiltradas.length > 0 && (
+        <div className="flex items-center justify-between text-xs sm:text-sm text-gray-300 bg-seguranca-black border border-gray-700 rounded-lg px-3 py-2">
+          <div className="truncate">
+            Mostrando{' '}
+            {Math.min((page - 1) * pageSize + 1, contasFiltradas.length)} -{' '}
+            {Math.min(page * pageSize, contasFiltradas.length)} de{' '}
+            {contasFiltradas.length} conta(s)
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="border-gray-600 text-gray-300 hover:bg-seguranca-black disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft size={16} className="mr-1" />
+              Anterior
+            </Button>
+
+            <span className="px-1 sm:px-2">
+              Página {page} de {totalPages}
+            </span>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === totalPages}
+              onClick={() =>
+                setPage((p) => (p < totalPages ? p + 1 : p))
+              }
+              className="border-gray-600 text-gray-300 hover:bg-seguranca-black disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Próxima
+              <ChevronRight size={16} className="ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

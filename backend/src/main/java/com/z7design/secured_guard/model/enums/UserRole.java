@@ -9,6 +9,8 @@ public enum UserRole {
     TI_SUPORTE, // 🟪 Gerencia configuração técnica
     AUDITOR, // 🟫 Acesso somente leitura
     COLABORADOR,
-    COMERCIAL, // 🟥 Departamento Comercial
-    ASSISTENTE_ADMINISTRATIVO // 🟨 Assistente Administrativo (Financeiro/Medição)
+    COMERCIAL, // Departamento Comercial (legado; preferir GESTOR_COMERCIAL ou ASSISTENTE_COMERCIAL)
+    GESTOR_COMERCIAL, // Acesso total ao módulo Comercial: Leads, Empresas, Clientes, Propostas, Orçamentos, Contratos, CRM
+    ASSISTENTE_COMERCIAL, // Leads, Clientes, Propostas, Orçamentos, CRM Comercial (sem Empresas e Contratos)
+    ASSISTENTE_ADMINISTRATIVO // Assistente Administrativo (Financeiro/Medição)
 }

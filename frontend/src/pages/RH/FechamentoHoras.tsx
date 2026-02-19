@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,16 +11,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   Calendar, 
-  Clock, 
   Upload, 
   FileText, 
-  TrendingUp, 
-  TrendingDown,
   Download,
   RefreshCw,
   AlertCircle,
-  Plus,
-  X
+  Search
 } from 'lucide-react';
 import { payrollClosureService, PayrollClosure, PayPeriod } from '@/services/payrollClosureService';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/axios';
 import { timeSheetService } from '@/services/timeSheetService';
+import LancamentoManualFolhaPonto from './LancamentoManualFolhaPonto';
 
 const FechamentoHoras: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +51,17 @@ const FechamentoHoras: React.FC = () => {
     negativeBalance: number;
   } | null>(null);
   const [bankHoursLoading, setBankHoursLoading] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
+
+  const filteredClosures = useMemo(() => {
+    const term = employeeSearch.trim().toLowerCase();
+    if (!term) return closures;
+    return closures.filter((c) => {
+      const name = (c.employee?.name ?? c.employeeName ?? '').toLowerCase();
+      const id = (c.employee?.id ?? c.employeeId ?? '').toString().toLowerCase();
+      return name.includes(term) || id.includes(term);
+    });
+  }, [closures, employeeSearch]);
 
   useEffect(() => {
     loadData();
@@ -151,6 +159,14 @@ const FechamentoHoras: React.FC = () => {
   };
 
   const handleDownloadTimeSheet = async (employeeId: string) => {
+    if (!employeeId) {
+      toast({
+        title: 'Ação indisponível',
+        description: 'ID do funcionário não disponível para este fechamento.',
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       const blob = await timeSheetService.downloadTimeSheet(employeeId, selectedYear, selectedMonth);
       const url = window.URL.createObjectURL(blob);
@@ -345,6 +361,7 @@ const FechamentoHoras: React.FC = () => {
           <TabsTrigger value="closures">Fechamentos</TabsTrigger>
           <TabsTrigger value="periods">Períodos</TabsTrigger>
           <TabsTrigger value="bank-hours">Banco de Horas</TabsTrigger>
+          <TabsTrigger value="lancamento-manual">Lançamento Manual</TabsTrigger>
         </TabsList>
 
         <TabsContent value="closures" className="space-y-4">
@@ -361,6 +378,24 @@ const FechamentoHoras: React.FC = () => {
               </Button>
             </CardHeader>
             <CardContent>
+              {closures.length > 0 && (
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar funcionário por nome..."
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  {employeeSearch.trim() && (
+                    <span className="text-sm text-muted-foreground">
+                      {filteredClosures.length} de {closures.length}
+                    </span>
+                  )}
+                </div>
+              )}
               {loading ? (
                 <div className="text-center py-8">Carregando...</div>
               ) : closures.length === 0 ? (
@@ -368,6 +403,13 @@ const FechamentoHoras: React.FC = () => {
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     Nenhum fechamento encontrado para este período.
+                  </AlertDescription>
+                </Alert>
+              ) : filteredClosures.length === 0 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Nenhum funcionário encontrado para &quot;{employeeSearch.trim()}&quot;.
                   </AlertDescription>
                 </Alert>
               ) : (
@@ -384,10 +426,10 @@ const FechamentoHoras: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {closures.map((closure) => (
+                    {filteredClosures.map((closure) => (
                       <TableRow key={closure.id}>
                         <TableCell className="font-medium">
-                          {closure.employeeName || closure.employeeId}
+                          {closure.employee?.name ?? closure.employeeName ?? closure.employeeId ?? '—'}
                         </TableCell>
                         <TableCell>
                           {closure.startDate} a {closure.endDate}
@@ -425,7 +467,8 @@ const FechamentoHoras: React.FC = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDownloadTimeSheet(closure.employeeId)}
+                              disabled={!(closure.employee?.id ?? closure.employeeId)}
+                              onClick={() => handleDownloadTimeSheet(closure.employee?.id ?? closure.employeeId ?? '')}
                               title="Baixar folha de ponto (Excel)"
                             >
                               <Download className="h-4 w-4" />
@@ -622,6 +665,10 @@ const FechamentoHoras: React.FC = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="lancamento-manual" className="space-y-4">
+          <LancamentoManualFolhaPonto />
         </TabsContent>
       </Tabs>
 

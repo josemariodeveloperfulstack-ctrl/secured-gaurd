@@ -51,6 +51,37 @@ public class PaymentReceiptController {
     }
     
     // Buscar todos os comprovantes
+    /**
+     * Retorna apenas os comprovantes do usuário autenticado, resolvendo o CPF a partir do token.
+     * Útil para telas de "Meus Documentos" onde cada colaborador só pode ver seus próprios comprovantes.
+     */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<PaymentReceiptDTO>> getMyPaymentReceipts() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated()) {
+                log.warn("⚠️ Tentativa de acesso a /api/receipts/me sem autenticação válida");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+            var resolvedCpf = authenticatedCpfResolver.resolve(auth);
+            if (resolvedCpf.isEmpty()) {
+                log.warn("⚠️ Não foi possível determinar o CPF do usuário autenticado {}", auth.getName());
+                return ResponseEntity.ok(Collections.emptyList());
+            }
+
+            String cpf = resolvedCpf.get();
+            log.info("👤 Usuário autenticado, buscando comprovantes por CPF: {}", cpf);
+            List<PaymentReceiptDTO> receipts = paymentReceiptService.findByUserCpf(cpf);
+            log.info("✅ Comprovantes encontrados para CPF {}: {} registros", cpf, receipts.size());
+            return ResponseEntity.ok(receipts);
+        } catch (Exception e) {
+            log.error("❌ Erro ao buscar comprovantes do usuário autenticado: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_COLABORADOR')")
     public ResponseEntity<List<PaymentReceiptDTO>> getAllPaymentReceipts(

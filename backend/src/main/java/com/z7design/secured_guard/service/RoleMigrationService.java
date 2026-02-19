@@ -170,6 +170,8 @@ public class RoleMigrationService {
                 "CLIENTE",
                 "COLABORADOR",
                 "COMERCIAL",
+                "GESTOR_COMERCIAL",
+                "ASSISTENTE_COMERCIAL",
                 "DEPARTAMENTO_PESSOAL"
         };
 

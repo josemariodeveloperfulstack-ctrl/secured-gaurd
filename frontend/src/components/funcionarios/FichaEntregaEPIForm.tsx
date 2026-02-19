@@ -55,7 +55,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
     funcionarioId: employeeId || '',
     empresaId: '',
     dataEntrega: '',
-    responsavelEntrega: '',
+    responsavelEntregaId: '',
     observacoes: '',
   });
 
@@ -741,7 +741,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pela Entrega</Label>
                 <Select
-                  value={form.responsavelEntregaId}
+                  value={form.responsavelEntregaId || ''}
                   onValueChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
                   disabled={loadingData}
                 >
@@ -839,7 +839,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
                         <div className="space-y-2 lg:col-span-2">
                           <Label>Nome do EPI</Label>
                           <Select
-                            value={epi.nome || undefined}
+                            value={epi.nome || ''}
                             onValueChange={(value) => {
                               handleEpiChange(idx, 'nome', value);
                               // Limpar campos de uniforme se mudar o EPI
@@ -928,7 +928,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
                             <div className="space-y-2">
                               <Label className="font-semibold text-seguranca-lightgray">Tipo de Uniforme *</Label>
                               <Select
-                                value={epi.uniformeTipo}
+                                value={epi.uniformeTipo || ''}
                                 onValueChange={(value) => {
                                   handleEpiChange(idx, 'uniformeTipo', value);
                                   if (value !== 'INDIVIDUAL') {
@@ -951,7 +951,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
                               <div className="space-y-2">
                                 <Label className="font-semibold text-seguranca-lightgray">Peça do Uniforme *</Label>
                                 <Select
-                                  value={epi.uniformePeca}
+                                  value={epi.uniformePeca || ''}
                                   onValueChange={(value) => handleEpiChange(idx, 'uniformePeca', value)}
                                 >
                                   <SelectTrigger className="bg-background">

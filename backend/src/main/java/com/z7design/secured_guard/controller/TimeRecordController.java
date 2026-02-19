@@ -28,7 +28,11 @@ public class TimeRecordController {
     private final TimeRecordService timeRecordService;
 
     @PostMapping("/register")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_CREATE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("""
+            hasAnyAuthority('TIME_RECORD_CREATE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
+                            'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
+            or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+            """)
     public ResponseEntity<?> registerTimeRecord(@RequestBody Map<String, Object> request) {
         try {
             UUID employeeId = UUID.fromString((String) request.get("employeeId"));
@@ -63,7 +67,11 @@ public class TimeRecordController {
     }
 
     @GetMapping("/today/{employeeId}")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("""
+            hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
+                            'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
+            or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+            """)
     public ResponseEntity<?> getTodayRecords(@PathVariable UUID employeeId) {
         try {
             List<TimeRecord> records = timeRecordService.getTodayRecords(employeeId);
@@ -81,7 +89,7 @@ public class TimeRecordController {
     }
 
     @GetMapping("/employee/{employeeId}")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getEmployeeRecords(
             @PathVariable UUID employeeId,
             @RequestParam(defaultValue = "0") int page,
@@ -106,7 +114,11 @@ public class TimeRecordController {
     }
 
     @GetMapping("/period/{employeeId}")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("""
+            hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
+                            'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
+            or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+            """)
     public ResponseEntity<?> getRecordsByPeriod(
             @PathVariable UUID employeeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -128,7 +140,11 @@ public class TimeRecordController {
     }
 
     @GetMapping("/next-record-type/{employeeId}")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("""
+            hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
+                            'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
+            or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+            """)
     public ResponseEntity<?> getNextRecordType(@PathVariable UUID employeeId) {
         try {
             TimeRecord.RecordType nextType = timeRecordService.getNextRecordType(employeeId);
@@ -146,7 +162,7 @@ public class TimeRecordController {
     }
 
     @GetMapping("/pending")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<?> getPendingRecords(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -169,7 +185,7 @@ public class TimeRecordController {
     }
 
     @PutMapping("/{recordId}/approve")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<?> approveRecord(
             @PathVariable UUID recordId,
             @RequestBody Map<String, String> request,
@@ -192,7 +208,7 @@ public class TimeRecordController {
     }
 
     @PutMapping("/{recordId}/reject")
-    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<?> rejectRecord(
             @PathVariable UUID recordId,
             @RequestBody Map<String, String> request) {
@@ -207,6 +223,37 @@ public class TimeRecordController {
             ));
         } catch (Exception e) {
             log.error("Erro ao rejeitar registro: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/manual/day")
+    @PreAuthorize("""
+            hasAnyAuthority('TIME_RECORD_READ', 'TIME_RECORD_CREATE', 'TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL',
+            'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')
+            """)
+    public ResponseEntity<?> saveManualDay(@RequestBody Map<String, Object> request) {
+        try {
+            UUID employeeId = UUID.fromString((String) request.get("employeeId"));
+            LocalDate date = LocalDate.parse((String) request.get("date"));
+            String entrada = (String) request.get("entrada");
+            String saidaAlmoco = (String) request.get("saidaAlmoco");
+            String retornoAlmoco = (String) request.get("retornoAlmoco");
+            String saida = (String) request.get("saida");
+
+            List<TimeRecord> saved = timeRecordService.saveManualDay(
+                    employeeId, date, entrada, saidaAlmoco, retornoAlmoco, saida);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Horários do dia salvos no banco de dados",
+                    "data", saved
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao salvar lançamento manual do dia: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "error", e.getMessage()

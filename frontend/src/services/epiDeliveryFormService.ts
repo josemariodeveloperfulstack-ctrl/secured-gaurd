@@ -175,6 +175,21 @@ export const epiDeliveryFormService = {
   },
 
   /**
+   * Gerar PDF de uma ficha de entrega de EPI existente (por ID)
+   */
+  async generatePdfById(id: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/epi-delivery-forms/${id}/generate-pdf`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar PDF da ficha de entrega de EPI:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Gerar PDF da ficha de entrega de EPI e salvar no banco
    */
   async generateAndSavePdf(data: CreateEPIDeliveryForm): Promise<Blob> {

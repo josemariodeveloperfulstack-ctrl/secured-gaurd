@@ -16,10 +16,11 @@ public interface PositionRepository extends JpaRepository<Position, UUID> {
     boolean existsByName(String name);
     
     /**
-     * Busca cargos por nome
+     * Busca cargos por nome ou por CBO (Código Brasileiro de Ocupação).
      */
     @Query("SELECT p FROM Position p " +
            "WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "   OR (p.cbo IS NOT NULL AND LOWER(p.cbo) LIKE LOWER(CONCAT('%', :query, '%'))) " +
            "ORDER BY p.name ASC")
     List<Position> searchPositions(@Param("query") String query);
     

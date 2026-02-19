@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.z7design.secured_guard.model.Vacation;
 import com.z7design.secured_guard.model.Employee;
@@ -63,8 +65,29 @@ public class VacationController {
                     examples = @ExampleObject(value = "{\"employee\":{\"id\":\"UUID_DO_FUNCIONARIO\"}, \"startDate\":\"2024-08-01\", \"endDate\":\"2024-08-30\", \"status\":\"PENDING\"}")))
     @PostMapping
     public ResponseEntity<VacationDTO> create(@RequestBody VacationDTO vacationDTO) {
-        // Buscar o funcionário pelo ID
-        Employee employee = employeeService.findById(vacationDTO.getEmployeeId());
+        // Quando o colaborador abre "Minhas Férias" o frontend envia user.id como employeeId.
+        // Aqui garantimos que sempre vamos resolver o FUNCIONÁRIO correto pelo CPF/usuário autenticado.
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth != null ? auth.getName() : null;
+
+        Employee employee;
+        try {
+            if (vacationDTO.getEmployeeId() != null) {
+                employee = employeeService.findById(vacationDTO.getEmployeeId());
+            } else {
+                throw new RuntimeException("ID do funcionário não informado");
+            }
+        } catch (RuntimeException ex) {
+            // Fallback: tentar resolver pelo CPF/usuário autenticado
+            if (username == null) {
+                throw ex;
+            }
+            employee = employeeService.findByCpfExact(username)
+                    .orElseThrow(() -> new RuntimeException("Funcionário não encontrado para o usuário autenticado"));
+            // alinhar DTO com o funcionário resolvido
+            vacationDTO.setEmployeeId(employee.getId());
+        }
+
         Vacation vacation = vacationDTO.toEntity();
         vacation.setEmployee(employee);
         vacation = vacationService.create(vacation);

@@ -136,6 +136,32 @@ public class PayslipController {
 
     // ==================== ENDPOINTS EXISTENTES ====================
 
+    /**
+     * Retorna os holerites apenas do usuário autenticado, independente do papel.
+     * A resolução do CPF é feita a partir do token JWT.
+     */
+    @GetMapping("/me")
+    @Operation(summary = "Listar holerites do usuário autenticado")
+    public ResponseEntity<List<Payslip>> getMyPayslips() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            log.warn("⚠️ Tentativa de acesso a /api/payslips/me sem autenticação válida");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
+        if (resolvedCpf.isEmpty()) {
+            log.warn("⚠️ Não foi possível determinar o CPF do usuário autenticado {}", auth.getName());
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+
+        String cpf = resolvedCpf.get();
+        log.info("👤 Buscando holerites do usuário autenticado (CPF: {})", cpf);
+        List<Payslip> payslips = payslipService.getPayslipsByCpf(cpf);
+        log.info("✅ Holerites encontrados para CPF {}: {} registros", cpf, payslips.size());
+        return ResponseEntity.ok(payslips);
+    }
+
     @PostMapping("/upload")
     @Operation(summary = "Upload and process one or more PDFs containing multiple payslips (up to 3 files)")
     public ResponseEntity<?> uploadPayslips(

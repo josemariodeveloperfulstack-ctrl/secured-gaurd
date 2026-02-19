@@ -181,6 +181,14 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     PAYROLL_CREATE: false,
     PAYROLL_MANAGE: false,
 
+    // Permissões de Gestão Patrimonial
+    PATRIMONIAL_READ: false,
+    PATRIMONIAL_WRITE: false,
+
+    // Módulo Fiscal
+    FISCAL_READ: false,
+    FISCAL_WRITE: false,
+
     // Permissão de Acesso Total
     ALL_PERMISSIONS: false,
   };
@@ -308,6 +316,10 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         COMMERCIAL_DASHBOARD_READ: true,
         SALES_GOALS_READ: true,
         SALES_GOALS_WRITE: true,
+
+        // Módulo Fiscal
+        FISCAL_READ: true,
+        FISCAL_WRITE: true,
       };
 
     case 'SUPERVISOR':
@@ -389,6 +401,13 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         // Permissões de Atendimento
         ATTENDANCE_READ: true,
         ATTENDANCE_MANAGE: true,
+
+        // Gestão Patrimonial
+        PATRIMONIAL_READ: true,
+        PATRIMONIAL_WRITE: true,
+        // Módulo Fiscal
+        FISCAL_READ: true,
+        FISCAL_WRITE: true,
       };
 
     case 'FINANCEIRO':
@@ -432,6 +451,13 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
 
         // Permissões de Atendimento
         ATTENDANCE_READ: true,
+
+        // Gestão Patrimonial
+        PATRIMONIAL_READ: true,
+        PATRIMONIAL_WRITE: true,
+        // Módulo Fiscal
+        FISCAL_READ: true,
+        FISCAL_WRITE: true,
       };
 
     case 'TI_SUPORTE':
@@ -618,6 +644,10 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         PAYROLL_READ: true,
         PAYROLL_CREATE: true,
         PAYROLL_MANAGE: true,
+
+        // Gestão Patrimonial
+        PATRIMONIAL_READ: true,
+        PATRIMONIAL_WRITE: true,
       };
 
     case 'OPERACIONAL':

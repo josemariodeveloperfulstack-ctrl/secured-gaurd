@@ -3,8 +3,8 @@ import { StandardLayout } from '@/components/StandardLayout';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import {
-  Database, Server, HardDrive, Clock, Save, TestTube, 
-  PlayCircle, Trash2, CheckCircle, XCircle, Loader2, AlertTriangle
+  Database, Server, HardDrive, Clock, Save, TestTube,
+  PlayCircle, CheckCircle, XCircle, Loader2, AlertTriangle, Download
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -46,6 +46,12 @@ interface GoogleDriveConfig {
   enabled: boolean;
   folderId: string;
   description: string;
+}
+
+interface BackupFile {
+  fileName: string;
+  size: number;
+  timestamp: string;
 }
 
 const ConfiguracaoBackup: React.FC = () => {
@@ -93,10 +99,13 @@ const ConfiguracaoBackup: React.FC = () => {
   });
 
   const [history, setHistory] = useState<BackupHistory[]>([]);
+  const [backupFiles, setBackupFiles] = useState<BackupFile[]>([]);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     loadConfigurations();
     loadHistory();
+    loadBackupFiles();
   }, []);
 
   const loadConfigurations = async () => {
@@ -149,6 +158,51 @@ const ConfiguracaoBackup: React.FC = () => {
       setHistory(response.data);
     } catch (error) {
       console.error('Erro ao carregar histórico:', error);
+    }
+  };
+
+  const loadBackupFiles = async () => {
+    try {
+      const response = await api.get('/api/backup/files');
+      setBackupFiles(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Erro ao carregar arquivos de backup:', error);
+      setBackupFiles([]);
+    }
+  };
+
+  const handleDownloadBackup = async (fileName: string) => {
+    setDownloading(fileName);
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const base = api.defaults.baseURL || window.location.origin;
+      const url = `${base.replace(/\/$/, '')}/api/backup/download?fileName=${encodeURIComponent(fileName)}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Falha ao baixar');
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      a.remove();
+      toast({
+        title: 'Download concluído',
+        description: `Arquivo ${fileName} baixado com sucesso.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao baixar',
+        description: error?.message || 'Não foi possível baixar o arquivo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -210,7 +264,7 @@ const ConfiguracaoBackup: React.FC = () => {
     setExecuting(type);
 
     try {
-      const response = await api.post(`/api/backup/execute/${configId}`);
+      const response = await api.post('/api/backup/execute', { description: type === 'LOCAL' ? 'backup-local' : 'backup-vps', configId });
       
       if (response.data.success) {
         toast({
@@ -218,8 +272,11 @@ const ConfiguracaoBackup: React.FC = () => {
           description: response.data.message,
         });
         
-        // Recarregar histórico após 5 segundos
-        setTimeout(() => loadHistory(), 5000);
+        // Recarregar histórico e lista de arquivos após 5 segundos
+        setTimeout(() => {
+          loadHistory();
+          loadBackupFiles();
+        }, 5000);
       }
     } catch (error: any) {
       toast({
@@ -673,10 +730,65 @@ const ConfiguracaoBackup: React.FC = () => {
 
           {/* Histórico */}
           <TabsContent value="history" className="space-y-4">
+            {/* Arquivos disponíveis para download */}
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5 text-green-400" />
+                  Baixar arquivos do sistema e banco de dados
+                </CardTitle>
+                <CardDescription>
+                  Arquivos de backup disponíveis no servidor. Clique em &quot;Baixar&quot; para fazer o download.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {backupFiles.length === 0 ? (
+                    <p className="text-center text-gray-400 py-6">
+                      Nenhum arquivo de backup disponível. Execute um backup (aba Backup Local ou VPS) para gerar arquivos.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {backupFiles.map((file) => (
+                        <div
+                          key={file.fileName}
+                          className="flex items-center justify-between border border-gray-600 rounded-lg p-3"
+                        >
+                          <div>
+                            <span className="font-medium text-seguranca-lightgray block">{file.fileName}</span>
+                            <span className="text-sm text-gray-400">
+                              {formatBytes(file.size)}
+                              {file.timestamp ? ` • ${file.timestamp}` : ''}
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadBackup(file.fileName)}
+                            disabled={downloading === file.fileName}
+                            className="border-green-600 text-green-400 hover:bg-green-600/20"
+                          >
+                            {downloading === file.fileName ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Download className="h-4 w-4 mr-1" />
+                                Baixar
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="bg-seguranca-graphite border-gray-600">
               <CardHeader>
                 <CardTitle>Historico de Backups</CardTitle>
-                <CardDescription>Ultimos backups executados</CardDescription>
+                <CardDescription>Ultimos backups executados (registros)</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -692,13 +804,13 @@ const ConfiguracaoBackup: React.FC = () => {
                             {new Date(item.backupDate).toLocaleString('pt-BR')}
                           </span>
                           <Badge className={
-                            item.status === 'SUCCESS' ? 'bg-green-600' : 
+                            item.status === 'SUCCESS' ? 'bg-green-600' :
                             item.status === 'FAILED' ? 'bg-red-600' : 'bg-yellow-600'
                           }>
                             {item.status}
                           </Badge>
                         </div>
-                        
+
                         <div className="text-sm text-gray-400 space-y-1">
                           {item.backupSizeBytes && (
                             <div>Tamanho: {formatBytes(item.backupSizeBytes)}</div>

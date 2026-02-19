@@ -75,9 +75,12 @@ const ContasAPagar: React.FC = () => {
   const [empresaFilterRelatorio, setEmpresaFilterRelatorio] = useState<string>('TODAS');
   const [showEmpresaFilterRelatorio, setShowEmpresaFilterRelatorio] = useState<boolean>(false);
 
-  // Estados para paginação
+  // Estados para paginação (aba Relatórios)
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
+
+  // Estado de carregamento para exportação da lista principal
+  const [listExportLoading, setListExportLoading] = useState(false);
 
   // Estatísticas do dashboard
   const [stats, setStats] = useState({
@@ -97,7 +100,8 @@ const ContasAPagar: React.FC = () => {
       console.log('🔍 DEBUG: Iniciando carregamento de dados...');
 
       const [contasData, estatisticas] = await Promise.all([
-        contasAPagarService.getContasAPagar(),
+        // Carregar todas as contas (sem paginação do backend) para permitir paginação completa no frontend
+        contasAPagarService.getAllContasAPagar(),
         contasAPagarService.getEstatisticas()
       ]);
 
@@ -230,6 +234,68 @@ const ContasAPagar: React.FC = () => {
     setShowFormModal(false);
     setEditingConta(null);
     loadData();
+  };
+
+  // Exportar todas as contas a pagar do período selecionado (aba Contas)
+  const handleExportContasPeriodoPdf = async () => {
+    if (contasFiltradas.length === 0) {
+      toast({
+        title: "Aviso",
+        description: "Não há contas para exportar no período e filtros selecionados.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setListExportLoading(true);
+
+      const inicioMes = new Date(anoSelecionado, mesSelecionado - 1, 1);
+      const fimMes = new Date(anoSelecionado, mesSelecionado, 0);
+
+      const startDate = format(inicioMes, 'yyyy-MM-dd');
+      const endDate = format(fimMes, 'yyyy-MM-dd');
+
+      const url = `/api/reports/contas-a-pagar?startDate=${startDate}&endDate=${endDate}&format=pdf`;
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao gerar relatório no servidor');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+
+      const mesStr = String(mesSelecionado).padStart(2, '0');
+      const filename = `contas-a-pagar-${anoSelecionado}-${mesStr}.pdf`;
+
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast({
+        title: "Sucesso",
+        description: `PDF de Contas a Pagar gerado para ${mesStr}/${anoSelecionado}.`
+      });
+    } catch (error) {
+      console.error('Erro ao exportar PDF de Contas a Pagar do período:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar PDF de Contas a Pagar para o período selecionado.",
+        variant: "destructive"
+      });
+    } finally {
+      setListExportLoading(false);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -1023,7 +1089,7 @@ const ContasAPagar: React.FC = () => {
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-lg">
-                    <FileText className="text-blue-600" />
+                    <FileText className="text-blue-500" />
                     Filtros e Busca
                   </div>
                 </CardTitle>
@@ -1037,7 +1103,7 @@ const ContasAPagar: React.FC = () => {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Buscar por descrição ou fornecedor..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 bg-seguranca-black border border-gray-700 rounded-lg text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
 
@@ -1046,12 +1112,12 @@ const ContasAPagar: React.FC = () => {
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 bg-seguranca-black border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="TODOS">Todos os Status</option>
-                      <option value="ABERTA">Aberta</option>
-                      <option value="PAGA">Paga</option>
-                      <option value="VENCIDA">Vencida</option>
+                      <option value="TODOS" className="text-gray-900">Todos os Status</option>
+                      <option value="ABERTA" className="text-gray-900">Aberta</option>
+                      <option value="PAGA" className="text-gray-900">Paga</option>
+                      <option value="VENCIDA" className="text-gray-900">Vencida</option>
                     </select>
                   </div>
 
@@ -1060,11 +1126,11 @@ const ContasAPagar: React.FC = () => {
                     <select
                       value={tipoFilter}
                       onChange={(e) => setTipoFilter(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 bg-seguranca-black border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <option value="TODOS">Todos os Tipos</option>
-                      <option value="FIXA">Fixa</option>
-                      <option value="VARIAVEL">Variável</option>
+                      <option value="TODOS" className="text-gray-900">Todos os Tipos</option>
+                      <option value="FIXA" className="text-gray-900">Fixa</option>
+                      <option value="VARIAVEL" className="text-gray-900">Variável</option>
                     </select>
                   </div>
                 </div>
@@ -1142,6 +1208,8 @@ const ContasAPagar: React.FC = () => {
               onView={handleViewConta}
               onRefresh={loadData}
               loading={loading}
+              onExportPeriodo={handleExportContasPeriodoPdf}
+              exportLoading={listExportLoading}
             />
           </TabsContent>
 

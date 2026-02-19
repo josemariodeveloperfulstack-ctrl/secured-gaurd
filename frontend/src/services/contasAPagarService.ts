@@ -196,7 +196,7 @@ export interface AnaliseFluxoPagamento {
 export const contasAPagarService = {
   // ===== CONTAS A PAGAR =====
   
-  // Buscar todas as contas
+  // Buscar contas com paginação básica (usando /api/invoices)
   async getContasAPagar(filters: ContasAPagarFilters = {}): Promise<ContaAPagar[]> {
     const params = new URLSearchParams();
     
@@ -211,10 +211,10 @@ export const contasAPagarService = {
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
-    console.log('🔍 DEBUG: Fazendo requisição para /invoices com params:', params.toString());
+    console.log('🔍 DEBUG: Fazendo requisição para /api/invoices com params:', params.toString());
     const response = await api.get(`/api/invoices?${params.toString()}`);
     
-    console.log('🔍 DEBUG: Resposta da API:', response.data);
+    console.log('🔍 DEBUG: Resposta da API /api/invoices:', response.data);
     
     // Transformar dados do backend para o formato do frontend
     const invoices = Array.isArray(response.data) ? response.data : response.data.content || [];
@@ -252,6 +252,20 @@ export const contasAPagarService = {
         centroCusto: invoice.centroCusto
       };
     });
+  },
+
+  // Buscar todas as contas (sem paginação) usando endpoint dedicado
+  // Usado na tela principal de Contas a Pagar para garantir que
+  // todas as contas sejam carregadas e a paginação seja feita no frontend.
+  async getAllContasAPagar(): Promise<ContaAPagar[]> {
+    console.log('🔍 DEBUG: Fazendo requisição para /api/invoices/all (sem paginação)');
+    const response = await api.get('/api/invoices/all');
+    const data = Array.isArray(response.data) ? response.data : response.data.content || [];
+    console.log('🔍 DEBUG: Resposta da API /api/invoices/all:', {
+      quantidade: Array.isArray(data) ? data.length : 0
+    });
+
+    return data.map((invoice: any) => this.mapInvoiceToContaAPagar(invoice));
   },
 
   // Buscar conta por ID

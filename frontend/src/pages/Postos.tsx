@@ -17,7 +17,9 @@ import {
   XCircle,
   Pause,
   Play,
-  Calendar
+  Calendar,
+  QrCode,
+  Link as LinkIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +54,9 @@ import WorkPostFormModal from '@/components/postos/WorkPostFormModal';
 import WorkPostViewModal from '@/components/postos/WorkPostViewModal';
 import WorkPostDeleteDialog from '@/components/postos/WorkPostDeleteDialog';
 import { StandardLayout } from '@/components/StandardLayout';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import qrCodeService, { QRCodeWorkPost } from '@/services/qrCodeService';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Postos: React.FC = () => {
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
@@ -70,8 +75,17 @@ const Postos: React.FC = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedWorkPost, setSelectedWorkPost] = useState<WorkPost | null>(null);
   const [editingWorkPost, setEditingWorkPost] = useState<WorkPost | null>(null);
-  
+
+  // Gestão de QR Codes
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrSelectedWorkPost, setQrSelectedWorkPost] = useState<WorkPost | null>(null);
+  const [qrCodes, setQrCodes] = useState<QRCodeWorkPost[]>([]);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrDescription, setQrDescription] = useState('');
+  const [qrRadius, setQrRadius] = useState<number>(100);
+
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Carregar dados
   useEffect(() => {
@@ -178,6 +192,110 @@ const Postos: React.FC = () => {
         title: "Erro",
         description: "Erro ao excluir posto de trabalho",
         variant: "destructive",
+      });
+    }
+  };
+
+  // QR Codes - carregar lista para um posto
+  const openQrModalForWorkPost = async (workPost: WorkPost) => {
+    setQrSelectedWorkPost(workPost);
+    setIsQrModalOpen(true);
+    setQrDescription('');
+    setQrRadius(100);
+
+    try {
+      setQrLoading(true);
+      const response = await qrCodeService.getQRCodesByWorkPost(workPost.id);
+      if (response?.success && Array.isArray(response.data)) {
+        setQrCodes(response.data);
+      } else {
+        setQrCodes([]);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar QR Codes:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os QR Codes deste posto.',
+        variant: 'destructive',
+      });
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleGenerateQrCode = async () => {
+    if (!qrSelectedWorkPost || !user) return;
+
+    try {
+      setQrLoading(true);
+      const result = await qrCodeService.generateQRCode(
+        qrSelectedWorkPost.id,
+        qrDescription || `QR Code para ${qrSelectedWorkPost.name}`,
+        user.id,
+        undefined,
+        undefined,
+        qrRadius
+      );
+
+      if (result?.success && result.data) {
+        // recarregar lista
+        const refreshed = await qrCodeService.getQRCodesByWorkPost(qrSelectedWorkPost.id);
+        setQrCodes(refreshed?.data ?? []);
+        toast({
+          title: 'QR Code gerado',
+          description: 'QR Code gerado com sucesso para o posto.',
+        });
+      } else {
+        toast({
+          title: 'Erro ao gerar QR Code',
+          description: result?.error || 'Tente novamente mais tarde.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('Erro ao gerar QR Code:', error);
+      toast({
+        title: 'Erro ao gerar QR Code',
+        description: error?.response?.data?.error || error.message || 'Não foi possível gerar o QR Code.',
+        variant: 'destructive',
+      });
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleDownloadQrImage = async (qr: QRCodeWorkPost) => {
+    try {
+      const url = await qrCodeService.getQRCodeImage(qr.id);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `qrcode-posto-${qrSelectedWorkPost?.postCode || ''}-${qr.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error('Erro ao baixar QR Code:', error);
+      toast({
+        title: 'Erro ao baixar QR Code',
+        description: error?.response?.data?.error || error.message || 'Não foi possível baixar o QR Code.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleToggleQrActive = async (qr: QRCodeWorkPost) => {
+    try {
+      await qrCodeService.toggleQRCode(qr.id);
+      if (!qrSelectedWorkPost) return;
+      const refreshed = await qrCodeService.getQRCodesByWorkPost(qrSelectedWorkPost.id);
+      setQrCodes(refreshed?.data ?? []);
+    } catch (error: any) {
+      console.error('Erro ao alterar status do QR Code:', error);
+      toast({
+        title: 'Erro ao alterar status',
+        description: error?.response?.data?.error || error.message || 'Não foi possível alterar o status do QR Code.',
+        variant: 'destructive',
       });
     }
   };
@@ -504,6 +622,10 @@ const Postos: React.FC = () => {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openQrModalForWorkPost(workPost)}>
+                                <QrCode className="mr-2 h-4 w-4" />
+                                QR Codes do Posto
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteWorkPost(workPost)}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Excluir
@@ -542,9 +664,106 @@ const Postos: React.FC = () => {
           workPost={selectedWorkPost}
           onConfirm={handleDeleteConfirm}
         />
+
+        {/* Modal de gestão de QR Codes do posto */}
+        <Dialog open={isQrModalOpen} onOpenChange={setIsQrModalOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <QrCode className="h-5 w-5" />
+                QR Codes do Posto
+              </DialogTitle>
+              <DialogDescription>
+                Gere e baixe os QR Codes para este posto de trabalho. Cada QR pode ser impresso e afixado no local.
+              </DialogDescription>
+            </DialogHeader>
+
+            {qrSelectedWorkPost && (
+              <div className="space-y-4">
+                <div className="text-sm">
+                  <p><span className="font-semibold">Posto:</span> {qrSelectedWorkPost.name}</p>
+                  <p className="text-muted-foreground">
+                    Código: {qrSelectedWorkPost.postCode} • {qrSelectedWorkPost.city}, {qrSelectedWorkPost.state}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Novo QR Code</p>
+                  <Input
+                    placeholder="Descrição (opcional) - ex: Portaria Principal"
+                    value={qrDescription}
+                    onChange={(e) => setQrDescription(e.target.value)}
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Raio da área (m):</span>
+                    <Input
+                      type="number"
+                      className="w-24"
+                      value={qrRadius}
+                      onChange={(e) => setQrRadius(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleGenerateQrCode}
+                    disabled={qrLoading || !user}
+                  >
+                    {qrLoading ? 'Gerando...' : 'Gerar QR Code'}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">QR Codes existentes</p>
+                  {qrLoading ? (
+                    <p className="text-sm text-muted-foreground">Carregando...</p>
+                  ) : qrCodes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum QR Code gerado ainda para este posto.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {qrCodes.map((qr) => (
+                        <div
+                          key={qr.id}
+                          className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {qr.description || 'QR Code sem descrição'}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Raio: {qr.radiusMeters}m • {qr.isActive ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleDownloadQrImage(qr)}
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleQrActive(qr)}
+                            >
+                              {qr.isActive ? 'Desativar' : 'Ativar'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </StandardLayout>
   );
 };
 
-export default Postos; 
+export default Postos;  

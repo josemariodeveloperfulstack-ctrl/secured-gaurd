@@ -107,7 +107,7 @@ public class DependentController {
         @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
         @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    // Permissões controladas pelo SecurityConfig
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<DependentDTO>> findByEmployeeId(
             @Parameter(description = "ID do funcionário") @PathVariable UUID employeeId) {
         try {

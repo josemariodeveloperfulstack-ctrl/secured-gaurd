@@ -177,10 +177,12 @@ const DashboardColaborador: React.FC = () => {
               <p className="text-sm text-gray-500">Unidade: {user?.unidadeName || 'Geral'}</p>
             </div>
           </div>
-          <button
-            type="button"
-            className="relative cursor-pointer bg-transparent border-0 p-0"
+          <div
+            role="button"
+            tabIndex={0}
+            className="relative cursor-pointer bg-transparent border-0 p-0 inline-flex"
             onClick={() => navigate('/mensagens')}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/mensagens')}
           >
             <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 bg-seguranca-red flex items-center justify-center border-2 border-seguranca-black">
               2
@@ -188,7 +190,7 @@ const DashboardColaborador: React.FC = () => {
             <Button size="icon" variant="ghost" className="rounded-full bg-seguranca-black/40 border border-gray-800 text-gray-400">
               <Mail className="w-5 h-5" />
             </Button>
-          </button>
+          </div>
         </div>
 
         {/* Quick Action Grid - Brutalist Theme */}
@@ -267,28 +269,44 @@ const DashboardColaborador: React.FC = () => {
           <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-600 pl-1">Próximas Ações</h2>
 
           <div className="space-y-4">
-            {/* Action Card: LGPD Priority (Action Stream Approach) */}
-            {!user?.lgpdAccepted && (
-              <Card className="bg-seguranca-red/10 border-seguranca-red/30 rounded-3xl overflow-hidden group">
-                <CardContent className="p-5 flex items-start gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-seguranca-red flex items-center justify-center shrink-0">
-                    <User className="w-6 h-6 text-white" />
+            {/* Action Card: LGPD - pendente ou já assinado */}
+            <Card className={user?.lgpdAccepted
+              ? 'bg-emerald-500/10 border-emerald-500/30 rounded-3xl overflow-hidden group'
+              : 'bg-seguranca-red/10 border-seguranca-red/30 rounded-3xl overflow-hidden group'
+            }>
+              <CardContent className="p-5 flex items-start gap-4">
+                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${user?.lgpdAccepted ? 'bg-emerald-500' : 'bg-seguranca-red'}`}>
+                  <User className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">
+                      {user?.lgpdAccepted ? 'Termos LGPD' : 'LGPD Obrigatória'}
+                    </h3>
+                    <p className="text-sm text-gray-400">
+                      {user?.lgpdAccepted
+                        ? 'Você já assinou os termos de privacidade.'
+                        : 'Temos novos termos de privacidade para você assinar.'}
+                    </p>
                   </div>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <h3 className="text-lg font-bold text-white">LGPD Obrigatória</h3>
-                      <p className="text-sm text-gray-400">Temos novos termos de privacidade para você assinar.</p>
-                    </div>
+                  {user?.lgpdAccepted ? (
+                    <Button
+                      className="w-full bg-emerald-600 text-white font-bold rounded-2xl cursor-default"
+                      disabled
+                    >
+                      Assinado
+                    </Button>
+                  ) : (
                     <Button
                       className="w-full bg-white text-seguranca-red hover:bg-gray-100 font-bold rounded-2xl"
                       onClick={() => navigate('/lgpd-consent')}
                     >
                       Assinar Termos AGORA
                     </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Action Card: Documents */}
             <Card className="bg-seguranca-black/60 border-gray-800 rounded-3xl border-l-4 border-l-blue-500 overflow-hidden">

@@ -6,6 +6,7 @@ import com.z7design.secured_guard.model.EPIDeliveryForm;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,7 +19,7 @@ import java.util.UUID;
  * Repositório para gerenciamento de fichas de entrega de EPI
  */
 @Repository
-public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm, UUID> {
+public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm, UUID>, JpaSpecificationExecutor<EPIDeliveryForm> {
 
     /**
      * Busca fichas por funcionário
@@ -69,22 +70,6 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
      * Busca fichas por período com paginação
      */
     Page<EPIDeliveryForm> findByDeliveryDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
-
-    /**
-     * Busca fichas com filtros combinados
-     */
-    @Query("SELECT f FROM EPIDeliveryForm f WHERE " +
-           "(:employeeId IS NULL OR f.employee.id = :employeeId) AND " +
-           "(:companyId IS NULL OR f.company.id = :companyId) AND " +
-           "(:startDate IS NULL OR f.deliveryDate >= :startDate) AND " +
-           "(:endDate IS NULL OR f.deliveryDate <= :endDate)")
-    Page<EPIDeliveryForm> findByFilters(
-        @Param("employeeId") UUID employeeId,
-        @Param("companyId") UUID companyId,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate,
-        Pageable pageable
-    );
 
     @Query("""
         SELECT f FROM EPIDeliveryForm f

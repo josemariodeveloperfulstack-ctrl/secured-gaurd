@@ -55,6 +55,13 @@ class CBOService {
     { codigo: '5174-10', titulo: 'Segurança pessoal', sinonimo: 'Segurança, Escolta' },
     { codigo: '5174-15', titulo: 'Segurança de aeroporto', sinonimo: 'Segurança, Aeroporto' },
     { codigo: '5174-20', titulo: 'Segurança de banco', sinonimo: 'Segurança, Banco' },
+
+    // Analistas (útil quando a API externa está bloqueada por CORS)
+    { codigo: '2124-05', titulo: 'Analista de sistemas', sinonimo: 'Analista de Sistemas, TI' },
+    { codigo: '2124-10', titulo: 'Analista de sistemas de computação', sinonimo: 'Analista, Desenvolvedor' },
+    { codigo: '2522-05', titulo: 'Analista de recursos humanos', sinonimo: 'Analista de RH, RH' },
+    { codigo: '2522-10', titulo: 'Analista de treinamento e desenvolvimento', sinonimo: 'Analista, T&D' },
+    { codigo: '2512-05', titulo: 'Analista administrativo', sinonimo: 'Analista, Administração' },
   ];
 
   /**
@@ -79,7 +86,7 @@ class CBOService {
       }
     }
 
-    // Tentar API (pode demorar)
+    // Tentar API externa (no browser pode falhar por CORS; nesse caso usamos só a base local)
     try {
       console.log('🌐 Tentando buscar na API externa...');
       const apiResults = await this.searchFromAPI(searchTerm);
@@ -88,10 +95,16 @@ class CBOService {
         return apiResults;
       }
     } catch (error) {
-      console.warn('⚠️ Erro ao buscar CBO na API externa:', error);
+      console.warn('⚠️ Erro ao buscar CBO na API externa (ex.: CORS):', error);
+      // Quando a API externa falha (ex.: CORS no browser), usar base local como fallback
+      const localFallback = this.searchFromLocal(searchTerm.toLowerCase());
+      if (localFallback.length > 0) {
+        console.log('✅ CBOs da base local (API externa indisponível):', localFallback.length);
+        return localFallback;
+      }
     }
 
-    // Se não encontrou na API e pulou a base local, buscar na base local agora
+    // Se pulou a base local no início e a API não retornou nada, tentar base local
     if (skipLocal) {
       const localResults = this.searchFromLocal(searchTerm.toLowerCase());
       if (localResults.length > 0) {
@@ -100,7 +113,6 @@ class CBOService {
       }
     }
 
-    // Se não encontrou nada, retornar vazio
     console.log('❌ Nenhum CBO encontrado');
     return [];
   }

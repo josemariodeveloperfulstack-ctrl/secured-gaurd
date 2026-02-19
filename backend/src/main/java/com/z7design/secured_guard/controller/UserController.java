@@ -9,6 +9,7 @@ import com.z7design.secured_guard.dto.CreateUserRequest;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.UserService;
 import com.z7design.secured_guard.service.UserOnlineStatusService;
+import com.z7design.secured_guard.service.LgpdConsentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -40,6 +41,7 @@ public class UserController {
 
     private final UserService userService;
     private final UserOnlineStatusService userOnlineStatusService;
+    private final LgpdConsentService lgpdConsentService;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -458,6 +460,8 @@ public class UserController {
         User currentUser = userService.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
+        boolean lgpdAccepted = lgpdConsentService.hasAcceptedAllRequiredConsents(currentUser.getId());
+
         // Construir resposta
         ProfileResponse response = ProfileResponse.builder()
                 .id(currentUser.getId())
@@ -469,6 +473,7 @@ public class UserController {
                 .roles(currentUser.getRoles().stream()
                         .map(role -> role.getName())
                         .collect(java.util.stream.Collectors.toList()))
+                .lgpdAccepted(lgpdAccepted)
                 .build();
 
         return ResponseEntity.ok(response);
@@ -496,6 +501,8 @@ public class UserController {
         // Atualizar o perfil
         User updatedUser = userService.updateProfile(currentUser.getId(), request);
 
+        boolean lgpdAccepted = lgpdConsentService.hasAcceptedAllRequiredConsents(updatedUser.getId());
+
         // Construir resposta
         ProfileResponse response = ProfileResponse.builder()
                 .id(updatedUser.getId())
@@ -507,6 +514,7 @@ public class UserController {
                 .roles(updatedUser.getRoles().stream()
                         .map(role -> role.getName())
                         .collect(java.util.stream.Collectors.toList()))
+                .lgpdAccepted(lgpdAccepted)
                 .build();
 
         return ResponseEntity.ok(response);

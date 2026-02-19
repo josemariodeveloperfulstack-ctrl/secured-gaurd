@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -28,6 +29,7 @@ public class AbsenceResponse {
     private LocalDateTime approvalDate;
     private SimpleEmployee coverageEmployee;
     private String coverageNotes;
+    private BigDecimal justifiedHours;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -114,6 +116,7 @@ public class AbsenceResponse {
                     .approvalDate(absence.getApprovalDate())
                     .coverageEmployee(coverageEmployee)
                     .coverageNotes(absence.getCoverageNotes())
+                    .justifiedHours(absence.getJustifiedHours())
                     .createdAt(absence.getCreatedAt())
                     .updatedAt(absence.getUpdatedAt())
                     .build();

@@ -2,7 +2,8 @@ import api from '@/lib/axios';
 
 export interface PayrollClosure {
   id: string;
-  employeeId: string;
+  employeeId?: string;
+  employee?: { id: string; name: string };
   employeeName?: string;
   referenceMonth: number;
   referenceYear: number;

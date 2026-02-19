@@ -25,6 +25,7 @@ import {
   Download, 
   Eye, 
   Trash2, 
+  FileDown,
   Calendar,
   User,
   Building,
@@ -137,6 +138,36 @@ const FichasEntregaEPI: React.FC = () => {
   const handleView = (ficha: EPIDeliveryForm) => {
     setSelectedFicha(ficha);
     setViewModalOpen(true);
+  };
+
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
+
+  const handleGeneratePdf = async (ficha: EPIDeliveryForm) => {
+    try {
+      setGeneratingPdfId(ficha.id);
+      const blob = await epiDeliveryFormService.generatePdfById(ficha.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ficha-entrega-epi-${ficha.employeeName}-${ficha.deliveryDate || ''}.pdf`.replace(/\s+/g, '-');
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({
+        title: 'Sucesso',
+        description: 'PDF gerado com sucesso!',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar o PDF da ficha.',
+        variant: 'destructive'
+      });
+    } finally {
+      setGeneratingPdfId(null);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -341,14 +372,30 @@ const FichasEntregaEPI: React.FC = () => {
                                 size="sm"
                                 onClick={() => handleView(ficha)}
                                 className="h-8 w-8 p-0"
+                                title="Visualizar"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handleGeneratePdf(ficha)}
+                                disabled={generatingPdfId === ficha.id}
+                                className="h-8 w-8 p-0"
+                                title="Gerar PDF"
+                              >
+                                {generatingPdfId === ficha.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <FileDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleDelete(ficha.id)}
                                 className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                title="Excluir"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
