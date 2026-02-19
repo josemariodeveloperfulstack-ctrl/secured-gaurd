@@ -70,11 +70,24 @@ docker restart traefik 2>/dev/null && echo "   Aguardando 15s..." && sleep 15 ||
 echo ""
 echo "6️⃣ Verificando routers PROD no Traefik..."
 ROUTERS=$(docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null || echo "[]")
-if echo "$ROUTERS" | grep -q "secured-guard-prod"; then
-  echo "✅ Router PROD encontrado"
+if echo "$ROUTERS" | grep -q "prod-https@file"; then
+  echo "✅ Router prod-https@file encontrado (config dinâmica)"
+elif echo "$ROUTERS" | grep -q "secured-guard-prod"; then
+  echo "✅ Router secured-guard-prod encontrado (Docker labels)"
 else
-  echo "⚠️ Router PROD pode não estar carregado. Routers:"
+  echo "⚠️ Router PROD não encontrado. Routers disponíveis:"
   echo "$ROUTERS" | jq -r '.[].name' 2>/dev/null | grep -E "prod|secured" || echo "$ROUTERS"
+fi
+
+# Verificar se arquivo de config dinâmica existe
+echo ""
+echo "6️⃣.1 Verificando config dinâmica Traefik..."
+if [ -f "/var/www/secured_guard/traefik/dynamic/prod.yml" ]; then
+  echo "✅ Arquivo prod.yml existe"
+  echo "   URL configurada: $(grep -A 1 'servers:' /var/www/secured_guard/traefik/dynamic/prod.yml | grep 'url:' | awk '{print $2}' | tr -d '"')"
+else
+  echo "❌ Arquivo prod.yml NÃO existe em /var/www/secured_guard/traefik/dynamic/"
+  echo "   Execute: scp traefik-dynamic-prod.yml root@VPS:/var/www/secured_guard/traefik/dynamic/prod.yml"
 fi
 
 # 7. Teste local (simulando Cloudflare)

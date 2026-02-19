@@ -159,6 +159,10 @@ jobs:
             
             echo "🔄 Reiniciando Traefik para carregar config dinâmica prod.yml..."
             docker restart traefik 2>/dev/null || true
+            echo "⏳ Aguardando Traefik carregar configuração (15s)..."
+            sleep 15
+            echo "🔍 Verificando se Traefik carregou router prod-https@file..."
+            docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null | jq -r '.[].name' | grep -q "prod-https@file" && echo "✅ Router prod-https@file encontrado" || echo "⚠️ Router prod-https@file não encontrado"
             
             echo "🔧 Flyway repair PROD (checksums V424, V427, V429)..."
             docker exec -i secured-guard-db-prod psql -U postgres -d secured_guard_prod -c "
