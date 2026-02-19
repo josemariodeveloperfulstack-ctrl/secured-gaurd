@@ -118,7 +118,7 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/docker-compose.prod.yml $VPS_STR:$DEPLOY_PATH/deploy/
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/nginx/nginx-prod.conf $VPS_STR:$DEPLOY_PATH/deploy/nginx/
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS scripts/fix-404-prod.sh $VPS_STR:$DEPLOY_PATH/deploy/
-          # Transfer config dinâmica Traefik PROD (fallback quando Docker provider não descobre Nginx)
+          # Traefik dynamic config PROD (resolve 502 - aponta para secured-guard-nginx-prod na z7network)
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR "mkdir -p /var/www/secured_guard/traefik/dynamic"
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS traefik-dynamic-prod.yml $VPS_STR:/var/www/secured_guard/traefik/dynamic/prod.yml
 
@@ -156,6 +156,9 @@ jobs:
             
             echo "🔧 Corrigindo 404 externo (Nginx na z7network + reinício Traefik)..."
             if [ -f fix-404-prod.sh ]; then bash fix-404-prod.sh; fi
+            
+            echo "🔄 Reiniciando Traefik para carregar config dinâmica prod.yml..."
+            docker restart traefik 2>/dev/null || true
             
             echo "🔧 Flyway repair PROD (checksums V424, V427, V429)..."
             docker exec -i secured-guard-db-prod psql -U postgres -d secured_guard_prod -c "

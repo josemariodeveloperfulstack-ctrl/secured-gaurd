@@ -4,6 +4,9 @@ Fluxo do tráfego: **Utilizador → Cloudflare → VPS (Traefik:443) → nginx (
 
 Se o site devolve 404 mas no servidor `curl http://127.0.0.1:8085/api/health` dá 200, o problema está no Cloudflare ou no Traefik.
 
+- **502 Bad Gateway**: Traefik não consegue alcançar o Nginx (config dinâmica incorreta ou rede)
+- **404**: Rota não encontrada (Traefik não está encaminhando corretamente)
+
 ---
 
 ## 1. Cloudflare (DNS e proxy)
@@ -82,8 +85,27 @@ O deploy copia `traefik-dynamic-prod.yml` para `/var/www/secured_guard/traefik/d
 
 O Traefik recarrega automaticamente (providers.file.watch=true).
 
+## Correção 502 (Traefik não acessa Nginx)
+
+Se o `fix-404-prod.sh` reporta *"Traefik NÃO consegue acessar Nginx"* e o router mostra `prod-https@file`:
+
+1. **Config dinâmica PROD**: O arquivo em `/var/www/secured_guard/traefik/dynamic/prod.yml` pode estar com URL errada (ex: localhost:8085).
+
+2. **Corrigir manualmente** (copie `traefik-dynamic-prod.yml` do repositório para o servidor):
+   ```bash
+   # Na máquina local (com acesso ao repo)
+   scp traefik-dynamic-prod.yml root@VPS:/var/www/secured_guard/traefik/dynamic/prod.yml
+   
+   # No servidor
+   docker restart traefik
+   sleep 15
+   curl -k -H "Host: securedguard.z7botsolutions.com.br" https://localhost/api/health
+   ```
+
+3. **No próximo deploy**: O workflow `deploy-prod-docker.yml` já envia `traefik-dynamic-prod.yml` e reinicia o Traefik automaticamente.
+
 ## Referências
 
-- `traefik-dynamic-prod.yml` – Config dinâmica PROD (baseada em traefik-dynamic-ci.yml)
+- `traefik-dynamic-prod.yml` – Config dinâmica PROD (server URL correta: secured-guard-nginx-prod:80)
 - `scripts/fix-404-traefik.sh` – Script similar para CI
 - `CORRIGIR_404_TRAEFIK.md` – Documentação para CI
