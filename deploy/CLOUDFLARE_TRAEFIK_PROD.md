@@ -72,7 +72,18 @@ O script: verifica Traefik e Nginx, conecta o nginx à rede `z7network` se neces
 
 ---
 
+## Config Dinâmica Traefik (traefik-dynamic-prod.yml)
+
+O deploy copia `traefik-dynamic-prod.yml` para `/var/www/secured_guard/traefik/dynamic/prod.yml`. Isso cria um fallback quando o Docker provider não descobre o Nginx (ex.: fora da rede z7network):
+
+- Router: `Host(securedguard.z7botsolutions.com.br)` → `secured-guard-nginx-prod:80`
+- Middlewares: CORS, métodos permitidos, timeouts para upload
+- Prioridade 2000
+
+O Traefik recarrega automaticamente (providers.file.watch=true).
+
 ## Referências
 
+- `traefik-dynamic-prod.yml` – Config dinâmica PROD (baseada em traefik-dynamic-ci.yml)
 - `scripts/fix-404-traefik.sh` – Script similar para CI
 - `CORRIGIR_404_TRAEFIK.md` – Documentação para CI

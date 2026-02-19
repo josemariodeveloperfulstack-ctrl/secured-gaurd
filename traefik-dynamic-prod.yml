@@ -1,0 +1,67 @@
+# ========================================
+# Configuração Dinâmica do Traefik para PROD
+# ========================================
+# Colocar em /var/www/secured_guard/traefik/dynamic/ no servidor
+# Traefik monta esse diretório em /etc/traefik/dynamic
+
+http:
+  middlewares:
+    # Middleware para permitir todos os métodos HTTP
+    prod-allow-methods:
+      headers:
+        customRequestHeaders:
+          Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
+        customResponseHeaders:
+          Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
+
+    # Middleware CORS para PROD
+    prod-cors:
+      headers:
+        accessControlAllowOriginList:
+          - "https://securedguard.z7botsolutions.com.br"
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "PATCH"
+          - "OPTIONS"
+          - "HEAD"
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 3600
+        addVaryHeader: true
+
+    # Timeout para uploads (5 min)
+    prod-timeout:
+      buffering:
+        maxRequestBodyBytes: 52428800   # 50MB
+        maxResponseBodyBytes: 52428800  # 50MB
+        memRequestBodyBytes: 2097152
+        memResponseBodyBytes: 2097152
+        retryExpression: "IsNetworkError() && Attempts() < 2"
+
+  routers:
+    # Router HTTPS para PROD - fallback quando Docker provider não descobre
+    prod-https:
+      rule: "Host(`securedguard.z7botsolutions.com.br`)"
+      entryPoints:
+        - websecure
+      service: prod-service
+      middlewares:
+        - prod-cors
+        - prod-allow-methods
+        - prod-timeout
+      tls:
+        certResolver: letsencryptresolver
+      priority: 2000
+
+  services:
+    prod-service:
+      loadBalancer:
+        servers:
+          - url: "http://secured-guard-nginx-prod:80"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: 100ms
