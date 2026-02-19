@@ -34,7 +34,7 @@ public class CrmController {
 
     @GetMapping("/dashboard/metrics")
     @Operation(summary = "Obter métricas do CRM", description = "Retorna métricas agregadas para o dashboard do CRM")
-    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<Map<String, Object>> getCrmMetrics() {
         try {
             log.info("Buscando métricas do CRM");
@@ -116,7 +116,7 @@ public class CrmController {
 
     @GetMapping("/dashboard/kanban-summary")
     @Operation(summary = "Obter resumo do Kanban", description = "Retorna resumo de leads por status para o Kanban")
-    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<Map<String, Object>> getKanbanSummary() {
         try {
             log.info("Buscando resumo do Kanban");

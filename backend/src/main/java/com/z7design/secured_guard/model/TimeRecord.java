@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,6 +16,7 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class TimeRecord {
 
     @Id
@@ -23,10 +25,12 @@ public class TimeRecord {
 
     @ManyToOne
     @JoinColumn(name = "employee_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "position", "user", "documents", "benefits", "dependents", "timeRecords", "payrolls", "epis", "occurrences"})
     private Employee employee;
 
     @ManyToOne
     @JoinColumn(name = "work_post_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "client", "contract", "responsible", "nrs", "epis", "trainings", "workSchedules"})
     private WorkPost workPost;
 
     @Column(name = "record_type", nullable = false)

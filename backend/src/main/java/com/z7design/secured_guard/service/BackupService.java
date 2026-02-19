@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -174,6 +176,37 @@ public class BackupService {
         } catch (IOException e) {
             logger.error("Erro ao limpar backups antigos", e);
         }
+    }
+
+    /**
+     * Testa conexão com o banco de dados (PostgreSQL).
+     */
+    public boolean testConnection(String host, int port, String database, String username, String password) {
+        if (database == null || database.isBlank()) {
+            return false;
+        }
+        String url = "jdbc:postgresql://" + host + ":" + port + "/" + database;
+        try (Connection conn = DriverManager.getConnection(url, username, password != null ? password : "")) {
+            return conn.isValid(3);
+        } catch (Exception e) {
+            logger.warn("Falha ao testar conexão com {}: {}", url, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Retorna o Path do arquivo de backup se existir e estiver dentro do diretório de backups (segurança).
+     */
+    public Path getBackupPath(String fileName) {
+        if (fileName == null || fileName.isBlank() || fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+            return null;
+        }
+        Path backupDir = Paths.get(backupPath);
+        Path resolved = backupDir.resolve(fileName).normalize();
+        if (!resolved.startsWith(backupDir.toAbsolutePath())) {
+            return null;
+        }
+        return Files.exists(resolved) ? resolved : null;
     }
 
     /**

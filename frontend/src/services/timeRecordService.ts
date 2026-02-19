@@ -66,7 +66,25 @@ export const timeRecordService = {
   async rejectRecord(recordId: string, approverId: string, reason: string) {
     const response = await api.put(`/time-records/${recordId}/reject`, { approverId, reason });
     return response.data;
-  }
+  },
+
+  /** Salva os horários de um dia (lançamento manual) no banco. Persiste conforme o usuário preenche. */
+  async saveManualDay(employeeId: string, date: string, payload: {
+    entrada?: string;
+    saidaAlmoco?: string;
+    retornoAlmoco?: string;
+    saida?: string;
+  }) {
+    const response = await api.post('/time-records/manual/day', {
+      employeeId,
+      date,
+      entrada: payload.entrada || undefined,
+      saidaAlmoco: payload.saidaAlmoco || undefined,
+      retornoAlmoco: payload.retornoAlmoco || undefined,
+      saida: payload.saida || undefined,
+    });
+    return response.data;
+  },
 };
 
 export default timeRecordService;

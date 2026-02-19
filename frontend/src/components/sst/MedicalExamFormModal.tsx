@@ -24,19 +24,15 @@ import { Loader2, User, Stethoscope, Calendar, FileText, Building2, Search } fro
 import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { doctorService } from '@/services/doctorService';
 import { useDebounce } from '@/hooks/use-debounce';
+import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
+import { Doctor } from '@/types/doctor';
+import NovaClinicaModal from '@/components/sst/NovaClinicaModal';
 
 interface MedicalExamFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   exam?: MedicalExam | null;
   onSubmit: (data: CreateMedicalExamDTO) => Promise<void>;
-}
-
-interface Doctor {
-  id: string;
-  name: string;
-  crmNumber: string;
-  crmState: string;
 }
 
 export default function MedicalExamFormModal({
@@ -73,6 +69,9 @@ export default function MedicalExamFormModal({
   const [clinicSearchTerm, setClinicSearchTerm] = useState('');
   const [clinics, setClinics] = useState<string[]>([]);
   const [showClinicDropdown, setShowClinicDropdown] = useState(false);
+
+  const [showNovoMedicoModal, setShowNovoMedicoModal] = useState(false);
+  const [showNovaClinicaModal, setShowNovaClinicaModal] = useState(false);
 
   const debouncedEmployeeSearch = useDebounce(employeeSearchTerm, 300);
   const debouncedDoctorSearch = useDebounce(doctorSearchTerm, 300);
@@ -186,6 +185,20 @@ export default function MedicalExamFormModal({
     setClinicName(clinic);
     setClinicSearchTerm(clinic);
     setShowClinicDropdown(false);
+  };
+
+  const handleClinicCreatedFromModal = (name: string) => {
+    setClinicName(name);
+    setClinicSearchTerm(name);
+    setShowClinicDropdown(false);
+  };
+
+  const handleMedicoCreatedFromModal = (medico: Doctor) => {
+    setSelectedDoctor(medico);
+    setDoctorId(medico.id);
+    setDoctorName(medico.name);
+    setDoctorSearchTerm(`${medico.name} - CRM ${medico.crmNumber}/${medico.crmState}`);
+    setShowDoctorDropdown(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -375,9 +388,18 @@ export default function MedicalExamFormModal({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="doctorName" className="text-seguranca-lightgray font-medium text-sm sm:text-base">
-                  Médico
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="doctorName" className="text-seguranca-lightgray font-medium text-sm sm:text-base">
+                    Médico
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNovoMedicoModal(true)}
+                    className="text-[11px] sm:text-xs text-seguranca-yellow hover:underline"
+                  >
+                    Cadastrar médico
+                  </button>
+                </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
@@ -426,10 +448,19 @@ export default function MedicalExamFormModal({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="clinicName" className="text-seguranca-lightgray font-medium text-sm sm:text-base flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Clínica
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="clinicName" className="text-seguranca-lightgray font-medium text-sm sm:text-base flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Clínica
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowNovaClinicaModal(true)}
+                    className="text-[11px] sm:text-xs text-seguranca-yellow hover:underline"
+                  >
+                    Cadastrar clínica
+                  </button>
+                </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
@@ -517,6 +548,16 @@ export default function MedicalExamFormModal({
           </DialogFooter>
         </form>
       </DialogContent>
+      <NovoMedicoModal
+        open={showNovoMedicoModal}
+        onClose={() => setShowNovoMedicoModal(false)}
+        onMedicoCreated={handleMedicoCreatedFromModal}
+      />
+      <NovaClinicaModal
+        open={showNovaClinicaModal}
+        onClose={() => setShowNovaClinicaModal(false)}
+        onClinicCreated={handleClinicCreatedFromModal}
+      />
     </Dialog>
   );
 }

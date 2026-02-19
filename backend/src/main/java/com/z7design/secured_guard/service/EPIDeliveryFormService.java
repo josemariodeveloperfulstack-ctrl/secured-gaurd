@@ -15,14 +15,17 @@ import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.PersonalProtectiveEquipmentRepository;
 import com.z7design.secured_guard.repository.UserRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -150,33 +153,54 @@ public class EPIDeliveryFormService {
         return EPIDeliveryFormDTO.fromEntity(savedForm);
     }
 
+    @Transactional(readOnly = true)
     public EPIDeliveryFormDTO findById(UUID id) {
         EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
         return EPIDeliveryFormDTO.fromEntity(form);
     }
 
+    @Transactional(readOnly = true)
     public EPIDeliveryForm findByIdEntity(UUID id) {
         return epiDeliveryFormRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
     }
 
+    @Transactional(readOnly = true)
     public Page<EPIDeliveryFormDTO> findAll(Pageable pageable) {
         return epiDeliveryFormRepository.findAll(pageable)
                 .map(EPIDeliveryFormDTO::fromEntity);
     }
 
+    @Transactional(readOnly = true)
     public Page<EPIDeliveryFormDTO> findByFilters(UUID employeeId, UUID companyId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        return epiDeliveryFormRepository.findByFilters(employeeId, companyId, startDate, endDate, pageable)
-                .map(EPIDeliveryFormDTO::fromEntity);
+        Specification<EPIDeliveryForm> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (employeeId != null) {
+                predicates.add(cb.equal(root.get("employee").get("id"), employeeId));
+            }
+            if (companyId != null) {
+                predicates.add(cb.equal(root.get("company").get("id"), companyId));
+            }
+            if (startDate != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("deliveryDate"), startDate));
+            }
+            if (endDate != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("deliveryDate"), endDate));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return epiDeliveryFormRepository.findAll(spec, pageable).map(EPIDeliveryFormDTO::fromEntity);
     }
 
+    @Transactional(readOnly = true)
     public List<EPIDeliveryFormDTO> findByEmployeeId(UUID employeeId) {
         return epiDeliveryFormRepository.findByEmployeeId(employeeId).stream()
                 .map(EPIDeliveryFormDTO::fromEntity)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<EPIDeliveryFormDTO> findByCompanyId(UUID companyId) {
         return epiDeliveryFormRepository.findByCompanyId(companyId).stream()
                 .map(EPIDeliveryFormDTO::fromEntity)

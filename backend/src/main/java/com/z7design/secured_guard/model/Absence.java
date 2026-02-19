@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -55,7 +56,10 @@ public class Absence {
     @Column(name = "is_justified", nullable = false)
     @Builder.Default
     private Boolean isJustified = false;
-    
+
+    @Column(name = "justified_hours", precision = 4, scale = 2)
+    private BigDecimal justifiedHours;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approved_by")
     private User approvedBy;

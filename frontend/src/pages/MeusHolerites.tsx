@@ -30,6 +30,7 @@ const monthNames: Record<number, string> = {
 const formatMonth = (month: number) => monthNames[month] ?? `Mês ${month}`;
 
 const MeusHoleritesContent: React.FC = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [holerites, setHolerites] = useState<Holerite[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -41,18 +42,26 @@ const MeusHoleritesContent: React.FC = () => {
   const [previewDoc, setPreviewDoc] = useState<any>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [espelhoLoading, setEspelhoLoading] = useState(false);
+
+  const employeeId = user?.employeeId ?? user?.id ?? null;
+
+  const now = new Date();
+  const [espelhoYear, setEspelhoYear] = useState<number>(now.getFullYear());
+  const [espelhoMonth, setEspelhoMonth] = useState<number>(now.getMonth() + 1);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
-        const [holeritesData, receiptsData] = await Promise.all([
-          holeriteService.getAllHolerites(),
-          receiptService.getAllReceipts()
+        const [myHolerites, myReceipts] = await Promise.all([
+          holeriteService.getMyHolerites(),
+          receiptService.getMyReceipts()
         ]);
-        setHolerites(holeritesData || []);
-        setReceipts(receiptsData || []);
+
+        setHolerites(myHolerites || []);
+        setReceipts(myReceipts || []);
       } catch (err: any) {
         console.error('Erro ao carregar documentos do colaborador', err);
         setError(err?.response?.data?.message || 'Não foi possível carregar seus documentos.');
@@ -174,11 +183,111 @@ const MeusHoleritesContent: React.FC = () => {
     setPreviewDoc(null);
   };
 
+  const handleDownloadEspelhoPonto = async () => {
+    if (!employeeId) {
+      toast({
+        title: 'Erro',
+        description: 'Funcionário não identificado. Não foi possível gerar o espelho de ponto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setEspelhoLoading(true);
+      const { timeSheetService } = await import('@/services/timeSheetService');
+      const blob = await timeSheetService.downloadMonthFolhaPontoPdf(
+        employeeId,
+        espelhoYear,
+        espelhoMonth
+      );
+
+      const url = window.URL.createObjectURL(blob);
+      // Abrir em nova aba para visualização; download pode ser feito pelo visualizador do navegador
+      window.open(url, '_blank', 'noopener,noreferrer');
+
+      toast({
+        title: 'Espelho de ponto gerado',
+        description: `Espelho de ponto de ${formatMonth(espelhoMonth)} / ${espelhoYear} aberto em nova aba.`,
+      });
+    } catch (err: any) {
+      console.error('Erro ao gerar espelho de ponto', err);
+      toast({
+        title: 'Erro ao gerar espelho de ponto',
+        description: err?.response?.data?.message || 'Não foi possível gerar o espelho de ponto. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setEspelhoLoading(false);
+    }
+  };
+
   return (
     <StandardLayout
       title="Meus Documentos"
-      subtitle="Visualize e gerencie seus holerites e comprovantes de pagamento organizados por ano e mês"
+      subtitle="Visualize e gerencie apenas os seus holerites, comprovantes e espelho de ponto, organizados por ano e mês"
     >
+      {/* Seção de Espelho de Ponto do Mês */}
+      <Card className="mb-8 bg-seguranca-graphite border-gray-700">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-gray-100">
+            <span className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-indigo-400" />
+              Espelho de Ponto do Mês
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-300">Ano:</span>
+              <select
+                value={espelhoYear}
+                onChange={(e) => setEspelhoYear(Number(e.target.value))}
+                className="bg-seguranca-black border border-gray-700 text-gray-100 text-sm rounded-md px-2 py-1"
+              >
+                {[espelhoYear, espelhoYear - 1, espelhoYear - 2].map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-300">Mês:</span>
+              <select
+                value={espelhoMonth}
+                onChange={(e) => setEspelhoMonth(Number(e.target.value))}
+                className="bg-seguranca-black border border-gray-700 text-gray-100 text-sm rounded-md px-2 py-1"
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                  <option key={month} value={month}>
+                    {formatMonth(month)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <Button
+            onClick={handleDownloadEspelhoPonto}
+            disabled={espelhoLoading}
+            className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            {espelhoLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Gerando espelho...
+              </>
+            ) : (
+              <>
+                <FileText className="w-4 h-4 mr-2" />
+                Abrir espelho de ponto (PDF)
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-300">
           <Loader2 className="w-8 h-8 animate-spin mb-3" />
@@ -194,9 +303,9 @@ const MeusHoleritesContent: React.FC = () => {
         <Card className="bg-seguranca-graphite border-gray-700">
           <CardContent className="py-10 flex flex-col items-center gap-3 text-gray-300">
             <FileText className="w-10 h-10" />
-            <p>Nenhum documento encontrado.</p>
+            <p>Ainda não há documentos disponíveis para você.</p>
             <span className="text-sm text-gray-500">
-              Assim que novos holerites ou comprovantes forem disponibilizados, eles aparecerão aqui.
+              Assim que seus holerites ou comprovantes forem disponibilizados, eles aparecerão aqui.
             </span>
           </CardContent>
         </Card>
@@ -309,12 +418,8 @@ const MeusHolerites: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const normalizedRole = (user.role ?? '').replace(/^ROLE_/, '').toUpperCase();
-
-  if (normalizedRole !== 'COLABORADOR') {
-    return <Navigate to="/holerites" replace />;
-  }
-
+  // Sempre mostrar a tela "Meus Documentos" (holerites e comprovantes do usuário logado).
+  // Não redirecionar para Gestão de Holerites; essa é outra tela (/holerites).
   return <MeusHoleritesContent />;
 };
 

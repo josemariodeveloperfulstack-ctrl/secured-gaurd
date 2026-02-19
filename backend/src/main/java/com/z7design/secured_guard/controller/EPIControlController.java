@@ -19,6 +19,7 @@ import com.z7design.secured_guard.repository.EPIDeliveryRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.PersonalProtectiveEquipmentRepository;
 import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.service.EPIControlPdfService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -31,6 +32,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/epi-control")
@@ -44,6 +48,7 @@ public class EPIControlController {
     private final EmployeeRepository employeeRepository;
     private final PersonalProtectiveEquipmentRepository epiRepository;
     private final UserRepository userRepository;
+    private final EPIControlPdfService epiControlPdfService;
     
     @Operation(summary = "Busca todos os registros de controle de EPI",
                description = "Retorna uma lista de todos os registros de controle de EPI com filtros opcionais.")
@@ -54,6 +59,7 @@ public class EPIControlController {
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<List<Map<String, Object>>> getEPIControlRecords(
             @RequestParam(required = false) String employeeName,
             @RequestParam(required = false) String employeeFunction,
@@ -412,6 +418,7 @@ public class EPIControlController {
                     content = @Content(mediaType = "application/json"))
     })
     @GetMapping("/stats")
+    @Transactional(readOnly = true)
     public ResponseEntity<Map<String, Object>> getEPIControlStats() {
         try {
             log.info("Buscando estatísticas de controle de EPI");
@@ -479,17 +486,27 @@ public class EPIControlController {
     }
     
     @Operation(summary = "Gera relatório PDF de controle de EPI",
-               description = "Gera um relatório PDF para um registro específico.")
+               description = "Gera um relatório PDF para um registro específico usando o layout padrão.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Relatório gerado com sucesso",
                     content = @Content(mediaType = "application/pdf")),
             @ApiResponse(responseCode = "404", description = "Registro não encontrado",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @GetMapping("/{id}/report")
-    public ResponseEntity<Object> generateEPIControlReport(@PathVariable String id) {
-        // TODO: Implementar geração de PDF quando necessário
-        return ResponseEntity.notFound().build();
+    @GetMapping(value = "/{id}/report", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generateEPIControlReport(@PathVariable String id) {
+        try {
+            UUID deliveryId = UUID.fromString(id);
+            byte[] pdf = epiControlPdfService.generateEPIControlPdf(deliveryId);
+            String fileName = "recibo-epi-" + id + ".pdf";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório PDF de controle de EPI: {}", e.getMessage(), e);
+            return ResponseEntity.notFound().build();
+        }
     }
     
     @Operation(summary = "Gera relatório PDF em lote",

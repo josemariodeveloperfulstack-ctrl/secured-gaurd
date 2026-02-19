@@ -258,6 +258,7 @@ const empresasMenuItems = [
   { icon: Building2, text: 'Filiais', to: '/filiais', id: 'filiais' },
   { icon: Building2, text: 'Clientes', to: '/clientes', id: 'clientes' },
   { icon: Handshake, text: 'Fornecedores', to: '/fornecedores', id: 'fornecedores' },
+  { icon: Package, text: 'Gestão Patrimonial', to: '/gestao-patrimonial', id: 'gestao-patrimonial' },
 ];
 
 // Módulo Comercial

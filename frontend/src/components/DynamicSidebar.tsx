@@ -400,6 +400,13 @@ export function DynamicSidebar() {
       requiredPermission: 'CLIENTS_READ'
     },
     {
+      icon: Package,
+      text: 'Gestão Patrimonial',
+      to: '/gestao-patrimonial',
+      id: 'gestao-patrimonial',
+      requiredPermission: 'PATRIMONIAL_READ'
+    },
+    {
       icon: PieChart,
       text: 'Relatórios',
       to: '/relatorios',
@@ -602,7 +609,7 @@ export function DynamicSidebar() {
         ['rh-sst', 'rh-sst-exames', 'rh-sst-epis', 'rh-sst-acidentes', 'rh-sst-treinamentos', 'rh-sst-inspecoes', 'rh-sst-cipa', 'rh-sst-relatorios'].includes(item.id)
       ),
       financeiro: filteredItems.filter(item =>
-        ['modulo-financeiro', 'gestao-financeira-dashboard', 'gestao-financeira-contas-pagar', 'gestao-financeira-contas-receber', 'gestao-financeira-fluxo-caixa', 'gestao-financeira-movimentacoes', 'gestao-financeira-conciliacao', 'gestao-financeira-relatorios', 'gestao-financeira-orcamento', 'gestao-financeira-centros-custo'].includes(item.id)
+        ['modulo-financeiro', 'gestao-financeira-dashboard', 'gestao-financeira-contas-pagar', 'gestao-financeira-contas-receber', 'gestao-financeira-fluxo-caixa', 'gestao-financeira-movimentacoes', 'gestao-financeira-conciliacao', 'gestao-financeira-relatorios', 'gestao-financeira-orcamento', 'gestao-financeira-centros-custo', 'gestao-patrimonial'].includes(item.id)
       ),
       operacional: filteredItems.filter(item =>
         ['servicos', 'controle-visitas-avancado', 'rota-semanal-supervisao', 'equipamentos', 'troca-plantao', 'supervisao', 'facial-login', 'supervisao-visitas', 'supervisao-rotas', 'supervisao-relatorios', 'supervisao-biometria'].includes(item.id)

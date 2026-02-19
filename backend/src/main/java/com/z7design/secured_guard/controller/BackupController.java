@@ -12,12 +12,20 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/backup")
@@ -55,10 +63,18 @@ public class BackupController {
 
     @Operation(summary = "Executar backup manual")
     @PostMapping("/execute")
-    public ResponseEntity<?> executeBackup(@RequestParam String description) {
+    public ResponseEntity<?> executeBackup(@RequestBody(required = false) Map<String, Object> body) {
         try {
-            log.info("🔄 Executando backup manual: {}", description);
-            backupService.performManualBackup(description);
+            String desc = "manual";
+            if (body != null) {
+                if (body.containsKey("description") && body.get("description") != null) {
+                    desc = String.valueOf(body.get("description"));
+                } else if (body.containsKey("configId") && body.get("configId") != null) {
+                    desc = "config-" + body.get("configId");
+                }
+            }
+            log.info("🔄 Executando backup manual: {}", desc);
+            backupService.performManualBackup(desc);
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "Backup executado com sucesso"
@@ -69,6 +85,76 @@ public class BackupController {
                     "success", false,
                     "message", e.getMessage()
             ));
+        }
+    }
+
+    @Operation(summary = "Testar conexão com banco de dados de backup")
+    @PostMapping("/test-connection")
+    public ResponseEntity<?> testConnection(@RequestBody Map<String, Object> body) {
+        try {
+            String host = (String) body.getOrDefault("host", "localhost");
+            Object portObj = body.get("port");
+            int port = portObj instanceof Number ? ((Number) portObj).intValue() : 5432;
+            String database = (String) body.getOrDefault("database", "");
+            String username = (String) body.getOrDefault("username", "postgres");
+            String password = body.containsKey("password") ? (String) body.get("password") : "";
+
+            boolean ok = backupService.testConnection(host, port, database, username, password);
+            return ResponseEntity.ok(Map.of(
+                    "success", ok,
+                    "message", ok ? "Conexão com o banco de dados estabelecida com sucesso." : "Não foi possível conectar ao banco."
+            ));
+        } catch (Exception e) {
+            log.error("Erro ao testar conexão: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", e.getMessage() != null ? e.getMessage() : "Erro ao testar conexão"
+            ));
+        }
+    }
+
+    @Operation(summary = "Listar arquivos de backup disponíveis para download")
+    @GetMapping("/files")
+    public ResponseEntity<List<Map<String, Object>>> listBackupFiles() {
+        try {
+            List<BackupService.BackupInfo> backups = backupService.listBackups();
+            List<Map<String, Object>> list = backups.stream()
+                    .map(b -> Map.<String, Object>of(
+                            "fileName", b.fileName,
+                            "size", b.size,
+                            "timestamp", b.timestamp != null ? b.timestamp.toString() : ""
+                    ))
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(list);
+        } catch (Exception e) {
+            log.error("Erro ao listar arquivos de backup: {}", e.getMessage());
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    @Operation(summary = "Baixar arquivo de backup (sistema/banco de dados)")
+    @GetMapping(value = "/download", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public ResponseEntity<Resource> downloadBackupFile(@RequestParam("fileName") String fileName) {
+        try {
+            if (fileName == null || fileName.isBlank() || fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+                return ResponseEntity.badRequest().build();
+            }
+            Path filePath = backupService.getBackupPath(fileName);
+            if (filePath == null || !java.nio.file.Files.exists(filePath)) {
+                return ResponseEntity.notFound().build();
+            }
+            Resource resource = new UrlResource(filePath.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                return ResponseEntity.notFound().build();
+            }
+            String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"; filename*=UTF-8''" + encodedName)
+                    .contentLength(resource.contentLength())
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("Erro ao baixar backup: {}", e.getMessage());
+            return ResponseEntity.internalServerError().build();
         }
     }
 

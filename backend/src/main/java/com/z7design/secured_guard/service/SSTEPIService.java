@@ -216,6 +216,14 @@ public class SSTEPIService {
     }
 
     /**
+     * Busca todas as entregas de EPIs
+     */
+    @Transactional(readOnly = true)
+    public List<EPIDelivery> getAllDeliveries() {
+        return deliveryRepository.findAll();
+    }
+
+    /**
      * Busca entregas por funcionário
      */
     @Transactional(readOnly = true)

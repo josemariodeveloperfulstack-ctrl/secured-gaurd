@@ -7,6 +7,7 @@ import com.z7design.secured_guard.repository.PayrollItemRepository;
 import com.z7design.secured_guard.repository.PayrollClosureRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.PayrollRepository;
+import com.z7design.secured_guard.repository.UnitRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class PayrollItemService {
     private final ContractPayrollConfigService contractPayrollConfigService;
     private final ObjectMapper objectMapper;
     private final PayrollRepository payrollRepository;
+    private final UnitRepository unitRepository;
 
     /**
      * Gera itens de folha a partir de um PayrollClosure
@@ -187,21 +189,33 @@ public class PayrollItemService {
         
         if (payroll == null) {
             // Criar um Payroll temporário (será preenchido quando a folha for gerada)
-            log.warn("⚠️ Payroll não encontrado para funcionário {} no período {}, criando temporário", 
+            log.warn("⚠️ Payroll não encontrado para funcionário {} no período {}, criando temporário",
                     closure.getEmployee().getId(), referenceMonth);
             payroll = new Payroll();
             payroll.setEmployee(closure.getEmployee());
-            payroll.setUnit(closure.getEmployee().getUnit());
+            // Unit obrigatório: usar do funcionário ou primeira unidade ativa
+            if (closure.getEmployee().getUnit() != null) {
+                payroll.setUnit(closure.getEmployee().getUnit());
+            } else {
+                List<Unit> activeUnits = unitRepository.findByActiveTrue();
+                if (!activeUnits.isEmpty()) {
+                    payroll.setUnit(activeUnits.get(0));
+                } else {
+                    throw new IllegalStateException(
+                            "Nenhuma unidade cadastrada. Cadastre ao menos uma unidade ativa para gerar fechamentos.");
+                }
+            }
             payroll.setReferenceMonth(referenceMonth);
-            payroll.setBaseSalary(closure.getEmployee().getSalario() != null ? 
-                    closure.getEmployee().getSalario().doubleValue() : 0.0);
+            payroll.setBaseSalary(closure.getEmployee().getSalario() != null
+                    ? closure.getEmployee().getSalario().doubleValue() : 0.0);
             payroll.setGrossSalary(0.0);
             payroll.setNetSalary(0.0);
             payroll.setOvertimeHours(0.0);
             payroll.setOvertimeValue(0.0);
             payroll.setBenefitsValue(0.0);
             payroll.setDeductionsValue(0.0);
-            payroll.setDocumentUrl("");
+            // @NotBlank exige valor não vazio; placeholder até o documento ser gerado
+            payroll.setDocumentUrl("pending");
             payroll = payrollRepository.save(payroll);
         }
         

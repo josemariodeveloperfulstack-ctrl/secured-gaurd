@@ -76,10 +76,10 @@ class EPIControlService {
     }
   }
 
-  // Gerar relatório PDF
+  // Gerar relatório PDF (usa layout padrão - mesmo da Ficha de Entrega de EPI)
   async generateEPIControlReport(recordId: string): Promise<Blob> {
     try {
-      const response = await api.get(`/epi-control/${recordId}/report`, {
+      const response = await api.get(`/api/epi-control/${recordId}/report`, {
         responseType: 'blob'
       });
       return response.data;

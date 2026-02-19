@@ -1,4 +1,4 @@
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'GESTOR_COMERCIAL' | 'ASSISTENTE_COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO';
 
 export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_GESTOR' | 'GRUPO_RH' | 'GRUPO_DPE' | 'GRUPO_SUPERVISOR' | 'GRUPO_COLABORADORES' | 'GRUPO_OPERACIONAL' | 'GRUPO_VIGILANTES' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_AUXILIARES' | 'GRUPO_COMERCIAL' | 'GRUPO_ASSISTENTE_ADMINISTRATIVO';
 
@@ -159,6 +159,14 @@ export interface UserPermissions {
   PAYROLL_CREATE: boolean;
   PAYROLL_MANAGE: boolean;
 
+  // Permissões de Gestão Patrimonial
+  PATRIMONIAL_READ: boolean;
+  PATRIMONIAL_WRITE: boolean;
+
+  // Permissões do Módulo Fiscal
+  FISCAL_READ: boolean;
+  FISCAL_WRITE: boolean;
+
   // Permissão de Acesso Total
   ALL_PERMISSIONS: boolean;
 
@@ -205,6 +213,7 @@ export interface User {
   status?: string;
   active?: boolean;
   firstAccessCompleted?: boolean; // Indica se o usuário completou o primeiro acesso (mudança de senha)
+  lgpdAccepted?: boolean; // Indica se o usuário assinou os termos LGPD
   createdAt?: string;
   updatedAt?: string;
 }
@@ -326,6 +335,24 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
     { label: 'Orçamentos', path: '/orcamentos', icon: 'Calculator', color: '🟨' },
     { label: 'Contratos', path: '/contratos', icon: 'FileContract', color: '🟨' },
     { label: 'Clientes', path: '/clientes', icon: 'Building2', color: '🟨' },
+  ],
+  GESTOR_COMERCIAL: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Leads', path: '/leads', icon: 'Target', color: '🟨' },
+    { label: 'Empresas', path: '/comercial/empresas', icon: 'Building', color: '🟨' },
+    { label: 'Clientes', path: '/clientes', icon: 'Building2', color: '🟨' },
+    { label: 'Propostas', path: '/propostas', icon: 'FileText', color: '🟨' },
+    { label: 'Orçamentos', path: '/orcamentos', icon: 'Calculator', color: '🟨' },
+    { label: 'Contratos', path: '/contratos', icon: 'FileContract', color: '🟨' },
+    { label: 'CRM Comercial', path: '/crm', icon: 'Kanban', color: '🟨' },
+  ],
+  ASSISTENTE_COMERCIAL: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Leads', path: '/leads', icon: 'Target', color: '🟨' },
+    { label: 'Clientes', path: '/clientes', icon: 'Building2', color: '🟨' },
+    { label: 'Propostas', path: '/propostas', icon: 'FileText', color: '🟨' },
+    { label: 'Orçamentos', path: '/orcamentos', icon: 'Calculator', color: '🟨' },
+    { label: 'CRM Comercial', path: '/crm', icon: 'Kanban', color: '🟨' },
   ],
   ASSISTENTE_ADMINISTRATIVO: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },

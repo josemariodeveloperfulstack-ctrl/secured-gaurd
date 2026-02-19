@@ -48,6 +48,7 @@ export interface Absence {
   documentUrl?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   isJustified: boolean;
+  justifiedHours?: number;
   coverageEmployee?: {
     id: string;
     name: string;
@@ -64,6 +65,7 @@ export interface CreateAbsenceDTO {
   reason: string;
   medicalCertificateDays?: number;
   documentUrl?: string;
+  justifiedHours?: number;
   coverageEmployeeId?: string;
   coverageNotes?: string;
 }

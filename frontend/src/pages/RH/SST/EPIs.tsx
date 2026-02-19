@@ -404,6 +404,14 @@ const EPIs: React.FC = () => {
               Voltar
             </Button>
             <Button
+              variant="outline"
+              onClick={() => navigate('/fichas-entrega-epi')}
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Fichas de EPI
+            </Button>
+            <Button
               onClick={() => setShowDeliveryModal(true)}
               className="bg-seguranca-red hover:bg-seguranca-darkred"
             >

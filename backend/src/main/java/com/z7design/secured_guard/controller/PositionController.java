@@ -40,7 +40,7 @@ public class PositionController {
     }
     
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_RH')")
     @Operation(summary = "Buscar cargos", description = "Busca cargos por nome com filtro dinâmico")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Cargos encontrados com sucesso"),
@@ -49,8 +49,7 @@ public class PositionController {
     public ResponseEntity<Object> searchPositions(@RequestParam(required = false) String query) {
         log.debug("Buscando cargos com query: {}", query);
         try {
-            // Retornar todos os cargos por enquanto para evitar erro
-            List<PositionDTO> positions = positionService.getAllPositions();
+            List<PositionDTO> positions = positionService.searchPositions(query);
             return ResponseEntity.ok(positions);
         } catch (Exception e) {
             log.error("Erro ao buscar cargos: ", e);

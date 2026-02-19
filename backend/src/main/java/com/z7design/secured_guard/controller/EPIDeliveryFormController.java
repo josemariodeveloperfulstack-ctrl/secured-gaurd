@@ -117,6 +117,24 @@ public class EPIDeliveryFormController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Gerar PDF de uma ficha de entrega de EPI existente")
+    @GetMapping("/{id}/generate-pdf")
+    public ResponseEntity<byte[]> generatePdf(@PathVariable UUID id) {
+        try {
+            log.info("📄 Gerando PDF da ficha de entrega de EPI: {}", id);
+            com.z7design.secured_guard.model.EPIDeliveryForm form = epiDeliveryFormService.findByIdEntity(id);
+            byte[] pdf = epiDeliveryPdfService.generateEPIDeliveryPdfFromForm(form);
+            String fileName = "ficha-entrega-epi-" + id + ".pdf";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("❌ Erro ao gerar PDF da ficha de entrega de EPI {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @Operation(summary = "Gerar PDF da ficha de entrega de EPI e salvar no banco", description = "Gera o PDF da ficha de entrega de EPI, salva o registro no banco e retorna o PDF")
     @PostMapping("/generate-pdf")
     public ResponseEntity<byte[]> generateAndSaveEPIDeliveryPdf(

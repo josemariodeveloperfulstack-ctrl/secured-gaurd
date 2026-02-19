@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -31,6 +32,7 @@ public class AbsenceDTO {
     private UUID coverageEmployeeId;
     private String coverageEmployeeName;
     private String coverageNotes;
+    private BigDecimal justifiedHours;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -52,6 +54,7 @@ public class AbsenceDTO {
                 .coverageEmployeeId(absence.getCoverageEmployee() != null ? absence.getCoverageEmployee().getId() : null)
                 .coverageEmployeeName(absence.getCoverageEmployee() != null ? absence.getCoverageEmployee().getName() : null)
                 .coverageNotes(absence.getCoverageNotes())
+                .justifiedHours(absence.getJustifiedHours())
                 .createdAt(absence.getCreatedAt())
                 .updatedAt(absence.getUpdatedAt())
                 .build();
@@ -69,6 +72,7 @@ public class AbsenceDTO {
                 .isJustified(this.isJustified != null ? this.isJustified : false)
                 .approvalDate(this.approvalDate)
                 .coverageNotes(this.coverageNotes)
+                .justifiedHours(this.justifiedHours)
                 .build();
     }
 }

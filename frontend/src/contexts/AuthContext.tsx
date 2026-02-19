@@ -289,6 +289,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         position: response.data.user?.position,
         employeeCode: response.data.user?.employeeCode,
         firstAccessCompleted: response.data.user?.firstAccessCompleted ?? response.data.firstAccessCompleted ?? false,
+        lgpdAccepted: !(response.data?.requiresLgpdConsent === true),
       };
 
       // Validar que o ID foi fornecido
@@ -427,7 +428,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           ...user,
           name: response.data.name,
           email: response.data.email,
-          whatsapp: response.data.whatsapp
+          whatsapp: response.data.whatsapp,
+          lgpdAccepted: response.data.lgpdAccepted ?? user?.lgpdAccepted,
         };
         setUser(updatedUser);
         setProfile(response.data);

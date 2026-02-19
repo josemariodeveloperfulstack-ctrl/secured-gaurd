@@ -103,10 +103,16 @@ const CargosPage: React.FC = () => {
       }
       handleCloseFormModal();
       fetchCargos();
-    } catch (error) {
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const serverMessage = error?.response?.data?.message;
+      const isDuplicate = status === 409;
+      const description = isDuplicate
+        ? (serverMessage || 'Já existe um cargo com este nome. Escolha outro nome.')
+        : 'Não foi possível salvar o cargo. Verifique os dados e tente novamente.';
       toast({
-        title: 'Erro ao salvar',
-        description: 'Não foi possível salvar o cargo. Verifique os dados e tente novamente.',
+        title: isDuplicate ? 'Cargo já cadastrado' : 'Erro ao salvar',
+        description,
         variant: 'destructive',
       });
     } finally {

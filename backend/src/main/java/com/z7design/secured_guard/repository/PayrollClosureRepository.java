@@ -22,6 +22,11 @@ public interface PayrollClosureRepository extends JpaRepository<PayrollClosure, 
 
     List<PayrollClosure> findByReferenceMonthAndReferenceYearOrderByEmployeeNameAsc(
             Integer month, Integer year);
+
+    @Query("SELECT pc FROM PayrollClosure pc JOIN FETCH pc.employee e WHERE pc.referenceMonth = :month AND pc.referenceYear = :year ORDER BY e.name ASC")
+    List<PayrollClosure> findByReferenceMonthAndReferenceYearWithEmployee(
+            @Param("month") Integer month,
+            @Param("year") Integer year);
     
     @Query("SELECT pc FROM PayrollClosure pc WHERE pc.payPeriod.id = :payPeriodId")
     List<PayrollClosure> findByPayPeriodId(@Param("payPeriodId") UUID payPeriodId);

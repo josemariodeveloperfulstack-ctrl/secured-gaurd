@@ -2,6 +2,7 @@ package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.z7design.secured_guard.converter.TipoArquivoConverter;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -38,7 +39,7 @@ public class ModeloDocumento {
     private String nomeModelo;
     
     @NotNull(message = "Tipo do arquivo é obrigatório")
-    @Convert(converter = com.z7design.secured_guard.converter.TipoArquivoConverter.class)
+    @Convert(converter = TipoArquivoConverter.class)
     @Column(name = "tipo_arquivo", nullable = false, length = 10)
     private TipoArquivo tipoArquivo;
     

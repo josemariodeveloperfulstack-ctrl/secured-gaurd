@@ -161,6 +161,12 @@ export function getCurrentEnvironmentConfig(): EnvironmentConfig {
  * Obtém a URL da API para o ambiente atual
  */
 export function getApiUrl(): string {
+  // Ambiente de desenvolvimento Vite: usar proxy `/api`
+  if (import.meta.env.DEV) {
+    console.log('🔧 Ambiente DEV (Vite): usando proxy /api');
+    return '/api';
+  }
+
   // Primeiro tenta usar variável de ambiente (para builds específicos)
   if (import.meta.env.VITE_API_URL) {
     console.log('🔧 Usando VITE_API_URL:', import.meta.env.VITE_API_URL);
@@ -177,6 +183,15 @@ export function getApiUrl(): string {
  * Obtém a URL do WebSocket para o ambiente atual
  */
 export function getWsUrl(): string {
+  // Ambiente de desenvolvimento Vite: usar proxy `/ws`
+  if (import.meta.env.DEV) {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.host;
+    const url = `${protocol}://${host}/ws`;
+    console.log('🔧 Ambiente DEV (Vite): usando proxy WebSocket', url);
+    return url;
+  }
+
   // Primeiro tenta usar variável de ambiente
   if (import.meta.env.VITE_WS_URL) {
     return import.meta.env.VITE_WS_URL;

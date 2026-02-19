@@ -349,15 +349,117 @@ const FechamentoHorasDetalhes: React.FC = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="metrics">
+        <TabsContent value="metrics" className="space-y-4">
+          {/* Dias e presença */}
           <Card>
             <CardHeader>
-              <CardTitle>Métricas Detalhadas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Dias e Presença
+              </CardTitle>
+              <CardDescription>Comparativo de dias esperados, trabalhados e faltas no período</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Métricas detalhadas em desenvolvimento...</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div>
+                  <p className="text-sm text-muted-foreground">Dias úteis esperados</p>
+                  <p className="text-2xl font-semibold">{closure.expectedDays ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Dias trabalhados</p>
+                  <p className="text-2xl font-semibold text-green-600">{closure.workedDays ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Faltas (dias)</p>
+                  <p className="text-2xl font-semibold text-red-600">{closure.totalAbsencesDays ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Taxa de presença</p>
+                  <p className="text-2xl font-semibold">
+                    {closure.expectedDays
+                      ? `${Math.round(((closure.workedDays ?? 0) / closure.expectedDays) * 100)}%`
+                      : '-'}
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          {/* Horas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Horas
+              </CardTitle>
+              <CardDescription>Distribuição das horas no período (trabalhadas, regulares, extras e atrasos)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total trabalhadas</p>
+                  <p className="text-xl font-semibold">{formatHours(closure.totalHoursWorked || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Horas regulares</p>
+                  <p className="text-xl font-semibold">{formatHours(closure.regularHours || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Adicional noturno</p>
+                  <p className="text-xl font-semibold">{formatHours(closure.nightShiftHours || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Extras +50%</p>
+                  <p className="text-xl font-semibold text-amber-600">{formatHours(closure.overtime50 || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Extras +100%</p>
+                  <p className="text-xl font-semibold text-amber-600">{formatHours(closure.overtime100 || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Atrasos</p>
+                  <p className="text-xl font-semibold text-red-600">
+                    {closure.totalDelaysMinutes ?? 0} min
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Resumo financeiro (métricas) */}
+          {summary && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Resumo Financeiro
+                </CardTitle>
+                <CardDescription>Proventos, descontos e valor líquido do fechamento</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total de proventos</p>
+                    <p className="text-2xl font-semibold text-green-600">
+                      {formatCurrency(summary.totalEarnings || 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total de descontos</p>
+                    <p className="text-2xl font-semibold text-red-600">
+                      {formatCurrency(Math.abs(summary.totalDeductions || 0))}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor líquido</p>
+                    <p className="text-2xl font-bold">
+                      {formatCurrency(summary.netAmount || 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
       </div>

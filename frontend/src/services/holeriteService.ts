@@ -182,6 +182,19 @@ class HoleriteService {
     }
   }
 
+  // Buscar holerites apenas do usuário autenticado (baseado no token / CPF)
+  async getMyHolerites(): Promise<Holerite[]> {
+    try {
+      console.log('🔍 Buscando holerites do usuário autenticado (GET /api/payslips/me)...');
+      const response = await api.get('/payslips/me');
+      console.log('✅ Holerites (meus) carregados:', response.data?.length ?? 0);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erro ao carregar holerites do usuário autenticado:', error);
+      throw error;
+    }
+  }
+
   // Buscar holerites por ano
   async getHoleritesByYear(year: number): Promise<Holerite[]> {
     try {

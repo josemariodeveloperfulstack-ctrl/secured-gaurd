@@ -68,7 +68,7 @@ public class OpportunityController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public OpportunityDTO create(@Valid @RequestBody OpportunityDTO dto) {
         Opportunity o = fromDTO(dto);
         Opportunity saved = opportunityService.create(
@@ -82,7 +82,7 @@ public class OpportunityController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<OpportunityDTO> update(@PathVariable String id, @Valid @RequestBody OpportunityDTO dto) {
         if (!opportunityService.findById(UUID.fromString(id)).isPresent()) {
             return ResponseEntity.notFound().build();
@@ -100,7 +100,7 @@ public class OpportunityController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         if (!opportunityService.findById(UUID.fromString(id)).isPresent()) {
             return ResponseEntity.notFound().build();

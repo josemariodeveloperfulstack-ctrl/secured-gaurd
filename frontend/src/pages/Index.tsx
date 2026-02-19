@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,7 +42,8 @@ import {
   RefreshCw,
   CreditCard,
   Banknote,
-  MessageSquare
+  MessageSquare,
+  Calendar
 } from 'lucide-react';
 import { getRoleDisplayName, getRoleColor } from '@/utils/permissions';
 import { dashboardService, DashboardStats } from '@/services/dashboardService';
@@ -129,19 +130,7 @@ const Index: React.FC = () => {
     }
   };
 
-  // Redirecionar para dashboards específicos por função
-  useEffect(() => {
-    if (!user) return;
-
-    if (normalizedRole === 'COLABORADOR') {
-      navigate('/dashboard-colaborador', { replace: true });
-    } else if (normalizedRole === 'VIGILANTE') {
-      navigate('/dashboard-vigilante', { replace: true });
-    } else if (['RH', 'DEPARTAMENTO_PESSOAL', 'ASSISTENCIA_RH', 'AUX_DEP'].includes(normalizedRole)) {
-      // RH e Departamento Pessoal devem usar o mesmo dashboard de RH
-      navigate('/rh', { replace: true });
-    }
-  }, [normalizedRole, navigate, user]);
+  // Não redirecionar mais por função: todos usam o mesmo dashboard unificado
 
   // Carregar dados iniciais (queries já disparam automaticamente)
   useEffect(() => {
@@ -370,7 +359,7 @@ const Index: React.FC = () => {
   return (
     <StandardLayout>
       <div className="mb-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-seguranca-lightgray mb-2">
               Bem-vindo, {user.name}!
@@ -389,7 +378,7 @@ const Index: React.FC = () => {
             disabled={refreshing}
             variant="outline"
             size="sm"
-            className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
+            className="self-start md:self-auto border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Atualizando...' : 'Atualizar'}
@@ -426,7 +415,42 @@ const Index: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-6 space-y-6">
+          {/* Ações rápidas (PONTO, DOCS, etc.) para todos os usuários */}
+          <div className="grid grid-cols-2 gap-4 max-w-2xl">
+            <Button
+              className="h-28 flex flex-col items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-white/10 rounded-3xl shadow-lg transition-transform active:scale-95"
+              onClick={() => navigate('/meu-ponto')}
+            >
+              <Clock className="w-8 h-8" />
+              <span className="font-bold text-lg">PONTO</span>
+            </Button>
+            <Button
+              className="h-28 flex flex-col items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-white/10 rounded-3xl shadow-lg transition-transform active:scale-95"
+              onClick={() => navigate('/meus-holerites')}
+            >
+              <FileText className="w-8 h-8" />
+              <span className="font-bold text-lg">DOCS</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex flex-col items-center justify-center gap-1 bg-seguranca-black/40 border-gray-800 text-gray-400 rounded-2xl transition-transform active:scale-95"
+              onClick={() => navigate('/minhas-ferias')}
+            >
+              <Calendar className="w-5 h-5 text-indigo-400" />
+              <span className="text-xs font-semibold">FÉRIAS</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-20 flex flex-col items-center justify-center gap-1 bg-seguranca-black/40 border-gray-800 text-gray-400 rounded-2xl transition-transform active:scale-95"
+              onClick={() => navigate('/meus-plantoes')}
+            >
+              <CheckCircle className="w-5 h-5 text-amber-400" />
+              <span className="text-xs font-semibold">PLANTÕES</span>
+            </Button>
+          </div>
+
+          {/* Estatísticas e notificações (dashboard corporativo) */}
           {renderStatsCards()}
           {renderNotifications()}
         </TabsContent>

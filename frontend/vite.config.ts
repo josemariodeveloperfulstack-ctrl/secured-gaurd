@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import fs from "fs";
 // import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -78,6 +79,24 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0", // Permite acesso de qualquer IP na rede
       port: 3000,
       strictPort: false, // Permite usar outra porta se 3000 estiver ocupada
+      // HTTPS local para testar câmera / QR Code (getUserMedia exige HTTPS)
+      https: (() => {
+        try {
+          const certDir = path.resolve(process.cwd(), "certs");
+          const keyPath = path.join(certDir, "localhost-key.pem");
+          const certPath = path.join(certDir, "localhost.pem");
+          if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+            return {
+              key: fs.readFileSync(keyPath),
+              cert: fs.readFileSync(certPath),
+            };
+          }
+          return undefined;
+        } catch {
+          // Se os arquivos não existirem, segue em HTTP normal
+          return undefined;
+        }
+      })(),
       hmr: {
         overlay: false, // Desabilita overlay de erros HMR
         // Configurar HMR para funcionar com IP externo

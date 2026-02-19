@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { positionService, Position } from '@/services/positionService';
+import { positionService } from '@/services/positionService';
 import { cboService, CBOItem } from '@/services/cboService';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -30,7 +30,8 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [positionSearchTerm, setPositionSearchTerm] = useState('');
-  const [filteredPositions, setFilteredPositions] = useState<Position[]>([]);
+  const [cboResultsByName, setCboResultsByName] = useState<CBOItem[]>([]);
+  const [loadingCboByName, setLoadingCboByName] = useState(false);
   const [showPositionDropdown, setShowPositionDropdown] = useState(false);
   const [cboSearchTerm, setCboSearchTerm] = useState('');
   const [filteredCBOs, setFilteredCBOs] = useState<CBOItem[]>([]);
@@ -54,26 +55,29 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
     }
   };
 
-  // Buscar cargos ao digitar o nome
+  // Campo Nome: buscar na mesma API externa de CBO usada no campo CBO (cboService)
   useEffect(() => {
-    const searchPositions = async () => {
+    const searchCboByName = async () => {
+      if (positionSearchTerm.trim().length < 2) {
+        setCboResultsByName([]);
+        return;
+      }
+      setLoadingCboByName(true);
       try {
-        if (positionSearchTerm.trim().length > 0) {
-          const searchResults = await positionService.searchPositions(positionSearchTerm.trim());
-          setFilteredPositions(searchResults);
-        } else {
-          setFilteredPositions([]);
-        }
+        // Mesma API externa do campo CBO: cboService.searchCBO (base local + API externa)
+        const results = await cboService.searchCBO(positionSearchTerm.trim(), false);
+        setCboResultsByName(results);
       } catch (error) {
-        console.error('Erro ao buscar cargos:', error);
-        setFilteredPositions([]);
+        console.warn('Erro ao buscar CBO por nome:', error);
+        setCboResultsByName([]);
+      } finally {
+        setLoadingCboByName(false);
       }
     };
 
-    // Debounce para evitar muitas requisições
     const timeoutId = setTimeout(() => {
-      searchPositions();
-    }, 300);
+      searchCboByName();
+    }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [positionSearchTerm]);
@@ -143,19 +147,19 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
     return () => clearTimeout(timeoutId);
   }, [cboSearchTerm]);
 
-  const handlePositionSelect = (position: Position) => {
+  const handleCboSelectFromNameField = (cbo: CBOItem) => {
     setForm(prev => ({
       ...prev,
-      name: position.name,
-      cbo: position.cbo || '',
-      description: position.description || ''
+      name: cbo.titulo,
+      cbo: cbo.codigo
     }));
-    setPositionSearchTerm(position.name);
+    setPositionSearchTerm(cbo.titulo);
+    setCboSearchTerm(cbo.codigo);
     setShowPositionDropdown(false);
   };
 
   const handlePositionInputFocus = () => {
-    if (positionSearchTerm.length > 0 && filteredPositions.length > 0) {
+    if (positionSearchTerm.length > 0 && cboResultsByName.length > 0) {
       setShowPositionDropdown(true);
     }
   };
@@ -170,8 +174,10 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
   const handleCboSelect = (cbo: CBOItem) => {
     setForm(prev => ({
       ...prev,
+      name: prev.name.trim() ? prev.name : cbo.titulo,
       cbo: cbo.codigo
     }));
+    if (!form.name.trim()) setPositionSearchTerm(cbo.titulo);
     setCboSearchTerm(cbo.codigo);
     setShowCboDropdown(false);
   };
@@ -217,13 +223,19 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
       onClose();
       setForm({ name: '', description: '', cbo: '' });
       setPositionSearchTerm('');
-      setFilteredPositions([]);
-    } catch (err) {
-      setError('Erro ao criar cargo. Tente novamente.');
+      setCboResultsByName([]);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const serverMessage = err?.response?.data?.message;
+      const isDuplicate = status === 409;
+      const message = isDuplicate
+        ? (serverMessage || 'Já existe um cargo com este nome. Escolha outro nome para cadastrar.')
+        : 'Erro ao criar cargo. Tente novamente.';
+      setError(message);
       toast({
-        title: "Erro",
-        description: "Não foi possível criar o cargo.",
-        variant: "destructive"
+        title: isDuplicate ? 'Cargo já cadastrado' : 'Erro',
+        description: message,
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -233,7 +245,7 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
   const handleClose = () => {
       setForm({ name: '', description: '', cbo: '' });
       setPositionSearchTerm('');
-      setFilteredPositions([]);
+      setCboResultsByName([]);
       setShowPositionDropdown(false);
       setCboSearchTerm('');
       setFilteredCBOs([]);
@@ -307,6 +319,9 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
                 </Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
+                  {loadingCboByName && (
+                    <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 animate-spin" />
+                  )}
                   <Input
                     id="name"
                     name="name"
@@ -314,32 +329,30 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
                     onChange={handleChange}
                     onFocus={handlePositionInputFocus}
                     onBlur={handlePositionInputBlur}
-                    placeholder="Ex: Analista de Segurança, Supervisor de Vigilância..."
+                    placeholder="Ex: Analista de Sistemas, Vigilante, Supervisor..."
                     required
                     disabled={loading}
-                    className="pl-9 sm:pl-10 bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                    className="pl-9 sm:pl-10 pr-9 sm:pr-10 bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                   />
                   
-                  {/* Dropdown de cargos */}
-                  {showPositionDropdown && filteredPositions.length > 0 && (
+                  {/* Dropdown: mesma API externa de CBO do campo CBO (cboService) */}
+                  {showPositionDropdown && cboResultsByName.length > 0 && (
                     <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {filteredPositions.map((position) => (
+                      {cboResultsByName.map((cbo, index) => (
                         <div
-                          key={position.id}
-                          className="px-3 py-2 hover:bg-gray-700 cursor-pointer border-b border-gray-600 last:border-b-0"
-                          onClick={() => handlePositionSelect(position)}
+                          key={`cbo-name-${cbo.codigo}-${index}`}
+                          className="px-3 py-2 hover:bg-gray-700 cursor-pointer border-b border-gray-600/50 last:border-b-0"
+                          onClick={() => handleCboSelectFromNameField(cbo)}
                         >
                           <div className="flex flex-col">
-                            <span className="font-medium text-seguranca-lightgray">{position.name}</span>
-                            {position.cbo && (
-                              <span className="text-xs text-gray-400">
-                                CBO: {position.cbo}
-                              </span>
-                            )}
-                            {position.description && (
-                              <span className="text-xs text-gray-500 truncate">
-                                {position.description}
-                              </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium text-seguranca-lightgray">{cbo.titulo}</span>
+                              <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
+                                CBO: {cbo.codigo}
+                              </Badge>
+                            </div>
+                            {cbo.sinonimo && (
+                              <span className="text-xs text-gray-500 mt-0.5">Sinônimo: {cbo.sinonimo}</span>
                             )}
                           </div>
                         </div>
@@ -347,10 +360,9 @@ const NovoCargoModal: React.FC<NovoCargoModalProps> = ({ open, onClose, onCargoC
                     </div>
                   )}
                   
-                  {/* Mensagem quando não há resultados */}
-                  {showPositionDropdown && positionSearchTerm.trim() !== '' && filteredPositions.length === 0 && (
+                  {showPositionDropdown && positionSearchTerm.trim() !== '' && cboResultsByName.length === 0 && !loadingCboByName && (
                     <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-lg shadow-lg p-3">
-                      <p className="text-xs text-gray-400 text-center">Nenhum cargo encontrado</p>
+                      <p className="text-xs text-gray-400 text-center">Nenhuma ocupação encontrada na API CBO</p>
                     </div>
                   )}
                 </div>

@@ -18,8 +18,6 @@ import epiControlService from '@/services/epiControlService';
 import EPIControlForm from '@/components/epi/EPIControlForm';
 import EPIControlTable from '@/components/epi/EPIControlTable';
 import EPIControlViewModal from '@/components/epi/EPIControlViewModal';
-import epiControlReportGenerator from '@/utils/epiControlReportGenerator';
-import epiReceiptGenerator from '@/utils/epiReceiptGenerator';
 import epiStockReportGenerator from '@/utils/epiStockReportGenerator';
 import epiService from '@/services/epiService';
 
@@ -188,7 +186,15 @@ const EPIControl: React.FC = () => {
 
   const handleGenerateReport = async (record: EPIControlRecord) => {
     try {
-      await epiControlReportGenerator.generatePDF(record);
+      const blob = await epiControlService.generateEPIControlReport(record.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recibo-epi-${record.employeeName.replace(/\s+/g, '-')}-${record.deliveryDate || ''}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       toast.success('Relatório PDF gerado com sucesso!');
     } catch (error) {
       toast.error('Erro ao gerar relatório PDF');
@@ -198,7 +204,15 @@ const EPIControl: React.FC = () => {
 
   const handleGenerateReceipt = async (record: EPIControlRecord) => {
     try {
-      await epiReceiptGenerator.generatePDF(record);
+      const blob = await epiControlService.generateEPIControlReport(record.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recibo-epi-${record.employeeName.replace(/\s+/g, '-')}-${record.deliveryDate || ''}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       toast.success('Recibo de EPI gerado com sucesso!');
     } catch (error) {
       toast.error('Erro ao gerar recibo de EPI');

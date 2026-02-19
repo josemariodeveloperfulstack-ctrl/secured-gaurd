@@ -2,6 +2,7 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.*;
 import com.z7design.secured_guard.repository.*;
+import com.z7design.secured_guard.util.AuthenticatedCpfResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,18 +27,30 @@ public class TimeRecordService {
     private final QRCodeWorkPostRepository qrCodeWorkPostRepository;
     private final EmployeeRepository employeeRepository;
     private final WorkPostRepository workPostRepository;
+    private final AuthenticatedCpfResolver authenticatedCpfResolver;
 
     @Transactional
     public TimeRecord registerTimeRecord(UUID employeeId, TimeRecord.RecordType recordType,
                                          String qrCode, String location, Double latitude,
                                          Double longitude, String ipAddress, String userAgent) {
-        
-        log.info("📍 Registrando ponto - Employee: {}, Tipo: {}, QRCode: {}", 
-                 employeeId, recordType, qrCode);
 
-        // Buscar funcionário
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+        log.info("📍 Registrando ponto - Employee: {}, Tipo: {}, QRCode: {}",
+                employeeId, recordType, qrCode);
+
+        // Buscar funcionário:
+        // 1) Pelo ID enviado
+        // 2) Se não encontrar, tentar resolver pelo CPF autenticado
+        Employee employee = employeeRepository.findById(employeeId).orElseGet(() -> {
+            log.warn("⚠️ Funcionário não encontrado pelo ID {}. Tentando resolver pelo CPF autenticado...", employeeId);
+            return authenticatedCpfResolver.resolve(
+                            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication())
+                    .flatMap(cpf -> {
+                        log.info("🔎 Resolvendo funcionário pelo CPF autenticado: {}", cpf);
+                        return employeeRepository.findByCpf(cpf)
+                                .or(() -> employeeRepository.findByDocument(cpf));
+                    })
+                    .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+        });
 
         // Validar QR Code se fornecido
         WorkPost workPost = null;
@@ -66,8 +80,8 @@ public class TimeRecordService {
             }
         }
 
-        // Validar sequência de registros
-        validateRecordSequence(employeeId, recordType);
+        // Validar sequência usando o ID real do Employee (não o user.id)
+        validateRecordSequence(employee.getId(), recordType);
 
         // Criar registro
         TimeRecord record = new TimeRecord();
@@ -91,7 +105,8 @@ public class TimeRecordService {
     }
 
     private void validateRecordSequence(UUID employeeId, TimeRecord.RecordType newRecordType) {
-        List<TimeRecord> todayRecords = timeRecordRepository.findTodayRecordsByEmployeeId(employeeId);
+        LocalDate today = LocalDate.now();
+        List<TimeRecord> todayRecords = timeRecordRepository.findTodayRecordsByEmployeeIdAndDate(employeeId, today);
         
         if (todayRecords.isEmpty() && newRecordType != TimeRecord.RecordType.ENTRADA) {
             throw new RuntimeException("Primeiro registro do dia deve ser ENTRADA");
@@ -134,19 +149,46 @@ public class TimeRecordService {
         return R * c;
     }
 
+    /**
+     * Resolve o Employee pelo ID enviado (pode ser user.id ou employee.id).
+     * Se não encontrar como Employee, tenta resolver pelo CPF do usuário autenticado.
+     * Exposto para outros serviços (ex.: folha de ponto PDF/Excel).
+     */
+    public Employee resolveEmployeeForReport(UUID employeeIdOrUserId) {
+        return resolveEmployee(employeeIdOrUserId);
+    }
+
+    private Employee resolveEmployee(UUID employeeIdOrUserId) {
+        return employeeRepository.findById(employeeIdOrUserId).orElseGet(() -> {
+            log.warn("⚠️ Funcionário não encontrado pelo ID {}. Tentando resolver pelo CPF autenticado...", employeeIdOrUserId);
+            return authenticatedCpfResolver.resolve(
+                            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication())
+                    .flatMap(cpf -> {
+                        log.info("🔎 Resolvendo funcionário pelo CPF autenticado: {}", cpf);
+                        return employeeRepository.findByCpf(cpf)
+                                .or(() -> employeeRepository.findByDocument(cpf));
+                    })
+                    .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+        });
+    }
+
     public List<TimeRecord> getTodayRecords(UUID employeeId) {
-        return timeRecordRepository.findTodayRecordsByEmployeeId(employeeId);
+        Employee employee = resolveEmployee(employeeId);
+        LocalDate today = LocalDate.now();
+        return timeRecordRepository.findTodayRecordsByEmployeeIdAndDate(employee.getId(), today);
     }
 
     public List<TimeRecord> getRecordsByPeriod(UUID employeeId, LocalDate startDate, LocalDate endDate) {
+        Employee employee = resolveEmployee(employeeId);
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(LocalTime.MAX);
         return timeRecordRepository.findByEmployeeIdAndRecordedAtBetweenOrderByRecordedAtAsc(
-                employeeId, start, end);
+                employee.getId(), start, end);
     }
 
     public Page<TimeRecord> getRecordsByEmployee(UUID employeeId, Pageable pageable) {
-        return timeRecordRepository.findByEmployeeIdOrderByRecordedAtDesc(employeeId, pageable);
+        Employee employee = resolveEmployee(employeeId);
+        return timeRecordRepository.findByEmployeeIdOrderByRecordedAtDesc(employee.getId(), pageable);
     }
 
     public Page<TimeRecord> getPendingRecords(Pageable pageable) {
@@ -180,14 +222,16 @@ public class TimeRecordService {
     }
 
     public TimeRecord.RecordType getNextRecordType(UUID employeeId) {
-        List<TimeRecord> todayRecords = timeRecordRepository.findTodayRecordsByEmployeeId(employeeId);
-        
+        Employee employee = resolveEmployee(employeeId);
+        LocalDate today = LocalDate.now();
+        List<TimeRecord> todayRecords = timeRecordRepository.findTodayRecordsByEmployeeIdAndDate(employee.getId(), today);
+
         if (todayRecords.isEmpty()) {
             return TimeRecord.RecordType.ENTRADA;
         }
 
         TimeRecord lastRecord = todayRecords.get(0);
-        
+
         switch (lastRecord.getRecordType()) {
             case ENTRADA:
                 return TimeRecord.RecordType.SAIDA_ALMOCO;
@@ -200,5 +244,60 @@ public class TimeRecordService {
             default:
                 return TimeRecord.RecordType.ENTRADA;
         }
+    }
+
+    /**
+     * Salva os horários de um dia para lançamento manual. Remove registros manuais existentes
+     * do dia e persiste os novos (conforme vai registrando no frontend).
+     */
+    @Transactional
+    public List<TimeRecord> saveManualDay(UUID employeeId, LocalDate date,
+                                          String entrada, String saidaAlmoco, String retornoAlmoco, String saida) {
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+
+        timeRecordRepository.deleteManualRecordsByEmployeeIdAndDate(employeeId, date);
+
+        List<TimeRecord> saved = new ArrayList<>();
+
+        if (isValidTime(entrada)) {
+            saved.add(saveManualRecord(employee, date, entrada, TimeRecord.RecordType.ENTRADA));
+        }
+        if (isValidTime(saidaAlmoco)) {
+            saved.add(saveManualRecord(employee, date, saidaAlmoco, TimeRecord.RecordType.SAIDA_ALMOCO));
+        }
+        if (isValidTime(retornoAlmoco)) {
+            saved.add(saveManualRecord(employee, date, retornoAlmoco, TimeRecord.RecordType.RETORNO_ALMOCO));
+        }
+        if (isValidTime(saida)) {
+            saved.add(saveManualRecord(employee, date, saida, TimeRecord.RecordType.SAIDA));
+        }
+
+        log.info("✅ Lançamento manual do dia {} para employee {}: {} registro(s) salvos",
+                date, employeeId, saved.size());
+        return saved;
+    }
+
+    private static boolean isValidTime(String time) {
+        if (time == null || time.isBlank()) return false;
+        return time.matches("\\d{1,2}:\\d{2}");
+    }
+
+    private TimeRecord saveManualRecord(Employee employee, LocalDate date, String timeStr,
+                                        TimeRecord.RecordType recordType) {
+        String[] parts = timeStr.trim().split(":");
+        int h = Integer.parseInt(parts[0]);
+        int m = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+        LocalTime time = LocalTime.of(h, m);
+        LocalDateTime recordedAt = date.atTime(time);
+
+        TimeRecord record = new TimeRecord();
+        record.setEmployee(employee);
+        record.setRecordType(recordType);
+        record.setRecordedAt(recordedAt);
+        record.setIsManual(true);
+        record.setStatus(TimeRecord.RecordStatus.APPROVED);
+        record.setLocation("Lançamento manual");
+        return timeRecordRepository.save(record);
     }
 }

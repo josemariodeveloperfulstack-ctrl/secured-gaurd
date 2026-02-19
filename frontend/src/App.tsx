@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import WebSocketConnector from '@/components/WebSocketConnector';
 import { NotificationProvider } from '@/components/NotificationSystem';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { SessionTimeoutManager } from '@/components/SessionTimeoutManager';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -134,6 +135,8 @@ const Usuarios = lazy(() => import('@/pages/Usuarios'));
 const Roles = lazy(() => import('@/pages/Roles'));
 const Clientes = lazyWithRetry(() => import('@/pages/Clientes'), 'Clientes');
 const Fornecedores = lazy(() => import('@/pages/Fornecedores'));
+const GestaoPatrimonial = lazy(() => import('@/pages/GestaoPatrimonial'));
+const ModuloFiscal = lazy(() => import('@/pages/ModuloFiscal'));
 const Contratos = lazy(() => import('@/pages/Contratos'));
 const Financeiro = lazy(() => import('@/pages/Financeiro').catch(() => ({ default: () => <div>Erro ao carregar Financeiro</div> })));
 const Medicao = lazy(() => import('@/pages/Medicao'));
@@ -292,6 +295,7 @@ function App() {
                 }}
               >
                 <AuthProvider>
+                  <SessionTimeoutManager />
                   <WebSocketConnector />
                   <Routes>
 
@@ -518,6 +522,20 @@ function App() {
                     <Route path="/filiais" element={
                       <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
                         <Filiais />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/gestao-patrimonial" element={
+                      <ProtectedRoute requiredPermissions={['PATRIMONIAL_READ']}>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <GestaoPatrimonial />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/modulo-fiscal" element={
+                      <ProtectedRoute requiredPermissions={['FISCAL_READ']}>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ModuloFiscal />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
 
@@ -1077,7 +1095,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/meus-holerites" element={
-                      <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']}>
+                      <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
                           <MeusHolerites />
                         </Suspense>
