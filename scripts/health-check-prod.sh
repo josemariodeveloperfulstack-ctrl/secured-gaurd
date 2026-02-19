@@ -191,6 +191,9 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
                 exit 0
             else
                 log "⚠️ Aplicação funciona internamente mas não externamente"
+                log "📌 O 404 externo vem do Cloudflare ou Traefik (encaminhamento para o servidor)."
+                log "   No servidor: cd /var/www/secured_guard/prod/deploy && bash fix-404-prod.sh"
+                log "   Ver também: deploy/CLOUDFLARE_TRAEFIK_PROD.md"
                 if [ $ATTEMPT -ge 10 ]; then
                     log "✅ Aplicação está funcionando internamente após $ATTEMPT tentativas"
                     exit 0

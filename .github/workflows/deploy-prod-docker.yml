@@ -117,6 +117,8 @@ jobs:
           # Transfer docker-compose and nginx config
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/docker-compose.prod.yml $VPS_STR:$DEPLOY_PATH/deploy/
           sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/nginx/nginx-prod.conf $VPS_STR:$DEPLOY_PATH/deploy/nginx/
+          # Transfer fix script for 404 externo (Traefik/Cloudflare)
+          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS scripts/fix-404-prod.sh $VPS_STR:$DEPLOY_PATH/deploy/
 
       - name: 🚀 Pull and Restart on VPS
         run: |
