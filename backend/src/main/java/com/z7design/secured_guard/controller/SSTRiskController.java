@@ -57,7 +57,8 @@ public class SSTRiskController {
     @PutMapping("/types/{id}")
     @Operation(summary = "Atualizar tipo de risco", description = "Atualiza um tipo de risco existente")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<OccupationalRiskType> updateRiskType(@PathVariable UUID id, @RequestBody OccupationalRiskType riskType) {
+    public ResponseEntity<OccupationalRiskType> updateRiskType(@PathVariable UUID id,
+            @RequestBody OccupationalRiskType riskType) {
         OccupationalRiskType updated = riskService.updateRiskType(id, riskType);
         if (updated == null) {
             return ResponseEntity.notFound().build();
@@ -87,12 +88,13 @@ public class SSTRiskController {
     @Operation(summary = "Associar risco ao cargo", description = "Associa um tipo de risco a um cargo")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<PositionRisk> associateRiskToPosition(
-            @PathVariable UUID positionId, 
+            @PathVariable UUID positionId,
             @PathVariable UUID riskTypeId,
-            @RequestParam String riskLevel,
-            @RequestParam(required = false) String description,
-            @RequestParam(required = false) String preventiveMeasures) {
-        PositionRisk positionRisk = riskService.associateRiskToPosition(positionId, riskTypeId, riskLevel, description, preventiveMeasures);
+            @RequestParam("riskLevel") String riskLevel,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "preventiveMeasures", required = false) String preventiveMeasures) {
+        PositionRisk positionRisk = riskService.associateRiskToPosition(positionId, riskTypeId, riskLevel, description,
+                preventiveMeasures);
         return ResponseEntity.ok(positionRisk);
     }
 
@@ -118,12 +120,13 @@ public class SSTRiskController {
     @Operation(summary = "Associar risco ao funcionário", description = "Associa um tipo de risco a um funcionário")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<EmployeeRisk> associateRiskToEmployee(
-            @PathVariable UUID employeeId, 
+            @PathVariable UUID employeeId,
             @PathVariable UUID riskTypeId,
-            @RequestParam String riskLevel,
-            @RequestParam(required = false) String description,
-            @RequestParam(required = false) String preventiveMeasures) {
-        EmployeeRisk employeeRisk = riskService.associateRiskToEmployee(employeeId, riskTypeId, riskLevel, description, preventiveMeasures);
+            @RequestParam("riskLevel") String riskLevel,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "preventiveMeasures", required = false) String preventiveMeasures) {
+        EmployeeRisk employeeRisk = riskService.associateRiskToEmployee(employeeId, riskTypeId, riskLevel, description,
+                preventiveMeasures);
         return ResponseEntity.ok(employeeRisk);
     }
 
@@ -139,7 +142,7 @@ public class SSTRiskController {
     @Operation(summary = "Copiar riscos do cargo para funcionário", description = "Copia todos os riscos de um cargo para um funcionário")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<EmployeeRisk>> copyRisksFromPositionToEmployee(
-            @PathVariable UUID employeeId, 
+            @PathVariable UUID employeeId,
             @PathVariable UUID positionId) {
         // TODO: Implementar método copyRisksFromPositionToEmployee no serviço
         return ResponseEntity.ok(List.of());

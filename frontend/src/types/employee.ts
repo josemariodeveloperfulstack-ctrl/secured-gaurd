@@ -15,6 +15,7 @@ export interface EmployeeBankData {
   agency: string;
   account: string;
   type: string; // Conta Corrente, Poupança, etc.
+  chavePix?: string;
 }
 
 export interface EmployeeHistoryItem {

@@ -1478,6 +1478,9 @@ const Holerites: React.FC = () => {
         if (response.data && (response.data.sucesso || response.data.documents)) {
           documents = response.data.documents || response.data || [];
           if (Array.isArray(documents)) {
+            // #region agent log
+            fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:fetchUnifiedDocuments',message:'Lista recebida (protegido)',data:{count:documents.length,endpoint},hypothesisId:'B',timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             // Sempre atualizar o estado, mesmo se for array vazio
             setUnifiedDocuments(documents);
             console.log('✅ Documentos unificados carregados:', documents.length);
@@ -2845,6 +2848,9 @@ const Holerites: React.FC = () => {
   // Funções para unificação individual
   const handleDragStart = (e: React.DragEvent, item: any, type: 'holerite' | 'recibo') => {
     console.log('🚀 Iniciando drag:', { type, item: item.employeeName || 'N/A' });
+    // #region agent log
+    fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:handleDragStart',message:'handleDragStart',data:{type,employeeName:item?.employeeName,month:item?.month,year:item?.year,id:item?.id},hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     // Definir dados para transferência
     e.dataTransfer.setData('application/json', JSON.stringify({ item, type }));
@@ -2868,7 +2874,11 @@ const Holerites: React.FC = () => {
     e.currentTarget.classList.remove('border-seguranca-yellow', 'bg-seguranca-yellow/10');
 
     try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const rawData = e.dataTransfer.getData('application/json');
+      // #region agent log
+      fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:handleDrop:entry',message:'handleDrop fired',data:{rawDataLength:rawData?.length,draggedHolerite:!!draggedHolerite,draggedRecibo:!!draggedRecibo},hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
+      const data = JSON.parse(rawData);
       const { item, type } = data;
 
       console.log('📊„ Item solto:', { type, item: item.employeeName || 'N/A' });
@@ -2931,6 +2941,9 @@ const Holerites: React.FC = () => {
       });
 
       // Se temos ambos os itens com nomes iguais, mostrar confirmação (case-insensitive)
+      // #region agent log
+      fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:handleDrop:stateCheck',message:'state after setState',data:{type,draggedHoleriteExists:!!draggedHolerite,draggedReciboExists:!!draggedRecibo,bothPresent:!!(draggedHolerite&&draggedRecibo),itemEmployeeName:item?.employeeName},hypothesisId:'B',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (draggedHolerite && draggedRecibo &&
         draggedHolerite.employeeName && draggedRecibo.employeeName) {
         const holeriteName = normalizeName(draggedHolerite.employeeName);
@@ -3015,6 +3028,9 @@ const Holerites: React.FC = () => {
     }
 
     console.log('✅ ValidaÃ§Ã£o aprovada - Criando unificação para:', holerite.employeeName || 'N/A');
+    // #region agent log
+    fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:createUnification',message:'createUnification called',data:{employeeName:holerite.employeeName,month:holerite.month,year:holerite.year,reciboMonth:recibo.month,reciboYear:recibo.year},hypothesisId:'C',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     // Criar nova unificação individual
     const newUnification = {
@@ -3274,6 +3290,19 @@ const Holerites: React.FC = () => {
       }
 
       console.log('🌐 Enviando requisição para backend...');
+      // #region agent log
+      const apiParamsPre = (() => {
+        const p: any = { employeeName, month, year };
+        const pId = unification?.holerite?.id;
+        const rId = unification?.recibo?.id;
+        if (pId && rId) {
+          p.payslipId = typeof pId === 'string' ? pId.replace(/^hol-/, '') : pId;
+          p.receiptId = typeof rId === 'string' ? rId.replace(/^rec-/, '') : rId;
+        }
+        return p;
+      })();
+      fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:generateUnifiedPdf:pre',message:'API call',data:{params:apiParamsPre},hypothesisId:'C',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const response = await api.post('/api/unified-documents/create', null, {
         params: (() => {
           const params: any = {
@@ -3303,6 +3332,9 @@ const Holerites: React.FC = () => {
       });
 
       console.log('✅ Resposta do backend:', response.data);
+      // #region agent log
+      fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:generateUnifiedPdf:success',message:'API success',data:{sucesso:response?.data?.sucesso,filePath:response?.data?.filePath},hypothesisId:'C',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
       if (!response?.data || response.data.sucesso !== true || !response.data.filePath) {
         throw new Error(response?.data?.mensagem || 'Resposta inválida do servidor ao criar documento unificado');
@@ -3346,6 +3378,9 @@ const Holerites: React.FC = () => {
     } catch (error: any) {
       console.error('âŒ Erro ao gerar PDF unificado (backend):', error);
 
+      // #region agent log
+      fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:generateUnifiedPdf:error',message:'API error',data:{status:error?.response?.status,data:error?.response?.data?.mensagem||error?.message},hypothesisId:'C',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       let errorMessage = 'Erro ao unificar documentos';
 
       if (error?.response?.status === 500) {
@@ -4414,6 +4449,9 @@ const Holerites: React.FC = () => {
       console.log('✅ Dados de organização recebidos:', data);
       console.log('📊 Total de documentos:', data?.totalPayslips || 0);
       console.log('📊 Empresas:', data?.companies?.length || 0);
+      // #region agent log
+      fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:loadUnifiedOrganization',message:'Organização recebida',data:{totalPayslips:data?.totalPayslips,companiesLen:data?.companies?.length||0},hypothesisId:'B',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setUnifiedOrganizationData(data);
 
       if (!data || !data.companies || data.companies.length === 0) {
@@ -7414,13 +7452,77 @@ const Holerites: React.FC = () => {
                   </div>
                 )}
 
+                {(() => {
+                  // #region agent log
+                  const _docLen = unifiedDocuments?.length ?? 0;
+                  const _compLen = unifiedOrganizationData?.companies?.length ?? 0;
+                  const _loading = loadingUnifiedOrganization;
+                  const _branch = _loading ? 'loading' : (!_compLen && !_docLen) ? 'empty' : (!_compLen && _docLen) ? 'fallback' : 'hierarchy';
+                  fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:render',message:'UnifiedDocs branch',data:{unifiedDocumentsLen:_docLen,companiesLen:_compLen,loading:_loading,branch:_branch},hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{});
+                  // #endregion
+                  return null;
+                })()}
                 {loadingUnifiedOrganization ? (
                   <div className="flex items-center justify-center py-16">
                     <Loader2 className="h-10 w-10 animate-spin text-purple-400" />
                   </div>
-                ) : !unifiedOrganizationData?.companies?.length ? (
+                ) : !unifiedOrganizationData?.companies?.length && !unifiedDocuments?.length ? (
                   <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-8 text-center text-gray-300 shadow-inner">
                     Nenhum documento unificado encontrado. Crie documentos unificados para visualizar a organização.
+                  </div>
+                ) : !unifiedOrganizationData?.companies?.length && unifiedDocuments?.length ? (
+                  (() => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7896/ingest/58881493-69ae-44f8-814d-9e7f553f6d57',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64a8ae'},body:JSON.stringify({sessionId:'64a8ae',location:'Holerites.tsx:fallback-block',message:'Renderizando lista plana',data:{count:unifiedDocuments?.length},hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
+                    return null;
+                  })(),
+                  <div className="rounded-2xl border border-gray-700/60 bg-gray-900/40 p-6">
+                    <p className="text-sm text-amber-400/90 mb-4">
+                      {unifiedDocuments.length} documento(s) criado(s). A organização por Empresa/Setor/Período será exibida quando os dados estiverem disponíveis. Clique em &quot;Recarregar Organização&quot; para atualizar.
+                    </p>
+                    <div className="space-y-3">
+                      {unifiedDocuments.map((doc, idx) => (
+                        <div
+                          key={doc.fileName || idx}
+                          className="flex flex-wrap items-center justify-between gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-600/50"
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-white">{doc.employeeName || 'N/A'}</p>
+                            <p className="text-xs text-gray-400">{doc.fileName} {doc.month && doc.year && ` · ${doc.month}/${doc.year}`}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              onClick={() => openUnifiedViewer(doc, idx)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Visualizar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                              onClick={() => downloadUnifiedDocument(doc)}
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-600 text-red-300 hover:bg-red-600/20"
+                              onClick={() => handleDeleteDocuments('individual', idx)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Excluir
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">

@@ -94,7 +94,7 @@ public class VehicleController {
             @ApiResponse(responseCode = "200", description = "Veículos encontrados"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<List<VehicleDTO>> searchVehicles(@RequestParam String searchTerm) {
+    public ResponseEntity<List<VehicleDTO>> searchVehicles(@RequestParam("searchTerm") String searchTerm) {
         log.debug("Buscando veículos com termo: {}", searchTerm);
         List<VehicleDTO> vehicles = vehicleService.searchVehicles(searchTerm);
         return ResponseEntity.ok(vehicles);

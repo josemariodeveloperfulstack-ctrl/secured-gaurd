@@ -268,6 +268,24 @@ export const formatCPF = (cpf: string): string => {
   return clean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 };
 
+/** Formata CPF progressivamente durante digitação (1-11 dígitos) */
+export const formatCpfForInput = (value: string): string => {
+  const digits = (value || '').replace(/\D/g, '').slice(0, 11);
+  let out = digits;
+  out = out.replace(/^(\d{3})(\d)/, '$1.$2');
+  out = out.replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+  out = out.replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+  return out;
+};
+
+/** Formata número do Título de Eleitor progressivamente (formato XXXX.XXXX.XXXX, 12 dígitos) */
+export const formatTituloEleitorForInput = (value: string): string => {
+  const digits = (value || '').replace(/\D/g, '').slice(0, 12);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 8) return `${digits.slice(0, 4)}.${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}.${digits.slice(4, 8)}.${digits.slice(8)}`;
+};
+
 export const formatCNPJ = (cnpj: string): string => {
   const clean = cnpj.replace(/\D/g, '');
   return clean.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');

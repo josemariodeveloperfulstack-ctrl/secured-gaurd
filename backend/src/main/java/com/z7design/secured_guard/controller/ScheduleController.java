@@ -122,7 +122,7 @@ public class ScheduleController {
         @Parameter(description = "Data da escala de trabalho (formato YYYY-MM-DD)", example = "2024-07-01", required = true)
         @GetMapping("/date")
         public ResponseEntity<List<Schedule>> findByDate(
-                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                        @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
                 return ResponseEntity.ok(scheduleService.findByDate(date));
         }
 
@@ -154,18 +154,23 @@ public class ScheduleController {
         @Operation(summary = "Gerar relatório PDF de escalas", description = "Gera relatório PDF de escalas com filtros opcionais")
         @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
         public ResponseEntity<byte[]> generatePDFReport(
-                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-                        @RequestParam(required = false) UUID employeeId,
-                        @RequestParam(required = false) UUID workPostId,
-                        @RequestParam(required = false) String status) {
+                        @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                        @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+                        @RequestParam(value = "employeeId", required = false) UUID employeeId,
+                        @RequestParam(value = "workPostId", required = false) UUID workPostId,
+                        @RequestParam(value = "status", required = false) String status) {
                 try {
-                        byte[] pdfBytes = scheduleService.generatePDFReport(startDate, endDate, employeeId, workPostId, status);
-                        String fileName = "relatorio-escalas-" + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
-                        
+                        byte[] pdfBytes = scheduleService.generatePDFReport(startDate, endDate, employeeId, workPostId,
+                                        status);
+                        String fileName = "relatorio-escalas-"
+                                        + java.time.LocalDate.now().format(
+                                                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                                        + ".pdf";
+
                         return ResponseEntity.ok()
-                                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-                                .body(pdfBytes);
+                                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                                        "attachment; filename=\"" + fileName + "\"")
+                                        .body(pdfBytes);
                 } catch (IOException e) {
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
                 }

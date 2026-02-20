@@ -240,7 +240,8 @@ export const employeeService = {
           bank: payload.bankData.bank || '',
           agency: payload.bankData.agency || '',
           account: payload.bankData.account || '',
-          accountType: payload.bankData.type || 'CORRENTE'
+          accountType: payload.bankData.type || 'CORRENTE',
+          chavePix: payload.bankData.chavePix || ''
         };
         delete payload.bankData;
       }
@@ -265,7 +266,8 @@ export const employeeService = {
           bank: payload.bankData.bank || '',
           agency: payload.bankData.agency || '',
           account: payload.bankData.account || '',
-          accountType: payload.bankData.type || 'CORRENTE'
+          accountType: payload.bankData.type || 'CORRENTE',
+          chavePix: payload.bankData.chavePix || ''
         };
         delete payload.bankData;
       }

@@ -77,8 +77,8 @@ public class SpecificActivityController {
 
     @GetMapping("/date-range")
     public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByDateRange(
-            @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
+            @RequestParam("startDate") LocalDate startDate,
+            @RequestParam("endDate") LocalDate endDate) {
         List<SpecificActivityResponse> activities = specificActivityService.getSpecificActivitiesByDateRange(startDate,
                 endDate);
         return ResponseEntity.ok(activities);
@@ -87,8 +87,8 @@ public class SpecificActivityController {
     @GetMapping("/employee/{employeeId}/date-range")
     public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByEmployeeAndDateRange(
             @PathVariable UUID employeeId,
-            @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
+            @RequestParam("startDate") LocalDate startDate,
+            @RequestParam("endDate") LocalDate endDate) {
         List<SpecificActivityResponse> activities = specificActivityService
                 .getSpecificActivitiesByEmployeeAndDateRange(employeeId, startDate, endDate);
         return ResponseEntity.ok(activities);
@@ -97,8 +97,8 @@ public class SpecificActivityController {
     @GetMapping("/location/{locationId}/date-range")
     public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByLocationAndDateRange(
             @PathVariable UUID locationId,
-            @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
+            @RequestParam("startDate") LocalDate startDate,
+            @RequestParam("endDate") LocalDate endDate) {
         List<SpecificActivityResponse> activities = specificActivityService
                 .getSpecificActivitiesByLocationAndDateRange(locationId, startDate, endDate);
         return ResponseEntity.ok(activities);
@@ -107,8 +107,8 @@ public class SpecificActivityController {
     @GetMapping("/type/{type}/date-range")
     public ResponseEntity<List<SpecificActivityResponse>> getSpecificActivitiesByTypeAndDateRange(
             @PathVariable SpecificActivity.ActivityType type,
-            @RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
+            @RequestParam("startDate") LocalDate startDate,
+            @RequestParam("endDate") LocalDate endDate) {
         List<SpecificActivityResponse> activities = specificActivityService
                 .getSpecificActivitiesByTypeAndDateRange(type, startDate, endDate);
         return ResponseEntity.ok(activities);
@@ -168,7 +168,7 @@ public class SpecificActivityController {
 
     @PutMapping("/{id}/status")
     public ResponseEntity<SpecificActivityResponse> updateStatus(@PathVariable UUID id,
-            @RequestParam SpecificActivity.ActivityStatus status) {
+            @RequestParam("status") SpecificActivity.ActivityStatus status) {
         try {
             SpecificActivityResponse updatedActivity = specificActivityService.updateStatus(id, status);
             return ResponseEntity.ok(updatedActivity);
@@ -189,7 +189,7 @@ public class SpecificActivityController {
 
     @PutMapping("/{id}/complete")
     public ResponseEntity<SpecificActivityResponse> completeActivity(@PathVariable UUID id,
-            @RequestParam(required = false) String observations) {
+            @RequestParam(value = "observations", required = false) String observations) {
         try {
             SpecificActivityResponse completedActivity = specificActivityService.completeActivity(id, observations);
             return ResponseEntity.ok(completedActivity);
@@ -210,12 +210,12 @@ public class SpecificActivityController {
 
     @GetMapping(value = "/report/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generatePDFReport(
-            @RequestParam(required = false) UUID employeeId,
-            @RequestParam(required = false) UUID locationId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) SpecificActivity.ActivityStatus status,
-            @RequestParam(required = false) SpecificActivity.ActivityType type) {
+            @RequestParam(value = "employeeId", required = false) UUID employeeId,
+            @RequestParam(value = "locationId", required = false) UUID locationId,
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "status", required = false) SpecificActivity.ActivityStatus status,
+            @RequestParam(value = "type", required = false) SpecificActivity.ActivityType type) {
 
         try {
             log.info("Recebida requisição para gerar PDF de atividades específicas");

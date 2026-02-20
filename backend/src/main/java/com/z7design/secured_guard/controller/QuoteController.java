@@ -60,7 +60,7 @@ public class QuoteController {
     @GetMapping("/{id}/pdf")
     @Operation(summary = "Gerar PDF do orçamento", description = "Gera PDF do orçamento com opção de incluir serviços")
     public ResponseEntity<byte[]> generateQuotePdf(@PathVariable String id,
-            @RequestParam(defaultValue = "false") boolean includeServices) {
+            @RequestParam(value = "includeServices", defaultValue = "false") boolean includeServices) {
         byte[] pdf = quoteCommercialPdfService.generatePdf(UUID.fromString(id), includeServices);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
@@ -76,10 +76,10 @@ public class QuoteController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        
+
         User currentUser = (User) authentication.getPrincipal();
         UUID currentUserId = currentUser.getId();
-        
+
         Quote createdQuote = quoteService.create(quoteDTO, currentUserId);
         QuoteDTO createdDTO = quoteService.convertToDTO(createdQuote);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdDTO);
@@ -94,7 +94,8 @@ public class QuoteController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Atualizar status do orçamento", description = "Atualiza apenas o status de um orçamento")
-    public ResponseEntity<QuoteDTO> updateQuoteStatus(@PathVariable String id, @RequestBody Map<String, String> statusUpdate) {
+    public ResponseEntity<QuoteDTO> updateQuoteStatus(@PathVariable String id,
+            @RequestBody Map<String, String> statusUpdate) {
         String status = statusUpdate.get("status");
         Quote updated = quoteService.updateStatus(UUID.fromString(id), status);
         QuoteDTO updatedDTO = quoteService.convertToDTO(updated);
@@ -167,7 +168,7 @@ public class QuoteController {
 
     @GetMapping("/search")
     @Operation(summary = "Buscar orçamentos", description = "Busca orçamentos por termo de pesquisa")
-    public ResponseEntity<List<QuoteDTO>> searchQuotes(@RequestParam String term) {
+    public ResponseEntity<List<QuoteDTO>> searchQuotes(@RequestParam("term") String term) {
         List<Quote> quotes = quoteService.searchQuotes(term);
         List<QuoteDTO> quoteDTOs = quoteService.convertToDTOList(quotes);
         return ResponseEntity.ok(quoteDTOs);
@@ -177,14 +178,13 @@ public class QuoteController {
     @Operation(summary = "Estatísticas por status", description = "Retorna contagem de orçamentos por status")
     public ResponseEntity<Map<String, Long>> getCountByStatus() {
         Map<String, Long> stats = Map.of(
-            "DRAFT", quoteService.countByStatus(QuoteStatus.DRAFT),
-            "SENT", quoteService.countByStatus(QuoteStatus.SENT),
-            "UNDER_REVIEW", quoteService.countByStatus(QuoteStatus.UNDER_REVIEW),
-            "APPROVED", quoteService.countByStatus(QuoteStatus.APPROVED),
-            "REJECTED", quoteService.countByStatus(QuoteStatus.REJECTED),
-            "EXPIRED", quoteService.countByStatus(QuoteStatus.EXPIRED),
-            "CONVERTED", quoteService.countByStatus(QuoteStatus.CONVERTED)
-        );
+                "DRAFT", quoteService.countByStatus(QuoteStatus.DRAFT),
+                "SENT", quoteService.countByStatus(QuoteStatus.SENT),
+                "UNDER_REVIEW", quoteService.countByStatus(QuoteStatus.UNDER_REVIEW),
+                "APPROVED", quoteService.countByStatus(QuoteStatus.APPROVED),
+                "REJECTED", quoteService.countByStatus(QuoteStatus.REJECTED),
+                "EXPIRED", quoteService.countByStatus(QuoteStatus.EXPIRED),
+                "CONVERTED", quoteService.countByStatus(QuoteStatus.CONVERTED));
         return ResponseEntity.ok(stats);
     }
 
@@ -192,14 +192,13 @@ public class QuoteController {
     @Operation(summary = "Valor total por status", description = "Retorna valor total dos orçamentos por status")
     public ResponseEntity<Map<String, BigDecimal>> getTotalValueByStatus() {
         Map<String, BigDecimal> stats = Map.of(
-            "DRAFT", quoteService.getTotalValueByStatus(QuoteStatus.DRAFT),
-            "SENT", quoteService.getTotalValueByStatus(QuoteStatus.SENT),
-            "UNDER_REVIEW", quoteService.getTotalValueByStatus(QuoteStatus.UNDER_REVIEW),
-            "APPROVED", quoteService.getTotalValueByStatus(QuoteStatus.APPROVED),
-            "REJECTED", quoteService.getTotalValueByStatus(QuoteStatus.REJECTED),
-            "EXPIRED", quoteService.getTotalValueByStatus(QuoteStatus.EXPIRED),
-            "CONVERTED", quoteService.getTotalValueByStatus(QuoteStatus.CONVERTED)
-        );
+                "DRAFT", quoteService.getTotalValueByStatus(QuoteStatus.DRAFT),
+                "SENT", quoteService.getTotalValueByStatus(QuoteStatus.SENT),
+                "UNDER_REVIEW", quoteService.getTotalValueByStatus(QuoteStatus.UNDER_REVIEW),
+                "APPROVED", quoteService.getTotalValueByStatus(QuoteStatus.APPROVED),
+                "REJECTED", quoteService.getTotalValueByStatus(QuoteStatus.REJECTED),
+                "EXPIRED", quoteService.getTotalValueByStatus(QuoteStatus.EXPIRED),
+                "CONVERTED", quoteService.getTotalValueByStatus(QuoteStatus.CONVERTED));
         return ResponseEntity.ok(stats);
     }
-} 
+}

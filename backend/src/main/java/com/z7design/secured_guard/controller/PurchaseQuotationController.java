@@ -185,7 +185,7 @@ public class PurchaseQuotationController {
     @GetMapping("/search")
     @Operation(summary = "Buscar cotações", description = "Busca cotações por termo de pesquisa")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
-    public ResponseEntity<List<PurchaseQuotationDTO>> searchQuotations(@RequestParam String term) {
+    public ResponseEntity<List<PurchaseQuotationDTO>> searchQuotations(@RequestParam("term") String term) {
         log.info("Buscando cotações com termo: {}", term);
         List<PurchaseQuotationDTO> quotations = purchaseQuotationService.searchQuotations(term);
         return ResponseEntity.ok(quotations);
@@ -209,15 +209,15 @@ public class PurchaseQuotationController {
     @Operation(summary = "Gerar relatório PDF de cotações", description = "Gera relatório com layout corporativo em formato retrato")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
     public ResponseEntity<byte[]> generateQuotationsReportPdf(
-            @RequestParam(required = false) String quoteNumber,
-            @RequestParam(required = false) String title,
-            @RequestParam(required = false) UUID supplierId,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startValidUntil,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endValidUntil,
-            @RequestParam(required = false) UUID assignedToId,
-            @RequestParam(required = false) BigDecimal minValue,
-            @RequestParam(required = false) BigDecimal maxValue) throws IOException {
+            @RequestParam(value = "quoteNumber", required = false) String quoteNumber,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "supplierId", required = false) UUID supplierId,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "startValidUntil", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startValidUntil,
+            @RequestParam(value = "endValidUntil", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endValidUntil,
+            @RequestParam(value = "assignedToId", required = false) UUID assignedToId,
+            @RequestParam(value = "minValue", required = false) BigDecimal minValue,
+            @RequestParam(value = "maxValue", required = false) BigDecimal maxValue) throws IOException {
         log.info("Gerando relatório PDF de cotações de compra");
         byte[] pdf = purchaseQuotationReportService.generateQuotationsReport(
                 quoteNumber, title, supplierId, status, startValidUntil, endValidUntil,

@@ -82,7 +82,7 @@ public class SupplierController {
 
     @GetMapping("/search")
     @Operation(summary = "Buscar fornecedores por nome", description = "Busca fornecedores pelo nome (parcial)")
-    public ResponseEntity<List<Supplier>> searchByName(@RequestParam String name) {
+    public ResponseEntity<List<Supplier>> searchByName(@RequestParam("name") String name) {
         return ResponseEntity.ok(supplierService.findByNameContaining(name));
     }
 
@@ -101,11 +101,11 @@ public class SupplierController {
     @GetMapping("/filters")
     @Operation(summary = "Buscar fornecedores com filtros", description = "Busca fornecedores aplicando múltiplos filtros")
     public ResponseEntity<Page<Supplier>> getByFilters(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String cnpj,
-            @RequestParam(required = false) String city,
-            @RequestParam(required = false) String state,
-            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "cnpj", required = false) String cnpj,
+            @RequestParam(value = "city", required = false) String city,
+            @RequestParam(value = "state", required = false) String state,
+            @RequestParam(value = "isActive", required = false) Boolean isActive,
             Pageable pageable) {
         return ResponseEntity.ok(supplierService.findByFilters(name, cnpj, city, state, isActive, pageable));
     }

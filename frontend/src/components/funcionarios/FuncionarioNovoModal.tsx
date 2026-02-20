@@ -33,6 +33,7 @@ import FichaEntregaEPIForm from './FichaEntregaEPIForm';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { validateCPF, formatCpfForInput, formatTituloEleitorForInput } from '@/utils/validation';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -86,7 +87,8 @@ const initialState: CreateEmployeeDTO = {
     bank: '',
     agency: '',
     account: '',
-    type: 'CORRENTE'
+    type: 'CORRENTE',
+    chavePix: ''
   }
 };
 
@@ -99,6 +101,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [error, setError] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
+  const [cpfError, setCpfError] = useState<string | null>(null);
   
   // Estados para médicos
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -370,12 +373,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           bank: employeeToEdit.bankData.bank || '',
           agency: employeeToEdit.bankData.agency || '',
           account: employeeToEdit.bankData.account || '',
-          type: employeeToEdit.bankData.type || 'CORRENTE'
+          type: employeeToEdit.bankData.type || 'CORRENTE',
+          chavePix: (employeeToEdit.bankData as any).chavePix || ''
         } : {
           bank: '',
           agency: '',
           account: '',
-          type: 'CORRENTE'
+          type: 'CORRENTE',
+          chavePix: ''
         },
         
         // Campos adicionais - comentados pois não existem na entidade
@@ -434,6 +439,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       // Modo de criação - resetar formulário
       setIsEditMode(false);
       setForm(initialState);
+      setCpfError(null);
       setSelectedPosition(null);
       setSelectedUnit(null);
       setSelectedUser(null);
@@ -763,7 +769,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setForm((prev) => ({
         ...prev,
         bankData: {
-          ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE' }),
+          ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE', chavePix: '' }),
           [field]: value
         }
       }));
@@ -784,6 +790,28 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleTituloEleitorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatTituloEleitorForInput(e.target.value);
+    setForm((prev) => ({ ...prev, tituloEleitor: formatted }));
+  };
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '');
+    const formatted = formatCpfForInput(raw);
+    setCpfError(null);
+    const updates: Partial<CreateEmployeeDTO> = { cpf: formatted };
+    if (raw.length === 11) {
+      if (validateCPF(formatted)) {
+        updates.ctps = raw;
+      } else {
+        setCpfError('CPF não válido');
+      }
+    } else {
+      updates.ctps = '';
+    }
+    setForm((prev) => ({ ...prev, ...updates }));
   };
 
   const handleSelectChange = (field: string, value: string) => {
@@ -1993,18 +2021,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  <Input 
                    name="cpf" 
                    value={form.cpf} 
-                   onChange={handleChange} 
+                   onChange={handleCpfChange} 
                    required 
                    placeholder="000.000.000-00"
+                   className={cpfError ? 'border-red-500' : ''}
                  />
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">RG</Label>
-                 <Input 
-                   name="rg" 
-                   value={form.rg} 
-                   onChange={handleChange} 
-                 />
+                 <p className="text-xs text-gray-400 mt-1">
+                   Digite apenas números; o campo será formatado automaticamente (000.000.000-00)
+                 </p>
+                 {cpfError && (
+                   <p className="text-xs text-red-500 mt-1">{cpfError}</p>
+                 )}
                </div>
                <div>
                  <Label className="text-sm font-medium text-gray-200">Data de Nascimento *</Label>
@@ -2177,7 +2204,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    <Input 
                      name="tituloEleitor" 
                      value={form.tituloEleitor || ''} 
-                     onChange={handleChange} 
+                     onChange={handleTituloEleitorChange} 
                      placeholder="Ex: 2236.5048.0205"
                      className="text-xs sm:text-sm h-9 sm:h-10"
                    />
@@ -2218,43 +2245,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                      name="tituloEleitorValidade" 
                      type="date" 
                      value={form.tituloEleitorValidade || ''} 
-                     onChange={handleChange} 
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-               </div>
-             </div>
-             
-             {/* Registro Geral (RG) */}
-             <div className="mt-4 pt-4 border-t border-gray-600">
-               <h4 className="text-md font-semibold text-white mb-4">Registro Geral (RG)</h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Número</Label>
-                   <Input 
-                     name="rg" 
-                     value={form.rg || ''} 
-                     onChange={handleChange} 
-                     placeholder="Ex: MG-15.934.064"
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Órgão Emissor</Label>
-                   <Input 
-                     name="carteiraIdentidadeOrgaoEmissor" 
-                     value={form.carteiraIdentidadeOrgaoEmissor || ''} 
-                     onChange={handleChange} 
-                     placeholder="Ex: PF"
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Data de Expedição</Label>
-                   <Input 
-                     name="carteiraIdentidadeDataEmissao" 
-                     type="date" 
-                     value={form.carteiraIdentidadeDataEmissao || ''} 
                      onChange={handleChange} 
                      className="text-xs sm:text-sm h-9 sm:h-10"
                    />
@@ -2354,31 +2344,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                      type="date" 
                      value={form.ctpsIssueDate || ''} 
                      onChange={handleChange} 
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Órgão Emissor da CTPS</Label>
-                   <Input 
-                     name="ctpsIssuingAgency" 
-                     value={form.ctpsIssuingAgency || ''} 
-                     onChange={handleChange} 
-                     placeholder="Ex: SSP, DETRAN"
-                   />
-                 </div>
-                 
-                 {/* Upload PDF da CTPS Digital */}
-                 <div className="md:col-span-2">
-                   <Label className="text-sm font-medium text-gray-200">Upload do PDF da CTPS Digital</Label>
-                   <Input 
-                     type="file"
-                     accept=".pdf"
-                     onChange={(e) => {
-                       const file = e.target.files?.[0];
-                       if (file) {
-                         setForm(prev => ({ ...prev, ctpsDigitalPdf: file }));
-                       }
-                     }}
-                     className="mt-1"
                    />
                  </div>
                  
@@ -2548,41 +2513,43 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                  <h4 className="text-md font-semibold text-seguranca-yellow">Endereço</h4>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
-                  <div className="flex gap-2">
+                <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 sm:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs sm:text-sm font-medium text-gray-200">Rua/Logradouro *</Label>
                     <Input 
-                      name="enderecoCep" 
-                      value={aplicarMascaraCep(form.enderecoCep || '')} 
-                      onChange={(e) => {
-                        const valor = e.target.value.replace(/\D/g, '');
-                        setForm(prev => ({ ...prev, enderecoCep: valor }));
-                        if (valor.length === 8) {
-                          buscarCep(valor);
-                        }
-                      }}
-                      placeholder="00000-000"
-                      maxLength={9}
+                      name="enderecoRua" 
+                      value={form.enderecoRua || ''} 
+                      onChange={handleChange} 
+                      placeholder="Nome da rua, avenida, etc."
                       required
-                      className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
+                      className="text-xs sm:text-sm h-9 sm:h-10"
                     />
-                    {loadingCep && (
-                      <div className="flex items-center px-2 sm:px-3 text-gray-400">
-                        <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
-                      </div>
-                    )}
                   </div>
-                </div>
-                <div className="md:col-span-2">
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Rua/Logradouro *</Label>
-                  <Input 
-                    name="enderecoRua" 
-                    value={form.enderecoRua || ''} 
-                    onChange={handleChange} 
-                    placeholder="Nome da rua, avenida, etc."
-                    required
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
+                  <div className="w-full sm:w-36 flex-shrink-0">
+                    <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        name="enderecoCep" 
+                        value={aplicarMascaraCep(form.enderecoCep || '')} 
+                        onChange={(e) => {
+                          const valor = e.target.value.replace(/\D/g, '');
+                          setForm(prev => ({ ...prev, enderecoCep: valor }));
+                          if (valor.length === 8) {
+                            buscarCep(valor);
+                          }
+                        }}
+                        placeholder="00000-000"
+                        maxLength={9}
+                        required
+                        className="text-xs sm:text-sm h-9 sm:h-10"
+                      />
+                      {loadingCep && (
+                        <div className="flex items-center px-2 text-gray-400">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs sm:text-sm font-medium text-gray-200">Número *</Label>
@@ -2674,13 +2641,22 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                     placeholder="0000"
                   />
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
+<div>
+                <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
                   <Input 
                     name="bankData.account" 
                     value={form.bankData?.account || ''} 
                     onChange={handleChange} 
                     placeholder="00000-0"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-sm font-medium text-gray-200">Chave Pix</Label>
+                  <Input 
+                    name="bankData.chavePix" 
+                    value={form.bankData?.chavePix || ''} 
+                    onChange={handleChange} 
+                    placeholder="CPF, e-mail, telefone ou chave aleatória"
                   />
                 </div>
               </div>
@@ -3455,15 +3431,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   onChange={handleChange} 
                 />
               </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Banco Depositário do PIS</Label>
-                <Input 
-                  name="pisBancoDepositario" 
-                  value={form.pisBancoDepositario || ''} 
-                  onChange={handleChange} 
-                  placeholder="Ex: Banco do Brasil"
-                />
-              </div>
             </div>
             </div>
           </Card>
@@ -3639,9 +3606,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">Relatório Resumido</h3>
+                <h3 className="text-lg font-semibold text-white">Gerar a ficha simples do funcionário</h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -3661,16 +3628,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 >
                   <Eye className="mr-2 h-4 w-4" />
                   Visualizar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleEmployeeRecordExcel}
-                  disabled={!canGenerateReports || loading}
-                  className="border-emerald-500 text-emerald-400 h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
-                >
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Gerar Excel
                 </Button>
               </div>
               </div>

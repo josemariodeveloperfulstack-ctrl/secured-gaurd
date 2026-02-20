@@ -35,8 +35,8 @@ public class TimeSheetController {
     @Operation(summary = "Gerar folha de ponto mensal em Excel para um funcionário")
     public ResponseEntity<byte[]> generateTimeSheet(
             @PathVariable UUID employeeId,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) Integer month) {
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month) {
         try {
             LocalDate today = LocalDate.now();
             int resolvedYear = (year != null) ? year : today.getYear();
@@ -48,7 +48,8 @@ public class TimeSheetController {
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(fileBytes);
         } catch (ResourceNotFoundException e) {
             log.warn("Recurso não encontrado ao gerar folha de ponto: {}", e.getMessage());
@@ -63,16 +64,17 @@ public class TimeSheetController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Gerar PDF da folha de ponto do mês preenchido com os registros do funcionário", description = "Gera PDF com os horários já registrados. Parâmetros: employeeId (obrigatório), year, month (opcionais, padrão atual), companyId (opcional).")
     public ResponseEntity<byte[]> generateMonthFolhaPontoPdf(
-            @RequestParam UUID employeeId,
-            @RequestParam(required = false) UUID companyId,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) Integer month) {
+            @RequestParam("employeeId") UUID employeeId,
+            @RequestParam(value = "companyId", required = false) UUID companyId,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month) {
         try {
             LocalDate today = LocalDate.now();
             int resolvedYear = (year != null) ? year : today.getYear();
             int resolvedMonth = (month != null) ? month : today.getMonthValue();
 
-            byte[] pdfBytes = folhaDePontoStandardPdfService.generateFilledPdf(employeeId, companyId, resolvedYear, resolvedMonth);
+            byte[] pdfBytes = folhaDePontoStandardPdfService.generateFilledPdf(employeeId, companyId, resolvedYear,
+                    resolvedMonth);
 
             String filename = String.format("folha-ponto-%04d-%02d.pdf", resolvedYear, resolvedMonth);
 
@@ -93,9 +95,9 @@ public class TimeSheetController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Gerar PDF da folha de ponto em branco para impressão e preenchimento manual", description = "Gera PDF com layout padronizado para qualquer mês/ano. Parâmetros opcionais: companyId, year (padrão atual), month (padrão atual).")
     public ResponseEntity<byte[]> generateBlankFolhaPontoPdf(
-            @RequestParam(required = false) UUID companyId,
-            @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) Integer month) {
+            @RequestParam(value = "companyId", required = false) UUID companyId,
+            @RequestParam(value = "year", required = false) Integer year,
+            @RequestParam(value = "month", required = false) Integer month) {
         try {
             LocalDate today = LocalDate.now();
             int resolvedYear = (year != null) ? year : today.getYear();
@@ -103,7 +105,8 @@ public class TimeSheetController {
 
             byte[] pdfBytes = folhaDePontoStandardPdfService.generateBlankPdf(companyId, resolvedYear, resolvedMonth);
 
-            String filename = String.format("folha-ponto-preenchimento-manual-%04d-%02d.pdf", resolvedYear, resolvedMonth);
+            String filename = String.format("folha-ponto-preenchimento-manual-%04d-%02d.pdf", resolvedYear,
+                    resolvedMonth);
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
@@ -118,6 +121,3 @@ public class TimeSheetController {
         }
     }
 }
-
-
-

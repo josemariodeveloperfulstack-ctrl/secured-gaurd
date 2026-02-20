@@ -75,8 +75,8 @@ public class PurchaseRequestController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
     public ResponseEntity<PurchaseRequestDTO> approveRequest(
             @PathVariable UUID id,
-            @RequestParam String approverName,
-            @RequestParam(required = false) String approvalNotes) {
+            @RequestParam("approverName") String approverName,
+            @RequestParam(value = "approvalNotes", required = false) String approvalNotes) {
         log.info("Aprovando requisição de compra com ID: {}", id);
         try {
             PurchaseRequestDTO approvedRequest = purchaseRequestService.approveRequest(id, approverName, approvalNotes);
@@ -90,8 +90,8 @@ public class PurchaseRequestController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
     public ResponseEntity<PurchaseRequestDTO> rejectRequest(
             @PathVariable UUID id,
-            @RequestParam String rejectorName,
-            @RequestParam String rejectionReason) {
+            @RequestParam("rejectorName") String rejectorName,
+            @RequestParam("rejectionReason") String rejectionReason) {
         log.info("Rejeitando requisição de compra com ID: {}", id);
         try {
             PurchaseRequestDTO rejectedRequest = purchaseRequestService.rejectRequest(id, rejectorName,
@@ -170,7 +170,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<List<PurchaseRequestDTO>> searchRequests(@RequestParam String searchTerm) {
+    public ResponseEntity<List<PurchaseRequestDTO>> searchRequests(@RequestParam("searchTerm") String searchTerm) {
         log.info("Buscando requisições de compra com termo: {}", searchTerm);
         List<PurchaseRequestDTO> requests = purchaseRequestService.searchRequests(searchTerm);
         return ResponseEntity.ok(requests);
@@ -204,11 +204,11 @@ public class PurchaseRequestController {
     @GetMapping("/reports/pdf")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
     public ResponseEntity<byte[]> generatePurchaseRequestsReportPdf(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) BigDecimal minValue,
-            @RequestParam(required = false) BigDecimal maxValue) throws IOException {
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "minValue", required = false) BigDecimal minValue,
+            @RequestParam(value = "maxValue", required = false) BigDecimal maxValue) throws IOException {
 
         log.info("Gerando relatório PDF de solicitações de compra");
         byte[] pdf = purchaseRequestReportService.generatePurchaseRequestsReport(
