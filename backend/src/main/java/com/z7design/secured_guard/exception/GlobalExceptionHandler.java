@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex, WebRequest request) {
         log.warn("Recurso não encontrado: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
@@ -35,14 +35,14 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex, WebRequest request) {
         log.warn("Erro de negócio: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.CONFLICT.value())
@@ -50,21 +50,22 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ValidationErrorResponse> handleValidationException(MethodArgumentNotValidException ex, WebRequest request) {
+    public ResponseEntity<ValidationErrorResponse> handleValidationException(MethodArgumentNotValidException ex,
+            WebRequest request) {
         log.warn("Erro de validação: {}", ex.getMessage());
-        
+
         Map<String, String> fieldErrors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
             String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
             fieldErrors.put(fieldName, errorMessage);
         });
-        
+
         ValidationErrorResponse errorResponse = ValidationErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
@@ -73,20 +74,20 @@ public class GlobalExceptionHandler {
                 .path(request.getDescription(false).replace("uri=", ""))
                 .fieldErrors(fieldErrors)
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ValidationErrorResponse> handleConstraintViolation(ConstraintViolationException ex, WebRequest request) {
+    public ResponseEntity<ValidationErrorResponse> handleConstraintViolation(ConstraintViolationException ex,
+            WebRequest request) {
         log.warn("Erro de constraint: {}", ex.getMessage());
-        
+
         Map<String, String> fieldErrors = ex.getConstraintViolations().stream()
                 .collect(Collectors.toMap(
                         violation -> violation.getPropertyPath().toString(),
-                        ConstraintViolation::getMessage
-                ));
-        
+                        ConstraintViolation::getMessage));
+
         ValidationErrorResponse errorResponse = ValidationErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
@@ -95,14 +96,14 @@ public class GlobalExceptionHandler {
                 .path(request.getDescription(false).replace("uri=", ""))
                 .fieldErrors(fieldErrors)
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
-        log.warn("Acesso negado: {}", ex.getMessage());
-        
+        log.warn("Acesso negado para {}: {}", request.getDescription(false), ex.getMessage());
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.FORBIDDEN.value())
@@ -110,14 +111,14 @@ public class GlobalExceptionHandler {
                 .message("Acesso negado. Você não tem permissão para realizar esta operação.")
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, WebRequest request) {
         log.warn("Argumento inválido: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
@@ -125,16 +126,17 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, WebRequest request) {
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex,
+            WebRequest request) {
         log.warn("Violação de integridade de dados: {}", ex.getMessage());
-        
+
         String message = "Erro ao salvar dados. Verifique se os dados já existem (ex: username ou email já cadastrado).";
-        
+
         // Tentar extrair uma mensagem mais específica da exceção
         if (ex.getMessage() != null) {
             String msg = ex.getMessage();
@@ -146,7 +148,7 @@ public class GlobalExceptionHandler {
                 message = "Número do contrato já está em uso por outro contrato.";
             }
         }
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.CONFLICT.value())
@@ -154,13 +156,15 @@ public class GlobalExceptionHandler {
                 .message(message)
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
     /**
-     * SockJS/WebSocket: ao desconectar, o transporte xhr_streaming usa Content-Type application/javascript.
-     * Não há converter para serializar ErrorResponse/Map nesse formato. Retornar 500 vazio evita erro em cascata.
+     * SockJS/WebSocket: ao desconectar, o transporte xhr_streaming usa Content-Type
+     * application/javascript.
+     * Não há converter para serializar ErrorResponse/Map nesse formato. Retornar
+     * 500 vazio evita erro em cascata.
      */
     @ExceptionHandler(HttpMessageNotWritableException.class)
     public ResponseEntity<Void> handleHttpMessageNotWritable(HttpMessageNotWritableException ex, WebRequest request) {
@@ -179,7 +183,7 @@ public class GlobalExceptionHandler {
         // Não é um erro real do servidor, então apenas logamos em debug
         String path = request.getDescription(false);
         log.debug("Cliente cancelou a conexão para: {} - {}", path, ex.getMessage());
-        
+
         // Retornar null para não enviar resposta (a conexão já foi fechada)
         return null;
     }
@@ -187,13 +191,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {
         // Ignorar ClientAbortException no handler genérico (já tratado acima)
-        if (ex instanceof ClientAbortException || 
-            (ex.getCause() != null && ex.getCause() instanceof ClientAbortException)) {
+        if (ex instanceof ClientAbortException ||
+                (ex.getCause() != null && ex.getCause() instanceof ClientAbortException)) {
             return null;
         }
-        
+
         log.error("Erro interno do servidor: {}", ex.getMessage(), ex);
-        
+
         // Log específico para debugging
         String requestPath = request.getDescription(false);
         if (requestPath.contains("/ws/") || requestPath.contains("/websocket")) {
@@ -224,12 +228,13 @@ public class GlobalExceptionHandler {
                 }
             }
         }
-        
-        // Em rotas WebSocket/SockJS não retornar body JSON (Content-Type application/javascript incompatível)
+
+        // Em rotas WebSocket/SockJS não retornar body JSON (Content-Type
+        // application/javascript incompatível)
         if (requestPath.contains("/ws/") || requestPath.contains("/websocket")) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
@@ -237,7 +242,7 @@ public class GlobalExceptionHandler {
                 .message("Erro interno do servidor. Tente novamente mais tarde.")
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
@@ -245,7 +250,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EquipmentNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleEquipmentNotFound(EquipmentNotFoundException ex, WebRequest request) {
         log.warn("Equipamento não encontrado: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
@@ -253,14 +258,14 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
     @ExceptionHandler(UnitNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleUnitNotFound(UnitNotFoundException ex, WebRequest request) {
         log.warn("Unidade não encontrada: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
@@ -268,14 +273,14 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
     @ExceptionHandler(WorkPostNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleWorkPostNotFound(WorkPostNotFoundException ex, WebRequest request) {
         log.warn("Posto de trabalho não encontrado: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
@@ -283,14 +288,15 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
     @ExceptionHandler(EquipmentAlreadyAssignedException.class)
-    public ResponseEntity<ErrorResponse> handleEquipmentAlreadyAssigned(EquipmentAlreadyAssignedException ex, WebRequest request) {
+    public ResponseEntity<ErrorResponse> handleEquipmentAlreadyAssigned(EquipmentAlreadyAssignedException ex,
+            WebRequest request) {
         log.warn("Equipamento já atribuído: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.CONFLICT.value())
@@ -298,14 +304,14 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
 
     @ExceptionHandler(EquipmentExpiredException.class)
     public ResponseEntity<ErrorResponse> handleEquipmentExpired(EquipmentExpiredException ex, WebRequest request) {
         log.warn("Equipamento expirado: {}", ex.getMessage());
-        
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
@@ -313,7 +319,7 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
-        
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 }

@@ -38,7 +38,7 @@ public class PositionController {
         List<PositionDTO> positions = positionService.getAllPositions();
         return ResponseEntity.ok(positions);
     }
-    
+
     @GetMapping("/search")
     @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_RH')")
     @Operation(summary = "Buscar cargos", description = "Busca cargos por nome com filtro dinâmico")
@@ -46,7 +46,7 @@ public class PositionController {
             @ApiResponse(responseCode = "200", description = "Cargos encontrados com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<Object> searchPositions(@RequestParam(required = false) String query) {
+    public ResponseEntity<Object> searchPositions(@RequestParam(value = "query", required = false) String query) {
         log.debug("Buscando cargos com query: {}", query);
         try {
             List<PositionDTO> positions = positionService.searchPositions(query);
@@ -64,10 +64,9 @@ public class PositionController {
             log.debug("Teste básico de posições");
             List<PositionDTO> positions = positionService.getAllPositions();
             return ResponseEntity.ok(java.util.Map.of(
-                "count", positions.size(),
-                "message", "Teste de posições funcionando",
-                "positions", positions
-            ));
+                    "count", positions.size(),
+                    "message", "Teste de posições funcionando",
+                    "positions", positions));
         } catch (Exception e) {
             log.error("Erro no teste de posições: ", e);
             return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
@@ -131,4 +130,4 @@ public class PositionController {
         positionService.deletePosition(id);
         return ResponseEntity.noContent().build();
     }
-} 
+}

@@ -220,7 +220,8 @@ public class SecurityConfig {
                                                 .hasAnyAuthority("OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_OPERACIONAL",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
-                                                                "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL", "ROLE_RH")
+                                                                "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
+                                                                "ROLE_RH")
                                                 // Endpoints de guias de transporte - requerem autenticação
                                                 .requestMatchers("/api/transport-guides/**").authenticated()
                                                 // Endpoints de reconhecimento facial - requerem apenas autenticação
@@ -293,12 +294,15 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/leads/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
                                                                 "LEADS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_COMERCIAL",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 // CRM, oportunidades, Kanban, dashboard comercial e metas
-                                                .requestMatchers("/api/crm/**", "/api/opportunities/**", "/api/kanban-status/**",
+                                                .requestMatchers("/api/crm/**", "/api/opportunities/**",
+                                                                "/api/kanban-status/**",
                                                                 "/api/commercial-dashboard/**", "/api/sales-goals/**")
-                                                .hasAnyRole("SUPER_ADMIN", "ADMIN", "GESTOR", "COMERCIAL", "GESTOR_COMERCIAL", "ASSISTENTE_COMERCIAL")
+                                                .hasAnyRole("SUPER_ADMIN", "ADMIN", "GESTOR", "COMERCIAL",
+                                                                "GESTOR_COMERCIAL", "ASSISTENTE_COMERCIAL")
                                                 .requestMatchers("/api/proposals/**")
                                                 .hasAnyAuthority("PROPOSALS_READ", "PROPOSALS_WRITE",
                                                                 "PROPOSALS_CREATE", "PROPOSALS_DELETE",
@@ -418,7 +422,8 @@ public class SecurityConfig {
                                                                 "GESTOR_COMERCIAL",
                                                                 "ASSISTENTE_COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO")
-                                                // Endpoints de mensagens - qualquer usuário autenticado pode enviar/receber
+                                                // Endpoints de mensagens - qualquer usuário autenticado pode
+                                                // enviar/receber
                                                 .requestMatchers("/api/v1/messages/**").authenticated()
                                                 // Emails dos departamentos - Comercial precisa para página de Contratos
                                                 .requestMatchers("/api/department-emails").hasAnyRole(
@@ -438,7 +443,9 @@ public class SecurityConfig {
                                                                 "ATTENDANCE_MANAGE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_FINANCEIRO", "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL", "ROLE_SUPERVISOR")
+                                                                "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
+                                                                "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                "ROLE_SUPERVISOR")
                                                 // Endpoints de chatbot - mesmas permissões de suporte
                                                 .requestMatchers("/api/v1/support/chatbot/**")
                                                 .hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE",
@@ -447,7 +454,9 @@ public class SecurityConfig {
                                                                 "ATTENDANCE_MANAGE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_FINANCEIRO", "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL", "ROLE_SUPERVISOR")
+                                                                "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
+                                                                "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
+                                                                "ROLE_SUPERVISOR")
                                                 // Endpoints de funcionários - temporariamente públicos para debug
                                                 .requestMatchers("/api/employees/**").permitAll()
                                                 // Endpoints de unidades - temporariamente públicos para debug
@@ -541,7 +550,11 @@ public class SecurityConfig {
                                                 // teste
                                                 .requestMatchers("/api/assinaturas-documentos/**").permitAll()
                                                 // Endpoints de dependentes - listar por funcionário disponível para
-                                                // qualquer usuário autenticado (ex.: ponto eletrônico, ficha do funcionário)
+                                                // qualquer usuário autenticado (ex.: ponto eletrônico, ficha do
+                                                // funcionário)
+                                                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS,
+                                                                "/api/dependents/**")
+                                                .permitAll()
                                                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                                                                 "/api/dependents/employee/**")
                                                 .authenticated()
@@ -570,9 +583,11 @@ public class SecurityConfig {
                                                                 "ROLE_GESTOR", "ROLE_RH", "EMPLOYEES_READ",
                                                                 "EMPLOYEES_WRITE", "EMPLOYEES_CREATE",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL")
-                                                // Endpoints de ponto eletrônico - qualquer usuário autenticado (dados filtrados por CPF no serviço)
+                                                // Endpoints de ponto eletrônico - qualquer usuário autenticado (dados
+                                                // filtrados por CPF no serviço)
                                                 .requestMatchers("/api/time-records/**").authenticated()
-                                                // Endpoints de folha de ponto (time-sheets) - qualquer autenticado (dados por funcionário/CPF no serviço)
+                                                // Endpoints de folha de ponto (time-sheets) - qualquer autenticado
+                                                // (dados por funcionário/CPF no serviço)
                                                 .requestMatchers("/api/time-sheets/**").authenticated()
                                                 // Todo o resto requer autenticação
                                                 .anyRequest().authenticated())
