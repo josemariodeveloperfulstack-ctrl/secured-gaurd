@@ -1,82 +1,114 @@
--- Gestão Patrimonial: categorias, localizações e bens
-CREATE TABLE IF NOT EXISTS patrimonial_categories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Gestão Patrimonial: categorias, localizações, bens, baixas, depreciação, manutenção
+
+-- Criação da tabela de categorias (hierárquica)
+CREATE TABLE IF NOT EXISTS asset_categories (
+    id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    default_useful_life_years INTEGER,
-    default_depreciation_rate_pct DECIMAL(5,2),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    parent_id UUID REFERENCES asset_categories(id),
+    depreciation_rate DECIMAL(5,2), -- Taxa anual de depreciação em %
+    lifespan_years INTEGER, -- Vida útil em anos
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS patrimonial_locations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR(50),
-    name VARCHAR(255) NOT NULL,
-    address_or_room VARCHAR(500),
-    notes TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
--- Criar patrimonial_assets sem FK para employees (adicionada condicionalmente abaixo)
-CREATE TABLE IF NOT EXISTS patrimonial_assets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR(30) NOT NULL UNIQUE,
+-- Criação da tabela de localizações
+CREATE TABLE IF NOT EXISTS asset_locations (
+    id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    category_id UUID NOT NULL REFERENCES patrimonial_categories(id) ON DELETE RESTRICT,
-    location_id UUID REFERENCES patrimonial_locations(id) ON DELETE SET NULL,
-    acquisition_date DATE NOT NULL,
-    acquisition_value DECIMAL(15,2) NOT NULL,
-    useful_life_years INTEGER NOT NULL,
-    residual_value_pct DECIMAL(5,2) NOT NULL DEFAULT 0,
-    status VARCHAR(20) NOT NULL DEFAULT 'EM_USO',
+    address VARCHAR(255),
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Criação da tabela de bens patrimoniais
+CREATE TABLE IF NOT EXISTS assets (
+    id UUID PRIMARY KEY NOT NULL,
+    code VARCHAR(50) NOT NULL UNIQUE, -- Código de patrimônio / etiqueta
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    
+    category_id UUID REFERENCES asset_categories(id),
+    location_id UUID REFERENCES asset_locations(id),
+    supplier_id UUID, -- Referência opcional para fornecedor
+    
+    acquisition_date DATE,
+    acquisition_value DECIMAL(15,2),
+    
+    current_value DECIMAL(15,2), -- Valor residual atual
+    status VARCHAR(50) NOT NULL, -- DISPONIVEL, EM_USO, MANUTENCAO, BAIXADO, EMPRESTADO
+    
     serial_number VARCHAR(100),
-    invoice_number VARCHAR(100),
-    responsible_employee_id UUID,
+    model VARCHAR(100),
+    brand VARCHAR(100),
+    
+    invoice_number VARCHAR(50), -- Número da nota fiscal
+    warranty_expiration DATE,
+    
+    responsible_employee_id UUID, -- Funcionário responsável (se houver)
+    
+    conditions VARCHAR(50), -- NOVO, BOM, REGULAR, RUIM, SUCATA
+    
     notes TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
 );
 
--- Adicionar FK para employees apenas se a tabela existir e tiver PRIMARY KEY (compatível com CI/prod)
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.table_constraints
-        WHERE table_name = 'employees' AND constraint_type = 'PRIMARY KEY'
-    ) THEN
-        IF NOT EXISTS (
-            SELECT 1 FROM information_schema.table_constraints
-            WHERE table_name = 'patrimonial_assets' AND constraint_name = 'fk_patrimonial_assets_responsible_employee'
-        ) THEN
-            ALTER TABLE patrimonial_assets
-            ADD CONSTRAINT fk_patrimonial_assets_responsible_employee
-            FOREIGN KEY (responsible_employee_id) REFERENCES employees(id) ON DELETE SET NULL;
-        END IF;
-    END IF;
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_category_id ON patrimonial_assets(category_id);
-CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_location_id ON patrimonial_assets(location_id);
-CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_status ON patrimonial_assets(status);
-CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_code ON patrimonial_assets(code);
-CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_acquisition_date ON patrimonial_assets(acquisition_date);
-CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_responsible_employee_id ON patrimonial_assets(responsible_employee_id);
-
--- Permissões Gestão Patrimonial
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'PATRIMONIAL_READ', 'Ler Gestão Patrimonial'),
-(gen_random_uuid(), 'PATRIMONIAL_WRITE', 'Gerenciar Gestão Patrimonial');
-
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id
-FROM roles r
-CROSS JOIN permissions p
-WHERE r.name IN ('SUPER_ADMIN', 'ADMIN', 'FINANCEIRO')
-AND p.name IN ('PATRIMONIAL_READ', 'PATRIMONIAL_WRITE')
-AND NOT EXISTS (
-    SELECT 1 FROM role_permissions rp
-    WHERE rp.role_id = r.id AND rp.permission_id = p.id
+-- Tabela de movimentações/histórico do bem
+CREATE TABLE IF NOT EXISTS asset_movements (
+    id UUID PRIMARY KEY,
+    asset_id UUID NOT NULL REFERENCES assets(id),
+    movement_type VARCHAR(50) NOT NULL, -- AQUISICAO, TRANSFERENCIA, BAIXA, MANUTENCAO, REAVALIACAO
+    
+    origin_location_id UUID REFERENCES asset_locations(id),
+    target_location_id UUID REFERENCES asset_locations(id),
+    
+    responsible_id UUID, -- Quem autorizou/realizou
+    movement_date TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    
+    notes TEXT
 );
+
+-- Tabela de manutenções de bens
+CREATE TABLE IF NOT EXISTS asset_maintenances (
+    id UUID PRIMARY KEY,
+    asset_id UUID NOT NULL REFERENCES assets(id),
+    
+    maintenance_type VARCHAR(50) NOT NULL, -- PREVENTIVA, CORRETIVA
+    status VARCHAR(50) NOT NULL, -- AGENDADA, EM_ANDAMENTO, CONCLUIDA, CANCELADA
+    
+    scheduled_date DATE,
+    completion_date DATE,
+    
+    cost DECIMAL(15,2),
+    vendor_name VARCHAR(255), -- Quem realizou a manutenção
+    
+    description TEXT,
+    notes TEXT,
+    
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Tabela de depreciação mensal (histórico de cálculo)
+CREATE TABLE IF NOT EXISTS asset_depreciations (
+    id UUID PRIMARY KEY,
+    asset_id UUID NOT NULL REFERENCES assets(id),
+    calculation_date DATE NOT NULL,
+    
+    previous_value DECIMAL(15,2),
+    depreciation_value DECIMAL(15,2),
+    current_value DECIMAL(15,2),
+    
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+);
+
+-- Índices para performance
+CREATE INDEX IF NOT EXISTS idx_assets_category ON assets(category_id);
+CREATE INDEX IF NOT EXISTS idx_assets_location ON assets(location_id);
+CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
+CREATE INDEX IF NOT EXISTS idx_asset_movements_asset ON asset_movements(asset_id);
+CREATE INDEX IF NOT EXISTS idx_asset_maintenances_asset ON asset_maintenances(asset_id);
