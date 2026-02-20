@@ -56,7 +56,8 @@ public class SSTMedicalExamController {
     @PutMapping("/types/{id}")
     @Operation(summary = "Atualizar tipo de exame", description = "Atualiza um tipo de exame existente")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<MedicalExamType> updateExamType(@PathVariable UUID id, @RequestBody MedicalExamType examType) {
+    public ResponseEntity<MedicalExamType> updateExamType(@PathVariable UUID id,
+            @RequestBody MedicalExamType examType) {
         MedicalExamType updated = medicalExamService.updateExamType(id, examType);
         if (updated == null) {
             return ResponseEntity.notFound().build();
@@ -105,7 +106,7 @@ public class SSTMedicalExamController {
     @Operation(summary = "Listar exames por funcionário e tipo", description = "Retorna exames de um funcionário de um tipo específico")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<MedicalExam>> getExamsByEmployeeAndType(
-            @PathVariable UUID employeeId, 
+            @PathVariable UUID employeeId,
             @PathVariable UUID examTypeId) {
         List<MedicalExam> exams = medicalExamService.getExamsByEmployeeAndType(employeeId, examTypeId);
         return ResponseEntity.ok(exams);
@@ -151,7 +152,8 @@ public class SSTMedicalExamController {
     @GetMapping("/expiring")
     @Operation(summary = "Listar exames próximos do vencimento", description = "Retorna exames que estão próximos do vencimento")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<List<MedicalExam>> getExpiringExams(@RequestParam(defaultValue = "30") int daysAhead) {
+    public ResponseEntity<List<MedicalExam>> getExpiringExams(
+            @RequestParam(value = "daysAhead", defaultValue = "30") int daysAhead) {
         List<MedicalExam> exams = medicalExamService.getExpiringExams(daysAhead);
         return ResponseEntity.ok(exams);
     }

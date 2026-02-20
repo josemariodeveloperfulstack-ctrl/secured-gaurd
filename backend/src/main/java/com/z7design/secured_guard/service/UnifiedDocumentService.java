@@ -84,67 +84,93 @@ public class UnifiedDocumentService {
     }
 
     /**
-     * Cria um documento unificado combinando holerite e recibo
+     * Cria um documento unificado combinando holerite e recibo.
+     * Une os PDFs originais sem alterar o conteúdo (usa PDFMergerUtility).
      */
     public String createUnifiedDocument(Payslip payslip, PaymentReceipt receipt) throws IOException {
-        log.info("=== 🎯 CRIANDO DOCUMENTO UNIFICADO ===");
+        log.info("=== 🎯 CRIANDO DOCUMENTO UNIFICADO (merge dos PDFs originais) ===");
         log.info("Funcionário: {}", payslip.getEmployeeName());
         log.info("Mês/Ano: {}/{}", payslip.getMonth(), payslip.getYear());
         log.info("Recibo: {}", receipt.getFileName());
 
-        // VERIFICAÇÃO INTELIGENTE DE NOMES
+        // Verificação de nomes (apenas log, não bloqueia)
         boolean namesMatch = verifyEmployeeNames(payslip.getEmployeeName(), receipt.getEmployeeName());
         log.info("🔍 Verificação de nomes: {} = {} ? {}", 
             payslip.getEmployeeName(), receipt.getEmployeeName(), namesMatch ? "✅ MATCH" : "❌ NO MATCH");
 
-        if (!namesMatch) {
-            log.warn("⚠️ Nomes não coincidem! Holerite: {} | Recibo: {}", 
-                payslip.getEmployeeName(), receipt.getEmployeeName());
+        // Resolver caminhos dos PDFs originais
+        String holeritePath = resolveHoleritePathForMerge(payslip);
+        String receiptPath = resolveReceiptPathForMerge(receipt);
+
+        if (holeritePath == null || !Files.exists(Paths.get(holeritePath))) {
+            throw new IOException("HOLERITE NÃO ENCONTRADO: O arquivo PDF do holerite de " + payslip.getEmployeeName() 
+                + " para " + payslip.getMonth() + "/" + payslip.getYear() + " não foi encontrado. "
+                + (payslip.getArquivoCaminho() != null ? "Caminho no banco: " + payslip.getArquivoCaminho() : ""));
+        }
+        if (receiptPath == null || !Files.exists(Paths.get(receiptPath))) {
+            throw new IOException("COMPROVANTE NÃO ENCONTRADO: O arquivo PDF do comprovante de " + receipt.getEmployeeName() 
+                + " para " + receipt.getMonth() + "/" + receipt.getYear() + " não foi encontrado. "
+                + (receipt.getFilePath() != null ? "Caminho no banco: " + receipt.getFilePath() : ""));
         }
 
-        // Criar diretório se não existir
-        Path unifiedPath = Paths.get(UNIFIED_DIR).toAbsolutePath();
-        if (!Files.exists(unifiedPath)) {
-            Files.createDirectories(unifiedPath);
-            log.info("Diretório criado: {}", unifiedPath);
-        }
+        log.info("📄 Holerite: {}", holeritePath);
+        log.info("📄 Comprovante: {}", receiptPath);
 
-        // Nome do arquivo unificado
-        String fileName = generateUnifiedFileName(payslip.getEmployeeName(), payslip.getMonth(), payslip.getYear());
-        String filePath = unifiedPath.resolve(fileName).toString();
+        // Unir os PDFs originais sem alteração (apenas junção)
+        String employeeName = payslip.getEmployeeName() != null ? payslip.getEmployeeName() : receipt.getEmployeeName();
+        int month = payslip.getMonth() != null ? payslip.getMonth() : receipt.getMonth();
+        int year = payslip.getYear() != null ? payslip.getYear() : receipt.getYear();
+        List<String> receiptPaths = new ArrayList<>();
+        receiptPaths.add(receiptPath);
 
-        try (PDDocument unifiedDocument = new PDDocument()) {
-            
-            // PÁGINA 1: HOLERITE
-            log.info("📄 Adicionando página 1: Holerite");
-            addHoleritePage(unifiedDocument, payslip);
-            
-            // PÁGINA 2: RECIBO DE PAGAMENTO
-            log.info("📄 Adicionando página 2: Recibo de Pagamento");
-            addReceiptPage(unifiedDocument, receipt);
-            
-            // PÁGINA 3: VERIFICAÇÃO E RESULTADOS DA UNIFICAÇÃO
-            log.info("📄 Adicionando página 3: Verificação e Resultados");
-            addVerificationPage(unifiedDocument, payslip, receipt, namesMatch);
-            
-            // Salvar documento unificado
-            unifiedDocument.save(filePath);
-            log.info("✅ Documento unificado criado: {}", filePath);
-            
-            // Verificar se foi criado
-            File savedFile = new File(filePath);
-            if (savedFile.exists()) {
-                log.info("📊 Arquivo verificado: {} bytes", savedFile.length());
-            } else {
-                throw new IOException("Arquivo unificado não foi criado");
+        return createUnifiedPdfUsingMerger(holeritePath, receiptPaths, employeeName, month, year, payslip, receipt);
+    }
+
+    /**
+     * Resolve o caminho do PDF do holerite para merge (tenta arquivoCaminho, depois busca em diretórios)
+     */
+    private String resolveHoleritePathForMerge(Payslip payslip) {
+        String path = payslip.getArquivoCaminho();
+        if (path != null && !path.isBlank()) {
+            Path p = Paths.get(path);
+            if (Files.exists(p)) {
+                return p.toAbsolutePath().toString();
             }
-            
-            return filePath;
-            
-        } catch (Exception e) {
-            log.error("💥 Erro ao criar documento unificado: {}", e.getMessage(), e);
-            throw new IOException("Erro ao criar documento unificado: " + e.getMessage(), e);
+            Path rel = Paths.get(System.getProperty("user.dir"), path);
+            if (Files.exists(rel)) {
+                return rel.toAbsolutePath().toString();
+            }
         }
+        String name = payslip.getEmployeeName() != null ? cleanText(payslip.getEmployeeName()) : "";
+        int month = payslip.getMonth() != null ? payslip.getMonth() : 1;
+        int year = payslip.getYear() != null ? payslip.getYear() : 2025;
+        return findHoleriteOriginalFileByNameAndPeriod(name, month, year);
+    }
+
+    /**
+     * Resolve o caminho do PDF do comprovante para merge (tenta filePath, depois busca em diretórios)
+     */
+    private String resolveReceiptPathForMerge(PaymentReceipt receipt) {
+        String path = receipt.getFilePath();
+        if (path != null && !path.isBlank()) {
+            Path p = Paths.get(path);
+            if (Files.exists(p)) {
+                return p.toAbsolutePath().toString();
+            }
+            Path rel = Paths.get(System.getProperty("user.dir"), path);
+            if (Files.exists(rel)) {
+                return rel.toAbsolutePath().toString();
+            }
+        }
+        String name = receipt.getEmployeeName() != null ? cleanText(receipt.getEmployeeName()) : "";
+        int month = receipt.getMonth() != null ? receipt.getMonth() : 1;
+        int year = receipt.getYear() != null ? receipt.getYear() : 2025;
+        String byPeriod = findReceiptOriginalFileByNameAndPeriod(name, month, year);
+        if (byPeriod != null) {
+            return byPeriod;
+        }
+        List<String> searched = new ArrayList<>();
+        return findReceiptOriginalFileByNameOnly(name, searched);
     }
 
     /**

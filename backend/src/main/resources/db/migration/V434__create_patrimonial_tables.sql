@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS patrimonial_locations (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Criar patrimonial_assets sem FK para employees (adicionada condicionalmente abaixo)
 CREATE TABLE IF NOT EXISTS patrimonial_assets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code VARCHAR(30) NOT NULL UNIQUE,
@@ -33,11 +34,29 @@ CREATE TABLE IF NOT EXISTS patrimonial_assets (
     status VARCHAR(20) NOT NULL DEFAULT 'EM_USO',
     serial_number VARCHAR(100),
     invoice_number VARCHAR(100),
-    responsible_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+    responsible_employee_id UUID,
     notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Adicionar FK para employees apenas se a tabela existir e tiver PRIMARY KEY (compatível com CI/prod)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_name = 'employees' AND constraint_type = 'PRIMARY KEY'
+    ) THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE table_name = 'patrimonial_assets' AND constraint_name = 'fk_patrimonial_assets_responsible_employee'
+        ) THEN
+            ALTER TABLE patrimonial_assets
+            ADD CONSTRAINT fk_patrimonial_assets_responsible_employee
+            FOREIGN KEY (responsible_employee_id) REFERENCES employees(id) ON DELETE SET NULL;
+        END IF;
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_category_id ON patrimonial_assets(category_id);
 CREATE INDEX IF NOT EXISTS idx_patrimonial_assets_location_id ON patrimonial_assets(location_id);

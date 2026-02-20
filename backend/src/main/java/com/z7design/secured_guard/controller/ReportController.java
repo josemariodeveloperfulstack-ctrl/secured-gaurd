@@ -45,9 +45,9 @@ public class ReportController {
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
     public ResponseEntity<?> generateContasAPagarReport(
-            @Parameter(description = "Data de início do período") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @Parameter(description = "Data de fim do período") @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(defaultValue = "html") String format) {
+            @Parameter(description = "Data de início do período") @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "Data de fim do período") @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(value = "format", defaultValue = "html") String format) {
 
         try {
             log.info("Gerando relatório de contas a pagar para período: {} a {}, formato: {}", startDate, endDate,
@@ -90,8 +90,8 @@ public class ReportController {
     @GetMapping("/contas-a-pagar/pdf")
     @Operation(summary = "Relatório de Contas a Pagar em PDF (Alias)", description = "Gera relatório de contas a pagar diretamente em PDF")
     public ResponseEntity<byte[]> generateContasAPagarReportPdfAlias(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         try {
             byte[] pdfBytes = contasAPagarReportService.generateContasAPagarReportPDF(startDate, endDate, null, null);
             return ResponseEntity.ok()
@@ -107,9 +107,9 @@ public class ReportController {
     @GetMapping("/payroll/pdf")
     @Operation(summary = "Relatório PDF da Folha de Pagamento", description = "Gera relatório PDF para envio à contabilidade.")
     public ResponseEntity<byte[]> generatePayrollPdf(
-            @RequestParam(required = false) String referenceMonth,
-            @RequestParam(required = false) java.util.UUID unitId,
-            @RequestParam(required = false) java.util.UUID employeeId) {
+            @RequestParam(value = "referenceMonth", required = false) String referenceMonth,
+            @RequestParam(value = "unitId", required = false) java.util.UUID unitId,
+            @RequestParam(value = "employeeId", required = false) java.util.UUID employeeId) {
         try {
             byte[] pdf = reportService.generatePayrollReportPdf(referenceMonth, unitId, employeeId);
             return ResponseEntity.ok()
@@ -125,10 +125,10 @@ public class ReportController {
     @PostMapping("/payroll/send-email")
     @Operation(summary = "Enviar relatório de folha em PDF por email", description = "Gera o PDF e envia para a contabilidade.")
     public ResponseEntity<Void> sendPayrollPdfByEmail(
-            @RequestParam(required = false) String to,
-            @RequestParam(required = false) String referenceMonth,
-            @RequestParam(required = false) java.util.UUID unitId,
-            @RequestParam(required = false) java.util.UUID employeeId) {
+            @RequestParam(value = "to", required = false) String to,
+            @RequestParam(value = "referenceMonth", required = false) String referenceMonth,
+            @RequestParam(value = "unitId", required = false) java.util.UUID unitId,
+            @RequestParam(value = "employeeId", required = false) java.util.UUID employeeId) {
         try {
             byte[] pdf = reportService.generatePayrollReportPdf(referenceMonth, unitId, employeeId);
             String subject = "Relatório de Folha - " + (referenceMonth != null ? referenceMonth : "Período");
@@ -169,7 +169,7 @@ public class ReportController {
     })
     public ResponseEntity<?> generateContasAPagarReportByStatus(
             @Parameter(description = "Status das contas") @PathVariable String status,
-            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(defaultValue = "html") String format) {
+            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(value = "format", defaultValue = "html") String format) {
 
         try {
             // Mapear status amigável (do frontend) para o enum do backend
@@ -224,7 +224,7 @@ public class ReportController {
     })
     public ResponseEntity<?> generateContasAPagarReportByType(
             @Parameter(description = "Tipo das contas") @PathVariable ExpenseType type,
-            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(defaultValue = "html") String format) {
+            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(value = "format", defaultValue = "html") String format) {
 
         try {
             log.info("Gerando relatório de contas a pagar por tipo: {}, formato: {}", type, format);
@@ -269,7 +269,7 @@ public class ReportController {
             @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
     public ResponseEntity<?> generateContasAPagarSummaryReport(
-            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(defaultValue = "html") String format) {
+            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(value = "format", defaultValue = "html") String format) {
 
         try {
             log.info("Gerando relatório resumido de contas a pagar, formato: {}", format);
@@ -316,9 +316,9 @@ public class ReportController {
     })
     public ResponseEntity<?> generateContasAPagarReportByCompany(
             @Parameter(description = "Sigla da empresa") @PathVariable String companySigla,
-            @Parameter(description = "Data de início do período") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @Parameter(description = "Data de fim do período") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(defaultValue = "pdf") String format) {
+            @Parameter(description = "Data de início do período") @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @Parameter(description = "Data de fim do período") @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @Parameter(description = "Formato de resposta: html ou pdf") @RequestParam(value = "format", defaultValue = "pdf") String format) {
 
         try {
             log.info("Gerando relatório de contas a pagar por empresa: {}, formato: {}", companySigla, format);
@@ -477,10 +477,10 @@ public class ReportController {
     @GetMapping("/accounts-receivable/pdf")
     @Operation(summary = "Relatório de Contas a Receber em PDF", description = "Gera relatório PDF de contas a receber com filtros")
     public ResponseEntity<byte[]> generateAccountsReceivableReportPdf(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String client,
-            @RequestParam(required = false) String status) {
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(value = "client", required = false) String client,
+            @RequestParam(value = "status", required = false) String status) {
         try {
             byte[] pdf = paymentReportService.generateAccountsReceivableReportPDF(
                     startDate, endDate, client, status, null, null, null, null, null);
@@ -497,8 +497,8 @@ public class ReportController {
     @GetMapping("/cash-flow/pdf")
     @Operation(summary = "Relatório de Fluxo de Caixa em PDF", description = "Gera relatório PDF de fluxo de caixa")
     public ResponseEntity<byte[]> generateCashFlowReportPdf(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         try {
             byte[] pdf = reportService.generateFinancialReportPdf(Map.of(
                     "startDate", startDate != null ? startDate : LocalDate.now().minusMonths(1),
@@ -516,16 +516,16 @@ public class ReportController {
     @GetMapping("/financial/pdf")
     @Operation(summary = "Relatório Financeiro em PDF (Alias)", description = "Gera relatório financeiro em PDF")
     public ResponseEntity<byte[]> generateFinancialPdfAlias(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return generateFinancialSummaryReportPdf(startDate, endDate);
     }
 
     @GetMapping("/summary/pdf")
     @Operation(summary = "Relatório Financeiro em PDF", description = "Gera relatório financeiro em PDF")
     public ResponseEntity<byte[]> generateFinancialSummaryReportPdf(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         try {
             // Relatório financeiro geral servirá como resumo por enquanto
             byte[] pdf = reportService.generateFinancialReportPdf(Map.of(

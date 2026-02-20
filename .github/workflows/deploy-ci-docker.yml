@@ -448,7 +448,7 @@ jobs:
           sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             set -e
             cd /var/www/secured_guard/ci
-            echo "📦 Iniciando postgres e redis para Flyway repair..."
+            echo "📦 Iniciando postgres-ci e redis-ci para Flyway repair..."
             docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
             echo "⏳ Aguardando postgres ficar pronto (até 90s)..."
             for i in $(seq 1 18); do
@@ -525,7 +525,7 @@ jobs:
             echo "--- Logs do backend (últimas 80 linhas, incluindo possíveis erros Flyway) ---"
             docker logs --tail 80 secured-guard-backend-ci 2>&1 || true
             echo "--- Verificação Flyway no banco ---"
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "SELECT version, checksum, success FROM flyway_schema_history WHERE version IN ('424','427','429') ORDER BY version;" 2>/dev/null || echo "Não foi possível verificar flyway_schema_history"
+            docker exec secured-guard-db-ci psql -U postgres -d secured_guard_test -c "SELECT version, checksum, success FROM flyway_schema_history WHERE version IN ('424','427','429') ORDER BY version;" 2>/dev/null || echo "Não foi possível verificar flyway_schema_history"
           EOF
 
       # ============================================

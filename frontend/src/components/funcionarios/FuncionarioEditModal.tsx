@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { doctorService } from '@/services/doctorService';
 import { Doctor } from '@/types/doctor';
+import { formatTituloEleitorForInput } from '@/utils/validation';
 
 interface FuncionarioEditModalProps {
   open: boolean;
@@ -59,7 +60,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       bank: '',
       agency: '',
       account: '',
-      type: 'CORRENTE'
+      type: 'CORRENTE',
+      chavePix: ''
     },
     // Campos do cônjuge
     spouseName: '',
@@ -283,7 +285,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         bank: '',
         agency: '',
         account: '',
-        type: 'CORRENTE'
+        type: 'CORRENTE' as const,
+        chavePix: ''
       };
         
         // Priorizar bankInfo (que vem do backend) sobre bankData
@@ -293,7 +296,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             bank: bankInfo.bank || '',
             agency: bankInfo.agency || '',
             account: bankInfo.account || '',
-            type: bankInfo.accountType || 'CORRENTE'
+            type: bankInfo.accountType || 'CORRENTE',
+            chavePix: bankInfo.chavePix || ''
           };
           console.log('💰 Dados bancários encontrados em bankInfo:', bankInfo);
         } else if (employeeData.bankData) {
@@ -301,7 +305,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             bank: employeeData.bankData.bank || '',
             agency: employeeData.bankData.agency || '',
             account: employeeData.bankData.account || '',
-            type: employeeData.bankData.type || 'CORRENTE'
+            type: employeeData.bankData.type || 'CORRENTE',
+            chavePix: (employeeData.bankData as any).chavePix || ''
           };
           console.log('💰 Dados bancários encontrados em bankData:', employeeData.bankData);
         } else {
@@ -732,13 +737,18 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       setForm((prev) => ({
         ...prev,
         bankData: {
-          ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE' }),
+          ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE', chavePix: '' }),
           [field]: value
         }
       }));
     } else {
       setForm((prev) => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleTituloEleitorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatTituloEleitorForInput(e.target.value);
+    setForm((prev) => ({ ...prev, tituloEleitor: formatted }));
   };
 
   const handleSelectChange = (field: string, value: string) => {
@@ -1245,7 +1255,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   <Input 
                     name="tituloEleitor" 
                     value={form.tituloEleitor || ''} 
-                    onChange={handleChange} 
+                    onChange={handleTituloEleitorChange} 
                     placeholder="Ex: 2236.5048.0205"
                     className="text-xs sm:text-sm h-9 sm:h-10"
                   />
@@ -1423,41 +1433,43 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             <div className="mt-4 pt-4 border-t border-gray-600">
               <h4 className="text-md font-semibold text-seguranca-yellow mb-4">Endereço</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
-                  <div className="flex gap-2">
+                <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 sm:gap-4">
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs sm:text-sm font-medium text-gray-200">Rua/Logradouro *</Label>
                     <Input 
-                      name="enderecoCep" 
-                      value={aplicarMascaraCep((form as any).enderecoCep || '')} 
-                      onChange={(e) => {
-                        const valor = e.target.value.replace(/\D/g, '');
-                        setForm(prev => ({ ...prev, enderecoCep: valor } as any));
-                        if (valor.length === 8) {
-                          buscarCep(valor);
-                        }
-                      }}
-                      placeholder="00000-000"
-                      maxLength={9}
+                      name="enderecoRua" 
+                      value={(form as any).enderecoRua || ''} 
+                      onChange={handleChange} 
+                      placeholder="Nome da rua, avenida, etc."
                       required
-                      className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
+                      className="text-xs sm:text-sm h-9 sm:h-10"
                     />
-                    {loadingCep && (
-                      <div className="flex items-center px-2 sm:px-3 text-gray-400">
-                        <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
-                      </div>
-                    )}
                   </div>
-                </div>
-                <div className="md:col-span-2">
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Rua/Logradouro *</Label>
-                  <Input 
-                    name="enderecoRua" 
-                    value={(form as any).enderecoRua || ''} 
-                    onChange={handleChange} 
-                    placeholder="Nome da rua, avenida, etc."
-                    required
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
+                  <div className="w-full sm:w-36 flex-shrink-0">
+                    <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        name="enderecoCep" 
+                        value={aplicarMascaraCep((form as any).enderecoCep || '')} 
+                        onChange={(e) => {
+                          const valor = e.target.value.replace(/\D/g, '');
+                          setForm(prev => ({ ...prev, enderecoCep: valor } as any));
+                          if (valor.length === 8) {
+                            buscarCep(valor);
+                          }
+                        }}
+                        placeholder="00000-000"
+                        maxLength={9}
+                        required
+                        className="text-xs sm:text-sm h-9 sm:h-10"
+                      />
+                      {loadingCep && (
+                        <div className="flex items-center px-2 text-gray-400">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs sm:text-sm font-medium text-gray-200">Número *</Label>
@@ -1587,9 +1599,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 <Label className="text-sm font-medium text-gray-200">Título de Eleitor</Label>
                 <Input 
                   name="tituloEleitor" 
-                  value={form.tituloEleitor} 
-                  onChange={handleChange} 
-                  placeholder="Número do título de eleitor"
+                  value={form.tituloEleitor || ''} 
+                  onChange={handleTituloEleitorChange} 
+                  placeholder="Ex: 2236.5048.0205"
                 />
               </div>
               <div>
@@ -2012,6 +2024,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   placeholder="00000-0"
                 />
               </div>
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium text-gray-200">Chave Pix</Label>
+                <Input 
+                  name="bankData.chavePix" 
+                  value={form.bankData?.chavePix || ''} 
+                  onChange={handleChange} 
+                  placeholder="CPF, e-mail, telefone ou chave aleatória"
+                />
+              </div>
               <div>
                 <Label className="text-sm font-medium text-gray-200">Tipo de Conta</Label>
                 <Select 
@@ -2019,7 +2040,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   onValueChange={(value) => setForm(prev => ({ 
                     ...prev, 
                     bankData: {
-                      ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE' }),
+                      ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE', chavePix: '' }),
                       type: value
                     }
                   }))}

@@ -70,7 +70,8 @@ public class SSTEPIController {
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar EPI", description = "Atualiza um EPI existente")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'SUPER_ADMIN', 'ADMIN', 'HR')")
-    public ResponseEntity<PersonalProtectiveEquipment> updateEPI(@PathVariable UUID id, @RequestBody PersonalProtectiveEquipment epi) {
+    public ResponseEntity<PersonalProtectiveEquipment> updateEPI(@PathVariable UUID id,
+            @RequestBody PersonalProtectiveEquipment epi) {
         PersonalProtectiveEquipment updatedEPI = epiService.updateEPI(id, epi);
         if (updatedEPI == null) {
             return ResponseEntity.notFound().build();
@@ -89,7 +90,7 @@ public class SSTEPIController {
     @PutMapping("/{id}/stock")
     @Operation(summary = "Atualizar estoque", description = "Atualiza o estoque de um EPI")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'SUPER_ADMIN', 'ADMIN', 'HR')")
-    public ResponseEntity<Void> updateStock(@PathVariable UUID id, @RequestParam Integer newStock) {
+    public ResponseEntity<Void> updateStock(@PathVariable UUID id, @RequestParam("newStock") Integer newStock) {
         epiService.updateEPIStock(id, newStock);
         return ResponseEntity.ok().build();
     }

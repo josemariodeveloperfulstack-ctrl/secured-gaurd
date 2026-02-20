@@ -40,7 +40,7 @@ public class SSTAccidentController {
                 .toList();
         return ResponseEntity.ok(dtos);
     }
-    
+
     private AccidentRecordDTO convertToDTO(AccidentRecord accident) {
         return AccidentRecordDTO.builder()
                 .id(accident.getId())
@@ -93,8 +93,8 @@ public class SSTAccidentController {
     @Operation(summary = "Listar acidentes por período", description = "Retorna acidentes em um período específico")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
     public ResponseEntity<List<AccidentRecord>> getAccidentsByPeriod(
-            @RequestParam LocalDate startDate, 
-            @RequestParam LocalDate endDate) {
+            @RequestParam("startDate") LocalDate startDate,
+            @RequestParam("endDate") LocalDate endDate) {
         List<AccidentRecord> accidents = accidentService.getAccidentsByPeriod(startDate, endDate);
         return ResponseEntity.ok(accidents);
     }
@@ -122,11 +122,12 @@ public class SSTAccidentController {
                 .daysOff(dto.getDaysOff() != null ? dto.getDaysOff() : 0)
                 .returnToWorkDate(dto.getReturnToWorkDate())
                 .witnessNames(dto.getWitnessNames())
-                .status(dto.getStatus() != null ? dto.getStatus() : com.z7design.secured_guard.model.enums.AccidentStatus.REGISTRADO)
+                .status(dto.getStatus() != null ? dto.getStatus()
+                        : com.z7design.secured_guard.model.enums.AccidentStatus.REGISTRADO)
                 .photosUrls(dto.getPhotosUrls())
                 .documentsUrls(dto.getDocumentsUrls())
                 .build();
-        
+
         AccidentRecord created = accidentService.createAccident(accident);
         return ResponseEntity.ok(created);
     }
@@ -211,7 +212,7 @@ public class SSTAccidentController {
     @GetMapping("/statistics/monthly")
     @Operation(summary = "Estatísticas mensais de acidentes", description = "Retorna estatísticas de acidentes por mês")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<SSTAccidentService.AccidentStatistics> getMonthlyStatistics(@RequestParam int year) {
+    public ResponseEntity<SSTAccidentService.AccidentStatistics> getMonthlyStatistics(@RequestParam("year") int year) {
         SSTAccidentService.AccidentStatistics statistics = accidentService.getMonthlyStatistics(year);
         return ResponseEntity.ok(statistics);
     }
@@ -219,7 +220,8 @@ public class SSTAccidentController {
     @GetMapping("/statistics/employee/{employeeId}")
     @Operation(summary = "Estatísticas de acidentes por funcionário", description = "Retorna estatísticas de acidentes de um funcionário")
     @PreAuthorize("hasAnyAuthority('ROLE_RH', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<SSTAccidentService.EmployeeAccidentStatistics> getEmployeeStatistics(@PathVariable UUID employeeId) {
+    public ResponseEntity<SSTAccidentService.EmployeeAccidentStatistics> getEmployeeStatistics(
+            @PathVariable UUID employeeId) {
         SSTAccidentService.EmployeeAccidentStatistics statistics = accidentService.getEmployeeStatistics(employeeId);
         return ResponseEntity.ok(statistics);
     }
