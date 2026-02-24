@@ -18,9 +18,13 @@ CREATE INDEX IF NOT EXISTS idx_fiscal_invoices_file_type ON fiscal_invoices(file
 CREATE INDEX IF NOT EXISTS idx_fiscal_invoices_created_at ON fiscal_invoices(created_at);
 
 -- Permissões Módulo Fiscal
-INSERT INTO permissions (id, name, description) VALUES
-(gen_random_uuid(), 'FISCAL_READ', 'Ler Módulo Fiscal'),
-(gen_random_uuid(), 'FISCAL_WRITE', 'Gerenciar e importar notas fiscais');
+INSERT INTO permissions (id, name, description)
+SELECT gen_random_uuid(), 'FISCAL_READ', 'Ler Módulo Fiscal'
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE name = 'FISCAL_READ');
+
+INSERT INTO permissions (id, name, description)
+SELECT gen_random_uuid(), 'FISCAL_WRITE', 'Gerenciar e importar notas fiscais'
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE name = 'FISCAL_WRITE');
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
