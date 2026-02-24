@@ -59,6 +59,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD_PROD}
       SPRING_FLYWAY_OUT_OF_ORDER: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: "30000"
       JWT_SECRET: ${JWT_SECRET_PROD}
       # WhatsApp/Baileys REST API
       BAILEYS_REST_URL: http://whatsapp-service-prod:3333
@@ -92,8 +94,8 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://127.0.0.1:8080/api/health" ]
       interval: 30s
-      timeout: 10s
-      retries: 5
+      timeout: 30s
+      retries: 10
       start_period: 300s
     restart: unless-stopped
 
