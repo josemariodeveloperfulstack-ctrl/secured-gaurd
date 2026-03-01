@@ -29,150 +29,151 @@ import com.z7design.secured_guard.model.Department;
 @Table(name = "employees")
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "documents", "benefits", "dependents", "timeRecords", "payrolls", "epis", "occurrences"})
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "documents", "benefits", "dependents", "timeRecords",
+        "payrolls", "epis", "occurrences" })
 public class Employee {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    
+
     @OneToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User user;
-    
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "position_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private Position position;
-    
+
     @Column
     private String registrationNumber;
-    
+
     @Column
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate hireDate;
-    
+
     @Column(name = "probation_end_date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate probationEndDate;
-    
+
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate terminationDate;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private EmploymentStatus status;
-    
+
     @Column(length = 500)
     private String notes;
-    
+
     @CreationTimestamp
     private LocalDateTime createdAt;
-    
+
     @UpdateTimestamp
     private LocalDateTime updatedAt;
-    
+
     @Column
     private String name;
-    
+
     @Column(nullable = true)
     private String document;
-    
+
     @Column(name = "birth_date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate birthDate;
-    
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "unit_id")
     @JsonIgnoreProperties("employees")
     private Unit unit;
-    
+
     @Column
     private String address; // Mantido para compatibilidade
-    
+
     // Campos de endereço separados
     @Column(name = "endereco_rua", length = 255)
     private String enderecoRua;
-    
-    @Column(name = "endereco_numero", length = 20)
+
+    @Column(name = "endereco_numero", length = 50)
     private String enderecoNumero;
-    
+
     @Column(name = "endereco_complemento", length = 100)
     private String enderecoComplemento;
-    
+
     @Column(name = "endereco_bairro", length = 100)
     private String enderecoBairro;
-    
+
     @Column(name = "endereco_cidade", length = 100)
     private String enderecoCidade;
-    
+
     @Column(name = "endereco_estado", length = 2)
     private String enderecoEstado;
-    
+
     @Column(name = "endereco_cep", length = 10)
     private String enderecoCep;
-    
+
     @Column
     private String phone;
-    
+
     @Column(name = "telefone_contato", length = 20)
     private String telefoneContato;
-    
+
     @Email(message = "Invalid email format")
     @Column
     private String email;
-    
+
     // CNH - cnh_number já existe (V504), adicionar apenas campos complementares
     @Column(name = "cnh_number", length = 20)
     private String cnhNumber;
-    
+
     @Column(name = "cnh_expiration_date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate cnhExpirationDate;
-    
+
     @Column(name = "cnh_category", length = 5)
     private String cnhCategory;
-    
+
     // CTPS - ctps já existe (V256), adicionar apenas campos complementares
     @Column(name = "ctps_series", length = 10)
     private String ctpsSeries;
-    
+
     @Column(name = "ctps_issue_date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate ctpsIssueDate;
-    
+
     @Column(name = "ctps_issuing_agency", length = 100)
     private String ctpsIssuingAgency;
-    
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "company_id")
     @JsonBackReference("company-employees")
     private Company company;
-    
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "work_post_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private WorkPost workPost;
-    
+
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "department_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private Department department;
-    
+
     // Dados Pessoais
     @Column(name = "marital_status")
     private String maritalStatus;
-    
+
     @Column(name = "nationality", length = 50)
     private String nationality;
-    
+
     // @Column(name = "photo_url")
     // private String photoUrl;
 
@@ -233,7 +234,7 @@ public class Employee {
     // private Boolean possuiWhatsapp;
 
     // Campos adicionais para admissão completa
-    @Column(name = "titulo_eleitor", length = 20)
+    @Column(name = "titulo_eleitor", length = 50)
     private String tituloEleitor;
 
     // @Column(name = "carteira_identidade")
@@ -280,6 +281,9 @@ public class Employee {
     @Column(name = "carteira_identidade_orgao_emissor", length = 50)
     private String carteiraIdentidadeOrgaoEmissor;
 
+    @Column(name = "numero_rg", length = 30)
+    private String numeroRg;
+
     @Column(name = "carteira_identidade_data_emissao")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate carteiraIdentidadeDataEmissao;
@@ -309,10 +313,10 @@ public class Employee {
     @Column(name = "certificado_militar", length = 30)
     private String certificadoMilitar;
 
-    @Column(name = "cbo", length = 20)
+    @Column(name = "cbo", length = 50)
     private String cbo;
 
-    @Column(name = "pis", length = 20)
+    @Column(name = "pis", length = 50)
     private String pis;
 
     @Column(name = "salario")
@@ -389,7 +393,7 @@ public class Employee {
     @Column(name = "estado_nascimento", length = 2)
     private String estadoNascimento;
 
-    @Column(name = "sexo", length = 20)
+    @Column(name = "sexo", length = 50)
     private String sexo; // MASCULINO, FEMININO, OUTRO
 
     @Column(name = "grau_instrucao", length = 50)
@@ -425,6 +429,12 @@ public class Employee {
     @Column(name = "conta_corrente", length = 20)
     private String contaCorrente;
 
+    @Column(name = "conta_digito", length = 10)
+    private String contaDigito;
+
+    @Column(name = "pix_key", length = 255)
+    private String pixKey;
+
     // Estrangeiros
     @Column(name = "carteira_modelo_19", length = 30)
     private String carteiraModelo19;
@@ -444,7 +454,7 @@ public class Employee {
 
     @Column(name = "nome_conjuge_estrangeiro", length = 100)
     private String nomeConjugeEstrangeiro;
-    
+
     // RIC - Registro de Identidade Civil (para naturalizados)
     @Column(name = "ric_numero", length = 30)
     private String ricNumero; // Nº RIC
@@ -515,7 +525,7 @@ public class Employee {
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "exame_medico_doctor_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private Doctor exameMedicoDoctor;
 
     @Column(name = "exame_medico_horario", length = 100)
@@ -523,6 +533,9 @@ public class Employee {
 
     @Column(name = "exame_medico_intervalos_refeicao")
     private Boolean exameMedicoIntervalosRefeicao; // true = Sim, false = Não
+
+    @Column(name = "exame_medico_horario_intervalo", length = 100)
+    private String exameMedicoHorarioIntervalo; // Ex: "12:00 ÀS 13:00 H"
 
     @Column(name = "exame_medico_observacoes", columnDefinition = "TEXT")
     private String exameMedicoObservacoes;
@@ -537,4 +550,4 @@ public class Employee {
     public String getFullName() {
         return this.name;
     }
-} 
+}

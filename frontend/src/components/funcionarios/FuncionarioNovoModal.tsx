@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { employeeService } from '@/services/employeeService';
 import { CreateEmployeeDTO } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
@@ -34,6 +35,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { validateCPF, formatCpfForInput, formatTituloEleitorForInput } from '@/utils/validation';
+import CurrencyInput from 'react-currency-input-field';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -87,6 +89,7 @@ const initialState: CreateEmployeeDTO = {
     bank: '',
     agency: '',
     account: '',
+    accountDigit: '',
     type: 'CORRENTE',
     chavePix: ''
   }
@@ -102,14 +105,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
   const [cpfError, setCpfError] = useState<string | null>(null);
-  
+
   // Estados para médicos
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [doctorSearchTerm, setDoctorSearchTerm] = useState('');
   const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
-  
+
   // Função para carregar médicos
   const loadDoctors = async () => {
     try {
@@ -144,17 +147,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setLoadingDoctors(false);
     }
   };
-  
+
   // Função para buscar CEP via API ViaCEP
   const buscarCep = async (cep: string) => {
     const cepLimpo = cep.replace(/\D/g, '');
     if (cepLimpo.length !== 8) return;
-    
+
     setLoadingCep(true);
     try {
       const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
       const data = await response.json();
-      
+
       if (!data.erro) {
         const enderecoCompleto = `${data.logradouro || ''}, ${data.bairro || ''}, ${data.localidade || ''} - ${data.uf || ''}, ${cepLimpo}`;
         setForm(prev => ({
@@ -189,7 +192,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setLoadingCep(false);
     }
   };
-  
+
   // Função para aplicar máscara de telefone
   const aplicarMascaraTelefone = (valor: string) => {
     const numeros = valor.replace(/\D/g, '');
@@ -199,13 +202,13 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       return numeros.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
     }
   };
-  
+
   // Função para aplicar máscara de CEP
   const aplicarMascaraCep = (valor: string) => {
     const numeros = valor.replace(/\D/g, '');
     return numeros.replace(/(\d{5})(\d{0,3})/, '$1-$2');
   };
-  
+
   // Estados para os dados dos selects
   const [positions, setPositions] = useState<Position[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -214,20 +217,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingData, setLoadingData] = useState(false);
-  
+
   // Estados para busca e filtros
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  
+
   // Estados para busca de cargos
   const [positionSearchTerm, setPositionSearchTerm] = useState('');
   const [filteredPositions, setFilteredPositions] = useState<Position[]>([]);
   const [showPositionDropdown, setShowPositionDropdown] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
-  
+
   // Estados para empresas
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
@@ -248,7 +251,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setCurrentEmployeeId(employeeToEdit.id);
         console.log('✅ currentEmployeeId definido para edição:', employeeToEdit.id);
       }
-      
+
       // Preencher o formulário com os dados do funcionário
       setForm({
         name: employeeToEdit.name || '',
@@ -277,7 +280,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         unit: employeeToEdit.unit || { id: '' },
         user: employeeToEdit.user || { id: '' },
         company: employeeToEdit.company || { id: '' },
-        
+
         // Campos do cônjuge
         spouseName: employeeToEdit.spouseName || '',
         spouseCpf: employeeToEdit.spouseCpf || '',
@@ -285,7 +288,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         spouseBirthDate: employeeToEdit.spouseBirthDate || '',
         spousePhone: employeeToEdit.spousePhone || '',
         spouseEmail: employeeToEdit.spouseEmail || '',
-        
+
         // Campos da ficha de registro
         empresaNome: employeeToEdit.empresaNome || '',
         empresaEndereco: employeeToEdit.empresaEndereco || '',
@@ -349,7 +352,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         pis: employeeToEdit.pis || '',
         gender: employeeToEdit.gender || '',
         vistoFiscalizacao: employeeToEdit.vistoFiscalizacao || '',
-        
+
         // Campos para Estrangeiro
         rneNumero: employeeToEdit.rneNumero || '',
         rneValidade: employeeToEdit.rneValidade || '',
@@ -357,7 +360,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         ricOrgaoEmissor: employeeToEdit.ricOrgaoEmissor || '',
         ricDataEmissao: employeeToEdit.ricDataEmissao || '',
         tipoVisto: employeeToEdit.tipoVisto || '',
-        
+
         // Dados do Exame Médico (ASO)
         exameMedicoData: employeeToEdit.exameMedicoData || '',
         exameMedicoTipo: employeeToEdit.exameMedicoTipo || '',
@@ -367,22 +370,24 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         exameMedicoObservacoes: employeeToEdit.exameMedicoObservacoes || '',
         exameMedicoPrimeiroEmprego: employeeToEdit.exameMedicoPrimeiroEmprego,
         exameMedicoContribuicaoSindicalPaga: employeeToEdit.exameMedicoContribuicaoSindicalPaga,
-        
+
         // Dados bancários - converter de bankInfo (backend) para bankData (frontend)
         bankData: employeeToEdit.bankData ? {
           bank: employeeToEdit.bankData.bank || '',
           agency: employeeToEdit.bankData.agency || '',
           account: employeeToEdit.bankData.account || '',
+          accountDigit: employeeToEdit.bankData.accountDigit || '',
           type: employeeToEdit.bankData.type || 'CORRENTE',
-          chavePix: (employeeToEdit.bankData as any).chavePix || ''
+          chavePix: (employeeToEdit.bankData as any).chavePix || (employeeToEdit.bankData as any).pixKey || ''
         } : {
           bank: '',
           agency: '',
           account: '',
+          accountDigit: '',
           type: 'CORRENTE',
           chavePix: ''
         },
-        
+
         // Campos adicionais - comentados pois não existem na entidade
         // workPostId: (employeeToEdit as any).workPostId || '',
         // departmentId: (employeeToEdit as any).departmentId || ''
@@ -396,7 +401,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         company: employeeToEdit.company
         // workPostId e departmentId não existem na entidade Employee
       });
-      
+
       if (employeeToEdit.position) {
         console.log('🔍 Carregando posição:', employeeToEdit.position);
         setSelectedPosition(employeeToEdit.position);
@@ -425,7 +430,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
       // Carregar dependentes do funcionário
       loadEmployeeDependents(employeeToEdit.id);
-      
+
       // Carregar médico se houver
       if (employeeToEdit.exameMedicoDoctor?.id) {
         doctorService.getById(employeeToEdit.exameMedicoDoctor.id)
@@ -453,7 +458,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setShowDoctorDropdown(false);
     }
   }, [employeeToEdit, open]);
-  
+
   // Carregar médicos quando abrir o modal
   useEffect(() => {
     if (open) {
@@ -492,16 +497,16 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   // Função para carregar dependentes do funcionário
   const loadEmployeeDependents = async (employeeId: string) => {
     if (!employeeId) return;
-    
+
     // Validar UUID - não fazer chamada se for UUID inválido/padrão
-    if (employeeId === '00000000-0000-0000-0000-000000000001' || 
-        employeeId === '00000000-0000-0000-0000-000000000000' ||
-        !employeeId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    if (employeeId === '00000000-0000-0000-0000-000000000001' ||
+      employeeId === '00000000-0000-0000-0000-000000000000' ||
+      !employeeId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       console.warn('UUID inválido para carregar dependentes:', employeeId);
       setEmployeeDependents([]);
       return;
     }
-    
+
     setLoadingDependents(true);
     try {
       const dependents = await dependentService.getDependentsByEmployee(employeeId);
@@ -523,7 +528,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setDependentToEdit(null);
     setDependentModalOpen(true);
   };
-  
+
   // Modificar callback para salvar dependente temporariamente se ainda não há funcionário criado
   const handleDependentSavedInCreation = async (dependentData: DependentCreateRequest) => {
     if (!isEditMode || !employeeToEdit?.id) {
@@ -560,7 +565,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         description: "Dependente excluído com sucesso.",
         variant: "default"
       });
-      
+
       // Recarregar dependentes
       if (employeeToEdit?.id) {
         await loadEmployeeDependents(employeeToEdit.id);
@@ -579,29 +584,29 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const handleDependentSaved = async () => {
     setDependentModalOpen(false);
     setDependentToEdit(null);
-    
+
     // Recarregar dependentes
     if (employeeToEdit?.id) {
       await loadEmployeeDependents(employeeToEdit.id);
     }
-    
+
     toast({
       title: "Sucesso!",
       description: dependentToEdit ? "Dependente atualizado com sucesso." : "Dependente adicionado com sucesso.",
       variant: "default"
     });
   };
-  
+
   // Estados para modal de novo cargo
   const [novoCargoModalOpen, setNovoCargoModalOpen] = useState(false);
   const [epiModalOpen, setEpiModalOpen] = useState(false);
-  
+
   // Estados para modal de novo médico
   const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
-  
+
   // Estados para modal de criar usuário padrão
   const [criarUsuarioModalOpen, setCriarUsuarioModalOpen] = useState(false);
-  
+
   // Estados para dependentes
   const [dependents, setDependents] = useState<Array<{
     name: string;
@@ -632,7 +637,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       try {
         // Verificar se o termo de busca é um CPF (apenas números)
         const isCpfSearch = /^\d+$/.test(userSearchTerm.replace(/\D/g, ''));
-        
+
         if (isCpfSearch && userSearchTerm.replace(/\D/g, '').length >= 11) {
           // Buscar por CPF
           try {
@@ -726,9 +731,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         form.enderecoEstado,
         form.enderecoCep ? `CEP: ${form.enderecoCep}` : ''
       ].filter(Boolean);
-      
+
       const enderecoCompleto = partes.join(', ');
-      
+
       setForm(prev => ({
         ...prev,
         address: enderecoCompleto
@@ -748,7 +753,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setFilteredPositions(positionsData);
       setUnits(unitsData);
       setCompanies(companiesData);
-      
+
       // Carregar usuários iniciais (sem filtro)
       const usersData = await userService.searchUsers();
       setUsers(usersData);
@@ -762,14 +767,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
+
     // Handle bankData fields
     if (name.startsWith('bankData.')) {
       const field = name.split('.')[1];
       setForm((prev) => ({
         ...prev,
         bankData: {
-          ...(prev.bankData || { bank: '', agency: '', account: '', type: 'CORRENTE', chavePix: '' }),
+          ...(prev.bankData || { bank: '', agency: '', account: '', accountDigit: '', type: 'CORRENTE', chavePix: '' }),
           [field]: value
         }
       }));
@@ -801,24 +806,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     const raw = e.target.value.replace(/\D/g, '');
     const formatted = formatCpfForInput(raw);
     setCpfError(null);
-    const updates: Partial<CreateEmployeeDTO> = { cpf: formatted };
+    const updates: Partial<CreateEmployeeDTO> = {
+      cpf: formatted,
+      ctps: raw // Sync CTPS with raw CPF as requested
+    };
     if (raw.length === 11) {
-      if (validateCPF(formatted)) {
-        updates.ctps = raw;
-      } else {
+      if (!validateCPF(formatted)) {
         setCpfError('CPF não válido');
       }
-    } else {
-      updates.ctps = '';
     }
     setForm((prev) => ({ ...prev, ...updates }));
   };
 
   const handleSelectChange = (field: string, value: string) => {
     if (value) {
-      setForm((prev) => ({ 
-        ...prev, 
-        [field]: { id: value } 
+      setForm((prev) => ({
+        ...prev,
+        [field]: { id: value }
       }));
     } else {
       setForm((prev) => {
@@ -846,7 +850,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validação de formato de email (se preenchido)
     if (form.email && form.email.trim() !== '') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -855,13 +859,13 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         return;
       }
     }
-    
+
     // Validações básicas
     if (!form.name || !form.cpf || !form.phone) {
       setError('Campos obrigatórios: Nome, CPF e Telefone.');
       return;
     }
-    
+
     // Validações de endereço
     if (!form.enderecoRua || !form.enderecoNumero || !form.enderecoBairro || !form.enderecoCidade || !form.enderecoEstado || !form.enderecoCep) {
       setError('Todos os campos de endereço são obrigatórios (Rua, Número, Bairro, Cidade, Estado e CEP).');
@@ -890,11 +894,12 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     try {
       // Incluir dependentes no payload (mas não enviar na criação/edição de funcionário)
       // Os dependentes devem ser gerenciados separadamente
+      // Prepara os dados do funcionário, garantindo que o salário seja enviado como número
       const employeeData = {
-        ...form
-        // Removido: dependents - não enviar dependentes no payload do funcionário
+        ...form,
+        salario: form.salario ? parseFloat(String(form.salario).replace(',', '.')) : 0
       };
-      
+
       if (isEditMode && employeeToEdit?.id) {
         // Modo de edição
         const updatedEmployee = await employeeService.updateEmployee(employeeToEdit.id, employeeData);
@@ -916,7 +921,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         console.log('✅ createdEmployee:', createdEmployee);
         setCurrentEmployeeId(createdEmployee.id);
         setIsEditMode(true); // Mudar para modo de edição após criar
-        
+
         // Salvar dependentes pendentes após criar o funcionário
         if (pendingDependents.length > 0 && createdEmployee.id) {
           try {
@@ -947,15 +952,15 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             variant: "default"
           });
         }
-        
+
         onCreated();
-        
+
         // Não limpar o formulário nem fechar o modal após criar
         // Permitir que o usuário gere as fichas imediatamente
       }
     } catch (err: any) {
       console.error('Erro ao cadastrar funcionário:', err);
-      
+
       // Tratar erros específicos
       if (err.message.includes('CPF já cadastrado')) {
         setError('CPF já cadastrado para outro funcionário');
@@ -991,9 +996,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     // Selecionar automaticamente o novo médico
     setSelectedDoctor(medico);
     setDoctorSearchTerm(`${medico.name} - CRM ${medico.crmNumber}/${medico.crmState}`);
-    setForm(prev => ({ 
-      ...prev, 
-      exameMedicoDoctor: { id: medico.id } 
+    setForm(prev => ({
+      ...prev,
+      exameMedicoDoctor: { id: medico.id }
     }));
     setShowDoctorDropdown(false);
     toast({
@@ -1012,7 +1017,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setSelectedUser(usuario);
     setUserSearchTerm(usuario.name);
     setCriarUsuarioModalOpen(false);
-    
+
     // Fechar o modal principal após criar o usuário
     onClose();
   };
@@ -1144,7 +1149,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       email: data.email || prev.email,
       phone: data.phone || prev.phone,
       notes: combined.notes || prev.notes,
-      
+
       // Campos adicionais
       tituloEleitor: combined.tituloEleitor || prev.tituloEleitor,
       tituloEleitorZona: combined.tituloEleitorZona || prev.tituloEleitorZona,
@@ -1173,7 +1178,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       pisDataCadastro: combined.pisDataCadastro || prev.pisDataCadastro,
       pisBancoDepositario: combined.pisBancoDepositario || prev.pisBancoDepositario,
       vistoFiscalizacao: data.vistoFiscalizacao || prev.vistoFiscalizacao,
-      
+
       // Dados do cônjuge
       spouseName: combined.spouseName || prev.spouseName,
       spouseCpf: data.spouseCpf || prev.spouseCpf,
@@ -1208,7 +1213,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     const value = e.target.value;
     setUserSearchTerm(value);
     setShowUserDropdown(true);
-    
+
     // Se o campo estiver vazio, limpar seleção
     if (value.trim() === '') {
       setForm(prev => ({ ...prev, user: { id: '' } }));
@@ -1260,8 +1265,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const handlePositionSelect = (position: Position) => {
     setSelectedPosition(position);
     setPositionSearchTerm(position.name);
-    setForm(prev => ({ 
-      ...prev, 
+    setForm(prev => ({
+      ...prev,
       position: { id: position.id },
       // Preencher CBO automaticamente se o cargo tiver CBO
       cbo: position.cbo || prev.cbo || ''
@@ -1309,14 +1314,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   };
 
   const updateDependent = (index: number, field: string, value: string) => {
-    setDependents(prev => prev.map((dependent, i) => 
+    setDependents(prev => prev.map((dependent, i) =>
       i === index ? { ...dependent, [field]: value } : dependent
     ));
   };
 
   // Verificar se o cargo selecionado permite criação de usuário padrão
-  const canCreateDefaultUser = selectedPosition && 
-    ['Vigia', 'Vigilante', 'Porteiro', 'Auxiliar de Serviços Gerais', 'Supervisor'].some(cargo => 
+  const canCreateDefaultUser = selectedPosition &&
+    ['Vigia', 'Vigilante', 'Porteiro', 'Auxiliar de Serviços Gerais', 'Supervisor'].some(cargo =>
       selectedPosition.name.toLowerCase().includes(cargo.toLowerCase())
     );
 
@@ -1604,2295 +1609,2581 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   return (
     <TooltipProvider>
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      // Só fechar se o usuário explicitamente fechar (X ou ESC)
-      // Não fechar automaticamente após salvar
-      if (!isOpen) {
-        // Só fechar se não estiver carregando e não houver funcionário salvo recentemente
-        if (!loading) {
-          onClose();
+      <Dialog open={open} onOpenChange={(isOpen) => {
+        // Só fechar se o usuário explicitamente fechar (X ou ESC)
+        // Não fechar automaticamente após salvar
+        if (!isOpen) {
+          // Só fechar se não estiver carregando e não houver funcionário salvo recentemente
+          if (!loading) {
+            onClose();
+          }
         }
-      }
-    }}>
-      <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto p-0 mx-4 sm:mx-0 bg-seguranca-graphite border-gray-600">
-        <DialogHeader className="bg-gradient-to-r from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white">
-          <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold">
-            <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg">
-              <UserIcon className="h-4 w-4 sm:h-6 sm:w-6" />
-            </div>
-            <span className="truncate">{isEditMode ? 'Editar Funcionário' : 'Novo Funcionário'}</span>
-          </DialogTitle>
-          <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
-            {isEditMode 
-              ? 'Edite os dados do funcionário. Campos marcados com * são obrigatórios.'
-              : 'Preencha os dados do funcionário. Campos marcados com * são obrigatórios.'
-            }
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-          {/* Botão de Importação de PDF */}
-          <div className="flex justify-end mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowPDFImport(!showPDFImport)}
-              className="flex items-center gap-2 border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
-            >
-              <Upload className="h-4 w-4" />
-              Importar PDF
-            </Button>
-          </div>
-          
-          {/* Seção de Importação de PDF */}
-          {showPDFImport && (
-            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-              <div className="p-4">
-              <h4 className="text-lg font-semibold text-seguranca-yellow mb-3 flex items-center">
-                <FileCheck className="mr-2" size={20} />
-                Importar FICHA DE REGISTRO DOS EMPREGADOS
-              </h4>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-seguranca-lightgray">
-                    Selecionar arquivo PDF
-                  </Label>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handlePDFFileChange}
-                    className="mt-1 bg-seguranca-black border-seguranca-lightgray/30 text-white"
-                  />
-                  <p className="text-xs text-seguranca-lightgray/60 mt-1">
-                    Apenas arquivos PDF. Máximo 10MB.
-                  </p>
-                </div>
-                
-                {pdfFile && (
-                  <div className="flex items-center gap-2 p-2 bg-seguranca-black rounded border border-seguranca-lightgray/30">
-                    <FileText className="h-4 w-4 text-seguranca-yellow" />
-                    <span className="text-sm text-white">{pdfFile.name}</span>
-                    <span className="text-xs text-seguranca-lightgray/60">
-                      ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
-                  </div>
-                )}
-                
-                {pdfError && (
-                  <div className="flex items-center gap-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="text-sm">{pdfError}</span>
-                  </div>
-                )}
-                
-            {pdfSuccess && (
-                  <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-500/30 rounded text-green-400">
-                    <FileCheck className="h-4 w-4" />
-                    <span className="text-sm">PDF processado com sucesso! Formulário preenchido automaticamente.</span>
-                  </div>
-                )}
+      }}>
+        <DialogContent className="max-w-4xl w-full max-h-[95vh] overflow-y-auto p-0 mx-4 sm:mx-0 bg-seguranca-graphite border-gray-600">
+          <DialogHeader className="bg-gradient-to-r from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white sticky top-0 z-10">
+            <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold">
+              <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg">
+                <UserIcon className="h-4 w-4 sm:h-6 sm:w-6" />
+              </div>
+              <span className="truncate">{isEditMode ? 'Editar Funcionário' : 'Novo Funcionário'}</span>
+            </DialogTitle>
+            <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
+              Preencha os dados abaixo. Itens obrigatórios estão indicados em vermelho.
+            </DialogDescription>
+          </DialogHeader>
 
-            {extractedPreview && (
-              <div className="mt-3 p-3 bg-seguranca-black rounded border border-seguranca-lightgray/30 text-sm text-white">
-                <h5 className="font-semibold mb-2">Pré-visualização dos dados extraídos</h5>
-                <div className="space-y-2">
-                  <details className="bg-[#2a2a2a] rounded p-2" open>
-                    <summary className="cursor-pointer font-medium">Dados da Empresa</summary>
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fillFormWithPDFData({ employer: extractedPreview.employer })}
-                        className="h-7 text-xs"
-                      >
-                        Aplicar este bloco
-                      </Button>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(extractedPreview.employer || {}).map(([k,v]) => (
-                        v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                      ))}
-                    </div>
-                  </details>
-                  <details className="bg-[#2a2a2a] rounded p-2">
-                    <summary className="cursor-pointer font-medium">Dados do Funcionário</summary>
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fillFormWithPDFData({ employee: extractedPreview.employee })}
-                        className="h-7 text-xs"
-                      >
-                        Aplicar este bloco
-                      </Button>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(extractedPreview.employee || {}).map(([k,v]) => (
-                        v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                      ))}
-                    </div>
-                  </details>
-                  <details className="bg-[#2a2a2a] rounded p-2">
-                    <summary className="cursor-pointer font-medium">Vínculo Empregatício</summary>
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fillFormWithPDFData({ contract: extractedPreview.contract })}
-                        className="h-7 text-xs"
-                      >
-                        Aplicar este bloco
-                      </Button>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(extractedPreview.contract || {}).map(([k,v]) => (
-                        v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                      ))}
-                    </div>
-                  </details>
-                  <details className="bg-[#2a2a2a] rounded p-2">
-                    <summary className="cursor-pointer font-medium">FGTS</summary>
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fillFormWithPDFData({ fgts: extractedPreview.fgts })}
-                        className="h-7 text-xs"
-                      >
-                        Aplicar este bloco
-                      </Button>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(extractedPreview.fgts || {}).map(([k,v]) => (
-                        (v !== undefined && v !== null && String(v).length > 0) ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                      ))}
-                    </div>
-                  </details>
-                  <details className="bg-[#2a2a2a] rounded p-2">
-                    <summary className="cursor-pointer font-medium">PIS</summary>
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fillFormWithPDFData({ pis: extractedPreview.pis })}
-                        className="h-7 text-xs"
-                      >
-                        Aplicar este bloco
-                      </Button>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(extractedPreview.pis || {}).map(([k,v]) => (
-                        v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                      ))}
-                    </div>
-                  </details>
-                  <details className="bg-[#2a2a2a] rounded p-2">
-                    <summary className="cursor-pointer font-medium">Título de Eleitor</summary>
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fillFormWithPDFData({ voter: extractedPreview.voter })}
-                        className="h-7 text-xs"
-                      >
-                        Aplicar este bloco
-                      </Button>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(extractedPreview.voter || {}).map(([k,v]) => (
-                        v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                      ))}
-                    </div>
-                  </details>
-                  <details className="bg-[#2a2a2a] rounded p-2">
-                    <summary className="cursor-pointer font-medium">Quando Estrangeiro</summary>
-                    <div className="flex justify-end mb-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fillFormWithPDFData({ foreigner: extractedPreview.foreigner })}
-                        className="h-7 text-xs"
-                      >
-                        Aplicar este bloco
-                      </Button>
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {Object.entries(extractedPreview.foreigner || {}).map(([k,v]) => (
-                        v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                      ))}
-                    </div>
-                  </details>
-                  {extractedPreview.notes ? (
-                    <div className="bg-[#2a2a2a] rounded p-2">
-                      <div className="font-medium">Observações</div>
-                      <div className="text-xs mt-1">{extractedPreview.notes}</div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            )}
-                
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={handleProcessPDF}
-                    disabled={!pdfFile || pdfProcessing}
-                    className="flex items-center gap-2 bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
-                  >
-                    {pdfProcessing ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-black"></div>
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <FileCheck className="h-4 w-4" />
-                        Processar PDF
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowPDFImport(false);
-                      setPdfFile(null);
-                      setPdfError(null);
-                      setPdfSuccess(false);
-                    }}
-                    className="border-seguranca-lightgray/30 text-seguranca-lightgray hover:bg-seguranca-lightgray/10"
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-              </div>
-            </Card>
-          )}
-        
-                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                  <Tabs defaultValue="cadastro" className="space-y-4 sm:space-y-6">
-                    <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border border-gray-600">
-                      <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
-                      <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
-                      <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="cadastro" className="space-y-4 sm:space-y-6">
-           {/* Seção: Relacionamentos Obrigatórios */}
-           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-             <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
-             <div className="flex items-center gap-2 sm:gap-3">
-               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                 <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-               </div>
-               <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">
-                 Relacionamentos Obrigatórios
-               </h3>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-               {/* Seleção de Usuário */}
-               <div className="space-y-2">
-                 <Label className="text-xs sm:text-sm font-medium text-gray-200">
-                   Usuário do Sistema
-                 </Label>
-                 <div className="relative">
-                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
-                   <Input
-                     placeholder="Digite nome, email, username ou CPF para buscar usuário..."
-                     value={userSearchTerm}
-                     onChange={handleUserSearch}
-                     onFocus={handleUserInputFocus}
-                     onBlur={handleUserInputBlur}
-                     className="pl-9 sm:pl-10 text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                   
-                   {/* Dropdown de usuários */}
-                   {showUserDropdown && filteredUsers.length > 0 && (
-                     <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                       {filteredUsers.map((user) => (
-                         <div
-                           key={user.id}
-                           className="px-3 py-2 hover:bg-gray-700 cursor-pointer border-b border-gray-600 last:border-b-0"
-                           onClick={() => handleUserSelect(user)}
-                         >
-                           <div className="flex flex-col">
-                             <span className="font-medium text-seguranca-lightgray">{user.name}</span>
-                             <span className="text-xs text-gray-400">
-                               {user.email} • {user.username} • {user.role}
-                             </span>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   )}
-                   
-                   {/* Mensagem quando não há resultados */}
-                   {showUserDropdown && userSearchTerm.trim() !== '' && filteredUsers.length === 0 && (
-                     <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-lg shadow-lg p-3">
-                       <p className="text-sm text-gray-400">Nenhum usuário encontrado</p>
-                     </div>
-                   )}
-                 </div>
-                 
-                 {/* Exibir usuário selecionado */}
-                 {selectedUser && (
-                   <div className="bg-green-900/20 border border-green-600 rounded-lg p-3">
-                     <div className="flex items-center justify-between">
-                       <div>
-                         <p className="text-sm font-medium text-green-400">Usuário selecionado:</p>
-                         <p className="text-sm text-seguranca-lightgray">{selectedUser.name}</p>
-                         <p className="text-xs text-gray-400">{selectedUser.email}</p>
-                       </div>
-                       <Button
-                         type="button"
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => {
-                           setSelectedUser(null);
-                           setUserSearchTerm('');
-                           setForm(prev => ({ ...prev, user: { id: '' } }));
-                         }}
-                         className="text-red-400 hover:text-red-300"
-                       >
-                         <X className="h-4 w-4" />
-                       </Button>
-                     </div>
-                   </div>
-                 )}
-                 <div className="flex items-center justify-between">
-                 <p className="text-xs text-gray-300">
-                   O usuário selecionado será associado ao funcionário para acesso ao sistema. (Opcional)
-                   {canCreateDefaultUser && (
-                     <span className="block mt-1 text-seguranca-yellow">
-                       Para este cargo, é recomendado criar um usuário padrão.
-                     </span>
-                   )}
-                 </p>
-                   {canCreateDefaultUser && (
-                     <Button
-                       type="button"
-                       variant="ghost"
-                       size="sm"
-                       onClick={() => setCriarUsuarioModalOpen(true)}
-                       className="text-seguranca-yellow hover:text-yellow-400 text-xs px-2 py-1 h-auto"
-                     >
-                       <UserPlus className="h-3 w-3 mr-1" />
-                       Criar Usuário Padrão
-                       <Link className="h-3 w-3 ml-1" />
-                     </Button>
-                   )}
-                 </div>
-               </div>
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+            {/* Botão de Importação de PDF */}
+            <div className="flex justify-end mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPDFImport(!showPDFImport)}
+                className="flex items-center gap-2 border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
+              >
+                <Upload className="h-4 w-4" />
+                Importar PDF
+              </Button>
+            </div>
 
-             </div>
-             </div>
-           </Card>
+            {/* Seção de Importação de PDF */}
+            {showPDFImport && (
+              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                <div className="p-4">
+                  <h4 className="text-lg font-semibold text-seguranca-yellow mb-3 flex items-center">
+                    <FileCheck className="mr-2" size={20} />
+                    Importar FICHA DE REGISTRO DOS EMPREGADOS
+                  </h4>
 
-           {/* Seção: Informações Pessoais */}
-           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-             <div className="p-4 space-y-4">
-             <div className="flex items-center gap-2 sm:gap-3">
-               <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
-                 <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
-               </div>
-               <h3 className="text-lg font-semibold text-white">Informações Pessoais</h3>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Nome Completo *</Label>
-                 <Input 
-                   name="name" 
-                   value={form.name} 
-                   onChange={handleChange} 
-                   required 
-                 />
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">CPF *</Label>
-                 <Input 
-                   name="cpf" 
-                   value={form.cpf} 
-                   onChange={handleCpfChange} 
-                   required 
-                   placeholder="000.000.000-00"
-                   className={cpfError ? 'border-red-500' : ''}
-                 />
-                 <p className="text-xs text-gray-400 mt-1">
-                   Digite apenas números; o campo será formatado automaticamente (000.000.000-00)
-                 </p>
-                 {cpfError && (
-                   <p className="text-xs text-red-500 mt-1">{cpfError}</p>
-                 )}
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Data de Nascimento *</Label>
-                 <Input
-                   name="birthDate"
-                   type="date"
-                   value={form.birthDate}
-                   onChange={handleChange}
-                   required
-                 />
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Sexo</Label>
-                 <Select 
-                   value={form.sexo || ''} 
-                   onValueChange={(value) => setForm(prev => ({ ...prev, sexo: value }))}
-                 >
-                   <SelectTrigger>
-                     <SelectValue placeholder="Selecione o sexo" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="MASCULINO">Masculino</SelectItem>
-                     <SelectItem value="FEMININO">Feminino</SelectItem>
-                     <SelectItem value="OUTRO">Outro</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Município de Nascimento</Label>
-                 <Input 
-                   name="municipioNascimento" 
-                   value={form.municipioNascimento || ''} 
-                   onChange={handleChange} 
-                   placeholder="Ex: Belo Horizonte"
-                 />
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Estado de Nascimento</Label>
-                 <Select 
-                   value={form.estadoNascimento || ''} 
-                   onValueChange={(value) => setForm(prev => ({ ...prev, estadoNascimento: value }))}
-                 >
-                   <SelectTrigger>
-                     <SelectValue placeholder="Selecione o estado" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="AC">Acre</SelectItem>
-                     <SelectItem value="AL">Alagoas</SelectItem>
-                     <SelectItem value="AP">Amapá</SelectItem>
-                     <SelectItem value="AM">Amazonas</SelectItem>
-                     <SelectItem value="BA">Bahia</SelectItem>
-                     <SelectItem value="CE">Ceará</SelectItem>
-                     <SelectItem value="DF">Distrito Federal</SelectItem>
-                     <SelectItem value="ES">Espírito Santo</SelectItem>
-                     <SelectItem value="GO">Goiás</SelectItem>
-                     <SelectItem value="MA">Maranhão</SelectItem>
-                     <SelectItem value="MT">Mato Grosso</SelectItem>
-                     <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
-                     <SelectItem value="MG">Minas Gerais</SelectItem>
-                     <SelectItem value="PA">Pará</SelectItem>
-                     <SelectItem value="PB">Paraíba</SelectItem>
-                     <SelectItem value="PR">Paraná</SelectItem>
-                     <SelectItem value="PE">Pernambuco</SelectItem>
-                     <SelectItem value="PI">Piauí</SelectItem>
-                     <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-                     <SelectItem value="RN">Rio Grande do Norte</SelectItem>
-                     <SelectItem value="RS">Rio Grande do Sul</SelectItem>
-                     <SelectItem value="RO">Rondônia</SelectItem>
-                     <SelectItem value="RR">Roraima</SelectItem>
-                     <SelectItem value="SC">Santa Catarina</SelectItem>
-                     <SelectItem value="SP">São Paulo</SelectItem>
-                     <SelectItem value="SE">Sergipe</SelectItem>
-                     <SelectItem value="TO">Tocantins</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Grau de Instrução</Label>
-                 <Select 
-                   value={form.grauInstrucao || ''} 
-                   onValueChange={(value) => setForm(prev => ({ ...prev, grauInstrucao: value }))}
-                 >
-                   <SelectTrigger>
-                     <SelectValue placeholder="Selecione o grau de instrução" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="ANALFABETO">Analfabeto</SelectItem>
-                     <SelectItem value="FUNDAMENTAL_INCOMPLETO">Ensino Fundamental Incompleto</SelectItem>
-                     <SelectItem value="FUNDAMENTAL_COMPLETO">Ensino Fundamental Completo</SelectItem>
-                     <SelectItem value="MEDIO_INCOMPLETO">Ensino Médio Incompleto</SelectItem>
-                     <SelectItem value="MEDIO_COMPLETO">Ensino Médio Completo</SelectItem>
-                     <SelectItem value="SUPERIOR_INCOMPLETO">Ensino Superior Incompleto</SelectItem>
-                     <SelectItem value="SUPERIOR_COMPLETO">Ensino Superior Completo</SelectItem>
-                     <SelectItem value="POS_GRADUACAO">Pós-Graduação</SelectItem>
-                     <SelectItem value="MESTRADO">Mestrado</SelectItem>
-                     <SelectItem value="DOUTORADO">Doutorado</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Matrícula do eSocial</Label>
-                 <Input 
-                   name="matriculaEsocial" 
-                   value={form.matriculaEsocial || ''} 
-                   onChange={handleChange} 
-                   placeholder="Matrícula do eSocial (opcional)"
-                 />
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Estado Civil</Label>
-                 <Select 
-                   value={form.maritalStatus} 
-                   onValueChange={(value) => setForm(prev => ({ ...prev, maritalStatus: value }))}
-                 >
-                   <SelectTrigger>
-                     <SelectValue placeholder="Selecione o estado civil" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="SINGLE">Solteiro</SelectItem>
-                     <SelectItem value="MARRIED">Casado</SelectItem>
-                     <SelectItem value="DIVORCED">Divorciado</SelectItem>
-                     <SelectItem value="WIDOWED">Viúvo</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Nacionalidade</Label>
-                 <Input 
-                   name="nationality" 
-                   value={form.nationality} 
-                   onChange={handleChange} 
-                   className="text-xs sm:text-sm h-9 sm:h-10"
-                 />
-               </div>
-             </div>
-             
-             {/* Dados Familiares (Nomes dos pais) */}
-             <div className="mt-4 pt-4 border-t border-gray-600">
-               <h4 className="text-md font-semibold text-white mb-4">Dados Familiares (Nomes dos pais)</h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Nome da Mãe</Label>
-                   <Input 
-                     name="nomeMae" 
-                     value={form.nomeMae || ''} 
-                     onChange={handleChange} 
-                     placeholder="Nome completo da mãe"
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Nome do Pai</Label>
-                   <Input 
-                     name="nomePai" 
-                     value={form.nomePai || ''} 
-                     onChange={handleChange} 
-                     placeholder="Nome completo do pai"
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-               </div>
-             </div>
-             
-             {/* Título de Eleitor */}
-             <div className="mt-4 pt-4 border-t border-gray-600">
-               <h4 className="text-md font-semibold text-white mb-4">Título de Eleitor</h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Número</Label>
-                   <Input 
-                     name="tituloEleitor" 
-                     value={form.tituloEleitor || ''} 
-                     onChange={handleTituloEleitorChange} 
-                     placeholder="Ex: 2236.5048.0205"
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Zona</Label>
-                   <Input 
-                     name="tituloEleitorZona" 
-                     value={form.tituloEleitorZona || ''} 
-                     onChange={handleChange} 
-                     placeholder="Ex: 316"
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Seção</Label>
-                   <Input 
-                     name="tituloEleitorSecao" 
-                     value={form.tituloEleitorSecao || ''} 
-                     onChange={handleChange} 
-                     placeholder="Ex: 0585"
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Data de Expedição</Label>
-                   <Input 
-                     name="tituloEleitorDataExpedicao" 
-                     type="date" 
-                     value={form.tituloEleitorDataExpedicao || ''} 
-                     onChange={handleChange} 
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Validade</Label>
-                   <Input 
-                     name="tituloEleitorValidade" 
-                     type="date" 
-                     value={form.tituloEleitorValidade || ''} 
-                     onChange={handleChange} 
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-               </div>
-             </div>
-             
-             {/* Nome do Conselho Regional */}
-             <div className="mt-4 pt-4 border-t border-gray-600">
-               <h4 className="text-md font-semibold text-white mb-4">Nome do Conselho Regional</h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Sigla</Label>
-                   <Input 
-                     name="nomeConselhoRegional" 
-                     value={form.nomeConselhoRegional || ''} 
-                     onChange={handleChange} 
-                     placeholder="Ex: CRM, CRO, etc."
-                     className="text-xs sm:text-sm h-9 sm:h-10"
-                   />
-                 </div>
-               </div>
-             </div>
-             
-             {/* Seção de Documentos Pessoais */}
-             <div className="mt-4 pt-4 border-t border-gray-600">
-               <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
-                 <FileText className="mr-2" size={16} />
-                 Documentos Pessoais
-               </h4>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {/* CNH */}
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Número da CNH</Label>
-                   <Input 
-                     name="cnhNumber" 
-                     value={form.cnhNumber || ''} 
-                     onChange={handleChange} 
-                     placeholder="00000000000"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Categoria da CNH</Label>
-                   <Select 
-                     value={form.cnhCategory || ''} 
-                     onValueChange={(value) => setForm(prev => ({ ...prev, cnhCategory: value }))}
-                   >
-                     <SelectTrigger>
-                       <SelectValue placeholder="Selecione a categoria" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="A">A - Motocicleta</SelectItem>
-                       <SelectItem value="B">B - Carro</SelectItem>
-                       <SelectItem value="C">C - Caminhão</SelectItem>
-                       <SelectItem value="D">D - Ônibus</SelectItem>
-                       <SelectItem value="E">E - Carreta</SelectItem>
-                       <SelectItem value="AB">AB - Moto e Carro</SelectItem>
-                       <SelectItem value="AC">AC - Moto e Caminhão</SelectItem>
-                       <SelectItem value="AD">AD - Moto e Ônibus</SelectItem>
-                       <SelectItem value="AE">AE - Moto e Carreta</SelectItem>
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Validade da CNH</Label>
-                   <Input 
-                     name="cnhExpirationDate" 
-                     type="date" 
-                     value={form.cnhExpirationDate || ''} 
-                     onChange={handleChange} 
-                   />
-                 </div>
-                 
-                 {/* CTPS */}
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Número da CTPS</Label>
-                   <Input 
-                     name="ctps" 
-                     value={form.ctps || ''} 
-                     onChange={handleChange} 
-                     placeholder="0000000"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Série da CTPS</Label>
-                   <Input 
-                     name="ctpsSeries" 
-                     value={form.ctpsSeries || ''} 
-                     onChange={handleChange} 
-                     placeholder="0000"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Data de Emissão da CTPS</Label>
-                   <Input 
-                     name="ctpsIssueDate" 
-                     type="date" 
-                     value={form.ctpsIssueDate || ''} 
-                     onChange={handleChange} 
-                   />
-                 </div>
-                 
-                 {/* CIN - Carteira de Identidade Nacional */}
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Número do CIN</Label>
-                   <Input 
-                     name="cinNumero" 
-                     value={form.cinNumero || ''} 
-                     onChange={handleChange} 
-                     placeholder="Número do CIN"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Órgão Emissor do CIN</Label>
-                   <Input 
-                     name="cinOrgaoEmissor" 
-                     value={form.cinOrgaoEmissor || ''} 
-                     onChange={handleChange} 
-                     placeholder="Ex: SSP, DETRAN"
-                   />
-                 </div>
-                 <div>
-                   <Label className="text-sm font-medium text-gray-200">Data de Emissão do CIN</Label>
-                   <Input 
-                     name="cinDataEmissao" 
-                     type="date" 
-                     value={form.cinDataEmissao || ''} 
-                     onChange={handleChange} 
-                   />
-                 </div>
-               </div>
-             </div>
-             
-             {/* Seção de dados do cônjuge - aparece apenas se estado civil for "Casado" */}
-             {form.maritalStatus === 'MARRIED' && (
-               <div className="mt-4 pt-4 border-t border-gray-600">
-                 <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
-                   <UserIcon className="mr-2" size={16} />
-                   Dados do Cônjuge
-                 </h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div>
-                     <Label className="text-sm font-medium text-gray-200">Nome do Cônjuge *</Label>
-                     <Input 
-                       name="spouseName" 
-                       value={form.spouseName || ''} 
-                       onChange={handleChange} 
-                       required 
-                       placeholder="Nome completo do cônjuge"
-                     />
-                   </div>
-                   <div>
-                     <Label className="text-sm font-medium text-gray-200">CPF do Cônjuge *</Label>
-                     <Input 
-                       name="spouseCpf" 
-                       value={form.spouseCpf || ''} 
-                       onChange={handleChange} 
-                       required 
-                       placeholder="000.000.000-00"
-                     />
-                   </div>
-                   <div>
-                     <Label className="text-sm font-medium text-gray-200">RG do Cônjuge *</Label>
-                     <Input 
-                       name="spouseRg" 
-                       value={form.spouseRg || ''} 
-                       onChange={handleChange} 
-                       required 
-                       placeholder="Número do RG"
-                     />
-                   </div>
-                   <div>
-                     <Label className="text-sm font-medium text-gray-200">Data de Nascimento do Cônjuge *</Label>
-                     <Input 
-                       name="spouseBirthDate" 
-                       type="date" 
-                       value={form.spouseBirthDate || ''} 
-                       onChange={handleChange} 
-                       required 
-                     />
-                   </div>
-                   <div>
-                     <Label className="text-sm font-medium text-gray-200">Profissão do Cônjuge</Label>
-                     <Input 
-                       name="spouseProfession" 
-                       value={form.spouseProfession || ''} 
-                       onChange={handleChange} 
-                       placeholder="Profissão do cônjuge"
-                     />
-                   </div>
-                   <div>
-                     <Label className="text-sm font-medium text-gray-200">Telefone do Cônjuge</Label>
-                     <Input 
-                       name="spousePhone" 
-                       value={form.spousePhone || ''} 
-                       onChange={handleChange} 
-                       placeholder="(00) 00000-0000"
-                     />
-                   </div>
-                 </div>
-               </div>
-             )}
-             
-            {/* Seção de dependentes removida do formulário de criação. A gestão de dependentes permanece no modo de edição via modal dedicado. */}
-             </div>
-           </Card>
-
-           {/* Seção: Informações de Contato */}
-           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-             <div className="p-4 space-y-4">
-             <div className="flex items-center gap-2 sm:gap-3">
-               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                 <Link className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-               </div>
-               <h3 className="text-lg font-semibold text-white">Informações de Contato</h3>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Email</Label>
-                <Input 
-                  name="email" 
-                  type="email" 
-                  value={form.email} 
-                  onChange={handleChange}
-                  placeholder="exemplo@email.com"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">WhatsApp *</Label>
-                <Input 
-                  name="phone" 
-                  value={aplicarMascaraTelefone(form.phone || '')} 
-                  onChange={(e) => {
-                    const valor = e.target.value.replace(/\D/g, '');
-                    setForm(prev => ({ ...prev, phone: valor }));
-                  }}
-                  required 
-                  placeholder="(00) 00000-0000"
-                  maxLength={15}
-                />
-              </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Telefone de Contato</Label>
-                 <Input 
-                   name="telefoneContato" 
-                   value={aplicarMascaraTelefone(form.telefoneContato || '')} 
-                   onChange={(e) => {
-                     const valor = e.target.value.replace(/\D/g, '');
-                     setForm(prev => ({ ...prev, telefoneContato: valor }));
-                   }}
-                   placeholder="(00) 00000-0000"
-                   maxLength={15}
-                 />
-               </div>
-             </div>
-             </div>
-           </Card>
-            
-           {/* Seção: Endereço Separado */}
-           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-             <div className="p-4 space-y-4">
-               <div className="flex items-center gap-2 sm:gap-3">
-                 <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                   <Building className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                 </div>
-                 <h4 className="text-md font-semibold text-seguranca-yellow">Endereço</h4>
-               </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 sm:gap-4">
-                  <div className="flex-1 min-w-0">
-                    <Label className="text-xs sm:text-sm font-medium text-gray-200">Rua/Logradouro *</Label>
-                    <Input 
-                      name="enderecoRua" 
-                      value={form.enderecoRua || ''} 
-                      onChange={handleChange} 
-                      placeholder="Nome da rua, avenida, etc."
-                      required
-                      className="text-xs sm:text-sm h-9 sm:h-10"
-                    />
-                  </div>
-                  <div className="w-full sm:w-36 flex-shrink-0">
-                    <Label className="text-xs sm:text-sm font-medium text-gray-200">CEP *</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        name="enderecoCep" 
-                        value={aplicarMascaraCep(form.enderecoCep || '')} 
-                        onChange={(e) => {
-                          const valor = e.target.value.replace(/\D/g, '');
-                          setForm(prev => ({ ...prev, enderecoCep: valor }));
-                          if (valor.length === 8) {
-                            buscarCep(valor);
-                          }
-                        }}
-                        placeholder="00000-000"
-                        maxLength={9}
-                        required
-                        className="text-xs sm:text-sm h-9 sm:h-10"
-                      />
-                      {loadingCep && (
-                        <div className="flex items-center px-2 text-gray-400">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Número *</Label>
-                  <Input 
-                    name="enderecoNumero" 
-                    value={form.enderecoNumero || ''} 
-                    onChange={handleChange} 
-                    placeholder="123"
-                    required
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Complemento</Label>
-                  <Input 
-                    name="enderecoComplemento" 
-                    value={form.enderecoComplemento || ''} 
-                    onChange={handleChange} 
-                    placeholder="Apto, Bloco, etc."
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Bairro *</Label>
-                  <Input 
-                    name="enderecoBairro" 
-                    value={form.enderecoBairro || ''} 
-                    onChange={handleChange} 
-                    placeholder="Nome do bairro"
-                    required
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Cidade *</Label>
-                  <Input 
-                    name="enderecoCidade" 
-                    value={form.enderecoCidade || ''} 
-                    onChange={handleChange} 
-                    placeholder="Nome da cidade"
-                    required
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs sm:text-sm font-medium text-gray-200">Estado (UF) *</Label>
-                  <Input 
-                    name="enderecoEstado" 
-                    value={form.enderecoEstado || ''} 
-                    onChange={(e) => {
-                      const valor = e.target.value.toUpperCase().substring(0, 2);
-                      setForm(prev => ({ ...prev, enderecoEstado: valor }));
-                    }}
-                    placeholder="MG"
-                    maxLength={2}
-                    required
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
-                </div>
-              </div>
-            </div>
-           </Card>
-
-          {/* Seção: Dados Bancários */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <div className="p-4 space-y-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Dados Bancários</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-200">Banco</Label>
-                  <Input 
-                    name="bankData.bank" 
-                    value={form.bankData?.bank || ''} 
-                    onChange={handleChange} 
-                    placeholder="Nome do banco"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-200">Agência</Label>
-                  <Input 
-                    name="bankData.agency" 
-                    value={form.bankData?.agency || ''} 
-                    onChange={handleChange} 
-                    placeholder="0000"
-                  />
-                </div>
-<div>
-                <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
-                  <Input 
-                    name="bankData.account" 
-                    value={form.bankData?.account || ''} 
-                    onChange={handleChange} 
-                    placeholder="00000-0"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label className="text-sm font-medium text-gray-200">Chave Pix</Label>
-                  <Input 
-                    name="bankData.chavePix" 
-                    value={form.bankData?.chavePix || ''} 
-                    onChange={handleChange} 
-                    placeholder="CPF, e-mail, telefone ou chave aleatória"
-                  />
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Seção: Dados do Exame Médico (ASO) */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <div className="p-4 space-y-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
-                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Dados do Exame Médico (ASO)</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Data do Exame Médico (ASO)</Label>
-                <Input 
-                  name="exameMedicoData" 
-                  type="date"
-                  value={form.exameMedicoData || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value }))} 
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Tipo de Exame Realizado</Label>
-                <Select 
-                  value={form.exameMedicoTipo || ''} 
-                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoTipo: value }))}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    <SelectItem value="ADMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Admissional</SelectItem>
-                    <SelectItem value="DEMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Demissional</SelectItem>
-                    <SelectItem value="PERIODICO" className="text-seguranca-lightgray hover:bg-gray-700">Periódico</SelectItem>
-                    <SelectItem value="MUDANCA_FUNCAO" className="text-seguranca-lightgray hover:bg-gray-700">Mudança de Função</SelectItem>
-                    <SelectItem value="RETORNO_TRABALHO" className="text-seguranca-lightgray hover:bg-gray-700">Retorno ao Trabalho</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-sm font-medium text-gray-200">Nome do Médico</Label>
-                <div className="relative">
-                  <Input 
-                    value={doctorSearchTerm} 
-                    onChange={(e) => {
-                      setDoctorSearchTerm(e.target.value);
-                      setShowDoctorDropdown(true);
-                      if (e.target.value.length > 0) {
-                        handleDoctorSearch(e.target.value);
-                      } else {
-                        loadDoctors();
-                      }
-                    }}
-                    onFocus={() => {
-                      setShowDoctorDropdown(true);
-                      if (doctors.length === 0) {
-                        loadDoctors();
-                      }
-                    }}
-                    onBlur={() => {
-                      // Delay para permitir clique no dropdown
-                      setTimeout(() => setShowDoctorDropdown(false), 200);
-                    }}
-                    placeholder="Digite para buscar médico..."
-                    className="text-xs sm:text-sm h-9 sm:h-10"
-                  />
-                  {showDoctorDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {loadingDoctors ? (
-                        <div className="p-2 text-sm text-gray-400">Carregando...</div>
-                      ) : doctors.length > 0 ? (
-                        doctors.map((doctor) => (
-                          <div
-                            key={doctor.id}
-                            className="p-2 hover:bg-gray-700 cursor-pointer text-seguranca-lightgray text-xs sm:text-sm"
-                            onClick={() => {
-                              setSelectedDoctor(doctor);
-                              setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
-                              setForm(prev => ({ 
-                                ...prev, 
-                                exameMedicoDoctor: { id: doctor.id } 
-                              }));
-                              setShowDoctorDropdown(false);
-                            }}
-                          >
-                            {doctor.name} - CRM {doctor.crmNumber}/{doctor.crmState}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-2 space-y-2">
-                          <div className="text-sm text-gray-400 mb-2">Nenhum médico encontrado</div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setNovoMedicoModalOpen(true);
-                              setShowDoctorDropdown(false);
-                            }}
-                            className="w-full text-left p-2 text-sm text-seguranca-yellow hover:bg-gray-700 rounded border border-seguranca-yellow/30 flex items-center gap-2"
-                          >
-                            <Plus className="h-4 w-4" />
-                            <span>Cadastrar novo médico</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Horário</Label>
-                <Input 
-                  name="exameMedicoHorario" 
-                  value={form.exameMedicoHorario || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoHorario: e.target.value }))} 
-                  placeholder="Ex: 18:00 ÀS 06:00 H"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Intervalos Almoço/Janta</Label>
-                <RadioGroup 
-                  value={form.exameMedicoIntervalosRefeicao === true ? 'sim' : form.exameMedicoIntervalosRefeicao === false ? 'nao' : ''}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoIntervalosRefeicao: value === 'sim' }))}
-                  className="flex gap-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="sim" id="intervalos-sim" className="text-seguranca-lightgray" />
-                    <Label htmlFor="intervalos-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="nao" id="intervalos-nao" className="text-seguranca-lightgray" />
-                    <Label htmlFor="intervalos-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-sm font-medium text-gray-200">Observações</Label>
-                <Textarea 
-                  name="exameMedicoObservacoes" 
-                  value={form.exameMedicoObservacoes || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, exameMedicoObservacoes: e.target.value }))} 
-                  placeholder="Observações sobre o exame médico..."
-                  rows={3}
-                  className="text-xs sm:text-sm bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Este é o primeiro registro (1º emprego)?</Label>
-                <RadioGroup 
-                  value={form.exameMedicoPrimeiroEmprego === true ? 'sim' : form.exameMedicoPrimeiroEmprego === false ? 'nao' : ''}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoPrimeiroEmprego: value === 'sim' }))}
-                  className="flex gap-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="sim" id="primeiro-sim" className="text-seguranca-lightgray" />
-                    <Label htmlFor="primeiro-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="nao" id="primeiro-nao" className="text-seguranca-lightgray" />
-                    <Label htmlFor="primeiro-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Contribuição Sindical está pago este ano?</Label>
-                <RadioGroup 
-                  value={form.exameMedicoContribuicaoSindicalPaga === true ? 'sim' : form.exameMedicoContribuicaoSindicalPaga === false ? 'nao' : ''}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoContribuicaoSindicalPaga: value === 'sim' }))}
-                  className="flex gap-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="sim" id="sindical-sim" className="text-seguranca-lightgray" />
-                    <Label htmlFor="sindical-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="nao" id="sindical-nao" className="text-seguranca-lightgray" />
-                    <Label htmlFor="sindical-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            </div>
-            </div>
-           </Card>
-
-          {/* Seção: Para Estrangeiro */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <div className="p-4 space-y-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Para Estrangeiro</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-200">RNE nº</Label>
-                <Input 
-                  name="rneNumero" 
-                  value={form.rneNumero || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, rneNumero: e.target.value }))} 
-                  placeholder="Número do RNE"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Validade</Label>
-                <Input 
-                  name="rneValidade" 
-                  type="date"
-                  value={form.rneValidade || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value }))} 
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Possui filhos com brasileiro?</Label>
-                <RadioGroup 
-                  value={form.temFilhosBrasileiros === true ? 'sim' : form.temFilhosBrasileiros === false ? 'nao' : ''}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, temFilhosBrasileiros: value === 'sim' }))}
-                  className="flex gap-4 mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="sim" id="filhos-brasileiros-sim" className="text-seguranca-lightgray" />
-                    <Label htmlFor="filhos-brasileiros-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="nao" id="filhos-brasileiros-nao" className="text-seguranca-lightgray" />
-                    <Label htmlFor="filhos-brasileiros-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Quantos?</Label>
-                <Input 
-                  name="quantidadeFilhosBrasileiros" 
-                  type="number"
-                  min="0"
-                  value={form.quantidadeFilhosBrasileiros || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, quantidadeFilhosBrasileiros: e.target.value ? parseInt(e.target.value) : undefined }))} 
-                  placeholder="Quantidade"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                  disabled={form.temFilhosBrasileiros !== true}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-sm font-medium text-gray-200 mb-2 block">
-                  Em caso de estrangeiro naturalizado brasileiro, informar o Nº RIC / Órgão Emissor / Data Emissão:
-                </Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-xs font-medium text-gray-300">Nº RIC</Label>
-                    <Input 
-                      name="ricNumero" 
-                      value={form.ricNumero || ''} 
-                      onChange={(e) => setForm(prev => ({ ...prev, ricNumero: e.target.value }))} 
-                      placeholder="Número do RIC"
-                      className="text-xs sm:text-sm h-9 sm:h-10"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs font-medium text-gray-300">Órgão Emissor</Label>
-                    <Input 
-                      name="ricOrgaoEmissor" 
-                      value={form.ricOrgaoEmissor || ''} 
-                      onChange={(e) => setForm(prev => ({ ...prev, ricOrgaoEmissor: e.target.value }))} 
-                      placeholder="Órgão Emissor"
-                      className="text-xs sm:text-sm h-9 sm:h-10"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
-                    <Input 
-                      name="ricDataEmissao" 
-                      type="date"
-                      value={form.ricDataEmissao || ''} 
-                      onChange={(e) => setForm(prev => ({ ...prev, ricDataEmissao: e.target.value }))} 
-                      className="text-xs sm:text-sm h-9 sm:h-10"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Tipo de Visto</Label>
-                <Input 
-                  name="tipoVisto" 
-                  value={form.tipoVisto || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, tipoVisto: e.target.value }))} 
-                  placeholder="Tipo de visto"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-            </div>
-            </div>
-          </Card>
-
-          {/* Seção: Dados do Cadastro / Admissão */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <div className="p-4 space-y-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
-                <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">Dados do Cadastro / Admissão</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-200">PIS</Label>
-                <Input 
-                  name="pis" 
-                  value={form.pis || ''} 
-                  onChange={handleChange} 
-                  placeholder="000.00000.00-0"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Reservista nº</Label>
-                <Input 
-                  name="certificadoMilitar" 
-                  value={form.certificadoMilitar || ''} 
-                  onChange={handleChange} 
-                  placeholder="Número do certificado militar"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Data de Admissão *</Label>
-                <Input 
-                  name="hireDate" 
-                  type="date" 
-                  value={form.hireDate} 
-                  onChange={handleChange} 
-                  required 
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Setor/Posto de Trabalho</Label>
-                <Select 
-                  value={(form as any).workPostId || ''}
-                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), workPostId: value }))}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
-                    <SelectValue placeholder="Selecione um posto" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {workPosts.map((wp) => (
-                      <SelectItem key={wp.id} value={wp.id} className="text-seguranca-lightgray hover:bg-gray-700">
-                        {wp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Salário (R$)</Label>
-                <Input 
-                  name="salario" 
-                  type="number" 
-                  step="0.01"
-                  value={form.salario as any || ''} 
-                  onChange={handleChange} 
-                  placeholder="0,00"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Forma de Pagamento</Label>
-                <Select 
-                  value={form.periodoPagamento || ''} 
-                  onValueChange={(value) => setForm(prev => ({ ...prev, periodoPagamento: value }))}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
-                    <SelectValue placeholder="Selecione a forma" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    <SelectItem value="MENSAL" className="text-seguranca-lightgray hover:bg-gray-700">Mensal</SelectItem>
-                    <SelectItem value="QUINZENAL" className="text-seguranca-lightgray hover:bg-gray-700">Quinzenal</SelectItem>
-                    <SelectItem value="SEMANAL" className="text-seguranca-lightgray hover:bg-gray-700">Semanal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Dias de Trabalho</Label>
-                <Input 
-                  name="diasTrabalho" 
-                  value={form.diasTrabalho || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, diasTrabalho: e.target.value }))} 
-                  placeholder="Ex: 12X36"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label className="text-sm font-medium text-gray-200 mb-2 block">Horário de Trabalho</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-xs font-medium text-gray-300">Intervalo</Label>
-                    <Input 
-                      name="horarioTrabalhoIntervalo" 
-                      value={form.horarioTrabalhoIntervalo || ''} 
-                      onChange={(e) => setForm(prev => ({ ...prev, horarioTrabalhoIntervalo: e.target.value }))} 
-                      placeholder="Ex: 23:00 ÀS 00:00 H"
-                      className="text-xs sm:text-sm h-9 sm:h-10"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs font-medium text-gray-300">Período de Trabalho</Label>
-                    <Input 
-                      name="horarioTrabalho" 
-                      value={form.horarioTrabalho || ''} 
-                      onChange={handleChange} 
-                      placeholder="Ex: 18:00 ÀS 06:00 H"
-                      className="text-xs sm:text-sm h-9 sm:h-10"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Prazo de Experiência</Label>
-                <Input 
-                  name="prazoExperienciaTexto" 
-                  value={form.prazoExperienciaTexto || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, prazoExperienciaTexto: e.target.value }))} 
-                  placeholder="Ex: 45 DIAS"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Prorrogação</Label>
-                <Input 
-                  name="prorrogacaoExperiencia" 
-                  value={form.prorrogacaoExperiencia || ''} 
-                  onChange={(e) => setForm(prev => ({ ...prev, prorrogacaoExperiencia: e.target.value }))} 
-                  placeholder="Prorrogação do prazo"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Dias de Folga</Label>
-                <Input 
-                  name="folgaSemanal" 
-                  value={form.folgaSemanal || ''} 
-                  onChange={handleChange} 
-                  placeholder="Ex: 1ª Escola"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Escala de Trabalho</Label>
-                <Input 
-                  name="escalaTrabalho" 
-                  value={form.escalaTrabalho || ''} 
-                  onChange={handleChange} 
-                  placeholder="Ex: 12x36, 6x1, etc."
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-            </div>
-            </div>
-          </Card>
-
-          {/* Seção: Informações Profissionais */}
-           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-             <div className="p-4 space-y-4">
-             <div className="flex items-center gap-2 sm:gap-3">
-               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                 <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-               </div>
-               <h3 className="text-lg font-semibold text-white">Informações Profissionais</h3>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Número de Registro</Label>
-                 <Input 
-                   name="registrationNumber" 
-                   value={form.registrationNumber} 
-                   onChange={handleChange} 
-                   placeholder="EMP001"
-                   className="text-xs sm:text-sm h-9 sm:h-10"
-                 />
-               </div>
-              {/* Cargo */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-200">
-                  Cargo
-                </Label>
-                <div className="relative">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium text-seguranca-lightgray">
+                        Selecionar arquivo PDF
+                      </Label>
                       <Input
-                        type="text"
-                        value={positionSearchTerm}
-                        onChange={handlePositionSearch}
-                        onFocus={handlePositionInputFocus}
-                        onBlur={handlePositionInputBlur}
-                        placeholder="Digite para buscar cargo..."
-                        className="pr-10"
+                        type="file"
+                        accept=".pdf"
+                        onChange={handlePDFFileChange}
+                        className="mt-1 bg-seguranca-black border-seguranca-lightgray/30 text-white"
                       />
-                      <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                      
-                      {/* Dropdown de cargos */}
-                      {showPositionDropdown && (
-                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                          {filteredPositions.length > 0 ? (
-                            filteredPositions.map((position) => (
-                              <div
-                                key={position.id}
-                                className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer flex items-center"
-                                onClick={() => handlePositionSelect(position)}
+                      <p className="text-xs text-seguranca-lightgray/60 mt-1">
+                        Apenas arquivos PDF. Máximo 10MB.
+                      </p>
+                    </div>
+
+                    {pdfFile && (
+                      <div className="flex items-center gap-2 p-2 bg-seguranca-black rounded border border-seguranca-lightgray/30">
+                        <FileText className="h-4 w-4 text-seguranca-yellow" />
+                        <span className="text-sm text-white">{pdfFile.name}</span>
+                        <span className="text-xs text-seguranca-lightgray/60">
+                          ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
+                    )}
+
+                    {pdfError && (
+                      <div className="flex items-center gap-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm">{pdfError}</span>
+                      </div>
+                    )}
+
+                    {pdfSuccess && (
+                      <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-500/30 rounded text-green-400">
+                        <FileCheck className="h-4 w-4" />
+                        <span className="text-sm">PDF processado com sucesso! Formulário preenchido automaticamente.</span>
+                      </div>
+                    )}
+
+                    {extractedPreview && (
+                      <div className="mt-3 p-3 bg-seguranca-black rounded border border-seguranca-lightgray/30 text-sm text-white">
+                        <h5 className="font-semibold mb-2">Pré-visualização dos dados extraídos</h5>
+                        <div className="space-y-2">
+                          <details className="bg-[#2a2a2a] rounded p-2" open>
+                            <summary className="cursor-pointer font-medium">Dados da Empresa</summary>
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fillFormWithPDFData({ employer: extractedPreview.employer })}
+                                className="h-7 text-xs"
                               >
-                                <Briefcase className="mr-2" size={16} />
-                                <div className="flex-1">
-                                  <div className="font-medium">{position.name}</div>
-                                  {position.description && (
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      {position.description}
+                                Aplicar este bloco
+                              </Button>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {Object.entries(extractedPreview.employer || {}).map(([k, v]) => (
+                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
+                              ))}
+                            </div>
+                          </details>
+                          <details className="bg-[#2a2a2a] rounded p-2">
+                            <summary className="cursor-pointer font-medium">Dados do Funcionário</summary>
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fillFormWithPDFData({ employee: extractedPreview.employee })}
+                                className="h-7 text-xs"
+                              >
+                                Aplicar este bloco
+                              </Button>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {Object.entries(extractedPreview.employee || {}).map(([k, v]) => (
+                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
+                              ))}
+                            </div>
+                          </details>
+                          <details className="bg-[#2a2a2a] rounded p-2">
+                            <summary className="cursor-pointer font-medium">Vínculo Empregatício</summary>
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fillFormWithPDFData({ contract: extractedPreview.contract })}
+                                className="h-7 text-xs"
+                              >
+                                Aplicar este bloco
+                              </Button>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {Object.entries(extractedPreview.contract || {}).map(([k, v]) => (
+                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
+                              ))}
+                            </div>
+                          </details>
+                          <details className="bg-[#2a2a2a] rounded p-2">
+                            <summary className="cursor-pointer font-medium">FGTS</summary>
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fillFormWithPDFData({ fgts: extractedPreview.fgts })}
+                                className="h-7 text-xs"
+                              >
+                                Aplicar este bloco
+                              </Button>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {Object.entries(extractedPreview.fgts || {}).map(([k, v]) => (
+                                (v !== undefined && v !== null && String(v).length > 0) ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
+                              ))}
+                            </div>
+                          </details>
+                          <details className="bg-[#2a2a2a] rounded p-2">
+                            <summary className="cursor-pointer font-medium">PIS</summary>
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fillFormWithPDFData({ pis: extractedPreview.pis })}
+                                className="h-7 text-xs"
+                              >
+                                Aplicar este bloco
+                              </Button>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {Object.entries(extractedPreview.pis || {}).map(([k, v]) => (
+                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
+                              ))}
+                            </div>
+                          </details>
+                          <details className="bg-[#2a2a2a] rounded p-2">
+                            <summary className="cursor-pointer font-medium">Título de Eleitor</summary>
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fillFormWithPDFData({ voter: extractedPreview.voter })}
+                                className="h-7 text-xs"
+                              >
+                                Aplicar este bloco
+                              </Button>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {Object.entries(extractedPreview.voter || {}).map(([k, v]) => (
+                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
+                              ))}
+                            </div>
+                          </details>
+                          <details className="bg-[#2a2a2a] rounded p-2">
+                            <summary className="cursor-pointer font-medium">Quando Estrangeiro</summary>
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fillFormWithPDFData({ foreigner: extractedPreview.foreigner })}
+                                className="h-7 text-xs"
+                              >
+                                Aplicar este bloco
+                              </Button>
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                              {Object.entries(extractedPreview.foreigner || {}).map(([k, v]) => (
+                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
+                              ))}
+                            </div>
+                          </details>
+                          {extractedPreview.notes ? (
+                            <div className="bg-[#2a2a2a] rounded p-2">
+                              <div className="font-medium">Observações</div>
+                              <div className="text-xs mt-1">{extractedPreview.notes}</div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleProcessPDF}
+                        disabled={!pdfFile || pdfProcessing}
+                        className="flex items-center gap-2 bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
+                      >
+                        {pdfProcessing ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-black"></div>
+                            Processando...
+                          </>
+                        ) : (
+                          <>
+                            <FileCheck className="h-4 w-4" />
+                            Processar PDF
+                          </>
+                        )}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowPDFImport(false);
+                          setPdfFile(null);
+                          setPdfError(null);
+                          setPdfSuccess(false);
+                        }}
+                        className="border-seguranca-lightgray/30 text-seguranca-lightgray hover:bg-seguranca-lightgray/10"
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+              <Tabs defaultValue="cadastro" className="space-y-4 sm:space-y-6">
+                <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border border-gray-600">
+                  <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+                  <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
+                  <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+                </TabsList>
+                <TabsContent value="cadastro" className="space-y-4 sm:space-y-6">
+                  {/* Seção: Relacionamentos Obrigatórios */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-base sm:text-lg md:text-xl font-semibold text-white">
+                          Relacionamentos Obrigatórios
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                        {/* Seleção de Usuário */}
+                        <div className="space-y-2">
+                          <Label className="text-xs sm:text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2">
+                            <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="truncate">Usuário do Sistema</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 sm:h-5 sm:w-5" />
+                            <Input
+                              placeholder="Digite nome, email, username ou CPF para buscar usuário..."
+                              value={userSearchTerm}
+                              onChange={handleUserSearch}
+                              onFocus={handleUserInputFocus}
+                              onBlur={handleUserInputBlur}
+                              className="pl-9 sm:pl-10 text-xs sm:text-sm h-9 sm:h-10"
+                            />
+
+                            {/* Dropdown de usuários */}
+                            {showUserDropdown && filteredUsers.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                {filteredUsers.map((user) => (
+                                  <div
+                                    key={user.id}
+                                    className="px-3 py-2 hover:bg-gray-700 cursor-pointer border-b border-gray-600 last:border-b-0"
+                                    onClick={() => handleUserSelect(user)}
+                                  >
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-seguranca-lightgray">{user.name}</span>
+                                      <span className="text-xs text-gray-400">
+                                        {user.email} • {user.username} • {user.role}
+                                      </span>
                                     </div>
-                                  )}
-                                </div>
+                                  </div>
+                                ))}
                               </div>
-                            ))
+                            )}
+
+                            {/* Mensagem quando não há resultados */}
+                            {showUserDropdown && userSearchTerm.trim() !== '' && filteredUsers.length === 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-lg shadow-lg p-3">
+                                <p className="text-sm text-gray-400">Nenhum usuário encontrado</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Exibir usuário selecionado */}
+                          {selectedUser && (
+                            <div className="bg-green-900/20 border border-green-600 rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-green-400">Usuário selecionado:</p>
+                                  <p className="text-sm text-seguranca-lightgray">{selectedUser.name}</p>
+                                  <p className="text-xs text-gray-400">{selectedUser.email}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(null);
+                                    setUserSearchTerm('');
+                                    setForm(prev => ({ ...prev, user: { id: '' } }));
+                                  }}
+                                  className="text-red-400 hover:text-red-300"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-gray-300">
+                              O usuário selecionado será associado ao funcionário para acesso ao sistema. (Opcional)
+                              {canCreateDefaultUser && (
+                                <span className="block mt-1 text-seguranca-yellow">
+                                  Para este cargo, é recomendado criar um usuário padrão.
+                                </span>
+                              )}
+                            </p>
+                            {canCreateDefaultUser && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCriarUsuarioModalOpen(true)}
+                                className="text-seguranca-yellow hover:text-yellow-400 text-xs px-2 py-1 h-auto"
+                              >
+                                <UserPlus className="h-3 w-3 mr-1" />
+                                Criar Usuário Padrão
+                                <Link className="h-3 w-3 ml-1" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Informações Pessoais */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
+                          <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">Informações Pessoais</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Nome Completo</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Input
+                            name="name"
+                            value={form.name}
+                            onChange={handleChange}
+                            required
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">CPF</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Input
+                            name="cpf"
+                            value={form.cpf}
+                            onChange={handleCpfChange}
+                            required
+                            placeholder="000.000.000-00"
+                            className={`bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 ${cpfError ? 'border-red-500' : ''}`}
+                          />
+                          <p className="text-xs text-gray-400 mt-1">
+                            Apenas números (formatado automaticamente)
+                          </p>
+                          {cpfError && (
+                            <p className="text-xs text-red-500 mt-1">{cpfError}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Data de Nascimento</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Input
+                            name="birthDate"
+                            type="date"
+                            value={form.birthDate}
+                            onChange={handleChange}
+                            required
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Sexo</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.sexo || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, sexo: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione o sexo" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="MASCULINO">Masculino</SelectItem>
+                              <SelectItem value="FEMININO">Feminino</SelectItem>
+                              <SelectItem value="OUTRO">Outro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Município de Nascimento</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="municipioNascimento"
+                            value={form.municipioNascimento || ''}
+                            onChange={handleChange}
+                            placeholder="Ex: Belo Horizonte"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Estado de Nascimento</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.estadoNascimento || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, estadoNascimento: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione o estado" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[300px]">
+                              <SelectItem value="AC">Acre</SelectItem>
+                              <SelectItem value="AL">Alagoas</SelectItem>
+                              <SelectItem value="AP">Amapá</SelectItem>
+                              <SelectItem value="AM">Amazonas</SelectItem>
+                              <SelectItem value="BA">Bahia</SelectItem>
+                              <SelectItem value="CE">Ceará</SelectItem>
+                              <SelectItem value="DF">Distrito Federal</SelectItem>
+                              <SelectItem value="ES">Espírito Santo</SelectItem>
+                              <SelectItem value="GO">Goiás</SelectItem>
+                              <SelectItem value="MA">Maranhão</SelectItem>
+                              <SelectItem value="MT">Mato Grosso</SelectItem>
+                              <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
+                              <SelectItem value="MG">Minas Gerais</SelectItem>
+                              <SelectItem value="PA">Pará</SelectItem>
+                              <SelectItem value="PB">Paraíba</SelectItem>
+                              <SelectItem value="PR">Paraná</SelectItem>
+                              <SelectItem value="PE">Pernambuco</SelectItem>
+                              <SelectItem value="PI">Piauí</SelectItem>
+                              <SelectItem value="RJ">Rio de Janeiro</SelectItem>
+                              <SelectItem value="RN">Rio Grande do Norte</SelectItem>
+                              <SelectItem value="RS">Rio Grande do Sul</SelectItem>
+                              <SelectItem value="RO">Rondônia</SelectItem>
+                              <SelectItem value="RR">Roraima</SelectItem>
+                              <SelectItem value="SC">Santa Catarina</SelectItem>
+                              <SelectItem value="SP">São Paulo</SelectItem>
+                              <SelectItem value="SE">Sergipe</SelectItem>
+                              <SelectItem value="TO">Tocantins</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Grau de Instrução</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.grauInstrucao || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, grauInstrucao: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione o grau" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[300px]">
+                              <SelectItem value="ANALFABETO">Analfabeto</SelectItem>
+                              <SelectItem value="FUNDAMENTAL_INCOMPLETO">Ens. Fundamental Incompleto</SelectItem>
+                              <SelectItem value="FUNDAMENTAL_COMPLETO">Ens. Fundamental Completo</SelectItem>
+                              <SelectItem value="MEDIO_INCOMPLETO">Ens. Médio Incompleto</SelectItem>
+                              <SelectItem value="MEDIO_COMPLETO">Ens. Médio Completo</SelectItem>
+                              <SelectItem value="SUPERIOR_INCOMPLETO">Ens. Superior Incompleto</SelectItem>
+                              <SelectItem value="SUPERIOR_COMPLETO">Ens. Superior Completo</SelectItem>
+                              <SelectItem value="POS_GRADUACAO">Pós-Graduação</SelectItem>
+                              <SelectItem value="MESTRADO">Mestrado</SelectItem>
+                              <SelectItem value="DOUTORADO">Doutorado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Matrícula eSocial</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="matriculaEsocial"
+                            value={form.matriculaEsocial || ''}
+                            onChange={handleChange}
+                            placeholder="Matrícula"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Estado Civil</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.maritalStatus}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, maritalStatus: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="SINGLE">Solteiro</SelectItem>
+                              <SelectItem value="MARRIED">Casado</SelectItem>
+                              <SelectItem value="DIVORCED">Divorciado</SelectItem>
+                              <SelectItem value="WIDOWED">Viúvo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Nacionalidade</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="nationality"
+                            value={form.nationality}
+                            onChange={handleChange}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Dados Familiares (Nomes dos pais) */}
+                      <div className="mt-4 pt-4 border-t border-gray-600">
+                        <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
+                          <UsersIcon className="mr-2" size={16} />
+                          Dados Familiares (Nomes dos pais)
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Nome da Mãe</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="nomeMae"
+                              value={form.nomeMae || ''}
+                              onChange={handleChange}
+                              placeholder="Nome completo da mãe"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Nome do Pai</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="nomePai"
+                              value={form.nomePai || ''}
+                              onChange={handleChange}
+                              placeholder="Nome completo do pai"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Título de Eleitor */}
+                      <div className="mt-4 pt-4 border-t border-gray-600">
+                        <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
+                          <FileText className="mr-2" size={16} />
+                          Título de Eleitor
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Número</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="tituloEleitor"
+                              value={form.tituloEleitor || ''}
+                              onChange={handleTituloEleitorChange}
+                              placeholder="Ex: 2236.5048.0205"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Zona</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="tituloEleitorZona"
+                              value={form.tituloEleitorZona || ''}
+                              onChange={handleChange}
+                              placeholder="Ex: 316"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Seção</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="tituloEleitorSecao"
+                              value={form.tituloEleitorSecao || ''}
+                              onChange={handleChange}
+                              placeholder="Ex: 0585"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Data de Expedição</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="tituloEleitorDataExpedicao"
+                              type="date"
+                              value={form.tituloEleitorDataExpedicao || ''}
+                              onChange={handleChange}
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Validade</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="tituloEleitorValidade"
+                              type="date"
+                              value={form.tituloEleitorValidade || ''}
+                              onChange={handleChange}
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Nome do Conselho Regional */}
+                      <div className="mt-4 pt-4 border-t border-gray-600">
+                        <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
+                          <FileText className="mr-2" size={16} />
+                          Nome do Conselho Regional
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Sigla</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="nomeConselhoRegional"
+                              value={form.nomeConselhoRegional || ''}
+                              onChange={handleChange}
+                              placeholder="Ex: CRM, CRO, etc."
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Seção de Documentos Pessoais */}
+                      <div className="mt-4 pt-4 border-t border-gray-600">
+                        <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
+                          <FileText className="mr-2" size={16} />
+                          Documentos Pessoais
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* CNH */}
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Número da CNH</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="cnhNumber"
+                              value={form.cnhNumber || ''}
+                              onChange={handleChange}
+                              placeholder="00000000000"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Categoria da CNH</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Select
+                              value={form.cnhCategory || ''}
+                              onValueChange={(value) => setForm(prev => ({ ...prev, cnhCategory: value }))}
+                            >
+                              <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                                <SelectValue placeholder="Selecione a categoria" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[300px]">
+                                <SelectItem value="A">A - Motocicleta</SelectItem>
+                                <SelectItem value="B">B - Carro</SelectItem>
+                                <SelectItem value="C">C - Caminhão</SelectItem>
+                                <SelectItem value="D">D - Ônibus</SelectItem>
+                                <SelectItem value="E">E - Carreta</SelectItem>
+                                <SelectItem value="AB">AB - Moto e Carro</SelectItem>
+                                <SelectItem value="AC">AC - Moto e Caminhão</SelectItem>
+                                <SelectItem value="AD">AD - Moto e Ônibus</SelectItem>
+                                <SelectItem value="AE">AE - Moto e Carreta</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Validade da CNH</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="cnhExpirationDate"
+                              type="date"
+                              value={form.cnhExpirationDate || ''}
+                              onChange={handleChange}
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            />
+                          </div>
+
+                          {/* CTPS */}
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Número da CTPS</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="ctps"
+                              value={form.ctps || ''}
+                              onChange={handleChange}
+                              placeholder="0000000"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Série da CTPS</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="ctpsSeries"
+                              value={form.ctpsSeries || ''}
+                              onChange={handleChange}
+                              placeholder="0000"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Data de Emissão da CTPS</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="ctpsIssueDate"
+                              type="date"
+                              value={form.ctpsIssueDate || ''}
+                              onChange={handleChange}
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            />
+                          </div>
+
+                          {/* CIN - Carteira de Identidade Nacional */}
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Número do CIN</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="cinNumero"
+                              value={form.cinNumero || ''}
+                              onChange={handleChange}
+                              placeholder="Número do CIN"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Órgão Emissor do CIN</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="cinOrgaoEmissor"
+                              value={form.cinOrgaoEmissor || ''}
+                              onChange={handleChange}
+                              placeholder="Ex: SSP, DETRAN"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Data de Emissão do CIN</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="cinDataEmissao"
+                              type="date"
+                              value={form.cinDataEmissao || ''}
+                              onChange={handleChange}
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Seção de dados do cônjuge - aparece apenas se estado civil for "Casado" */}
+                      {form.maritalStatus === 'MARRIED' && (
+                        <div className="mt-4 pt-4 border-t border-gray-600">
+                          <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
+                            <UserIcon className="mr-2" size={16} />
+                            Dados do Cônjuge
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                                <span className="truncate">Nome do Cônjuge</span>
+                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                              </Label>
+                              <Input
+                                name="spouseName"
+                                value={form.spouseName || ''}
+                                onChange={handleChange}
+                                required
+                                placeholder="Nome completo do cônjuge"
+                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                                <span className="truncate">CPF do Cônjuge</span>
+                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                              </Label>
+                              <Input
+                                name="spouseCpf"
+                                value={form.spouseCpf || ''}
+                                onChange={handleChange}
+                                required
+                                placeholder="000.000.000-00"
+                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                                <span className="truncate">RG do Cônjuge</span>
+                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                              </Label>
+                              <Input
+                                name="spouseRg"
+                                value={form.spouseRg || ''}
+                                onChange={handleChange}
+                                required
+                                placeholder="Número do RG"
+                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                                <span className="truncate">Data de Nascimento do Cônjuge</span>
+                                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                              </Label>
+                              <Input
+                                name="spouseBirthDate"
+                                type="date"
+                                value={form.spouseBirthDate || ''}
+                                onChange={handleChange}
+                                required
+                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                                <span className="truncate">Profissão do Cônjuge</span>
+                                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                              </Label>
+                              <Input
+                                name="spouseProfession"
+                                value={form.spouseProfession || ''}
+                                onChange={handleChange}
+                                placeholder="Profissão do cônjuge"
+                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                                <span className="truncate">Telefone do Cônjuge</span>
+                                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                              </Label>
+                              <Input
+                                name="spousePhone"
+                                value={form.spousePhone || ''}
+                                onChange={handleChange}
+                                placeholder="(00) 00000-0000"
+                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Seção de dependentes removida do formulário de criação. A gestão de dependentes permanece no modo de edição via modal dedicado. */}
+                    </div>
+                  </Card>
+
+                  {/* Seção: Informações de Contato */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <Link className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Informações de Contato</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Email</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="email"
+                            type="email"
+                            value={form.email}
+                            onChange={handleChange}
+                            placeholder="exemplo@email.com"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">WhatsApp</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Input
+                            name="phone"
+                            value={aplicarMascaraTelefone(form.phone || '')}
+                            onChange={(e) => {
+                              const valor = e.target.value.replace(/\D/g, '');
+                              setForm(prev => ({ ...prev, phone: valor }));
+                            }}
+                            required
+                            placeholder="(00) 00000-0000"
+                            maxLength={15}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Telefone de Contato</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="telefoneContato"
+                            value={aplicarMascaraTelefone(form.telefoneContato || '')}
+                            onChange={(e) => {
+                              const valor = e.target.value.replace(/\D/g, '');
+                              setForm(prev => ({ ...prev, telefoneContato: valor }));
+                            }}
+                            placeholder="(00) 00000-0000"
+                            maxLength={15}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Endereço Separado */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <Building className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Endereço</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 sm:gap-4">
+                          <div className="flex-1 min-w-0">
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Rua/Logradouro</span>
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                            </Label>
+                            <Input
+                              name="enderecoRua"
+                              value={form.enderecoRua || ''}
+                              onChange={handleChange}
+                              placeholder="Nome da rua, avenida, etc."
+                              required
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div className="w-full sm:w-40 flex-shrink-0">
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">CEP</span>
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                name="enderecoCep"
+                                value={aplicarMascaraCep(form.enderecoCep || '')}
+                                onChange={(e) => {
+                                  const valor = e.target.value.replace(/\D/g, '');
+                                  setForm(prev => ({ ...prev, enderecoCep: valor }));
+                                  if (valor.length === 8) {
+                                    buscarCep(valor);
+                                  }
+                                }}
+                                placeholder="00000-000"
+                                maxLength={9}
+                                required
+                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                              />
+                              {loadingCep && (
+                                <div className="flex items-center px-1 text-seguranca-yellow">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-yellow"></div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Número</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Input
+                            name="enderecoNumero"
+                            value={form.enderecoNumero || ''}
+                            onChange={handleChange}
+                            placeholder="123"
+                            required
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Complemento</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="enderecoComplemento"
+                            value={form.enderecoComplemento || ''}
+                            onChange={handleChange}
+                            placeholder="Apt 101, Bloco B"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Bairro</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Input
+                            name="enderecoBairro"
+                            value={form.enderecoBairro || ''}
+                            onChange={handleChange}
+                            placeholder="Centro"
+                            required
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div className="flex gap-4">
+                          <div className="flex-1">
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Cidade</span>
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                            </Label>
+                            <Input
+                              name="enderecoCidade"
+                              value={form.enderecoCidade || ''}
+                              onChange={handleChange}
+                              placeholder="São Paulo"
+                              required
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                          <div className="w-24">
+                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">UF</span>
+                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                            </Label>
+                            <Select
+                              value={form.enderecoUf || ''}
+                              onValueChange={(value) => setForm(prev => ({ ...prev, enderecoUf: value }))}
+                              required
+                            >
+                              <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                                <SelectValue placeholder="UF" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[300px]">
+                                <SelectItem value="AC">AC</SelectItem>
+                                <SelectItem value="AL">AL</SelectItem>
+                                <SelectItem value="AP">AP</SelectItem>
+                                <SelectItem value="AM">AM</SelectItem>
+                                <SelectItem value="BA">BA</SelectItem>
+                                <SelectItem value="CE">CE</SelectItem>
+                                <SelectItem value="DF">DF</SelectItem>
+                                <SelectItem value="ES">ES</SelectItem>
+                                <SelectItem value="GO">GO</SelectItem>
+                                <SelectItem value="MA">MA</SelectItem>
+                                <SelectItem value="MT">MT</SelectItem>
+                                <SelectItem value="MS">MS</SelectItem>
+                                <SelectItem value="MG">MG</SelectItem>
+                                <SelectItem value="PA">PA</SelectItem>
+                                <SelectItem value="PB">PB</SelectItem>
+                                <SelectItem value="PR">PR</SelectItem>
+                                <SelectItem value="PE">PE</SelectItem>
+                                <SelectItem value="PI">PI</SelectItem>
+                                <SelectItem value="RJ">RJ</SelectItem>
+                                <SelectItem value="RN">RN</SelectItem>
+                                <SelectItem value="RS">RS</SelectItem>
+                                <SelectItem value="RO">RO</SelectItem>
+                                <SelectItem value="RR">RR</SelectItem>
+                                <SelectItem value="SC">SC</SelectItem>
+                                <SelectItem value="SP">SP</SelectItem>
+                                <SelectItem value="SE">SE</SelectItem>
+                                <SelectItem value="TO">TO</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Dados Bancários */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">Dados Bancários</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Banco</Label>
+                          <Input
+                            name="bankData.bank"
+                            value={form.bankData?.bank || ''}
+                            onChange={handleChange}
+                            placeholder="Nome do banco"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Agência</Label>
+                          <Input
+                            name="bankData.agency"
+                            value={form.bankData?.agency || ''}
+                            onChange={handleChange}
+                            placeholder="0000"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
+                            <Input
+                              name="bankData.account"
+                              value={form.bankData?.account || ''}
+                              onChange={handleChange}
+                              placeholder="00000"
+                            />
+                          </div>
+                          <div className="w-20">
+                            <Label className="text-sm font-medium text-gray-200">Dígito</Label>
+                            <Input
+                              name="bankData.accountDigit"
+                              value={form.bankData?.accountDigit || ''}
+                              onChange={handleChange}
+                              placeholder="0"
+                              maxLength={2}
+                            />
+                          </div>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-medium text-gray-200">Chave Pix</Label>
+                          <Input
+                            name="bankData.chavePix"
+                            value={form.bankData?.chavePix || ''}
+                            onChange={handleChange}
+                            placeholder="CPF, e-mail, telefone ou chave aleatória"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Dados do Exame Médico (ASO) */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
+                          <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">Dados do Exame Médico (ASO)</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Data do Exame Médico (ASO)</Label>
+                          <Input
+                            name="exameMedicoData"
+                            type="date"
+                            value={form.exameMedicoData || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value }))}
+                            className="text-xs sm:text-sm h-9 sm:h-10"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Tipo de Exame Realizado</Label>
+                          <Select
+                            value={form.exameMedicoTipo || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoTipo: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="Selecione o tipo" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600">
+                              <SelectItem value="ADMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Admissional</SelectItem>
+                              <SelectItem value="DEMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Demissional</SelectItem>
+                              <SelectItem value="PERIODICO" className="text-seguranca-lightgray hover:bg-gray-700">Periódico</SelectItem>
+                              <SelectItem value="MUDANCA_FUNCAO" className="text-seguranca-lightgray hover:bg-gray-700">Mudança de Função</SelectItem>
+                              <SelectItem value="RETORNO_TRABALHO" className="text-seguranca-lightgray hover:bg-gray-700">Retorno ao Trabalho</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-medium text-gray-200">Nome do Médico</Label>
+                          <div className="relative">
+                            <Input
+                              value={doctorSearchTerm}
+                              onChange={(e) => {
+                                setDoctorSearchTerm(e.target.value);
+                                setShowDoctorDropdown(true);
+                                if (e.target.value.length > 0) {
+                                  handleDoctorSearch(e.target.value);
+                                } else {
+                                  loadDoctors();
+                                }
+                              }}
+                              onFocus={() => {
+                                setShowDoctorDropdown(true);
+                                if (doctors.length === 0) {
+                                  loadDoctors();
+                                }
+                              }}
+                              onBlur={() => {
+                                // Delay para permitir clique no dropdown
+                                setTimeout(() => setShowDoctorDropdown(false), 200);
+                              }}
+                              placeholder="Digite para buscar médico..."
+                              className="text-xs sm:text-sm h-9 sm:h-10"
+                            />
+                            {showDoctorDropdown && (
+                              <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                                {loadingDoctors ? (
+                                  <div className="p-2 text-sm text-gray-400">Carregando...</div>
+                                ) : doctors.length > 0 ? (
+                                  doctors.map((doctor) => (
+                                    <div
+                                      key={doctor.id}
+                                      className="p-2 hover:bg-gray-700 cursor-pointer text-seguranca-lightgray text-xs sm:text-sm"
+                                      onClick={() => {
+                                        setSelectedDoctor(doctor);
+                                        setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
+                                        setForm(prev => ({
+                                          ...prev,
+                                          exameMedicoDoctor: { id: doctor.id }
+                                        }));
+                                        setShowDoctorDropdown(false);
+                                      }}
+                                    >
+                                      {doctor.name} - CRM {doctor.crmNumber}/{doctor.crmState}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="p-2 space-y-2">
+                                    <div className="text-sm text-gray-400 mb-2">Nenhum médico encontrado</div>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setNovoMedicoModalOpen(true);
+                                        setShowDoctorDropdown(false);
+                                      }}
+                                      className="w-full text-left p-2 text-sm text-seguranca-yellow hover:bg-gray-700 rounded border border-seguranca-yellow/30 flex items-center gap-2"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      <span>Cadastrar novo médico</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Este é o primeiro registro (1º emprego)?</Label>
+                          <RadioGroup
+                            value={form.exameMedicoPrimeiroEmprego === true ? 'sim' : form.exameMedicoPrimeiroEmprego === false ? 'nao' : ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoPrimeiroEmprego: value === 'sim' }))}
+                            className="flex gap-4 mt-2"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="sim" id="primeiro-sim" className="text-seguranca-lightgray" />
+                              <Label htmlFor="primeiro-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="nao" id="primeiro-nao" className="text-seguranca-lightgray" />
+                              <Label htmlFor="primeiro-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Contribuição Sindical está pago este ano?</Label>
+                          <RadioGroup
+                            value={form.exameMedicoContribuicaoSindicalPaga === true ? 'sim' : form.exameMedicoContribuicaoSindicalPaga === false ? 'nao' : ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoContribuicaoSindicalPaga: value === 'sim' }))}
+                            className="flex gap-4 mt-2"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="sim" id="sindical-sim" className="text-seguranca-lightgray" />
+                              <Label htmlFor="sindical-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="nao" id="sindical-nao" className="text-seguranca-lightgray" />
+                              <Label htmlFor="sindical-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Para Estrangeiro */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-white">Para Estrangeiro</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">RNE nº</Label>
+                          <Input
+                            name="rneNumero"
+                            value={form.rneNumero || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, rneNumero: e.target.value }))}
+                            placeholder="Número do RNE"
+                            className="text-xs sm:text-sm h-9 sm:h-10"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Validade</Label>
+                          <Input
+                            name="rneValidade"
+                            type="date"
+                            value={form.rneValidade || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value }))}
+                            className="text-xs sm:text-sm h-9 sm:h-10"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Possui filhos com brasileiro?</Label>
+                          <RadioGroup
+                            value={form.temFilhosBrasileiros === true ? 'sim' : form.temFilhosBrasileiros === false ? 'nao' : ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, temFilhosBrasileiros: value === 'sim' }))}
+                            className="flex gap-4 mt-2"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="sim" id="filhos-brasileiros-sim" className="text-seguranca-lightgray" />
+                              <Label htmlFor="filhos-brasileiros-sim" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Sim</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="nao" id="filhos-brasileiros-nao" className="text-seguranca-lightgray" />
+                              <Label htmlFor="filhos-brasileiros-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Quantos?</Label>
+                          <Input
+                            name="quantidadeFilhosBrasileiros"
+                            type="number"
+                            min="0"
+                            value={form.quantidadeFilhosBrasileiros || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, quantidadeFilhosBrasileiros: e.target.value ? parseInt(e.target.value) : undefined }))}
+                            placeholder="Quantidade"
+                            className="text-xs sm:text-sm h-9 sm:h-10"
+                            disabled={form.temFilhosBrasileiros !== true}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label className="text-sm font-medium text-gray-200 mb-2 block">
+                            Em caso de estrangeiro naturalizado brasileiro, informar o Nº RIC / Órgão Emissor / Data Emissão:
+                          </Label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <Label className="text-xs font-medium text-gray-300">Nº RIC</Label>
+                              <Input
+                                name="ricNumero"
+                                value={form.ricNumero || ''}
+                                onChange={(e) => setForm(prev => ({ ...prev, ricNumero: e.target.value }))}
+                                placeholder="Número do RIC"
+                                className="text-xs sm:text-sm h-9 sm:h-10"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium text-gray-300">Órgão Emissor</Label>
+                              <Input
+                                name="ricOrgaoEmissor"
+                                value={form.ricOrgaoEmissor || ''}
+                                onChange={(e) => setForm(prev => ({ ...prev, ricOrgaoEmissor: e.target.value }))}
+                                placeholder="Órgão Emissor"
+                                className="text-xs sm:text-sm h-9 sm:h-10"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
+                              <Input
+                                name="ricDataEmissao"
+                                type="date"
+                                value={form.ricDataEmissao || ''}
+                                onChange={(e) => setForm(prev => ({ ...prev, ricDataEmissao: e.target.value }))}
+                                className="text-xs sm:text-sm h-9 sm:h-10"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200">Tipo de Visto</Label>
+                          <Input
+                            name="tipoVisto"
+                            value={form.tipoVisto || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, tipoVisto: e.target.value }))}
+                            placeholder="Tipo de visto"
+                            className="text-xs sm:text-sm h-9 sm:h-10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Dados do Cadastro / Admissão */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Dados do Cadastro / Admissão</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">PIS</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="pis"
+                            value={form.pis || ''}
+                            onChange={handleChange}
+                            placeholder="000.00000.00-0"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Reservista nº</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="certificadoMilitar"
+                            value={form.certificadoMilitar || ''}
+                            onChange={handleChange}
+                            placeholder="Número do certificado militar"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Data de Admissão</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Input
+                            name="hireDate"
+                            type="date"
+                            value={form.hireDate}
+                            onChange={handleChange}
+                            required
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Setor/Posto de Trabalho</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={(form as any).workPostId || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...(prev as any), workPostId: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione um posto" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              {workPosts.map((wp) => (
+                                <SelectItem key={wp.id} value={wp.id} className="hover:bg-gray-700">
+                                  {wp.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {/* Cargo */}
+                        <div className="space-y-2 md:col-span-2">
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Cargo</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <div className="relative">
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <Input
+                                  type="text"
+                                  value={positionSearchTerm}
+                                  onChange={handlePositionSearch}
+                                  onFocus={handlePositionInputFocus}
+                                  onBlur={handlePositionInputBlur}
+                                  placeholder="Digite para buscar cargo..."
+                                  className="pr-10 bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                                />
+                                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+
+                                {/* Dropdown de cargos */}
+                                {showPositionDropdown && (
+                                  <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                                    {filteredPositions.length > 0 ? (
+                                      filteredPositions.map((position) => (
+                                        <div
+                                          key={position.id}
+                                          className="px-3 py-2 hover:bg-gray-700 cursor-pointer flex items-center text-seguranca-lightgray"
+                                          onClick={() => handlePositionSelect(position)}
+                                        >
+                                          <Briefcase className="mr-2 text-seguranca-yellow" size={16} />
+                                          <div className="flex-1">
+                                            <div className="font-medium text-sm sm:text-base text-gray-200">{position.name}</div>
+                                            {position.description && (
+                                              <div className="text-xs text-gray-400">
+                                                {position.description}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="px-3 py-2 text-gray-400 text-sm">
+                                        Nenhum cargo encontrado
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setNovoCargoModalOpen(true)}
+                                className="px-3 flex-shrink-0 h-10 sm:h-11 bg-seguranca-graphite border-gray-600 text-seguranca-yellow hover:bg-gray-700 hover:text-seguranca-yellow min-h-[40px] sm:min-h-[44px]"
+                                title="Criar novo cargo"
+                              >
+                                <Plus size={16} />
+                              </Button>
+                            </div>
+
+                            {/* Cargo selecionado */}
+                            {selectedPosition && (
+                              <div className="mt-2 p-2 bg-gray-700 border border-gray-600 rounded-md flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <Briefcase className="mr-2 text-seguranca-yellow" size={16} />
+                                  <span className="text-sm text-seguranca-lightgray">
+                                    {selectedPosition.name}
+                                  </span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedPosition(null);
+                                    setPositionSearchTerm('');
+                                    setForm(prev => ({ ...prev, position: { id: '' } }));
+                                  }}
+                                  className="text-seguranca-red hover:text-red-400 hover:bg-gray-600 rounded-md h-8 w-8 p-0 min-h-[40px] sm:min-h-[44px] min-w-[40px] sm:min-w-[44px] flex items-center justify-center -mr-1"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            Digite para buscar cargos existentes ou clique no botão + para criar um novo.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Remuneração */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Remuneração</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Salário (R$)</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <CurrencyInput
+                            name="salario"
+                            placeholder="R$ 0,00"
+                            decimalsLimit={2}
+                            decimalSeparator=","
+                            groupSeparator="."
+                            prefix="R$ "
+                            value={form.salario}
+                            onValueChange={(value, name, values) => setForm(prev => ({ ...prev, salario: values?.float ?? 0 }))}
+                            className="flex h-10 sm:h-11 w-full rounded-md border border-gray-600 bg-seguranca-graphite px-3 py-1 text-sm sm:text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:border-seguranca-yellow focus:border-seguranca-yellow disabled:cursor-not-allowed disabled:opacity-50 text-seguranca-lightgray"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Forma de Pagamento</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.periodoPagamento || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, periodoPagamento: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione a forma" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="MENSAL" className="hover:bg-gray-700">Mensal</SelectItem>
+                              <SelectItem value="QUINZENAL" className="hover:bg-gray-700">Quinzenal</SelectItem>
+                              <SelectItem value="SEMANAL" className="hover:bg-gray-700">Semanal</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Informações Adicionais Admissão */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Informações Adicionais</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Prazo de Experiência</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="prazoExperienciaTexto"
+                            value={form.prazoExperienciaTexto || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, prazoExperienciaTexto: e.target.value }))}
+                            placeholder="Ex: 45 DIAS"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Prorrogação</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="prorrogacaoExperiencia"
+                            value={form.prorrogacaoExperiencia || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, prorrogacaoExperiencia: e.target.value }))}
+                            placeholder="Prorrogação do prazo"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Dias de Folga</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="folgaSemanal"
+                            value={form.folgaSemanal || ''}
+                            onChange={handleChange}
+                            placeholder="Ex: 1ª Escola"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Escala de Trabalho</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="escalaTrabalho"
+                            value={form.escalaTrabalho || ''}
+                            onChange={handleChange}
+                            placeholder="Ex: 12x36, 6x1, etc."
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Horário</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="exameMedicoHorario"
+                            value={form.exameMedicoHorario || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoHorario: e.target.value }))}
+                            placeholder="Ex: 18:00 ÀS 06:00 H"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Intervalos Almoço/Janta</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <RadioGroup
+                            value={form.exameMedicoIntervalosRefeicao === true ? 'sim' : form.exameMedicoIntervalosRefeicao === false ? 'nao' : ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoIntervalosRefeicao: value === 'sim' }))}
+                            className="flex gap-4 mt-3"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="sim" id="intervalos-sim" className="text-seguranca-lightgray min-h-[44px] sm:min-h-0 min-w-[44px] sm:min-w-0 flex items-center justify-center p-0 m-0 border-gray-500 text-seguranca-yellow" />
+                              <Label htmlFor="intervalos-sim" className="text-gray-300 font-medium cursor-pointer text-sm sm:text-base h-[44px] sm:h-auto flex items-center">Sim</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="nao" id="intervalos-nao" className="text-seguranca-lightgray min-h-[44px] sm:min-h-0 min-w-[44px] sm:min-w-0 flex items-center justify-center p-0 m-0 border-gray-500 text-seguranca-yellow" />
+                              <Label htmlFor="intervalos-nao" className="text-gray-300 font-medium cursor-pointer text-sm sm:text-base h-[44px] sm:h-auto flex items-center">Não</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                        {form.exameMedicoIntervalosRefeicao === true && (
+                          <div className="md:col-span-2">
+                            <Label className="text-sm font-medium text-seguranca-yellow flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Horário do Intervalo</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="exameMedicoHorarioIntervalo"
+                              value={form.exameMedicoHorarioIntervalo || ''}
+                              onChange={(e) => setForm(prev => ({ ...prev, exameMedicoHorarioIntervalo: e.target.value }))}
+                              placeholder="Ex: 12:00 ÀS 13:00 H"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Informações Profissionais */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Informações Profissionais</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Número de Registro</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="registrationNumber"
+                            value={form.registrationNumber}
+                            onChange={handleChange}
+                            placeholder="EMP001"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Status</span>
+                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                          </Label>
+                          <Select
+                            value={form.status}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione o status" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="ACTIVE" className="hover:bg-gray-700">Ativo</SelectItem>
+                              <SelectItem value="INACTIVE" className="hover:bg-gray-700">Inativo</SelectItem>
+                              <SelectItem value="VACATION" className="hover:bg-gray-700">Férias</SelectItem>
+                              <SelectItem value="TERMINATED" className="hover:bg-gray-700">Demitido</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Data de Demissão</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="dataRescisao"
+                            type="date"
+                            value={form.dataRescisao || ''}
+                            onChange={handleChange}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          />
+                        </div>
+                        {form.status === 'TERMINATED' && (
+                          <div className="md:col-span-2 bg-red-900/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
+                            <p className="text-red-300 text-sm sm:text-base flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                              Ao definir o status como Demitido, é obrigatório informar a Data de Demissão.
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">CBO</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="cbo"
+                            value={form.cbo || ''}
+                            onChange={handleChange}
+                            placeholder="Ex: 517410"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Departamento</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={(form as any).departmentId || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione um departamento" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              {departments.map((d) => (
+                                <SelectItem key={d.id} value={d.id} className="hover:bg-gray-700">
+                                  {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Unidade</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.unit?.id || ''}
+                            onValueChange={(value) => handleSelectChange('unit', value)}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione uma unidade" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              {units.map((unit) => (
+                                <SelectItem key={unit.id} value={unit.id} className="hover:bg-gray-700">
+                                  <div className="flex items-center">
+                                    <Building className="mr-2 text-seguranca-yellow" size={16} />
+                                    {unit.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Empresa</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={selectedCompany?.id || 'none'}
+                            onValueChange={handleCompanySelect}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione uma empresa" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="none" className="hover:bg-gray-700">
+                                <span className="text-gray-400">Nenhuma empresa</span>
+                              </SelectItem>
+                              {companies.map((company) => (
+                                <SelectItem
+                                  key={company.id}
+                                  value={company.id}
+                                  className="hover:bg-gray-700"
+                                >
+                                  {company.sigla ? `${company.sigla.toUpperCase()} - ${company.name}` : company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: FGTS */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">FGTS</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Optante pelo FGTS?</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={String(form.fgtsOptante ?? '')}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, fgtsOptante: value === 'true' }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="true" className="hover:bg-gray-700">Sim</SelectItem>
+                              <SelectItem value="false" className="hover:bg-gray-700">Não</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Data da Opção</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="fgtsDataOpcao"
+                            type="date"
+                            value={form.fgtsDataOpcao || ''}
+                            onChange={handleChange}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Data de Retratação</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="fgtsDataRetratacao"
+                            type="date"
+                            value={form.fgtsDataRetratacao || ''}
+                            onChange={handleChange}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Banco Depositário</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="fgtsBancoDepositario"
+                            value={form.fgtsBancoDepositario || ''}
+                            onChange={handleChange}
+                            placeholder="Ex: Banco do Brasil"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: PIS/PASEP */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">PIS / PASEP</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Número do PIS</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="pis"
+                            value={form.pis || ''}
+                            onChange={handleChange}
+                            placeholder="Número do PIS"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Data de Cadastro</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="pisDataCadastro"
+                            type="date"
+                            value={form.pisDataCadastro || ''}
+                            onChange={handleChange}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Seção: Foto e Observações */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Documentos e Observações</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Foto 3x4</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoChange}
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray file:bg-gray-700 file:text-seguranca-lightgray file:border-0 file:rounded file:px-2 file:py-1 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                          {photoPreview && (
+                            <img
+                              src={photoPreview}
+                              alt="Prévia"
+                              className="mt-2 w-24 h-24 rounded-lg object-cover border border-gray-600 shadow-md"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Observações</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <textarea
+                            name="notes"
+                            value={form.notes || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
+                            rows={3}
+                            className="w-full rounded-md px-3 py-2 resize-none border border-gray-600 bg-seguranca-graphite text-seguranca-lightgray text-sm sm:text-base focus:border-seguranca-yellow focus:outline-none focus:ring-1 focus:ring-transparent placeholder:text-gray-400"
+                            placeholder="Observações adicionais sobre o funcionário..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                </TabsContent>
+                <TabsContent value="dependentes" className="space-y-4 sm:space-y-6">
+                  {/* Seção: Dependentes */}
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                            <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                          </div>
+                          <h3 className="text-lg sm:text-xl font-semibold text-white">Dependentes</h3>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={handleAddDependent}
+                          disabled={false}
+                          className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto text-sm sm:text-base h-10 sm:h-11 justify-center sm:justify-start"
+                        >
+                          <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Adicionar Dependente
+                        </Button>
+                      </div>
+
+                      {/* Permitir adicionar dependentes mesmo na criação - serão salvos após salvar o funcionário */}
+                      {employeeDependents.length === 0 && !isEditMode ? (
+                        <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                          <p className="text-blue-300 text-sm flex items-center">
+                            <AlertCircle className="mr-2" size={16} />
+                            Você pode adicionar dependentes após salvar o funcionário. Eles serão salvos automaticamente.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {loadingDependents ? (
+                            <div className="text-center py-4">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
+                              <p className="text-gray-400 text-sm mt-2">Carregando dependentes...</p>
+                            </div>
+                          ) : employeeDependents.length === 0 ? (
+                            <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4 text-center">
+                              <UsersIcon className="mx-auto mb-2 text-gray-400" size={32} />
+                              <p className="text-gray-400 text-sm">Nenhum dependente cadastrado</p>
+                              <p className="text-gray-500 text-xs mt-1">Clique em "Adicionar Dependente" para começar</p>
+                            </div>
                           ) : (
-                            <div className="px-3 py-2 text-gray-500 dark:text-gray-400 text-sm">
-                              Nenhum cargo encontrado
+                            <div className="space-y-2">
+                              {employeeDependents.map((dependent) => (
+                                <div
+                                  key={dependent.id}
+                                  className="bg-gray-800/50 border border-gray-600 rounded-lg p-4 hover:border-purple-500/50 transition-colors"
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <h4 className="font-semibold text-white">{dependent.name}</h4>
+                                        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                                          {dependent.relationship}
+                                        </Badge>
+                                        {dependent.isStudent && (
+                                          <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                                            Estudante
+                                          </Badge>
+                                        )}
+                                        {dependent.isBeneficiary && (
+                                          <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
+                                            Beneficiário
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                                        {dependent.cpf && (
+                                          <p className="text-gray-400">
+                                            <span className="font-medium">CPF:</span> {dependent.cpf}
+                                          </p>
+                                        )}
+                                        {dependent.birthDate && (
+                                          <p className="text-gray-400">
+                                            <span className="font-medium">Nascimento:</span> {new Date(dependent.birthDate).toLocaleDateString('pt-BR')}
+                                          </p>
+                                        )}
+                                        {dependent.phone && (
+                                          <p className="text-gray-400">
+                                            <span className="font-medium">Telefone:</span> {dependent.phone}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 ml-4">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditDependent(dependent)}
+                                        className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                                      >
+                                        <Edit2 size={16} />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteDependent(dependent)}
+                                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                      >
+                                        <Trash2 size={16} />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              <p className="text-gray-400 text-xs mt-2">
+                                Total: {employeeDependents.length} dependente(s)
+                              </p>
                             </div>
                           )}
                         </div>
                       )}
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setNovoCargoModalOpen(true)}
-                      className="px-3 flex-shrink-0"
-                      title="Criar novo cargo"
-                    >
-                      <Plus size={16} />
-                    </Button>
-                  </div>
-                  
-                  {/* Cargo selecionado */}
-                  {selectedPosition && (
-                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Briefcase className="mr-2 text-blue-600 dark:text-blue-400" size={16} />
-                        <span className="text-sm text-blue-800 dark:text-blue-200">
-                          {selectedPosition.name}
-                        </span>
+                  </Card>
+
+                </TabsContent>
+                <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Gerar a ficha simples do funcionário</h3>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPosition(null);
-                          setPositionSearchTerm('');
-                          setForm(prev => ({ ...prev, position: { id: '' } }));
-                        }}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleEmployeeRecordPdf('download')}
+                          disabled={!canGenerateReports || loading}
+                          className="border-blue-500 text-blue-400 hover:bg-blue-500/10 text-sm sm:text-base h-10 sm:h-11"
+                        >
+                          <FileText className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Gerar PDF
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleEmployeeRecordPdf('preview')}
+                          disabled={!canGenerateReports || loading}
+                          className="border-gray-500 text-gray-300 hover:bg-gray-500/10 text-sm sm:text-base h-10 sm:h-11"
+                        >
+                          <Eye className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Visualizar
+                        </Button>
+                      </div>
                     </div>
-                  )}
-                </div>
-                <p className="text-xs text-gray-300">
-                  Digite para buscar cargos existentes ou clique no botão + para criar um novo.
-                </p>
-              </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Status *</Label>
-                <Select 
-                  value={form.status} 
-                  onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}
-                >
-                   <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
-                     <SelectValue placeholder="Selecione o status" />
-                   </SelectTrigger>
-                   <SelectContent className="bg-seguranca-graphite border-gray-600">
-                     <SelectItem value="ACTIVE" className="text-seguranca-lightgray hover:bg-gray-700">Ativo</SelectItem>
-                     <SelectItem value="INACTIVE" className="text-seguranca-lightgray hover:bg-gray-700">Inativo</SelectItem>
-                     <SelectItem value="VACATION" className="text-seguranca-lightgray hover:bg-gray-700">Férias</SelectItem>
-                     <SelectItem value="TERMINATED" className="text-seguranca-lightgray hover:bg-gray-700">Demitido</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Data de Demissão</Label>
-                <Input 
-                  name="dataRescisao" 
-                  type="date" 
-                  value={form.dataRescisao || ''} 
-                  onChange={handleChange} 
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              {form.status === 'TERMINATED' && (
-                <div className="md:col-span-2 bg-red-900/20 border border-red-500/40 rounded-lg p-3">
-                  <p className="text-red-300 text-xs sm:text-sm flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                    Ao definir o status como Demitido, é obrigatório informar a Data de Demissão.
-                  </p>
+                  </Card>
+
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Ficha de Registro de Funcionário</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleEmployeeRecordPdf('download')}
+                          disabled={!canGenerateReports || loading}
+                          className="border-blue-500 text-blue-400 hover:bg-blue-500/10 text-sm sm:text-base h-10 sm:h-11"
+                        >
+                          <FileText className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Gerar PDF
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleEmployeeRecordPdf('preview')}
+                          disabled={!canGenerateReports || loading}
+                          className="border-gray-500 text-gray-300 hover:bg-gray-500/10 text-sm sm:text-base h-10 sm:h-11"
+                        >
+                          <Eye className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Visualizar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleEmployeeRecordExcel}
+                          disabled={!canGenerateReports || loading}
+                          className="border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 text-sm sm:text-base h-10 sm:h-11 disabled:opacity-50"
+                        >
+                          <FileSpreadsheet className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Gerar Excel
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Ficha de Entrega de EPI</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3 sm:space-y-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleEpiPdf('download')}
+                            disabled={!canGenerateReports || loading}
+                            className="border-green-500 text-green-400 hover:bg-green-500/10 w-full text-sm sm:text-base h-10 sm:h-11"
+                          >
+                            <Shield className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                            Gerar Ficha Manual
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleEpiPdf('preview')}
+                            disabled={!canGenerateReports || loading}
+                            className="border-gray-500 text-gray-300 hover:bg-gray-500/10 w-full text-sm sm:text-base h-10 sm:h-11"
+                          >
+                            <Eye className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                            Visualizar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleEpiExcel}
+                            disabled={!canGenerateReports || loading}
+                            className="border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 w-full text-sm sm:text-base h-10 sm:h-11 disabled:opacity-50"
+                          >
+                            <FileSpreadsheet className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                            Gerar Excel
+                          </Button>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleOpenEpiManagement}
+                            className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10 w-full text-sm sm:text-base h-10 sm:h-11"
+                          >
+                            Cadastrar / Gerenciar EPIs do Funcionário
+                          </Button>
+                          <p className="text-sm text-gray-400 mt-2">
+                            Abra a gestão de EPIs para cadastrar ou revisar os equipamentos entregues antes de gerar o PDF completo.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Dados para Contabilidade</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleAccountingPdf}
+                          disabled={!canGenerateReports || loading}
+                          className="border-red-500 text-red-400 hover:bg-red-500/10 text-sm sm:text-base h-10 sm:h-11"
+                        >
+                          <FileText className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Gerar PDF
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleAccountingPreview}
+                          disabled={!canGenerateReports || loading}
+                          className="border-gray-500 text-gray-300 hover:bg-gray-500/10 text-sm sm:text-base h-10 sm:h-11"
+                        >
+                          <Eye className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Visualizar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleAccountingExcel}
+                          disabled={!canGenerateReports || loading}
+                          className="border-emerald-500 text-emerald-400 hover:bg-emerald-500/10 text-sm sm:text-base h-10 sm:h-11 disabled:opacity-50"
+                        >
+                          <FileSpreadsheet className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                          Gerar Excel
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+
+              {error && (
+                <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
+                  <p className="text-destructive text-sm">{error}</p>
                 </div>
               )}
-              <div>
-                <Label className="text-sm font-medium text-gray-200">CBO</Label>
-                <Input 
-                  name="cbo" 
-                  value={form.cbo || ''} 
-                  onChange={handleChange} 
-                  placeholder="Ex: 517410"
-                  className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Departamento</Label>
-                <Select 
-                  value={(form as any).departmentId || ''}
-                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
-                    <SelectValue placeholder="Selecione um departamento" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id} className="text-seguranca-lightgray hover:bg-gray-700">
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Unidade (Opcional)</Label>
-                 <Select 
-                   value={form.unit?.id || ''} 
-                   onValueChange={(value) => handleSelectChange('unit', value)}
-                 >
-                   <SelectTrigger>
-                     <SelectValue placeholder="Selecione uma unidade" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     {units.map((unit) => (
-                       <SelectItem key={unit.id} value={unit.id}>
-                         <div className="flex items-center">
-                           <Building className="mr-2" size={16} />
-                           {unit.name}
-                         </div>
-                       </SelectItem>
-                     ))}
-                   </SelectContent>
-                 </Select>
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Empresa (Opcional)</Label>
-                 <Select 
-                   value={selectedCompany?.id || 'none'} 
-                   onValueChange={handleCompanySelect}
-                 >
-                   <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                     <SelectValue placeholder="Selecione uma empresa" />
-                   </SelectTrigger>
-                   <SelectContent className="bg-seguranca-graphite border-gray-600">
-                     <SelectItem value="none" className="text-seguranca-lightgray hover:bg-gray-700">
-                       <span className="text-gray-400">Nenhuma empresa</span>
-                     </SelectItem>
-                     {companies.map((company) => (
-                       <SelectItem 
-                         key={company.id} 
-                         value={company.id}
-                         className="text-seguranca-lightgray hover:bg-gray-700"
-                       >
-                         {company.sigla ? `${company.sigla.toUpperCase()} - ${company.name}` : company.name}
-                       </SelectItem>
-                     ))}
-                   </SelectContent>
-                 </Select>
-               </div>
-             </div>
-             </div>
-           </Card>
 
-          {/* Seção: FGTS */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <div className="p-4 space-y-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">FGTS</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Optante pelo FGTS?</Label>
-                <Select 
-                  value={String(form.fgtsOptante ?? '')} 
-                  onValueChange={(value) => setForm(prev => ({ ...prev, fgtsOptante: value === 'true' }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Sim</SelectItem>
-                    <SelectItem value="false">Não</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Data da Opção</Label>
-                <Input 
-                  name="fgtsDataOpcao" 
-                  type="date" 
-                  value={form.fgtsDataOpcao || ''} 
-                  onChange={handleChange} 
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Data de Retratação</Label>
-                <Input 
-                  name="fgtsDataRetratacao" 
-                  type="date" 
-                  value={form.fgtsDataRetratacao || ''} 
-                  onChange={handleChange} 
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Banco Depositário</Label>
-                <Input 
-                  name="fgtsBancoDepositario" 
-                  value={form.fgtsBancoDepositario || ''} 
-                  onChange={handleChange} 
-                  placeholder="Ex: Banco do Brasil"
-                />
-              </div>
-            </div>
-            </div>
-          </Card>
-
-          {/* Seção: PIS/PASEP */}
-          <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-            <div className="p-4 space-y-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">PIS / PASEP</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Número do PIS</Label>
-                <Input 
-                  name="pis" 
-                  value={form.pis || ''} 
-                  onChange={handleChange} 
-                  placeholder="Número do PIS"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-200">Data de Cadastro</Label>
-                <Input 
-                  name="pisDataCadastro" 
-                  type="date" 
-                  value={form.pisDataCadastro || ''} 
-                  onChange={handleChange} 
-                />
-              </div>
-            </div>
-            </div>
-          </Card>
-
-          {/* Seção: Dados da Empresa (Ficha) - opcional */}
-
-           {/* Seção: Foto e Observações */}
-           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-             <div className="p-4 space-y-4">
-             <div className="flex items-center gap-2 sm:gap-3">
-               <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                 <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-               </div>
-               <h3 className="text-lg font-semibold text-white">Documentos e Observações</h3>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Foto 3x4</Label>
-                 <Input 
-                   type="file" 
-                   accept="image/*" 
-                   onChange={handlePhotoChange} 
-                 />
-                 {photoPreview && (
-                   <img 
-                     src={photoPreview} 
-                     alt="Prévia" 
-                     className="mt-2 w-24 h-24 rounded object-cover border" 
-                   />
-                 )}
-               </div>
-               <div>
-                 <Label className="text-sm font-medium text-gray-200">Observações</Label>
-                 <textarea
-                   name="notes"
-                   value={form.notes || ''}
-                   onChange={(e) => setForm(prev => ({ ...prev, notes: e.target.value }))}
-                   rows={3}
-                   className="w-full rounded px-3 py-2 resize-none border border-gray-600 bg-gray-700 text-white"
-                   placeholder="Observações sobre o funcionário..."
-                 />
-               </div>
-             </div>
-             </div>
-           </Card>
-
-          </TabsContent>
-          <TabsContent value="dependentes" className="space-y-4 sm:space-y-6">
-          {/* Seção: Dependentes */}
-           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-             <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                  <UsersIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Dependentes</h3>
-              </div>
-               <Button
-                 type="button"
-                 onClick={handleAddDependent}
-                 disabled={false}
-                 className="bg-purple-600 hover:bg-purple-700 text-white"
-                 size="sm"
-               >
-                 <Plus className="mr-2" size={16} />
-                 Adicionar Dependente
-               </Button>
-             </div>
-
-             {/* Permitir adicionar dependentes mesmo na criação - serão salvos após salvar o funcionário */}
-             {employeeDependents.length === 0 && !isEditMode ? (
-               <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                 <p className="text-blue-300 text-sm flex items-center">
-                   <AlertCircle className="mr-2" size={16} />
-                   Você pode adicionar dependentes após salvar o funcionário. Eles serão salvos automaticamente.
-                 </p>
-               </div>
-             ) : (
-               <div className="space-y-3">
-                 {loadingDependents ? (
-                   <div className="text-center py-4">
-                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
-                     <p className="text-gray-400 text-sm mt-2">Carregando dependentes...</p>
-                   </div>
-                 ) : employeeDependents.length === 0 ? (
-                   <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4 text-center">
-                     <UsersIcon className="mx-auto mb-2 text-gray-400" size={32} />
-                     <p className="text-gray-400 text-sm">Nenhum dependente cadastrado</p>
-                     <p className="text-gray-500 text-xs mt-1">Clique em "Adicionar Dependente" para começar</p>
-                   </div>
-                 ) : (
-                   <div className="space-y-2">
-                     {employeeDependents.map((dependent) => (
-                       <div
-                         key={dependent.id}
-                         className="bg-gray-800/50 border border-gray-600 rounded-lg p-4 hover:border-purple-500/50 transition-colors"
-                       >
-                         <div className="flex items-start justify-between">
-                           <div className="flex-1">
-                             <div className="flex items-center gap-2 mb-2">
-                               <h4 className="font-semibold text-white">{dependent.name}</h4>
-                               <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
-                                 {dependent.relationship}
-                               </Badge>
-                               {dependent.isStudent && (
-                                 <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
-                                   Estudante
-                                 </Badge>
-                               )}
-                               {dependent.isBeneficiary && (
-                                 <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
-                                   Beneficiário
-                                 </Badge>
-                               )}
-                             </div>
-                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                               {dependent.cpf && (
-                                 <p className="text-gray-400">
-                                   <span className="font-medium">CPF:</span> {dependent.cpf}
-                                 </p>
-                               )}
-                               {dependent.birthDate && (
-                                 <p className="text-gray-400">
-                                   <span className="font-medium">Nascimento:</span> {new Date(dependent.birthDate).toLocaleDateString('pt-BR')}
-                                 </p>
-                               )}
-                               {dependent.phone && (
-                                 <p className="text-gray-400">
-                                   <span className="font-medium">Telefone:</span> {dependent.phone}
-                                 </p>
-                               )}
-                             </div>
-                           </div>
-                           <div className="flex gap-2 ml-4">
-                             <Button
-                               type="button"
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => handleEditDependent(dependent)}
-                               className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
-                             >
-                               <Edit2 size={16} />
-                             </Button>
-                             <Button
-                               type="button"
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => handleDeleteDependent(dependent)}
-                               className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                             >
-                               <Trash2 size={16} />
-                             </Button>
-                           </div>
-                         </div>
-                       </div>
-                     ))}
-                     <p className="text-gray-400 text-xs mt-2">
-                       Total: {employeeDependents.length} dependente(s)
-                     </p>
-                   </div>
-                 )}
-               </div>
-             )}
-             </div>
-           </Card>
-
-          </TabsContent>
-          <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
-            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-              <div className="p-4 space-y-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Gerar a ficha simples do funcionário</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleEmployeeRecordPdf('download')}
-                  disabled={!canGenerateReports || loading}
-                  className="border-blue-500 text-blue-400 hover:bg-blue-500/10 h-9 sm:h-10 text-xs sm:text-sm"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Gerar PDF
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleEmployeeRecordPdf('preview')}
-                  disabled={!canGenerateReports || loading}
-                  className="border-gray-500 text-gray-300 hover:bg-gray-500/10 h-9 sm:h-10 text-xs sm:text-sm"
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  Visualizar
-                </Button>
-              </div>
-              </div>
-            </Card>
-
-            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-              <div className="p-4 space-y-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                  <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Ficha de Registro de Funcionário</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleEmployeeRecordPdf('download')}
-                  disabled={!canGenerateReports || loading}
-                  className="border-blue-500 text-blue-400 hover:bg-blue-500/10 h-9 sm:h-10 text-xs sm:text-sm"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Gerar PDF
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleEmployeeRecordPdf('preview')}
-                  disabled={!canGenerateReports || loading}
-                  className="border-gray-500 text-gray-300 hover:bg-gray-500/10 h-9 sm:h-10 text-xs sm:text-sm"
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  Visualizar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleEmployeeRecordExcel}
-                  disabled={!canGenerateReports || loading}
-                  className="border-emerald-500 text-emerald-400 h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
-                >
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Gerar Excel
-                </Button>
-              </div>
-              </div>
-            </Card>
-
-            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-              <div className="p-4 space-y-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Ficha de Entrega de EPI</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <DialogFooter className="flex flex-col gap-3 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-600 overflow-x-hidden mt-6">
+                {/* Botões de ação */}
+                <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => handleEpiPdf('download')}
-                    disabled={!canGenerateReports || loading}
-                    className="border-green-500 text-green-400 hover:bg-green-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
+                    onClick={onClose}
+                    disabled={loading}
+                    className="w-full h-10 sm:h-12 text-sm sm:text-base border-gray-500 text-gray-300 hover:bg-gray-700 hover:text-white"
                   >
-                    <Shield className="mr-2 h-4 w-4" />
-                    Gerar Ficha Manual
+                    Cancelar
                   </Button>
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleEpiPdf('preview')}
-                    disabled={!canGenerateReports || loading}
-                    className="border-gray-500 text-gray-300 hover:bg-gray-500/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full h-10 sm:h-12 text-sm sm:text-base font-semibold bg-gradient-to-r from-seguranca-red to-[#cc0000] hover:from-[#cc0000] hover:to-[#990000] text-white shadow-lg shadow-seguranca-red/20 border-0"
                   >
-                    <Eye className="mr-2 h-4 w-4" />
-                    Visualizar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleEpiExcel}
-                    disabled={!canGenerateReports || loading}
-                    className="border-emerald-500 text-emerald-400 w-full h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
-                  >
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Gerar Excel
+                    {loading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-2 inline-block"></div>
+                        Salvando...
+                      </>
+                    ) : (
+                      'Salvar'
+                    )}
                   </Button>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleOpenEpiManagement}
-                    className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow/10 w-full h-9 sm:h-10 text-xs sm:text-sm"
-                  >
-                    Cadastrar / Gerenciar EPIs do Funcionário
-                  </Button>
-                  <p className="text-xs text-gray-400">
-                    Abra a gestão de EPIs para cadastrar ou revisar os equipamentos entregues antes de gerar o PDF completo.
-                  </p>
-                </div>
-              </div>
-              </div>
-            </Card>
+              </DialogFooter>
+            </form>
+          </div>
+        </DialogContent>
 
-            <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-              <div className="p-4 space-y-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                </div>
-                <h3 className="text-lg font-semibold text-white">Dados para Contabilidade</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAccountingPdf}
-                  disabled={!canGenerateReports || loading}
-                  className="border-red-500 text-red-400 hover:bg-red-500/10 h-9 sm:h-10 text-xs sm:text-sm"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Gerar PDF
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAccountingPreview}
-                  disabled={!canGenerateReports || loading}
-                  className="border-gray-500 text-gray-300 hover:bg-gray-500/10 h-9 sm:h-10 text-xs sm:text-sm"
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  Visualizar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleAccountingExcel}
-                  disabled={!canGenerateReports || loading}
-                  className="border-emerald-500 text-emerald-400 h-9 sm:h-10 text-xs sm:text-sm disabled:opacity-50"
-                >
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Gerar Excel
-                </Button>
-              </div>
-              </div>
-            </Card>
-          </TabsContent>
-          </Tabs>
+        {/* Modal de Novo Cargo */}
+        <NovoCargoModal
+          open={novoCargoModalOpen}
+          onClose={() => setNovoCargoModalOpen(false)}
+          onCargoCreated={handleCargoCreated}
+        />
 
-          {error && (
-             <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
-               <p className="text-destructive text-sm">{error}</p>
-             </div>
-           )}
-          
-          <DialogFooter className="flex flex-col gap-2 sm:gap-2 pt-3 sm:pt-4 border-t border-gray-600 overflow-x-hidden">
-            {/* Botões de ação */}
-            <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose} 
-                disabled={loading}
-                className="w-full h-9 sm:h-10 text-xs sm:text-sm"
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={loading}
-                className="w-full h-9 sm:h-10 text-xs sm:text-sm bg-seguranca-red hover:bg-seguranca-red/90 text-white"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white mr-2 inline-block"></div>
-                    Salvando...
-                  </>
-                ) : (
-                  'Salvar'
-                )}
-              </Button>
+        {/* Modal de Criar Usuário Padrão */}
+        <CriarUsuarioPadraoModal
+          open={criarUsuarioModalOpen}
+          onClose={() => {
+            setCriarUsuarioModalOpen(false);
+            // Se fechar sem criar usuário, fechar o modal principal também
+            onClose();
+          }}
+          onUsuarioCreated={handleUsuarioPadraoCriado}
+          positionName={selectedPosition?.name || ''}
+          employeeName={form.name}
+          employeeCpf={form.cpf}
+          employeePhone={form.phone}
+        />
+
+        {/* Modal de Novo Médico */}
+        <NovoMedicoModal
+          open={novoMedicoModalOpen}
+          onClose={() => setNovoMedicoModalOpen(false)}
+          onMedicoCreated={handleMedicoCreated}
+        />
+
+        {/* Modal de Dependentes */}
+        <DependentFormModal
+          isOpen={dependentModalOpen}
+          onClose={() => {
+            setDependentModalOpen(false);
+            setDependentToEdit(null);
+          }}
+          employeeId={employeeToEdit?.id}
+          employeeName={employeeToEdit?.name}
+          dependent={dependentToEdit || undefined}
+          onSuccess={async () => {
+            if (!isEditMode || !employeeToEdit?.id) {
+              // Se ainda não há funcionário criado, armazenar dependente temporariamente
+              // O DependentFormModal retornará os dados do dependente via callback
+              setDependentModalOpen(false);
+              setDependentToEdit(null);
+              toast({
+                title: "Aviso",
+                description: "Dependente será adicionado após salvar o funcionário.",
+                variant: "default"
+              });
+            } else {
+              // Se já há funcionário, usar o callback normal
+              await handleDependentSaved();
+            }
+          }}
+        />
+
+        {/* Modal de Ficha de Entrega de EPI */}
+        <Dialog open={epiModalOpen} onOpenChange={setEpiModalOpen}>
+          <DialogContent className="max-w-5xl w-full max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
+            <DialogHeader className="pb-3 sm:pb-4">
+              <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-seguranca-lightgray">
+                Ficha de Entrega de EPI
+              </DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm text-gray-400">
+                Cadastre e gerencie os EPIs entregues para este funcionário. Após salvar, gere o PDF completo na seção de relatórios.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="pt-2">
+              <FichaEntregaEPIForm employeeId={employeeIdValue || undefined} />
             </div>
-          </DialogFooter>
-         </form>
-        </div>
-       </DialogContent>
-       
-       {/* Modal de Novo Cargo */}
-       <NovoCargoModal
-         open={novoCargoModalOpen}
-         onClose={() => setNovoCargoModalOpen(false)}
-         onCargoCreated={handleCargoCreated}
-       />
-
-       {/* Modal de Criar Usuário Padrão */}
-       <CriarUsuarioPadraoModal
-         open={criarUsuarioModalOpen}
-         onClose={() => {
-           setCriarUsuarioModalOpen(false);
-           // Se fechar sem criar usuário, fechar o modal principal também
-           onClose();
-         }}
-         onUsuarioCreated={handleUsuarioPadraoCriado}
-         positionName={selectedPosition?.name || ''}
-         employeeName={form.name}
-         employeeCpf={form.cpf}
-         employeePhone={form.phone}
-       />
-
-       {/* Modal de Novo Médico */}
-       <NovoMedicoModal
-         open={novoMedicoModalOpen}
-         onClose={() => setNovoMedicoModalOpen(false)}
-         onMedicoCreated={handleMedicoCreated}
-       />
-
-       {/* Modal de Dependentes */}
-       <DependentFormModal
-         isOpen={dependentModalOpen}
-         onClose={() => {
-           setDependentModalOpen(false);
-           setDependentToEdit(null);
-         }}
-         employeeId={employeeToEdit?.id}
-         employeeName={employeeToEdit?.name}
-         dependent={dependentToEdit || undefined}
-         onSuccess={async () => {
-           if (!isEditMode || !employeeToEdit?.id) {
-             // Se ainda não há funcionário criado, armazenar dependente temporariamente
-             // O DependentFormModal retornará os dados do dependente via callback
-             setDependentModalOpen(false);
-             setDependentToEdit(null);
-             toast({
-               title: "Aviso",
-               description: "Dependente será adicionado após salvar o funcionário.",
-               variant: "default"
-             });
-           } else {
-             // Se já há funcionário, usar o callback normal
-             await handleDependentSaved();
-           }
-         }}
-       />
-
-       {/* Modal de Ficha de Entrega de EPI */}
-       <Dialog open={epiModalOpen} onOpenChange={setEpiModalOpen}>
-         <DialogContent className="max-w-5xl w-full max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600">
-           <DialogHeader className="pb-3 sm:pb-4">
-             <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold text-seguranca-lightgray">
-               Ficha de Entrega de EPI
-             </DialogTitle>
-             <DialogDescription className="text-xs sm:text-sm text-gray-400">
-               Cadastre e gerencie os EPIs entregues para este funcionário. Após salvar, gere o PDF completo na seção de relatórios.
-             </DialogDescription>
-           </DialogHeader>
-           <div className="pt-2">
-             <FichaEntregaEPIForm employeeId={employeeIdValue || undefined} />
-           </div>
-         </DialogContent>
-       </Dialog>
-     </Dialog>
-     </TooltipProvider>
-   );
- };
+          </DialogContent>
+        </Dialog>
+      </Dialog>
+    </TooltipProvider>
+  );
+};
 
 export default FuncionarioNovoModal; 

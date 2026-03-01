@@ -33,7 +33,7 @@ import org.springframework.cache.annotation.Cacheable;
 @RequiredArgsConstructor
 @Slf4j
 public class EmployeeService {
-    
+
     @Autowired
     private EmployeeRepository employeeRepository;
     @Autowired
@@ -50,24 +50,32 @@ public class EmployeeService {
     private com.z7design.secured_guard.repository.WorkPostRepository workPostRepository;
     @Autowired
     private com.z7design.secured_guard.repository.DepartmentRepository departmentRepository;
-    
+
     @Transactional
-    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public EmployeeDTO create(EmployeeDTO dto) {
         try {
             System.out.println("[DEBUG] EmployeeService.create - Iniciando criação de funcionário");
             System.out.println("[DEBUG] DTO recebido: " + dto.getName() + " - " + dto.getCpf());
-            
-            if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty() && employeeRepository.existsByEmail(dto.getEmail())) {
-                throw new RuntimeException("Email já cadastrado");
+
+            if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()
+                    && employeeRepository.existsByEmail(dto.getEmail())) {
+                throw new java.lang.IllegalArgumentException("Email já cadastrado");
             }
-            
+
             if (dto.getCpf() != null && employeeRepository.existsByDocument(dto.getCpf())) {
-                throw new RuntimeException("CPF já cadastrado para outro funcionário");
+                throw new java.lang.IllegalArgumentException("CPF já cadastrado para outro funcionário");
             }
-            
+
             System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
             Employee employee = toEntity(dto);
+
+            // Log fields after toEntity conversion
+            System.out.println("[DEBUG] Fields after toEntity:");
+            System.out.println("  - Sexo: " + employee.getSexo());
+            System.out.println("  - MaritalStatus: " + employee.getMaritalStatus());
+            System.out.println("  - GrauInstrucao: " + employee.getGrauInstrucao());
+
             applyTerminationRules(employee, dto);
             System.out.println("[DEBUG] Entity criada, salvando no banco");
             Employee saved = employeeRepository.save(employee);
@@ -75,38 +83,41 @@ public class EmployeeService {
             return toDTO(saved);
         } catch (Exception e) {
             System.err.println("[ERROR] Erro ao criar funcionário: " + e.getMessage());
+            if (dto.getSalario() != null) {
+                System.err.println("[DEBUG] Valor do salário no DTO: " + dto.getSalario());
+            }
             e.printStackTrace();
             throw new RuntimeException("Erro ao criar funcionário: " + e.getMessage(), e);
         }
     }
-    
+
     @Transactional
-    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public EmployeeDTO update(UUID id, EmployeeDTO dto) {
         try {
             System.out.println("[DEBUG] EmployeeService.update - Iniciando atualização do funcionário ID: " + id);
             System.out.println("[DEBUG] DTO recebido - Nome: " + dto.getName() + ", Email: " + dto.getEmail());
-            
+
             Employee existingEmployee = findById(id);
             System.out.println("[DEBUG] Funcionário existente encontrado: " + existingEmployee.getName());
             System.out.println("[DEBUG] Email existente: " + existingEmployee.getEmail());
-            
+
             // Validar email único (exceto para o próprio funcionário)
-            if (dto.getEmail() != null && existingEmployee.getEmail() != null && 
-                !existingEmployee.getEmail().equals(dto.getEmail()) && 
-                employeeRepository.existsByEmail(dto.getEmail())) {
+            if (dto.getEmail() != null && existingEmployee.getEmail() != null &&
+                    !existingEmployee.getEmail().equals(dto.getEmail()) &&
+                    employeeRepository.existsByEmail(dto.getEmail())) {
                 throw new RuntimeException("Email já cadastrado");
             }
-            
+
             // Validar CPF único (exceto para o próprio funcionário)
             if (dto.getCpf() != null && !dto.getCpf().equals(existingEmployee.getDocument())) {
                 if (employeeRepository.existsByDocument(dto.getCpf())) {
                     throw new RuntimeException("CPF já cadastrado para outro funcionário");
                 }
             }
-            
+
             System.out.println("[DEBUG] Atualizando campos do funcionário existente...");
-            
+
             // Atualizar apenas os campos fornecidos, preservando campos de auditoria
             if (dto.getName() != null) {
                 existingEmployee.setName(dto.getName());
@@ -116,6 +127,48 @@ public class EmployeeService {
             }
             if (dto.getBirthDate() != null) {
                 existingEmployee.setBirthDate(dto.getBirthDate());
+            }
+            if (dto.getMaritalStatus() != null) {
+                System.out.println("[DEBUG] Atualizando MaritalStatus: " + dto.getMaritalStatus());
+                existingEmployee.setMaritalStatus(dto.getMaritalStatus());
+            }
+            if (dto.getNationality() != null) {
+                existingEmployee.setNationality(dto.getNationality());
+            }
+            if (dto.getGrauInstrucao() != null) {
+                System.out.println("[DEBUG] Atualizando GrauInstrucao: " + dto.getGrauInstrucao());
+                existingEmployee.setGrauInstrucao(dto.getGrauInstrucao());
+            }
+            if (dto.getSexo() != null) {
+                System.out.println("[DEBUG] Atualizando Sexo: " + dto.getSexo());
+                existingEmployee.setSexo(dto.getSexo());
+            }
+            if (dto.getMunicipioNascimento() != null) {
+                existingEmployee.setMunicipioNascimento(dto.getMunicipioNascimento());
+            }
+            if (dto.getLocalNascimento() != null) {
+                existingEmployee.setLocalNascimento(dto.getLocalNascimento());
+            }
+            if (dto.getEstadoNascimento() != null) {
+                existingEmployee.setEstadoNascimento(dto.getEstadoNascimento());
+            }
+            if (dto.getSpouseName() != null) {
+                existingEmployee.setSpouseName(dto.getSpouseName());
+            }
+            if (dto.getSpouseCpf() != null) {
+                existingEmployee.setSpouseCpf(dto.getSpouseCpf());
+            }
+            if (dto.getSpouseRg() != null) {
+                existingEmployee.setSpouseRg(dto.getSpouseRg());
+            }
+            if (dto.getSpouseBirthDate() != null) {
+                existingEmployee.setSpouseBirthDate(dto.getSpouseBirthDate());
+            }
+            if (dto.getSpousePhone() != null) {
+                existingEmployee.setSpousePhone(dto.getSpousePhone());
+            }
+            if (dto.getSpouseEmail() != null) {
+                existingEmployee.setSpouseEmail(dto.getSpouseEmail());
             }
             if (dto.getRegistrationNumber() != null) {
                 existingEmployee.setRegistrationNumber(dto.getRegistrationNumber());
@@ -133,19 +186,20 @@ public class EmployeeService {
                     System.out.println("[DEBUG] Status atualizado: " + status);
                 } catch (IllegalArgumentException ex) {
                     System.err.println("[ERROR] Status inválido: " + dto.getStatus());
-                    throw new RuntimeException("Status inválido: " + dto.getStatus() + ". Status válidos: " + 
-                        Arrays.toString(EmploymentStatus.values()));
+                    throw new RuntimeException("Status inválido: " + dto.getStatus() + ". Status válidos: " +
+                            Arrays.toString(EmploymentStatus.values()));
                 }
             }
             if (dto.getNotes() != null) {
                 existingEmployee.setNotes(dto.getNotes());
             }
             // Atualizar campo address (compatibilidade) e campos separados
-            if (dto.getAddress() != null && dto.getAddress().getStreet() != null && !dto.getAddress().getStreet().isEmpty()) {
+            if (dto.getAddress() != null && dto.getAddress().getStreet() != null
+                    && !dto.getAddress().getStreet().isEmpty()) {
                 existingEmployee.setAddress(dto.getAddress().getStreet());
                 System.out.println("[DEBUG] Address atualizado: " + existingEmployee.getAddress());
             }
-            
+
             // Se os campos separados vierem no objeto address, usar eles também
             if (dto.getAddress() != null) {
                 if (dto.getAddress().getStreet() != null) {
@@ -176,12 +230,12 @@ public class EmployeeService {
             if (dto.getEmail() != null) {
                 existingEmployee.setEmail(dto.getEmail());
             }
-            
+
             // Atualizar telefone de contato
             if (dto.getTelefoneContato() != null) {
                 existingEmployee.setTelefoneContato(dto.getTelefoneContato());
             }
-            
+
             // Atualizar campos de endereço separados
             if (dto.getEnderecoRua() != null) {
                 existingEmployee.setEnderecoRua(dto.getEnderecoRua());
@@ -204,7 +258,7 @@ public class EmployeeService {
             if (dto.getEnderecoCep() != null) {
                 existingEmployee.setEnderecoCep(dto.getEnderecoCep());
             }
-            
+
             // Atualizar campos CIN
             if (dto.getCinNumero() != null) {
                 existingEmployee.setCinNumero(dto.getCinNumero());
@@ -215,7 +269,7 @@ public class EmployeeService {
             if (dto.getCinDataEmissao() != null) {
                 existingEmployee.setCinDataEmissao(dto.getCinDataEmissao());
             }
-            
+
             // Atualizar CTPS Digital PDF (apenas se fornecido)
             if (dto.getCtpsDigitalPdf() != null) {
                 existingEmployee.setCtpsDigitalPdf(dto.getCtpsDigitalPdf());
@@ -226,7 +280,7 @@ public class EmployeeService {
             if (dto.getCtpsDigitalPdfTamanho() != null) {
                 existingEmployee.setCtpsDigitalPdfTamanho(dto.getCtpsDigitalPdfTamanho());
             }
-            
+
             // Atualizar dados bancários se fornecidos
             if (dto.getBankInfo() != null) {
                 if (dto.getBankInfo().getBank() != null) {
@@ -238,16 +292,22 @@ public class EmployeeService {
                 if (dto.getBankInfo().getAccount() != null) {
                     existingEmployee.setContaCorrente(dto.getBankInfo().getAccount());
                 }
+                if (dto.getBankInfo().getAccountDigit() != null) {
+                    existingEmployee.setContaDigito(dto.getBankInfo().getAccountDigit());
+                }
+                if (dto.getBankInfo().getPixKey() != null) {
+                    existingEmployee.setPixKey(dto.getBankInfo().getPixKey());
+                }
             }
-            
+
             // Atualizar entidades relacionais se fornecidas
             if (dto.getUser() != null && dto.getUser().getId() != null) {
                 existingEmployee.setUser(userRepository.findById(dto.getUser().getId())
-                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado para o id informado.")));
+                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado para o id informado.")));
             }
             if (dto.getPosition() != null && dto.getPosition().getId() != null) {
                 existingEmployee.setPosition(positionRepository.findById(dto.getPosition().getId())
-                    .orElseThrow(() -> new RuntimeException("Cargo não encontrado para o id informado.")));
+                        .orElseThrow(() -> new RuntimeException("Cargo não encontrado para o id informado.")));
             }
             if (dto.getUnit() != null && dto.getUnit().getId() != null) {
                 existingEmployee.setUnit(unitRepository.findById(dto.getUnit().getId()).orElse(null));
@@ -255,7 +315,7 @@ public class EmployeeService {
             if (dto.getCompany() != null && dto.getCompany().getId() != null) {
                 existingEmployee.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
             }
-            
+
             // Atualizar WorkPost se fornecido
             if (dto.getWorkPostId() != null && !dto.getWorkPostId().trim().isEmpty()) {
                 try {
@@ -267,7 +327,7 @@ public class EmployeeService {
             } else {
                 existingEmployee.setWorkPost(null);
             }
-            
+
             // Atualizar Department se fornecido
             if (dto.getDepartmentId() != null && !dto.getDepartmentId().trim().isEmpty()) {
                 try {
@@ -279,7 +339,7 @@ public class EmployeeService {
             } else {
                 existingEmployee.setDepartment(null);
             }
-            
+
             // Atualizar dados do exame médico (ASO)
             if (dto.getExameMedicoData() != null) {
                 existingEmployee.setExameMedicoData(dto.getExameMedicoData());
@@ -288,7 +348,8 @@ public class EmployeeService {
                 existingEmployee.setExameMedicoTipo(dto.getExameMedicoTipo());
             }
             if (dto.getExameMedicoDoctor() != null && dto.getExameMedicoDoctor().getId() != null) {
-                existingEmployee.setExameMedicoDoctor(doctorRepository.findById(dto.getExameMedicoDoctor().getId()).orElse(null));
+                existingEmployee.setExameMedicoDoctor(
+                        doctorRepository.findById(dto.getExameMedicoDoctor().getId()).orElse(null));
             } else if (dto.getExameMedicoDoctor() == null) {
                 existingEmployee.setExameMedicoDoctor(null);
             }
@@ -307,7 +368,7 @@ public class EmployeeService {
             if (dto.getExameMedicoContribuicaoSindicalPaga() != null) {
                 existingEmployee.setExameMedicoContribuicaoSindicalPaga(dto.getExameMedicoContribuicaoSindicalPaga());
             }
-            
+
             // Atualizar campos para Estrangeiro
             if (dto.getRneNumero() != null) {
                 existingEmployee.setRneNumero(dto.getRneNumero());
@@ -327,7 +388,7 @@ public class EmployeeService {
             if (dto.getTipoVisto() != null) {
                 existingEmployee.setTipoVisto(dto.getTipoVisto());
             }
-            
+
             // Atualizar campos de admissão
             if (dto.getPis() != null) {
                 existingEmployee.setPis(dto.getPis());
@@ -360,6 +421,7 @@ public class EmployeeService {
                 existingEmployee.setCertificadoMilitar(dto.getCertificadoMilitar());
             }
             if (dto.getSalario() != null) {
+                System.out.println("[DEBUG] Atualizando Salário: " + dto.getSalario());
                 existingEmployee.setSalario(dto.getSalario());
             }
             if (dto.getSalarioPorExtenso() != null) {
@@ -389,12 +451,12 @@ public class EmployeeService {
             if (dto.getEscalaTrabalho() != null) {
                 existingEmployee.setEscalaTrabalho(dto.getEscalaTrabalho());
             }
-            
+
             applyTerminationRules(existingEmployee, dto);
 
             // Atualizar timestamp
             existingEmployee.setUpdatedAt(LocalDateTime.now());
-            
+
             System.out.println("[DEBUG] Salvando funcionário atualizado...");
             System.out.println("[DEBUG] Campos de endereço antes de salvar:");
             System.out.println("  - enderecoRua: " + existingEmployee.getEnderecoRua());
@@ -402,14 +464,14 @@ public class EmployeeService {
             System.out.println("  - enderecoCidade: " + existingEmployee.getEnderecoCidade());
             System.out.println("  - enderecoEstado: " + existingEmployee.getEnderecoEstado());
             System.out.println("  - enderecoCep: " + existingEmployee.getEnderecoCep());
-            
+
             Employee saved = employeeRepository.save(existingEmployee);
             System.out.println("[DEBUG] Funcionário salvo com sucesso: " + saved.getName());
-            
+
             System.out.println("[DEBUG] Convertendo entidade para DTO...");
             EmployeeDTO result = toDTO(saved);
             System.out.println("[DEBUG] DTO retornado - Nome: " + result.getName());
-            
+
             return result;
         } catch (Exception e) {
             System.err.println("[ERROR] Erro ao atualizar funcionário ID " + id + ": " + e.getMessage());
@@ -418,9 +480,49 @@ public class EmployeeService {
             throw new RuntimeException("Erro ao atualizar funcionário: " + e.getMessage(), e);
         }
     }
-    
+
     @Transactional
-    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
+    public void bulkUpdateStatus(List<UUID> ids, String statusStr) {
+        EmploymentStatus status = EmploymentStatus.valueOf(statusStr.toUpperCase());
+        List<Employee> employees = employeeRepository.findAllById(ids);
+        for (Employee employee : employees) {
+            employee.setStatus(status);
+            employee.setUpdatedAt(LocalDateTime.now());
+        }
+        employeeRepository.saveAll(employees);
+    }
+
+    @Transactional
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
+    public void bulkTerminate(List<UUID> ids, java.time.LocalDate terminationDate) {
+        List<Employee> employees = employeeRepository.findAllById(ids);
+        for (Employee employee : employees) {
+            employee.setStatus(EmploymentStatus.TERMINATED);
+            employee.setTerminationDate(terminationDate);
+            employee.setUpdatedAt(LocalDateTime.now());
+
+            // Apply termination rules (deactivate user etc.)
+            applyTerminationRules(employee, null);
+        }
+        employeeRepository.saveAll(employees);
+    }
+
+    @Transactional
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
+    public void bulkDelete(List<UUID> ids) {
+        List<Employee> employees = employeeRepository.findAllById(ids);
+        for (Employee employee : employees) {
+            if (employee.getStatus() != EmploymentStatus.TERMINATED) {
+                throw new RuntimeException(
+                        "O funcionário " + employee.getName() + " não pode ser excluído pois não está demitido.");
+            }
+        }
+        employeeRepository.deleteAll(employees);
+    }
+
+    @Transactional
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void delete(UUID id) {
         Employee employee = findById(id);
         if (employee.getStatus() != EmploymentStatus.TERMINATED) {
@@ -461,15 +563,17 @@ public class EmployeeService {
             userRepository.save(user);
         });
     }
-    
+
     @Transactional(readOnly = true)
-    // Removido @Cacheable - entidade Employee tem relacionamentos circulares que causam problemas no Redis
+    // Removido @Cacheable - entidade Employee tem relacionamentos circulares que
+    // causam problemas no Redis
     // O cache será aplicado apenas nos métodos que retornam DTOs
     public Employee findById(UUID id) {
         Employee employee = employeeRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
-        
-        // Forçar inicialização de relacionamentos LAZY para evitar LazyInitializationException
+                .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
+
+        // Forçar inicialização de relacionamentos LAZY para evitar
+        // LazyInitializationException
         try {
             if (employee.getUser() != null) {
                 org.hibernate.Hibernate.initialize(employee.getUser());
@@ -478,7 +582,8 @@ public class EmployeeService {
                 org.hibernate.Hibernate.initialize(employee.getPosition());
             }
             if (employee.getUnit() != null) {
-                // Inicializar Unit mas evitar inicializar a coleção employees (evita referência circular no cache Redis)
+                // Inicializar Unit mas evitar inicializar a coleção employees (evita referência
+                // circular no cache Redis)
                 org.hibernate.Hibernate.initialize(employee.getUnit());
                 // Não inicializar a coleção employees do Unit para evitar referência circular
                 // A coleção employees já está marcada com @JsonIgnoreProperties no model
@@ -496,14 +601,14 @@ public class EmployeeService {
             System.err.println("[WARNING] Erro ao inicializar relacionamentos LAZY: " + e.getMessage());
             // Continuar mesmo se houver erro na inicialização
         }
-        
+
         return employee;
     }
-    
+
     public Optional<Employee> findByEmail(String email) {
         return employeeRepository.findByEmail(email);
     }
-    
+
     public List<Employee> findByStatus(EmploymentStatus status) {
         try {
             System.out.println("[DEBUG] EmployeeService.findByStatus - Status recebido: " + status);
@@ -516,92 +621,106 @@ public class EmployeeService {
             throw e;
         }
     }
-    
+
     public List<Employee> findByNameContaining(String name) {
         try {
             System.out.println("[DEBUG] EmployeeService.findByNameContaining - Nome recebido: " + name);
             List<Employee> employees = employeeRepository.findByNameContainingIgnoreCase(name);
-            System.out.println("[DEBUG] EmployeeService.findByNameContaining - Funcionários encontrados: " + employees.size());
+            System.out.println(
+                    "[DEBUG] EmployeeService.findByNameContaining - Funcionários encontrados: " + employees.size());
             return employees;
         } catch (Exception e) {
-            System.err.println("[ERROR] EmployeeService.findByNameContaining - Erro ao buscar funcionários: " + e.getMessage());
+            System.err.println(
+                    "[ERROR] EmployeeService.findByNameContaining - Erro ao buscar funcionários: " + e.getMessage());
             throw new RuntimeException("Erro ao buscar funcionários por nome: " + e.getMessage());
         }
     }
-    
+
     public List<Employee> findByNameOrDocumentContaining(String searchTerm) {
         try {
-            System.out.println("[DEBUG] EmployeeService.findByNameOrDocumentContaining - Termo recebido: " + searchTerm);
-            List<Employee> employees = employeeRepository.findByNameContainingIgnoreCaseOrDocumentContainingIgnoreCase(searchTerm, searchTerm);
-            System.out.println("[DEBUG] EmployeeService.findByNameOrDocumentContaining - Funcionários encontrados: " + employees.size());
+            System.out
+                    .println("[DEBUG] EmployeeService.findByNameOrDocumentContaining - Termo recebido: " + searchTerm);
+            List<Employee> employees = employeeRepository
+                    .findByNameContainingIgnoreCaseOrDocumentContainingIgnoreCase(searchTerm, searchTerm);
+            System.out.println("[DEBUG] EmployeeService.findByNameOrDocumentContaining - Funcionários encontrados: "
+                    + employees.size());
             return employees;
         } catch (Exception e) {
-            System.err.println("[ERROR] EmployeeService.findByNameOrDocumentContaining - Erro ao buscar funcionários: " + e.getMessage());
+            System.err.println("[ERROR] EmployeeService.findByNameOrDocumentContaining - Erro ao buscar funcionários: "
+                    + e.getMessage());
             throw new RuntimeException("Erro ao buscar funcionários por nome ou documento: " + e.getMessage());
         }
     }
-    
+
     public List<SimpleEmployeeDTO> findSimpleEmployeesByNameOrDocument(String searchTerm) {
         try {
-            System.out.println("[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Termo recebido: " + searchTerm);
-            List<Employee> employees = employeeRepository.findByNameContainingIgnoreCaseOrDocumentContainingIgnoreCase(searchTerm, searchTerm);
-            System.out.println("[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Funcionários encontrados: " + employees.size());
-            
+            System.out.println(
+                    "[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Termo recebido: " + searchTerm);
+            List<Employee> employees = employeeRepository
+                    .findByNameContainingIgnoreCaseOrDocumentContainingIgnoreCase(searchTerm, searchTerm);
+            System.out
+                    .println("[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Funcionários encontrados: "
+                            + employees.size());
+
             return employees.stream()
-                .map(emp -> SimpleEmployeeDTO.builder()
-                    .id(emp.getId())
-                    .name(emp.getName())
-                    .document(emp.getDocument())
-                    .email(emp.getEmail())
-                    .phone(emp.getPhone())
-                    .registrationNumber(emp.getRegistrationNumber())
-                    .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
-                    .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
-                    .build())
-                .collect(java.util.stream.Collectors.toList());
+                    .map(emp -> SimpleEmployeeDTO.builder()
+                            .id(emp.getId())
+                            .name(emp.getName())
+                            .document(emp.getDocument())
+                            .email(emp.getEmail())
+                            .phone(emp.getPhone())
+                            .registrationNumber(emp.getRegistrationNumber())
+                            .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
+                            .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
+                            .build())
+                    .collect(java.util.stream.Collectors.toList());
         } catch (Exception e) {
-            System.err.println("[ERROR] EmployeeService.findSimpleEmployeesByNameOrDocument - Erro ao buscar funcionários: " + e.getMessage());
+            System.err.println(
+                    "[ERROR] EmployeeService.findSimpleEmployeesByNameOrDocument - Erro ao buscar funcionários: "
+                            + e.getMessage());
             throw new RuntimeException("Erro ao buscar funcionários por nome ou documento: " + e.getMessage());
         }
     }
-    
+
     public long count() {
         return employeeRepository.count();
     }
-    
+
     public List<Employee> findByUnit(UUID unitId) {
         return employeeRepository.findByUnitId(unitId);
     }
-    
+
     public List<Employee> findByPosition(UUID positionId) {
         return employeeRepository.findByPositionId(positionId);
     }
-    
+
     @Transactional(readOnly = true)
     public List<Employee> findAll() {
         try {
             System.out.println("🔍 EmployeeService.findAll - Iniciando busca no banco...");
-            
+
             // Primeiro, vamos tentar buscar apenas os IDs
             try {
                 List<Employee> employees = employeeRepository.findAll();
-                System.out.println("✅ EmployeeService.findAll - Encontrados " + employees.size() + " funcionários no banco");
-                
+                System.out.println(
+                        "✅ EmployeeService.findAll - Encontrados " + employees.size() + " funcionários no banco");
+
                 // Log dos primeiros funcionários para debug
                 if (!employees.isEmpty()) {
                     for (int i = 0; i < Math.min(3, employees.size()); i++) {
                         Employee emp = employees.get(i);
-                        System.out.println("📋 Funcionário " + (i+1) + ": " + emp.getName() + " (ID: " + emp.getId() + ")");
+                        System.out.println(
+                                "📋 Funcionário " + (i + 1) + ": " + emp.getName() + " (ID: " + emp.getId() + ")");
                     }
                 }
-                
+
                 return employees;
             } catch (Exception repoError) {
                 System.err.println("❌ EmployeeService.findAll - Erro no repository: " + repoError.getMessage());
                 repoError.printStackTrace();
                 throw repoError;
             }
-            
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeService.findAll - Erro ao buscar funcionários: " + e.getMessage());
             e.printStackTrace();
@@ -641,7 +760,8 @@ public class EmployeeService {
         try {
             System.out.println("🔍 EmployeeService.findBasicDataBySearchTerm - Buscando por termo: " + searchTerm);
             List<Object[]> data = employeeRepository.findBasicDataBySearchTerm(searchTerm);
-            System.out.println("✅ EmployeeService.findBasicDataBySearchTerm - Encontrados " + data.size() + " registros");
+            System.out
+                    .println("✅ EmployeeService.findBasicDataBySearchTerm - Encontrados " + data.size() + " registros");
             return data;
         } catch (Exception e) {
             System.err.println("❌ EmployeeService.findBasicDataBySearchTerm - Erro: " + e.getMessage());
@@ -649,7 +769,7 @@ public class EmployeeService {
             throw new RuntimeException("Erro ao buscar dados básicos por termo: " + e.getMessage(), e);
         }
     }
-    
+
     /**
      * Versão paginada de findBasicData para ambientes com muitos registros.
      */
@@ -658,7 +778,8 @@ public class EmployeeService {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500); // evitar pageSize muito grande
             int offset = Math.max(page, 0) * pageSize;
-            System.out.println("🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset);
+            System.out.println(
+                    "🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset);
             List<Object[]> data = employeeRepository.findBasicDataPaged(pageSize, offset);
             System.out.println("✅ EmployeeService.findBasicDataPaged - Encontrados " + data.size() + " registros");
             return data;
@@ -670,16 +791,19 @@ public class EmployeeService {
     }
 
     /**
-     * Versão paginada de findBasicDataBySearchTerm para ambientes com muitos registros.
+     * Versão paginada de findBasicDataBySearchTerm para ambientes com muitos
+     * registros.
      */
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
-            System.out.println("🔍 EmployeeService.findBasicDataBySearchTermPaged - termo=" + searchTerm + " page=" + page + " size=" + pageSize + " offset=" + offset);
+            System.out.println("🔍 EmployeeService.findBasicDataBySearchTermPaged - termo=" + searchTerm + " page="
+                    + page + " size=" + pageSize + " offset=" + offset);
             List<Object[]> data = employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset);
-            System.out.println("✅ EmployeeService.findBasicDataBySearchTermPaged - Encontrados " + data.size() + " registros");
+            System.out.println(
+                    "✅ EmployeeService.findBasicDataBySearchTermPaged - Encontrados " + data.size() + " registros");
             return data;
         } catch (Exception e) {
             System.err.println("❌ EmployeeService.findBasicDataBySearchTermPaged - Erro: " + e.getMessage());
@@ -687,19 +811,19 @@ public class EmployeeService {
             throw new RuntimeException("Erro ao buscar dados básicos por termo (paginado): " + e.getMessage(), e);
         }
     }
-    
+
     @Transactional(readOnly = true)
     public List<EmployeeDTO> getAllAsDTOs() {
         try {
             log.info("Buscando todos os funcionários como DTOs...");
             List<Employee> employees = employeeRepository.findAll();
             log.info("Encontrados {} funcionários", employees.size());
-            
+
             if (employees.isEmpty()) {
                 log.warn("Nenhum funcionário encontrado no banco de dados");
                 return java.util.Collections.emptyList();
             }
-            
+
             log.info("Retornando lista vazia temporariamente para debug");
             return java.util.Collections.emptyList();
         } catch (Exception e) {
@@ -708,7 +832,7 @@ public class EmployeeService {
             return java.util.Collections.emptyList();
         }
     }
-    
+
     @Transactional
     public Employee updateStatus(UUID id, EmploymentStatus status) {
         Employee employee = findById(id);
@@ -717,7 +841,7 @@ public class EmployeeService {
     }
 
     @Transactional
-    @CacheEvict(value = {"employees", "employees-by-company", "dashboard-summary"}, allEntries = true)
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void deleteById(UUID id) {
         employeeRepository.deleteById(id);
     }
@@ -728,8 +852,9 @@ public class EmployeeService {
             System.out.println("[DEBUG] Iniciando conversão DTO -> Entity");
             System.out.println("[DEBUG] DTO status: " + dto.getStatus());
             System.out.println("[DEBUG] DTO user: " + (dto.getUser() != null ? dto.getUser().getId() : "null"));
-            System.out.println("[DEBUG] DTO position: " + (dto.getPosition() != null ? dto.getPosition().getId() : "null"));
-            
+            System.out.println(
+                    "[DEBUG] DTO position: " + (dto.getPosition() != null ? dto.getPosition().getId() : "null"));
+
             Employee e = new Employee();
             if (dto.getId() != null) {
                 e.setId(dto.getId());
@@ -761,7 +886,7 @@ public class EmployeeService {
             e.setRegistrationNumber(dto.getRegistrationNumber());
             e.setHireDate(dto.getHireDate());
             e.setTerminationDate(dto.getTerminationDate());
-            
+
             // Validar e converter status
             if (dto.getStatus() != null && !dto.getStatus().trim().isEmpty()) {
                 try {
@@ -770,20 +895,21 @@ public class EmployeeService {
                     System.out.println("[DEBUG] Status convertido com sucesso: " + status);
                 } catch (IllegalArgumentException ex) {
                     System.err.println("[ERROR] Status inválido: " + dto.getStatus());
-                    throw new RuntimeException("Status inválido: " + dto.getStatus() + ". Status válidos: " + 
-                        Arrays.toString(EmploymentStatus.values()));
+                    throw new RuntimeException("Status inválido: " + dto.getStatus() + ". Status válidos: " +
+                            Arrays.toString(EmploymentStatus.values()));
                 }
             } else {
                 System.out.println("[DEBUG] Status não fornecido, mantendo status atual");
             }
-            
+
             // e.setPossuiWhatsapp(dto.getPossuiWhatsapp());
             // e.setCaminhoPdf(dto.getCaminhoPdf());
             // e.setMesReferencia(dto.getMesReferencia());
             // e.setAnoReferencia(dto.getAnoReferencia());
             e.setNotes(dto.getNotes());
-            
-            // Processar endereço - usar campos separados se disponíveis, senão usar campo address antigo
+
+            // Processar endereço - usar campos separados se disponíveis, senão usar campo
+            // address antigo
             if (dto.getAddress() != null) {
                 if (dto.getAddress().getStreet() != null && !dto.getAddress().getStreet().isEmpty()) {
                     e.setAddress(dto.getAddress().getStreet());
@@ -814,15 +940,15 @@ public class EmployeeService {
                 e.setAddress(""); // Definir como string vazia se não fornecido
             }
             System.out.println("[DEBUG] Address salvo: " + e.getAddress());
-            
+
             e.setPhone(dto.getPhone());
             e.setEmail(dto.getEmail());
-            
+
             // Mapear telefone de contato
             if (dto.getTelefoneContato() != null) {
                 e.setTelefoneContato(dto.getTelefoneContato());
             }
-            
+
             // Mapear campos de endereço separados
             if (dto.getEnderecoRua() != null) {
                 e.setEnderecoRua(dto.getEnderecoRua());
@@ -845,7 +971,7 @@ public class EmployeeService {
             if (dto.getEnderecoCep() != null) {
                 e.setEnderecoCep(dto.getEnderecoCep());
             }
-            
+
             // Mapear campos CIN
             if (dto.getCinNumero() != null) {
                 e.setCinNumero(dto.getCinNumero());
@@ -856,7 +982,7 @@ public class EmployeeService {
             if (dto.getCinDataEmissao() != null) {
                 e.setCinDataEmissao(dto.getCinDataEmissao());
             }
-            
+
             // Mapear CTPS Digital PDF (apenas se fornecido)
             if (dto.getCtpsDigitalPdf() != null) {
                 e.setCtpsDigitalPdf(dto.getCtpsDigitalPdf());
@@ -867,7 +993,7 @@ public class EmployeeService {
             if (dto.getCtpsDigitalPdfTamanho() != null) {
                 e.setCtpsDigitalPdfTamanho(dto.getCtpsDigitalPdfTamanho());
             }
-            
+
             // Mapear dados do cônjuge
             e.setSpouseName(dto.getSpouseName());
             e.setSpouseCpf(dto.getSpouseCpf());
@@ -875,7 +1001,7 @@ public class EmployeeService {
             e.setSpouseBirthDate(dto.getSpouseBirthDate());
             e.setSpousePhone(dto.getSpousePhone());
             e.setSpouseEmail(dto.getSpouseEmail());
-            
+
             // Mapear campos da ficha de registro
             e.setEmpresaNome(dto.getEmpresaNome());
             e.setEmpresaEndereco(dto.getEmpresaEndereco());
@@ -898,12 +1024,19 @@ public class EmployeeService {
             e.setLocalNascimento(dto.getLocalNascimento());
             e.setMunicipioNascimento(dto.getMunicipioNascimento());
             e.setEstadoNascimento(dto.getEstadoNascimento());
+            e.setMaritalStatus(dto.getMaritalStatus());
+            if (dto.getNationality() != null) {
+                e.setNationality(dto.getNationality());
+            }
             e.setSexo(dto.getSexo());
             e.setGrauInstrucao(dto.getGrauInstrucao());
             e.setMatriculaEsocial(dto.getMatriculaEsocial());
             e.setCbo(dto.getCbo());
             e.setPis(dto.getPis());
-            e.setSalario(dto.getSalario());
+            if (dto.getSalario() != null) {
+                System.out.println("[DEBUG] toEntity - Mapeando Salário: " + dto.getSalario());
+                e.setSalario(dto.getSalario());
+            }
             e.setSalarioPorExtenso(dto.getSalarioPorExtenso());
             e.setPeriodoPagamento(dto.getPeriodoPagamento());
             e.setHorarioTrabalho(dto.getHorarioTrabalho());
@@ -950,7 +1083,7 @@ public class EmployeeService {
             e.setNaturalizado(dto.getNaturalizado());
             e.setDecretoNaturalizacao(dto.getDecretoNaturalizacao());
             e.setVistoFiscalizacao(dto.getVistoFiscalizacao());
-            
+
             // Campos para Estrangeiro
             if (dto.getRneNumero() != null) {
                 e.setRneNumero(dto.getRneNumero());
@@ -972,26 +1105,34 @@ public class EmployeeService {
             }
             e.setAssinaturaFuncionario(dto.getAssinaturaFuncionario());
             e.setDataRescisao(dto.getDataRescisao());
-            
+
             // Setar entidades relacionais (agora opcionais)
             if (dto.getUser() != null && dto.getUser().getId() != null) {
-                e.setUser(userRepository.findById(dto.getUser().getId())
-                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado para o id informado.")));
+                System.out.println("[DEBUG] Buscando usuário ID: " + dto.getUser().getId());
+                e.setUser(userRepository.findById(dto.getUser().getId()).orElse(null));
+                if (e.getUser() == null) {
+                    System.err
+                            .println("[WARNING] Usuário não encontrado para o id informado: " + dto.getUser().getId());
+                }
             }
-                
+
             if (dto.getPosition() != null && dto.getPosition().getId() != null) {
-                e.setPosition(positionRepository.findById(dto.getPosition().getId())
-                    .orElseThrow(() -> new RuntimeException("Cargo não encontrado para o id informado.")));
+                System.out.println("[DEBUG] Buscando cargo ID: " + dto.getPosition().getId());
+                e.setPosition(positionRepository.findById(dto.getPosition().getId()).orElse(null));
+                if (e.getPosition() == null) {
+                    System.err.println(
+                            "[WARNING] Cargo não encontrado para o id informado: " + dto.getPosition().getId());
+                }
             }
-                
+
             if (dto.getUnit() != null && dto.getUnit().getId() != null) {
                 e.setUnit(unitRepository.findById(dto.getUnit().getId()).orElse(null));
             }
-            
+
             if (dto.getCompany() != null && dto.getCompany().getId() != null) {
                 e.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
             }
-            
+
             // Mapear WorkPost se fornecido
             if (dto.getWorkPostId() != null && !dto.getWorkPostId().trim().isEmpty()) {
                 try {
@@ -1001,7 +1142,7 @@ public class EmployeeService {
                     System.err.println("[WARNING] WorkPostId inválido: " + dto.getWorkPostId());
                 }
             }
-            
+
             // Mapear Department se fornecido
             if (dto.getDepartmentId() != null && !dto.getDepartmentId().trim().isEmpty()) {
                 try {
@@ -1011,7 +1152,7 @@ public class EmployeeService {
                     System.err.println("[WARNING] DepartmentId inválido: " + dto.getDepartmentId());
                 }
             }
-            
+
             // Mapear dados do exame médico (ASO)
             if (dto.getExameMedicoData() != null) {
                 e.setExameMedicoData(dto.getExameMedicoData());
@@ -1037,30 +1178,32 @@ public class EmployeeService {
             if (dto.getExameMedicoContribuicaoSindicalPaga() != null) {
                 e.setExameMedicoContribuicaoSindicalPaga(dto.getExameMedicoContribuicaoSindicalPaga());
             }
-            
+
             // Mapear documentos se fornecidos
             if (dto.getDocuments() != null && !dto.getDocuments().isEmpty()) {
                 System.out.println("[DEBUG] Documentos fornecidos: " + dto.getDocuments().size());
             }
-            
+
             // Mapear contato de emergência se fornecido
             if (dto.getEmergencyContact() != null) {
                 System.out.println("[DEBUG] Contato de emergência fornecido: " + dto.getEmergencyContact().getName());
             }
-            
+
             // Mapear informações bancárias se fornecidas
             if (dto.getBankInfo() != null) {
                 System.out.println("[DEBUG] Informações bancárias fornecidas: " + dto.getBankInfo().getBank());
                 e.setBanco(dto.getBankInfo().getBank());
                 e.setAgencia(dto.getBankInfo().getAgency());
                 e.setContaCorrente(dto.getBankInfo().getAccount());
+                e.setContaDigito(dto.getBankInfo().getAccountDigit());
+                e.setPixKey(dto.getBankInfo().getPixKey());
             }
-            
+
             // Mapear informações profissionais se fornecidas
             if (dto.getJobInfo() != null) {
                 System.out.println("[DEBUG] Informações profissionais fornecidas: " + dto.getJobInfo().getPosition());
             }
-            
+
             System.out.println("[DEBUG] Conversão DTO -> Entity concluída com sucesso");
             return e;
         } catch (Exception ex) {
@@ -1073,14 +1216,15 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public EmployeeDTO toDTO(Employee e) {
         try {
-            System.out.println("[DEBUG] Iniciando conversão Entity -> DTO para funcionário: " + (e != null ? e.getName() : "null"));
-            
+            System.out.println("[DEBUG] Iniciando conversão Entity -> DTO para funcionário: "
+                    + (e != null ? e.getName() : "null"));
+
             if (e == null) {
                 throw new IllegalArgumentException("Employee não pode ser null");
             }
-            
+
             EmployeeDTO dto = new EmployeeDTO();
-            
+
             // Campos básicos essenciais
             dto.setId(e.getId());
             dto.setName(e.getName());
@@ -1093,7 +1237,7 @@ public class EmployeeService {
             dto.setNotes(e.getNotes());
             dto.setCreatedAt(e.getCreatedAt());
             dto.setUpdatedAt(e.getUpdatedAt());
-            
+
             // Campos opcionais com verificação de null
             if (e.getBirthDate() != null) {
                 dto.setBirthDate(e.getBirthDate());
@@ -1113,8 +1257,9 @@ public class EmployeeService {
             if (e.getTerminationDate() != null) {
                 dto.setTerminationDate(e.getTerminationDate());
             }
-            
-            // Address - usar campos separados se disponíveis, senão usar campo address antigo
+
+            // Address - usar campos separados se disponíveis, senão usar campo address
+            // antigo
             EmployeeDTO.AddressDTO address = new EmployeeDTO.AddressDTO();
             if (e.getEnderecoRua() != null) {
                 address.setStreet(e.getEnderecoRua());
@@ -1139,11 +1284,11 @@ public class EmployeeService {
             if (e.getEnderecoCep() != null) {
                 address.setZipCode(e.getEnderecoCep());
             }
-            if (address.getStreet() != null || address.getNumber() != null || 
-                address.getNeighborhood() != null || address.getCity() != null) {
+            if (address.getStreet() != null || address.getNumber() != null ||
+                    address.getNeighborhood() != null || address.getCity() != null) {
                 dto.setAddress(address);
             }
-            
+
             // Mapear campos de endereço separados
             dto.setEnderecoRua(e.getEnderecoRua());
             dto.setEnderecoNumero(e.getEnderecoNumero());
@@ -1152,20 +1297,22 @@ public class EmployeeService {
             dto.setEnderecoCidade(e.getEnderecoCidade());
             dto.setEnderecoEstado(e.getEnderecoEstado());
             dto.setEnderecoCep(e.getEnderecoCep());
-            
+
             // Mapear telefone de contato
             dto.setTelefoneContato(e.getTelefoneContato());
-            
+
             // Mapear campos CIN
             dto.setCinNumero(e.getCinNumero());
             dto.setCinOrgaoEmissor(e.getCinOrgaoEmissor());
             dto.setCinDataEmissao(e.getCinDataEmissao());
-            
-            // Mapear CTPS Digital PDF (não incluir o byte array no DTO por padrão, apenas metadados)
-            // dto.setCtpsDigitalPdf(e.getCtpsDigitalPdf()); // Não incluir byte array no DTO
+
+            // Mapear CTPS Digital PDF (não incluir o byte array no DTO por padrão, apenas
+            // metadados)
+            // dto.setCtpsDigitalPdf(e.getCtpsDigitalPdf()); // Não incluir byte array no
+            // DTO
             dto.setCtpsDigitalPdfNome(e.getCtpsDigitalPdfNome());
             dto.setCtpsDigitalPdfTamanho(e.getCtpsDigitalPdfTamanho());
-            
+
             // Mapear dados do cônjuge
             dto.setSpouseName(e.getSpouseName());
             dto.setSpouseCpf(e.getSpouseCpf());
@@ -1173,7 +1320,7 @@ public class EmployeeService {
             dto.setSpouseBirthDate(e.getSpouseBirthDate());
             dto.setSpousePhone(e.getSpousePhone());
             dto.setSpouseEmail(e.getSpouseEmail());
-            
+
             // Mapear campos da ficha de registro
             dto.setEmpresaNome(e.getEmpresaNome());
             dto.setEmpresaEndereco(e.getEmpresaEndereco());
@@ -1232,17 +1379,20 @@ public class EmployeeService {
             dto.setVistoFiscalizacao(e.getVistoFiscalizacao());
             dto.setAssinaturaFuncionario(e.getAssinaturaFuncionario());
             dto.setDataRescisao(e.getDataRescisao());
-            
+
             // Mapear dados bancários
-            if (e.getBanco() != null || e.getAgencia() != null || e.getContaCorrente() != null) {
+            if (e.getBanco() != null || e.getAgencia() != null || e.getContaCorrente() != null
+                    || e.getContaDigito() != null || e.getPixKey() != null) {
                 EmployeeDTO.BankInfoDTO bankInfo = new EmployeeDTO.BankInfoDTO();
                 bankInfo.setBank(e.getBanco());
                 bankInfo.setAgency(e.getAgencia());
                 bankInfo.setAccount(e.getContaCorrente());
+                bankInfo.setAccountDigit(e.getContaDigito());
                 bankInfo.setAccountType("CORRENTE"); // Tipo padrão
+                bankInfo.setPixKey(e.getPixKey());
                 dto.setBankInfo(bankInfo);
             }
-            
+
             // Mapear WorkPost e Department
             if (e.getWorkPost() != null) {
                 dto.setWorkPostId(e.getWorkPost().getId().toString());
@@ -1250,7 +1400,7 @@ public class EmployeeService {
             if (e.getDepartment() != null) {
                 dto.setDepartmentId(e.getDepartment().getId().toString());
             }
-            
+
             // Mapear entidades relacionais com verificação de null
             if (e.getUser() != null) {
                 try {
@@ -1265,12 +1415,12 @@ public class EmployeeService {
                     dto.setUser(null);
                 }
             }
-            
+
             if (e.getPosition() != null) {
                 try {
                     // Forçar inicialização do position (LAZY loading)
                     org.hibernate.Hibernate.initialize(e.getPosition());
-                    
+
                     EmployeeDTO.PositionDTO positionDTO = new EmployeeDTO.PositionDTO();
                     positionDTO.setId(e.getPosition().getId());
                     positionDTO.setName(e.getPosition().getName());
@@ -1285,12 +1435,12 @@ public class EmployeeService {
                     dto.setPosition(null);
                 }
             }
-            
+
             if (e.getUnit() != null) {
                 try {
                     // Forçar inicialização do unit (LAZY loading)
                     org.hibernate.Hibernate.initialize(e.getUnit());
-                    
+
                     EmployeeDTO.UnitDTO unitDTO = new EmployeeDTO.UnitDTO();
                     unitDTO.setId(e.getUnit().getId());
                     unitDTO.setName(e.getUnit().getName());
@@ -1305,7 +1455,7 @@ public class EmployeeService {
                     dto.setUnit(null);
                 }
             }
-            
+
             // Mapear Company
             if (e.getCompany() != null) {
                 try {
@@ -1317,37 +1467,38 @@ public class EmployeeService {
                     dto.setCompany(null);
                 }
             }
-            
+
             System.out.println("[DEBUG] DTO criado com sucesso para: " + dto.getName());
             return dto;
-            
+
         } catch (Exception ex) {
             System.err.println("[ERROR] Erro na conversão Entity -> DTO: " + ex.getMessage());
             ex.printStackTrace();
             throw new RuntimeException("Erro na conversão Entity -> DTO: " + ex.getMessage(), ex);
         }
     }
-    
+
     /**
      * Lista supervisores ativos para seleção em formulários
      */
     public List<SimpleEmployeeDTO> getSupervisors() {
-        // Buscar funcionários ativos com cargo que contenha "supervisor" (case insensitive)
+        // Buscar funcionários ativos com cargo que contenha "supervisor" (case
+        // insensitive)
         List<Employee> allActiveEmployees = employeeRepository.findByStatus(EmploymentStatus.ACTIVE);
-        
+
         return allActiveEmployees.stream()
-            .filter(emp -> emp.getPosition() != null && 
-                          emp.getPosition().getName() != null &&
-                          emp.getPosition().getName().toLowerCase().contains("supervisor"))
-            .map(emp -> SimpleEmployeeDTO.builder()
-                .id(emp.getId())
-                .name(emp.getName())
-                .email(emp.getEmail())
-                .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
-                .build())
-            .collect(java.util.stream.Collectors.toList());
+                .filter(emp -> emp.getPosition() != null &&
+                        emp.getPosition().getName() != null &&
+                        emp.getPosition().getName().toLowerCase().contains("supervisor"))
+                .map(emp -> SimpleEmployeeDTO.builder()
+                        .id(emp.getId())
+                        .name(emp.getName())
+                        .email(emp.getEmail())
+                        .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
     }
-    
+
     /**
      * Busca funcionário por CPF exato (normalizado)
      * Tenta buscar em diferentes campos e com normalização
@@ -1357,25 +1508,25 @@ public class EmployeeService {
         // Normalizar CPF (remover caracteres não numéricos)
         String normalizedCpf = cpf.replaceAll("[^0-9]", "");
         log.debug("Buscando funcionário por CPF exato (normalizado): {}", normalizedCpf);
-        
+
         // PRIORIDADE 1: Buscar User pelo username (que contém o CPF)
         Optional<com.z7design.secured_guard.model.User> userOpt = userRepository.findByUsername(normalizedCpf);
         if (userOpt.isEmpty()) {
             // Tentar também com CPF formatado (com pontos e traço)
-            String formattedCpf = normalizedCpf.length() == 11 
-                ? String.format("%s.%s.%s-%s", 
-                    normalizedCpf.substring(0, 3),
-                    normalizedCpf.substring(3, 6),
-                    normalizedCpf.substring(6, 9),
-                    normalizedCpf.substring(9))
-                : normalizedCpf;
+            String formattedCpf = normalizedCpf.length() == 11
+                    ? String.format("%s.%s.%s-%s",
+                            normalizedCpf.substring(0, 3),
+                            normalizedCpf.substring(3, 6),
+                            normalizedCpf.substring(6, 9),
+                            normalizedCpf.substring(9))
+                    : normalizedCpf;
             userOpt = userRepository.findByUsername(formattedCpf);
         }
-        
+
         if (userOpt.isPresent()) {
             com.z7design.secured_guard.model.User user = userOpt.get();
             log.debug("✅ User encontrado pelo username (CPF): {} - ID: {}", user.getUsername(), user.getId());
-            
+
             // Buscar Employee relacionado ao User
             Optional<Employee> employeeOpt = employeeRepository.findByUserId(user.getId());
             if (employeeOpt.isPresent()) {
@@ -1385,70 +1536,72 @@ public class EmployeeService {
                 log.warn("⚠️ User encontrado mas não há Employee relacionado para userId: {}", user.getId());
             }
         }
-        
+
         // PRIORIDADE 2: Buscar usando findByCpf (busca na coluna cpf com normalização)
         Optional<Employee> employeeOpt = employeeRepository.findByCpf(normalizedCpf);
         if (employeeOpt.isPresent()) {
             log.debug("✅ Funcionário encontrado usando findByCpf: {}", employeeOpt.get().getName());
             return employeeOpt;
         }
-        
+
         // PRIORIDADE 3: Buscar usando findByDocument (campo document)
         employeeOpt = employeeRepository.findByDocument(normalizedCpf);
         if (employeeOpt.isPresent()) {
             log.debug("✅ Funcionário encontrado usando findByDocument: {}", employeeOpt.get().getName());
             return employeeOpt;
         }
-        
+
         // PRIORIDADE 4: Buscar todos e normalizar manualmente (fallback)
         List<Employee> allEmployees = employeeRepository.findAll();
         employeeOpt = allEmployees.stream()
-            .filter(e -> e.getDocument() != null)
-            .filter(e -> e.getDocument().replaceAll("[^0-9]", "").equals(normalizedCpf))
-            .findFirst();
-        
+                .filter(e -> e.getDocument() != null)
+                .filter(e -> e.getDocument().replaceAll("[^0-9]", "").equals(normalizedCpf))
+                .findFirst();
+
         if (employeeOpt.isPresent()) {
             log.debug("✅ Funcionário encontrado usando busca manual: {}", employeeOpt.get().getName());
             return employeeOpt;
         }
-        
-        log.warn("⚠️ Funcionário não encontrado para CPF: {} (tentou users.username, employees.document, employees.cpf)", normalizedCpf);
+
+        log.warn(
+                "⚠️ Funcionário não encontrado para CPF: {} (tentou users.username, employees.document, employees.cpf)",
+                normalizedCpf);
         return Optional.empty();
     }
-    
+
     /**
      * Busca dados básicos do funcionário por CPF
      */
     public Map<String, Object> getEmployeeBasicDataByCpf(String cpf) {
         log.debug("Buscando dados básicos do funcionário por CPF: {}", cpf);
-        
+
         Optional<Employee> employeeOpt = findByCpfExact(cpf);
         if (employeeOpt.isEmpty()) {
             log.warn("Funcionário não encontrado para CPF: {}", cpf);
             return new HashMap<>();
         }
-        
+
         Employee employee = employeeOpt.get();
         Map<String, Object> data = new HashMap<>();
-        
+
         data.put("id", employee.getId());
         data.put("name", employee.getName());
         data.put("cpf", employee.getDocument());
         data.put("email", employee.getEmail());
         data.put("phone", employee.getPhone());
         data.put("status", employee.getStatus());
-        
+
         if (employee.getPosition() != null) {
             data.put("position", employee.getPosition().getName());
             data.put("positionId", employee.getPosition().getId());
         }
-        
+
         if (employee.getUnit() != null) {
             data.put("unit", employee.getUnit().getName());
             data.put("unitId", employee.getUnit().getId());
         }
-        
+
         log.debug("Dados básicos encontrados para funcionário: {}", employee.getName());
         return data;
     }
-} 
+}

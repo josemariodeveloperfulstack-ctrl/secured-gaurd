@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Bell, Mail, Search, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Mail, Search, ArrowLeft, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import UserMenu from './UserMenu';
 import Logo from './Logo';
@@ -11,6 +11,25 @@ const Header: React.FC = () => {
   const { profile } = useAuth();
   const username = profile?.full_name || profile?.username || 'Usuário';
 
+  const [today, setToday] = useState('');
+
+  useEffect(() => {
+    const updateDate = () => {
+      const now = new Date();
+      const formatted = now.toLocaleDateString('pt-BR', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      // Capitaliza: "sáb., 28 de fev. de 2026" → "Sáb., 28 de Fev. de 2026"
+      setToday(formatted.replace(/^./, c => c.toUpperCase()));
+    };
+    updateDate();
+    const timer = setInterval(updateDate, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <header className="h-16 bg-seguranca-graphite shadow-md px-4 flex items-center justify-between flex-shrink-0 z-40 border-b border-gray-700">
       <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -20,6 +39,14 @@ const Header: React.FC = () => {
         <div className="flex items-center gap-2">
           <ArrowLeft className="text-seguranca-lightgray cursor-pointer hover:text-seguranca-yellow transition-colors" size={20} />
           <Logo size="md" className="ml-1" />
+        </div>
+
+        {/* 📅 Data de Hoje */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-seguranca-yellow/10 border border-seguranca-yellow/40 select-none">
+          <CalendarDays className="text-seguranca-yellow flex-shrink-0" size={16} />
+          <span className="text-[12px] font-semibold text-white tracking-wide whitespace-nowrap">
+            {today}
+          </span>
         </div>
       </div>
 
@@ -56,3 +83,4 @@ const Header: React.FC = () => {
 };
 
 export default Header;
+

@@ -14,6 +14,7 @@ export interface EmployeeBankData {
   bank: string;
   agency: string;
   account: string;
+  accountDigit?: string;
   type: string; // Conta Corrente, Poupança, etc.
   chavePix?: string;
 }
@@ -54,7 +55,7 @@ export interface Employee {
   terminationDate?: string; // LocalDate do backend
   status?: string;
   notes?: string;
-  
+
   // Campos adicionais do backend
   tituloEleitor?: string;
   tituloEleitorDataExpedicao?: string;
@@ -69,25 +70,25 @@ export interface Employee {
   ctps?: string;
   cbo?: string;
   pis?: string;
-  
+
   // Campos de CNH
   cnhNumber?: string;
   cnhExpirationDate?: string;
   cnhCategory?: string;
-  
+
   // Campos de CTPS
   ctpsSeries?: string;
   ctpsIssueDate?: string;
   ctpsIssuingAgency?: string;
   ctpsRural?: string;
-  
+
   // Documentos adicionais
   tituloEleitorZona?: string;
   tituloEleitorSecao?: string;
   carteiraIdentidadeOrgaoEmissor?: string;
   carteiraIdentidadeDataEmissao?: string;
   certificadoMilitar?: string;
-  
+
   // Informações de trabalho
   cbo?: string;
   salario?: number; // BigDecimal do backend
@@ -100,19 +101,19 @@ export interface Employee {
   prorrogacaoExperiencia?: string; // Prorrogação do prazo de experiência
   folgaSemanal?: string; // Dias de Folga (ex: "1ª Escola")
   escalaTrabalho?: string; // Escala de Trabalho
-  
+
   // FGTS
   fgtsOptante?: boolean;
   fgtsDataOpcao?: string;
   fgtsBancoDepositario?: string;
   fgtsDataRetratacao?: string;
-  
+
   // Empresa
   empresaNome?: string;
   empresaEndereco?: string;
   empresaCnpj?: string;
   vistoFiscalizacao?: string;
-  
+
   // Informações pessoais adicionais
   nomePai?: string;
   nomeMae?: string;
@@ -122,14 +123,14 @@ export interface Employee {
   sexo?: string;
   grauInstrucao?: string;
   matriculaEsocial?: string;
-  
+
   // PIS
   pisDataCadastro?: string;
   pisBancoDepositario?: string;
   pisEnderecoBanco?: string;
   pisCodigoBanco?: string;
   pisCodigoAgencia?: string;
-  
+
   // Estrangeiros
   carteiraModelo19?: string;
   registroGeralEstrangeiro?: string;
@@ -147,7 +148,7 @@ export interface Employee {
   ricOrgaoEmissor?: string; // Órgão Emissor do RIC
   ricDataEmissao?: string; // Data de Emissão do RIC
   tipoVisto?: string; // Tipo de Visto
-  
+
   // Assinaturas e controle
   assinaturaFuncionario?: string;
   dataRescisao?: string;
@@ -155,7 +156,7 @@ export interface Employee {
   caminhoPdf?: string;
   mesReferencia?: string;
   anoReferencia?: string;
-  
+
   // Dados do cônjuge
   spouseName?: string;
   spouseCpf?: string;
@@ -164,7 +165,7 @@ export interface Employee {
   spouseProfession?: string;
   spousePhone?: string;
   spouseEmail?: string;
-  
+
   // Campos da ficha de registro
   empresaNome?: string;
   empresaEndereco?: string;
@@ -226,20 +227,20 @@ export interface Employee {
   vistoFiscalizacao?: string;
   assinaturaFuncionario?: string;
   dataRescisao?: string;
-  
+
   // Relacionamentos (apenas IDs como no backend)
-  position?: { 
+  position?: {
     id: UUID;
     name?: string;
     description?: string;
   };
-  unit?: { 
+  unit?: {
     id: UUID;
     name?: string;
     description?: string;
   };
   user?: { id: UUID };
-  company?: { 
+  company?: {
     id: UUID;
     name?: string;
     sigla?: string;
@@ -256,14 +257,16 @@ export interface Employee {
     name?: string;
     description?: string;
   };
-  
+
   // Dados aninhados (opcionais)
   bankData?: EmployeeBankData;
   bankInfo?: {
     bank?: string;
     agency?: string;
     account?: string;
+    accountDigit?: string;
     accountType?: string;
+    pixKey?: string;
   };
   documents?: EmployeeDocument[];
   history?: EmployeeHistoryItem[];
@@ -274,7 +277,7 @@ export interface Employee {
     cpf?: string;
     rg?: string;
   }>;
-  
+
   createdAt?: string;
   updatedAt?: string;
 }
@@ -310,7 +313,7 @@ export interface CreateEmployeeDTO {
   hireDate?: string;
   status?: string;
   notes?: string;
-  
+
   // Campos adicionais
   tituloEleitor?: string;
   tituloEleitorDataExpedicao?: string;
@@ -325,25 +328,25 @@ export interface CreateEmployeeDTO {
   ctps?: string;
   cbo?: string;
   pis?: string;
-  
+
   // Campos de CNH
   cnhNumber?: string;
   cnhExpirationDate?: string;
   cnhCategory?: string;
-  
+
   // Campos de CTPS
   ctpsSeries?: string;
   ctpsIssueDate?: string;
   ctpsIssuingAgency?: string;
   ctpsRural?: string;
-  
+
   // Documentos adicionais
   tituloEleitorZona?: string;
   tituloEleitorSecao?: string;
   carteiraIdentidadeOrgaoEmissor?: string;
   carteiraIdentidadeDataEmissao?: string;
   certificadoMilitar?: string;
-  
+
   // Informações de trabalho
   cbo?: string;
   salario?: number;
@@ -356,19 +359,19 @@ export interface CreateEmployeeDTO {
   prorrogacaoExperiencia?: string; // Prorrogação do prazo de experiência
   folgaSemanal?: string; // Dias de Folga (ex: "1ª Escola")
   escalaTrabalho?: string; // Escala de Trabalho
-  
+
   // FGTS
   fgtsOptante?: boolean;
   fgtsDataOpcao?: string;
   fgtsBancoDepositario?: string;
   fgtsDataRetratacao?: string;
-  
+
   // Empresa
   empresaNome?: string;
   empresaEndereco?: string;
   empresaCnpj?: string;
   vistoFiscalizacao?: string;
-  
+
   // Informações pessoais adicionais
   nomePai?: string;
   nomeMae?: string;
@@ -378,14 +381,14 @@ export interface CreateEmployeeDTO {
   sexo?: string;
   grauInstrucao?: string;
   matriculaEsocial?: string;
-  
+
   // PIS
   pisDataCadastro?: string;
   pisBancoDepositario?: string;
   pisEnderecoBanco?: string;
   pisCodigoBanco?: string;
   pisCodigoAgencia?: string;
-  
+
   // Estrangeiros
   carteiraModelo19?: string;
   registroGeralEstrangeiro?: string;
@@ -403,12 +406,12 @@ export interface CreateEmployeeDTO {
   ricOrgaoEmissor?: string; // Órgão Emissor do RIC
   ricDataEmissao?: string; // Data de Emissão do RIC
   tipoVisto?: string; // Tipo de Visto
-  
+
   // Assinaturas e controle
   assinaturaFuncionario?: string;
   dataRescisao?: string;
   possuiWhatsapp?: boolean;
-  
+
   // Dados do Exame Médico (ASO)
   exameMedicoData?: string;
   exameMedicoTipo?: string; // ADMISSIONAL, DEMISSIONAL, PERIODICO, MUDANCA_FUNCAO, RETORNO_TRABALHO
@@ -418,7 +421,7 @@ export interface CreateEmployeeDTO {
   exameMedicoObservacoes?: string;
   exameMedicoPrimeiroEmprego?: boolean; // true = Sim, false = Não
   exameMedicoContribuicaoSindicalPaga?: boolean; // true = Sim, false = Não
-  
+
   // Dados do cônjuge
   spouseName?: string;
   spouseCpf?: string;
@@ -427,7 +430,7 @@ export interface CreateEmployeeDTO {
   spouseProfession?: string;
   spousePhone?: string;
   spouseEmail?: string;
-  
+
   // Campos da ficha de registro
   empresaNome?: string;
   empresaEndereco?: string;
@@ -489,32 +492,32 @@ export interface CreateEmployeeDTO {
   vistoFiscalizacao?: string;
   assinaturaFuncionario?: string;
   dataRescisao?: string;
-  
+
   // Relacionamentos
-  position?: { 
+  position?: {
     id: string;
     name?: string;
     description?: string;
   };
-  unit?: { 
+  unit?: {
     id: string;
     name?: string;
     description?: string;
   };
   user?: { id: string };
-  company?: { 
+  company?: {
     id: string;
     name?: string;
     sigla?: string;
     cnpj?: string;
   };
-  
+
   // Campo para Posto de Trabalho
   workPostId?: string;
-  
+
   // Campo para Departamento
   departmentId?: string;
-  
+
   // Dados aninhados
   bankData?: EmployeeBankData;
   documents?: { type: string; number: string; file?: File }[];

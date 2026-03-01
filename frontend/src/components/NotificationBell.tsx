@@ -177,7 +177,7 @@ export const NotificationBell: React.FC = () => {
                       </div>
                       <div>
                         <h3 className="font-bold text-seguranca-lightgray tracking-tight">CENTRO DE NOTIFICAÇÕES</h3>
-                        <p className="text-[10px] text-gray-500 font-mono">SECURED GUARD OS v1.0</p>
+                        <p className="text-[10px] text-gray-500 font-mono">PROMOVER VIGILÂNCIA PATRIMONIAL</p>
                       </div>
                     </div>
                   )}
@@ -357,7 +357,7 @@ export const NotificationBell: React.FC = () => {
               {/* Footer */}
               <div className="p-4 border-t border-gray-800 bg-seguranca-black flex items-center justify-between flex-none">
                 <p className="text-[9px] text-gray-600 font-mono italic">
-                  SECURED GUARD PROTECTIVE SERVICES &copy; 2026
+                  PROMOVER VIGILÂNCIA PATRIMONIAL &copy; 2026
                 </p>
                 <Button
                   variant="ghost"

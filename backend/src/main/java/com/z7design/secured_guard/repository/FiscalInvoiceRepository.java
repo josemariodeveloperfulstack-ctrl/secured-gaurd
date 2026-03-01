@@ -14,26 +14,26 @@ import java.util.UUID;
 @Repository
 public interface FiscalInvoiceRepository extends JpaRepository<FiscalInvoice, UUID> {
 
-    @Query("SELECT f FROM FiscalInvoice f WHERE " +
-            "(:periodYear <= 0 OR f.periodYear = :periodYear) AND " +
-            "(:periodMonth <= 0 OR f.periodMonth = :periodMonth) AND " +
-            "(:clientName = '' OR LOWER(CAST(f.clientName AS string)) LIKE LOWER(CONCAT('%', CAST(:clientName AS string), '%'))) AND " +
-            "(:fileType = '' OR f.fileType = :fileType)")
-    Page<FiscalInvoice> findByFilters(
-            @Param("periodYear") Integer periodYear,
-            @Param("periodMonth") Integer periodMonth,
-            @Param("clientName") String clientName,
-            @Param("fileType") String fileType,
-            Pageable pageable);
+        @Query("SELECT f FROM FiscalInvoice f WHERE " +
+                        "(:periodYear <= 0 OR f.periodYear = :periodYear) AND " +
+                        "(:periodMonth <= 0 OR f.periodMonth = :periodMonth) AND " +
+                        "(:clientName = '' OR LOWER(f.clientName) LIKE LOWER(CONCAT('%', :clientName, '%'))) AND " +
+                        "(:fileType = '' OR f.fileType = :fileType)")
+        Page<FiscalInvoice> findByFilters(
+                        @Param("periodYear") Integer periodYear,
+                        @Param("periodMonth") Integer periodMonth,
+                        @Param("clientName") String clientName,
+                        @Param("fileType") String fileType,
+                        Pageable pageable);
 
-    @Query("SELECT f FROM FiscalInvoice f WHERE " +
-            "(:periodYear <= 0 OR f.periodYear = :periodYear) AND " +
-            "(:periodMonth <= 0 OR f.periodMonth = :periodMonth) AND " +
-            "(:clientName = '' OR LOWER(CAST(f.clientName AS string)) LIKE LOWER(CONCAT('%', CAST(:clientName AS string), '%'))) AND " +
-            "(:fileType = '' OR f.fileType = :fileType)")
-    List<FiscalInvoice> findAllByFilters(
-            @Param("periodYear") Integer periodYear,
-            @Param("periodMonth") Integer periodMonth,
-            @Param("clientName") String clientName,
-            @Param("fileType") String fileType);
+        @Query("SELECT f FROM FiscalInvoice f WHERE " +
+                        "(:periodYear <= 0 OR f.periodYear = :periodYear) AND " +
+                        "(:periodMonth <= 0 OR f.periodMonth = :periodMonth) AND " +
+                        "(:clientName = '' OR LOWER(f.clientName) LIKE LOWER(CONCAT('%', :clientName, '%'))) AND " +
+                        "(:fileType = '' OR f.fileType = :fileType)")
+        List<FiscalInvoice> findAllByFilters(
+                        @Param("periodYear") Integer periodYear,
+                        @Param("periodMonth") Integer periodMonth,
+                        @Param("clientName") String clientName,
+                        @Param("fileType") String fileType);
 }

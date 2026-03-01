@@ -32,11 +32,12 @@ public class EmployeeDTO {
     private String gender;
     private String maritalStatus;
     private String nationality;
-    
-    // Lista de dependentes (usado apenas para visualização, não para criação/atualização)
+
+    // Lista de dependentes (usado apenas para visualização, não para
+    // criação/atualização)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private java.util.List<com.z7design.secured_guard.dto.DependentDTO> dependents;
-    
+
     // private String photoUrl;
     // private String currentScale;
     private String email;
@@ -45,7 +46,7 @@ public class EmployeeDTO {
     private String cnhNumber;
     @JsonDeserialize(using = AddressDeserializer.class)
     private AddressDTO address;
-    
+
     // Campos de endereço separados
     private String enderecoRua;
     private String enderecoNumero;
@@ -54,13 +55,13 @@ public class EmployeeDTO {
     private String enderecoCidade;
     private String enderecoEstado;
     private String enderecoCep;
-    
+
     // CIN (Carteira de Identidade Nacional)
     private String cinNumero;
     private String cinOrgaoEmissor;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate cinDataEmissao;
-    
+
     // CTPS Digital PDF
     private byte[] ctpsDigitalPdf;
     private String ctpsDigitalPdfNome;
@@ -83,7 +84,8 @@ public class EmployeeDTO {
     private LocalDate hireDate;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate terminationDate;
-    // Campos já implementados abaixo (linhas 87-141) - mantidos comentados para evitar duplicação
+    // Campos já implementados abaixo (linhas 87-141) - mantidos comentados para
+    // evitar duplicação
     // private String cep;
     // private String ctps;
     // private String cbo;
@@ -102,7 +104,7 @@ public class EmployeeDTO {
     // private String anoReferencia;
     private String notes;
     private String status;
-    
+
     // Dados do cônjuge
     private String spouseName;
     private String spouseCpf;
@@ -111,7 +113,7 @@ public class EmployeeDTO {
     private LocalDate spouseBirthDate;
     private String spousePhone;
     private String spouseEmail;
-    
+
     // Campos da ficha de registro
     private String empresaNome;
     private String empresaEndereco;
@@ -162,10 +164,10 @@ public class EmployeeDTO {
     private String pisCodigoAgencia;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate cnhExpirationDate;
-    
+
     // Campo para Posto de Trabalho
     private String workPostId;
-    
+
     // Campo para Departamento
     private String departmentId;
     private String cnhCategory;
@@ -186,7 +188,7 @@ public class EmployeeDTO {
     private Boolean naturalizado;
     private String decretoNaturalizacao;
     private String vistoFiscalizacao;
-    
+
     // Campos para Estrangeiro
     private String rneNumero; // RNE nº
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -196,11 +198,11 @@ public class EmployeeDTO {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate ricDataEmissao; // Data de Emissão do RIC
     private String tipoVisto; // Tipo de Visto
-    
+
     private String assinaturaFuncionario;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dataRescisao;
-    
+
     // Dados do Exame Médico (ASO)
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate exameMedicoData;
@@ -208,10 +210,11 @@ public class EmployeeDTO {
     private IdOnlyDTO exameMedicoDoctor; // Referência ao médico
     private String exameMedicoHorario; // Ex: "18:00 ÀS 06:00 H"
     private Boolean exameMedicoIntervalosRefeicao; // true = Sim, false = Não
+    private String exameMedicoHorarioIntervalo; // Ex: "12:00 ÀS 13:00 H"
     private String exameMedicoObservacoes;
     private Boolean exameMedicoPrimeiroEmprego; // true = Sim, false = Não
     private Boolean exameMedicoContribuicaoSindicalPaga; // true = Sim, false = Não
-    
+
     /**
      * Usuário do sistema vinculado ao funcionário (opcional).
      * Só deve ser preenchido se o funcionário também for usuário do sistema.
@@ -234,7 +237,7 @@ public class EmployeeDTO {
         private String state;
         private String zipCode;
     }
-    
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -243,9 +246,11 @@ public class EmployeeDTO {
         private String bank;
         private String agency;
         private String account;
+        private String accountDigit;
         private String accountType;
+        private String pixKey;
     }
-    
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -262,7 +267,7 @@ public class EmployeeDTO {
         private BigDecimal salary;
         private String status;
     }
-    
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -275,7 +280,7 @@ public class EmployeeDTO {
         private LocalDate issueDate;
         private String issuingAuthority;
     }
-    
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -325,20 +330,20 @@ public class EmployeeDTO {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
     }
-    
+
     // Deserializador customizado para o campo address
     public static class AddressDeserializer extends StdDeserializer<AddressDTO> {
-        
+
         public AddressDeserializer() {
             super(AddressDTO.class);
         }
-        
+
         @Override
         public AddressDTO deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
             JsonNode node = p.getCodec().readTree(p);
-            
+
             AddressDTO address = new AddressDTO();
-            
+
             if (node.isTextual()) {
                 // Se for string, usar como street
                 address.setStreet(node.asText());
@@ -366,8 +371,8 @@ public class EmployeeDTO {
                     address.setZipCode(node.get("zipCode").asText());
                 }
             }
-            
+
             return address;
         }
     }
-} 
+}

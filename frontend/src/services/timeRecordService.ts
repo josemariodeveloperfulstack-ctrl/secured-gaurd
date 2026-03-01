@@ -68,7 +68,6 @@ export const timeRecordService = {
     return response.data;
   },
 
-  /** Salva os horários de um dia (lançamento manual) no banco. Persiste conforme o usuário preenche. */
   async saveManualDay(employeeId: string, date: string, payload: {
     entrada?: string;
     saidaAlmoco?: string;
@@ -85,6 +84,14 @@ export const timeRecordService = {
     });
     return response.data;
   },
+
+  async generateReport(employeeId: string, month: number, year: number) {
+    const response = await api.get(`/time-records/report/${employeeId}`, {
+      params: { month, year },
+      responseType: 'blob'
+    });
+    return response.data;
+  }
 };
 
 export default timeRecordService;

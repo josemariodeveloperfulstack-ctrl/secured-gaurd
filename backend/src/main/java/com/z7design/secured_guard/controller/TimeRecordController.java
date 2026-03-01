@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.TimeRecord;
+import com.z7design.secured_guard.service.TimeRecordReportService;
 import com.z7design.secured_guard.service.TimeRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +9,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +29,29 @@ import java.util.UUID;
 public class TimeRecordController {
 
         private final TimeRecordService timeRecordService;
+        private final TimeRecordReportService timeRecordReportService;
+
+        @GetMapping("/report/{employeeId}")
+        @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR', 'CLIENT_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
+        public ResponseEntity<byte[]> generateMonthlyReport(
+                        @PathVariable UUID employeeId,
+                        @RequestParam int month,
+                        @RequestParam int year) {
+                try {
+                        byte[] pdfBytes = timeRecordReportService.generateMonthlyReport(employeeId, month, year);
+
+                        String filename = "espelho_ponto_" + employeeId + "_" + month + "_" + year + ".pdf";
+
+                        return ResponseEntity.ok()
+                                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                                        "attachment; filename=\"" + filename + "\"")
+                                        .contentType(MediaType.APPLICATION_PDF)
+                                        .body(pdfBytes);
+                } catch (Exception e) {
+                        log.error("Erro ao gerar relatório de ponto PDF: {}", e.getMessage(), e);
+                        return ResponseEntity.internalServerError().build();
+                }
+        }
 
         @PostMapping("/register")
         @PreAuthorize("""

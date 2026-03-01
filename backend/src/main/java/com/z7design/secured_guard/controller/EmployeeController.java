@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.z7design.secured_guard.service.EmployeeExcelImportService;
+import com.z7design.secured_guard.service.EmployeeImportService;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,11 +32,12 @@ import java.util.HashMap;
 @RequiredArgsConstructor
 @Tag(name = "Funcionários", description = "Endpoints para gestão de funcionários")
 public class EmployeeController {
-    
+
     private final EmployeeService employeeService;
     private final EmployeeRecordPdfService employeeRecordPdfService;
     private final EmployeeExcelImportService employeeExcelImportService;
-    
+    private final EmployeeImportService employeeImportService;
+
     @GetMapping("/count")
     @Operation(summary = "Contar funcionários", description = "Retorna o número total de funcionários")
     public ResponseEntity<Object> getCount() {
@@ -56,7 +58,8 @@ public class EmployeeController {
     public ResponseEntity<Object> testStatus() {
         try {
             System.out.println("🔍 EmployeeController.testStatus - Testando endpoint");
-            return ResponseEntity.ok(java.util.Map.of("message", "Endpoint funcionando", "timestamp", System.currentTimeMillis()));
+            return ResponseEntity
+                    .ok(java.util.Map.of("message", "Endpoint funcionando", "timestamp", System.currentTimeMillis()));
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.testStatus - Erro: " + e.getMessage());
             e.printStackTrace();
@@ -69,14 +72,14 @@ public class EmployeeController {
     public ResponseEntity<Object> getAllSimple() {
         try {
             System.out.println("🔍 EmployeeController.getAllSimple - Buscando dados básicos");
-            
+
             List<Employee> employees = employeeService.findAll();
             System.out.println("🔍 Encontrados " + employees.size() + " funcionários no banco");
-            
+
             if (employees.isEmpty()) {
-                    return ResponseEntity.ok(java.util.Collections.emptyList());
-                }
-            
+                return ResponseEntity.ok(java.util.Collections.emptyList());
+            }
+
             // Retornar apenas dados básicos sem conversão DTO
             List<java.util.Map<String, Object>> simpleEmployees = new java.util.ArrayList<>();
             for (Employee employee : employees) {
@@ -89,10 +92,11 @@ public class EmployeeController {
                 simple.put("createdAt", employee.getCreatedAt());
                 simpleEmployees.add(simple);
             }
-            
-            System.out.println("✅ EmployeeController.getAllSimple - Retornando " + simpleEmployees.size() + " funcionários simples");
+
+            System.out.println("✅ EmployeeController.getAllSimple - Retornando " + simpleEmployees.size()
+                    + " funcionários simples");
             return ResponseEntity.ok(simpleEmployees);
-            
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getAllSimple - Erro: " + e.getMessage());
             e.printStackTrace();
@@ -105,20 +109,20 @@ public class EmployeeController {
     public ResponseEntity<Object> testBasic() {
         try {
             System.out.println("🔍 EmployeeController.testBasic - Teste básico");
-            
+
             // Teste 1: Contar funcionários
             long count = employeeService.count();
             System.out.println("✅ Contagem: " + count);
-            
+
             // Teste 2: Buscar apenas os IDs sem carregar relacionamentos
             try {
                 List<Employee> employees = employeeService.findAll();
                 System.out.println("✅ Busca findAll executada com sucesso");
-                
+
                 if (!employees.isEmpty()) {
                     Employee first = employees.get(0);
                     System.out.println("✅ Primeiro funcionário: " + first.getName());
-                    
+
                     java.util.Map<String, Object> result = new java.util.HashMap<>();
                     result.put("count", count);
                     result.put("firstEmployee", first.getName());
@@ -126,20 +130,20 @@ public class EmployeeController {
                     result.put("totalFound", employees.size());
                     return ResponseEntity.ok(result);
                 } else {
-                    return ResponseEntity.ok(java.util.Map.of("count", count, "message", "Nenhum funcionário encontrado"));
+                    return ResponseEntity
+                            .ok(java.util.Map.of("count", count, "message", "Nenhum funcionário encontrado"));
                 }
             } catch (Exception findAllError) {
                 System.err.println("❌ Erro no findAll: " + findAllError.getMessage());
                 findAllError.printStackTrace();
-                
+
                 // Retornar apenas a contagem se o findAll falhar
                 return ResponseEntity.ok(java.util.Map.of(
-                    "count", count, 
-                    "findAllError", findAllError.getMessage(),
-                    "message", "Contagem funcionou, mas findAll falhou"
-                ));
+                        "count", count,
+                        "findAllError", findAllError.getMessage(),
+                        "message", "Contagem funcionou, mas findAll falhou"));
             }
-            
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.testBasic - Erro: " + e.getMessage());
             e.printStackTrace();
@@ -152,16 +156,15 @@ public class EmployeeController {
     public ResponseEntity<Object> getEmployeeIds() {
         try {
             System.out.println("🔍 EmployeeController.getEmployeeIds - Buscando apenas IDs");
-            
+
             // Usar query nativa para buscar apenas IDs
             List<UUID> employeeIds = employeeService.findAllIds();
             System.out.println("✅ Encontrados " + employeeIds.size() + " IDs de funcionários");
-            
+
             return ResponseEntity.ok(java.util.Map.of(
-                "count", employeeIds.size(),
-                "ids", employeeIds
-            ));
-            
+                    "count", employeeIds.size(),
+                    "ids", employeeIds));
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getEmployeeIds - Erro: " + e.getMessage());
             e.printStackTrace();
@@ -174,11 +177,11 @@ public class EmployeeController {
     public ResponseEntity<Object> getEmployeeById(@PathVariable UUID id) {
         try {
             System.out.println("🔍 EmployeeController.getEmployeeById - Buscando funcionário ID: " + id);
-            
+
             Employee employee = employeeService.findById(id);
             if (employee != null) {
                 System.out.println("✅ Funcionário encontrado: " + employee.getName());
-                
+
                 // Retornar dados básicos sem conversão DTO
                 java.util.Map<String, Object> result = new java.util.HashMap<>();
                 result.put("id", employee.getId());
@@ -187,12 +190,12 @@ public class EmployeeController {
                 result.put("phone", employee.getPhone());
                 result.put("status", employee.getStatus() != null ? employee.getStatus().name() : null);
                 result.put("createdAt", employee.getCreatedAt());
-                
+
                 return ResponseEntity.ok(result);
             } else {
                 return ResponseEntity.notFound().build();
             }
-            
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getEmployeeById - Erro: " + e.getMessage());
             e.printStackTrace();
@@ -205,10 +208,10 @@ public class EmployeeController {
     public ResponseEntity<Object> getBasicData() {
         try {
             System.out.println("🔍 EmployeeController.getBasicData - Buscando dados básicos");
-            
+
             List<Object[]> data = employeeService.findBasicData();
             System.out.println("✅ Encontrados " + data.size() + " registros básicos");
-            
+
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
             for (Object[] row : data) {
                 java.util.Map<String, Object> employee = new java.util.HashMap<>();
@@ -218,40 +221,39 @@ public class EmployeeController {
                 employee.put("phone", row[10]); // phone está na posição 10
                 employee.put("status", row[7]); // status está na posição 7
                 employee.put("createdAt", row[17]); // created_at está na posição 17
-                
+
                 // Adicionar position e unit
                 if (row.length > 19 && row[19] != null) {
                     java.util.Map<String, Object> position = new java.util.HashMap<>();
                     position.put("name", row[19]); // position_name
                     employee.put("position", position);
                 }
-                
+
                 if (row.length > 20 && row[20] != null) {
                     java.util.Map<String, Object> unit = new java.util.HashMap<>();
                     unit.put("name", row[20]); // unit_name
                     employee.put("unit", unit);
                 }
-                
+
                 // Adicionar company (sigla) se existir (index 21)
                 if (row.length > 21 && row[21] != null) {
                     java.util.Map<String, Object> company = new java.util.HashMap<>();
                     company.put("sigla", row[21]); // company_sigla
                     employee.put("company", company);
                 }
-                
+
                 // Adicionar userId se existir (index 22)
                 if (row.length > 22 && row[22] != null) {
                     employee.put("userId", row[22]);
                 }
-                
+
                 employees.add(employee);
             }
-            
+
             return ResponseEntity.ok(java.util.Map.of(
-                "count", employees.size(),
-                "employees", employees
-            ));
-            
+                    "count", employees.size(),
+                    "employees", employees));
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getBasicData - Erro: " + e.getMessage());
             e.printStackTrace();
@@ -268,9 +270,10 @@ public class EmployeeController {
     @Transactional(readOnly = true)
     public ResponseEntity<Object> getAll(@RequestParam(required = false) String searchTerm) {
         try {
-            System.out.println("🔍 EmployeeController.getAll - Usando query nativa para evitar problemas de relacionamentos");
+            System.out.println(
+                    "🔍 EmployeeController.getAll - Usando query nativa para evitar problemas de relacionamentos");
             System.out.println("🔍 EmployeeController.getAll - searchTerm: " + searchTerm);
-            
+
             // Se houver searchTerm, usar busca por nome ou documento
             List<Object[]> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
@@ -280,12 +283,12 @@ public class EmployeeController {
                 data = employeeService.findBasicData();
             }
             System.out.println("🔍 Encontrados " + data.size() + " funcionários no banco");
-            
+
             if (data.isEmpty()) {
                 System.out.println("⚠️ Lista de funcionários vazia");
                 return ResponseEntity.ok(java.util.Collections.emptyList());
             }
-            
+
             // Converter para Map simples
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
             for (Object[] row : data) {
@@ -310,64 +313,64 @@ public class EmployeeController {
                     employee.put("salario", row[16]);
                     employee.put("createdAt", row[17]);
                     employee.put("updatedAt", row[18]);
-                    
+
                     // Adicionar position e unit (novas colunas da query)
                     if (row.length > 19 && row[19] != null) {
                         java.util.Map<String, Object> position = new java.util.HashMap<>();
                         position.put("name", row[19]); // position_name
                         employee.put("position", position);
                     }
-                    
+
                     if (row.length > 20 && row[20] != null) {
                         java.util.Map<String, Object> unit = new java.util.HashMap<>();
                         unit.put("name", row[20]); // unit_name
                         employee.put("unit", unit);
                     }
-                    
+
                     // Adicionar company (sigla) se existir (index 21)
                     if (row.length > 21 && row[21] != null) {
                         java.util.Map<String, Object> company = new java.util.HashMap<>();
                         company.put("sigla", row[21]); // company_sigla
                         employee.put("company", company);
                     }
-                    
+
                     // Adicionar userId se existir (index 22)
                     if (row.length > 22 && row[22] != null) {
                         employee.put("userId", row[22]);
                     }
-                    
+
                     // Adicionar workPost se existir (index 23)
                     if (row.length > 23 && row[23] != null) {
                         java.util.Map<String, Object> workPost = new java.util.HashMap<>();
                         workPost.put("name", row[23]); // work_post_name
                         employee.put("workPost", workPost);
                     }
-                    
+
                     // Adicionar department se existir (index 24)
                     if (row.length > 24 && row[24] != null) {
                         java.util.Map<String, Object> department = new java.util.HashMap<>();
                         department.put("name", row[24]); // department_name
                         employee.put("department", department);
                     }
-                    
+
                     employees.add(employee);
-                    } catch (Exception dtoError) {
+                } catch (Exception dtoError) {
                     System.err.println("❌ Erro ao converter funcionário: " + dtoError.getMessage());
-                        dtoError.printStackTrace();
-                        // Continua com os outros funcionários
-                    }
+                    dtoError.printStackTrace();
+                    // Continua com os outros funcionários
                 }
-                
+            }
+
             System.out.println("✅ EmployeeController.getAll - Retornando " + employees.size() + " funcionários");
             return ResponseEntity.ok(employees);
-            
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getAll - Erro geral: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(500).body(java.util.Collections.emptyList());
         }
     }
-    
+
     @GetMapping("/paged")
     @Operation(summary = "Listar funcionários (paginado)", description = "Retorna uma lista paginada de funcionários com opção de busca por nome ou CPF")
     @ApiResponses(value = {
@@ -376,25 +379,27 @@ public class EmployeeController {
     })
     @Transactional(readOnly = true)
     public ResponseEntity<Object> getAllPaged(@RequestParam(required = false) String searchTerm,
-                                              @RequestParam(defaultValue = "0") int page,
-                                              @RequestParam(defaultValue = "500") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "500") int size) {
         try {
             int safePage = Math.max(page, 0);
             int safeSize = Math.min(Math.max(size, 1), 500);
-            System.out.println("🔍 EmployeeController.getAllPaged - page=" + safePage + " size=" + safeSize + " searchTerm=" + searchTerm);
-            
+            System.out.println("🔍 EmployeeController.getAllPaged - page=" + safePage + " size=" + safeSize
+                    + " searchTerm=" + searchTerm);
+
             List<Object[]> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                 data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize);
             } else {
                 data = employeeService.findBasicDataPaged(safePage, safeSize);
             }
-            System.out.println("🔍 EmployeeController.getAllPaged - Encontrados " + data.size() + " funcionários no banco");
-            
+            System.out.println(
+                    "🔍 EmployeeController.getAllPaged - Encontrados " + data.size() + " funcionários no banco");
+
             if (data.isEmpty()) {
                 return ResponseEntity.ok(java.util.Collections.emptyList());
             }
-            
+
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
             for (Object[] row : data) {
                 try {
@@ -418,49 +423,51 @@ public class EmployeeController {
                     employee.put("salario", row[16]);
                     employee.put("createdAt", row[17]);
                     employee.put("updatedAt", row[18]);
-                    
+
                     if (row.length > 19 && row[19] != null) {
                         java.util.Map<String, Object> position = new java.util.HashMap<>();
                         position.put("name", row[19]); // position_name
                         employee.put("position", position);
                     }
-                    
+
                     if (row.length > 20 && row[20] != null) {
                         java.util.Map<String, Object> unit = new java.util.HashMap<>();
                         unit.put("name", row[20]); // unit_name
                         employee.put("unit", unit);
                     }
-                    
+
                     if (row.length > 21 && row[21] != null) {
                         java.util.Map<String, Object> company = new java.util.HashMap<>();
                         company.put("sigla", row[21]); // company_sigla
                         employee.put("company", company);
                     }
-                    
+
                     if (row.length > 22 && row[22] != null) {
                         employee.put("userId", row[22]);
                     }
-                    
+
                     if (row.length > 23 && row[23] != null) {
                         java.util.Map<String, Object> workPost = new java.util.HashMap<>();
                         workPost.put("name", row[23]); // work_post_name
                         employee.put("workPost", workPost);
                     }
-                    
+
                     if (row.length > 24 && row[24] != null) {
                         java.util.Map<String, Object> department = new java.util.HashMap<>();
                         department.put("name", row[24]); // department_name
                         employee.put("department", department);
                     }
-                    
+
                     employees.add(employee);
                 } catch (Exception dtoError) {
-                    System.err.println("❌ EmployeeController.getAllPaged - Erro ao converter funcionário: " + dtoError.getMessage());
+                    System.err.println("❌ EmployeeController.getAllPaged - Erro ao converter funcionário: "
+                            + dtoError.getMessage());
                     dtoError.printStackTrace();
                 }
             }
-            
-            System.out.println("✅ EmployeeController.getAllPaged - Retornando " + employees.size() + " funcionários (página " + safePage + ")");
+
+            System.out.println("✅ EmployeeController.getAllPaged - Retornando " + employees.size()
+                    + " funcionários (página " + safePage + ")");
             return ResponseEntity.ok(employees);
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getAllPaged - Erro geral: " + e.getMessage());
@@ -468,7 +475,7 @@ public class EmployeeController {
             return ResponseEntity.status(500).body(java.util.Collections.emptyList());
         }
     }
-    
+
     @GetMapping("/{id}")
     @Operation(summary = "Buscar funcionário por ID", description = "Retorna um funcionário específico pelo seu ID com todos os relacionamentos")
     @ApiResponses(value = {
@@ -480,7 +487,7 @@ public class EmployeeController {
     public ResponseEntity<Object> getById(@PathVariable String id) {
         try {
             System.out.println("🔍 EmployeeController.getById - Buscando funcionário ID: " + id);
-            
+
             // Converter String para UUID
             UUID employeeId;
             try {
@@ -489,20 +496,24 @@ public class EmployeeController {
                 System.err.println("❌ ID inválido: " + id);
                 return ResponseEntity.badRequest().body(java.util.Map.of("error", "ID inválido: " + id));
             }
-            
+
             // Buscar funcionário completo com relacionamentos usando findById e toDTO
             Employee employee = employeeService.findById(employeeId);
             System.out.println("✅ Funcionário encontrado: " + employee.getName());
-            
-            // Converter para DTO que inclui todos os relacionamentos (user, position, unit, etc)
+
+            // Converter para DTO que inclui todos os relacionamentos (user, position, unit,
+            // etc)
             EmployeeDTO dto = employeeService.toDTO(employee);
-            
-            System.out.println("✅ DTO convertido - User ID: " + (dto.getUser() != null ? dto.getUser().getId() : "null"));
-            System.out.println("✅ DTO convertido - Position ID: " + (dto.getPosition() != null ? dto.getPosition().getId() : "null"));
-            System.out.println("✅ DTO convertido - Unit ID: " + (dto.getUnit() != null ? dto.getUnit().getId() : "null"));
-            
+
+            System.out
+                    .println("✅ DTO convertido - User ID: " + (dto.getUser() != null ? dto.getUser().getId() : "null"));
+            System.out.println("✅ DTO convertido - Position ID: "
+                    + (dto.getPosition() != null ? dto.getPosition().getId() : "null"));
+            System.out
+                    .println("✅ DTO convertido - Unit ID: " + (dto.getUnit() != null ? dto.getUnit().getId() : "null"));
+
             return ResponseEntity.ok(dto);
-            
+
         } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
             System.err.println("❌ Funcionário não encontrado: " + id);
             return ResponseEntity.notFound().build();
@@ -512,7 +523,7 @@ public class EmployeeController {
             return ResponseEntity.status(500).body(java.util.Map.of("error", e.getMessage()));
         }
     }
-    
+
     @GetMapping("/email/{email}")
     @Operation(summary = "Buscar funcionário por email", description = "Retorna um funcionário específico pelo email")
     public ResponseEntity<EmployeeDTO> getByEmail(@PathVariable String email) {
@@ -520,7 +531,7 @@ public class EmployeeController {
                 .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado"));
         return ResponseEntity.ok(employeeService.toDTO(employee));
     }
-    
+
     @PostMapping
     @Operation(summary = "Criar novo funcionário", description = "Cria um novo funcionário no sistema")
     @ApiResponses(value = {
@@ -532,7 +543,7 @@ public class EmployeeController {
         EmployeeDTO createdEmployee = employeeService.create(employeeDTO);
         return ResponseEntity.status(201).body(createdEmployee);
     }
-    
+
     @PutMapping("/{id}")
     @Operation(summary = "Atualizar funcionário", description = "Atualiza os dados de um funcionário existente")
     @ApiResponses(value = {
@@ -545,7 +556,7 @@ public class EmployeeController {
         EmployeeDTO updatedEmployee = employeeService.update(UUID.fromString(id), employeeDTO);
         return ResponseEntity.ok(updatedEmployee);
     }
-    
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir funcionário", description = "Exclui um funcionário do sistema")
     @ApiResponses(value = {
@@ -557,18 +568,43 @@ public class EmployeeController {
         employeeService.delete(UUID.fromString(id));
         return ResponseEntity.noContent().build();
     }
-    
-    @PutMapping("/{id}/status")
+
+    @PatchMapping("/{id}/status")
     @Operation(summary = "Atualizar status do funcionário", description = "Atualiza apenas o status de um funcionário")
-    public ResponseEntity<Employee> updateStatus(@PathVariable String id, @RequestParam String status) {
-        try {
-            com.z7design.secured_guard.model.enums.EmploymentStatus employmentStatus = 
-                com.z7design.secured_guard.model.enums.EmploymentStatus.valueOf(status.toUpperCase());
-            Employee employee = employeeService.updateStatus(UUID.fromString(id), employmentStatus);
-            return ResponseEntity.ok(employee);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Status inválido: " + status);
-        }
+    public ResponseEntity<EmployeeDTO> updateStatus(@PathVariable String id, @RequestParam String status) {
+        return ResponseEntity
+                .ok(employeeService.update(UUID.fromString(id), EmployeeDTO.builder().status(status).build()));
+    }
+
+    @PostMapping("/bulk-status")
+    @Operation(summary = "Atualizar status de múltiplos funcionários", description = "Atualiza o status de vários funcionários em lote")
+    public ResponseEntity<Void> bulkUpdateStatus(@RequestBody Map<String, Object> request) {
+        List<String> ids = (List<String>) request.get("ids");
+        String status = (String) request.get("status");
+        List<UUID> uuids = ids.stream().map(UUID::fromString).toList();
+        employeeService.bulkUpdateStatus(uuids, status);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/bulk-terminate")
+    @Operation(summary = "Demitir múltiplos funcionários", description = "Demite vários funcionários em lote")
+    public ResponseEntity<Void> bulkTerminate(@RequestBody Map<String, Object> request) {
+        List<String> ids = (List<String>) request.get("ids");
+        String terminationDateStr = (String) request.get("terminationDate");
+        java.time.LocalDate terminationDate = terminationDateStr != null ? java.time.LocalDate.parse(terminationDateStr)
+                : java.time.LocalDate.now();
+        List<UUID> uuids = ids.stream().map(UUID::fromString).toList();
+        employeeService.bulkTerminate(uuids, terminationDate);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/bulk-delete")
+    @Operation(summary = "Excluir múltiplos funcionários", description = "Exclui vários funcionários em lote. Apenas funcionários demitidos podem ser excluídos.")
+    public ResponseEntity<Void> bulkDelete(@RequestBody Map<String, Object> request) {
+        List<String> ids = (List<String>) request.get("ids");
+        List<UUID> uuids = ids.stream().map(UUID::fromString).toList();
+        employeeService.bulkDelete(uuids);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/status/{status}")
@@ -581,18 +617,20 @@ public class EmployeeController {
     public ResponseEntity<List<EmployeeDTO>> getByStatus(@PathVariable String status) {
         try {
             System.out.println("[DEBUG] EmployeeController.getByStatus - Status recebido: " + status);
-            com.z7design.secured_guard.model.enums.EmploymentStatus employmentStatus = 
-                com.z7design.secured_guard.model.enums.EmploymentStatus.valueOf(status.toUpperCase());
+            com.z7design.secured_guard.model.enums.EmploymentStatus employmentStatus = com.z7design.secured_guard.model.enums.EmploymentStatus
+                    .valueOf(status.toUpperCase());
             System.out.println("[DEBUG] EmployeeController.getByStatus - Status convertido: " + employmentStatus);
             List<Employee> employees = employeeService.findByStatus(employmentStatus);
-            System.out.println("[DEBUG] EmployeeController.getByStatus - Funcionários encontrados: " + employees.size());
+            System.out
+                    .println("[DEBUG] EmployeeController.getByStatus - Funcionários encontrados: " + employees.size());
             // Converter um por um para identificar qual está causando problema
             List<EmployeeDTO> dtos = new ArrayList<>();
             for (int i = 0; i < employees.size(); i++) {
                 Employee employee = employees.get(i);
                 try {
-                    System.out.println("[DEBUG] Convertendo funcionário " + (i+1) + "/" + employees.size() + ": " + employee.getName());
-                    
+                    System.out.println("[DEBUG] Convertendo funcionário " + (i + 1) + "/" + employees.size() + ": "
+                            + employee.getName());
+
                     // Teste básico - apenas dados essenciais
                     EmployeeDTO dto = new EmployeeDTO();
                     dto.setId(employee.getId());
@@ -601,17 +639,18 @@ public class EmployeeController {
                     dto.setStatus(employee.getStatus() != null ? employee.getStatus().name() : null);
                     dto.setCreatedAt(employee.getCreatedAt());
                     dto.setUpdatedAt(employee.getUpdatedAt());
-                    
+
                     dtos.add(dto);
-                    System.out.println("[DEBUG] Funcionário " + (i+1) + " convertido com sucesso");
-                    
+                    System.out.println("[DEBUG] Funcionário " + (i + 1) + " convertido com sucesso");
+
                 } catch (Exception ex) {
-                    System.err.println("[ERROR] Erro ao converter funcionário " + (i+1) + " (" + employee.getName() + "): " + ex.getMessage());
+                    System.err.println("[ERROR] Erro ao converter funcionário " + (i + 1) + " (" + employee.getName()
+                            + "): " + ex.getMessage());
                     ex.printStackTrace();
                     // Continuar com os outros funcionários
                 }
             }
-            
+
             System.out.println("[DEBUG] EmployeeController.getByStatus - DTOs criados: " + dtos.size());
             return ResponseEntity.ok(dtos);
         } catch (IllegalArgumentException e) {
@@ -623,7 +662,7 @@ public class EmployeeController {
             return ResponseEntity.status(500).build();
         }
     }
-    
+
     @GetMapping("/search/name")
     @Operation(summary = "Buscar funcionários por nome", description = "Retorna funcionários cujo nome contenha o termo informado")
     @ApiResponses(value = {
@@ -635,15 +674,17 @@ public class EmployeeController {
         try {
             System.out.println("[DEBUG] EmployeeController.searchByName - Nome recebido: " + name);
             List<Employee> employees = employeeService.findByNameContaining(name);
-            System.out.println("[DEBUG] EmployeeController.searchByName - Funcionários encontrados: " + employees.size());
-            List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO).collect(java.util.stream.Collectors.toList());
+            System.out
+                    .println("[DEBUG] EmployeeController.searchByName - Funcionários encontrados: " + employees.size());
+            List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO)
+                    .collect(java.util.stream.Collectors.toList());
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.searchByName - Erro: " + e.getMessage());
             throw new RuntimeException("Erro ao buscar funcionários por nome: " + e.getMessage());
         }
     }
-    
+
     @GetMapping("/search")
     @Operation(summary = "Buscar funcionários por nome ou documento", description = "Retorna funcionários cujo nome ou documento contenha o termo informado")
     @ApiResponses(value = {
@@ -655,15 +696,17 @@ public class EmployeeController {
         try {
             System.out.println("[DEBUG] EmployeeController.searchByNameOrDocument - Termo recebido: " + q);
             List<Employee> employees = employeeService.findByNameOrDocumentContaining(q);
-            System.out.println("[DEBUG] EmployeeController.searchByNameOrDocument - Funcionários encontrados: " + employees.size());
-            List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO).collect(java.util.stream.Collectors.toList());
+            System.out.println("[DEBUG] EmployeeController.searchByNameOrDocument - Funcionários encontrados: "
+                    + employees.size());
+            List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO)
+                    .collect(java.util.stream.Collectors.toList());
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.searchByNameOrDocument - Erro: " + e.getMessage());
             throw new RuntimeException("Erro ao buscar funcionários: " + e.getMessage());
         }
     }
-    
+
     @GetMapping("/search/simple")
     @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ')")
     @Operation(summary = "Buscar funcionários simplificados", description = "Retorna dados simplificados de funcionários para seleção em formulários")
@@ -676,14 +719,15 @@ public class EmployeeController {
         try {
             System.out.println("[DEBUG] EmployeeController.searchSimple - Termo recebido: " + q);
             List<SimpleEmployeeDTO> employees = employeeService.findSimpleEmployeesByNameOrDocument(q);
-            System.out.println("[DEBUG] EmployeeController.searchSimple - Funcionários encontrados: " + employees.size());
+            System.out
+                    .println("[DEBUG] EmployeeController.searchSimple - Funcionários encontrados: " + employees.size());
             return ResponseEntity.ok(employees);
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.searchSimple - Erro: " + e.getMessage());
             throw new RuntimeException("Erro ao buscar funcionários: " + e.getMessage());
         }
     }
-    
+
     @GetMapping("/search/cpf/{cpf}")
     @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ')")
     @Operation(summary = "Buscar funcionário por CPF exato", description = "Busca funcionário por CPF normalizado (remove caracteres não numéricos)")
@@ -695,15 +739,17 @@ public class EmployeeController {
     public ResponseEntity<EmployeeDTO> findByCpfExact(@PathVariable String cpf) {
         try {
             System.out.println("[DEBUG] EmployeeController.findByCpfExact - CPF recebido: " + cpf);
-            
+
             java.util.Optional<Employee> employeeOpt = employeeService.findByCpfExact(cpf);
-            
+
             if (employeeOpt.isPresent()) {
                 EmployeeDTO dto = employeeService.toDTO(employeeOpt.get());
-                System.out.println("[DEBUG] EmployeeController.findByCpfExact - Funcionário encontrado: " + dto.getName());
+                System.out.println(
+                        "[DEBUG] EmployeeController.findByCpfExact - Funcionário encontrado: " + dto.getName());
                 return ResponseEntity.ok(dto);
             } else {
-                System.out.println("[DEBUG] EmployeeController.findByCpfExact - Funcionário não encontrado para CPF: " + cpf);
+                System.out.println(
+                        "[DEBUG] EmployeeController.findByCpfExact - Funcionário não encontrado para CPF: " + cpf);
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
@@ -712,7 +758,7 @@ public class EmployeeController {
             throw new RuntimeException("Erro ao buscar funcionário por CPF: " + e.getMessage());
         }
     }
-    
+
     @GetMapping("/{id}/generate-record-pdf")
     @Operation(summary = "Gerar PDF da ficha de registro do funcionário", description = "Gera e retorna o PDF da ficha de registro do funcionário")
     @ApiResponses(value = {
@@ -723,16 +769,17 @@ public class EmployeeController {
     public ResponseEntity<byte[]> generateEmployeeRecordPdf(@PathVariable String id) {
         try {
             System.out.println("[DEBUG] EmployeeController.generateEmployeeRecordPdf - ID: " + id);
-            
+
             UUID employeeId = UUID.fromString(id);
             byte[] pdf = employeeRecordPdfService.generateEmployeeRecordPdf(employeeId);
-            
+
             String fileName = "ficha-registro-funcionario-" + id + ".pdf";
-            
+
             return ResponseEntity.ok()
-                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/pdf")
-                .body(pdf);
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + fileName + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/pdf")
+                    .body(pdf);
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.generateEmployeeRecordPdf - Erro: " + e.getMessage());
             e.printStackTrace();
@@ -757,16 +804,18 @@ public class EmployeeController {
             String fileName = "ficha-registro-funcionario-" + id + ".xlsx";
 
             return ResponseEntity.ok()
-                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                .body(excel);
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + fileName + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    .body(excel);
         } catch (Exception e) {
             System.err.println("[ERROR] EmployeeController.generateEmployeeRecordExcel - Erro: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-    
+
     /**
      * 📥 Importar funcionários de planilha Excel
      */
@@ -775,18 +824,19 @@ public class EmployeeController {
     @PreAuthorize("hasAnyAuthority('RH_FUNCIONARIOS_CREATE', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN')")
     public ResponseEntity<Map<String, Object>> importEmployeesFromExcel(@RequestParam("file") MultipartFile file) {
         try {
-            System.out.println("📥 EmployeeController.importEmployeesFromExcel - Arquivo recebido: " + file.getOriginalFilename());
-            
+            System.out.println(
+                    "📥 EmployeeController.importEmployeesFromExcel - Arquivo recebido: " + file.getOriginalFilename());
+
             if (file.isEmpty()) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "Arquivo vazio");
                 return ResponseEntity.badRequest().body(response);
             }
-            
+
             // Processar importação
             EmployeeExcelImportService.ImportResult result = employeeExcelImportService.importEmployees(file);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", result.isSuccess());
             response.put("created", result.getCreated());
@@ -794,25 +844,64 @@ public class EmployeeController {
             response.put("errors", result.getErrors());
             response.put("warnings", result.getWarnings());
             response.put("message", result.getSummary());
-            
-            System.out.println("✅ EmployeeController.importEmployeesFromExcel - Importação concluída: " + result.getSummary());
-            
+
+            System.out.println(
+                    "✅ EmployeeController.importEmployeesFromExcel - Importação concluída: " + result.getSummary());
+
             if (result.isSuccess()) {
                 return ResponseEntity.ok(response);
             } else {
                 return ResponseEntity.badRequest().body(response);
             }
-            
+
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.importEmployeesFromExcel - Erro: " + e.getMessage());
             e.printStackTrace();
-            
+
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", "Erro ao processar importação: " + e.getMessage());
             errorResponse.put("errors", List.of(e.getMessage()));
-            
+
             return ResponseEntity.status(500).body(errorResponse);
         }
     }
-} 
+
+    /**
+     * 📥 Importar funcionários da planilha Promover Vigilância Patrimonial
+     */
+    @PostMapping("/import/promover")
+    @Operation(summary = "Importar planilha Promover", description = "Importa funcionários da planilha XLSX da Promover (CNPJ 43576260000112). Upsert por CPF. Cria Departamento/Cargo automaticamente se não existir.")
+    @PreAuthorize("hasAnyAuthority('RH_FUNCIONARIOS_CREATE', 'SUPER_ADMIN', 'ROLE_SUPER_ADMIN', 'ADMIN', 'ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> importFromPromoverPlanilha(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "cnpj", required = false) String cnpj) {
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Arquivo vazio"));
+            }
+
+            EmployeeImportService.ImportResult result = employeeImportService.importar(file, cnpj);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", result.erros() == 0);
+            response.put("total", result.total());
+            response.put("criados", result.criados());
+            response.put("atualizados", result.atualizados());
+            response.put("erros", result.erros());
+            response.put("mensagens", result.mensagens());
+            response.put("message", String.format(
+                    "Importação concluída: %d total | %d criados | %d atualizados | %d erros",
+                    result.total(), result.criados(), result.atualizados(), result.erros()));
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("❌ importFromPromoverPlanilha - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Erro ao processar importação: " + e.getMessage()));
+        }
+    }
+}

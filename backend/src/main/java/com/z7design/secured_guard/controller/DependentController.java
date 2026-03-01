@@ -26,22 +26,19 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Tag(name = "Dependentes", description = "Endpoints para gestão de dependentes de funcionários")
 public class DependentController {
-    
+
     private final DependentService dependentService;
-    
+
     @PostMapping
-    @Operation(
-        summary = "Criar novo dependente",
-        description = "Cria um novo dependente associado a um funcionário"
-    )
+    @Operation(summary = "Criar novo dependente", description = "Cria um novo dependente associado a um funcionário")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "Dependente criado com sucesso"),
-        @ApiResponse(responseCode = "400", description = "Dados inválidos"),
-        @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
-        @ApiResponse(responseCode = "409", description = "CPF já cadastrado"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "201", description = "Dependente criado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
+            @ApiResponse(responseCode = "409", description = "CPF já cadastrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_COLABORADOR')")
     public ResponseEntity<DependentDTO> create(
             @Valid @RequestBody DependentDTO.CreateRequest request) {
         try {
@@ -53,15 +50,12 @@ public class DependentController {
             throw e;
         }
     }
-    
+
     @GetMapping
-    @Operation(
-        summary = "Listar todos os dependentes",
-        description = "Retorna lista de todos os dependentes cadastrados"
-    )
+    @Operation(summary = "Listar todos os dependentes", description = "Retorna lista de todos os dependentes cadastrados")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     // Permissões controladas pelo SecurityConfig
     public ResponseEntity<List<DependentDTO>> findAll() {
@@ -74,18 +68,15 @@ public class DependentController {
             throw e;
         }
     }
-    
+
     @GetMapping("/{id}")
-    @Operation(
-        summary = "Buscar dependente por ID",
-        description = "Retorna dados de um dependente específico"
-    )
+    @Operation(summary = "Buscar dependente por ID", description = "Retorna dados de um dependente específico")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Dependente encontrado"),
-        @ApiResponse(responseCode = "404", description = "Dependente não encontrado"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "200", description = "Dependente encontrado"),
+            @ApiResponse(responseCode = "404", description = "Dependente não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_COLABORADOR')")
     public ResponseEntity<DependentDTO> findById(
             @Parameter(description = "ID do dependente") @PathVariable UUID id) {
         try {
@@ -97,29 +88,26 @@ public class DependentController {
             throw e;
         }
     }
-    
+
     @GetMapping("/employee/{employeeId}")
-    @Operation(
-        summary = "Buscar dependentes por funcionário",
-        description = "Retorna lista de dependentes de um funcionário específico"
-    )
+    @Operation(summary = "Buscar dependentes por funcionário", description = "Retorna lista de dependentes de um funcionário específico")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<DependentDTO>> findByEmployeeId(
             @Parameter(description = "ID do funcionário") @PathVariable UUID employeeId) {
         try {
             log.info("Buscando dependentes do funcionário ID: {}", employeeId);
-            
+
             // Validar UUID - se for o UUID padrão/inválido, retornar lista vazia
-            if (employeeId == null || employeeId.toString().equals("00000000-0000-0000-0000-000000000001") || 
-                employeeId.toString().equals("00000000-0000-0000-0000-000000000000")) {
+            if (employeeId == null || employeeId.toString().equals("00000000-0000-0000-0000-000000000001") ||
+                    employeeId.toString().equals("00000000-0000-0000-0000-000000000000")) {
                 log.warn("UUID inválido ou padrão recebido: {}", employeeId);
                 return ResponseEntity.ok(java.util.Collections.emptyList());
             }
-            
+
             List<DependentDTO> dependents = dependentService.findByEmployeeId(employeeId);
             return ResponseEntity.ok(dependents);
         } catch (Exception e) {
@@ -127,17 +115,14 @@ public class DependentController {
             throw e;
         }
     }
-    
+
     @GetMapping("/cpf/{cpf}")
-    @Operation(
-        summary = "Buscar dependente por CPF",
-        description = "Retorna lista de dependentes com CPF específico"
-    )
+    @Operation(summary = "Buscar dependente por CPF", description = "Retorna lista de dependentes com CPF específico")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_COLABORADOR')")
     public ResponseEntity<List<DependentDTO>> findByCpf(
             @Parameter(description = "CPF do dependente") @PathVariable String cpf) {
         try {
@@ -149,17 +134,14 @@ public class DependentController {
             throw e;
         }
     }
-    
+
     @GetMapping("/relationship/{relationship}")
-    @Operation(
-        summary = "Buscar dependentes por relacionamento",
-        description = "Retorna lista de dependentes com relacionamento específico (filho, cônjuge, etc)"
-    )
+    @Operation(summary = "Buscar dependentes por relacionamento", description = "Retorna lista de dependentes com relacionamento específico (filho, cônjuge, etc)")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "200", description = "Lista de dependentes retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_COLABORADOR')")
     public ResponseEntity<List<DependentDTO>> findByRelationship(
             @Parameter(description = "Tipo de relacionamento") @PathVariable String relationship) {
         try {
@@ -171,20 +153,17 @@ public class DependentController {
             throw e;
         }
     }
-    
+
     @PutMapping("/{id}")
-    @Operation(
-        summary = "Atualizar dependente",
-        description = "Atualiza os dados de um dependente existente"
-    )
+    @Operation(summary = "Atualizar dependente", description = "Atualiza os dados de um dependente existente")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Dependente atualizado com sucesso"),
-        @ApiResponse(responseCode = "400", description = "Dados inválidos"),
-        @ApiResponse(responseCode = "404", description = "Dependente não encontrado"),
-        @ApiResponse(responseCode = "409", description = "CPF já cadastrado"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "200", description = "Dependente atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "404", description = "Dependente não encontrado"),
+            @ApiResponse(responseCode = "409", description = "CPF já cadastrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_COLABORADOR')")
     public ResponseEntity<DependentDTO> update(
             @Parameter(description = "ID do dependente") @PathVariable UUID id,
             @Valid @RequestBody DependentDTO.UpdateRequest request) {
@@ -197,18 +176,15 @@ public class DependentController {
             throw e;
         }
     }
-    
+
     @DeleteMapping("/{id}")
-    @Operation(
-        summary = "Excluir dependente",
-        description = "Remove um dependente do sistema"
-    )
+    @Operation(summary = "Excluir dependente", description = "Remove um dependente do sistema")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "204", description = "Dependente excluído com sucesso"),
-        @ApiResponse(responseCode = "404", description = "Dependente não encontrado"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
+            @ApiResponse(responseCode = "204", description = "Dependente excluído com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Dependente não encontrado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','COLABORADOR','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_COLABORADOR')")
     public ResponseEntity<Void> delete(
             @Parameter(description = "ID do dependente") @PathVariable UUID id) {
         try {

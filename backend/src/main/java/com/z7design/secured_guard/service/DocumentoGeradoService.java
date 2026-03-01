@@ -25,78 +25,83 @@ import java.util.regex.Pattern;
 @Transactional
 @Slf4j
 public class DocumentoGeradoService {
-    
+
     private final DocumentoGeradoRepository documentoGeradoRepository;
     private final ModeloDocumentoRepository modeloDocumentoRepository;
     private final EmployeeRepository employeeRepository;
     private final ObjectMapper objectMapper;
     private final PdfGenerationService pdfGenerationService;
-    
+
     // Regex para encontrar placeholders no formato {{variavel}}
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([^}]+)\\}\\}");
-    
+
     public DocumentoGeradoService(DocumentoGeradoRepository documentoGeradoRepository,
-                                 ModeloDocumentoRepository modeloDocumentoRepository,
-                                 EmployeeRepository employeeRepository,
-                                 ObjectMapper objectMapper,
-                                 PdfGenerationService pdfGenerationService) {
+            ModeloDocumentoRepository modeloDocumentoRepository,
+            EmployeeRepository employeeRepository,
+            ObjectMapper objectMapper,
+            PdfGenerationService pdfGenerationService) {
         this.documentoGeradoRepository = documentoGeradoRepository;
         this.modeloDocumentoRepository = modeloDocumentoRepository;
         this.employeeRepository = employeeRepository;
         this.objectMapper = objectMapper;
         this.pdfGenerationService = pdfGenerationService;
     }
-    
+
     /**
      * Gera um novo documento a partir de um modelo
      */
-    public DocumentoGerado gerarDocumento(UUID modeloId, UUID funcionarioId, 
-                                          Map<String, Object> dadosPreenchidos, 
-                                          User criadoPor) {
-        
+    public DocumentoGerado gerarDocumento(UUID modeloId, UUID funcionarioId,
+            Map<String, Object> dadosPreenchidos,
+            User criadoPor) {
+
         // Buscar modelo e funcionário
         ModeloDocumento modelo = modeloDocumentoRepository.findById(modeloId)
                 .orElseThrow(() -> new RuntimeException("Modelo não encontrado"));
-        
+
         Employee funcionario = employeeRepository.findById(funcionarioId)
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
-        
+
         // Preencher dados automáticos do funcionário
         Map<String, Object> dadosCompletos = preencherDadosAutomaticos(funcionario, dadosPreenchidos);
-        
+
         // Gerar conteúdo final
         String conteudoTemplate = modelo.getConteudoTemplate();
-        log.info("📝 Template do modelo: {} (tamanho: {} chars)", 
-            modelo.getNomeModelo(), 
-            conteudoTemplate != null ? conteudoTemplate.length() : 0);
-        
+        log.info("📝 Template do modelo: {} (tamanho: {} chars)",
+                modelo.getNomeModelo(),
+                conteudoTemplate != null ? conteudoTemplate.length() : 0);
+
         String conteudoFinal = substituirPlaceholders(conteudoTemplate, dadosCompletos);
-        
-        // Se não houver conteúdo template, criar um conteúdo básico com os dados do funcionário
+
+        // Se não houver conteúdo template, criar um conteúdo básico com os dados do
+        // funcionário
         if (conteudoFinal == null || conteudoFinal.trim().isEmpty()) {
             log.warn("⚠️ Template vazio ou nulo para modelo {}. Gerando conteúdo básico.", modelo.getNomeModelo());
             conteudoFinal = gerarConteudoBasico(funcionario, dadosCompletos);
         }
-        
+
         log.info("📄 Conteúdo final gerado: {} caracteres", conteudoFinal.length());
-        
+
         // Gerar PDF usando o conteúdo final
-        byte[] arquivoPdf = gerarPdf(modelo, dadosCompletos, conteudoFinal);
-        
+        UUID companyId = funcionario.getCompany() != null ? funcionario.getCompany().getId() : null;
+        byte[] arquivoPdf = gerarPdf(modelo, dadosCompletos, conteudoFinal, companyId);
+
         // Validar que o PDF foi gerado corretamente
         if (arquivoPdf == null || arquivoPdf.length == 0) {
-            log.error("❌ Erro ao gerar PDF: arquivo vazio ou nulo para modelo {} e funcionário {}", modeloId, funcionarioId);
+            log.error("❌ Erro ao gerar PDF: arquivo vazio ou nulo para modelo {} e funcionário {}", modeloId,
+                    funcionarioId);
             throw new RuntimeException("Erro ao gerar PDF: arquivo vazio ou nulo");
         }
-        
-        log.info("✅ PDF gerado com sucesso: {} bytes para modelo {} e funcionário {}", arquivoPdf.length, modeloId, funcionarioId);
-        
+
+        log.info("✅ PDF gerado com sucesso: {} bytes para modelo {} e funcionário {}", arquivoPdf.length, modeloId,
+                funcionarioId);
+
         String nomeArquivoPdf = pdfGenerationService.gerarNomeArquivo(modelo, funcionario.getName());
-        
+
         // Converter dados para JSON
         String dadosJson = converterParaJson(dadosCompletos);
-        
-        // Criar documento gerado usando new em vez de builder para evitar problemas de ordem
+
+        // Criar documento gerado usando new em vez de builder para evitar problemas de
+        // ordem
         DocumentoGerado documento = new DocumentoGerado();
         documento.setModelo(modelo);
         documento.setFuncionario(funcionario);
@@ -108,25 +113,25 @@ public class DocumentoGeradoService {
         documento.setStatus(DocumentoGerado.StatusDocumento.PENDENTE);
         documento.setCriadoPor(criadoPor);
         documento.setDataCriacao(LocalDateTime.now());
-        
+
         return documentoGeradoRepository.save(documento);
     }
-    
+
     /**
      * Assina um documento
      */
     public DocumentoGerado assinarDocumento(UUID documentoId, User usuario, String ipAddress) {
         DocumentoGerado documento = buscarPorId(documentoId);
-        
+
         if (documento.isAssinado()) {
             throw new RuntimeException("Documento já foi assinado");
         }
-        
+
         documento.marcarComoAssinado(usuario, ipAddress);
-        
+
         return documentoGeradoRepository.save(documento);
     }
-    
+
     /**
      * Busca documento por ID
      */
@@ -135,7 +140,7 @@ public class DocumentoGeradoService {
         return documentoGeradoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Documento não encontrado"));
     }
-    
+
     /**
      * Lista documentos por funcionário
      */
@@ -143,10 +148,10 @@ public class DocumentoGeradoService {
     public List<DocumentoGerado> listarPorFuncionario(UUID funcionarioId) {
         Employee funcionario = employeeRepository.findById(funcionarioId)
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
-        
+
         return documentoGeradoRepository.findByFuncionarioOrderByDataCriacaoDesc(funcionario);
     }
-    
+
     /**
      * Lista documentos por modelo
      */
@@ -154,10 +159,10 @@ public class DocumentoGeradoService {
     public List<DocumentoGerado> listarPorModelo(UUID modeloId) {
         ModeloDocumento modelo = modeloDocumentoRepository.findById(modeloId)
                 .orElseThrow(() -> new RuntimeException("Modelo não encontrado"));
-        
+
         return documentoGeradoRepository.findByModeloOrderByDataCriacaoDesc(modelo);
     }
-    
+
     /**
      * Lista documentos por status
      */
@@ -165,7 +170,7 @@ public class DocumentoGeradoService {
     public List<DocumentoGerado> listarPorStatus(DocumentoGerado.StatusDocumento status) {
         return documentoGeradoRepository.findByStatusOrderByDataCriacaoDesc(status);
     }
-    
+
     /**
      * Lista documentos com paginação
      */
@@ -173,7 +178,7 @@ public class DocumentoGeradoService {
     public Page<DocumentoGerado> listarComPaginacao(Pageable pageable) {
         return documentoGeradoRepository.findAllByOrderByDataCriacaoDesc(pageable);
     }
-    
+
     /**
      * Lista documentos pendentes
      */
@@ -181,7 +186,7 @@ public class DocumentoGeradoService {
     public List<DocumentoGerado> listarPendentes() {
         return documentoGeradoRepository.findByStatusOrderByDataCriacaoDesc(DocumentoGerado.StatusDocumento.PENDENTE);
     }
-    
+
     /**
      * Lista documentos vencidos
      */
@@ -189,7 +194,7 @@ public class DocumentoGeradoService {
     public List<DocumentoGerado> listarVencidos() {
         return documentoGeradoRepository.findExpiredDocuments(LocalDateTime.now());
     }
-    
+
     /**
      * Lista documentos que vencem em breve
      */
@@ -197,22 +202,23 @@ public class DocumentoGeradoService {
     public List<DocumentoGerado> listarVencendoEmBreve(int dias) {
         LocalDateTime dataInicio = LocalDateTime.now();
         LocalDateTime dataFim = LocalDateTime.now().plusDays(dias);
-        
+
         return documentoGeradoRepository.findDocumentsExpiringSoon(dataInicio, dataFim);
     }
-    
+
     /**
      * Atualiza status de documentos vencidos
      */
     public void atualizarStatusVencidos() {
-        List<DocumentoGerado> documentosVencidos = documentoGeradoRepository.findDocumentsToUpdateStatus(LocalDateTime.now());
-        
+        List<DocumentoGerado> documentosVencidos = documentoGeradoRepository
+                .findDocumentsToUpdateStatus(LocalDateTime.now());
+
         for (DocumentoGerado documento : documentosVencidos) {
             documento.marcarComoVencido();
             documentoGeradoRepository.save(documento);
         }
     }
-    
+
     /**
      * Cancela um documento
      */
@@ -221,7 +227,7 @@ public class DocumentoGeradoService {
         documento.cancelar();
         return documentoGeradoRepository.save(documento);
     }
-    
+
     /**
      * Define data de vencimento para um documento
      */
@@ -230,13 +236,13 @@ public class DocumentoGeradoService {
         documento.setDataVencimento(dataVencimento);
         return documentoGeradoRepository.save(documento);
     }
-    
+
     /**
      * Preenche dados automáticos do funcionário
      */
     private Map<String, Object> preencherDadosAutomaticos(Employee funcionario, Map<String, Object> dadosManuais) {
         Map<String, Object> dadosCompletos = new HashMap<>();
-        
+
         // Dados automáticos do funcionário
         dadosCompletos.put("nome", funcionario.getName());
         dadosCompletos.put("cpf", funcionario.getDocument()); // CPF está no campo document
@@ -248,20 +254,20 @@ public class DocumentoGeradoService {
         dadosCompletos.put("endereco", funcionario.getAddress());
         dadosCompletos.put("telefone", funcionario.getPhone());
         dadosCompletos.put("email", funcionario.getEmail());
-        
+
         // Dados da empresa
         dadosCompletos.put("empresa", "Secure Guard"); // TODO: Buscar da configuração
         dadosCompletos.put("cnpj", "00.000.000/0001-00"); // TODO: Buscar da configuração
         dadosCompletos.put("data_atual", LocalDateTime.now().toLocalDate());
-        
+
         // Sobrescrever com dados manuais se fornecidos
         if (dadosManuais != null) {
             dadosCompletos.putAll(dadosManuais);
         }
-        
+
         return dadosCompletos;
     }
-    
+
     /**
      * Substitui placeholders no template
      */
@@ -269,36 +275,36 @@ public class DocumentoGeradoService {
         if (template == null || dados == null) {
             return template;
         }
-        
+
         String resultado = template;
         Matcher matcher = PLACEHOLDER_PATTERN.matcher(template);
-        
+
         while (matcher.find()) {
             String placeholder = matcher.group(1).trim();
             String valor = obterValorPlaceholder(placeholder, dados);
             resultado = resultado.replace(matcher.group(0), valor);
         }
-        
+
         return resultado;
     }
-    
+
     /**
      * Obtém valor para um placeholder específico
      */
     private String obterValorPlaceholder(String placeholder, Map<String, Object> dados) {
         Object valor = dados.get(placeholder);
-        
+
         if (valor == null) {
             return "[" + placeholder + "]"; // Placeholder não encontrado
         }
-        
+
         if (valor instanceof LocalDateTime) {
             return ((LocalDateTime) valor).toLocalDate().toString();
         }
-        
+
         return valor.toString();
     }
-    
+
     /**
      * Converte dados para JSON
      */
@@ -309,7 +315,7 @@ public class DocumentoGeradoService {
             throw new RuntimeException("Erro ao converter dados para JSON", e);
         }
     }
-    
+
     /**
      * Converte JSON para dados
      */
@@ -321,14 +327,14 @@ public class DocumentoGeradoService {
             throw new RuntimeException("Erro ao converter JSON para dados", e);
         }
     }
-    
+
     /**
      * Estatísticas de documentos
      */
     @Transactional(readOnly = true)
     public Map<String, Object> obterEstatisticas() {
         Map<String, Object> stats = new HashMap<>();
-        
+
         // Contar por status
         List<Object[]> statusCounts = documentoGeradoRepository.countByStatus();
         Map<String, Long> statusStats = new HashMap<>();
@@ -336,7 +342,7 @@ public class DocumentoGeradoService {
             statusStats.put((String) row[0], (Long) row[1]);
         }
         stats.put("porStatus", statusStats);
-        
+
         // Contar por modelo
         List<Object[]> modeloCounts = documentoGeradoRepository.countByModelo();
         Map<String, Long> modeloStats = new HashMap<>();
@@ -344,40 +350,41 @@ public class DocumentoGeradoService {
             modeloStats.put((String) row[0], (Long) row[1]);
         }
         stats.put("porModelo", modeloStats);
-        
+
         // Documentos vencidos
         List<DocumentoGerado> vencidos = listarVencidos();
         stats.put("vencidos", vencidos.size());
-        
+
         // Documentos pendentes
         List<DocumentoGerado> pendentes = listarPendentes();
         stats.put("pendentes", pendentes.size());
-        
+
         return stats;
     }
-    
+
     /**
      * Gera PDF a partir de um modelo
      */
-    private byte[] gerarPdf(ModeloDocumento modelo, Map<String, Object> dadosPreenchidos, String conteudoFinal) {
+    private byte[] gerarPdf(ModeloDocumento modelo, Map<String, Object> dadosPreenchidos, String conteudoFinal,
+            UUID companyId) {
         try {
             // Usar o conteúdo final diretamente para gerar o PDF
-            return pdfGenerationService.gerarPdf(conteudoFinal, modelo.getNomeModelo());
+            return pdfGenerationService.gerarPdf(conteudoFinal, modelo.getNomeModelo(), companyId);
         } catch (IOException e) {
             throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
         }
     }
-    
+
     /**
      * Gera conteúdo básico quando não há template
      */
     private String gerarConteudoBasico(Employee funcionario, Map<String, Object> dadosCompletos) {
         StringBuilder conteudo = new StringBuilder();
-        
+
         String nomeModelo = funcionario.getName() != null ? funcionario.getName() : "Funcionário";
         conteudo.append("DECLARAÇÃO\n\n");
         conteudo.append("Declaro para os devidos fins que:\n\n");
-        
+
         // Informações do funcionário
         if (dadosCompletos.get("nome") != null) {
             conteudo.append("Nome: ").append(dadosCompletos.get("nome")).append("\n");
@@ -406,14 +413,17 @@ public class DocumentoGeradoService {
         if (dadosCompletos.get("email") != null && !dadosCompletos.get("email").toString().isEmpty()) {
             conteudo.append("E-mail: ").append(dadosCompletos.get("email")).append("\n");
         }
-        
+
         conteudo.append("\n");
-        conteudo.append("Data: ").append(LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))).append("\n");
+        conteudo.append("Data: ")
+                .append(LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                .append("\n");
         conteudo.append("\n");
         conteudo.append("_________________________________________\n");
         conteudo.append(nomeModelo).append("\n");
-        conteudo.append("CPF: ").append(dadosCompletos.get("cpf") != null ? dadosCompletos.get("cpf") : "").append("\n");
-        
+        conteudo.append("CPF: ").append(dadosCompletos.get("cpf") != null ? dadosCompletos.get("cpf") : "")
+                .append("\n");
+
         return conteudo.toString();
     }
 }

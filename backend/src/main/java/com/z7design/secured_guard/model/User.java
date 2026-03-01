@@ -139,6 +139,10 @@ public class User implements UserDetails {
     @Column(length = 500)
     private String address;
 
+    // CPF para vinculação com a tabela employees (employees.document = users.cpf)
+    @Column(length = 14)
+    private String cpf;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -363,6 +367,14 @@ public class User implements UserDetails {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getCpf() {
+        return cpf;
+    }
+
+    public void setCpf(String cpf) {
+        this.cpf = cpf;
     }
 
     public LocalDateTime getCreatedAt() {

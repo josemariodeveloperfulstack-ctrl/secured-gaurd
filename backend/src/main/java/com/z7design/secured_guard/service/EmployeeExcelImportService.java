@@ -22,13 +22,13 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class EmployeeExcelImportService {
-    
+
     private final EmployeeService employeeService;
     private final CompanyRepository companyRepository;
-    
+
     // Mapeamento de colunas possíveis da planilha para campos da entidade
     private static final Map<String, String> COLUMN_MAPPING = new HashMap<>();
-    
+
     static {
         // Informações básicas
         COLUMN_MAPPING.put("nome", "name");
@@ -61,7 +61,7 @@ public class EmployeeExcelImportService {
         COLUMN_MAPPING.put("matricula e social", "matriculaEsocial");
         COLUMN_MAPPING.put("matrícula e social", "matriculaEsocial");
         COLUMN_MAPPING.put("matricula", "matriculaEsocial");
-        
+
         // Endereço
         COLUMN_MAPPING.put("endereco", "enderecoRua");
         COLUMN_MAPPING.put("endereço", "enderecoRua");
@@ -76,7 +76,7 @@ public class EmployeeExcelImportService {
         COLUMN_MAPPING.put("estado", "enderecoEstado");
         COLUMN_MAPPING.put("uf", "enderecoEstado");
         COLUMN_MAPPING.put("cep", "enderecoCep");
-        
+
         // Dados profissionais
         COLUMN_MAPPING.put("data admissao", "hireDate");
         COLUMN_MAPPING.put("data de admissão", "hireDate");
@@ -85,52 +85,67 @@ public class EmployeeExcelImportService {
         COLUMN_MAPPING.put("matrícula", "registrationNumber");
         COLUMN_MAPPING.put("status", "status");
         COLUMN_MAPPING.put("situacao", "status");
-        
+
         // Dados familiares
         COLUMN_MAPPING.put("nome pai", "nomePai");
         COLUMN_MAPPING.put("pai", "nomePai");
         COLUMN_MAPPING.put("nome mae", "nomeMae");
         COLUMN_MAPPING.put("mae", "nomeMae");
         COLUMN_MAPPING.put("mãe", "nomeMae");
-        
+
         // Estado civil
         COLUMN_MAPPING.put("estado civil", "maritalStatus");
         COLUMN_MAPPING.put("nacionalidade", "nationality");
+
+        // Mapeamentos específicos da planilha do usuário
+        COLUMN_MAPPING.put("funcionário", "name");
+        COLUMN_MAPPING.put("setor", "unitName");
+        COLUMN_MAPPING.put("função", "positionName");
+        COLUMN_MAPPING.put("escala", "escalaTrabalho");
+        COLUMN_MAPPING.put("nasc.", "birthDate");
+        COLUMN_MAPPING.put("ag. itaú", "bank");
+        COLUMN_MAPPING.put("conta", "account");
+        COLUMN_MAPPING.put("digito", "accountDigit");
+        COLUMN_MAPPING.put("chave pix", "pixKey");
+        COLUMN_MAPPING.put("salário / 26", "salario");
+        COLUMN_MAPPING.put("situação", "status");
+        COLUMN_MAPPING.put("aso feito em", "exameMedicoData");
     }
-    
+
     @Transactional
     public ImportResult importEmployees(MultipartFile file) {
         log.info("📥 Iniciando importação de funcionários do Excel: {}", file.getOriginalFilename());
-        
+
         ImportResult result = new ImportResult();
-        
+
         try {
             // Validar arquivo
             if (file.isEmpty()) {
                 result.addError("Arquivo vazio");
                 return result;
             }
-            
-            if (!file.getOriginalFilename().endsWith(".xlsx") && 
-                !file.getOriginalFilename().endsWith(".xls")) {
+
+            if (!file.getOriginalFilename().endsWith(".xlsx") &&
+                    !file.getOriginalFilename().endsWith(".xls")) {
                 result.addError("Apenas arquivos Excel (.xlsx ou .xls) são aceitos");
                 return result;
             }
-            
+
             // Ler planilha
             Workbook workbook = WorkbookFactory.create(file.getInputStream());
             Sheet sheet = workbook.getSheetAt(0); // Primeira aba
-            
+
             if (sheet == null || sheet.getPhysicalNumberOfRows() < 2) {
                 result.addError("Planilha vazia ou sem dados");
                 workbook.close();
                 return result;
             }
-            
+
             // Encontrar linha do cabeçalho (nem sempre é a primeira linha)
             int headerRowIndex = findHeaderRow(sheet);
             if (headerRowIndex < 0) {
-                result.addError("Cabeçalho não encontrado na planilha. Verifique se a linha contém os nomes das colunas.");
+                result.addError(
+                        "Cabeçalho não encontrado na planilha. Verifique se a linha contém os nomes das colunas.");
                 workbook.close();
                 return result;
             }
@@ -141,17 +156,17 @@ public class EmployeeExcelImportService {
                 workbook.close();
                 return result;
             }
-            
+
             Map<String, Integer> columnIndexMap = new HashMap<>();
             int companyCnpjColumnIndex = -1;
             String fixedCompanyCnpj = null;
-            
+
             // Mapear colunas do cabeçalho
             for (int i = 0; i < headerRow.getLastCellNum(); i++) {
                 Cell cell = headerRow.getCell(i);
                 if (cell != null) {
                     String columnName = getCellValueAsString(cell).toLowerCase().trim();
-                    
+
                     // Verificar se é coluna de empresa (CNPJ)
                     if (columnName.contains("cnpj") && columnName.contains("empresa")) {
                         companyCnpjColumnIndex = i;
@@ -162,24 +177,25 @@ public class EmployeeExcelImportService {
                     for (Map.Entry<String, String> entry : COLUMN_MAPPING.entrySet()) {
                         if (columnName.contains(entry.getKey())) {
                             columnIndexMap.put(entry.getValue(), i);
-                            log.debug("📋 Coluna '{}' mapeada para campo '{}' na posição {}", 
+                            log.debug("📋 Coluna '{}' mapeada para campo '{}' na posição {}",
                                     columnName, entry.getValue(), i);
                         }
                     }
                 }
             }
-            
+
             // Validar se encontrou CNPJ da empresa
             if (companyCnpjColumnIndex == -1) {
                 fixedCompanyCnpj = findCompanyCnpjInSheet(sheet, headerRowIndex);
                 if (fixedCompanyCnpj == null || fixedCompanyCnpj.isEmpty()) {
-                    result.addError("Coluna 'CNPJ Empresa' não encontrada na planilha. É necessário uma coluna contendo o CNPJ da empresa.");
+                    result.addError(
+                            "Coluna 'CNPJ Empresa' não encontrada na planilha. É necessário uma coluna contendo o CNPJ da empresa.");
                     workbook.close();
                     return result;
                 }
                 log.info("📋 CNPJ da empresa encontrado no cabeçalho: {}", fixedCompanyCnpj);
             }
-            
+
             // Buscar empresa do primeiro registro (todos devem ser da mesma empresa)
             Row firstDataRow = sheet.getRow(headerRowIndex + 1);
             if (firstDataRow == null) {
@@ -187,7 +203,7 @@ public class EmployeeExcelImportService {
                 workbook.close();
                 return result;
             }
-            
+
             String companyCnpj;
             if (fixedCompanyCnpj != null) {
                 companyCnpj = fixedCompanyCnpj;
@@ -195,73 +211,75 @@ public class EmployeeExcelImportService {
                 Cell cnpjCell = firstDataRow.getCell(companyCnpjColumnIndex);
                 companyCnpj = getCellValueAsString(cnpjCell);
             }
-            
+
             if (companyCnpj == null || companyCnpj.trim().isEmpty()) {
                 result.addError("CNPJ da empresa não encontrado na primeira linha de dados");
                 workbook.close();
                 return result;
             }
-            
+
             // Normalizar CNPJ (remover caracteres não numéricos)
             String normalizedCnpj = companyCnpj.replaceAll("[^0-9]", "");
             log.info("🔍 Buscando empresa com CNPJ normalizado: {}", normalizedCnpj);
-            
+
             // Buscar empresa no banco
             Optional<Company> companyOpt = companyRepository.findByNormalizedCnpj(normalizedCnpj);
             if (companyOpt.isEmpty()) {
-                result.addError("Empresa não encontrada com CNPJ: " + companyCnpj + 
-                               ". Por favor, cadastre a empresa primeiro.");
+                result.addError("Empresa não encontrada com CNPJ: " + companyCnpj +
+                        ". Por favor, cadastre a empresa primeiro.");
                 workbook.close();
                 return result;
             }
-            
+
             Company company = companyOpt.get();
-            log.info("✅ Empresa encontrada: {} (ID: {}, Sigla: {})", 
+            log.info("✅ Empresa encontrada: {} (ID: {}, Sigla: {})",
                     company.getName(), company.getId(), company.getSigla());
-            
+
             // Processar linhas de dados
             int totalRows = sheet.getPhysicalNumberOfRows();
             log.info("📊 Processando {} linhas de dados", totalRows - (headerRowIndex + 1));
-            
+
             for (int rowIndex = headerRowIndex + 1; rowIndex < totalRows; rowIndex++) {
                 Row row = sheet.getRow(rowIndex);
-                if (row == null) continue;
-                
+                if (row == null)
+                    continue;
+
                 try {
                     // Verificar se a linha tem dados
-                    if (isRowEmpty(row)) continue;
-                    
+                    if (isRowEmpty(row))
+                        continue;
+
                     // Validar se o CNPJ da empresa é o mesmo (quando existe coluna de CNPJ)
                     if (companyCnpjColumnIndex != -1) {
                         Cell rowCnpjCell = row.getCell(companyCnpjColumnIndex);
                         String rowCnpj = getCellValueAsString(rowCnpjCell);
                         String rowNormalizedCnpj = rowCnpj != null ? rowCnpj.replaceAll("[^0-9]", "") : "";
-                        
+
                         if (!rowNormalizedCnpj.equals(normalizedCnpj)) {
-                            result.addWarning("Linha " + (rowIndex + 1) + 
+                            result.addWarning("Linha " + (rowIndex + 1) +
                                     ": CNPJ diferente do esperado. Ignorando linha.");
                             continue;
                         }
                     }
-                    
+
                     // Criar DTO do funcionário a partir da linha
                     EmployeeDTO employeeDTO = createEmployeeDTOFromRow(row, columnIndexMap, company);
-                    
+
                     // Validar campos obrigatórios
                     if (employeeDTO.getName() == null || employeeDTO.getName().trim().isEmpty()) {
                         result.addWarning("Linha " + (rowIndex + 1) + ": Nome não informado. Ignorando linha.");
                         continue;
                     }
-                    
+
                     if (employeeDTO.getCpf() == null || employeeDTO.getCpf().trim().isEmpty()) {
                         result.addWarning("Linha " + (rowIndex + 1) + ": CPF não informado. Ignorando linha.");
                         continue;
                     }
-                    
+
                     // Verificar se funcionário já existe (por CPF)
                     String normalizedCpf = employeeDTO.getCpf().replaceAll("[^0-9]", "");
                     Optional<Employee> existingEmployee = employeeService.findByCpfExact(normalizedCpf);
-                    
+
                     if (existingEmployee.isPresent()) {
                         log.info("⚠️ Funcionário já existe (CPF: {}). Atualizando...", normalizedCpf);
                         // Atualizar funcionário existente
@@ -273,18 +291,18 @@ public class EmployeeExcelImportService {
                         employeeService.create(employeeDTO);
                         result.incrementCreated();
                     }
-                    
+
                 } catch (Exception e) {
                     log.error("❌ Erro ao processar linha {}: {}", rowIndex + 1, e.getMessage(), e);
                     result.addError("Linha " + (rowIndex + 1) + ": " + e.getMessage());
                 }
             }
-            
+
             workbook.close();
-            
-            log.info("✅ Importação concluída: {} criados, {} atualizados, {} erros", 
+
+            log.info("✅ Importação concluída: {} criados, {} atualizados, {} erros",
                     result.getCreated(), result.getUpdated(), result.getErrors().size());
-            
+
         } catch (IOException e) {
             log.error("❌ Erro ao ler arquivo Excel: {}", e.getMessage(), e);
             result.addError("Erro ao ler arquivo: " + e.getMessage());
@@ -292,13 +310,13 @@ public class EmployeeExcelImportService {
             log.error("❌ Erro inesperado na importação: {}", e.getMessage(), e);
             result.addError("Erro inesperado: " + e.getMessage());
         }
-        
+
         return result;
     }
-    
+
     private EmployeeDTO createEmployeeDTOFromRow(Row row, Map<String, Integer> columnIndexMap, Company company) {
         EmployeeDTO dto = new EmployeeDTO();
-        
+
         // Vincular empresa
         if (company != null) {
             EmployeeDTO.IdOnlyDTO companyDTO = new EmployeeDTO.IdOnlyDTO();
@@ -306,18 +324,20 @@ public class EmployeeExcelImportService {
             companyDTO.setName(company.getName());
             dto.setCompany(companyDTO);
         }
-        
+
         // Mapear campos da planilha
         for (Map.Entry<String, Integer> entry : columnIndexMap.entrySet()) {
             String fieldName = entry.getKey();
             int columnIndex = entry.getValue();
-            
+
             Cell cell = row.getCell(columnIndex);
-            if (cell == null) continue;
-            
+            if (cell == null)
+                continue;
+
             String cellValue = getCellValueAsString(cell);
-            if (cellValue == null || cellValue.trim().isEmpty()) continue;
-            
+            if (cellValue == null || cellValue.trim().isEmpty())
+                continue;
+
             try {
                 switch (fieldName) {
                     case "name":
@@ -345,7 +365,8 @@ public class EmployeeExcelImportService {
                         dto.setMunicipioNascimento(cellValue.trim());
                         break;
                     case "estadoNascimento":
-                        dto.setEstadoNascimento(cellValue.trim().toUpperCase().substring(0, Math.min(2, cellValue.length())));
+                        dto.setEstadoNascimento(
+                                cellValue.trim().toUpperCase().substring(0, Math.min(2, cellValue.length())));
                         break;
                     case "grauInstrucao":
                         dto.setGrauInstrucao(cellValue.trim());
@@ -369,7 +390,8 @@ public class EmployeeExcelImportService {
                         dto.setEnderecoCidade(cellValue.trim());
                         break;
                     case "enderecoEstado":
-                        dto.setEnderecoEstado(cellValue.trim().toUpperCase().substring(0, Math.min(2, cellValue.length())));
+                        dto.setEnderecoEstado(
+                                cellValue.trim().toUpperCase().substring(0, Math.min(2, cellValue.length())));
                         break;
                     case "enderecoCep":
                         dto.setEnderecoCep(cellValue.replaceAll("[^0-9]", ""));
@@ -395,12 +417,57 @@ public class EmployeeExcelImportService {
                     case "nationality":
                         dto.setNationality(cellValue.trim());
                         break;
+                    case "bank":
+                        if (dto.getBankInfo() == null)
+                            dto.setBankInfo(new EmployeeDTO.BankInfoDTO());
+                        dto.getBankInfo().setBank(cellValue.trim());
+                        break;
+                    case "account":
+                        if (dto.getBankInfo() == null)
+                            dto.setBankInfo(new EmployeeDTO.BankInfoDTO());
+                        dto.getBankInfo().setAccount(cellValue.trim());
+                        break;
+                    case "accountDigit":
+                        if (dto.getBankInfo() == null)
+                            dto.setBankInfo(new EmployeeDTO.BankInfoDTO());
+                        dto.getBankInfo().setAccountDigit(cellValue.trim());
+                        break;
+                    case "pixKey":
+                        if (dto.getBankInfo() == null)
+                            dto.setBankInfo(new EmployeeDTO.BankInfoDTO());
+                        dto.getBankInfo().setPixKey(cellValue.trim());
+                        break;
+                    case "salario":
+                        try {
+                            String normalizedSalario = cellValue.replaceAll("[^0-9,.]", "").replace(",", ".");
+                            dto.setSalario(new java.math.BigDecimal(normalizedSalario));
+                        } catch (Exception e) {
+                            log.warn("⚠️ Erro ao converter salário: {}", cellValue);
+                        }
+                        break;
+                    case "exameMedicoData":
+                        dto.setExameMedicoData(parseDate(cellValue));
+                        break;
+                    case "escalaTrabalho":
+                        dto.setEscalaTrabalho(cellValue.trim());
+                        break;
+                    case "unitName":
+                        // Guardar o nome do setor para processamento posterior ou busca
+                        // Por enquanto, podemos tentar colocar no DTO se houver campo
+                        dto.setNotes(
+                                (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Setor: " + cellValue.trim());
+                        break;
+                    case "positionName":
+                        // Guardar o nome do cargo
+                        dto.setNotes(
+                                (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Cargo: " + cellValue.trim());
+                        break;
                 }
             } catch (Exception e) {
                 log.warn("⚠️ Erro ao mapear campo '{}' com valor '{}': {}", fieldName, cellValue, e.getMessage());
             }
         }
-        
+
         // Valores padrão
         if (dto.getStatus() == null || dto.getStatus().isEmpty()) {
             dto.setStatus("ACTIVE");
@@ -411,10 +478,10 @@ public class EmployeeExcelImportService {
         if (dto.getNationality() == null || dto.getNationality().isEmpty()) {
             dto.setNationality("Brasileiro");
         }
-        
+
         // Criar objeto AddressDTO se houver dados de endereço
-        if (dto.getEnderecoRua() != null || dto.getEnderecoNumero() != null || 
-            dto.getEnderecoBairro() != null || dto.getEnderecoCidade() != null) {
+        if (dto.getEnderecoRua() != null || dto.getEnderecoNumero() != null ||
+                dto.getEnderecoBairro() != null || dto.getEnderecoCidade() != null) {
             EmployeeDTO.AddressDTO address = new EmployeeDTO.AddressDTO();
             address.setStreet(dto.getEnderecoRua());
             address.setNumber(dto.getEnderecoNumero());
@@ -425,13 +492,14 @@ public class EmployeeExcelImportService {
             address.setZipCode(dto.getEnderecoCep());
             dto.setAddress(address);
         }
-        
+
         return dto;
     }
-    
+
     private String getCellValueAsString(Cell cell) {
-        if (cell == null) return null;
-        
+        if (cell == null)
+            return null;
+
         switch (cell.getCellType()) {
             case STRING:
                 return cell.getStringCellValue();
@@ -459,20 +527,21 @@ public class EmployeeExcelImportService {
                 return null;
         }
     }
-    
+
     private LocalDate parseDate(String dateStr) {
-        if (dateStr == null || dateStr.trim().isEmpty()) return null;
-        
+        if (dateStr == null || dateStr.trim().isEmpty())
+            return null;
+
         // Tentar diferentes formatos de data
         String[] formats = {
-            "yyyy-MM-dd",
-            "dd/MM/yyyy",
-            "dd-MM-yyyy",
-            "dd.MM.yyyy",
-            "yyyy/MM/dd",
-            "MM/dd/yyyy"
+                "yyyy-MM-dd",
+                "dd/MM/yyyy",
+                "dd-MM-yyyy",
+                "dd.MM.yyyy",
+                "yyyy/MM/dd",
+                "MM/dd/yyyy"
         };
-        
+
         for (String format : formats) {
             try {
                 DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format);
@@ -481,13 +550,14 @@ public class EmployeeExcelImportService {
                 // Tentar próximo formato
             }
         }
-        
+
         log.warn("⚠️ Não foi possível fazer parse da data: {}", dateStr);
         return null;
     }
-    
+
     private String normalizeSexo(String sexo) {
-        if (sexo == null) return null;
+        if (sexo == null)
+            return null;
         String normalized = sexo.trim().toUpperCase();
         if (normalized.contains("MASCULINO") || normalized.contains("M") || normalized.contains("HOMEM")) {
             return "MASCULINO";
@@ -497,9 +567,10 @@ public class EmployeeExcelImportService {
             return "OUTRO";
         }
     }
-    
+
     private String normalizeStatus(String status) {
-        if (status == null) return "ACTIVE";
+        if (status == null)
+            return "ACTIVE";
         String normalized = status.trim().toUpperCase();
         if (normalized.contains("ATIVO") || normalized.contains("ACTIVE")) {
             return "ACTIVE";
@@ -510,9 +581,10 @@ public class EmployeeExcelImportService {
         }
         return "ACTIVE";
     }
-    
+
     private String normalizeMaritalStatus(String status) {
-        if (status == null) return "SINGLE";
+        if (status == null)
+            return "SINGLE";
         String normalized = status.trim().toUpperCase();
         if (normalized.contains("SOLTEIRO") || normalized.contains("SINGLE")) {
             return "SINGLE";
@@ -525,9 +597,10 @@ public class EmployeeExcelImportService {
         }
         return "SINGLE";
     }
-    
+
     private boolean isRowEmpty(Row row) {
-        if (row == null) return true;
+        if (row == null)
+            return true;
         for (int i = 0; i < row.getLastCellNum(); i++) {
             Cell cell = row.getCell(i);
             if (cell != null && cell.getCellType() != CellType.BLANK) {
@@ -546,7 +619,8 @@ public class EmployeeExcelImportService {
         int bestScore = 0;
         for (int rowIndex = 0; rowIndex <= maxRow; rowIndex++) {
             Row row = sheet.getRow(rowIndex);
-            if (row == null || isRowEmpty(row)) continue;
+            if (row == null || isRowEmpty(row))
+                continue;
             int score = countHeaderMatches(row);
             if (score > bestScore) {
                 bestScore = score;
@@ -560,9 +634,11 @@ public class EmployeeExcelImportService {
         int score = 0;
         for (int i = 0; i < row.getLastCellNum(); i++) {
             Cell cell = row.getCell(i);
-            if (cell == null) continue;
+            if (cell == null)
+                continue;
             String columnName = getCellValueAsString(cell);
-            if (columnName == null) continue;
+            if (columnName == null)
+                continue;
             String normalized = columnName.toLowerCase().trim();
             if (normalized.contains("cnpj") && normalized.contains("empresa")) {
                 score += 2;
@@ -582,12 +658,15 @@ public class EmployeeExcelImportService {
         int maxRow = Math.min(headerRowIndex, sheet.getLastRowNum());
         for (int rowIndex = 0; rowIndex <= maxRow; rowIndex++) {
             Row row = sheet.getRow(rowIndex);
-            if (row == null) continue;
+            if (row == null)
+                continue;
             for (int cellIndex = 0; cellIndex < row.getLastCellNum(); cellIndex++) {
                 Cell cell = row.getCell(cellIndex);
-                if (cell == null) continue;
+                if (cell == null)
+                    continue;
                 String value = getCellValueAsString(cell);
-                if (value == null) continue;
+                if (value == null)
+                    continue;
                 String normalized = value.toLowerCase();
                 if (normalized.contains("cnpj")) {
                     String extracted = extractDigits(value);
@@ -607,32 +686,55 @@ public class EmployeeExcelImportService {
     }
 
     private String extractDigits(String value) {
-        if (value == null) return "";
+        if (value == null)
+            return "";
         return value.replaceAll("[^0-9]", "");
     }
-    
+
     public static class ImportResult {
         private int created = 0;
         private int updated = 0;
         private List<String> errors = new ArrayList<>();
         private List<String> warnings = new ArrayList<>();
-        
-        public void incrementCreated() { created++; }
-        public void incrementUpdated() { updated++; }
-        public void addError(String error) { errors.add(error); }
-        public void addWarning(String warning) { warnings.add(warning); }
-        
-        public int getCreated() { return created; }
-        public int getUpdated() { return updated; }
-        public List<String> getErrors() { return errors; }
-        public List<String> getWarnings() { return warnings; }
-        
+
+        public void incrementCreated() {
+            created++;
+        }
+
+        public void incrementUpdated() {
+            updated++;
+        }
+
+        public void addError(String error) {
+            errors.add(error);
+        }
+
+        public void addWarning(String warning) {
+            warnings.add(warning);
+        }
+
+        public int getCreated() {
+            return created;
+        }
+
+        public int getUpdated() {
+            return updated;
+        }
+
+        public List<String> getErrors() {
+            return errors;
+        }
+
+        public List<String> getWarnings() {
+            return warnings;
+        }
+
         public boolean isSuccess() {
             return errors.isEmpty() && (created > 0 || updated > 0);
         }
-        
+
         public String getSummary() {
-            return String.format("Criados: %d, Atualizados: %d, Erros: %d, Avisos: %d", 
+            return String.format("Criados: %d, Atualizados: %d, Erros: %d, Avisos: %d",
                     created, updated, errors.size(), warnings.size());
         }
     }

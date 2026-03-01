@@ -20,13 +20,17 @@ export const useNotificationBell = () => {
   // Carregar mensagens
   const loadMessages = useCallback(async (page = 0, size = 20) => {
     try {
+      if (!localStorage.getItem('token')) {
+        return { messages: [], totalElements: 0, totalPages: 0 };
+      }
+
       setIsLoading(true);
       setStoreLoading(true);
-      
+
       const result = await messageService.getSystemMessages(page, size);
       setSystemMessages(result.messages);
       setLastUpdate(new Date());
-      
+
       return result;
     } catch (error: any) {
       console.error('Erro ao carregar mensagens:', error);
@@ -45,6 +49,8 @@ export const useNotificationBell = () => {
   // Carregar contagem de não lidas
   const loadUnreadCount = useCallback(async () => {
     try {
+      if (!localStorage.getItem('token')) return 0;
+
       const count = await messageService.getUnreadSystemCount();
       // A contagem será calculada a partir das mensagens no store
       return count;
@@ -58,11 +64,11 @@ export const useNotificationBell = () => {
   const markAsRead = useCallback(async (messageId: string) => {
     try {
       await messageService.markSystemMessageAsRead(messageId);
-      updateSystemMessage(messageId, { 
-        status: 'read', 
-        readAt: new Date().toISOString() 
+      updateSystemMessage(messageId, {
+        status: 'read',
+        readAt: new Date().toISOString()
       });
-      
+
       toast({
         title: "Sucesso",
         description: "Mensagem marcada como lida",
@@ -83,7 +89,7 @@ export const useNotificationBell = () => {
   const markAllAsRead = useCallback(async () => {
     try {
       const unreadMessages = systemMessages.filter(msg => msg.status === 'UNREAD');
-      
+
       if (unreadMessages.length === 0) {
         toast({
           title: "Info",
@@ -94,18 +100,18 @@ export const useNotificationBell = () => {
       }
 
       setIsLoading(true);
-      
+
       // Marcar todas como lidas em paralelo
       const promises = unreadMessages.map(async (message) => {
         await messageService.markSystemMessageAsRead(message.id);
-        updateSystemMessage(message.id, { 
-          status: 'read', 
-          readAt: new Date().toISOString() 
+        updateSystemMessage(message.id, {
+          status: 'read',
+          readAt: new Date().toISOString()
         });
       });
 
       await Promise.all(promises);
-      
+
       toast({
         title: "Sucesso",
         description: `${unreadMessages.length} mensagens marcadas como lidas`,
@@ -128,12 +134,14 @@ export const useNotificationBell = () => {
   useEffect(() => {
     const updateInterval = setInterval(async () => {
       try {
+        if (!localStorage.getItem('token')) return; // Pausa updates se não estiver logado
+
         await loadUnreadCount();
-        
+
         // Se faz mais de 5 minutos desde a última atualização, recarregar mensagens
         const now = new Date();
         const diffInMinutes = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
-        
+
         if (diffInMinutes > 5) {
           await loadMessages(0, 10); // Carregar apenas as 10 mais recentes
         }

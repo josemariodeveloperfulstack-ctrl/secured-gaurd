@@ -31,8 +31,8 @@ public class TimeRecordService {
 
     @Transactional
     public TimeRecord registerTimeRecord(UUID employeeId, TimeRecord.RecordType recordType,
-                                         String qrCode, String location, Double latitude,
-                                         Double longitude, String ipAddress, String userAgent) {
+            String qrCode, String location, Double latitude,
+            Double longitude, String ipAddress, String userAgent) {
 
         log.info("📍 Registrando ponto - Employee: {}, Tipo: {}, QRCode: {}",
                 employeeId, recordType, qrCode);
@@ -43,7 +43,7 @@ public class TimeRecordService {
         Employee employee = employeeRepository.findById(employeeId).orElseGet(() -> {
             log.warn("⚠️ Funcionário não encontrado pelo ID {}. Tentando resolver pelo CPF autenticado...", employeeId);
             return authenticatedCpfResolver.resolve(
-                            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication())
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication())
                     .flatMap(cpf -> {
                         log.info("🔎 Resolvendo funcionário pelo CPF autenticado: {}", cpf);
                         return employeeRepository.findByCpf(cpf)
@@ -52,31 +52,38 @@ public class TimeRecordService {
                     .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
         });
 
-        // Validar QR Code se fornecido
+        // Se houver QR Code, tenta identificar o posto.
+        // Caso contrário, usa o posto atual do funcionário como padrão.
         WorkPost workPost = null;
         if (qrCode != null && !qrCode.isEmpty()) {
             QRCodeWorkPost qrCodeWorkPost = qrCodeWorkPostRepository
                     .findValidQRCode(qrCode, LocalDateTime.now())
                     .orElseThrow(() -> new RuntimeException("QR Code inválido ou expirado"));
-            
+
             workPost = qrCodeWorkPost.getWorkPost();
             log.info("✅ QR Code válido para posto: {}", workPost.getName());
-            
+
             // Validar geolocalização se configurado
             if (qrCodeWorkPost.getLatitude() != null && qrCodeWorkPost.getLongitude() != null) {
                 if (latitude == null || longitude == null) {
                     throw new RuntimeException("Geolocalização obrigatória para este posto");
                 }
-                
+
                 double distance = calculateDistance(
                         qrCodeWorkPost.getLatitude(), qrCodeWorkPost.getLongitude(),
                         latitude, longitude);
-                
+
                 if (distance > qrCodeWorkPost.getRadiusMeters()) {
-                    log.warn("⚠️ Distância excedida: {} metros (limite: {})", 
-                             distance, qrCodeWorkPost.getRadiusMeters());
+                    log.warn("⚠️ Distância excedida: {} metros (limite: {})",
+                            distance, qrCodeWorkPost.getRadiusMeters());
                     throw new RuntimeException("Você está fora da área permitida para registro");
                 }
+            }
+        } else {
+            // Fallback para o posto atual do funcionário
+            workPost = employee.getWorkPost();
+            if (workPost != null) {
+                log.info("ℹ️ Usando posto atual do funcionário: {}", workPost.getName());
             }
         }
 
@@ -107,14 +114,14 @@ public class TimeRecordService {
     private void validateRecordSequence(UUID employeeId, TimeRecord.RecordType newRecordType) {
         LocalDate today = LocalDate.now();
         List<TimeRecord> todayRecords = timeRecordRepository.findTodayRecordsByEmployeeIdAndDate(employeeId, today);
-        
+
         if (todayRecords.isEmpty() && newRecordType != TimeRecord.RecordType.ENTRADA) {
             throw new RuntimeException("Primeiro registro do dia deve ser ENTRADA");
         }
 
         if (!todayRecords.isEmpty()) {
             TimeRecord lastRecord = todayRecords.get(0);
-            
+
             // Validar sequência lógica
             switch (lastRecord.getRecordType()) {
                 case ENTRADA:
@@ -144,14 +151,15 @@ public class TimeRecordService {
         double lonDistance = Math.toRadians(lon2 - lon1);
         double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+                        * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     }
 
     /**
      * Resolve o Employee pelo ID enviado (pode ser user.id ou employee.id).
-     * Se não encontrar como Employee, tenta resolver pelo CPF do usuário autenticado.
+     * Se não encontrar como Employee, tenta resolver pelo CPF do usuário
+     * autenticado.
      * Exposto para outros serviços (ex.: folha de ponto PDF/Excel).
      */
     public Employee resolveEmployeeForReport(UUID employeeIdOrUserId) {
@@ -160,9 +168,10 @@ public class TimeRecordService {
 
     private Employee resolveEmployee(UUID employeeIdOrUserId) {
         return employeeRepository.findById(employeeIdOrUserId).orElseGet(() -> {
-            log.warn("⚠️ Funcionário não encontrado pelo ID {}. Tentando resolver pelo CPF autenticado...", employeeIdOrUserId);
+            log.warn("⚠️ Funcionário não encontrado pelo ID {}. Tentando resolver pelo CPF autenticado...",
+                    employeeIdOrUserId);
             return authenticatedCpfResolver.resolve(
-                            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication())
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication())
                     .flatMap(cpf -> {
                         log.info("🔎 Resolvendo funcionário pelo CPF autenticado: {}", cpf);
                         return employeeRepository.findByCpf(cpf)
@@ -200,11 +209,11 @@ public class TimeRecordService {
     public TimeRecord approveRecord(UUID recordId, UUID approverId) {
         TimeRecord record = timeRecordRepository.findById(recordId)
                 .orElseThrow(() -> new RuntimeException("Registro não encontrado"));
-        
+
         record.setStatus(TimeRecord.RecordStatus.APPROVED);
         record.setApprovedById(approverId);
         record.setApprovedAt(LocalDateTime.now());
-        
+
         return timeRecordRepository.save(record);
     }
 
@@ -212,19 +221,20 @@ public class TimeRecordService {
     public TimeRecord rejectRecord(UUID recordId, UUID approverId, String reason) {
         TimeRecord record = timeRecordRepository.findById(recordId)
                 .orElseThrow(() -> new RuntimeException("Registro não encontrado"));
-        
+
         record.setStatus(TimeRecord.RecordStatus.REJECTED);
         record.setApprovedById(approverId);
         record.setApprovedAt(LocalDateTime.now());
         record.setJustification(reason);
-        
+
         return timeRecordRepository.save(record);
     }
 
     public TimeRecord.RecordType getNextRecordType(UUID employeeId) {
         Employee employee = resolveEmployee(employeeId);
         LocalDate today = LocalDate.now();
-        List<TimeRecord> todayRecords = timeRecordRepository.findTodayRecordsByEmployeeIdAndDate(employee.getId(), today);
+        List<TimeRecord> todayRecords = timeRecordRepository.findTodayRecordsByEmployeeIdAndDate(employee.getId(),
+                today);
 
         if (todayRecords.isEmpty()) {
             return TimeRecord.RecordType.ENTRADA;
@@ -247,12 +257,13 @@ public class TimeRecordService {
     }
 
     /**
-     * Salva os horários de um dia para lançamento manual. Remove registros manuais existentes
+     * Salva os horários de um dia para lançamento manual. Remove registros manuais
+     * existentes
      * do dia e persiste os novos (conforme vai registrando no frontend).
      */
     @Transactional
     public List<TimeRecord> saveManualDay(UUID employeeId, LocalDate date,
-                                          String entrada, String saidaAlmoco, String retornoAlmoco, String saida) {
+            String entrada, String saidaAlmoco, String retornoAlmoco, String saida) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
 
@@ -279,12 +290,13 @@ public class TimeRecordService {
     }
 
     private static boolean isValidTime(String time) {
-        if (time == null || time.isBlank()) return false;
+        if (time == null || time.isBlank())
+            return false;
         return time.matches("\\d{1,2}:\\d{2}");
     }
 
     private TimeRecord saveManualRecord(Employee employee, LocalDate date, String timeStr,
-                                        TimeRecord.RecordType recordType) {
+            TimeRecord.RecordType recordType) {
         String[] parts = timeStr.trim().split(":");
         int h = Integer.parseInt(parts[0]);
         int m = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
@@ -298,6 +310,10 @@ public class TimeRecordService {
         record.setIsManual(true);
         record.setStatus(TimeRecord.RecordStatus.APPROVED);
         record.setLocation("Lançamento manual");
+        // Associar ao posto atual do funcionário se disponível
+        if (employee.getWorkPost() != null) {
+            record.setWorkPost(employee.getWorkPost());
+        }
         return timeRecordRepository.save(record);
     }
 }

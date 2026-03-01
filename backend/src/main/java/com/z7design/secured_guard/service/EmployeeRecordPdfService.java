@@ -72,8 +72,8 @@ public class EmployeeRecordPdfService {
             ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
                     .companyId(companyId)
                     .reportTitle("FICHA DE REGISTRO DO FUNCIONÁRIO")
-                    .topMargin(120f)
-                    .bottomMargin(80f)
+                    .topMargin(80f)
+                    .bottomMargin(50f)
                     .leftMargin(50f)
                     .rightMargin(50f)
                     .build();
@@ -136,9 +136,9 @@ public class EmployeeRecordPdfService {
             String naturalidade = buildNaturalidade(employee);
             addTableRow(personalTable, "Naturalidade:", naturalidade);
 
-            addTableRow(personalTable, "Estado Civil:", employee.getMaritalStatus());
-            addTableRow(personalTable, "Grau de Instrução:", employee.getGrauInstrucao());
-            addTableRow(personalTable, "Sexo:", employee.getSexo());
+            addTableRow(personalTable, "Estado Civil:", translateMaritalStatus(employee.getMaritalStatus()));
+            addTableRow(personalTable, "Grau de Instrução:", translateGrauInstrucao(employee.getGrauInstrucao()));
+            addTableRow(personalTable, "Sexo:", translateSexo(employee.getSexo()));
             addTableRow(personalTable, "Telefone:", employee.getPhone());
             addTableRow(personalTable, "Email:", employee.getEmail());
             addTableRow(personalTable, "Endereço:", buildAddress(employee));
@@ -641,14 +641,14 @@ public class EmployeeRecordPdfService {
                         .setBold()
                         .setFontSize(10))
                 .setBackgroundColor(new DeviceRgb(240, 240, 240))
-                .setPadding(6);
+                .setPadding(2.5f);
     }
 
     private Cell createValueCell(String text) {
         return new Cell()
                 .add(new Paragraph(text != null ? text : "")
                         .setFontSize(10))
-                .setPadding(6);
+                .setPadding(2.5f);
     }
 
     private UUID resolveCompanyId(Company company) {
@@ -685,6 +685,80 @@ public class EmployeeRecordPdfService {
         }
 
         throw new RuntimeException("Não foi possível determinar a empresa para o relatório.");
+    }
+
+    private String translateMaritalStatus(String status) {
+        if (status == null || status.trim().isEmpty())
+            return "";
+        log.debug("Translating marital status: {}", status);
+        switch (status.toUpperCase()) {
+            case "SINGLE":
+            case "SOLTEIRO":
+            case "SOLTEIRA":
+                return "Solteiro(a)";
+            case "MARRIED":
+            case "CASADO":
+            case "CASADA":
+                return "Casado(a)";
+            case "DIVORCED":
+            case "DIVORCIADO":
+            case "DIVORCIADA":
+                return "Divorciado(a)";
+            case "WIDOWED":
+            case "VIUVO":
+            case "VIUVA":
+                return "Viúvo(a)";
+            case "SEPARATED":
+            case "SEPARADO":
+            case "SEPARADA":
+                return "Separado(a)";
+            case "STABLE_UNION":
+            case "UNIAO_ESTAVEL":
+                return "União Estável";
+            default:
+                return status;
+        }
+    }
+
+    private String translateSexo(String sexo) {
+        if (sexo == null || sexo.trim().isEmpty())
+            return "";
+        log.debug("Translating sexo: {}", sexo);
+        switch (sexo.toUpperCase()) {
+            case "M":
+            case "MALE":
+            case "MASCULINO":
+                return "Masculino";
+            case "F":
+            case "FEMALE":
+            case "FEMININO":
+                return "Feminino";
+            case "OTHER":
+            case "OUTRO":
+                return "Outro";
+            default:
+                return sexo;
+        }
+    }
+
+    private String translateGrauInstrucao(String grau) {
+        if (grau == null || grau.trim().isEmpty())
+            return "";
+        log.debug("Translating grau instrução: {}", grau);
+        // Mapeamento básico se vierem termos técnicos ou em inglês
+        switch (grau.toUpperCase()) {
+            case "ELEMENTARY":
+                return "Ensino Fundamental";
+            case "HIGH_SCHOOL":
+                return "Ensino Médio";
+            case "SUPERIOR":
+            case "GRADUATE":
+                return "Ensino Superior";
+            case "POST_GRADUATE":
+                return "Pós-Graduação";
+            default:
+                return grau;
+        }
     }
 
     private String buildAddress(Employee employee) {

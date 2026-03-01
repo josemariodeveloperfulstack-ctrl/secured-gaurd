@@ -31,21 +31,38 @@ export interface SimpleEmployee {
   document?: string;
 }
 
+export interface EmployeeFilters {
+  searchTerm?: string;
+  status?: string;
+  companyId?: string;
+  unitId?: string;
+  workPostId?: string;
+}
+
 export const employeeService = {
   /**
    * Buscar todos os funcionários (paginado - até 500 por página)
    */
-  async getAllEmployees(searchTerm?: string, page = 0, size = 500): Promise<Employee[]> {
+  async getAllEmployees(filters?: EmployeeFilters, page = 0, size = 500): Promise<Employee[]> {
     try {
       const params: any = { page, size };
-      if (searchTerm && searchTerm.trim()) {
-        params.searchTerm = searchTerm.trim();
-        console.log('🔍 [EmployeeService] Buscando com searchTerm:', params.searchTerm);
-      } else {
-        console.log('🔍 [EmployeeService] Buscando funcionários (page=%s, size=%s)', page, size);
+      if (filters?.searchTerm && filters.searchTerm.trim()) {
+        params.searchTerm = filters.searchTerm.trim();
       }
+      if (filters?.status && filters.status !== 'all') {
+        params.status = filters.status;
+      }
+      if (filters?.companyId && filters.companyId !== 'all') {
+        params.companyId = filters.companyId;
+      }
+      if (filters?.unitId && filters.unitId !== 'all') {
+        params.unitId = filters.unitId;
+      }
+      if (filters?.workPostId && filters.workPostId !== 'all') {
+        params.workPostId = filters.workPostId;
+      }
+
       const response = await api.get('/api/employees/paged', { params });
-      console.log('🔍 [EmployeeService] Resposta recebida:', response.data?.length || 0, 'funcionários');
       return response.data || [];
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
@@ -102,7 +119,7 @@ export const employeeService = {
     try {
       const response = await api.get('/api/employees/basic');
       const data = response.data;
-      
+
       if (data && data.employees) {
         return data.employees.map((emp: any) => ({
           id: emp.id,
@@ -112,7 +129,7 @@ export const employeeService = {
           document: emp.document
         }));
       }
-      
+
       return [];
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
@@ -167,16 +184,16 @@ export const employeeService = {
       console.log(`[EmployeeService] Buscando funcionários com status: ${status}`);
       const response = await api.get(`/api/employees/status/${status.toUpperCase()}`);
       console.log(`[EmployeeService] Resposta recebida:`, response.data);
-      
+
       if (!response.data) {
         console.warn('[EmployeeService] Resposta vazia do backend');
         return [];
       }
-      
+
       // Garantir que seja um array
       const employees = Array.isArray(response.data) ? response.data : [];
       console.log(`[EmployeeService] ${employees.length} funcionários encontrados`);
-      
+
       return employees;
     } catch (error: any) {
       console.error('[EmployeeService] Erro ao buscar funcionários por status:', error);
@@ -240,12 +257,13 @@ export const employeeService = {
           bank: payload.bankData.bank || '',
           agency: payload.bankData.agency || '',
           account: payload.bankData.account || '',
+          accountDigit: payload.bankData.accountDigit || '',
           accountType: payload.bankData.type || 'CORRENTE',
-          chavePix: payload.bankData.chavePix || ''
+          pixKey: payload.bankData.chavePix || ''
         };
         delete payload.bankData;
       }
-      
+
       const response = await api.post('/api/employees', payload);
       return response.data;
     } catch (error: any) {
@@ -266,12 +284,13 @@ export const employeeService = {
           bank: payload.bankData.bank || '',
           agency: payload.bankData.agency || '',
           account: payload.bankData.account || '',
+          accountDigit: payload.bankData.accountDigit || '',
           accountType: payload.bankData.type || 'CORRENTE',
-          chavePix: payload.bankData.chavePix || ''
+          pixKey: payload.bankData.chavePix || ''
         };
         delete payload.bankData;
       }
-      
+
       const response = await api.put(`/api/employees/${id}`, payload);
       return response.data;
     } catch (error: any) {
@@ -285,7 +304,7 @@ export const employeeService = {
    */
   async updateEmployeeStatus(id: string, status: string): Promise<Employee> {
     try {
-      const response = await api.put(`/api/employees/${id}/status`, null, {
+      const response = await api.patch(`/api/employees/${id}/status`, null, {
         params: { status }
       });
       return response.data;
@@ -351,6 +370,111 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao importar funcionários:', error);
       throw new Error(error.response?.data?.message || 'Erro ao importar funcionários');
+    }
+  },
+
+  /**
+   * Atualizar status de múltiplos funcionários em lote
+   */
+  async bulkUpdateStatus(ids: string[], status: string): Promise<void> {
+    try {
+      await api.post('/api/employees/bulk-status', { ids, status });
+    } catch (error: any) {
+      console.error('Erro ao atualizar status em lote:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao atualizar status em lote');
+    }
+  },
+
+  /**
+   * Demitir múltiplos funcionários em lote
+   */
+  async bulkTerminate(ids: string[], terminationDate: string): Promise<void> {
+    try {
+      await api.post('/api/employees/bulk-terminate', { ids, terminationDate });
+    } catch (error: any) {
+      console.error('Erro ao demitir em lote:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao demitir em lote');
+    }
+  },
+
+  /**
+   * Excluir múltiplos funcionários em lote
+   */
+  async bulkDeleteEmployees(ids: string[]): Promise<void> {
+    try {
+      await api.post('/api/employees/bulk-delete', { ids });
+    } catch (error: any) {
+      console.error('Erro ao excluir em lote:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao excluir em lote');
+    }
+  },
+
+  /**
+   * Excluir um funcionário
+   */
+  async deleteEmployee(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/employees/${id}`);
+    } catch (error: any) {
+      console.error('Erro ao excluir funcionário:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao excluir funcionário');
+    }
+  },
+
+  /**
+   * Verificar dependências que impedem a exclusão
+   */
+  async checkDeletionDependencies(id: string): Promise<{
+    hasDependencies: boolean;
+    dependentsCount: number;
+    documentsCount: number;
+    generatedDocsCount: number;
+    messages: string[];
+  }> {
+    try {
+      const messages: string[] = [];
+      let hasDependencies = false;
+
+      // Buscar dependências em paralelo
+      const [dependents, documents, generatedDocs] = await Promise.all([
+        api.get(`/api/dependents/employee/${id}`).then(res => res.data).catch(() => []),
+        api.get(`/api/documents/employee/${id}`).then(res => res.data).catch(() => []),
+        api.get(`/api/documentos-gerados/funcionario/${id}`).then(res => res.data).catch(() => [])
+      ]);
+
+      const dependentsCount = Array.isArray(dependents) ? dependents.length : 0;
+      const documentsCount = Array.isArray(documents) ? documents.length : 0;
+      const generatedDocsCount = Array.isArray(generatedDocs) ? generatedDocs.length : 0;
+
+      if (dependentsCount > 0) {
+        hasDependencies = true;
+        messages.push(`Possui ${dependentsCount} dependente(s) cadastrado(s).`);
+      }
+      if (documentsCount > 0) {
+        hasDependencies = true;
+        messages.push(`Possui ${documentsCount} documento(s) anexado(s).`);
+      }
+      if (generatedDocsCount > 0) {
+        hasDependencies = true;
+        messages.push(`Possui ${generatedDocsCount} documento(s) gerado(s).`);
+      }
+
+      return {
+        hasDependencies,
+        dependentsCount,
+        documentsCount,
+        generatedDocsCount,
+        messages
+      };
+    } catch (error) {
+      console.error('Erro ao verificar dependências:', error);
+      return {
+        hasDependencies: false,
+        dependentsCount: 0,
+        documentsCount: 0,
+        generatedDocsCount: 0,
+        messages: []
+      };
     }
   }
 };

@@ -4,59 +4,70 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { 
-  MoreHorizontal, Edit, Trash2, Eye, User, Mail, Phone, MapPin, 
+import {
+  MoreHorizontal, Edit, Trash2, Eye, User, Mail, Phone, MapPin,
   Calendar, Building, FileText, UserPlus, AlertCircle, UserMinus, Briefcase
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface FuncionariosTableProps {
   employees: Employee[];
+  selectedIds: string[];
+  onSelect: (id: string, selected: boolean) => void;
+  onSelectAll: (selected: boolean) => void;
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
   onTerminate: (employee: Employee) => void;
   onViewDocuments: (employee: Employee) => void;
   onViewDependents: (employee: Employee) => void;
+  onViewDetails: (employee: Employee) => void;
   isLoading?: boolean;
+  isMobileSelectionMode?: boolean;
 }
 
 export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
   employees,
+  selectedIds,
+  onSelect,
+  onSelectAll,
   onEdit,
   onDelete,
   onTerminate,
   onViewDocuments,
   onViewDependents,
-  isLoading = false
+  onViewDetails,
+  isLoading = false,
+  isMobileSelectionMode = false
 }) => {
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
-      'ACTIVE': { 
-        label: 'Ativo', 
+      'ACTIVE': {
+        label: 'Ativo',
         className: 'bg-green-500/20 text-green-300 border-green-500/30'
       },
-      'INACTIVE': { 
-        label: 'Inativo', 
+      'INACTIVE': {
+        label: 'Inativo',
         className: 'bg-gray-500/20 text-gray-300 border-gray-500/30'
       },
-      'VACATION': { 
-        label: 'Férias', 
+      'VACATION': {
+        label: 'Férias',
         className: 'bg-blue-500/20 text-blue-300 border-blue-500/30'
       },
-      'MATERNITY_LEAVE': { 
-        label: 'Licença Maternidade', 
+      'MATERNITY_LEAVE': {
+        label: 'Licença Maternidade',
         className: 'bg-pink-500/20 text-pink-300 border-pink-500/30'
       },
-      'MEDICAL_CERTIFICATE': { 
-        label: 'Atestado', 
+      'MEDICAL_CERTIFICATE': {
+        label: 'Atestado',
         className: 'bg-purple-500/20 text-purple-300 border-purple-500/30'
       },
-      'TERMINATED': { 
-        label: 'Demitido', 
+      'TERMINATED': {
+        label: 'Demitido',
         className: 'bg-red-500/20 text-red-300 border-red-500/30'
       },
-      'SUSPENDED': { 
-        label: 'Suspenso', 
+      'SUSPENDED': {
+        label: 'Suspenso',
         className: 'bg-orange-500/20 text-orange-300 border-orange-500/30'
       }
     };
@@ -78,8 +89,8 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
     return (
       <div className="space-y-3">
         {[...Array(5)].map((_, i) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             className="h-32 bg-seguranca-black/50 animate-pulse rounded-lg border border-gray-600/30"
           />
         ))}
@@ -106,6 +117,13 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
         <Table>
           <TableHeader>
             <TableRow className="bg-seguranca-black/50 hover:bg-seguranca-black/70 border-gray-600/30">
+              <TableHead className="w-[50px]">
+                <Checkbox
+                  checked={employees.length > 0 && selectedIds.length === employees.length}
+                  onCheckedChange={(checked) => onSelectAll(!!checked)}
+                  className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                />
+              </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Funcionário</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Cargo/Função</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Empresa</TableHead>
@@ -113,23 +131,33 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
               <TableHead className="text-seguranca-yellow font-semibold">Admissão</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Demissão</TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">Status</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold w-[70px]">Ações</TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold w-[100px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {employees.map((employee, index) => (
-              <TableRow 
+              <TableRow
                 key={employee.id}
-                className="border-gray-600/30 hover:bg-seguranca-black/30 transition-all duration-200 group"
+                className={`border-gray-600/30 hover:bg-seguranca-black/30 transition-all duration-200 group ${selectedIds.includes(employee.id) ? 'bg-seguranca-red/5' : ''}`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <TableCell className="py-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 p-2 rounded-lg bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 transition-colors">
+                  <Checkbox
+                    checked={selectedIds.includes(employee.id)}
+                    onCheckedChange={(checked) => onSelect(employee.id, !!checked)}
+                    className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                  />
+                </TableCell>
+                <TableCell className="py-4">
+                  <div
+                    className="flex items-start gap-3 cursor-pointer group/name"
+                    onClick={() => onViewDetails(employee)}
+                  >
+                    <div className="mt-1 p-2 rounded-lg bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 group-hover/name:border-seguranca-red/50 transition-colors">
                       <User className="h-5 w-5 text-seguranca-red" />
                     </div>
                     <div>
-                      <div className="font-semibold text-seguranca-lightgray group-hover:text-white transition-colors">
+                      <div className="font-semibold text-seguranca-lightgray group-hover:text-white group-hover/name:text-seguranca-yellow transition-colors">
                         {employee.name}
                       </div>
                       {employee.registrationNumber && (
@@ -210,61 +238,79 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   {getStatusBadge(employee.status || 'INACTIVE')}
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        className="h-8 w-8 p-0 hover:bg-seguranca-red/20 hover:text-seguranca-red transition-colors"
-                      >
-                        <span className="sr-only">Abrir menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent 
-                      align="end" 
-                      className="bg-seguranca-black border-gray-600 w-56"
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewDetails(employee)}
+                      className="h-8 w-8 p-0 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors"
+                      title="Ver Detalhes"
                     >
-                      <DropdownMenuItem 
-                        onClick={() => onEdit(employee)}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white cursor-pointer"
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Editar Funcionário
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => onViewDocuments(employee)}
-                        className="text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 cursor-pointer"
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Ver Documentos
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => onViewDependents(employee)}
-                        className="text-green-400 hover:bg-green-500/20 hover:text-green-300 cursor-pointer"
-                      >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Ver Dependentes
-                      </DropdownMenuItem>
-                      {employee.status !== 'TERMINATED' && (
-                        <DropdownMenuItem 
-                          onClick={() => onTerminate(employee)}
-                          className="text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 cursor-pointer"
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-seguranca-red/20 hover:text-seguranca-red transition-colors"
                         >
-                          <UserMinus className="mr-2 h-4 w-4" />
-                          Demitir Funcionário
-                        </DropdownMenuItem>
-                      )}
-                      {employee.status === 'TERMINATED' && (
-                        <DropdownMenuItem 
-                          onClick={() => onDelete(employee)}
-                          className="text-red-400 hover:bg-red-500/20 hover:text-red-300 cursor-pointer"
+                          <span className="sr-only">Abrir menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="bg-seguranca-black border-gray-600 w-56 p-1 bg-clip-padding backdrop-blur-xl"
+                      >
+                        <DropdownMenuItem
+                          onClick={() => onViewDetails(employee)}
+                          className="text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 cursor-pointer"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir Funcionário
+                          <Eye className="mr-2 h-4 w-4" />
+                          Visualizar Detalhes
                         </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <DropdownMenuItem
+                          onClick={() => onEdit(employee)}
+                          className="text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white cursor-pointer"
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar Funcionário
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onViewDocuments(employee)}
+                          className="text-seguranca-yellow hover:bg-seguranca-yellow/20 hover:text-seguranca-yellow cursor-pointer"
+                        >
+                          <FileText className="mr-2 h-4 w-4" />
+                          Ver Documentos
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onViewDependents(employee)}
+                          className="text-green-400 hover:bg-green-500/20 hover:text-green-300 cursor-pointer"
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Ver Dependentes
+                        </DropdownMenuItem>
+                        {employee.status !== 'TERMINATED' && (
+                          <DropdownMenuItem
+                            onClick={() => onTerminate(employee)}
+                            className="text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 cursor-pointer"
+                          >
+                            <UserMinus className="mr-2 h-4 w-4" />
+                            Demitir Funcionário
+                          </DropdownMenuItem>
+                        )}
+                        {employee.status === 'TERMINATED' && (
+                          <DropdownMenuItem
+                            onClick={() => onDelete(employee)}
+                            className="text-red-400 hover:bg-red-500/20 hover:text-red-300 cursor-pointer"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir Funcionário
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -273,137 +319,145 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
       </div>
 
       {/* Mobile View - Cards */}
-      <div className="lg:hidden space-y-4">
+      <div className="lg:hidden space-y-3">
         {employees.map((employee, index) => (
-          <Card 
+          <Card
             key={employee.id}
-            className="bg-seguranca-black/50 border-gray-600/30 hover:border-seguranca-red/50 transition-all duration-300 overflow-hidden group"
+            onClick={() => isMobileSelectionMode ? onSelect(employee.id, !selectedIds.includes(employee.id)) : onViewDetails(employee)}
+            className={`bg-seguranca-black/50 border-gray-600/30 hover:border-seguranca-red/50 transition-all duration-300 overflow-hidden group relative
+              ${selectedIds.includes(employee.id) ? 'ring-1 ring-seguranca-red border-seguranca-red/50 bg-seguranca-red/5' : ''}
+              cursor-pointer active:scale-[0.98]`}
             style={{ animationDelay: `${index * 50}ms` }}
           >
-            <div className="p-4 space-y-3">
+            {isMobileSelectionMode && (
+              <div className="absolute top-3 left-3 z-10">
+                <Checkbox
+                  checked={selectedIds.includes(employee.id)}
+                  onCheckedChange={(checked) => onSelect(employee.id, !!checked)}
+                  className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red h-5 w-5"
+                />
+              </div>
+            )}
+
+            <div className={`p-3 space-y-2 ${isMobileSelectionMode ? 'pl-10' : ''}`}>
               {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3 flex-1">
-                  <div className="p-2 rounded-lg bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 transition-colors">
-                    <User className="h-5 w-5 text-seguranca-red" />
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 transition-colors flex-shrink-0">
+                    <User className="h-4 w-4 text-seguranca-red" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-seguranca-lightgray group-hover:text-white transition-colors">
+                    <h3 className="font-semibold text-seguranca-lightgray group-hover:text-seguranca-yellow transition-colors truncate text-sm">
                       {employee.name}
                     </h3>
                     {employee.registrationNumber && (
-                      <p className="text-sm text-gray-400 font-mono mt-1">
+                      <p className="text-[10px] text-gray-500 font-mono">
                         Mat: {employee.registrationNumber}
                       </p>
                     )}
                   </div>
                 </div>
-                {getStatusBadge(employee.status || 'INACTIVE')}
+                <div className="flex-shrink-0 scale-75 origin-right">
+                  {getStatusBadge(employee.status || 'INACTIVE')}
+                </div>
               </div>
 
-              {/* Info */}
-              <div className="space-y-2 text-sm">
+              {/* Info Grid - Compact */}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
                 {employee.position?.name && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Building className="h-4 w-4 flex-shrink-0" />
+                  <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
+                    <Briefcase className="h-3 w-3 flex-shrink-0 text-seguranca-yellow/70" />
                     <span className="truncate">{employee.position.name}</span>
                   </div>
                 )}
-                {employee.position?.description && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Briefcase className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{employee.position.description}</span>
-                  </div>
-                )}
                 {employee.company?.sigla && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Building className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate font-semibold">Empresa: {employee.company.sigla}</span>
+                  <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
+                    <Building className="h-3 w-3 flex-shrink-0 text-blue-400/70" />
+                    <span className="truncate font-medium">{employee.company.sigla}</span>
                   </div>
                 )}
                 {(() => {
-                  // Priorizar workPost, depois department (NÃO exibir unit)
-                  const workPostName = employee.workPost?.name;
-                  const departmentName = (employee as any).department?.name;
-                  const displayName = workPostName || departmentName;
+                  const displayName = employee.workPost?.name || (employee as any).department?.name;
                   return displayName ? (
-                    <div className="flex items-center gap-2 text-gray-400">
-                      <MapPin className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">Setor/Posto: {displayName}</span>
+                    <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
+                      <MapPin className="h-3 w-3 flex-shrink-0 text-red-400/70" />
+                      <span className="truncate">{displayName}</span>
                     </div>
                   ) : null;
                 })()}
                 {employee.hireDate && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Calendar className="h-4 w-4 flex-shrink-0" />
-                    <span>Admissão: {formatDate(employee.hireDate)}</span>
-                  </div>
-                )}
-                {employee.terminationDate && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Calendar className="h-4 w-4 flex-shrink-0" />
-                    <span>Demissão: {formatDate(employee.terminationDate)}</span>
+                  <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
+                    <Calendar className="h-3 w-3 flex-shrink-0 text-green-400/70" />
+                    <span>{formatDate(employee.hireDate)}</span>
                   </div>
                 )}
               </div>
 
-              {/* Alert for status */}
-              {employee.status !== 'TERMINATED' && (
-                <div className="p-2 bg-orange-900/20 border border-orange-600/30 rounded-md">
-                  <span className="text-xs text-orange-400 flex items-center">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Demitir primeiro para excluir
-                  </span>
-                </div>
-              )}
-              {employee.status === 'TERMINATED' && (
-                <div className="p-2 bg-green-900/20 border border-green-600/30 rounded-md">
-                  <span className="text-xs text-green-400 flex items-center">
-                    ✅ Pode ser excluído
-                  </span>
-                </div>
-              )}
+              {/* Status Specific Messages inside footer if not selected */}
+              {!isMobileSelectionMode && (
+                <div className="pt-2 border-t border-gray-600/20 flex items-center justify-between">
+                  <div className="flex-1">
+                    {employee.status !== 'TERMINATED' ? (
+                      <span className="text-[10px] text-orange-400/80 flex items-center">
+                        <AlertCircle className="h-2.5 w-2.5 mr-1" />
+                        Demitir para excluir
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-green-400/80 flex items-center">
+                        ✅ Elegível para exclusão
+                      </span>
+                    )}
+                  </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 pt-3 border-t border-gray-600/30">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(employee)}
-                  className="flex-1 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Editar
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onViewDocuments(employee)}
-                  className="flex-1 border-blue-600/30 text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/50"
-                >
-                  <FileText className="h-4 w-4 mr-1" />
-                  Docs
-                </Button>
-                {employee.status === 'TERMINATED' ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onDelete(employee)}
-                    className="border-red-600/30 text-red-400 hover:bg-red-500/20 hover:border-red-500/50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onTerminate(employee)}
-                    className="border-orange-600/30 text-orange-400 hover:bg-orange-500/20 hover:border-orange-500/50"
-                  >
-                    <UserMinus className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+                  {/* Desktop-like inline actions for mobile when not in selection mode */}
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); onViewDetails(employee); }}
+                      className="h-7 w-7 p-0 text-blue-400 hover:text-blue-300"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); onEdit(employee); }}
+                      className="h-7 w-7 p-0 text-gray-400 hover:text-white"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400">
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-seguranca-black border-gray-600">
+                        <DropdownMenuItem onClick={() => onViewDetails(employee)} className="text-blue-400 text-xs">
+                          <Eye className="mr-2 h-3.5 w-3.5" /> Ver Detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onViewDocuments(employee)} className="text-seguranca-yellow text-xs">
+                          <FileText className="mr-2 h-3.5 w-3.5" /> Documentos
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onViewDependents(employee)} className="text-green-400 text-xs">
+                          <UserPlus className="mr-2 h-3.5 w-3.5" /> Dependentes
+                        </DropdownMenuItem>
+                        {employee.status !== 'TERMINATED' && (
+                          <DropdownMenuItem onClick={() => onTerminate(employee)} className="text-orange-400 text-xs">
+                            <UserMinus className="mr-2 h-3.5 w-3.5" /> Demitir
+                          </DropdownMenuItem>
+                        )}
+                        {employee.status === 'TERMINATED' && (
+                          <DropdownMenuItem onClick={() => onDelete(employee)} className="text-red-400 text-xs">
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
         ))}

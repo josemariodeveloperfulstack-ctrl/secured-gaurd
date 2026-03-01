@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { 
-  Users, 
-  Plus, 
-  Search, 
+import {
+  Users,
+  Plus,
+  Search,
   Filter,
   RefreshCw,
   User,
@@ -30,8 +30,23 @@ import {
   Clock,
   UserMinus,
   XCircle,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle,
+  CheckCircle,
+  X,
+  Eye,
+  Trash2
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
@@ -46,7 +61,9 @@ import DocumentosGerarTab from '@/components/funcionarios/DocumentosGerarTab';
 import DependenteModal from '@/components/dependentes/DependenteModal';
 import { FuncionariosTable } from '@/components/funcionarios/FuncionariosTable';
 import ExcelImportModal from '@/components/funcionarios/ExcelImportModal';
-import { FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, Upload } from 'lucide-react';
+import { EmployeeViewDetailsModal } from '@/components/funcionarios/EmployeeViewDetailsModal';
+import FuncionarioEditModal from '@/components/funcionarios/FuncionarioEditModal';
 
 const Funcionarios: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -59,6 +76,8 @@ const Funcionarios: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
   useGSAP();
@@ -73,7 +92,32 @@ const Funcionarios: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(shouldOpenModal);
   const [excelImportModalOpen, setExcelImportModalOpen] = useState(shouldOpenExcelImport);
   const [dependentSearchTerm, setDependentSearchTerm] = useState('');
-  
+  const [promoverImportModalOpen, setPromoverImportModalOpen] = useState(false);
+  const [promoverImportLoading, setPromoverImportLoading] = useState(false);
+  const [promoverImportResult, setPromoverImportResult] = useState<any>(null);
+  const [promoverCnpj, setPromoverCnpj] = useState<string>('43576260000112'); // Padrão
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [isMobileSelectionMode, setIsMobileSelectionMode] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'destructive' | 'default';
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => { },
+    variant: 'default'
+  });
+
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [employeeForDetails, setEmployeeForDetails] = useState<Employee | null>(null);
+
   // Atualizar aba quando mudar na URL
   useEffect(() => {
     const tab = params.get('tab') || 'lista';
@@ -81,21 +125,18 @@ const Funcionarios: React.FC = () => {
   }, [location.search]);
 
   // Carregar funcionários
-  const loadEmployees = async (search?: string) => {
+  const loadEmployees = async (filters?: EmployeeFilters, page = 0) => {
     try {
       setLoading(true);
       setError(null);
-      
-      const term = search?.trim() || undefined;
-      console.log('🔍 [Funcionarios] Carregando funcionários, searchTerm:', term || '(todos)');
-      
-      // Buscar lista e contagem total em paralelo quando não há busca
+
+      // Buscar lista e contagem total
       const [data, count] = await Promise.all([
-        employeeService.getAllEmployees(term),
-        term ? Promise.resolve(null) : employeeService.getEmployeesCount()
+        employeeService.getAllEmployees(filters, page, pageSize),
+        employeeService.getEmployeesCount() // Sempre buscar o total para o contador
       ]);
-      
-      console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length, '| Total no sistema:', count ?? 'N/A');
+
+      console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length, '| Página:', page, '| Total no sistema:', count);
       setEmployees(data);
       if (count !== null) setTotalCount(count);
     } catch (err) {
@@ -108,22 +149,39 @@ const Funcionarios: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      setSelectedIds([]); // Limpar seleção após carregar
     }
   };
 
-  // Carregar funcionários com filtros
+  // Efeito para carregar ao mudar de página
+  useEffect(() => {
+    loadEmployeesWithFilters();
+  }, [currentPage]);
+
+  // Carregar funcionários com filtros atuais
   const loadEmployeesWithFilters = async () => {
-    const term = searchTerm?.trim() || undefined;
-    await loadEmployees(term);
+    const filters: EmployeeFilters = {
+      searchTerm: searchTerm.trim() || undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      companyId: companyFilter !== 'all' ? companyFilter : undefined,
+    };
+    await loadEmployees(filters, currentPage);
   };
 
   // Carregar funcionários (único efeito - evita carregamento duplo)
   useEffect(() => {
-    const term = searchTerm?.trim() || undefined;
-    const debounceMs = term ? 500 : 0; // sem espera na carga inicial; 500ms debounce na busca
-    const timeoutId = setTimeout(() => loadEmployees(term), debounceMs);
+    // Resetar para página 0 ao mudar filtros
+    setCurrentPage(0);
+
+    const filters: EmployeeFilters = {
+      searchTerm: searchTerm.trim() || undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      companyId: companyFilter !== 'all' ? companyFilter : undefined,
+    };
+    const debounceMs = filters.searchTerm ? 500 : 0;
+    const timeoutId = setTimeout(() => loadEmployees(filters as any, 0), debounceMs);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  }, [searchTerm, statusFilter, companyFilter]);
 
   useEffect(() => {
     if (shouldOpenModal) setModalOpen(true);
@@ -154,7 +212,7 @@ const Funcionarios: React.FC = () => {
     console.log('🔍 Estado atual editModalOpen:', editModalOpen);
     console.log('🔍 Estado atual employeeToEdit:', employeeToEdit);
     console.log('🔍 Estado atual modalOpen:', modalOpen);
-    
+
     try {
       // Fechar modal de criação se estiver aberto (primeiro, antes de tudo)
       if (modalOpen) {
@@ -164,29 +222,29 @@ const Funcionarios: React.FC = () => {
           navigate('/rh/funcionarios', { replace: true });
         }
       }
-      
+
       // Garantir que editModalOpen está false antes de buscar dados
       setEditModalOpen(false);
       setEmployeeToEdit(null);
-      
+
       // Buscar dados completos do funcionário do backend
       console.log('🔍 Buscando dados completos do funcionário:', employee.id);
       const fullEmployeeData = await employeeService.getEmployeeById(employee.id);
       console.log('🔍 Dados completos recebidos:', fullEmployeeData);
-      
+
       // Verificar se os dados foram recebidos corretamente
       if (!fullEmployeeData || !fullEmployeeData.id) {
         throw new Error('Dados do funcionário não foram retornados corretamente');
       }
-      
+
       // Definir dados primeiro, depois abrir modal
       // IMPORTANTE: Garantir que modalOpen está false antes de abrir editModalOpen
       setModalOpen(false);
       setEmployeeToEdit(fullEmployeeData);
       setEditModalOpen(true);
-      
+
       console.log('🔍 Estado após setEditModalOpen:', true);
-      
+
       console.log('🔍 Estado após setEmployeeToEdit:', fullEmployeeData);
     } catch (error) {
       console.error('❌ Erro ao buscar dados do funcionário:', error);
@@ -217,10 +275,10 @@ const Funcionarios: React.FC = () => {
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const searchDigits = searchTerm.replace(/\D/g, '');
   const filteredEmployees = employees.filter(employee => {
-    const matchesDepartment = departmentFilter === 'all' || 
-      employee.unit?.id === departmentFilter || 
+    const matchesDepartment = departmentFilter === 'all' ||
+      employee.unit?.id === departmentFilter ||
       employee.position?.id === departmentFilter;
-    
+
     const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
 
     const matchesSearch = !normalizedSearch || (() => {
@@ -234,7 +292,7 @@ const Funcionarios: React.FC = () => {
 
       return nameMatch || emailMatch || registrationMatch || cpfMatch;
     })();
-    
+
     return matchesDepartment && matchesStatus && matchesSearch;
   });
 
@@ -266,20 +324,10 @@ const Funcionarios: React.FC = () => {
   };
 
   // Excluir funcionário
-  const deleteEmployee = async (employeeId: string) => {
-    // Encontrar o funcionário para verificar o status
-    const employee = employees.find(emp => emp.id === employeeId);
-    
-    if (!employee) {
-      toast({
-        title: "Erro",
-        description: "Funcionário não encontrado.",
-        variant: "destructive"
-      });
-      return;
-    }
+  const deleteEmployee = async (employee: Employee) => {
+    const employeeId = employee.id;
 
-    // Verificar se o funcionário pode ser excluído
+    // 1. Verificar status (apenas demitidos podem ser excluídos)
     if (employee.status !== 'TERMINATED') {
       toast({
         title: "❌ Não é possível excluir",
@@ -296,29 +344,62 @@ Para excluir este funcionário:
       return;
     }
 
-    if (!confirm(`🗑️ Tem certeza que deseja excluir o funcionário "${employee.name}"?
-
-⚠️ ATENÇÃO: Esta ação é irreversível e removerá permanentemente todos os dados do funcionário do sistema.
-
-Status: ${getStatusText(employee.status)}
-CPF: ${employee.cpf}
-
-Confirma a exclusão?`)) {
-      return;
-    }
+    // 2. Verificar dependências (dependentes, documentos)
+    toast({
+      title: "🔍 Verificando dependências...",
+      description: "Aguarde enquanto conferimos se há dados vinculados a este funcionário.",
+    });
 
     try {
-      await employeeService.deleteEmployee(employeeId);
-      toast({
-        title: "✅ Sucesso",
-        description: `Funcionário "${employee.name}" foi excluído permanentemente do sistema.`,
+      const deps = await employeeService.checkDeletionDependencies(employeeId);
+
+      if (deps.hasDependencies) {
+        toast({
+          title: "⚠️ Ação Necessária",
+          description: (
+            <div className="mt-2 space-y-2">
+              <p>Este funcionário não pode ser excluído ainda pois possui vínculos ativos:</p>
+              <ul className="list-disc pl-4 text-sm">
+                {deps.messages.map((msg, i) => <li key={i}>{msg}</li>)}
+              </ul>
+              <p className="font-semibold text-xs mt-2">Por favor, remova os dependentes e documentos antes de excluir o cadastro do funcionário.</p>
+            </div>
+          ),
+          variant: "destructive",
+          duration: 6000
+        });
+        return;
+      }
+
+      // 3. Se não houver dependências, prosseguir para confirmação
+      setConfirmConfig({
+        open: true,
+        title: '🗑️ Confirmar Exclusão Permanente',
+        description: `Tem certeza que deseja excluir o funcionário "${employee.name}"? Esta ação é irreversível e removerá permanentemente todos os dados (Status: ${getStatusText(employee.status)}, CPF: ${employee.cpf}) do sistema.`,
+        variant: 'destructive',
+        onConfirm: async () => {
+          try {
+            await employeeService.deleteEmployee(employeeId);
+            toast({
+              title: "✅ Sucesso",
+              description: `Funcionário "${employee.name}" foi excluído permanentemente do sistema.`,
+            });
+            loadEmployeesWithFilters(); // Recarregar lista
+          } catch (err: any) {
+            console.error('Erro ao excluir funcionário:', err);
+            toast({
+              title: "❌ Erro ao excluir",
+              description: err.message || "Não foi possível realizar a exclusão. Tente novamente mais tarde.",
+              variant: "destructive"
+            });
+          }
+        }
       });
-      loadEmployeesWithFilters(); // Recarregar lista
     } catch (err) {
-      console.error('Erro ao excluir funcionário:', err);
+      console.error('Erro ao verificar dependências:', err);
       toast({
-        title: "❌ Erro na exclusão",
-        description: "Não foi possível excluir o funcionário. Verifique se ele pode ser excluído ou se há dependências no sistema.",
+        title: "❌ Erro de Verificação",
+        description: "Houve um problema ao verificar as dependências do funcionário. Tente novamente.",
         variant: "destructive"
       });
     }
@@ -326,25 +407,124 @@ Confirma a exclusão?`)) {
 
   // Alterar status do funcionário para TERMINATED
   const handleTerminateEmployee = async (employee: Employee) => {
-    if (!confirm(`Tem certeza que deseja alterar o status do funcionário "${employee.name}" para "Demitido"?`)) {
+    setConfirmConfig({
+      open: true,
+      title: 'Confirmar Demissão',
+      description: `Tem certeza que deseja alterar o status do funcionário "${employee.name}" para "Demitido"? Esta ação desativará o acesso do usuário.`,
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await employeeService.updateEmployeeStatus(employee.id, 'TERMINATED');
+          toast({
+            title: "Sucesso",
+            description: "Status do funcionário alterado para Demitido.",
+          });
+          loadEmployeesWithFilters();
+        } catch (err) {
+          console.error('Erro ao alterar status:', err);
+          toast({
+            title: "Erro",
+            description: "Não foi possível alterar o status do funcionário.",
+            variant: "destructive"
+          });
+        }
+      }
+    });
+  };
+
+  // Seleção individual
+  const handleSelectEmployee = (id: string, selected: boolean) => {
+    setSelectedIds(prev =>
+      selected ? [...prev, id] : prev.filter(i => i !== id)
+    );
+  };
+
+  // Selecionar todos os carregados
+  const handleSelectAllEmployees = (checked: boolean) => {
+    setSelectedIds(checked ? employees.map(e => e.id) : []);
+  };
+
+  // Demissão em massa
+  const handleBulkTerminate = async () => {
+    if (selectedIds.length === 0) return;
+
+    setConfirmConfig({
+      open: true,
+      title: 'Confirmar Demissão em Massa',
+      description: `Tem certeza que deseja demitir os ${selectedIds.length} funcionários selecionados? Esta ação é irreversível e desativará o acesso de todos.`,
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          setBulkActionLoading(true);
+          const terminationDate = new Date().toISOString().split('T')[0];
+          await employeeService.bulkTerminate(selectedIds, terminationDate);
+
+          toast({
+            title: "🚀 Sucesso",
+            description: `${selectedIds.length} funcionários demitidos com sucesso.`,
+          });
+
+          setSelectedIds([]);
+          loadEmployeesWithFilters();
+        } catch (err: any) {
+          console.error('Erro ao demitir em massa:', err);
+          toast({
+            title: "❌ Erro",
+            description: err.message || "Não foi possível demitir os funcionários.",
+            variant: "destructive"
+          });
+        } finally {
+          setBulkActionLoading(false);
+        }
+      }
+    });
+  };
+
+  // Exclusão em massa
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    // 1. Validar se todos os selecionados estão demitidos
+    const nonTerminated = employees.filter(e => selectedIds.includes(e.id) && e.status !== 'TERMINATED');
+
+    if (nonTerminated.length > 0) {
+      toast({
+        title: "❌ Não é possível excluir em lote",
+        description: `Existem ${nonTerminated.length} funcionários selecionados que não estão demitidos. Apenas funcionários demitidos podem ser excluídos permanentemente.`,
+        variant: "destructive"
+      });
       return;
     }
 
-    try {
-      await employeeService.updateEmployeeStatus(employee.id, 'TERMINATED');
-      toast({
-        title: "Sucesso",
-        description: "Status do funcionário alterado para Demitido.",
-      });
-      loadEmployeesWithFilters(); // Recarregar lista
-    } catch (err) {
-      console.error('Erro ao alterar status do funcionário:', err);
-      toast({
-        title: "Erro",
-        description: "Não foi possível alterar o status do funcionário.",
-        variant: "destructive"
-      });
-    }
+    setConfirmConfig({
+      open: true,
+      title: '🗑️ Confirmar Exclusão em Massa',
+      description: `Tem certeza que deseja excluir permanentemente os ${selectedIds.length} funcionários selecionados? Esta ação é irreversível e removerá todos os dados do sistema.`,
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          setBulkActionLoading(true);
+          await employeeService.bulkDeleteEmployees(selectedIds);
+
+          toast({
+            title: "✅ Sucesso",
+            description: `${selectedIds.length} funcionários excluídos permanentemente.`,
+          });
+
+          setSelectedIds([]);
+          loadEmployeesWithFilters();
+        } catch (err: any) {
+          console.error('Erro ao excluir em massa:', err);
+          toast({
+            title: "❌ Erro ao excluir",
+            description: err.message || "Não foi possível excluir os funcionários.",
+            variant: "destructive"
+          });
+        } finally {
+          setBulkActionLoading(false);
+        }
+      }
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -388,6 +568,18 @@ Confirma a exclusão?`)) {
     setSelectedEmployee(null);
   };
 
+  const handleViewDetails = (employee: Employee) => {
+    setEmployeeForDetails(employee);
+    setDetailsModalOpen(true);
+  };
+
+  const handleEditFromDetails = (employee: Employee) => {
+    setEmployeeToEdit(employee);
+    setEditModalOpen(true);
+    // Não fechamos o de detalhes, ou fechamos? UX decision: fechar detalhes para focar na edição
+    setDetailsModalOpen(false);
+  };
+
   // Loading state
   if (loading && employees.length === 0) {
     return (
@@ -410,7 +602,7 @@ Confirma a exclusão?`)) {
           <div className="text-center">
             <AlertCircle className="mx-auto h-8 w-8 text-red-500 mb-4" />
             <p className="text-seguranca-lightgray mb-4">{error}</p>
-            <Button 
+            <Button
               onClick={() => loadEmployees()}
               className="bg-seguranca-red hover:bg-seguranca-darkred"
             >
@@ -439,7 +631,7 @@ Confirma a exclusão?`)) {
     : `${subtitleLoaded} funcionário${subtitleLoaded !== 1 ? 's' : ''} no sistema`;
 
   return (
-    <StandardLayout 
+    <StandardLayout
       title="Gestão de Funcionários"
       subtitle={subtitleText}
     >
@@ -490,18 +682,18 @@ Confirma a exclusão?`)) {
                         <p className="text-xs text-gray-400">{selectedEmployee.position?.name || 'Cargo não definido'}</p>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setSelectedEmployee(null)}
                       className="text-gray-400 hover:text-white"
                     >
                       Trocar Funcionário
                     </Button>
                   </div>
-                  
-                  <DependenteModal 
-                    employeeId={selectedEmployee.id} 
+
+                  <DependenteModal
+                    employeeId={selectedEmployee.id}
                     employeeName={selectedEmployee.name}
                   />
                 </div>
@@ -511,7 +703,7 @@ Confirma a exclusão?`)) {
                     <UserPlus className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                     <h3 className="text-lg font-medium text-gray-300 mb-2">Selecione um funcionário</h3>
                     <p className="text-gray-400 mb-6">Selecione um funcionário abaixo para gerenciar seus dependentes.</p>
-                    
+
                     <div className="w-full max-w-md mx-auto space-y-4">
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -525,13 +717,13 @@ Confirma a exclusão?`)) {
 
                       <div className="bg-seguranca-black/30 border border-gray-700 rounded-md max-h-80 overflow-y-auto text-left">
                         {employees
-                          .filter(emp => 
-                            !dependentSearchTerm || 
+                          .filter(emp =>
+                            !dependentSearchTerm ||
                             emp.name.toLowerCase().includes(dependentSearchTerm.toLowerCase()) ||
                             (emp.document && emp.document.includes(dependentSearchTerm))
                           )
                           .map(emp => (
-                            <div 
+                            <div
                               key={emp.id}
                               className="p-3 hover:bg-gray-700 cursor-pointer flex items-center justify-between border-b border-gray-700/50 last:border-0 transition-colors group"
                               onClick={() => setSelectedEmployee(emp)}
@@ -548,7 +740,7 @@ Confirma a exclusão?`)) {
                               <ChevronRight size={16} className="text-gray-500 group-hover:text-seguranca-yellow transition-colors" />
                             </div>
                           ))}
-                          
+
                         {employees.filter(emp => !dependentSearchTerm || emp.name.toLowerCase().includes(dependentSearchTerm.toLowerCase())).length === 0 && (
                           <div className="p-8 text-center text-gray-500">
                             <p>Nenhum funcionário encontrado.</p>
@@ -557,10 +749,10 @@ Confirma a exclusão?`)) {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="pt-4 border-t border-gray-700/50 w-full max-w-md text-center">
-                    <Button 
-                      variant="link" 
+                    <Button
+                      variant="link"
                       className="text-gray-400 hover:text-seguranca-yellow"
                       onClick={() => {
                         const tabsList = document.querySelector('[role="tablist"]');
@@ -578,7 +770,7 @@ Confirma a exclusão?`)) {
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="lista">
           <div className="space-y-6">
             {/* Statistics Cards */}
@@ -643,8 +835,8 @@ Confirma a exclusão?`)) {
             {/* Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4" data-animate="fadeDown">
               <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setRefreshing(true);
                     loadEmployees();
@@ -665,6 +857,25 @@ Confirma a exclusão?`)) {
                   Importar Excel
                 </Button>
                 <Button
+                  variant="outline"
+                  className="border-yellow-600/50 text-yellow-400 hover:bg-yellow-900/20"
+                  onClick={() => { setPromoverImportResult(null); setPromoverImportModalOpen(true); }}
+                >
+                  <Upload size={20} className="mr-2" />
+                  Importar Planilha Promover
+                </Button>
+                <Button
+                  onClick={() => setIsMobileSelectionMode(!isMobileSelectionMode)}
+                  variant={isMobileSelectionMode ? "destructive" : "outline"}
+                  className={`lg:hidden h-11 px-4 border-gray-600 transition-all duration-300 ${isMobileSelectionMode ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white'}`}
+                >
+                  {isMobileSelectionMode ? (
+                    <><CheckCircle2 className="mr-2 h-4 w-4" /> Pronto</>
+                  ) : (
+                    <><Shuffle className="mr-2 h-4 w-4" /> Selecionar</>
+                  )}
+                </Button>
+                <Button
                   className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20"
                   onClick={handleOpenModal}
                 >
@@ -682,7 +893,7 @@ Confirma a exclusão?`)) {
                   <div>
                     <h4 className="text-blue-400 font-semibold">Regras de Exclusão de Funcionários</h4>
                     <p className="text-blue-300 text-sm mt-1">
-                      <strong>⚠️ Importante:</strong> Apenas funcionários com status "Demitido" podem ser excluídos do sistema. 
+                      <strong>⚠️ Importante:</strong> Apenas funcionários com status "Demitido" podem ser excluídos do sistema.
                       Para excluir um funcionário ativo, primeiro altere seu status para "Demitido" usando o botão "Demitir".
                     </p>
                   </div>
@@ -704,7 +915,7 @@ Confirma a exclusão?`)) {
                     <p className="text-sm text-gray-400">Filtre e encontre funcionários rapidamente</p>
                   </div>
                 </div>
-                <Button 
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
@@ -735,7 +946,7 @@ Confirma a exclusão?`)) {
                     className="pl-10 h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20"
                   />
                 </div>
-                
+
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -750,7 +961,20 @@ Confirma a exclusão?`)) {
                   <option value="TERMINATED">❌ Demitido</option>
                   <option value="SUSPENDED">⏸️ Suspenso</option>
                 </select>
-                
+
+                <select
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
+                >
+                  <option value="all">🏢 Todas as Empresas</option>
+                  {/* Idealmente buscaríamos do backend, mas aqui podemos extrair das empresas presentes nos funcionários carregados */}
+                  {Array.from(new Set(employees.map(e => e.company?.id).filter(Boolean))).map(companyId => {
+                    const companyName = employees.find(e => e.company?.id === companyId)?.company?.sigla || companyId;
+                    return <option key={companyId} value={companyId}>{companyName}</option>;
+                  })}
+                </select>
+
                 <select
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
@@ -767,7 +991,10 @@ Confirma a exclusão?`)) {
             {/* Lista de Funcionários Moderna */}
             <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               <FuncionariosTable
-                employees={filteredEmployees}
+                employees={employees}
+                selectedIds={selectedIds}
+                onSelect={handleSelectEmployee}
+                onSelectAll={handleSelectAllEmployees}
                 onEdit={handleEditEmployee}
                 onDelete={deleteEmployee}
                 onTerminate={handleTerminateEmployee}
@@ -780,8 +1007,118 @@ Confirma a exclusão?`)) {
                     (dependentesTab as HTMLElement).click();
                   }
                 }}
+                onViewDetails={handleViewDetails}
                 isLoading={loading}
+                isMobileSelectionMode={isMobileSelectionMode}
               />
+
+              {/* Paginação */}
+              {totalCount !== null && totalCount > pageSize && (
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-seguranca-black/30 p-4 rounded-lg border border-gray-700/50">
+                  <div className="text-sm text-gray-400">
+                    Mostrando <span className="text-white font-medium">{employees.length}</span> de <span className="text-white font-medium">{totalCount}</span> funcionários
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(0)}
+                      disabled={currentPage === 0 || loading}
+                      className="border-gray-700 text-gray-400 hover:text-white"
+                    >
+                      Primeira
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                      disabled={currentPage === 0 || loading}
+                      className="border-gray-700 text-gray-400 hover:text-white"
+                    >
+                      Anterior
+                    </Button>
+
+                    <div className="h-8 px-4 flex items-center justify-center bg-seguranca-red text-white text-sm font-bold rounded-md min-w-[32px]">
+                      {currentPage + 1}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      disabled={employees.length < pageSize || loading}
+                      className="border-gray-700 text-gray-400 hover:text-white"
+                    >
+                      Próxima
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(Math.floor((totalCount - 1) / pageSize))}
+                      disabled={employees.length < pageSize || loading}
+                      className="border-gray-700 text-gray-400 hover:text-white"
+                    >
+                      Última
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Barra de Ações em Massa */}
+              {selectedIds.length > 0 && (
+                <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <Card className="bg-seguranca-black border-seguranca-red shadow-2xl shadow-seguranca-red/20 px-6 py-4 flex items-center gap-6">
+                    <div className="flex items-center gap-2 border-r border-gray-700 pr-6">
+                      <div className="bg-seguranca-red/20 text-seguranca-red h-8 w-8 rounded-full flex items-center justify-center font-bold">
+                        {selectedIds.length}
+                      </div>
+                      <span className="text-sm font-medium text-white">Selecionados</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedIds([])}
+                        className="text-gray-400 border-gray-700 hover:bg-gray-800"
+                        disabled={bulkActionLoading}
+                      >
+                        Cancelar
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={bulkActionLoading}
+                        onClick={handleBulkDelete}
+                        className="border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500"
+                      >
+                        {bulkActionLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Excluir Selecionados
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        disabled={bulkActionLoading}
+                        onClick={handleBulkTerminate}
+                        className="bg-seguranca-red hover:bg-seguranca-darkred text-white"
+                      >
+                        {bulkActionLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <UserMinus className="h-4 w-4 mr-2" />
+                        )}
+                        Demitir Selecionados
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              )}
             </Card>
           </div>
         </TabsContent>
@@ -806,7 +1143,7 @@ Confirma a exclusão?`)) {
             <DialogTitle>Documentos de {selectedEmployee?.name}</DialogTitle>
           </DialogHeader>
           {selectedEmployee && (
-            <EmployeeDocuments 
+            <EmployeeDocuments
               employeeId={selectedEmployee.id}
               employeeName={selectedEmployee.name}
             />
@@ -831,6 +1168,130 @@ Confirma a exclusão?`)) {
           }
         }}
       />
+
+      {/* Modal de Importação Planilha Promover */}
+      <Dialog open={promoverImportModalOpen} onOpenChange={setPromoverImportModalOpen}>
+        <DialogContent className="max-w-lg bg-seguranca-black border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Upload className="text-seguranca-yellow" size={20} />
+              Importar Planilha Promover
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-gray-400">
+              Selecione a empresa e o arquivo <strong className="text-white">.xlsx</strong> da planilha de funcionários rede Promover.
+              O sistema irá criar ou atualizar os funcionários pelo CPF automaticamente.
+            </p>
+
+            <div className="flex flex-col gap-2 mb-4">
+              <label className="text-sm font-semibold text-gray-300">Empresa de Destino:</label>
+              <select
+                value={promoverCnpj}
+                onChange={(e) => setPromoverCnpj(e.target.value)}
+                className="bg-seguranca-black border border-gray-700 text-white rounded-lg px-3 py-2 text-sm w-full outline-none focus:border-seguranca-yellow transition-all"
+              >
+                <option value="43576260000112">Promover Vigilância Patrimonial (CNPJ: 43.576.260/0001-12)</option>
+                <option value="36698521000101">Promover Terceirização (CNPJ: 36.698.521/0001-01)</option>
+              </select>
+            </div>
+
+            {!promoverImportLoading && !promoverImportResult && (
+              <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-seguranca-yellow/40 rounded-xl cursor-pointer hover:border-seguranca-yellow/70 hover:bg-seguranca-yellow/5 transition-all">
+                <Upload className="text-seguranca-yellow mb-2" size={32} />
+                <span className="text-sm text-gray-400">Clique para selecionar o arquivo .xlsx</span>
+                <input
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setPromoverImportLoading(true);
+                    setPromoverImportResult(null);
+                    try {
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      formData.append('cnpj', promoverCnpj);
+                      const { default: api } = await import('@/services/api');
+                      const resp = await api.post('/api/employees/import/promover', formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                      });
+                      setPromoverImportResult(resp.data);
+                      loadEmployeesWithFilters();
+                    } catch (err: any) {
+                      setPromoverImportResult({
+                        success: false,
+                        message: err?.response?.data?.message || err.message || 'Erro ao importar',
+                      });
+                    } finally {
+                      setPromoverImportLoading(false);
+                    }
+                  }}
+                />
+              </label>
+            )}
+
+            {promoverImportLoading && (
+              <div className="flex flex-col items-center justify-center h-36 gap-3">
+                <Loader2 className="text-seguranca-yellow animate-spin" size={40} />
+                <p className="text-sm text-gray-400">Processando importação...</p>
+              </div>
+            )}
+
+            {promoverImportResult && (
+              <div className={`rounded-xl p-4 border ${promoverImportResult.success
+                ? 'bg-green-900/20 border-green-600/40'
+                : 'bg-red-900/20 border-red-600/40'
+                }`}>
+                <p className={`font-semibold mb-2 ${promoverImportResult.success ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                  {promoverImportResult.success ? '✅ Importação concluída!' : '❌ Erro na importação'}
+                </p>
+                <p className="text-sm text-gray-300">{promoverImportResult.message}</p>
+                {promoverImportResult.success && (
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-seguranca-black/40 rounded-lg p-2">
+                      <p className="text-gray-500">Total</p>
+                      <p className="text-white font-bold text-lg">{promoverImportResult.total}</p>
+                    </div>
+                    <div className="bg-seguranca-black/40 rounded-lg p-2">
+                      <p className="text-gray-500">Criados</p>
+                      <p className="text-green-400 font-bold text-lg">{promoverImportResult.criados}</p>
+                    </div>
+                    <div className="bg-seguranca-black/40 rounded-lg p-2">
+                      <p className="text-gray-500">Atualizados</p>
+                      <p className="text-blue-400 font-bold text-lg">{promoverImportResult.atualizados}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Exibir erros detalhados se existirem */}
+                {!promoverImportResult.success && promoverImportResult.mensagens && promoverImportResult.mensagens.length > 0 && (
+                  <div className="mt-3 text-left">
+                    <p className="text-xs text-red-400 font-bold mb-1">Detalhes dos Erros:</p>
+                    <div className="max-h-40 overflow-y-auto bg-seguranca-black/50 p-2 rounded-lg text-xs font-mono text-gray-300 border border-red-900/30">
+                      <ul>
+                        {promoverImportResult.mensagens.map((msg: string, idx: number) => (
+                          <li key={idx} className="mb-1 pb-1 border-b border-gray-800/50 last:border-0">{msg}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  className="mt-4 w-full border-gray-600 text-gray-300 hover:bg-gray-800"
+                  variant="outline"
+                  onClick={() => { setPromoverImportResult(null); }}
+                >
+                  Importar outro arquivo
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Criação/Edição de Funcionário */}
       {/* 
@@ -858,6 +1319,66 @@ Confirma a exclusão?`)) {
           }
         }}
         employeeToEdit={editModalOpen && employeeToEdit ? employeeToEdit : null}
+      />
+
+      {/* Modal de Confirmação Customizado */}
+      <AlertDialog
+        open={confirmConfig.open}
+        onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, open }))}
+      >
+        <AlertDialogContent className="bg-seguranca-black/90 backdrop-blur-xl border-gray-700/50 max-w-[420px] p-0 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.5)] border-t-seguranca-red/30">
+          <div className="absolute top-4 right-4 z-10">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setConfirmConfig(prev => ({ ...prev, open: false }))}
+              className="h-8 w-8 rounded-full text-gray-500 hover:text-white hover:bg-white/10"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="p-8">
+            <div className="flex flex-col items-center text-center space-y-5">
+              <div className={`p-5 rounded-2xl shadow-inner ${confirmConfig.variant === 'destructive' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                {confirmConfig.variant === 'destructive' ? (
+                  <AlertTriangle className="h-10 w-10 animate-pulse" />
+                ) : (
+                  <CheckCircle className="h-10 w-10" />
+                )}
+              </div>
+              <div className="space-y-3">
+                <AlertDialogTitle className="text-2xl font-bold text-white tracking-tight">
+                  {confirmConfig.title}
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-gray-400 text-sm leading-relaxed px-2">
+                  {confirmConfig.description}
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </div>
+          <AlertDialogFooter className="bg-seguranca-graphite/40 border-t border-gray-800/50 p-6 gap-3 sm:gap-0 mt-0">
+            <AlertDialogCancel className="bg-transparent border-gray-700 text-gray-400 hover:bg-seguranca-black hover:text-white transition-all duration-300 px-6">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmConfig.onConfirm}
+              className={`px-8 transition-all duration-300 ${confirmConfig.variant === 'destructive'
+                ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-[0_0_15px_rgba(220,38,38,0.3)]'
+                : 'bg-gradient-to-r from-seguranca-red to-red-700 hover:from-red-500 hover:to-red-600 shadow-[0_0_15px_rgba(220,38,38,0.3)]'
+                } text-white border-0`}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Modal de Detalhes Completo */}
+      <EmployeeViewDetailsModal
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+        employee={employeeForDetails}
+        onEdit={handleEditFromDetails}
       />
     </StandardLayout>
   );
