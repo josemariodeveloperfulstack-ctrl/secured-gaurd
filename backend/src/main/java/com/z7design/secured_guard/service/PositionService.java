@@ -30,13 +30,41 @@ public class PositionService {
             log.info("Buscando todos os cargos");
             List<Position> positions = positionRepository.findAll();
             log.info("Encontrados {} cargos", positions.size());
-            
+
             if (positions.isEmpty()) {
                 log.warn("Nenhum cargo encontrado no banco de dados");
                 return java.util.Collections.emptyList();
             }
-            
+
             return positions.stream()
+                    .map(pos -> {
+                        try {
+                            return PositionDTO.fromEntity(pos);
+                        } catch (Exception e) {
+                            log.error("Erro ao converter cargo {}: {}", pos.getName(), e.getMessage());
+                            return null; // Continuar com outros cargos
+                        }
+                    })
+                    .filter(dto -> dto != null)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Erro ao buscar cargos: {}", e.getMessage(), e);
+            log.warn("Retornando lista vazia devido ao erro");
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    public List<PositionDTO> searchPositions(String query) {
+        log.info("Buscando cargos com query: {}", query);
+        List<Position> positions;
+
+        if (query == null || query.trim().isEmpty()) {
+            positions = positionRepository.findAllByOrderByNameAsc();
+        } else {
+            positions = positionRepository.searchPositions(query.trim());
+        }
+
+        return positions.stream()
                 .map(pos -> {
                     try {
                         return PositionDTO.fromEntity(pos);
@@ -45,27 +73,6 @@ public class PositionService {
                         return null; // Continuar com outros cargos
                     }
                 })
-                .filter(dto -> dto != null)
-                .collect(Collectors.toList());
-        } catch (Exception e) {
-            log.error("Erro ao buscar cargos: {}", e.getMessage(), e);
-            log.warn("Retornando lista vazia devido ao erro");
-            return java.util.Collections.emptyList();
-        }
-    }
-    
-    public List<PositionDTO> searchPositions(String query) {
-        log.info("Buscando cargos com query: {}", query);
-        List<Position> positions;
-        
-        if (query == null || query.trim().isEmpty()) {
-            positions = positionRepository.findAllByOrderByNameAsc();
-        } else {
-            positions = positionRepository.searchPositions(query.trim());
-        }
-        
-        return positions.stream()
-                .map(PositionDTO::fromEntity)
                 .filter(dto -> dto != null) // Filtrar DTOs nulos
                 .collect(Collectors.toList());
     }
@@ -88,7 +95,8 @@ public class PositionService {
 
         if (dto.getUnitId() != null) {
             Unit unit = unitRepository.findById(dto.getUnitId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com ID: " + dto.getUnitId()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Unidade não encontrada com ID: " + dto.getUnitId()));
             position.setUnit(unit);
         }
 
@@ -114,7 +122,8 @@ public class PositionService {
 
         if (dto.getUnitId() != null) {
             Unit unit = unitRepository.findById(dto.getUnitId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Unidade não encontrada com ID: " + dto.getUnitId()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Unidade não encontrada com ID: " + dto.getUnitId()));
             existingPosition.setUnit(unit);
         } else {
             existingPosition.setUnit(null); // Remove a associação se unitId for null
@@ -133,4 +142,4 @@ public class PositionService {
         positionRepository.deleteById(id);
         log.info("Cargo excluído com sucesso - ID: {}", id);
     }
-} 
+}
