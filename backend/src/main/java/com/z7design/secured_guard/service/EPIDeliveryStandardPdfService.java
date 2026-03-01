@@ -159,6 +159,10 @@ public class EPIDeliveryStandardPdfService {
                         ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
                                         .companyId(company.getId())
                                         .reportTitle("FICHA DE ENTREGA DE EPI")
+                                        .topMargin(100f)
+                                        .bottomMargin(40f)
+                                        .leftMargin(40f)
+                                        .rightMargin(40f)
                                         .includeEmailInFooter(true)
                                         .build();
 
@@ -192,9 +196,9 @@ public class EPIDeliveryStandardPdfService {
                         document.add(createSectionHeader("TERMO DE RESPONSABILIDADE"));
                         String declarationText = "Recebi da empresa acima identificada, os EPI's abaixo relacionados, para uso exclusivo no desempenho de minhas funções. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação e devolvê-los à empresa em caso de rescisão contratual. Estou ciente de que o não uso desses equipamentos constitui ato de insubordinação, sujeito a sanções disciplinares conforme o art. 158 da CLT.";
                         document.add(new Paragraph(declarationText)
-                                        .setFontSize(10f)
+                                        .setFontSize(9f)
                                         .setTextAlignment(TextAlignment.JUSTIFIED)
-                                        .setMarginBottom(10f));
+                                        .setMarginBottom(5f));
 
                         // Seção: Equipamentos de Proteção Individual
                         document.add(createSectionHeader("EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (EPI)"));
@@ -225,12 +229,12 @@ public class EPIDeliveryStandardPdfService {
                         }
 
                         // Adicionar linhas vazias para manter padrão visual se houver poucos itens
-                        int itemsToAdd = Math.max(0, 10 - (form.getItems() != null ? form.getItems().size() : 0));
+                        int itemsToAdd = Math.max(0, 8 - (form.getItems() != null ? form.getItems().size() : 0));
                         for (int i = 0; i < itemsToAdd; i++) {
-                                epiTable.addCell(new Cell().setHeight(15f));
-                                epiTable.addCell(new Cell().setHeight(15f));
-                                epiTable.addCell(new Cell().setHeight(15f));
-                                epiTable.addCell(new Cell().setHeight(15f));
+                                epiTable.addCell(new Cell().setHeight(12f));
+                                epiTable.addCell(new Cell().setHeight(12f));
+                                epiTable.addCell(new Cell().setHeight(12f));
+                                epiTable.addCell(new Cell().setHeight(12f));
                         }
                         document.add(epiTable);
 
@@ -346,18 +350,18 @@ public class EPIDeliveryStandardPdfService {
 
         private Cell createLabelValueCell(String label, String value) {
                 Paragraph p = new Paragraph();
-                p.add(new Text(label).setBold().setFontSize(9f));
-                p.add(new Text(" " + (value != null && !value.isEmpty() ? value : "-")).setFontSize(10f));
-                return new Cell().add(p).setPadding(5f);
+                p.add(new Text(label).setBold().setFontSize(8f));
+                p.add(new Text(" " + (value != null && !value.isEmpty() ? value : "-")).setFontSize(9f));
+                return new Cell().add(p).setPadding(2f);
         }
 
         private Paragraph createSectionHeader(String title) {
                 return new Paragraph(title)
                                 .setBold()
-                                .setFontSize(11f)
+                                .setFontSize(10f)
                                 .setFontColor(new DeviceRgb(255, 0, 0)) // RED
-                                .setMarginTop(15f)
-                                .setMarginBottom(5f)
+                                .setMarginTop(8f)
+                                .setMarginBottom(2f)
                                 .setBorderLeft(new SolidBorder(new DeviceRgb(255, 0, 0), 3f))
                                 .setPaddingLeft(5f);
         }
@@ -369,9 +373,9 @@ public class EPIDeliveryStandardPdfService {
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginTop(30f)
-                                .setMarginBottom(40f)
-                                .setFontSize(10f);
+                                .setMarginTop(15f)
+                                .setMarginBottom(25f)
+                                .setFontSize(9f);
                 document.add(dateLoc);
 
                 Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 45, 10, 45 }))

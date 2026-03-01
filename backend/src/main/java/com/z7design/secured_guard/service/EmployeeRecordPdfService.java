@@ -72,7 +72,7 @@ public class EmployeeRecordPdfService {
             ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
                     .companyId(companyId)
                     .reportTitle("FICHA DE REGISTRO DO FUNCIONÁRIO")
-                    .topMargin(80f)
+                    .topMargin(130f) // Increased to allow title space without overlap
                     .bottomMargin(50f)
                     .leftMargin(50f)
                     .rightMargin(50f)
@@ -81,12 +81,21 @@ public class EmployeeRecordPdfService {
             docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
             Document document = docWithPdf.getDocument();
 
+            // DATA DE REGISTRO (Mover para o topo)
+            Paragraph dateTop = new Paragraph(
+                    "Data de Registro: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                    .setFontSize(9)
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setMarginBottom(10)
+                    .setMarginTop(0);
+            document.add(dateTop);
+
             // DADOS DA EMPRESA (no topo)
             if (company != null) {
                 Paragraph companyTitle = new Paragraph("DADOS DA EMPRESA")
                         .setBold()
                         .setFontSize(12)
-                        .setMarginTop(10)
+                        .setMarginTop(5)
                         .setMarginBottom(10);
                 document.add(companyTitle);
 
@@ -139,7 +148,7 @@ public class EmployeeRecordPdfService {
             addTableRow(personalTable, "Estado Civil:", translateMaritalStatus(employee.getMaritalStatus()));
             addTableRow(personalTable, "Grau de Instrução:", translateGrauInstrucao(employee.getGrauInstrucao()));
             addTableRow(personalTable, "Sexo:", translateSexo(employee.getSexo()));
-            addTableRow(personalTable, "Telefone:", employee.getPhone());
+            addTableRow(personalTable, "Telefone:", formatPhoneNumber(employee.getPhone()));
             addTableRow(personalTable, "Email:", employee.getEmail());
             addTableRow(personalTable, "Endereço:", buildAddress(employee));
             document.add(personalTable);
@@ -196,6 +205,9 @@ public class EmployeeRecordPdfService {
                     .useAllAvailableWidth()
                     .setMarginBottom(15);
 
+            if (employee.getRegistrationNumber() != null && !employee.getRegistrationNumber().trim().isEmpty()) {
+                addTableRow(professionalTable, "Nº Registro:", employee.getRegistrationNumber());
+            }
             addTableRow(professionalTable, "Data de Admissão:", formatDate(employee.getHireDate()));
             addTableRow(professionalTable, "Cargo:",
                     employee.getPosition() != null ? employee.getPosition().getName() : "");
@@ -212,15 +224,12 @@ public class EmployeeRecordPdfService {
             }
 
             addTableRow(professionalTable, "Período de Pagamento:", employee.getPeriodoPagamento());
-            addTableRow(professionalTable, "Horário de Trabalho:", employee.getHorarioTrabalho());
-            if (employee.getHorarioTrabalhoIntervalo() != null
-                    && !employee.getHorarioTrabalhoIntervalo().trim().isEmpty()) {
-                addTableRow(professionalTable, "Intervalo:", employee.getHorarioTrabalhoIntervalo());
-            }
-            addTableRow(professionalTable, "Dias de Trabalho:", employee.getDiasTrabalho());
-            addTableRow(professionalTable, "Folga Semanal:", employee.getFolgaSemanal());
             addTableRow(professionalTable, "Escala de Trabalho:", employee.getEscalaTrabalho());
             document.add(professionalTable);
+
+            // Quebra de página antes do FGTS
+            document.add(
+                    new com.itextpdf.layout.element.AreaBreak(com.itextpdf.layout.properties.AreaBreakType.NEXT_PAGE));
 
             // FGTS
             Paragraph fgtsTitle = new Paragraph("SITUAÇÃO PERANTE O FUNDO DE GARANTIA DO TEMPO DE SERVIÇO (FGTS)")
@@ -255,11 +264,31 @@ public class EmployeeRecordPdfService {
 
             addTableRow(pisTable, "Número PIS:", employee.getPis());
             addTableRow(pisTable, "Cadastrado em:", formatDate(employee.getPisDataCadastro()));
-            addTableRow(pisTable, "Dep. no Banco:", employee.getPisBancoDepositario());
-            addTableRow(pisTable, "Endereço Banco:", employee.getPisEnderecoBanco());
-            addTableRow(pisTable, "Código Banco:", employee.getPisCodigoBanco());
-            addTableRow(pisTable, "Código Agência:", employee.getPisCodigoAgencia());
             document.add(pisTable);
+
+            // DADOS BANCÁRIOS
+            Paragraph bankTitle = new Paragraph("DADOS BANCÁRIOS")
+                    .setBold()
+                    .setFontSize(12)
+                    .setMarginTop(10)
+                    .setMarginBottom(10);
+            document.add(bankTitle);
+
+            Table bankTable = new Table(UnitValue.createPercentArray(new float[] { 40f, 60f }))
+                    .useAllAvailableWidth()
+                    .setMarginBottom(15);
+
+            addTableRow(bankTable, "Banco:", employee.getBanco());
+            addTableRow(bankTable, "Agência:", employee.getAgencia());
+
+            String contaStr = employee.getContaCorrente() != null ? employee.getContaCorrente() : "";
+            if (employee.getContaDigito() != null && !employee.getContaDigito().trim().isEmpty()) {
+                contaStr += "-" + employee.getContaDigito();
+            }
+            addTableRow(bankTable, "Conta Corrente:", contaStr);
+            addTableRow(bankTable, "Chave PIX:", employee.getPixKey());
+
+            document.add(bankTable);
 
             // DADOS FAMILIARES
             Paragraph familyTitle = new Paragraph("DADOS FAMILIARES")
@@ -281,6 +310,9 @@ public class EmployeeRecordPdfService {
             }
             document.add(familyTable);
 
+            // Bloco final: Visto, Observações e Assinatura mantidos juntos na mesma página
+            com.itextpdf.layout.element.Div finalBlock = new com.itextpdf.layout.element.Div().setKeepTogether(true);
+
             // VISTO DA FISCALIZAÇÃO
             if (employee.getVistoFiscalizacao() != null && !employee.getVistoFiscalizacao().trim().isEmpty()) {
                 Paragraph vistoTitle = new Paragraph("VISTO DA FISCALIZAÇÃO")
@@ -288,12 +320,12 @@ public class EmployeeRecordPdfService {
                         .setFontSize(12)
                         .setMarginTop(10)
                         .setMarginBottom(10);
-                document.add(vistoTitle);
+                finalBlock.add(vistoTitle);
 
                 Paragraph visto = new Paragraph(employee.getVistoFiscalizacao())
                         .setFontSize(10)
                         .setMarginBottom(15);
-                document.add(visto);
+                finalBlock.add(visto);
             }
 
             // OBSERVAÇÕES
@@ -303,28 +335,22 @@ public class EmployeeRecordPdfService {
                         .setFontSize(12)
                         .setMarginTop(10)
                         .setMarginBottom(10);
-                document.add(notesTitle);
+                finalBlock.add(notesTitle);
 
                 Paragraph notes = new Paragraph(employee.getNotes())
                         .setFontSize(10)
                         .setMarginBottom(10);
-                document.add(notes);
+                finalBlock.add(notes);
             }
-
-            // DATA DE REGISTRO
-            Paragraph date = new Paragraph(
-                    "Data de Registro: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
-                    .setFontSize(9)
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setMarginTop(20);
-            document.add(date);
 
             // LINHA PARA ASSINATURA DO EMPREGADO
             Paragraph signature = new Paragraph("Assinatura do Empregado: _________________________________")
                     .setFontSize(10)
                     .setMarginTop(30)
                     .setMarginBottom(10);
-            document.add(signature);
+            finalBlock.add(signature);
+
+            document.add(finalBlock);
 
             // DATA DE RESCISÃO (se houver)
             if (employee.getTerminationDate() != null) {
@@ -639,16 +665,18 @@ public class EmployeeRecordPdfService {
         return new Cell()
                 .add(new Paragraph(text != null ? text : "")
                         .setBold()
-                        .setFontSize(10))
+                        .setFontSize(10)
+                        .setMultipliedLeading(1.0f))
                 .setBackgroundColor(new DeviceRgb(240, 240, 240))
-                .setPadding(2.5f);
+                .setPadding(1.5f); // Reduced padding to compress rows
     }
 
     private Cell createValueCell(String text) {
         return new Cell()
                 .add(new Paragraph(text != null ? text : "")
-                        .setFontSize(10))
-                .setPadding(2.5f);
+                        .setFontSize(10)
+                        .setMultipliedLeading(1.0f))
+                .setPadding(1.5f); // Reduced padding to compress rows
     }
 
     private UUID resolveCompanyId(Company company) {
@@ -741,6 +769,20 @@ public class EmployeeRecordPdfService {
         }
     }
 
+    private String formatPhoneNumber(String phone) {
+        if (phone == null || phone.trim().isEmpty())
+            return "";
+        String numbers = phone.replaceAll("\\D", "");
+        if (numbers.length() == 11) {
+            return String.format("(%s) %s-%s", numbers.substring(0, 2), numbers.substring(2, 7),
+                    numbers.substring(7, 11));
+        } else if (numbers.length() == 10) {
+            return String.format("(%s) %s-%s", numbers.substring(0, 2), numbers.substring(2, 6),
+                    numbers.substring(6, 10));
+        }
+        return phone;
+    }
+
     private String translateGrauInstrucao(String grau) {
         if (grau == null || grau.trim().isEmpty())
             return "";
@@ -757,7 +799,18 @@ public class EmployeeRecordPdfService {
             case "POST_GRADUATE":
                 return "Pós-Graduação";
             default:
-                return grau;
+                String[] words = grau.split("_");
+                StringBuilder sb = new StringBuilder();
+                for (String word : words) {
+                    if (!word.isEmpty()) {
+                        sb.append(Character.toUpperCase(word.charAt(0)));
+                        if (word.length() > 1) {
+                            sb.append(word.substring(1).toLowerCase());
+                        }
+                        sb.append(" ");
+                    }
+                }
+                return sb.toString().trim();
         }
     }
 
