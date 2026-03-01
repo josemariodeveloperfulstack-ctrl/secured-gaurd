@@ -253,18 +253,7 @@ jobs:
           echo "❌ Transferência falhou após 5 tentativas"
           exit 1
 
-      # ============================================
-      # 9️⃣ VALIDATE AND CONFIGURE JWT_SECRET
-      # ============================================
-      - name: 🔐 Validate and configure JWT_SECRET
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
-            if [ -z "$JWT_SECRET" ]; then
-              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
-            fi
-            export JWT_SECRET
-          EOF
+
 
       # ============================================
       # 🔟 CREATE .ENV FILE ON VPS
@@ -313,35 +302,7 @@ jobs:
           # Limpar arquivo temporário
           rm -f /tmp/ci.env
 
-      # ============================================
-      # 1️⃣1️⃣ ENSURE JWT_SECRET IS CORRECT ON HOST AND .ENV
-      # ============================================
-      - name: 🔐 Ensure JWT_SECRET is correct on host and .env
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
-            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
-            if [ -z "$JWT_SECRET" ]; then
-              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
-            fi
-            export JWT_SECRET=$JWT_SECRET
-            echo "JWT_SECRET_CI=$JWT_SECRET" >> .env
-          EOF
 
-      # ============================================
-      # 1️⃣2️⃣ FORCE .ENV CORRECTION BEFORE STOPPING CONTAINERS
-      # ============================================
-      - name: 🔧 Force .env correction before stopping containers
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
-            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
-            if [ -z "$JWT_SECRET" ]; then
-              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
-            fi
-            sed -i '/^JWT_SECRET_CI=/d' .env
-            echo "JWT_SECRET_CI=$JWT_SECRET" >> .env
-          EOF
 
       # ============================================
       # 1️⃣3️⃣ FORCE EXIT SWARM MODE AND COMPLETE CLEANUP
@@ -490,20 +451,7 @@ jobs:
             docker-compose -f docker-compose.ci.yml up -d
           EOF
 
-      # ============================================
-      # 1️⃣9️⃣ VERIFY .ENV AND JWT_SECRET IN CONTAINERS
-      # ============================================
-      - name: 🔐 Verify .env and JWT_SECRET in containers
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
-            if [ -z "$JWT_SECRET" ]; then
-              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
-            fi
-            cd /var/www/secured_guard/ci
-            cat .env | grep JWT_SECRET
-            docker exec secured-guard-backend-ci sh -c "export JWT_SECRET=$JWT_SECRET" || true
-          EOF
+
 
       # ============================================
       # 2️⃣1️⃣ ENSURE USER ROLES AND PERMISSIONS
