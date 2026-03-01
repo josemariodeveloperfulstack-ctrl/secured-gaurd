@@ -105,22 +105,26 @@ jobs:
             printf "MAIL_PASSWORD=%s\n" "$MAIL_PASS"
           } > .prod.env
 
-          SSH_OPTS="-o StrictHostKeyChecking=no"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
           VPS_STR="${{ secrets.VPS_USER_PROD }}@${{ secrets.VPS_HOST_PROD }}"
           
-          # Ensure target directory
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR "mkdir -p $DEPLOY_PATH/deploy/nginx"
+          # Create deployment archive locally
+          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh traefik-dynamic-prod.yml
+
+          # Transfer archive
+          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS prod-deploy.tar.gz $VPS_STR:/tmp/prod-deploy.tar.gz
           
-          # Transfer .env
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS .prod.env $VPS_STR:$DEPLOY_PATH/deploy/.env
-          
-          # Transfer docker-compose, nginx config e script fix 404
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/docker-compose.prod.yml $VPS_STR:$DEPLOY_PATH/deploy/
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS deploy/nginx/nginx-prod.conf $VPS_STR:$DEPLOY_PATH/deploy/nginx/
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS scripts/fix-404-prod.sh $VPS_STR:$DEPLOY_PATH/deploy/
-          # Traefik dynamic config PROD (resolve 502 - aponta para secured-guard-nginx-prod na z7network)
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR "mkdir -p /var/www/secured_guard/traefik/dynamic"
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS traefik-dynamic-prod.yml $VPS_STR:/var/www/secured_guard/traefik/dynamic/prod.yml
+          # Move files to correct paths in a single SSH session
+          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << 'ENDSSH'
+            mkdir -p /var/www/secured_guard/prod/deploy/nginx /var/www/secured_guard/traefik/dynamic
+            tar -xzf /tmp/prod-deploy.tar.gz -C /tmp
+            mv /tmp/.prod.env /var/www/secured_guard/prod/deploy/.env
+            mv /tmp/deploy/docker-compose.prod.yml /var/www/secured_guard/prod/deploy/
+            mv /tmp/deploy/nginx/nginx-prod.conf /var/www/secured_guard/prod/deploy/nginx/
+            mv /tmp/scripts/fix-404-prod.sh /var/www/secured_guard/prod/deploy/
+            mv /tmp/traefik-dynamic-prod.yml /var/www/secured_guard/traefik/dynamic/prod.yml
+            rm -rf /tmp/prod-deploy.tar.gz /tmp/deploy /tmp/scripts
+          ENDSSH
 
       - name: 🚀 Pull and Restart on VPS
         run: |
