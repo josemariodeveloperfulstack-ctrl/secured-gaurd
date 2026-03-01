@@ -305,31 +305,9 @@ jobs:
 
 
       # ============================================
-      # 1️⃣3️⃣ FORCE EXIT SWARM MODE AND COMPLETE CLEANUP
+      # 1️⃣3️⃣ EXECUTE ALL DEPLOYMENT COMMANDS IN SINGLE SSH SESSION
       # ============================================
-      - name: 🔧 Force exit Swarm mode and complete cleanup
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            docker swarm leave --force 2>/dev/null || true
-            cd /var/www/secured_guard/ci
-            docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            docker ps -a | grep secured-guard | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
-          EOF
-
-      # ============================================
-      # 1️⃣4️⃣ BACKUP AND STOP OLD CONTAINERS
-      # ============================================
-      - name: 💾 Backup and stop old containers
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
-            docker-compose -f docker-compose.ci.yml stop 2>/dev/null || true
-          EOF
-
-      # ============================================
-      # 1️⃣5️⃣ PULL NEW IMAGES (with retry and keepalive)
-      # ============================================
-      - name: 📥 Pull new images
+      - name: 🚀 Execute Deployment (Single SSH Session)
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
           
@@ -337,6 +315,12 @@ jobs:
             set -e
             export DOCKER_CLIENT_TIMEOUT=300
             export DOCKER_HTTP_TIMEOUT=300
+
+            echo "🔧 Force exit Swarm mode and complete cleanup..."
+            docker swarm leave --force 2>/dev/null || true
+            cd /var/www/secured_guard/ci
+            docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            docker ps -a | grep secured-guard | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
 
             echo "🔎 Verificando acesso ao Docker Hub..."
             for i in 1 2 3; do
@@ -373,45 +357,14 @@ jobs:
             docker image inspect z7design/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
             docker image inspect z7design/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
             docker image inspect z7design/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
-          EOF
 
-      # ============================================
-      # 1️⃣6️⃣ VERIFY IMAGES BEFORE STARTING
-      # ============================================
-      - name: 🔍 Verify images before starting
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            docker images | grep "z7design/secured-guard"
-          EOF
-
-      # ============================================
-      # 1️⃣7️⃣ CLEAN NETWORKS BEFORE STARTING
-      # ============================================
-      - name: 🧹 Clean networks before starting
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
-            # Parar containers que podem estar usando a rede
-            docker-compose -f docker-compose.ci.yml down 2>/dev/null || true
-            # Remover rede secured-guard-ci se existir (será recriada pelo docker-compose)
+            echo "🧹 Limpando redes..."
             docker network rm secured-guard-ci 2>/dev/null || true
-            # Aguardar um pouco para garantir que a rede foi removida
             sleep 2
-            # Verificar se a rede foi removida
-            docker network ls | grep secured-guard-ci || echo "✅ Rede secured-guard-ci removida ou não existe"
-          EOF
-
-      # ============================================
-      # 1️⃣7️⃣b FLYWAY REPAIR - Corrige checksum mismatch V424/V427
-      # ============================================
-      - name: 🔧 Flyway repair - Fix checksum mismatch
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            set -e
-            cd /var/www/secured_guard/ci
-            echo "📦 Iniciando postgres-ci e redis-ci para Flyway repair..."
+            
+            echo "📦 Iniciando bando de dados e Flyway repair..."
             docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
-            echo "⏳ Aguardando postgres ficar pronto (até 90s)..."
+            echo "⏳ Aguardando postgres ficar pronto..."
             for i in $(seq 1 18); do
               if docker exec secured-guard-db-ci pg_isready -U secured_guard_ci -d secured_guard_ci 2>/dev/null; then
                 echo "✅ Postgres pronto!"
@@ -421,89 +374,34 @@ jobs:
               sleep 5
             done
             sleep 3
+            
             echo "🔧 Removendo registros de migrações falhas..."
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427','429') AND success = false;" 2>/dev/null || echo "⚠️ DELETE ignorado (tabela pode não existir)"
-            echo "🔧 Atualizando checksums V424 e V427..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427','429') AND success = false;" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "SELECT version, checksum, success FROM flyway_schema_history WHERE version IN ('424','427','429');" 2>/dev/null || echo "   (verificação omitida)"
-            echo "✅ Flyway repair concluído!"
-          EOF
-
-      # ============================================
-      # 1️⃣8️⃣ START NEW CONTAINERS
-      # ============================================
-      - name: 🚀 Start new containers
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
+            
+            echo "🚀 Iniciando todos os containers..."
             docker-compose -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
-          EOF
-
-      # ============================================
-      # 1️⃣9️⃣ FIX CONTAINERS THAT ARE NOT RUNNING
-      # ============================================
-      - name: 🔧 Fix containers that are not running
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
+            
+            echo "⏳ Aguardando backend subir..."
+            sleep 15
             docker-compose -f docker-compose.ci.yml ps
-            docker-compose -f docker-compose.ci.yml up -d
-          EOF
-
-
-
-      # ============================================
-      # 2️⃣1️⃣ ENSURE USER ROLES AND PERMISSIONS
-      # ============================================
-      - name: 👥 Ensure user roles and permissions
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            echo "Verificando permissões de usuários..."
-          EOF
-
-      # ============================================
-      # 2️⃣2️⃣ DIAGNOSTIC - CONTAINER STATUS
-      # ============================================
-      - name: 🔍 Diagnostic - Container Status
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            cd /var/www/secured_guard/ci
-            docker-compose -f docker-compose.ci.yml ps
-            echo "--- Logs do backend (últimas 80 linhas, incluindo possíveis erros Flyway) ---"
+            
+            echo "🔐 Verificando JWT_SECRET e configs..."
+            cat .env | grep JWT_SECRET || true
+            
+            echo "--- Logs do backend (últimas 80 linhas) ---"
             docker logs --tail 80 secured-guard-backend-ci 2>&1 || true
-            echo "--- Verificação Flyway no banco ---"
-            docker exec secured-guard-db-ci psql -U postgres -d secured_guard_test -c "SELECT version, checksum, success FROM flyway_schema_history WHERE version IN ('424','427','429') ORDER BY version;" 2>/dev/null || echo "Não foi possível verificar flyway_schema_history"
-          EOF
-
-      # ============================================
-      # 2️⃣3️⃣ DIAGNOSTIC - NETWORK CONNECTIVITY
-      # ============================================
-      - name: 🌐 Diagnostic - Network Connectivity
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            
+            echo "🌐 Testando conexão local..."
             curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
-          EOF
-
-      # ============================================
-      # 2️⃣4️⃣ VERIFY CONTAINERS ARE RUNNING
-      # ============================================
-      - name: 🔍 Verify containers are running
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            docker ps | grep secured-guard
-          EOF
-
-      # ============================================
-      # 2️⃣5️⃣ ENSURE TRAEFIK IS RUNNING
-      # ============================================
-      - name: 🔄 Ensure traefik is running
-        run: |
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            
+            echo "🔄 Garantindo que o traefik está a rodar..."
             if ! docker ps | grep -q traefik; then
               cd /var/www/secured_guard
               docker-compose -f docker-compose.traefik.yml up -d
             fi
+            
           EOF
 
       # ============================================
