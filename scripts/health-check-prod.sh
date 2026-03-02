@@ -18,13 +18,7 @@ cleanup_and_exit() {
 
 trap cleanup_and_exit EXIT INT TERM
 
-echo "🏥 Verificando saúde da aplicação PROD..."
-
-# Verificar variáveis de ambiente necessárias
-if [ -z "${SSH_USER:-}" ] || [ -z "${SSH_HOST:-}" ] || [ -z "${SSH_PASSWORD:-}" ]; then
-    echo "❌ Erro: Variáveis de ambiente SSH_USER, SSH_HOST e SSH_PASSWORD devem estar definidas"
-    exit 1
-fi
+echo "🏥 Verificando saúde da aplicação PROD (Executando no servidor inteiro)..."
 
 # Configurações
 MAX_ATTEMPTS=15
@@ -41,7 +35,7 @@ log() {
 # Função para verificar Traefik (usando o mesmo traefik do sistema)
 check_traefik() {
     log "🔍 Verificando status do Traefik..."
-    local traefik_status=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" "docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1" || echo "")
+    local traefik_status=$(docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1 || echo "")
     if echo "$traefik_status" | grep -q "Up" 2>/dev/null; then
         log "✅ Traefik está rodando"
         return 0
@@ -54,8 +48,7 @@ check_traefik() {
 # Função para verificar se backend está pronto
 check_backend_ready() {
     log "🔍 Verificando se backend está pronto..."
-    local backend_status=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
-        "docker inspect secured-guard-backend-prod --format '{{.State.Health.Status}}' 2>/dev/null || echo 'unknown'" 2>/dev/null || echo "unknown")
+    local backend_status=$(docker inspect secured-guard-backend-prod --format '{{.State.Health.Status}}' 2>/dev/null || echo 'unknown')
     
     if [ "$backend_status" = "healthy" ]; then
         log "✅ Backend está healthy"
@@ -66,8 +59,7 @@ check_backend_ready() {
     else
         log "⚠️ Status do backend: $backend_status"
         # Verificar logs para ver se há erros
-        local last_log=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
-            "docker logs --tail 5 secured-guard-backend-prod 2>&1 | tail -1" 2>/dev/null || echo "")
+        local last_log=$(docker logs --tail 5 secured-guard-backend-prod 2>&1 | tail -1 || echo "")
         if [ -n "$last_log" ]; then
             log "📋 Última linha do log: $last_log"
             # Se container não existe, rodar diagnóstico uma vez na primeira tentativa
@@ -81,16 +73,10 @@ check_backend_ready() {
     fi
 }
 
-# Função para verificar health check interno (via SSH)
+# Função para verificar health check interno
 check_internal_health() {
     log "🔍 Verificando health check interno no servidor..."
-    local response=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
-        "curl -s -w '\n%{http_code}' --max-time 10 ${INTERNAL_HEALTH_CHECK} 2>/dev/null || echo '000'" 2>/dev/null || echo "ssh_failed")
-    
-    if [ "$response" = "ssh_failed" ]; then
-        log "⚠️ Não foi possível conectar via SSH"
-        return 1
-    fi
+    local response=$(curl -s -w '\n%{http_code}' --max-time 10 ${INTERNAL_HEALTH_CHECK} 2>/dev/null || echo '000')
     
     local http_code=$(echo "$response" | tail -1)
     local body=$(echo "$response" | head -n -1)
@@ -163,25 +149,23 @@ check_external_health() {
 collect_diagnostics() {
     log "🔍 Coletando informações de diagnóstico..."
     
-    sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" << 'DIAG_EOF'
-        echo "📋 Status dos containers PROD:"
-        cd /var/www/secured_guard/prod/deploy
-        docker-compose -f docker-compose.prod.yml ps 2>&1 || echo "Erro ao verificar containers"
-        
-        echo ""
-        echo "🌐 Testando conectividade interna:"
-        echo "Backend (localhost:8084):"
-        curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8084/api/health || echo "Backend não responde"
-        
-        echo ""
-        echo "📋 Logs do backend (últimas 30 linhas):"
-        docker logs --tail 30 secured-guard-backend-prod 2>&1 | tail -30 || echo "Container não encontrado"
-DIAG_EOF
+    echo "📋 Status dos containers PROD:"
+    cd /var/www/secured_guard/prod/deploy || true
+    docker-compose -f docker-compose.prod.yml ps 2>&1 || echo "Erro ao verificar containers"
+    
+    echo ""
+    echo "🌐 Testando conectividade interna:"
+    echo "Backend (localhost:8084):"
+    curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8084/api/health || echo "Backend não responde"
+    
+    echo ""
+    echo "📋 Logs do backend (últimas 30 linhas):"
+    docker logs --tail 30 secured-guard-backend-prod 2>&1 | tail -30 || echo "Container não encontrado"
 }
 
 # Aguardar inicialização
-log "⏳ Aguardando 60 segundos para aplicação inicializar..."
-sleep 60
+log "⏳ Aguardando 10 segundos para aplicação inicializar..."
+sleep 10
 
 # Loop principal de tentativas
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
@@ -199,13 +183,9 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             else
                 log "⚠️ Aplicação funciona internamente mas não externamente"
                 log "📌 O 404 externo vem do Cloudflare ou Traefik (encaminhamento para o servidor)."
-                log "   No servidor: cd /var/www/secured_guard/prod/deploy && bash fix-404-prod.sh"
-                log "   Ver também: deploy/CLOUDFLARE_TRAEFIK_PROD.md"
                 if [ $ATTEMPT -ge 10 ]; then
                     log "✅ Aplicação está funcionando internamente após $ATTEMPT tentativas"
-                    log "📌 O 404 externo vem do Cloudflare ou Traefik (encaminhamento para o servidor)."
-                    log "   No servidor: cd /var/www/secured_guard/prod/deploy && bash fix-404-prod.sh"
-                    log "   Ver também: deploy/CLOUDFLARE_TRAEFIK_PROD.md"
+                    log "📌 Retornando 0 pois o erro externo deve ser problema de rota Traefik"
                     exit 0
                 fi
             fi

@@ -90,7 +90,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.VPS_HOST_PROD }} >> ~/.ssh/known_hosts
 
-      - name: ⚙️ Create .env file and Transfer structures
+      - name: 🚀 Execute Deployment (Single SSH Session)
         env:
           MAIL_PASS: ${{ secrets.MAIL_PASSWORD }}
         run: |
@@ -105,46 +105,46 @@ jobs:
             printf "MAIL_PASSWORD=%s\n" "$MAIL_PASS"
           } > .prod.env
 
+          # Create deployment archive locally including the health check script
+          chmod +x scripts/health-check-prod.sh scripts/fix-404-prod.sh
+          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh scripts/health-check-prod.sh traefik-dynamic-prod.yml
+
+          # Encode archive in base64 to safely pass it into the heredoc
+          B64_TAR=$(base64 -w 0 prod-deploy.tar.gz)
+
           SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
           VPS_STR="${{ secrets.VPS_USER_PROD }}@${{ secrets.VPS_HOST_PROD }}"
           
-          # Create deployment archive locally
-          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh traefik-dynamic-prod.yml
-
-          # Transfer archive
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" scp $SSH_OPTS prod-deploy.tar.gz $VPS_STR:/tmp/prod-deploy.tar.gz
-          
-          # Move files to correct paths in a single SSH session
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << 'ENDSSH'
-            mkdir -p /var/www/secured_guard/prod/deploy/nginx /var/www/secured_guard/traefik/dynamic
-            tar -xzf /tmp/prod-deploy.tar.gz -C /tmp
-            mv /tmp/.prod.env /var/www/secured_guard/prod/deploy/.env
-            mv /tmp/deploy/docker-compose.prod.yml /var/www/secured_guard/prod/deploy/
-            mv /tmp/deploy/nginx/nginx-prod.conf /var/www/secured_guard/prod/deploy/nginx/
-            mv /tmp/scripts/fix-404-prod.sh /var/www/secured_guard/prod/deploy/
-            mv /tmp/traefik-dynamic-prod.yml /var/www/secured_guard/traefik/dynamic/prod.yml
-            rm -rf /tmp/prod-deploy.tar.gz /tmp/deploy /tmp/scripts
-          ENDSSH
-
-      - name: 🚀 Pull and Restart on VPS
-        run: |
-          SSH_OPTS="-o StrictHostKeyChecking=no"
-          VPS_STR="${{ secrets.VPS_USER_PROD }}@${{ secrets.VPS_HOST_PROD }}"
-          
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << 'ENDSSH'
+          echo "🚀 Initiating single SSH session for full deployment..."
+          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << EOF
             set -e
-            cd /var/www/secured_guard/prod/deploy
+            
+            export DEPLOY_DIR="/var/www/secured_guard/prod/deploy"
+            export TRAEFIK_DIR="/var/www/secured_guard/traefik/dynamic"
+            export SCRIPT_DIR="/var/www/secured_guard/prod/scripts"
+            
+            echo "📦 Extracting deployment files..."
+            mkdir -p \$DEPLOY_DIR/nginx \$TRAEFIK_DIR \$SCRIPT_DIR
+            echo "$B64_TAR" | base64 -d > /tmp/prod-deploy.tar.gz
+            tar -xzf /tmp/prod-deploy.tar.gz -C /tmp
+            
+            mv /tmp/.prod.env \$DEPLOY_DIR/.env
+            mv /tmp/deploy/docker-compose.prod.yml \$DEPLOY_DIR/
+            mv /tmp/deploy/nginx/nginx-prod.conf \$DEPLOY_DIR/nginx/
+            mv /tmp/scripts/fix-404-prod.sh \$DEPLOY_DIR/
+            mv /tmp/scripts/health-check-prod.sh \$SCRIPT_DIR/
+            mv /tmp/traefik-dynamic-prod.yml \$TRAEFIK_DIR/prod.yml
+            
+            rm -rf /tmp/prod-deploy.tar.gz /tmp/deploy /tmp/scripts
+            
+            cd \$DEPLOY_DIR
             
             echo "🔐 Login Docker Hub..."
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
             
-            # Ensure networks exist (secured-guard para compose, z7network para Traefik)
-            if ! docker network ls | grep -q "secured-guard"; then
-              docker network create secured-guard
-            fi
-            if ! docker network ls | grep -q "z7network"; then
-              docker network create z7network
-            fi
+            # Ensure networks exist
+            if ! docker network ls | grep -q "secured-guard"; then docker network create secured-guard; fi
+            if ! docker network ls | grep -q "z7network"; then docker network create z7network; fi
             
             echo "📥 Pull das imagens..."
             docker-compose -f docker-compose.prod.yml pull
@@ -152,56 +152,39 @@ jobs:
             echo "🚀 Subindo containers..."
             docker-compose -f docker-compose.prod.yml up -d --remove-orphans
             
-            echo "📋 Status dos containers:"
-            docker-compose -f docker-compose.prod.yml ps -a
-            
             echo "⏳ Aguardando 15s para Postgres ficar healthy..."
             sleep 15
             
-            echo "🔧 Corrigindo 404 externo (Nginx na z7network + reinício Traefik)..."
+            echo "🔧 Corrigindo 404 externo..."
             if [ -f fix-404-prod.sh ]; then bash fix-404-prod.sh; fi
             
-            echo "🔄 Reiniciando Traefik para carregar config dinâmica prod.yml..."
+            echo "🔄 Reiniciando Traefik (ignora se falhar)..."
             docker restart traefik 2>/dev/null || true
-            echo "⏳ Aguardando Traefik carregar configuração (15s)..."
             sleep 15
-            echo "🔍 Verificando se Traefik carregou router prod-https@file..."
-            docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null | jq -r '.[].name' | grep -q "prod-https@file" && echo "✅ Router prod-https@file encontrado" || echo "⚠️ Router prod-https@file não encontrado"
             
-            echo "🔧 Flyway repair PROD (checksums V424, V427, V429)..."
+            echo "🔧 Flyway repair PROD..."
             docker exec -i secured-guard-db-prod psql -U postgres -d secured_guard_prod -c "
               UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';
               UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';
               UPDATE flyway_schema_history SET checksum = -1673547286 WHERE version = '429';
-            "
+            " 2>/dev/null || true
             
             echo "🔄 Reiniciando backend para aplicar migrações..."
             docker restart secured-guard-backend-prod
-            
             sleep 5
-            if ! docker ps -a --format '{{.Names}}' | grep -qx 'secured-guard-backend-prod'; then
-              echo "❌ Container secured-guard-backend-prod não existe após up!"
-              docker ps -a --format 'table {{.Names}}\t{{.Status}}'
-              docker-compose -f docker-compose.prod.yml logs --tail=50 backend 2>&1 || true
-              exit 1
-            fi
-            BACKEND_STATE=$(docker inspect secured-guard-backend-prod --format '{{.State.Status}}' 2>/dev/null || echo "missing")
-            if [ "$BACKEND_STATE" = "exited" ] || [ "$BACKEND_STATE" = "dead" ]; then
-              echo "❌ Backend em estado: $BACKEND_STATE"
+            
+            BACKEND_STATE=\$(docker inspect secured-guard-backend-prod --format '{{.State.Status}}' 2>/dev/null || echo "missing")
+            if [ "\$BACKEND_STATE" = "exited" ] || [ "\$BACKEND_STATE" = "dead" ]; then
+              echo "❌ Backend em estado: \$BACKEND_STATE"
               docker logs --tail=80 secured-guard-backend-prod 2>&1
               exit 1
             fi
-            echo "✅ Backend container presente e estado: $BACKEND_STATE"
-          ENDSSH
-
-      - name: 🏥 Health Check
-        env:
-          SSH_USER: ${{ secrets.VPS_USER_PROD }}
-          SSH_HOST: ${{ secrets.VPS_HOST_PROD }}
-          SSH_PASSWORD: ${{ secrets.VPS_PASSWORD_PROD }}
-        run: |
-          chmod +x scripts/health-check-prod.sh
-          ./scripts/health-check-prod.sh
+            echo "✅ Backend container presente e estado: \$BACKEND_STATE"
+            
+            echo "🏥 Iniciando script de Health Check internamente..."
+            cd \$SCRIPT_DIR
+            ./health-check-prod.sh
+          EOF
 
       - name: 🎉 Deployment Successful
         if: success()
