@@ -63,10 +63,10 @@ public class FiscalInvoiceController {
     @Operation(summary = "Listar notas fiscais com filtros e paginação")
     @PreAuthorize("hasAnyAuthority('FISCAL_READ','FISCAL_WRITE','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
     public ResponseEntity<Page<FiscalInvoice>> list(
-            @Parameter(description = "Ano do período") @RequestParam(required = false) Integer periodYear,
-            @Parameter(description = "Mês do período (1-12)") @RequestParam(required = false) Integer periodMonth,
-            @Parameter(description = "Nome do cliente (parcial)") @RequestParam(required = false) String clientName,
-            @Parameter(description = "Tipo: PDF ou XML") @RequestParam(required = false) String fileType,
+            @Parameter(description = "Ano do período") @RequestParam(value = "periodYear", required = false) Integer periodYear,
+            @Parameter(description = "Mês do período (1-12)") @RequestParam(value = "periodMonth", required = false) Integer periodMonth,
+            @Parameter(description = "Nome do cliente (parcial)") @RequestParam(value = "clientName", required = false) String clientName,
+            @Parameter(description = "Tipo: PDF ou XML") @RequestParam(value = "fileType", required = false) String fileType,
             Pageable pageable) {
         return ResponseEntity.ok(service.findByFilters(periodYear, periodMonth, clientName, fileType, pageable));
     }
@@ -85,7 +85,8 @@ public class FiscalInvoiceController {
         FiscalInvoice inv = service.findById(id);
         Path path = service.getFilePath(inv);
         Resource resource = new UrlResource(path.toUri());
-        String filename = inv.getFileNameOriginal() != null ? inv.getFileNameOriginal() : "nota." + inv.getFileType().toLowerCase();
+        String filename = inv.getFileNameOriginal() != null ? inv.getFileNameOriginal()
+                : "nota." + inv.getFileType().toLowerCase();
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -96,11 +97,11 @@ public class FiscalInvoiceController {
     @Operation(summary = "Download em ZIP (agrupado por período, cliente ou tipo)")
     @PreAuthorize("hasAnyAuthority('FISCAL_READ','FISCAL_WRITE','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
     public ResponseEntity<byte[]> downloadZip(
-            @Parameter(description = "Agrupar por: PERIOD, CLIENT, TYPE") @RequestParam(defaultValue = "PERIOD") String groupBy,
-            @RequestParam(required = false) Integer periodYear,
-            @RequestParam(required = false) Integer periodMonth,
-            @RequestParam(required = false) String clientName,
-            @RequestParam(required = false) String fileType) throws IOException {
+            @Parameter(description = "Agrupar por: PERIOD, CLIENT, TYPE") @RequestParam(value = "groupBy", defaultValue = "PERIOD") String groupBy,
+            @RequestParam(value = "periodYear", required = false) Integer periodYear,
+            @RequestParam(value = "periodMonth", required = false) Integer periodMonth,
+            @RequestParam(value = "clientName", required = false) String clientName,
+            @RequestParam(value = "fileType", required = false) String fileType) throws IOException {
         byte[] zip = service.buildZipDownload(groupBy, periodYear, periodMonth, clientName, fileType);
         if (zip.length == 0) {
             return ResponseEntity.noContent().build();
