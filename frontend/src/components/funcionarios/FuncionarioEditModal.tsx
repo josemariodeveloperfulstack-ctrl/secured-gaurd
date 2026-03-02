@@ -822,6 +822,28 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     }
   };
 
+  // Atualizar campo address quando campos separados são alterados
+  useEffect(() => {
+    if (form.enderecoRua || form.enderecoNumero || form.enderecoBairro || form.enderecoCidade || form.enderecoEstado || form.enderecoCep) {
+      const partes = [
+        form.enderecoRua,
+        form.enderecoNumero ? `nº ${form.enderecoNumero}` : '',
+        form.enderecoComplemento || '',
+        form.enderecoBairro,
+        form.enderecoCidade,
+        form.enderecoEstado,
+        form.enderecoCep ? `CEP: ${form.enderecoCep}` : ''
+      ].filter(Boolean);
+
+      const enderecoCompleto = partes.join(', ');
+
+      setForm(prev => ({
+        ...prev,
+        address: enderecoCompleto
+      }));
+    }
+  }, [form.enderecoRua, form.enderecoNumero, form.enderecoComplemento, form.enderecoBairro, form.enderecoCidade, form.enderecoEstado, form.enderecoCep]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -845,7 +867,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      await employeeService.updateEmployee(funcionario.id, form);
+      // Prepara os dados do funcionário, garantindo que o salário seja enviado como número
+      const employeeData = {
+        ...form,
+        salario: form.salario ? parseFloat(String(form.salario).replace(',', '.')) : 0
+      };
+
+      await employeeService.updateEmployee(funcionario.id, employeeData);
       toast({
         title: "Sucesso",
         description: "Funcionário atualizado com sucesso!",
@@ -1002,18 +1030,19 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   // handleTituloEleitorChange already exists
 
-  const handleUserSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const searchTerm = e.target.value;
-    setUserSearchTerm(searchTerm);
-    // basic implementation to pacify TS
+  const handleUserSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUserSearchTerm(e.target.value);
+    setShowUserDropdown(true);
   };
 
   const handleUserInputFocus = () => {
-    // pacify TS
+    setShowUserDropdown(true);
   };
 
   const handleUserInputBlur = () => {
-    // pacify TS
+    setTimeout(() => {
+      setShowUserDropdown(false);
+    }, 200);
   };
 
   const handleUserSelect = (user: User) => {
