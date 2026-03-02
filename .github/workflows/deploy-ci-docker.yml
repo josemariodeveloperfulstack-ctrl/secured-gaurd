@@ -244,6 +244,7 @@ jobs:
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/health-check-ci.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/clear-service-worker-cache.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/
           }
           for i in 1 2 3 4 5; do
             echo "📤 Tentativa $i de transferência..."
@@ -414,6 +415,10 @@ jobs:
             chmod +x /var/www/secured_guard/ci/scripts/health-check-ci.sh
             /var/www/secured_guard/ci/scripts/health-check-ci.sh
             
+            echo "🧹 Limpando cache do Service Worker..."
+            chmod +x /var/www/secured_guard/ci/scripts/clear-service-worker-cache.sh
+            /var/www/secured_guard/ci/scripts/clear-service-worker-cache.sh
+            
           EOF
             SSH_EXIT_CODE=$?
             set -e
@@ -433,20 +438,7 @@ jobs:
             exit 1
           fi
 
-      # ============================================
-      # 2️⃣6️⃣ CLEAR SERVICE WORKER CACHE
-      # ============================================
-      - name: 🧹 Clear Service Worker Cache
-        run: |
-          # Enviar script de limpeza para VPS
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp scripts/clear-service-worker-cache.sh \
-            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/tmp/clear-service-worker-cache.sh
-          
-          # Executar script na VPS
-          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
-            chmod +x /tmp/clear-service-worker-cache.sh
-            /tmp/clear-service-worker-cache.sh
-          EOF
+
 
 
 
