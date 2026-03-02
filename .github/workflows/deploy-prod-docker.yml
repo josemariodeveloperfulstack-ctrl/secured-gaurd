@@ -112,11 +112,19 @@ jobs:
           # Encode archive in base64 to safely pass it into the heredoc
           B64_TAR=$(base64 -w 0 prod-deploy.tar.gz)
 
-          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30 -o IPQoS=none -o TCPKeepAlive=yes"
           VPS_STR="${{ secrets.VPS_USER_PROD }}@${{ secrets.VPS_HOST_PROD }}"
           
           echo "🚀 Initiating single SSH session for full deployment..."
-          sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << EOF
+          SUCCESS=0
+          
+          for i in 1 2 3 4 5; do
+            echo "======================================"
+            echo "🔁 Tentativa $i de 5 de conexão SSH..."
+            echo "======================================"
+            
+            set +e
+            sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << EOF
             set -e
             
             export DEPLOY_DIR="/var/www/secured_guard/prod/deploy"
@@ -185,6 +193,23 @@ jobs:
             cd \$SCRIPT_DIR
             ./health-check-prod.sh
           EOF
+            SSH_EXIT_CODE=$?
+            set -e
+            
+            if [ $SSH_EXIT_CODE -eq 0 ]; then
+              echo "✅ Deployment concluído com sucesso!"
+              SUCCESS=1
+              break
+            else
+              echo "⚠️ Erro na execução SSH (Código: $SSH_EXIT_CODE). Aguardando 15s para tentar novamente..."
+              sleep 15
+            fi
+          done
+          
+          if [ $SUCCESS -eq 0 ]; then
+            echo "❌ Falha crítica: O Deploy não pôde ser concluído após 5 tentativas de conexão SSH."
+            exit 1
+          fi
 
       - name: 🎉 Deployment Successful
         if: success()

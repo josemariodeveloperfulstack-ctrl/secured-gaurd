@@ -19,13 +19,7 @@ cleanup_and_exit() {
 
 trap cleanup_and_exit EXIT INT TERM
 
-echo "🏥 Verificando saúde da aplicação CI..."
-
-# Verificar variáveis de ambiente necessárias
-if [ -z "${SSH_USER:-}" ] || [ -z "${SSH_HOST:-}" ] || [ -z "${SSH_PASSWORD:-}" ]; then
-    echo "❌ Erro: Variáveis de ambiente SSH_USER, SSH_HOST e SSH_PASSWORD devem estar definidas"
-    exit 1
-fi
+echo "🏥 Verificando saúde da aplicação CI (Executando no servidor inteiro)..."
 
 # Configurações
 MAX_ATTEMPTS=25
@@ -41,7 +35,7 @@ log() {
 # Função para verificar Traefik
 check_traefik() {
     log "🔍 Verificando status do Traefik..."
-    local traefik_status=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" "docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1" || echo "")
+    local traefik_status=$(docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1 || echo "")
     if echo "$traefik_status" | grep -q "Up" 2>/dev/null; then
         log "✅ Traefik está rodando"
         return 0
@@ -54,8 +48,7 @@ check_traefik() {
 # Função para verificar se backend está pronto
 check_backend_ready() {
     log "🔍 Verificando se backend está pronto..."
-    local backend_status=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
-        "docker inspect secured-guard-backend-ci --format '{{.State.Health.Status}}' 2>/dev/null || echo 'unknown'" 2>/dev/null || echo "unknown")
+    local backend_status=$(docker inspect secured-guard-backend-ci --format '{{.State.Health.Status}}' 2>/dev/null || echo 'unknown')
     
     if [ "$backend_status" = "healthy" ]; then
         log "✅ Backend está healthy"
@@ -66,8 +59,7 @@ check_backend_ready() {
     else
         log "⚠️ Status do backend: $backend_status"
         # Verificar logs para ver se há erros
-        local last_log=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
-            "docker logs --tail 5 secured-guard-backend-ci 2>&1 | tail -1" 2>/dev/null || echo "")
+        local last_log=$(docker logs --tail 5 secured-guard-backend-ci 2>&1 | tail -1 || echo "")
         if [ -n "$last_log" ]; then
             log "📋 Última linha do log: $last_log"
         fi
@@ -75,16 +67,10 @@ check_backend_ready() {
     fi
 }
 
-# Função para verificar health check interno (via SSH)
+# Função para verificar health check interno
 check_internal_health() {
     log "🔍 Verificando health check interno no servidor..."
-    local response=$(sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
-        "curl -s -w '\n%{http_code}' --max-time 10 ${INTERNAL_HEALTH_CHECK} 2>/dev/null || echo '000'" 2>/dev/null || echo "ssh_failed")
-    
-    if [ "$response" = "ssh_failed" ]; then
-        log "⚠️ Não foi possível conectar via SSH"
-        return 1
-    fi
+    local response=$(curl -s -w '\n%{http_code}' --max-time 10 ${INTERNAL_HEALTH_CHECK} 2>/dev/null || echo '000')
     
     local http_code=$(echo "$response" | tail -1 | tr -d '\r\n' | head -c 3)
     local body=$(echo "$response" | head -n -1)
@@ -195,38 +181,36 @@ check_external_health() {
 collect_diagnostics() {
     log "🔍 Coletando informações de diagnóstico..."
     
-    sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" << 'DIAG_EOF'
-        echo "📋 Status dos containers CI:"
-        cd /var/www/secured_guard/ci
-        docker-compose -f docker-compose.ci.yml ps 2>&1 || echo "Erro ao verificar containers"
-        
+    echo "📋 Status dos containers CI:"
+    cd /var/www/secured_guard/ci || true
+    docker-compose -f docker-compose.ci.yml ps 2>&1 || echo "Erro ao verificar containers"
+    
+    echo ""
+    echo "🔍 Verificando Traefik:"
+    if docker ps | grep -q traefik; then
+        echo "✅ Traefik está rodando"
+        docker ps --filter "name=traefik" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
         echo ""
-        echo "🔍 Verificando Traefik:"
-        if docker ps | grep -q traefik; then
-            echo "✅ Traefik está rodando"
-            docker ps --filter "name=traefik" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            echo ""
-            echo "📋 Logs do Traefik (últimas 20 linhas):"
-            docker logs --tail 20 traefik 2>&1 | tail -20 || echo "Erro ao ler logs"
-        else
-            echo "❌ Traefik não está rodando!"
-        fi
-        
-        echo ""
-        echo "🌐 Testando conectividade interna:"
-        echo "Backend (localhost:8081):"
-        curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
-        echo "Nginx (localhost:8082):"
-        curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8082/api/health || echo "Nginx não responde"
-        
-        echo ""
-        echo "📋 Logs do backend (últimas 30 linhas):"
-        docker logs --tail 30 secured-guard-backend-ci 2>&1 | tail -30 || echo "Container não encontrado"
-        
-        echo ""
-        echo "📋 Logs do nginx (últimas 20 linhas):"
-        docker logs --tail 20 secured-guard-nginx-ci 2>&1 | tail -20 || echo "Container não encontrado"
-DIAG_EOF
+        echo "📋 Logs do Traefik (últimas 20 linhas):"
+        docker logs --tail 20 traefik 2>&1 | tail -20 || echo "Erro ao ler logs"
+    else
+        echo "❌ Traefik não está rodando!"
+    fi
+    
+    echo ""
+    echo "🌐 Testando conectividade interna:"
+    echo "Backend (localhost:8081):"
+    curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
+    echo "Nginx (localhost:8082):"
+    curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8082/api/health || echo "Nginx não responde"
+    
+    echo ""
+    echo "📋 Logs do backend (últimas 30 linhas):"
+    docker logs --tail 30 secured-guard-backend-ci 2>&1 | tail -30 || echo "Container não encontrado"
+    
+    echo ""
+    echo "📋 Logs do nginx (últimas 20 linhas):"
+    docker logs --tail 20 secured-guard-nginx-ci 2>&1 | tail -20 || echo "Container não encontrado"
 }
 
 # Aguardar inicialização
