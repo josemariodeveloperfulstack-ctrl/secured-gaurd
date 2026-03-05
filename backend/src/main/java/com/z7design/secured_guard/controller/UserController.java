@@ -7,6 +7,7 @@ import com.z7design.secured_guard.dto.ProfileResponse;
 import com.z7design.secured_guard.dto.UpdateUserRequest;
 import com.z7design.secured_guard.dto.CreateUserRequest;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.security.JwtService;
 import com.z7design.secured_guard.service.UserService;
 import com.z7design.secured_guard.service.UserOnlineStatusService;
 import com.z7design.secured_guard.service.LgpdConsentService;
@@ -42,6 +43,7 @@ public class UserController {
     private final UserService userService;
     private final UserOnlineStatusService userOnlineStatusService;
     private final LgpdConsentService lgpdConsentService;
+    private final JwtService jwtService;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -519,5 +521,39 @@ public class UserController {
                 .build();
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Retorna o role atual do usuário logado diretamente do banco de dados e
+     * um novo token JWT, permitindo ao frontend detectar mudanças de role sem
+     * re-login.
+     */
+    @GetMapping("/me/current-role")
+    @Operation(summary = "Verificar role atual", description = "Retorna o role atual do usuário no banco e um JWT atualizado")
+    public ResponseEntity<?> getCurrentRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String username = authentication.getName();
+        User currentUser = userService.findByUsername(username).orElse(null);
+        if (currentUser == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Usuário não encontrado"));
+        }
+
+        // Role atual direto do banco
+        String currentRole = currentUser.getRoles().stream()
+                .findFirst()
+                .map(role -> role.getName())
+                .orElse("COLABORADOR");
+
+        // Gera um novo token com o role atualizado
+        String newToken = jwtService.generateToken(currentUser);
+
+        return ResponseEntity.ok(Map.of(
+                "role", currentRole,
+                "token", newToken,
+                "userId", currentUser.getId().toString()));
     }
 }

@@ -125,14 +125,58 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('🔍 Nenhum token ou usuário encontrado');
         }
       } catch (error) {
-        console.error('Erro ao carregar dados do usuário:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        console.error('❌ [AuthContext] Erro fatal ao carregar dados do usuário:', error);
+        // Só remover se for erro de parsing (corrupção), erro de rede não deve limpar a sessão
+        if (error instanceof SyntaxError) {
+          console.warn('⚠️ [AuthContext] Dados corrompidos detectados, limpando localStorage...');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
       }
       setIsLoading(false);
     };
 
     loadUser();
+  }, []);
+
+  // Polling: verifica se o role do usuário foi alterado pelo admin e atualiza sem re-login
+  useEffect(() => {
+    const POLL_INTERVAL = 60_000; // 60 segundos
+
+    const checkRoleChange = async () => {
+      const token = localStorage.getItem('token');
+      const savedUserStr = localStorage.getItem('user');
+      if (!token || !savedUserStr) return;
+
+      try {
+        const response = await api.get('/api/users/me/current-role');
+        const { role: dbRole, token: newToken } = response.data as { role: string; token: string };
+
+        const savedUser = JSON.parse(savedUserStr);
+        const storedRole = (savedUser.role ?? '').replace(/^ROLE_/, '');
+        const normalizedDbRole = dbRole.replace(/^ROLE_/, '');
+
+        if (storedRole !== normalizedDbRole) {
+          console.log(`🔄 Role alterado: ${storedRole} → ${normalizedDbRole}. Atualizando sessão...`);
+
+          // Atualiza token
+          localStorage.setItem('token', newToken);
+
+          // Atualiza user em localStorage
+          const rolePermissions = generatePermissions(normalizedDbRole as UserRole);
+          const updatedUser = { ...savedUser, role: normalizedDbRole, permissions: rolePermissions };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+
+          // Atualiza estado React
+          setUser(updatedUser);
+        }
+      } catch {
+        // Silencioso — não interromper a sessão por falha no poll
+      }
+    };
+
+    const intervalId = setInterval(checkRoleChange, POLL_INTERVAL);
+    return () => clearInterval(intervalId);
   }, []);
 
   const loadUserGroups = async (userId: string) => {
@@ -238,6 +282,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         'AUDITOR',
         'VIGILANTE',
         'ASSISTENTE_ADMINISTRATIVO',
+        'ANALISTA_SUPRIMENTOS',
         'AUXI_ADMINISTRATIVO',
         'AUX_DEP',
         'COLABORADOR',

@@ -411,7 +411,32 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'chat-interno',
     'mensagens',
   ]),
+  ANALISTA_SUPRIMENTOS: new Set([
+    'dashboard',
+    'holerites',
+    'financeiro',
+    'financeiro-contas-pagar',
+    'financeiro-relatorios',
+    'financeiro-centro-custos',
+    'estoque-simplificado',
+    'estoque-relatorios',
+    'estoque-alertas',
+    'estoque-fornecedores',
+    'compras',
+    'compras-solicitacoes',
+    'compras-aprovacoes',
+    'compras-cotacoes',
+    'compras-relatorios',
+    'chat-interno',
+    'mensagens',
+  ]),
 };
+
+// Roles que NÃO devem ver módulos Financeiro ou Fiscal
+const ROLES_WITHOUT_FINANCIAL_MODULES = new Set<UserRole>([
+  'RH',
+  'DEPARTAMENTO_PESSOAL',
+]);
 
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   collapsed,
@@ -528,15 +553,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
 
   const filteredMainMenuItems = useMemo(() => filterItemsForRole(mainMenuItems), [filterItemsForRole]);
   const filteredFinanceiroItems = useMemo(() => filterItemsForRole(financeiroMenuItems), [filterItemsForRole]);
-  const visibleFinanceiroItems = useMemo(
-    () => filteredFinanceiroItems.filter(item => shouldShowModule((item as { requiredPermission?: string }).requiredPermission)),
-    [filteredFinanceiroItems, shouldShowModule]
-  );
+  const visibleFinanceiroItems = useMemo(() => {
+    if (ROLES_WITHOUT_FINANCIAL_MODULES.has(normalizedRole)) return [];
+    return filteredFinanceiroItems.filter(item => shouldShowModule((item as { requiredPermission?: string }).requiredPermission));
+  }, [filteredFinanceiroItems, shouldShowModule, normalizedRole]);
   const filteredFiscalItems = useMemo(() => filterItemsForRole(fiscalMenuItems), [filterItemsForRole]);
-  const visibleFiscalItems = useMemo(
-    () => filteredFiscalItems.filter(item => shouldShowModule((item as { requiredPermission?: string }).requiredPermission)),
-    [filteredFiscalItems, shouldShowModule]
-  );
+  const visibleFiscalItems = useMemo(() => {
+    if (ROLES_WITHOUT_FINANCIAL_MODULES.has(normalizedRole)) return [];
+    return filteredFiscalItems.filter(item => shouldShowModule((item as { requiredPermission?: string }).requiredPermission));
+  }, [filteredFiscalItems, shouldShowModule, normalizedRole]);
   const filteredOperacionalItems = useMemo(() => filterItemsForRole(operacionalMenuItems), [filterItemsForRole]);
   const filteredRhItems = useMemo(() => filterItemsForRole(rhMenuItems), [filterItemsForRole]);
   const filteredSstItems = useMemo(() => filterItemsForRole(sstMenuItems), [filterItemsForRole]);
