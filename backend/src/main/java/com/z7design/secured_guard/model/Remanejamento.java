@@ -14,7 +14,9 @@ public class Remanejamento {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
-    @JsonIgnoreProperties({"timeRecords", "payrolls", "documents", "benefits", "schedules", "occurrences", "epis", "dependents"})
+    @JsonIgnoreProperties({ "timeRecords", "payrolls", "documents", "benefits", "schedules", "occurrences", "epis",
+            "dependents" })
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     private Employee employee;
 
     @Enumerated(EnumType.STRING)
@@ -42,22 +44,75 @@ public class Remanejamento {
     private WorkPost destinationWorkstation;
 
     // Getters e setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public Employee getEmployee() { return employee; }
-    public void setEmployee(Employee employee) { this.employee = employee; }
-    public RemanejamentoTipo getTipo() { return tipo; }
-    public void setTipo(RemanejamentoTipo tipo) { this.tipo = tipo; }
-    public String getOrigem() { return origem; }
-    public void setOrigem(String origem) { this.origem = origem; }
-    public String getDestino() { return destino; }
-    public void setDestino(String destino) { this.destino = destino; }
-    public LocalDate getDataRemanejamento() { return dataRemanejamento; }
-    public void setDataRemanejamento(LocalDate dataRemanejamento) { this.dataRemanejamento = dataRemanejamento; }
-    public String getObservacao() { return observacao; }
-    public void setObservacao(String observacao) { this.observacao = observacao; }
-    public WorkPost getOriginWorkstation() { return originWorkstation; }
-    public void setOriginWorkstation(WorkPost originWorkstation) { this.originWorkstation = originWorkstation; }
-    public WorkPost getDestinationWorkstation() { return destinationWorkstation; }
-    public void setDestinationWorkstation(WorkPost destinationWorkstation) { this.destinationWorkstation = destinationWorkstation; }
-} 
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public Employee getEmployee() {
+        return employee;
+    }
+
+    public void setEmployee(Employee employee) {
+        this.employee = employee;
+    }
+
+    public RemanejamentoTipo getTipo() {
+        return tipo;
+    }
+
+    public void setTipo(RemanejamentoTipo tipo) {
+        this.tipo = tipo;
+    }
+
+    public String getOrigem() {
+        return origem;
+    }
+
+    public void setOrigem(String origem) {
+        this.origem = origem;
+    }
+
+    public String getDestino() {
+        return destino;
+    }
+
+    public void setDestino(String destino) {
+        this.destino = destino;
+    }
+
+    public LocalDate getDataRemanejamento() {
+        return dataRemanejamento;
+    }
+
+    public void setDataRemanejamento(LocalDate dataRemanejamento) {
+        this.dataRemanejamento = dataRemanejamento;
+    }
+
+    public String getObservacao() {
+        return observacao;
+    }
+
+    public void setObservacao(String observacao) {
+        this.observacao = observacao;
+    }
+
+    public WorkPost getOriginWorkstation() {
+        return originWorkstation;
+    }
+
+    public void setOriginWorkstation(WorkPost originWorkstation) {
+        this.originWorkstation = originWorkstation;
+    }
+
+    public WorkPost getDestinationWorkstation() {
+        return destinationWorkstation;
+    }
+
+    public void setDestinationWorkstation(WorkPost destinationWorkstation) {
+        this.destinationWorkstation = destinationWorkstation;
+    }
+}

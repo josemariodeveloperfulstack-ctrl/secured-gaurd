@@ -573,6 +573,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       ...fiscalMenuItems,
       ...operacionalMenuItems,
       ...rhMenuItems,
+      ...sstMenuItems,
       ...departamentoPessoalMenuItems,
       ...comercialMenuItems,
       ...estoqueMenuItems,

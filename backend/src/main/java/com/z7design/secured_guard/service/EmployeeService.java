@@ -124,6 +124,7 @@ public class EmployeeService {
             }
             if (dto.getCpf() != null) {
                 existingEmployee.setDocument(dto.getCpf());
+                existingEmployee.setCpf(dto.getCpf());
             }
             if (dto.getBirthDate() != null) {
                 existingEmployee.setBirthDate(dto.getBirthDate());
@@ -134,6 +135,9 @@ public class EmployeeService {
             }
             if (dto.getNationality() != null) {
                 existingEmployee.setNationality(dto.getNationality());
+            }
+            if (dto.getPhotoUrl() != null) {
+                existingEmployee.setPhotoUrl(dto.getPhotoUrl());
             }
             if (dto.getGrauInstrucao() != null) {
                 System.out.println("[DEBUG] Atualizando GrauInstrucao: " + dto.getGrauInstrucao());
@@ -298,6 +302,9 @@ public class EmployeeService {
                 if (dto.getBankInfo().getPixKey() != null) {
                     existingEmployee.setPixKey(dto.getBankInfo().getPixKey());
                 }
+                if (dto.getBankInfo().getAccountType() != null) {
+                    existingEmployee.setAccountType(dto.getBankInfo().getAccountType());
+                }
             }
 
             // Atualizar entidades relacionais se fornecidas
@@ -344,6 +351,9 @@ public class EmployeeService {
             if (dto.getExameMedicoData() != null) {
                 existingEmployee.setExameMedicoData(dto.getExameMedicoData());
             }
+            if (dto.getExameMedicoVencimento() != null) {
+                existingEmployee.setExameMedicoVencimento(dto.getExameMedicoVencimento());
+            }
             if (dto.getExameMedicoTipo() != null) {
                 existingEmployee.setExameMedicoTipo(dto.getExameMedicoTipo());
             }
@@ -358,6 +368,9 @@ public class EmployeeService {
             }
             if (dto.getExameMedicoIntervalosRefeicao() != null) {
                 existingEmployee.setExameMedicoIntervalosRefeicao(dto.getExameMedicoIntervalosRefeicao());
+            }
+            if (dto.getExameMedicoHorarioIntervalo() != null) {
+                existingEmployee.setExameMedicoHorarioIntervalo(dto.getExameMedicoHorarioIntervalo());
             }
             if (dto.getExameMedicoObservacoes() != null) {
                 existingEmployee.setExameMedicoObservacoes(dto.getExameMedicoObservacoes());
@@ -395,6 +408,10 @@ public class EmployeeService {
             }
             if (dto.getTituloEleitor() != null) {
                 existingEmployee.setTituloEleitor(dto.getTituloEleitor());
+            }
+            if (dto.getRg() != null) {
+                existingEmployee.setNumeroRg(dto.getRg());
+                existingEmployee.setRg(dto.getRg());
             }
             if (dto.getTituloEleitorZona() != null) {
                 existingEmployee.setTituloEleitorZona(dto.getTituloEleitorZona());
@@ -451,6 +468,85 @@ public class EmployeeService {
             if (dto.getEscalaTrabalho() != null) {
                 existingEmployee.setEscalaTrabalho(dto.getEscalaTrabalho());
             }
+
+            // Campos da Ficha de Registro faltantes na atualização passada
+            if (dto.getEmpresaNome() != null)
+                existingEmployee.setEmpresaNome(dto.getEmpresaNome());
+            if (dto.getEmpresaEndereco() != null)
+                existingEmployee.setEmpresaEndereco(dto.getEmpresaEndereco());
+            if (dto.getEmpresaCnpj() != null)
+                existingEmployee.setEmpresaCnpj(dto.getEmpresaCnpj());
+            if (dto.getNomeConselhoRegional() != null)
+                existingEmployee.setNomeConselhoRegional(dto.getNomeConselhoRegional());
+            if (dto.getNomePai() != null)
+                existingEmployee.setNomePai(dto.getNomePai());
+            if (dto.getNomeMae() != null)
+                existingEmployee.setNomeMae(dto.getNomeMae());
+            if (dto.getMatriculaEsocial() != null)
+                existingEmployee.setMatriculaEsocial(dto.getMatriculaEsocial());
+            if (dto.getCbo() != null)
+                existingEmployee.setCbo(dto.getCbo());
+            if (dto.getFgtsOptante() != null)
+                existingEmployee.setFgtsOptante(dto.getFgtsOptante());
+            if (dto.getFgtsDataOpcao() != null)
+                existingEmployee.setFgtsDataOpcao(dto.getFgtsDataOpcao());
+            if (dto.getFgtsBancoDepositario() != null)
+                existingEmployee.setFgtsBancoDepositario(dto.getFgtsBancoDepositario());
+            if (dto.getFgtsDataRetratacao() != null)
+                existingEmployee.setFgtsDataRetratacao(dto.getFgtsDataRetratacao());
+            if (dto.getPisDataCadastro() != null)
+                existingEmployee.setPisDataCadastro(dto.getPisDataCadastro());
+            if (dto.getPisBancoDepositario() != null)
+                existingEmployee.setPisBancoDepositario(dto.getPisBancoDepositario());
+            if (dto.getPisEnderecoBanco() != null)
+                existingEmployee.setPisEnderecoBanco(dto.getPisEnderecoBanco());
+            if (dto.getPisCodigoBanco() != null)
+                existingEmployee.setPisCodigoBanco(dto.getPisCodigoBanco());
+            if (dto.getPisCodigoAgencia() != null)
+                existingEmployee.setPisCodigoAgencia(dto.getPisCodigoAgencia());
+
+            // CNH e CTPS
+            if (dto.getCnhExpirationDate() != null)
+                existingEmployee.setCnhExpirationDate(dto.getCnhExpirationDate());
+            if (dto.getCnhCategory() != null)
+                existingEmployee.setCnhCategory(dto.getCnhCategory());
+            // CNH: persistir null quando vazio para não violar uk_employees_cnh_number (vários sem CNH = null permitido)
+            String cnhNum = dto.getCnhNumber();
+            existingEmployee.setCnhNumber(cnhNum != null && !cnhNum.trim().isEmpty() ? cnhNum.trim() : null);
+            if (dto.getCtps() != null)
+                existingEmployee.setCtps(dto.getCtps());
+            if (dto.getCtpsRural() != null)
+                existingEmployee.setCtpsRural(dto.getCtpsRural());
+            if (dto.getCtpsSeries() != null)
+                existingEmployee.setCtpsSeries(dto.getCtpsSeries());
+            if (dto.getCtpsIssueDate() != null)
+                existingEmployee.setCtpsIssueDate(dto.getCtpsIssueDate());
+            if (dto.getCtpsIssuingAgency() != null)
+                existingEmployee.setCtpsIssuingAgency(dto.getCtpsIssuingAgency());
+
+            // Outros documentos e nacionalidade
+            if (dto.getCarteiraModelo19() != null)
+                existingEmployee.setCarteiraModelo19(dto.getCarteiraModelo19());
+            if (dto.getRegistroGeralEstrangeiro() != null)
+                existingEmployee.setRegistroGeralEstrangeiro(dto.getRegistroGeralEstrangeiro());
+            if (dto.getCasadoBrasileiro() != null)
+                existingEmployee.setCasadoBrasileiro(dto.getCasadoBrasileiro());
+            if (dto.getNomeConjugeEstrangeiro() != null)
+                existingEmployee.setNomeConjugeEstrangeiro(dto.getNomeConjugeEstrangeiro());
+            if (dto.getTemFilhosBrasileiros() != null)
+                existingEmployee.setTemFilhosBrasileiros(dto.getTemFilhosBrasileiros());
+            if (dto.getQuantidadeFilhosBrasileiros() != null)
+                existingEmployee.setQuantidadeFilhosBrasileiros(dto.getQuantidadeFilhosBrasileiros());
+            if (dto.getDataChegadaBrasil() != null)
+                existingEmployee.setDataChegadaBrasil(dto.getDataChegadaBrasil());
+            if (dto.getNaturalizado() != null)
+                existingEmployee.setNaturalizado(dto.getNaturalizado());
+            if (dto.getDecretoNaturalizacao() != null)
+                existingEmployee.setDecretoNaturalizacao(dto.getDecretoNaturalizacao());
+            if (dto.getVistoFiscalizacao() != null)
+                existingEmployee.setVistoFiscalizacao(dto.getVistoFiscalizacao());
+            if (dto.getAssinaturaFuncionario() != null)
+                existingEmployee.setAssinaturaFuncionario(dto.getAssinaturaFuncionario());
 
             applyTerminationRules(existingEmployee, dto);
 
@@ -540,7 +636,15 @@ public class EmployeeService {
             employee.setTerminationDate(dto.getDataRescisao());
         }
 
-        if (employee.getTerminationDate() == null) {
+        // Always sync termination reason from DTO if provided, otherwise clear if no
+        // termination date
+        if (dto.getTerminationReason() != null) {
+            employee.setTerminationReason(dto.getTerminationReason());
+        }
+
+        if (employee.getTerminationDate() == null && dto.getTerminationDate() == null
+                && dto.getDataRescisao() == null) {
+            employee.setTerminationReason(null);
             return;
         }
 
@@ -861,7 +965,9 @@ public class EmployeeService {
             }
             e.setName(dto.getName());
             e.setDocument(dto.getCpf());
-            // e.setCarteiraIdentidade(dto.getCarteiraIdentidade());
+            e.setCpf(dto.getCpf());
+            e.setNumeroRg(dto.getRg());
+            e.setRg(dto.getRg());
             // e.setTituloEleitor(dto.getTituloEleitor());
             // e.setGrauInstrucao(dto.getGrauInstrucao());
             // e.setPai(dto.getPai());
@@ -881,7 +987,7 @@ public class EmployeeService {
             e.setBirthDate(dto.getBirthDate());
             e.setMaritalStatus(dto.getMaritalStatus());
             e.setNationality(dto.getNationality());
-            // e.setPhotoUrl(dto.getPhotoUrl());
+            e.setPhotoUrl(dto.getPhotoUrl());
             // e.setCurrentScale(dto.getCurrentScale());
             e.setRegistrationNumber(dto.getRegistrationNumber());
             e.setHireDate(dto.getHireDate());
@@ -1157,6 +1263,9 @@ public class EmployeeService {
             if (dto.getExameMedicoData() != null) {
                 e.setExameMedicoData(dto.getExameMedicoData());
             }
+            if (dto.getExameMedicoVencimento() != null) {
+                e.setExameMedicoVencimento(dto.getExameMedicoVencimento());
+            }
             if (dto.getExameMedicoTipo() != null) {
                 e.setExameMedicoTipo(dto.getExameMedicoTipo());
             }
@@ -1196,6 +1305,7 @@ public class EmployeeService {
                 e.setAgencia(dto.getBankInfo().getAgency());
                 e.setContaCorrente(dto.getBankInfo().getAccount());
                 e.setContaDigito(dto.getBankInfo().getAccountDigit());
+                e.setAccountType(dto.getBankInfo().getAccountType());
                 e.setPixKey(dto.getBankInfo().getPixKey());
             }
 
@@ -1228,8 +1338,8 @@ public class EmployeeService {
             // Campos básicos essenciais
             dto.setId(e.getId());
             dto.setName(e.getName());
-            dto.setCpf(e.getDocument());
-            // dto.setRg(e.getRg()); // Campo RG não existe na entidade
+            dto.setCpf(e.getCpf() != null && !e.getCpf().trim().isEmpty() ? e.getCpf() : e.getDocument());
+            dto.setRg(e.getRg() != null && !e.getRg().trim().isEmpty() ? e.getRg() : e.getNumeroRg());
             // dto.setGender(e.getGender()); // Campo Gender não existe na entidade
             dto.setEmail(e.getEmail());
             dto.setPhone(e.getPhone());
@@ -1248,14 +1358,16 @@ public class EmployeeService {
             if (e.getNationality() != null) {
                 dto.setNationality(e.getNationality());
             }
-            if (e.getRegistrationNumber() != null) {
-                dto.setRegistrationNumber(e.getRegistrationNumber());
-            }
+            dto.setPhotoUrl(e.getPhotoUrl());
+            dto.setRegistrationNumber(e.getRegistrationNumber());
             if (e.getHireDate() != null) {
                 dto.setHireDate(e.getHireDate());
             }
             if (e.getTerminationDate() != null) {
                 dto.setTerminationDate(e.getTerminationDate());
+            }
+            if (e.getTerminationReason() != null) {
+                dto.setTerminationReason(e.getTerminationReason());
             }
 
             // Address - usar campos separados se disponíveis, senão usar campo address
@@ -1350,6 +1462,10 @@ public class EmployeeService {
             dto.setHorarioTrabalho(e.getHorarioTrabalho());
             dto.setFolgaSemanal(e.getFolgaSemanal());
             dto.setEscalaTrabalho(e.getEscalaTrabalho());
+            dto.setHorarioTrabalhoIntervalo(e.getHorarioTrabalhoIntervalo());
+            dto.setDiasTrabalho(e.getDiasTrabalho());
+            dto.setPrazoExperienciaTexto(e.getPrazoExperienciaTexto());
+            dto.setProrrogacaoExperiencia(e.getProrrogacaoExperiencia());
             dto.setFgtsOptante(e.getFgtsOptante());
             dto.setFgtsDataOpcao(e.getFgtsDataOpcao());
             dto.setFgtsBancoDepositario(e.getFgtsBancoDepositario());
@@ -1359,7 +1475,7 @@ public class EmployeeService {
             dto.setPisEnderecoBanco(e.getPisEnderecoBanco());
             dto.setPisCodigoBanco(e.getPisCodigoBanco());
             dto.setPisCodigoAgencia(e.getPisCodigoAgencia());
-            // dto.setCnhNumber(e.getCnhNumber()); // Campo já existe no modelo
+            dto.setCnhNumber(e.getCnhNumber());
             dto.setCnhExpirationDate(e.getCnhExpirationDate());
             dto.setCnhCategory(e.getCnhCategory());
             dto.setCtps(e.getCtps());
@@ -1380,15 +1496,46 @@ public class EmployeeService {
             dto.setAssinaturaFuncionario(e.getAssinaturaFuncionario());
             dto.setDataRescisao(e.getDataRescisao());
 
+            // Mapear dados do Exame Médico (ASO)
+            dto.setExameMedicoData(e.getExameMedicoData());
+            dto.setExameMedicoVencimento(e.getExameMedicoVencimento());
+            dto.setExameMedicoTipo(e.getExameMedicoTipo());
+            dto.setExameMedicoHorario(e.getExameMedicoHorario());
+            dto.setExameMedicoIntervalosRefeicao(e.getExameMedicoIntervalosRefeicao());
+            dto.setExameMedicoHorarioIntervalo(e.getExameMedicoHorarioIntervalo());
+            dto.setExameMedicoObservacoes(e.getExameMedicoObservacoes());
+            dto.setExameMedicoPrimeiroEmprego(e.getExameMedicoPrimeiroEmprego());
+            dto.setExameMedicoContribuicaoSindicalPaga(e.getExameMedicoContribuicaoSindicalPaga());
+
+            // Mapear campos de CIN
+            dto.setCinNumero(e.getCinNumero());
+            dto.setCinOrgaoEmissor(e.getCinOrgaoEmissor());
+            dto.setCinDataEmissao(e.getCinDataEmissao());
+
+            // Mapear relacionamento de Posto de Trabalho e Departamento
+            if (e.getWorkPost() != null) {
+                dto.setWorkPostId(e.getWorkPost().getId().toString());
+            }
+            if (e.getDepartment() != null) {
+                dto.setDepartmentId(e.getDepartment().getId().toString());
+            }
+
+            if (e.getExameMedicoDoctor() != null) {
+                EmployeeDTO.IdOnlyDTO doctorDTO = new EmployeeDTO.IdOnlyDTO();
+                doctorDTO.setId(e.getExameMedicoDoctor().getId());
+                doctorDTO.setName(e.getExameMedicoDoctor().getName());
+                dto.setExameMedicoDoctor(doctorDTO);
+            }
+
             // Mapear dados bancários
             if (e.getBanco() != null || e.getAgencia() != null || e.getContaCorrente() != null
-                    || e.getContaDigito() != null || e.getPixKey() != null) {
+                    || e.getContaDigito() != null || e.getPixKey() != null || e.getAccountType() != null) {
                 EmployeeDTO.BankInfoDTO bankInfo = new EmployeeDTO.BankInfoDTO();
                 bankInfo.setBank(e.getBanco());
                 bankInfo.setAgency(e.getAgencia());
                 bankInfo.setAccount(e.getContaCorrente());
                 bankInfo.setAccountDigit(e.getContaDigito());
-                bankInfo.setAccountType("CORRENTE"); // Tipo padrão
+                bankInfo.setAccountType(e.getAccountType() != null ? e.getAccountType() : "CORRENTE");
                 bankInfo.setPixKey(e.getPixKey());
                 dto.setBankInfo(bankInfo);
             }
@@ -1567,6 +1714,17 @@ public class EmployeeService {
                 "⚠️ Funcionário não encontrado para CPF: {} (tentou users.username, employees.document, employees.cpf)",
                 normalizedCpf);
         return Optional.empty();
+    }
+
+    /**
+     * Busca funcionário por matrícula eSocial (exata, case insensitive).
+     * Usado na importação Excel para identificar registro existente quando CPF não for encontrado.
+     */
+    public Optional<Employee> findByMatriculaEsocial(String matriculaEsocial) {
+        if (matriculaEsocial == null || matriculaEsocial.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        return employeeRepository.findByMatriculaEsocialIgnoreCase(matriculaEsocial.trim());
     }
 
     /**

@@ -1,15 +1,33 @@
 # Template de Fundo para Relatórios
 
-Este diretório contém o template de fundo usado em todos os relatórios PDF do sistema.
+Este diretório contém os templates de fundo usados nos relatórios PDF do sistema.
 
-## Arquivo Necessário
+## Arquivos
 
-- **Nome do arquivo:** `report-background-template.png`
-- **Localização:** `backend/src/main/resources/templates/reports/report-background-template.png`
+| Uso        | Nome do arquivo                    | Observação                          |
+|-----------|-------------------------------------|-------------------------------------|
+| Retrato   | `report-background-template.png`    | Páginas em orientação retrato (A4). |
+| Paisagem  | `report-background-landscape.png`   | Template correto em paisagem (sem distorção). |
 
-## Especificações do Template
+**Localização:** `backend/src/main/resources/templates/reports/`
 
-O template de fundo deve conter:
+## Template PAISAGEM (layout correto — use a segunda imagem)
+
+O layout correto em paisagem é o **template em branco** (segunda imagem de referência):
+
+- **Cabeçalho:** forma cinza escura/preta no canto superior esquerdo (trapézio, borda curva inferior direita) + faixa horizontal laranja→vermelho no topo.
+- **Centro:** fundo branco (área de conteúdo).
+- **Rodapé:** só a faixa fina laranja→vermelho; **não** coloque texto no PNG.
+
+O sistema desenha em cima: **logo** na forma escura, **título** e **bloco da empresa** no rodapé. Com esse PNG, tudo se ajusta sem distorção.
+
+**Como ativar:** salve essa imagem como `report-background-landscape.png` neste diretório e reinicie o backend.
+
+---
+
+## Especificações do Template (retrato)
+
+O template de fundo em retrato pode conter:
 
 1. **Gradiente horizontal no topo** (amarelo → laranja → vermelho)
 2. **Forma curva escura** no canto superior esquerdo
@@ -34,11 +52,11 @@ O sistema adiciona automaticamente sobre o template:
 - **Informações do rodapé** (endereço, telefone, email, CNPJ)
 - **Data de geração** (no rodapé)
 
-## Como Adicionar o Template
+## Como Adicionar os Templates
 
-1. Salve a imagem do template como `report-background-template.png`
-2. Coloque o arquivo neste diretório: `backend/src/main/resources/templates/reports/`
-3. Reinicie a aplicação para que o template seja carregado
+1. **Retrato:** salve a imagem como `report-background-template.png` e coloque neste diretório.
+2. **Paisagem:** use **só** o template em branco (segunda imagem): forma escura no canto + faixa laranja→vermelho no topo + fundo branco + faixa fina no rodapé. Salve como `report-background-landscape.png` neste diretório. O sistema sobrepõe o logo e o texto do rodapé. Esse é o layout correto, sem distorção.
+3. Reinicie a aplicação para que os templates sejam carregados.
 
 ## Fallback
 

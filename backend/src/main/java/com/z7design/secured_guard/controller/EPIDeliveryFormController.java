@@ -206,4 +206,23 @@ public class EPIDeliveryFormController {
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @Operation(summary = "Gerar PDF em branco da ficha de entrega de EPI (Manual)", description = "Se employeeId for informado, os dados do funcionário (nome, função, CPF, RG, admissão, demissão) são preenchidos na ficha.")
+    @GetMapping("/generate-blank-pdf")
+    public ResponseEntity<byte[]> generateBlankPdf(
+            @RequestParam UUID companyId,
+            @RequestParam(required = false) UUID employeeId) {
+        try {
+            log.info("📄 Gerando PDF em branco da ficha de entrega de EPI para empresa: {}, funcionário: {}", companyId, employeeId);
+            byte[] pdf = epiDeliveryPdfService.generateBlankEPIDeliveryPdf(companyId, employeeId);
+            String fileName = "ficha-entrega-epi-manual.pdf";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .body(pdf);
+        } catch (Exception e) {
+            log.error("❌ Erro ao gerar PDF em branco de ficha de entrega de EPI: {}", e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

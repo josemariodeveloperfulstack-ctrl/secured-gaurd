@@ -14,6 +14,7 @@ import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { caepiService, CAEPIResponse } from '@/services/caepiService';
+import { formatCPF, formatCNPJ } from '@/utils/validation';
 
 const epiOptions = [
   'Capacete de Segurança',
@@ -47,24 +48,27 @@ const uniformePecasOptions = [
 
 interface FichaEntregaEPIFormProps {
   employeeId?: string;
+  companyId?: string;
 }
 
-const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId }) => {
+const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
-    empresaId: '',
+    empresaId: companyId || '',
     dataEntrega: '',
     responsavelEntregaId: '',
     observacoes: '',
   });
 
-  // Atualizar funcionarioId quando employeeId mudar
+  // Atualizar funcionarioId e empresaId quando props mudarem
   useEffect(() => {
-    if (employeeId) {
-      setForm(prev => ({ ...prev, funcionarioId: employeeId }));
-    }
-  }, [employeeId]);
+    setForm(prev => ({
+      ...prev,
+      funcionarioId: employeeId || prev.funcionarioId,
+      empresaId: companyId || prev.empresaId
+    }));
+  }, [employeeId, companyId]);
 
   const [epis, setEpis] = useState([
     {
@@ -644,7 +648,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || funcionario.document || '-'}
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
                       </div>
                     </div>
                   </div>
@@ -688,7 +692,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId })
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.cnpj}
+                        {empresa.cnpj ? formatCNPJ(empresa.cnpj) : '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">

@@ -395,9 +395,9 @@ export default function MedicalExamFormModal({
                   <button
                     type="button"
                     onClick={() => setShowNovoMedicoModal(true)}
-                    className="text-[11px] sm:text-xs text-seguranca-yellow hover:underline"
+                    className="text-[11px] sm:text-xs text-seguranca-yellow underline hover:no-underline focus:outline-none focus:ring-0"
                   >
-                    Cadastrar médico
+                    + Cadastrar novo médico
                   </button>
                 </div>
                 <div className="relative">

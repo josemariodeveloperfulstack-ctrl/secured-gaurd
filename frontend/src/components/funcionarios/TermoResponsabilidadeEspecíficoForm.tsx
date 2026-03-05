@@ -19,10 +19,15 @@ const documentTypes = [
     { id: 'CELULAR', label: 'TERMO DE RESPONSABILIDADE APARELHO CELULAR' },
 ];
 
-const TermoResponsabilidadeEspecíficoForm = () => {
+interface TermoResponsabilidadeEspecificoFormProps {
+    employeeId?: string;
+    companyId?: string;
+}
+
+const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({ employeeId, companyId }) => {
     const [form, setForm] = useState({
-        funcionarioId: '',
-        empresaId: '',
+        funcionarioId: employeeId || '',
+        empresaId: companyId || '',
         documentTypeId: 'BH_BUS',
         identificador: '', // Número do Cartão ou IMEI/Série do Celular
         descricao: '', // Marca/Modelo para celular
@@ -33,6 +38,14 @@ const TermoResponsabilidadeEspecíficoForm = () => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loadingData, setLoadingData] = useState(false);
+
+    useEffect(() => {
+        setForm(prev => ({
+            ...prev,
+            funcionarioId: employeeId || prev.funcionarioId,
+            empresaId: companyId || prev.empresaId
+        }));
+    }, [employeeId, companyId]);
 
     useEffect(() => {
         const fetchData = async () => {

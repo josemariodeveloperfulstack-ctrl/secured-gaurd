@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { 
-  FileText, 
-  Shield, 
-  FileSignature, 
-  FileCheck, 
-  UserX, 
+import {
+  FileText,
+  Shield,
+  FileSignature,
+  FileCheck,
+  UserX,
   File,
   Download,
   Eye,
@@ -18,8 +18,8 @@ import {
 import { Input } from '../ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { documentModels, categories, getModelsByCategory, DocumentModel } from '@/utils/documentModels';
-import { 
-  termoResponsabilidadeCartaoOtimoGenerator, 
+import {
+  termoResponsabilidadeCartaoOtimoGenerator,
   termoResponsabilidadeCelularGenerator,
   termoResponsabilidadeCartaoBhBusGenerator,
   termoResponsabilidadeCartaoBetimGenerator
@@ -37,7 +37,11 @@ import {
 } from '@/utils/outrosDocumentosGenerator';
 import { generatePDFBlob } from '@/utils/pdfPreviewHelper';
 
-const ModelosDocumentosForm = () => {
+interface ModelosDocumentosFormProps {
+  hideHeaderStats?: boolean;
+}
+
+const ModelosDocumentosForm: React.FC<ModelosDocumentosFormProps> = ({ hideHeaderStats = false }) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedModel, setSelectedModel] = useState<DocumentModel | null>(null);
@@ -245,7 +249,7 @@ const ModelosDocumentosForm = () => {
             variant: 'destructive'
           });
       }
-      
+
       toast({
         title: 'Sucesso',
         description: `Documento "${model.name}" gerado com sucesso!`,
@@ -707,7 +711,7 @@ const ModelosDocumentosForm = () => {
         const url = window.URL.createObjectURL(pdfBlob);
         window.open(url, '_blank');
         setTimeout(() => window.URL.revokeObjectURL(url), 100);
-        
+
         toast({
           title: 'Sucesso',
           description: `Visualizando "${model.name}" em nova aba.`,
@@ -742,87 +746,90 @@ const ModelosDocumentosForm = () => {
 
   return (
     <div className="space-y-6 w-full">
-      {/* 1. Estatísticas no Topo (Padrão SST) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-4 flex items-center space-x-4">
-            <div className="p-2 bg-blue-500/10 rounded-full">
-              <FileText className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-400">Total de Modelos</p>
-              <h3 className="text-2xl font-bold text-seguranca-lightgray">{documentModels.length}</h3>
-            </div>
-          </CardContent>
-        </Card>
+      {/* 1. Estatísticas no Topo (Padrão SST) - Oculto se hideHeaderStats for true */}
+      {!hideHeaderStats && (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardContent className="p-4 flex items-center space-x-4">
+                <div className="p-2 bg-blue-500/10 rounded-full">
+                  <FileText className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-400">Total de Modelos</p>
+                  <h3 className="text-2xl font-bold text-seguranca-lightgray">{documentModels.length}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-4 flex items-center space-x-4">
-            <div className="p-2 bg-green-500/10 rounded-full">
-              <Shield className="h-6 w-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-400">Disponíveis</p>
-              <h3 className="text-2xl font-bold text-green-500">{documentModels.filter(m => m.hasGenerator).length}</h3>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardContent className="p-4 flex items-center space-x-4">
+                <div className="p-2 bg-green-500/10 rounded-full">
+                  <Shield className="h-6 w-6 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-400">Disponíveis</p>
+                  <h3 className="text-2xl font-bold text-green-500">{documentModels.filter(m => m.hasGenerator).length}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-4 flex items-center space-x-4">
-            <div className="p-2 bg-orange-500/10 rounded-full">
-              <FileSignature className="h-6 w-6 text-orange-500" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-400">Em Desenvolvimento</p>
-              <h3 className="text-2xl font-bold text-orange-500">{documentModels.filter(m => !m.hasGenerator).length}</h3>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardContent className="p-4 flex items-center space-x-4">
+                <div className="p-2 bg-orange-500/10 rounded-full">
+                  <FileSignature className="h-6 w-6 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-400">Em Desenvolvimento</p>
+                  <h3 className="text-2xl font-bold text-orange-500">{documentModels.filter(m => !m.hasGenerator).length}</h3>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-4 flex items-center space-x-4">
-            <div className="p-2 bg-purple-500/10 rounded-full">
-              <FileCheck className="h-6 w-6 text-purple-500" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-400">Categorias</p>
-              <h3 className="text-2xl font-bold text-purple-500">{categories.length}</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 2. Filtros e Busca */}
-      <Card className="bg-seguranca-graphite border-gray-600 w-full">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg text-seguranca-lightgray">
-            <Search className="h-5 w-5" />
-            Filtros e Busca
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 w-full">
-            <div className="flex-1 relative w-full">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar por nome ou descrição..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
-              />
-            </div>
+            <Card className="bg-seguranca-graphite border-gray-600">
+              <CardContent className="p-4 flex items-center space-x-4">
+                <div className="p-2 bg-purple-500/10 rounded-full">
+                  <FileCheck className="h-6 w-6 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-400">Categorias</p>
+                  <h3 className="text-2xl font-bold text-purple-500">{categories.length}</h3>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          <Card className="bg-seguranca-graphite border-gray-600 w-full">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg text-seguranca-lightgray">
+                <Search className="h-5 w-5" />
+                Filtros e Busca
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4 w-full">
+                <div className="flex-1 relative w-full">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Buscar por nome ou descrição..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* 3. Lista de Modelos por Categoria */}
       <Tabs defaultValue="ORDEM_SERVICO" className="w-full">
         <TabsList className="flex flex-wrap gap-2 bg-transparent p-0 mb-4 h-auto w-full">
           {categories.map(category => (
-            <TabsTrigger 
-              key={category.id} 
-              value={category.id} 
+            <TabsTrigger
+              key={category.id}
+              value={category.id}
               className="
                 px-3 py-1.5
                 text-xs sm:text-sm
@@ -850,8 +857,8 @@ const ModelosDocumentosForm = () => {
           <TabsContent key={category.id} value={category.id} className="mt-0 w-full">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 w-full">
               {modelsByCategory.find(c => c.id === category.id)?.models.map(model => (
-                <Card 
-                  key={model.id} 
+                <Card
+                  key={model.id}
                   className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-all hover:shadow-lg flex flex-col h-full overflow-hidden"
                 >
                   <CardHeader className="p-3 pb-2">
@@ -859,13 +866,12 @@ const ModelosDocumentosForm = () => {
                       <div className="p-1.5 bg-seguranca-black rounded-lg text-gray-300">
                         {getCategoryIcon(model.category)}
                       </div>
-                      <Badge 
+                      <Badge
                         variant={model.hasGenerator ? "default" : "secondary"}
-                        className={`text-[10px] px-1.5 py-0 whitespace-nowrap ${
-                          model.hasGenerator 
-                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' 
+                        className={`text-[10px] px-1.5 py-0 whitespace-nowrap ${model.hasGenerator
+                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                             : 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                        }`}
+                          }`}
                       >
                         {model.hasGenerator ? "Disponível" : "Em Dev"}
                       </Badge>
@@ -874,12 +880,12 @@ const ModelosDocumentosForm = () => {
                       {model.name}
                     </CardTitle>
                   </CardHeader>
-                  
+
                   <CardContent className="p-3 pt-0 flex-1 flex flex-col">
                     <p className="text-[11px] text-gray-400 line-clamp-2 mb-3 flex-1">
                       {model.description}
                     </p>
-                    
+
                     <div className="grid grid-cols-2 gap-2 mt-auto">
                       <Button
                         size="sm"
@@ -894,11 +900,10 @@ const ModelosDocumentosForm = () => {
                         size="sm"
                         onClick={() => handleGenerateDocument(model)}
                         disabled={!model.hasGenerator}
-                        className={`w-full h-7 text-[10px] px-1 ${
-                          model.hasGenerator 
-                            ? 'bg-seguranca-yellow text-seguranca-black hover:bg-yellow-500' 
+                        className={`w-full h-7 text-[10px] px-1 ${model.hasGenerator
+                            ? 'bg-seguranca-yellow text-seguranca-black hover:bg-yellow-500'
                             : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                        }`}
+                          }`}
                       >
                         <Download className="h-3 w-3 mr-1" />
                         Gerar
@@ -907,7 +912,7 @@ const ModelosDocumentosForm = () => {
                   </CardContent>
                 </Card>
               ))}
-              
+
               {modelsByCategory.find(c => c.id === category.id)?.models.length === 0 && (
                 <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-500 bg-seguranca-black/20 rounded-lg border border-gray-700 border-dashed">
                   <FileText className="h-12 w-12 mb-3 opacity-20" />

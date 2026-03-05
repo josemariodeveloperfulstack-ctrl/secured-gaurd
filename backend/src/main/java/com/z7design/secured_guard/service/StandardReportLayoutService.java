@@ -38,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import org.springframework.core.io.ClassPathResource;
 
+import jakarta.annotation.PostConstruct;
+
 /**
  * Serviço para criar layout padrão de relatórios com cabeçalho e rodapé
  * dinâmicos
@@ -78,8 +80,11 @@ public class StandardReportLayoutService {
 
     private static final DeviceRgb DARK_CURVE = new DeviceRgb(30, 30, 30); // Forma curva escura
 
-    // Caminho do template de fundo do relatório
+    // Caminho do template de fundo do relatório (retrato)
     private static final String REPORT_BACKGROUND_TEMPLATE = "templates/reports/report-background-template.png";
+    // Template paisagem (imagem de referência do cabeçalho/rodapé em paisagem) — aceita .png ou .jpg
+    private static final String REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_PNG = "templates/reports/report-background-landscape.png";
+    private static final String REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_JPG = "templates/reports/report-background-landscape.jpg";
 
     // Cache de ImageData (não Image) para evitar problemas de reutilização entre
     // documentos PDF
@@ -98,6 +103,32 @@ public class StandardReportLayoutService {
     // Reduzindo para ~35% do tamanho original para caber dentro da forma escura
     private static final float LOGO_WIDTH_PT = 78f; // ~104px (35% de 297px) = 78pt
     private static final float LOGO_HEIGHT_PT = 57f; // ~76px (35% de 217px) = 57pt
+    // Paisagem: logo menor para encaixar na área do template (forma escura)
+    private static final float LOGO_WIDTH_PT_LANDSCAPE = 68f;
+    private static final float LOGO_HEIGHT_PT_LANDSCAPE = 50f;
+    private static final float LOGO_X_OFFSET_LANDSCAPE = 18f; // margem esquerda na forma escura
+    private static final float LOGO_Y_OFFSET_TOP_LANDSCAPE = 14f; // distância do topo da página
+
+    /**
+     * Verifica na inicialização se o template de paisagem existe; caso contrário,
+     * relatórios em paisagem usarão o fallback programático (layout diferente do desejado).
+     */
+    @PostConstruct
+    public void checkLandscapeTemplateAvailable() {
+        try {
+            boolean pngExists = new ClassPathResource(REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_PNG).exists();
+            boolean jpgExists = new ClassPathResource(REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_JPG).exists();
+            if (pngExists) {
+                log.info("Template de paisagem disponível: {}", REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_PNG);
+            } else if (jpgExists) {
+                log.info("Template de paisagem disponível: {}", REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_JPG);
+            } else {
+                log.warn("Template de paisagem NÃO encontrado. Coloque report-background-landscape.png ou report-background-landscape.jpg em src/main/resources/templates/reports/");
+            }
+        } catch (Exception e) {
+            log.warn("Verificação do template de paisagem falhou: {}", e.getMessage());
+        }
+    }
 
     /**
      * Cria um novo documento PDF com layout padrão
@@ -206,8 +237,8 @@ public class StandardReportLayoutService {
                 // 1. Camada de Background (abaixo do conteúdo)
                 PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
 
-                // Tentar carregar template de fundo
-                ImageData backgroundTemplateData = service.loadReportBackgroundTemplateData();
+                // Tentar carregar template de fundo (retrato ou paisagem conforme orientação)
+                ImageData backgroundTemplateData = service.loadReportBackgroundTemplateData(config.isLandscape());
                 if (backgroundTemplateData != null) {
                     try {
                         Image backgroundImage = new Image(backgroundTemplateData);
@@ -231,7 +262,7 @@ public class StandardReportLayoutService {
                 Canvas canvasLayout = new Canvas(headerFooterCanvas, pageSize);
 
                 service.addHeader(canvasLayout, pageSize, company, config, pdfDoc);
-                service.addFooter(canvasLayout, pageSize, company);
+                service.addFooter(canvasLayout, pageSize, company, config);
 
                 canvasLayout.close();
                 headerFooterCanvas.release();
@@ -251,31 +282,28 @@ public class StandardReportLayoutService {
         float pageHeight = pageSize.getHeight();
         float headerTop = pageHeight; // Topo do cabeçalho (topo da página)
 
-        // Logo da empresa - centralizado dentro da forma escura no canto superior
-        // esquerdo
-        // O logo deve ficar centralizado dentro da forma curva escura, mais próximo do
-        // topo
-        // Com padding bottom de 20pt (espaço abaixo do logo)
+        // Logo da empresa - exibido dinamicamente; em paisagem usa posição/tamanho do template
         try {
             Image logoImage = loadCompanyLogo(company, pdfDoc);
             if (logoImage != null) {
-                // A forma escura está no canto superior esquerdo
-                // Centralizar o logo horizontalmente dentro da forma escura, mas mais próximo
-                // do topo
-                float formAreaWidth = 120f; // Largura estimada da forma escura
-                float logoX = (formAreaWidth - LOGO_WIDTH_PT) / 2f; // Centralizar horizontalmente
-                // Subir o logo mais: posicionar bem próximo do topo da forma escura
-                // Com padding bottom de 20pt (espaço abaixo do logo)
-                float logoY = headerTop - 10f - LOGO_HEIGHT_PT; // Mais próximo do topo (10pt do topo)
-
+                float logoW, logoH, logoX, logoY;
+                if (config.isLandscape()) {
+                    logoW = LOGO_WIDTH_PT_LANDSCAPE;
+                    logoH = LOGO_HEIGHT_PT_LANDSCAPE;
+                    logoX = LOGO_X_OFFSET_LANDSCAPE;
+                    logoY = headerTop - LOGO_Y_OFFSET_TOP_LANDSCAPE - logoH;
+                } else {
+                    float formAreaWidth = 120f;
+                    logoW = LOGO_WIDTH_PT;
+                    logoH = LOGO_HEIGHT_PT;
+                    logoX = (formAreaWidth - logoW) / 2f;
+                    logoY = headerTop - 10f - logoH;
+                }
                 logoImage.setFixedPosition(logoX, logoY);
-                logoImage.setWidth(LOGO_WIDTH_PT);
-                logoImage.setHeight(LOGO_HEIGHT_PT);
+                logoImage.setWidth(logoW);
+                logoImage.setHeight(logoH);
                 canvas.add(logoImage);
-
-                log.debug(
-                        "✅ Logo da empresa {} centralizado dentro da forma escura em ({}, {}) com padding bottom de 20pt",
-                        company.getName(), logoX, logoY);
+                log.debug("✅ Logo da empresa {} no cabeçalho ({}, {}) {}x{}", company.getName(), logoX, logoY, logoW, logoH);
             } else {
                 log.debug("⚠️ Logo da empresa {} não disponível", company.getName());
             }
@@ -323,11 +351,11 @@ public class StandardReportLayoutService {
      * Adiciona rodapé ao documento
      * Nota: O fundo já foi desenhado no método addHeaderFooterToAllPages
      */
-    private void addFooter(Canvas canvas, Rectangle pageSize, Company company) {
+    private void addFooter(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config) {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
 
-        // Informações da empresa no rodapé (acima da linha gradiente)
+        // Informações da empresa no rodapé (retrato e paisagem — dados da vigilância/empresa)
         // O rodapé deve ficar acima da linha gradiente (4pt de altura)
 
         // Primeira linha: Nome da empresa (centralizado)
@@ -443,35 +471,39 @@ public class StandardReportLayoutService {
     }
 
     /**
-     * Carrega ImageData do template de fundo (com cache)
-     * Retorna null se o template não existir
+     * Carrega ImageData do template de fundo (com cache).
+     * Em paisagem usa report-background-landscape.png (imagem de referência do cabeçalho/rodapé).
+     * Retorna null se o template não existir.
      */
-    private ImageData loadReportBackgroundTemplateData() {
-        // Verificar cache primeiro
-        String cacheKey = REPORT_BACKGROUND_TEMPLATE;
-        if (templateDataCache.containsKey(cacheKey)) {
-            log.debug("Template de fundo carregado do cache (ImageData): {}", cacheKey);
-            return templateDataCache.get(cacheKey);
+    private ImageData loadReportBackgroundTemplateData(boolean landscape) {
+        if (landscape) {
+            // Paisagem: tenta .png e depois .jpg (usuário pode ter salvo como JPG)
+            ImageData data = loadTemplateFromPath(REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_PNG);
+            if (data != null) return data;
+            data = loadTemplateFromPath(REPORT_BACKGROUND_TEMPLATE_LANDSCAPE_JPG);
+            if (data != null) return data;
+            log.warn("Template de paisagem não encontrado. Coloque report-background-landscape.png ou .jpg em src/main/resources/templates/reports/");
+            return null;
         }
+        return loadTemplateFromPath(REPORT_BACKGROUND_TEMPLATE);
+    }
 
+    private ImageData loadTemplateFromPath(String path) {
+        if (templateDataCache.containsKey(path)) {
+            log.debug("Template de fundo carregado do cache: {}", path);
+            return templateDataCache.get(path);
+        }
         try {
-            ClassPathResource resource = new ClassPathResource(REPORT_BACKGROUND_TEMPLATE);
-            if (!resource.exists()) {
-                log.debug("Template de fundo não encontrado em: {}", REPORT_BACKGROUND_TEMPLATE);
-                return null;
-            }
-
+            ClassPathResource resource = new ClassPathResource(path);
+            if (!resource.exists()) return null;
             ImageData imageData = ImageDataFactory.create(resource.getInputStream().readAllBytes());
-
-            // Adicionar ImageData ao cache (com limite de tamanho)
             if (templateDataCache.size() < CACHE_MAX_SIZE) {
-                templateDataCache.put(cacheKey, imageData);
-                log.info("✅ Template de fundo carregado e adicionado ao cache: {}", REPORT_BACKGROUND_TEMPLATE);
+                templateDataCache.put(path, imageData);
+                log.info("✅ Template de fundo carregado: {}", path);
             }
-
             return imageData;
         } catch (Exception e) {
-            log.warn("Erro ao carregar template de fundo de {}: {}", REPORT_BACKGROUND_TEMPLATE, e.getMessage());
+            log.debug("Template não carregado de {}: {}", path, e.getMessage());
             return null;
         }
     }

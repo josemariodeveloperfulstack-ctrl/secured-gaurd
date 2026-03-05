@@ -2,8 +2,8 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.AssinaturaDocumento;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.service.AssinaturaDocumentoService;
-import com.z7design.secured_guard.service.AuthenticationService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,14 +22,23 @@ import java.util.UUID;
 @RequestMapping("/api/assinaturas-documentos")
 @CrossOrigin(origins = "*")
 public class AssinaturaDocumentoController {
-    
+
     private final AssinaturaDocumentoService assinaturaDocumentoService;
-    private final AuthenticationService authenticationService;
-    
+    private final UserRepository userRepository;
+
     public AssinaturaDocumentoController(AssinaturaDocumentoService assinaturaDocumentoService,
-                                        AuthenticationService authenticationService) {
+                                         UserRepository userRepository) {
         this.assinaturaDocumentoService = assinaturaDocumentoService;
-        this.authenticationService = authenticationService;
+        this.userRepository = userRepository;
+    }
+
+    private User getCurrentUser(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new RuntimeException("No authentication found");
+        }
+        String username = authentication.getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
     
     /**
@@ -44,7 +53,7 @@ public class AssinaturaDocumentoController {
         
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            User usuarioAtual = getCurrentUser(authentication);
             AssinaturaDocumento assinatura = assinaturaDocumentoService.criarAssinaturaEletronica(
                 documentoId, usuarioAtual, request, observacoes);
             
@@ -66,7 +75,7 @@ public class AssinaturaDocumentoController {
         
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            User usuarioAtual = getCurrentUser(authentication);
             AssinaturaDocumento assinatura = assinaturaDocumentoService.criarAssinaturaDigital(
                 documentoId, usuarioAtual, certificadoDigital, hashDocumento, request);
             
@@ -105,7 +114,7 @@ public class AssinaturaDocumentoController {
     public ResponseEntity<List<AssinaturaDocumento>> listarMinhasAssinaturas() {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            User usuarioAtual = getCurrentUser(authentication);
             List<AssinaturaDocumento> assinaturas = assinaturaDocumentoService.listarPorUsuario(usuarioAtual.getId());
             return ResponseEntity.ok(assinaturas);
         } catch (Exception e) {
@@ -144,7 +153,7 @@ public class AssinaturaDocumentoController {
         
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            User usuarioAtual = getCurrentUser(authentication);
             List<AssinaturaDocumento> assinaturas = assinaturaDocumentoService.listarPorUsuarioEPeriodo(
                 usuarioAtual.getId(), dataInicio, dataFim);
             return ResponseEntity.ok(assinaturas);
@@ -250,7 +259,7 @@ public class AssinaturaDocumentoController {
         
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            User usuarioAtual = getCurrentUser(authentication);
             
             // Criar assinatura eletrônica
             AssinaturaDocumento assinatura = assinaturaDocumentoService.criarAssinaturaEletronica(

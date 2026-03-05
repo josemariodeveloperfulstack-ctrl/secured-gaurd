@@ -1,0 +1,26 @@
+========================================
+  LAYOUT PAISAGEM - COMO ATIVAR
+========================================
+
+O relatório em paisagem só usa o layout correto (sem distorção) quando
+a imagem do template existir neste diretório.
+
+O QUE FAZER:
+1. Use a SEGUNDA imagem de referência (template em branco em paisagem):
+   - Forma escura no canto superior esquerdo
+   - Faixa laranja/vermelho no topo
+   - Fundo branco
+   - Faixa fina no rodapé
+
+2. Salve essa imagem com o nome:
+   report-background-landscape.png  ou  report-background-landscape.jpg
+
+3. Coloque o arquivo NESTA pasta:
+   backend/src/main/resources/templates/reports/
+
+4. Reinicie o backend.
+
+Se não existir .png nem .jpg, o sistema usa um desenho programático e o
+layout fica diferente (logo distorcido, cabeçalho incorreto).
+
+Ver também: README.md nesta pasta.

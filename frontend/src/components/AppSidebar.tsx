@@ -333,8 +333,10 @@ export function AppSidebar() {
     const path = location.pathname;
     const allItems = [
       ...mainMenuItems,
+      ...financeiroMenuItems,
       ...empresasMenuItems,
       ...rhMenuItems,
+      ...sstMenuItems,
       ...departamentoPessoalMenuItems,
       ...operacionalMenuItems,
       ...comercialMenuItems,

@@ -35,7 +35,8 @@ import {
   CheckCircle,
   X,
   Eye,
-  Trash2
+  Trash2,
+  BarChart2
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -50,6 +51,7 @@ import {
 import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
+import { companyService } from '@/services/companyService';
 import { Employee } from '@/types/employee';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 import { EmployeeDocuments } from '@/components/funcionarios/EmployeeDocuments';
@@ -57,6 +59,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import EmployeeTrainingTab from '@/components/funcionarios/EmployeeTrainingTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EmployeeDocumentsPanel from '@/components/funcionarios/EmployeeDocumentsPanel';
+import { RelatoriosModal } from '@/components/funcionarios/RelatoriosModal';
 import DocumentosGerarTab from '@/components/funcionarios/DocumentosGerarTab';
 import DependenteModal from '@/components/dependentes/DependenteModal';
 import { FuncionariosTable } from '@/components/funcionarios/FuncionariosTable';
@@ -114,6 +117,32 @@ const Funcionarios: React.FC = () => {
     onConfirm: () => { },
     variant: 'default'
   });
+  const [relatoriosModalOpen, setRelatoriosModalOpen] = useState(false);
+
+  // Carregar empresas para filtros e para o modal de importação Promover
+  useEffect(() => {
+    const loadCompanies = async () => {
+      try {
+        const list = await companyService.getAllCompanies();
+        setCompanies(list);
+
+        // Se o CNPJ atual não estiver na lista, usar o primeiro como padrão
+        if (list.length > 0) {
+          const hasCurrent = list.some(c => (c.cnpj || '').replace(/[^0-9]/g, '') === promoverCnpj);
+          if (!hasCurrent) {
+            const first = list[0];
+            if (first?.cnpj) {
+              setPromoverCnpj(String(first.cnpj).replace(/[^0-9]/g, ''));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar empresas para importação Promover:', error);
+      }
+    };
+
+    loadCompanies();
+  }, []); // carregar apenas uma vez
 
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [employeeForDetails, setEmployeeForDetails] = useState<Employee | null>(null);
@@ -882,6 +911,14 @@ Para excluir este funcionário:
                   <Plus size={20} className="mr-2" />
                   Novo Funcionário
                 </Button>
+                <Button
+                  variant="outline"
+                  className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-900/20"
+                  onClick={() => setRelatoriosModalOpen(true)}
+                >
+                  <BarChart2 size={20} className="mr-2" />
+                  Relatórios
+                </Button>
               </div>
             </div>
 
@@ -991,7 +1028,7 @@ Para excluir este funcionário:
             {/* Lista de Funcionários Moderna */}
             <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               <FuncionariosTable
-                employees={employees}
+                employees={filteredEmployees}
                 selectedIds={selectedIds}
                 onSelect={handleSelectEmployee}
                 onSelectAll={handleSelectAllEmployees}
@@ -1191,8 +1228,22 @@ Para excluir este funcionário:
                 onChange={(e) => setPromoverCnpj(e.target.value)}
                 className="bg-seguranca-black border border-gray-700 text-white rounded-lg px-3 py-2 text-sm w-full outline-none focus:border-seguranca-yellow transition-all"
               >
-                <option value="43576260000112">Promover Vigilância Patrimonial (CNPJ: 43.576.260/0001-12)</option>
-                <option value="36698521000101">Promover Terceirização (CNPJ: 36.698.521/0001-01)</option>
+                {companies.length === 0 && (
+                  <>
+                    <option value="43576260000112">Promover Vigilância Patrimonial (CNPJ: 43.576.260/0001-12)</option>
+                    <option value="36698521000101">Promover Terceirização (CNPJ: 36.698.521/0001-01)</option>
+                  </>
+                )}
+                {companies.map((c) => {
+                  const normalizedCnpj = (c.cnpj || '').replace(/[^0-9]/g, '');
+                  const sigla = c.sigla ? `${c.sigla} - ` : '';
+                  const cnpjLabel = c.cnpj ? ` (CNPJ: ${c.cnpj})` : '';
+                  return (
+                    <option key={c.id || normalizedCnpj} value={normalizedCnpj}>
+                      {sigla}{c.name}{cnpjLabel}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -1379,6 +1430,13 @@ Para excluir este funcionário:
         onOpenChange={setDetailsModalOpen}
         employee={employeeForDetails}
         onEdit={handleEditFromDetails}
+      />
+
+      {/* Modal de Relatórios Avançado */}
+      <RelatoriosModal
+        open={relatoriosModalOpen}
+        onOpenChange={setRelatoriosModalOpen}
+        employees={employees}
       />
     </StandardLayout>
   );

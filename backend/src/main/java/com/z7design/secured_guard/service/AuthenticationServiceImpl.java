@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -24,12 +25,10 @@ import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.security.JwtService;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final UserRepository userRepository;
@@ -41,6 +40,27 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final UserCustomPermissionService customPermissionService;
     private final LgpdConsentService lgpdConsentService;
     private final TwoFactorAuthService twoFactorAuthService;
+
+    public AuthenticationServiceImpl(
+            UserRepository userRepository,
+            RoleRepository roleRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            @Lazy AuthenticationManager authenticationManager,
+            UserDetailsService userDetailsService,
+            UserCustomPermissionService customPermissionService,
+            LgpdConsentService lgpdConsentService,
+            TwoFactorAuthService twoFactorAuthService) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.authenticationManager = authenticationManager;
+        this.userDetailsService = userDetailsService;
+        this.customPermissionService = customPermissionService;
+        this.lgpdConsentService = lgpdConsentService;
+        this.twoFactorAuthService = twoFactorAuthService;
+    }
 
     @Override
     @Transactional

@@ -47,6 +47,7 @@ import { remanejamentoService, Remanejamento } from '@/services/remanejamentoSer
 import timeRecordService, { TimeRecord } from '@/services/timeRecordService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatCPF, formatRG, formatPhone } from '@/utils/formatters';
 
 interface EmployeeViewDetailsModalProps {
     open: boolean;
@@ -342,11 +343,11 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                     <CardContent className="p-4 space-y-3">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">CPF</span>
-                                            <span className="text-sm font-mono text-white">{employee.cpf || '-'}</span>
+                                            <span className="text-sm font-mono text-white">{formatCPF(employee.cpf)}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">RG</span>
-                                            <span className="text-sm font-mono text-white">{employee.rg || '-'}</span>
+                                            <span className="text-sm font-mono text-white">{formatRG(employee.rg)}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Data de Nascimento</span>
@@ -367,11 +368,11 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Telefone Principal</span>
-                                            <span className="text-sm text-white">{employee.phone || '-'}</span>
+                                            <span className="text-sm text-white">{formatPhone(employee.phone)}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Telefone Contato</span>
-                                            <span className="text-sm text-white">{(employee as any).telefoneContato || '-'}</span>
+                                            <span className="text-sm text-white">{formatPhone((employee as any).telefoneContato)}</span>
                                         </div>
                                     </CardContent>
                                 </Card>

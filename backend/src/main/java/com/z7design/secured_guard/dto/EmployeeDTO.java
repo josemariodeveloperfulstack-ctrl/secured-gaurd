@@ -38,7 +38,7 @@ public class EmployeeDTO {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private java.util.List<com.z7design.secured_guard.dto.DependentDTO> dependents;
 
-    // private String photoUrl;
+    private String photoUrl;
     // private String currentScale;
     private String email;
     private String phone;
@@ -66,6 +66,7 @@ public class EmployeeDTO {
     private byte[] ctpsDigitalPdf;
     private String ctpsDigitalPdfNome;
     private Long ctpsDigitalPdfTamanho;
+    @com.fasterxml.jackson.annotation.JsonProperty("bankData")
     private BankInfoDTO bankInfo;
     private JobInfoDTO jobInfo;
     private List<DocumentDTO> documents;
@@ -84,6 +85,7 @@ public class EmployeeDTO {
     private LocalDate hireDate;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate terminationDate;
+    private String terminationReason;
     // Campos já implementados abaixo (linhas 87-141) - mantidos comentados para
     // evitar duplicação
     // private String cep;
@@ -206,6 +208,9 @@ public class EmployeeDTO {
     // Dados do Exame Médico (ASO)
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate exameMedicoData;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate exameMedicoVencimento;
     private String exameMedicoTipo; // ADMISSIONAL, DEMISSIONAL, PERIODICO, MUDANCA_FUNCAO, RETORNO_TRABALHO
     private IdOnlyDTO exameMedicoDoctor; // Referência ao médico
     private String exameMedicoHorario; // Ex: "18:00 ÀS 06:00 H"
@@ -247,7 +252,9 @@ public class EmployeeDTO {
         private String agency;
         private String account;
         private String accountDigit;
+        @com.fasterxml.jackson.annotation.JsonProperty("type")
         private String accountType;
+        @com.fasterxml.jackson.annotation.JsonProperty("chavePix")
         private String pixKey;
     }
 

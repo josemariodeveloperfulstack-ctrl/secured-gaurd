@@ -1,14 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { format } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 
 interface DatePickerProps {
   date?: Date;
@@ -21,34 +21,82 @@ interface DatePickerProps {
 export function DatePicker({
   date,
   onDateChange,
-  placeholder = "Selecione uma data",
+  placeholder = "dd/mm/aaaa",
   disabled = false,
   className
 }: DatePickerProps) {
+  const [inputValue, setInputValue] = React.useState<string>("");
+
+  React.useEffect(() => {
+    if (date) {
+      setInputValue(format(date, "dd/MM/yyyy"));
+    } else {
+      setInputValue("");
+    }
+  }, [date]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+
+    // Allow only numbers and slashes
+    const cleanValue = value.replace(/[^\d/]/g, "");
+
+    // Auto-formatting (dd/mm/yyyy)
+    let formattedValue = cleanValue;
+    if (cleanValue.length === 2 && !cleanValue.includes("/") && value.length > inputValue.length) {
+      formattedValue = cleanValue + "/";
+    } else if (cleanValue.length === 5 && cleanValue.split("/").length === 2 && value.length > inputValue.length) {
+      formattedValue = cleanValue + "/";
+    }
+
+    // Limit length
+    if (formattedValue.length <= 10) {
+      setInputValue(formattedValue);
+
+      // If it's a complete date, try to parse it
+      if (formattedValue.length === 10) {
+        const parsedDate = parse(formattedValue, "dd/MM/yyyy", new Date());
+        if (isValid(parsedDate)) {
+          onDateChange?.(parsedDate);
+        }
+      } else if (formattedValue.length === 0) {
+        onDateChange?.(undefined);
+      }
+    }
+  };
+
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
+      <div className="relative w-full">
+        <Input
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          placeholder={placeholder}
+          disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal",
-            !date && "text-muted-foreground",
+            "w-full pr-10 bg-inherit border-inherit text-inherit",
             className
           )}
-          disabled={disabled}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "PPP", { locale: ptBR }) : placeholder}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[252px] p-0 bg-popover border border-border shadow-lg" align="start">
+        />
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors h-4 w-4"
+            disabled={disabled}
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </button>
+        </PopoverTrigger>
+      </div>
+      <PopoverContent className="w-[280px] p-0 bg-popover border border-border shadow-2xl z-[10100]" align="start">
         <Calendar
           mode="single"
           selected={date}
           onSelect={onDateChange}
           initialFocus
           locale={ptBR}
-          className="rounded-md w-[252px]"
+          className="rounded-md"
         />
       </PopoverContent>
     </Popover>
@@ -93,32 +141,13 @@ export function DateTimePicker({
 
   return (
     <div className="space-y-2">
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "w-full justify-start text-left font-normal",
-              !selectedDate && "text-muted-foreground",
-              className
-            )}
-            disabled={disabled}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {selectedDate ? format(selectedDate, "PPP", { locale: ptBR }) : placeholder}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[252px] p-0 bg-popover border border-border shadow-lg" align="start">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            initialFocus
-            locale={ptBR}
-            className="rounded-md w-[252px]"
-          />
-        </PopoverContent>
-      </Popover>
+      <DatePicker
+        date={selectedDate}
+        onDateChange={setSelectedDate}
+        placeholder="dd/mm/aaaa"
+        disabled={disabled}
+        className={className}
+      />
       <input
         type="time"
         value={selectedTime}
@@ -128,4 +157,4 @@ export function DateTimePicker({
       />
     </div>
   );
-} 
+}

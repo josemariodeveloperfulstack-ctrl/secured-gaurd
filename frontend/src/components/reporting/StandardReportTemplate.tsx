@@ -6,58 +6,83 @@ interface StandardReportTemplateProps {
     company?: Company;
     children: React.ReactNode;
     showBranding?: boolean;
+    orientation?: 'portrait' | 'landscape';
 }
 
 export const StandardReportTemplate: React.FC<StandardReportTemplateProps> = ({
     title,
     company,
     children,
-    showBranding = true
+    showBranding = true,
+    orientation
 }) => {
     const currentDate = new Date().toLocaleDateString('pt-BR');
+    const isLandscape = orientation === 'landscape';
+    const containerClasses = isLandscape
+        ? "relative bg-white pt-0 px-8 pb-8 min-h-[750px] w-full max-w-[1100px] mx-auto text-black overflow-hidden"
+        : "relative bg-white pt-0 px-10 pb-10 min-h-[1100px] w-full max-w-[850px] mx-auto text-black overflow-hidden";
 
     return (
-        <div className="bg-white p-8 min-h-[1100px] w-full max-w-[850px] mx-auto text-black shadow-lg" id="report-content">
+        <div className={containerClasses} id="report-content" style={{ fontFamily: 'Inter, sans-serif' }}>
             {showBranding && (
-                <div className="relative mb-10 border-b-4 border-transparent w-full">
-                    {/* Gradient Bar */}
-                    <div className="h-[30px] w-full bg-gradient-to-r from-[#FFCC00] via-[#FF9900] to-[#FF3333]"></div>
+                <div className="relative w-full h-[150px] mb-8">
+                    {/* Top Gradient Bar */}
+                    <div className="absolute top-0 left-0 right-0 h-[28px] bg-gradient-to-r from-[#FFCC00] via-[#FF9900] to-[#FF3333] z-0"></div>
 
-                    {/* Curved Logo Area (Simulated) */}
-                    <div className="absolute top-0 left-0 h-[80px] w-[150px] bg-[#1a1a1a] rounded-br-[50px] flex items-center justify-center z-10">
-                        <img src="/logo-sistema.png" className="max-w-[100px] max-height-[50px] object-contain" alt="Logo" />
-                    </div>
+                    {/* Dark Curve Shape (Top-Left) */}
+                    <div
+                        className="absolute top-0 left-0 bg-[#1e1e1e] w-[260px] h-[130px] z-10"
+                        style={{ borderBottomRightRadius: '90% 100%' }}
+                    />
+
+                    {/* Logo inside the curve - only in portrait */}
+                    {!isLandscape && (
+                        <div className="absolute top-[15px] left-[20px] w-[150px] h-[70px] z-20 flex items-center justify-center">
+                            <img src="/logo-sistema.png" className="max-h-[60px] max-w-full object-contain" alt="Logo" />
+                        </div>
+                    )}
 
                     {/* Title Area */}
-                    <div className="text-center mt-10 pt-2">
-                        <h1 className="text-[#1a1a1a] m-0 text-2xl font-extrabold uppercase tracking-tight">{title}</h1>
-                        <p className="text-gray-500 m-1 text-xs font-medium">
-                            {company?.name || 'Secured Guard'} | Relatório Oficial
-                        </p>
+                    <div className="absolute top-0 left-[260px] right-0 h-[130px] z-20 flex flex-col items-end pr-4 justify-center pt-[28px]">
+                        <h1 className="text-black font-black uppercase text-2xl lg:text-3xl m-0 tracking-tight leading-none text-right">
+                            {title}
+                        </h1>
+                        <div className="flex items-center gap-3 mt-3 w-full justify-end">
+                            <div className="h-[2px] w-[60px] bg-gradient-to-r from-[#FF9900] to-[#FF3333]"></div>
+                            <p className="text-gray-600 font-bold uppercase tracking-widest text-xs m-0">
+                                {company?.name || 'SECURED GUARD'}
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* Main Content */}
-            <div className="mt-8 min-h-[800px]">
+            <div className="relative z-30">
                 {children}
             </div>
 
             {showBranding && (
-                <div className="mt-10 border-t border-gray-100 pt-6 text-center text-gray-500 text-[10px]">
-                    <p className="m-0 font-bold text-gray-800">{company?.name || 'Secured Guard'}</p>
-                    <p className="m-0">
-                        {company?.address || 'Endereço não informado'}
-                        {company?.phone ? ` | Tel: ${company.phone}` : ''}
-                    </p>
-                    <p className="m-0">{company?.email || 'contato@securedguard.com.br'}</p>
+                <div className="relative z-30 mt-12 pt-6">
+                    {/* Bottom Gradient Line */}
+                    <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-gradient-to-r from-[#FFCC00] via-[#FF9900] to-[#FF3333] z-0"></div>
 
-                    {/* Bottom Gradient Bar */}
-                    <div className="mt-4 h-1 w-full bg-gradient-to-r from-[#FFCC00] via-[#FF9900] to-[#FF3333]"></div>
-
-                    <p className="mt-2 text-gray-400">
-                        Gerado automaticamente em {currentDate} pelo Sistema Secured Guard
-                    </p>
+                    {/* Footer: portrait = line + company data; landscape = line only */}
+                    {!isLandscape && (
+                        <div className="flex justify-between items-center text-[10px] text-gray-500 pb-4">
+                            <div className="text-left font-medium">
+                                <p className="m-0 text-black font-bold uppercase">{company?.name || 'Secured Guard'}</p>
+                                <p className="m-0">{company?.email || 'contato@securedguard.com.br'}</p>
+                            </div>
+                            <div className="text-center font-bold text-gray-400">
+                                GERADO EM {currentDate} | SECURED GUARD INTELLIGENCE
+                            </div>
+                            <div className="text-right font-medium">
+                                <p className="m-0">{company?.address || 'Endereço não informado'}</p>
+                                <p className="m-0">{company?.phone ? `TEL: ${company.phone}` : ''}</p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

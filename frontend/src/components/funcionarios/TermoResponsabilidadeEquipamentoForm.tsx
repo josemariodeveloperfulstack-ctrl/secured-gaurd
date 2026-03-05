@@ -12,6 +12,7 @@ import { employeeService } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import { formatCPF, formatCNPJ } from '@/utils/validation';
 
 const equipamentosOptions = [
   'Notebook',
@@ -33,10 +34,15 @@ const equipamentosOptions = [
   'Vale-Transporte',
 ];
 
-const TermoResponsabilidadeEquipamentoForm = () => {
+interface TermoResponsabilidadeEquipamentoFormProps {
+  employeeId?: string;
+  companyId?: string;
+}
+
+const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipamentoFormProps> = ({ employeeId, companyId }) => {
   const [form, setForm] = useState({
-    funcionarioId: '',
-    empresaId: '',
+    funcionarioId: employeeId || '',
+    empresaId: companyId || '',
     equipamento: '',
     marca: '',
     modelo: '',
@@ -54,6 +60,14 @@ const TermoResponsabilidadeEquipamentoForm = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      funcionarioId: employeeId || prev.funcionarioId,
+      empresaId: companyId || prev.empresaId
+    }));
+  }, [employeeId, companyId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -313,7 +327,7 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || funcionario.document || '-'}
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
                       </div>
                     </div>
                   </div>
@@ -368,7 +382,7 @@ const TermoResponsabilidadeEquipamentoForm = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.cnpj}
+                        {empresa.cnpj ? formatCNPJ(empresa.cnpj) : '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">

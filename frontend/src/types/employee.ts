@@ -53,6 +53,7 @@ export interface Employee {
   registrationNumber?: string;
   hireDate?: string; // LocalDate do backend
   terminationDate?: string; // LocalDate do backend
+  terminationReason?: string;
   status?: string;
   notes?: string;
 
@@ -148,6 +149,11 @@ export interface Employee {
   ricOrgaoEmissor?: string; // Órgão Emissor do RIC
   ricDataEmissao?: string; // Data de Emissão do RIC
   tipoVisto?: string; // Tipo de Visto
+
+  // CIN (Carteira de Identidade Nacional)
+  cinNumero?: string;
+  cinOrgaoEmissor?: string;
+  cinDataEmissao?: string;
 
   // Assinaturas e controle
   assinaturaFuncionario?: string;
@@ -277,6 +283,20 @@ export interface Employee {
     cpf?: string;
     rg?: string;
   }>;
+
+  // Dados do Exame Médico (ASO)
+  exameMedicoData?: string;
+  exameMedicoVencimento?: string;
+  exameMedicoTipo?: string;
+  exameMedicoDoctor?: { id: UUID; name?: string };
+  /** Data limite para gozo de férias (ISO). Usado no filtro Férias Vencidas / A Vencer. */
+  proximasFeriasVencimento?: string;
+  exameMedicoHorario?: string;
+  exameMedicoIntervalosRefeicao?: boolean;
+  exameMedicoHorarioIntervalo?: string;
+  exameMedicoObservacoes?: string;
+  exameMedicoPrimeiroEmprego?: boolean;
+  exameMedicoContribuicaoSindicalPaga?: boolean;
 
   createdAt?: string;
   updatedAt?: string;
@@ -414,6 +434,7 @@ export interface CreateEmployeeDTO {
 
   // Dados do Exame Médico (ASO)
   exameMedicoData?: string;
+  exameMedicoVencimento?: string;
   exameMedicoTipo?: string; // ADMISSIONAL, DEMISSIONAL, PERIODICO, MUDANCA_FUNCAO, RETORNO_TRABALHO
   exameMedicoDoctor?: { id: string };
   exameMedicoHorario?: string; // Ex: "18:00 ÀS 06:00 H"
@@ -421,6 +442,12 @@ export interface CreateEmployeeDTO {
   exameMedicoObservacoes?: string;
   exameMedicoPrimeiroEmprego?: boolean; // true = Sim, false = Não
   exameMedicoContribuicaoSindicalPaga?: boolean; // true = Sim, false = Não
+  exameMedicoHorarioIntervalo?: string;
+
+  // CIN (Carteira de Identidade Nacional)
+  cinNumero?: string;
+  cinOrgaoEmissor?: string;
+  cinDataEmissao?: string;
 
   // Dados do cônjuge
   spouseName?: string;

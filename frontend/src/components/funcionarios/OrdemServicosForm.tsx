@@ -11,14 +11,20 @@ import { FileText, Download, Eye, User, Building, Calendar, Clock, MapPin, Alert
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { clientService, Client } from '@/services/clientService';
+import { formatCPF } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
-const OrdemServicosForm = () => {
+interface OrdemServicosFormProps {
+  employeeId?: string;
+  companyId?: string;
+}
+
+const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    employeeId: '',
-    companyId: '',
+    employeeId: employeeId || '',
+    companyId: companyId || '',
     clientId: '',
     position: '',
     serviceType: '',
@@ -42,6 +48,14 @@ const OrdemServicosForm = () => {
   const funcionario = employees.find(f => f.id === form.employeeId);
   const empresa = companies.find(e => e.id === form.companyId);
   const cliente = clients.find(c => c.id === form.clientId);
+
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      employeeId: employeeId || prev.employeeId,
+      companyId: companyId || prev.companyId
+    }));
+  }, [employeeId, companyId]);
 
   useEffect(() => {
     loadData();
@@ -393,7 +407,7 @@ const OrdemServicosForm = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || funcionario.document || '-'}
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
                       </div>
                     </div>
                   </div>

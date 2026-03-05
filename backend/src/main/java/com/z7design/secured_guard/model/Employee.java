@@ -16,7 +16,9 @@ import org.hibernate.annotations.NotFoundAction;
 import jakarta.validation.constraints.Email;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import org.hibernate.annotations.CreationTimestamp;
@@ -82,6 +84,9 @@ public class Employee {
     @Column(nullable = true)
     private String document;
 
+    @Column(name = "cpf", length = 20)
+    private String cpf;
+
     @Column(name = "birth_date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate birthDate;
@@ -131,6 +136,9 @@ public class Employee {
     @Column(name = "cnh_number", length = 20)
     private String cnhNumber;
 
+    @Column(name = "termination_reason", length = 255)
+    private String terminationReason;
+
     @Column(name = "cnh_expiration_date")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate cnhExpirationDate;
@@ -153,18 +161,24 @@ public class Employee {
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "company_id")
     @JsonBackReference("company-employees")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Company company;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "work_post_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private WorkPost workPost;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "department_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Department department;
 
     // Dados Pessoais
@@ -174,8 +188,8 @@ public class Employee {
     @Column(name = "nationality", length = 50)
     private String nationality;
 
-    // @Column(name = "photo_url")
-    // private String photoUrl;
+    @Column(name = "photo_url", length = 500)
+    private String photoUrl;
 
     // Dados Profissionais
     // @Column(name = "current_scale")
@@ -283,6 +297,9 @@ public class Employee {
 
     @Column(name = "numero_rg", length = 30)
     private String numeroRg;
+
+    @Column(name = "rg", length = 30)
+    private String rg;
 
     @Column(name = "carteira_identidade_data_emissao")
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -432,6 +449,9 @@ public class Employee {
     @Column(name = "conta_digito", length = 10)
     private String contaDigito;
 
+    @Column(name = "account_type", length = 50)
+    private String accountType;
+
     @Column(name = "pix_key", length = 255)
     private String pixKey;
 
@@ -519,6 +539,10 @@ public class Employee {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate exameMedicoData;
 
+    @Column(name = "exame_medico_vencimento")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate exameMedicoVencimento;
+
     @Column(name = "exame_medico_tipo", length = 50)
     private String exameMedicoTipo; // ADMISSIONAL, DEMISSIONAL, PERIODICO, MUDANCA_FUNCAO, RETORNO_TRABALHO
 
@@ -526,6 +550,8 @@ public class Employee {
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "exame_medico_doctor_id")
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Doctor exameMedicoDoctor;
 
     @Column(name = "exame_medico_horario", length = 100)

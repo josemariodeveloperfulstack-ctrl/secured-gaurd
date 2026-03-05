@@ -2,8 +2,12 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.EmployeeDTO;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Department;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.Unit;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.DepartmentRepository;
+import com.z7design.secured_guard.repository.UnitRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -25,6 +29,8 @@ public class EmployeeExcelImportService {
 
     private final EmployeeService employeeService;
     private final CompanyRepository companyRepository;
+    private final UnitRepository unitRepository;
+    private final DepartmentRepository departmentRepository;
 
     // Mapeamento de colunas possíveis da planilha para campos da entidade
     private static final Map<String, String> COLUMN_MAPPING = new HashMap<>();
@@ -100,7 +106,10 @@ public class EmployeeExcelImportService {
         // Mapeamentos específicos da planilha do usuário
         COLUMN_MAPPING.put("funcionário", "name");
         COLUMN_MAPPING.put("setor", "unitName");
+        COLUMN_MAPPING.put("setor de trabalho", "unitName");
         COLUMN_MAPPING.put("função", "positionName");
+        COLUMN_MAPPING.put("nome do funcionário", "name");
+        COLUMN_MAPPING.put("salário base", "salario");
         COLUMN_MAPPING.put("escala", "escalaTrabalho");
         COLUMN_MAPPING.put("nasc.", "birthDate");
         COLUMN_MAPPING.put("ag. itaú", "bank");
@@ -249,21 +258,27 @@ public class EmployeeExcelImportService {
                     if (isRowEmpty(row))
                         continue;
 
-                    // Validar se o CNPJ da empresa é o mesmo (quando existe coluna de CNPJ)
+                    // Resolver empresa da linha: se existir coluna CNPJ Empresa, usar o CNPJ da linha; senão usar a empresa já encontrada
+                    Company rowCompany = company;
                     if (companyCnpjColumnIndex != -1) {
                         Cell rowCnpjCell = row.getCell(companyCnpjColumnIndex);
                         String rowCnpj = getCellValueAsString(rowCnpjCell);
                         String rowNormalizedCnpj = rowCnpj != null ? rowCnpj.replaceAll("[^0-9]", "") : "";
 
-                        if (!rowNormalizedCnpj.equals(normalizedCnpj)) {
-                            result.addWarning("Linha " + (rowIndex + 1) +
-                                    ": CNPJ diferente do esperado. Ignorando linha.");
-                            continue;
+                        if (rowNormalizedCnpj == null || rowNormalizedCnpj.isEmpty()) {
+                            result.addWarning("Linha " + (rowIndex + 1) + ": CNPJ da empresa vazio. Usando empresa padrão.");
+                        } else if (!rowNormalizedCnpj.equals(normalizedCnpj)) {
+                            Optional<Company> rowCompanyOpt = companyRepository.findByNormalizedCnpj(rowNormalizedCnpj);
+                            if (rowCompanyOpt.isPresent()) {
+                                rowCompany = rowCompanyOpt.get();
+                            } else {
+                                result.addWarning("Linha " + (rowIndex + 1) + ": Empresa com CNPJ " + rowCnpj + " não cadastrada. Usando empresa padrão.");
+                            }
                         }
                     }
 
-                    // Criar DTO do funcionário a partir da linha
-                    EmployeeDTO employeeDTO = createEmployeeDTOFromRow(row, columnIndexMap, company);
+                    // Criar DTO do funcionário a partir da linha (com empresa e setor de trabalho)
+                    EmployeeDTO employeeDTO = createEmployeeDTOFromRow(row, columnIndexMap, rowCompany);
 
                     // Validar campos obrigatórios
                     if (employeeDTO.getName() == null || employeeDTO.getName().trim().isEmpty()) {
@@ -276,18 +291,23 @@ public class EmployeeExcelImportService {
                         continue;
                     }
 
-                    // Verificar se funcionário já existe (por CPF)
+                    // Análise: se já existir no banco (por CPF ou matrícula eSocial), apenas atualiza
                     String normalizedCpf = employeeDTO.getCpf().replaceAll("[^0-9]", "");
                     Optional<Employee> existingEmployee = employeeService.findByCpfExact(normalizedCpf);
 
+                    if (existingEmployee.isEmpty() && employeeDTO.getMatriculaEsocial() != null && !employeeDTO.getMatriculaEsocial().trim().isEmpty()) {
+                        existingEmployee = employeeService.findByMatriculaEsocial(employeeDTO.getMatriculaEsocial().trim());
+                        if (existingEmployee.isPresent()) {
+                            log.info("📋 Funcionário encontrado por matrícula eSocial: {}. Atualizando...", employeeDTO.getMatriculaEsocial());
+                        }
+                    }
+
                     if (existingEmployee.isPresent()) {
-                        log.info("⚠️ Funcionário já existe (CPF: {}). Atualizando...", normalizedCpf);
-                        // Atualizar funcionário existente
+                        log.info("✅ Funcionário já existe (CPF: {}). Atualizando com dados da planilha (setor, empresa, etc.).", normalizedCpf);
                         employeeDTO.setId(existingEmployee.get().getId());
                         employeeService.update(existingEmployee.get().getId(), employeeDTO);
                         result.incrementUpdated();
                     } else {
-                        // Criar novo funcionário
                         employeeService.create(employeeDTO);
                         result.incrementCreated();
                     }
@@ -452,13 +472,27 @@ public class EmployeeExcelImportService {
                         dto.setEscalaTrabalho(cellValue.trim());
                         break;
                     case "unitName":
-                        // Guardar o nome do setor para processamento posterior ou busca
-                        // Por enquanto, podemos tentar colocar no DTO se houver campo
-                        dto.setNotes(
-                                (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Setor: " + cellValue.trim());
+                        // Setor de trabalho: tentar vincular a Unidade ou Departamento pelo nome
+                        String setorNome = cellValue.trim();
+                        Optional<Unit> unitOpt = unitRepository.findByName(setorNome)
+                                .or(() -> unitRepository.findByNameContainingIgnoreCase(setorNome).stream().findFirst());
+                        if (unitOpt.isPresent()) {
+                            EmployeeDTO.UnitDTO unitDTO = new EmployeeDTO.UnitDTO();
+                            unitDTO.setId(unitOpt.get().getId());
+                            unitDTO.setName(unitOpt.get().getName());
+                            dto.setUnit(unitDTO);
+                        } else {
+                            List<Department> deps = departmentRepository.findByNameContainingIgnoreCase(setorNome);
+                            if (!deps.isEmpty()) {
+                                dto.setDepartmentId(deps.get(0).getId().toString());
+                            } else {
+                                dto.setNotes(
+                                        (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Setor: " + setorNome);
+                            }
+                        }
                         break;
                     case "positionName":
-                        // Guardar o nome do cargo
+                        // Guardar o nome do cargo (posição pode ser resolvida depois se houver PositionRepository por nome)
                         dto.setNotes(
                                 (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Cargo: " + cellValue.trim());
                         break;

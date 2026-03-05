@@ -219,7 +219,24 @@ export const epiDeliveryFormService = {
     }
   },
 
-  
+  /**
+   * Gerar PDF em branco da ficha de entrega de EPI (Manual).
+   * Se employeeId for informado, a ficha vem com nome, função, CPF, RG, admissão e demissão preenchidos.
+   */
+  async generateBlankPdf(companyId: string, employeeId?: string | null): Promise<Blob> {
+    try {
+      const params: { companyId: string; employeeId?: string } = { companyId };
+      if (employeeId) params.employeeId = employeeId;
+      const response = await api.get('/api/epi-delivery-forms/generate-blank-pdf', {
+        params,
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar PDF em branco da ficha de entrega de EPI:', error);
+      throw error;
+    }
+  },
 };
 
 

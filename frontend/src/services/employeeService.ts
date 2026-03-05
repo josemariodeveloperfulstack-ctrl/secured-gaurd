@@ -21,6 +21,9 @@ export interface Employee {
   salario?: number;
   createdAt?: string;
   updatedAt?: string;
+  rg?: string;
+  nomePai?: string;
+  nomeMae?: string;
 }
 
 export interface SimpleEmployee {
@@ -326,6 +329,38 @@ export const employeeService = {
     } catch (error: any) {
       console.error('Erro ao gerar PDF da ficha de registro:', error);
       throw new Error(error.response?.data?.message || 'Erro ao gerar PDF da ficha de registro');
+    }
+  },
+
+  /**
+   * Gerar PDF do relatório detalhado de funcionários (mesmo layout do Relatório de Veículos).
+   * companyId opcional (quando filtro "Todas as Empresas", o backend usa empresa dos funcionários ou primeira ativa).
+   * employeeIds opcional (lista vazia = todos).
+   */
+  async exportEmployeesReportPdf(companyId: string | null | undefined, employeeIds: string[]): Promise<Blob> {
+    try {
+      const response = await api.post(
+        '/api/employees/report/pdf',
+        { companyId: companyId || null, employeeIds: employeeIds || [] },
+        { responseType: 'blob' }
+      );
+      if (response.data instanceof Blob && response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const err = JSON.parse(text);
+        throw new Error(err.message || err.error || 'Erro ao gerar relatório PDF');
+      }
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.data instanceof Blob && error.response.data.type === 'application/json') {
+        try {
+          const text = await error.response.data.text();
+          const err = JSON.parse(text);
+          throw new Error(err.message || err.error || 'Erro ao gerar relatório PDF');
+        } catch {
+          throw new Error('Erro ao processar resposta do servidor');
+        }
+      }
+      throw error;
     }
   },
 

@@ -31,4 +31,42 @@ export const formatCurrency = (value: number | null | undefined): string => {
     style: 'currency',
     currency: 'BRL',
   }).format(value);
+};
+
+/**
+ * Formata um CPF no padrão 000.000.000-00
+ * @param cpf O CPF como string apenas números ou já formatado
+ * @returns O CPF formatado ou '-' se vazio
+ */
+export const formatCPF = (cpf: string | null | undefined): string => {
+  if (!cpf) return '-';
+  const digits = cpf.replace(/\D/g, '');
+  if (digits.length !== 11) return cpf;
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+};
+
+/**
+ * Formata um RG, removendo espaços excedentes
+ * @param rg O RG como string
+ * @returns O RG higienizado ou '-' se vazio
+ */
+export const formatRG = (rg: string | null | undefined): string => {
+  if (!rg || rg.trim() === '') return '-';
+  return rg.trim();
+};
+
+/**
+ * Formata números de telefone ou celular no padrão (00) 00000-0000 ou (00) 0000-0000
+ * @param phone O telefone como string
+ * @returns O telefone formatado ou '-' se vazio
+ */
+export const formatPhone = (phone: string | null | undefined): string => {
+  if (!phone) return '-';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11) {
+    return digits.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  } else if (digits.length === 10) {
+    return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+  }
+  return phone;
 }; 

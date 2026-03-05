@@ -13,13 +13,15 @@ import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
+import { formatCNPJ } from '@/utils/validation';
 import { reportLayoutService } from '@/services/reportLayoutService';
 
 interface FichaRegistroFuncionarioFormProps {
   employeeId?: string;
+  companyId?: string;
 }
 
-const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> = ({ employeeId }) => {
+const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
 
   // Função auxiliar para formatar data ISO para BR
@@ -34,19 +36,21 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
   };
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
-    empresaId: '',
+    empresaId: companyId || '',
     dataRegistro: '',
     responsavelRegistroId: '', // ID do funcionário responsável
     observacoes: '',
     documentosEntregues: [] as string[],
   });
 
-  // Atualizar funcionarioId quando employeeId mudar
+  // Atualizar funcionarioId e empresaId quando props mudarem
   useEffect(() => {
-    if (employeeId) {
-      setForm(prev => ({ ...prev, funcionarioId: employeeId }));
-    }
-  }, [employeeId]);
+    setForm(prev => ({
+      ...prev,
+      funcionarioId: employeeId || prev.funcionarioId,
+      empresaId: companyId || prev.empresaId
+    }));
+  }, [employeeId, companyId]);
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -434,7 +438,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                          {empresa.cnpj}
+                          {empresa.cnpj ? formatCNPJ(empresa.cnpj) : '-'}
                         </div>
                       </div>
                       <div className="space-y-1.5">
@@ -615,9 +619,9 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         <div id="ficha-registro-printable">
           <StandardReportTemplate title="Ficha de Registro do Funcionário" company={empresa}>
-            <div className="space-y-6 text-black">
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-2">
+            <div className="space-y-3 text-black">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <h3 className="font-bold border-b pb-1 text-sm uppercase">Dados Pessoais</h3>
                   <p className="text-sm"><strong>Nome:</strong> {fullEmployee?.name}</p>
                   <p className="text-sm"><strong>CPF:</strong> {fullEmployee?.cpf || fullEmployee?.document}</p>
@@ -627,7 +631,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                   <p className="text-sm"><strong>E-mail:</strong> {fullEmployee?.email || '-'}</p>
                   <p className="text-sm"><strong>Endereço:</strong> {typeof fullEmployee?.address === 'string' ? fullEmployee?.address : fullEmployee?.address?.street || '-'}</p>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <h3 className="font-bold border-b pb-1 text-sm uppercase">Dados Profissionais</h3>
                   <p className="text-sm"><strong>Cargo:</strong> {(fullEmployee as any)?.position?.name || '-'}</p>
                   <p className="text-sm"><strong>Setor:</strong> {(fullEmployee as any)?.unit?.name || '-'}</p>
@@ -637,15 +641,15 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <h3 className="font-bold border-b pb-1 text-sm uppercase">Dados do Registro</h3>
                 <p className="text-sm"><strong>Data do Registro:</strong> {formatDateToBR(form.dataRegistro)}</p>
                 <p className="text-sm"><strong>Responsável pelo Registro:</strong> {responsavel?.name || '-'}</p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <h3 className="font-bold border-b pb-1 text-sm uppercase">Documentos Entregues</h3>
-                <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="grid grid-cols-2 gap-1 mt-1">
                   {documentosOptions.map(doc => (
                     <div key={doc} className="flex items-center gap-2 text-xs">
                       <div className={`w-3 h-3 border ${form.documentosEntregues.includes(doc) ? 'bg-black' : ''}`}></div>
@@ -655,12 +659,12 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <h3 className="font-bold border-b pb-1 text-sm uppercase">Observações</h3>
-                <p className="text-sm border p-2 rounded bg-gray-50 min-h-[60px]">{form.observacoes || 'Nenhuma observação informada.'}</p>
+                <p className="text-sm border p-1 rounded bg-gray-50 min-h-[40px]">{form.observacoes || 'Nenhuma observação informada.'}</p>
               </div>
 
-              <div className="mt-20 grid grid-cols-2 gap-20 pt-10">
+              <div className="mt-6 grid grid-cols-2 gap-10 pt-4">
                 <div className="text-center border-t pt-2">
                   <p className="text-xs font-bold">{fullEmployee?.name}</p>
                   <p className="text-[10px]">Assinatura do Funcionário</p>

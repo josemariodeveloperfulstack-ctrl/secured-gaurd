@@ -87,7 +87,11 @@ public class EPIDeliveryStandardPdfService {
                                         .setMarginBottom(10);
 
                         addTableRow(employeeTable, "Funcionário:", employee.getName());
-                        addTableRow(employeeTable, "CPF:", employee.getDocument());
+                        addTableRow(employeeTable, "CPF:",
+                                        CompanyDataFormatter.formatCpf(
+                                                        employee.getCpf() != null && !employee.getCpf().trim().isEmpty()
+                                                                        ? employee.getCpf()
+                                                                        : employee.getDocument()));
                         addTableRow(employeeTable, "Cargo:",
                                         employee.getPosition() != null ? employee.getPosition().getName() : "");
                         addTableRow(employeeTable, "Setor:",
@@ -109,7 +113,7 @@ public class EPIDeliveryStandardPdfService {
                         Table companyTable = new Table(UnitValue.createPercentArray(new float[] { 40f, 60f }))
                                         .useAllAvailableWidth();
                         addTableRow(companyTable, "Razão Social:", company.getName());
-                        addTableRow(companyTable, "CNPJ:", company.getCnpj());
+                        addTableRow(companyTable, "CNPJ:", CompanyDataFormatter.formatCnpj(company.getCnpj()));
                         addTableRow(companyTable, "Endereço:", company.getAddress());
                         document.add(companyTable);
 
@@ -158,7 +162,7 @@ public class EPIDeliveryStandardPdfService {
                         PdfWriter writer = new PdfWriter(baos);
                         ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
                                         .companyId(company.getId())
-                                        .reportTitle("FICHA DE ENTREGA DE EPI")
+                                        .reportTitle("CONTROLE DE EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (EPI)")
                                         .topMargin(100f)
                                         .bottomMargin(40f)
                                         .leftMargin(40f)
@@ -169,78 +173,106 @@ public class EPIDeliveryStandardPdfService {
                         docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
                         Document document = docWithPdf.getDocument();
 
-                        // Seção: Dados da Empresa
-                        document.add(createSectionHeader("DADOS DA EMPRESA"));
-                        Table companyTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                        .useAllAvailableWidth();
-                        companyTable.addCell(createLabelValueCell("RAZÃO SOCIAL:", company.getName()));
-                        companyTable.addCell(createLabelValueCell("CNPJ:", company.getCnpj()));
-                        companyTable.addCell(createLabelValueCell("ENDEREÇO:", company.getAddress()));
-                        document.add(companyTable);
+                        // Empresa
+                        document.add(new Paragraph((company.getName() != null ? company.getName() : "").toUpperCase())
+                                        .setBold().setFontSize(10f).setMarginBottom(1f));
+                        document.add(new Paragraph("CNPJ: " + (company.getCnpj() != null ? company.getCnpj() : ""))
+                                        .setFontSize(9f).setMarginBottom(10f));
 
-                        // Seção: Identificação do Funcionário
-                        document.add(createSectionHeader("IDENTIFICAÇÃO DO FUNCIONÁRIO"));
-                        Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                        .useAllAvailableWidth();
+                        // Tabela do Funcionário (sem bordas)
+                        Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 50f, 50f }))
+                                        .useAllAvailableWidth().setMarginBottom(15f);
 
-                        String funcao = employee.getPosition() != null ? employee.getPosition().getName() : "";
-                        String setor = employee.getUnit() != null ? employee.getUnit().getName() : "";
+                        String name = employee.getName() != null ? employee.getName().toUpperCase() : "";
+                        String position = employee.getPosition() != null
+                                        ? employee.getPosition().getName().toUpperCase()
+                                        : "";
+                        String documentStr = employee.getCpf() != null && !employee.getCpf().trim().isEmpty()
+                                        ? employee.getCpf()
+                                        : employee.getDocument();
+                        if (documentStr == null)
+                                documentStr = "";
 
-                        employeeTable.addCell(createLabelValueCell("NOME:", employee.getName()));
-                        employeeTable.addCell(createLabelValueCell("CPF:", employee.getDocument()));
-                        employeeTable.addCell(createLabelValueCell("FUNÇÃO:", funcao));
-                        employeeTable.addCell(createLabelValueCell("SETOR:", setor));
+                        String rgStr = buildRg(employee);
+
+                        String dateHire = formatDate(employee.getHireDate());
+                        String dateTerm = formatDate(employee.getTerminationDate());
+
+                        employeeTable.addCell(createNoBorderLabelValue("NOME:", name));
+                        employeeTable.addCell(createNoBorderLabelValue("FUNÇÃO:", position));
+                        employeeTable.addCell(createNoBorderLabelValue("CPF:", documentStr));
+                        employeeTable.addCell(createNoBorderLabelValue("RG:", rgStr));
+                        employeeTable.addCell(createNoBorderLabelValue("ADMISSÃO:", dateHire));
+                        employeeTable.addCell(createNoBorderLabelValue("DEMISSÃO:", dateTerm));
                         document.add(employeeTable);
 
-                        // Seção: Termo de Responsabilidade
-                        document.add(createSectionHeader("TERMO DE RESPONSABILIDADE"));
-                        String declarationText = "Recebi da empresa acima identificada, os EPI's abaixo relacionados, para uso exclusivo no desempenho de minhas funções. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação e devolvê-los à empresa em caso de rescisão contratual. Estou ciente de que o não uso desses equipamentos constitui ato de insubordinação, sujeito a sanções disciplinares conforme o art. 158 da CLT.";
-                        document.add(new Paragraph(declarationText)
-                                        .setFontSize(9f)
-                                        .setTextAlignment(TextAlignment.JUSTIFIED)
+                        // Termo de Responsabilidade
+                        document.add(new Paragraph("RECIBO DE EQUIPAMENTO DE PROTEÇÃO INDIVIDUAL (EPI)")
+                                        .setBold().setFontSize(10f).setTextAlignment(TextAlignment.CENTER)
                                         .setMarginBottom(5f));
 
-                        // Seção: Equipamentos de Proteção Individual
-                        document.add(createSectionHeader("EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (EPI)"));
-                        Table epiTable = new Table(UnitValue.createPercentArray(new float[] { 40f, 15f, 15f, 30f }))
+                        String declarationText = "Recebi da " + company.getName()
+                                        + ", os EPI's abaixo especificados a serem usados no desempenho de minhas tarefas. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação, quando necessário solicitar a substituição ou reposição e devolvê-los à Empresa em caso de demissão. Estou ciente também que o uso desses EPI's implicará em insubordinação, sujeito a sanções disciplinares previstas no art. 158 CLT.";
+                        document.add(new Paragraph(declarationText)
+                                        .setFontSize(8f).setTextAlignment(TextAlignment.JUSTIFIED)
+                                        .setMarginBottom(10f));
+
+                        Table contagemTable = new Table(UnitValue.createPercentArray(new float[] { 50f, 50f }))
+                                        .useAllAvailableWidth().setMarginBottom(5f);
+                        contagemTable.addCell(new Cell().add(new Paragraph("Contagem: ___/___/___").setFontSize(9f))
+                                        .setBorder(Border.NO_BORDER).setPaddingLeft(0));
+                        contagemTable.addCell(new Cell()
+                                        .add(new Paragraph("Assinatura: _________________________").setFontSize(9f))
+                                        .setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT));
+                        document.add(contagemTable);
+
+                        // Tabela EPI de 8 colunas conforme Imagem 1
+                        Table epiTable = new Table(UnitValue
+                                        .createPercentArray(new float[] { 26f, 6f, 10f, 10f, 12f, 12f, 12f, 12f }))
                                         .useAllAvailableWidth();
 
-                        epiTable.addHeaderCell(
-                                        new Cell().add(new Paragraph("DESCRIÇÃO DO EPI").setBold().setFontSize(9f)));
-                        epiTable.addHeaderCell(new Cell().add(new Paragraph("CA").setBold().setFontSize(9f)));
-                        epiTable.addHeaderCell(new Cell().add(new Paragraph("QUANT.").setBold().setFontSize(9f)));
-                        epiTable.addHeaderCell(new Cell().add(new Paragraph("ASSINATURA").setBold().setFontSize(9f)));
+                        epiTable.addHeaderCell(createEpiHeaderCell("EQUIPAMENTO"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("Nº"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("CA"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("QUANTIDADE"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("ENTREGA"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("SUBSTITUÍDO"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO DA SUBST."));
+                        epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
 
+                        String deliveryStr = formatDate(form.getDeliveryDate());
+                        int itemIdx = 1;
                         if (form.getItems() != null && !form.getItems().isEmpty()) {
                                 for (EPIDeliveryFormItem item : form.getItems()) {
-                                        epiTable.addCell(new Cell().add(new Paragraph(
-                                                        item.getEpiName() != null ? item.getEpiName() : "")
-                                                        .setFontSize(9f)));
-                                        epiTable.addCell(new Cell()
-                                                        .add(new Paragraph(item.getCa() != null ? item.getCa() : "")
-                                                                        .setFontSize(9f)));
-                                        epiTable.addCell(new Cell().add(new Paragraph(
+                                        epiTable.addCell(createEpiDataCell(
+                                                        item.getEpiName() != null ? item.getEpiName().toUpperCase()
+                                                                        : ""));
+                                        epiTable.addCell(createEpiDataCell(String.valueOf(itemIdx++)));
+                                        epiTable.addCell(createEpiDataCell(item.getCa() != null ? item.getCa() : ""));
+                                        epiTable.addCell(createEpiDataCell(
                                                         item.getQuantity() != null ? item.getQuantity().toString()
-                                                                        : "1")
-                                                        .setFontSize(9f)));
-                                        epiTable.addCell(new Cell().add(new Paragraph(""))); // Espaço para assinatura
-                                                                                             // manual
+                                                                        : "1"));
+                                        epiTable.addCell(createEpiDataCell(deliveryStr));
+                                        epiTable.addCell(createEpiDataCell(""));
+                                        epiTable.addCell(createEpiDataCell(""));
+                                        epiTable.addCell(createEpiDataCell(""));
                                 }
                         }
 
-                        // Adicionar linhas vazias para manter padrão visual se houver poucos itens
-                        int itemsToAdd = Math.max(0, 8 - (form.getItems() != null ? form.getItems().size() : 0));
+                        // Manter um número fixo de linhas
+                        int itemsToAdd = Math.max(0, 15 - (form.getItems() != null ? form.getItems().size() : 0));
                         for (int i = 0; i < itemsToAdd; i++) {
-                                epiTable.addCell(new Cell().setHeight(12f));
-                                epiTable.addCell(new Cell().setHeight(12f));
-                                epiTable.addCell(new Cell().setHeight(12f));
-                                epiTable.addCell(new Cell().setHeight(12f));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
                         }
+
                         document.add(epiTable);
-
-                        // Assinaturas
-                        addSignatures(document, form, employee, company);
-
                         document.close();
                 } catch (Exception e) {
                         log.error("Erro ao gerar ficha de EPI com layout padrão", e);
@@ -269,13 +301,18 @@ public class EPIDeliveryStandardPdfService {
 
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Empresa:", company.getName(),
                                         labelStyle, valueStyle);
-                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(),
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNPJ:",
+                                        CompanyDataFormatter.formatCnpj(company.getCnpj()),
                                         labelStyle, valueStyle);
                         rowIndex++;
 
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Funcionário:", employee.getName(),
                                         labelStyle, valueStyle);
-                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CPF:", employee.getDocument(),
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CPF:",
+                                        CompanyDataFormatter.formatCpf(
+                                                        employee.getCpf() != null && !employee.getCpf().trim().isEmpty()
+                                                                        ? employee.getCpf()
+                                                                        : employee.getDocument()),
                                         labelStyle, valueStyle);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Função:",
                                         employee.getPosition() != null ? employee.getPosition().getName() : "",
@@ -285,6 +322,9 @@ public class EPIDeliveryStandardPdfService {
                                         labelStyle, valueStyle);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Admissão:",
                                         formatDate(employee.getHireDate()), labelStyle,
+                                        valueStyle);
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "RG:",
+                                        buildRg(employee), labelStyle,
                                         valueStyle);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Data de Entrega:",
                                         formatDate(form.getDeliveryDate()),
@@ -348,69 +388,174 @@ public class EPIDeliveryStandardPdfService {
                 }
         }
 
-        private Cell createLabelValueCell(String label, String value) {
+        private static final DateTimeFormatter DATE_FORMAT_DDMMYYYY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        public byte[] generateBlankEPIDeliveryPdf(UUID companyId, UUID employeeId) throws Exception {
+                log.info("📄 Gerando ficha de entrega de EPI EM BRANCO (Manual) para empresa ID: {}, funcionário: {}", companyId, employeeId);
+
+                Company company = companyRepository.findById(companyId)
+                                .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
+
+                Employee employee = null;
+                if (employeeId != null) {
+                        employee = employeeRepository.findById(employeeId).orElse(null);
+                }
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                DocumentWithPdf docWithPdf = null;
+
+                try {
+                        PdfWriter writer = new PdfWriter(baos);
+                        ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
+                                        .companyId(company.getId())
+                                        .reportTitle("CONTROLE DE EQUIPAMENTOS DE PROTEÇÃO INDIVIDUAL (EPI)")
+                                        .topMargin(100f)
+                                        .bottomMargin(40f)
+                                        .leftMargin(40f)
+                                        .rightMargin(40f)
+                                        .includeEmailInFooter(true)
+                                        .build();
+
+                        docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
+                        Document document = docWithPdf.getDocument();
+
+                        // Empresa
+                        document.add(new Paragraph((company.getName() != null ? company.getName() : "").toUpperCase())
+                                        .setBold().setFontSize(10f).setMarginBottom(1f));
+                        document.add(new Paragraph("CNPJ: " + (company.getCnpj() != null ? company.getCnpj() : ""))
+                                        .setFontSize(9f).setMarginBottom(10f));
+
+                        // Tabela do Funcionário (preenchida com dados do funcionário se informado)
+                        String nome = employee != null && employee.getName() != null ? employee.getName() : "";
+                        String funcao = employee != null && employee.getPosition() != null && employee.getPosition().getName() != null ? employee.getPosition().getName() : "";
+                        String cpf = employee != null && employee.getCpf() != null ? employee.getCpf() : "";
+                        String rgRaw = employee != null ? (employee.getRg() != null ? employee.getRg() : employee.getNumeroRg()) : null;
+                        String rg = rgRaw != null ? rgRaw : "";
+                        String admissao = employee != null && employee.getHireDate() != null ? employee.getHireDate().format(DATE_FORMAT_DDMMYYYY) : "__/__/____";
+                        String demissao = employee != null && employee.getTerminationDate() != null ? employee.getTerminationDate().format(DATE_FORMAT_DDMMYYYY) : "__/__/____";
+
+                        Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 50f, 50f }))
+                                        .useAllAvailableWidth().setMarginBottom(15f);
+
+                        employeeTable.addCell(createNoBorderLabelValue("NOME:", nome.isEmpty() ? "________________________________________________" : nome));
+                        employeeTable.addCell(createNoBorderLabelValue("FUNÇÃO:", funcao.isEmpty() ? "______________________________________________" : funcao));
+                        employeeTable.addCell(createNoBorderLabelValue("CPF:", cpf.isEmpty() ? "________________________________________________" : cpf));
+                        employeeTable.addCell(createNoBorderLabelValue("RG:", rg.isEmpty() ? "________________________________________________" : rg));
+                        employeeTable.addCell(createNoBorderLabelValue("ADMISSÃO:", admissao));
+                        employeeTable.addCell(createNoBorderLabelValue("DEMISSÃO:", demissao));
+                        document.add(employeeTable);
+
+                        // Termo de Responsabilidade
+                        document.add(new Paragraph("RECIBO DE EQUIPAMENTO DE PROTEÇÃO INDIVIDUAL (EPI)")
+                                        .setBold().setFontSize(10f).setTextAlignment(TextAlignment.CENTER)
+                                        .setMarginBottom(5f));
+
+                        String declarationText = "Recebi da " + company.getName()
+                                        + ", os EPI's abaixo especificados a serem usados no desempenho de minhas tarefas. Assumo o compromisso de usá-los durante a jornada de trabalho, zelar pela sua conservação, quando necessário solicitar a substituição ou reposição e devolvê-los à Empresa em caso de demissão. Estou ciente também que o uso desses EPI's implicará em insubordinação, sujeito a sanções disciplinares previstas no art. 158 CLT.";
+                        document.add(new Paragraph(declarationText)
+                                        .setFontSize(8f).setTextAlignment(TextAlignment.JUSTIFIED)
+                                        .setMarginBottom(10f));
+
+                        Table contagemTable = new Table(UnitValue.createPercentArray(new float[] { 50f, 50f }))
+                                        .useAllAvailableWidth().setMarginBottom(5f);
+                        contagemTable.addCell(new Cell().add(new Paragraph("Contagem: ___/___/___").setFontSize(9f))
+                                        .setBorder(Border.NO_BORDER).setPaddingLeft(0));
+                        contagemTable.addCell(new Cell()
+                                        .add(new Paragraph("Assinatura: _________________________").setFontSize(9f))
+                                        .setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT));
+                        document.add(contagemTable);
+
+                        // Tabela EPI de 8 colunas (vazia)
+                        Table epiTable = new Table(UnitValue
+                                        .createPercentArray(new float[] { 26f, 6f, 10f, 10f, 12f, 12f, 12f, 12f }))
+                                        .useAllAvailableWidth();
+
+                        epiTable.addHeaderCell(createEpiHeaderCell("EQUIPAMENTO"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("Nº"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("CA"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("QUANTIDADE"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("ENTREGA"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("SUBSTITUÍDO"));
+                        epiTable.addHeaderCell(createEpiHeaderCell("MOTIVO DA SUBST."));
+                        epiTable.addHeaderCell(createEpiHeaderCell("ASSINATURA"));
+
+                        // Adicionar 18 linhas vazias
+                        for (int i = 0; i < 18; i++) {
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                                epiTable.addCell(createEpiDataCell(""));
+                        }
+
+                        document.add(epiTable);
+                        document.close();
+                } catch (Exception e) {
+                        log.error("Erro ao gerar ficha de EPI em branco", e);
+                        throw e;
+                }
+
+                log.info("✅ Ficha de entrega de EPI em branco gerada com sucesso. Tamanho: {} bytes", baos.size());
+                return baos.toByteArray();
+        }
+
+        private Cell createNoBorderLabelValue(String label, String value) {
                 Paragraph p = new Paragraph();
-                p.add(new Text(label).setBold().setFontSize(8f));
-                p.add(new Text(" " + (value != null && !value.isEmpty() ? value : "-")).setFontSize(9f));
-                return new Cell().add(p).setPadding(2f);
+                p.add(new Text(label + " ").setBold().setFontSize(9f));
+                p.add(new Text(value != null && !value.isEmpty() ? value : "").setFontSize(9f));
+                return new Cell().add(p).setBorder(Border.NO_BORDER).setPadding(2f);
         }
 
-        private Paragraph createSectionHeader(String title) {
-                return new Paragraph(title)
-                                .setBold()
-                                .setFontSize(10f)
-                                .setFontColor(new DeviceRgb(255, 0, 0)) // RED
-                                .setMarginTop(8f)
-                                .setMarginBottom(2f)
-                                .setBorderLeft(new SolidBorder(new DeviceRgb(255, 0, 0), 3f))
-                                .setPaddingLeft(5f);
+        private Cell createEpiHeaderCell(String text) {
+                return new Cell()
+                                .add(new Paragraph(text).setBold().setFontSize(7f)
+                                                .setTextAlignment(TextAlignment.CENTER))
+                                .setBackgroundColor(ColorConstants.LIGHT_GRAY)
+                                .setPadding(3f);
         }
 
-        private void addSignatures(Document document, EPIDeliveryForm form, Employee employee, Company company) {
-                String city = company.getCity() != null ? company.getCity() : "_______________";
-                String date = LocalDate.now()
-                                .format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("pt", "BR")));
-
-                Paragraph dateLoc = new Paragraph(city + ", " + date)
-                                .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginTop(15f)
-                                .setMarginBottom(25f)
-                                .setFontSize(9f);
-                document.add(dateLoc);
-
-                Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 45, 10, 45 }))
-                                .useAllAvailableWidth();
-
-                Cell cell1 = new Cell()
-                                .add(new Paragraph("_________________________________")
+        private Cell createEpiDataCell(String text) {
+                return new Cell()
+                                .add(new Paragraph(text != null ? text : "").setFontSize(7f)
                                                 .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(company.getName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Empregador").setTextAlignment(TextAlignment.CENTER).setFontSize(8f))
-                                .setBorder(Border.NO_BORDER);
-
-                Cell spacer = new Cell().setBorder(Border.NO_BORDER);
-
-                Cell cell2 = new Cell()
-                                .add(new Paragraph("_________________________________")
-                                                .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(employee.getName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Empregado").setTextAlignment(TextAlignment.CENTER).setFontSize(8f))
-                                .setBorder(Border.NO_BORDER);
-
-                sigTable.addCell(cell1);
-                sigTable.addCell(spacer);
-                sigTable.addCell(cell2);
-
-                document.add(sigTable);
+                                .setPadding(3f).setHeight(15f);
         }
 
         private void addTableRow(Table table, String label, String value) {
                 table.addCell(new Cell().add(new Paragraph(label).setBold().setFontSize(9f)));
                 table.addCell(new Cell().add(new Paragraph(value != null ? value : "-").setFontSize(9f)));
+        }
+
+        private String buildRg(Employee employee) {
+                String rg = "";
+                // Prioridade 1: Campo rg legado
+                if (employee.getRg() != null && !employee.getRg().trim().isEmpty()) {
+                        rg = employee.getRg();
+                }
+                // Prioridade 2: CIN
+                else if (employee.getCinNumero() != null && !employee.getCinNumero().trim().isEmpty()) {
+                        rg = employee.getCinNumero();
+                        if (employee.getCinOrgaoEmissor() != null && !employee.getCinOrgaoEmissor().trim().isEmpty()) {
+                                rg = employee.getCinOrgaoEmissor() + "-" + rg;
+                        }
+                }
+                // Prioridade 3: Campo numeroRg
+                else if (employee.getNumeroRg() != null && !employee.getNumeroRg().trim().isEmpty()) {
+                        rg = employee.getNumeroRg();
+                        if (employee.getCarteiraIdentidadeOrgaoEmissor() != null
+                                        && !employee.getCarteiraIdentidadeOrgaoEmissor().trim().isEmpty()) {
+                                rg = employee.getCarteiraIdentidadeOrgaoEmissor() + "-" + rg;
+                        }
+                }
+                // Prioridade 4: Órgão Emissor apenas
+                else if (employee.getCarteiraIdentidadeOrgaoEmissor() != null
+                                && !employee.getCarteiraIdentidadeOrgaoEmissor().trim().isEmpty()) {
+                        rg = employee.getCarteiraIdentidadeOrgaoEmissor();
+                }
+                return rg;
         }
 
         private String formatDate(LocalDate date) {

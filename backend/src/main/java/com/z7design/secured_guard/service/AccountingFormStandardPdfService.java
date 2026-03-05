@@ -85,11 +85,24 @@ public class AccountingFormStandardPdfService {
                                         .setMarginBottom(10);
                         document.add(date);
 
-                        document.add(createSectionHeader("1. DADOS PESSOAIS"));
+                        if (company != null) {
+                                document.add(createSectionHeader("1. DADOS DA EMPRESA"));
+                                Table companyTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
+                                                .useAllAvailableWidth();
+                                companyTable.addCell(createLabelValueCell("EMPRESA:", company.getName()));
+                                companyTable.addCell(createLabelValueCell("CNPJ:",
+                                                CompanyDataFormatter.formatCnpj(company.getCnpj())));
+                                document.add(companyTable);
+                        }
+
+                        document.add(createSectionHeader("2. DADOS PESSOAIS"));
                         Table personalTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
                                         .useAllAvailableWidth();
-                        personalTable.addCell(createLabelValueCell("NOME COMPLETO:", employee.getName()));
-                        personalTable.addCell(createLabelValueCell("CPF:", employee.getDocument()));
+                        personalTable.addCell(createLabelValueCell("NOME COMPLETO:", employee.getFullName()));
+                        personalTable.addCell(createLabelValueCell("CPF:",
+                                        employee.getCpf() != null && !employee.getCpf().trim().isEmpty()
+                                                        ? employee.getCpf()
+                                                        : employee.getDocument()));
                         personalTable.addCell(createLabelValueCell("RG:", buildRg(employee)));
                         personalTable.addCell(createLabelValueCell("DATA DE NASCIMENTO:",
                                         formatDate(employee.getBirthDate())));
@@ -98,7 +111,7 @@ public class AccountingFormStandardPdfService {
                         personalTable.addCell(createLabelValueCell("NACIONALIDADE:", employee.getNationality()));
                         document.add(personalTable);
 
-                        document.add(createSectionHeader("2. DOCUMENTAÇÃO"));
+                        document.add(createSectionHeader("3. DOCUMENTAÇÃO"));
                         Table documentsTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
                                         .useAllAvailableWidth();
                         documentsTable.addCell(createLabelValueCell("PIS/PASEP:", employee.getPis()));
@@ -106,7 +119,10 @@ public class AccountingFormStandardPdfService {
                         documentsTable.addCell(createLabelValueCell("ZONA/SEÇÃO:", buildZonaSecao(employee)));
                         documentsTable.addCell(
                                         createLabelValueCell("CTPS / SÉRIE:",
-                                                        (employee.getCtps() != null ? employee.getCtps() : "") + " / "
+                                                        (employee.getCtps() != null
+                                                                        ? CompanyDataFormatter
+                                                                                        .formatCtps(employee.getCtps())
+                                                                        : "") + " / "
                                                                         + (employee.getCtpsSeries() != null
                                                                                         ? employee.getCtpsSeries()
                                                                                         : "")));
@@ -122,7 +138,7 @@ public class AccountingFormStandardPdfService {
                                                                                                      // necessário
                         document.add(documentsTable);
 
-                        document.add(createSectionHeader("3. ENDEREÇO E CONTATO"));
+                        document.add(createSectionHeader("4. ENDEREÇO E CONTATO"));
                         Table contactTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
                                         .useAllAvailableWidth();
                         contactTable.addCell(createLabelValueCell("ENDEREÇO:", buildAddress(employee)));
@@ -130,7 +146,7 @@ public class AccountingFormStandardPdfService {
                         contactTable.addCell(createLabelValueCell("E-MAIL:", employee.getEmail()));
                         document.add(contactTable);
 
-                        document.add(createSectionHeader("4. DADOS PROFISSIONAIS"));
+                        document.add(createSectionHeader("5. DADOS PROFISSIONAIS"));
                         Table professionalTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
                                         .useAllAvailableWidth();
                         professionalTable.addCell(
@@ -149,37 +165,16 @@ public class AccountingFormStandardPdfService {
                                                         : ""));
                         document.add(professionalTable);
 
-                        if (company != null) {
-                                document.add(createSectionHeader("5. DADOS DA EMPRESA"));
-                                Table companyTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
+                        if (employee.getBanco() != null || employee.getAgencia() != null
+                                        || employee.getContaCorrente() != null) {
+                                document.add(createSectionHeader("6. DADOS BANCÁRIOS"));
+                                Table bankTable = new Table(
+                                                UnitValue.createPercentArray(new float[] { 33, 33, 34 }))
                                                 .useAllAvailableWidth();
-                                companyTable.addCell(createLabelValueCell("EMPRESA:", company.getName()));
-                                companyTable.addCell(createLabelValueCell("CNPJ:", company.getCnpj()));
-                                document.add(companyTable);
-
-                                if (employee.getBanco() != null || employee.getAgencia() != null
-                                                || employee.getContaCorrente() != null) {
-                                        document.add(createSectionHeader("6. DADOS BANCÁRIOS"));
-                                        Table bankTable = new Table(
-                                                        UnitValue.createPercentArray(new float[] { 33, 33, 34 }))
-                                                        .useAllAvailableWidth();
-                                        bankTable.addCell(createLabelValueCell("BANCO:", employee.getBanco()));
-                                        bankTable.addCell(createLabelValueCell("AGÊNCIA:", employee.getAgencia()));
-                                        bankTable.addCell(createLabelValueCell("CONTA:", employee.getContaCorrente()));
-                                        document.add(bankTable);
-                                }
-                        } else {
-                                if (employee.getBanco() != null || employee.getAgencia() != null
-                                                || employee.getContaCorrente() != null) {
-                                        document.add(createSectionHeader("5. DADOS BANCÁRIOS"));
-                                        Table bankTable = new Table(
-                                                        UnitValue.createPercentArray(new float[] { 33, 33, 34 }))
-                                                        .useAllAvailableWidth();
-                                        bankTable.addCell(createLabelValueCell("BANCO:", employee.getBanco()));
-                                        bankTable.addCell(createLabelValueCell("AGÊNCIA:", employee.getAgencia()));
-                                        bankTable.addCell(createLabelValueCell("CONTA:", employee.getContaCorrente()));
-                                        document.add(bankTable);
-                                }
+                                bankTable.addCell(createLabelValueCell("BANCO:", employee.getBanco()));
+                                bankTable.addCell(createLabelValueCell("AGÊNCIA:", employee.getAgencia()));
+                                bankTable.addCell(createLabelValueCell("CONTA:", employee.getContaCorrente()));
+                                document.add(bankTable);
                         }
 
                         addSignatures(document, employee, company);
@@ -222,12 +217,26 @@ public class AccountingFormStandardPdfService {
                                         LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), labelStyle,
                                         valueStyle);
 
-                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "1. DADOS PESSOAIS", lastColumn,
+                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "1. DADOS DA EMPRESA",
+                                        lastColumn,
+                                        workbook);
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Empresa:",
+                                        reportCompany.getName(), labelStyle,
+                                        valueStyle);
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNPJ:",
+                                        CompanyDataFormatter.formatCnpj(reportCompany.getCnpj()),
+                                        labelStyle,
+                                        valueStyle);
+
+                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "2. DADOS PESSOAIS", lastColumn,
                                         workbook);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Nome Completo:",
                                         employee.getName(),
                                         labelStyle, valueStyle);
-                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CPF:", employee.getDocument(),
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CPF:",
+                                        employee.getCpf() != null && !employee.getCpf().trim().isEmpty()
+                                                        ? employee.getCpf()
+                                                        : employee.getDocument(),
                                         labelStyle,
                                         valueStyle);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "RG:", buildRg(employee),
@@ -254,7 +263,8 @@ public class AccountingFormStandardPdfService {
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Zona/Seção Eleitoral:",
                                         buildZonaSecao(employee), labelStyle,
                                         valueStyle);
-                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CTPS:", employee.getCtps(),
+                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CTPS:",
+                                        CompanyDataFormatter.formatCtps(employee.getCtps()),
                                         labelStyle,
                                         valueStyle);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Série CTPS:",
@@ -273,7 +283,7 @@ public class AccountingFormStandardPdfService {
                                         employee.getCertificadoMilitar(), labelStyle,
                                         valueStyle);
 
-                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "3. ENDEREÇO E CONTATO",
+                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "4. ENDEREÇO E CONTATO",
                                         lastColumn,
                                         workbook);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Endereço:", buildAddress(employee),
@@ -287,7 +297,7 @@ public class AccountingFormStandardPdfService {
                                         labelStyle,
                                         valueStyle);
 
-                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "4. DADOS PROFISSIONAIS",
+                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "5. DADOS PROFISSIONAIS",
                                         lastColumn,
                                         workbook);
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Número de Registro:",
@@ -313,59 +323,21 @@ public class AccountingFormStandardPdfService {
                         rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Setor:",
                                         employee.getUnit() != null ? employee.getUnit().getName() : "",
                                         labelStyle, valueStyle);
-                        if (company != null) {
-                                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Empresa:",
-                                                company.getName(), labelStyle,
-                                                valueStyle);
-                                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(),
-                                                labelStyle,
-                                                valueStyle);
-                        }
-
-                        if (company != null) {
-                                rowIndex = excelReportLayoutService.addSection(sheet, rowIndex, "5. DADOS DA EMPRESA",
+                        if (employee.getBanco() != null || employee.getAgencia() != null
+                                        || employee.getContaCorrente() != null) {
+                                rowIndex = excelReportLayoutService.addSection(sheet, rowIndex,
+                                                "6. DADOS BANCÁRIOS",
                                                 lastColumn,
                                                 workbook);
-                                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Empresa:",
-                                                company.getName(), labelStyle,
+                                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Banco:",
+                                                employee.getBanco(), labelStyle,
                                                 valueStyle);
-                                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "CNPJ:", company.getCnpj(),
-                                                labelStyle,
+                                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Agência:",
+                                                employee.getAgencia(),
+                                                labelStyle, valueStyle);
+                                rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Conta Corrente:",
+                                                employee.getContaCorrente(), labelStyle,
                                                 valueStyle);
-
-                                if (employee.getBanco() != null || employee.getAgencia() != null
-                                                || employee.getContaCorrente() != null) {
-                                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex,
-                                                        "6. DADOS BANCÁRIOS",
-                                                        lastColumn,
-                                                        workbook);
-                                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Banco:",
-                                                        employee.getBanco(), labelStyle,
-                                                        valueStyle);
-                                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Agência:",
-                                                        employee.getAgencia(),
-                                                        labelStyle, valueStyle);
-                                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Conta Corrente:",
-                                                        employee.getContaCorrente(), labelStyle,
-                                                        valueStyle);
-                                }
-                        } else {
-                                if (employee.getBanco() != null || employee.getAgencia() != null
-                                                || employee.getContaCorrente() != null) {
-                                        rowIndex = excelReportLayoutService.addSection(sheet, rowIndex,
-                                                        "5. DADOS BANCÁRIOS",
-                                                        lastColumn,
-                                                        workbook);
-                                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Banco:",
-                                                        employee.getBanco(), labelStyle,
-                                                        valueStyle);
-                                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Agência:",
-                                                        employee.getAgencia(),
-                                                        labelStyle, valueStyle);
-                                        rowIndex = excelReportLayoutService.addRow(sheet, rowIndex, "Conta Corrente:",
-                                                        employee.getContaCorrente(), labelStyle,
-                                                        valueStyle);
-                                }
                         }
 
                         sheet.autoSizeColumn(0);
@@ -483,7 +455,7 @@ public class AccountingFormStandardPdfService {
                 if (employee.getEnderecoCep() != null && !employee.getEnderecoCep().trim().isEmpty()) {
                         if (address.length() > 0)
                                 address.append(" - CEP: ");
-                        address.append(employee.getEnderecoCep());
+                        address.append(CompanyDataFormatter.formatZipCode(employee.getEnderecoCep()));
                 }
 
                 // Fallback para campo address antigo
@@ -517,12 +489,27 @@ public class AccountingFormStandardPdfService {
 
         private String buildRg(Employee employee) {
                 String rg = "";
-                if (employee.getCinNumero() != null && !employee.getCinNumero().trim().isEmpty()) {
+                // Prioridade 1: Campo rg legado
+                if (employee.getRg() != null && !employee.getRg().trim().isEmpty()) {
+                        rg = employee.getRg();
+                }
+                // Prioridade 2: CIN
+                else if (employee.getCinNumero() != null && !employee.getCinNumero().trim().isEmpty()) {
                         rg = employee.getCinNumero();
                         if (employee.getCinOrgaoEmissor() != null && !employee.getCinOrgaoEmissor().trim().isEmpty()) {
                                 rg = employee.getCinOrgaoEmissor() + "-" + rg;
                         }
-                } else if (employee.getCarteiraIdentidadeOrgaoEmissor() != null
+                }
+                // Prioridade 3: Campo numeroRg
+                else if (employee.getNumeroRg() != null && !employee.getNumeroRg().trim().isEmpty()) {
+                        rg = employee.getNumeroRg();
+                        if (employee.getCarteiraIdentidadeOrgaoEmissor() != null
+                                        && !employee.getCarteiraIdentidadeOrgaoEmissor().trim().isEmpty()) {
+                                rg = employee.getCarteiraIdentidadeOrgaoEmissor() + "-" + rg;
+                        }
+                }
+                // Prioridade 4: Órgão Emissor apenas
+                else if (employee.getCarteiraIdentidadeOrgaoEmissor() != null
                                 && !employee.getCarteiraIdentidadeOrgaoEmissor().trim().isEmpty()) {
                         rg = employee.getCarteiraIdentidadeOrgaoEmissor();
                 }

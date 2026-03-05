@@ -7,18 +7,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { Calendar, User, Building, FileText, Download, Eye, Loader2, CheckCircle2, DollarSign, Clock, Briefcase } from 'lucide-react';
+import { Calendar, User, Building, FileText, Download, Eye, Loader2, CheckCircle2, Clock, Briefcase } from 'lucide-react';
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
+import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
-const ContratosTrabalhoForm = () => {
+interface ContratosTrabalhoFormProps {
+  employeeId?: string;
+  companyId?: string;
+}
+
+const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    employeeId: '',
-    companyId: '',
+    employeeId: employeeId || '',
+    companyId: companyId || '',
     position: '',
     contractType: '',
     startDate: '',
@@ -41,6 +47,14 @@ const ContratosTrabalhoForm = () => {
   const funcionario = employees.find(f => f.id === form.employeeId);
   const empresa = companies.find(e => e.id === form.companyId);
   const costCenter = costCenters.find(cc => cc.id === form.department || cc.name === form.department);
+
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      employeeId: employeeId || prev.employeeId,
+      companyId: companyId || prev.companyId
+    }));
+  }, [employeeId, companyId]);
 
   useEffect(() => {
     loadData();
@@ -290,113 +304,118 @@ const ContratosTrabalhoForm = () => {
         </CardHeader>
         <CardContent className="space-y-8">
 
-          {/* Identificação */}
-          <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-              <User className="h-4 w-4" />
-              <span>Identificação das Partes</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label className="text-base font-semibold">Funcionário</Label>
-                <Select
-                  value={form.employeeId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{f.name}</span>
-                            {f.document && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+          {/* Identificação das Partes */}
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b bg-muted/40">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-foreground">Identificação das Partes</span>
               </div>
+            </div>
+            <div className="p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Funcionário</Label>
+                  <Select
+                    value={form.employeeId}
+                    onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
+                    disabled={loadingData}
+                  >
+                    <SelectTrigger className="h-12 rounded-lg border border-input bg-muted/40 text-foreground font-medium shadow-sm transition-colors hover:bg-muted/60 focus:ring-2 focus:ring-primary/20 focus:border-primary/50 [&>span]:line-clamp-2 [&>span]:text-left [&>span]:normal-case">
+                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
+                      {loadingData ? (
+                        <div className="p-3 text-center text-sm text-muted-foreground">Carregando funcionários...</div>
+                      ) : employees.length > 0 ? (
+                        employees.map(f => (
+                          <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
+                            <div className="flex flex-col gap-0.5 text-left">
+                              <span className="font-medium normal-case">{f.name}</span>
+                              {f.document && (
+                                <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-3 text-center text-sm text-muted-foreground">Nenhum funcionário encontrado</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-base font-semibold">Empresa</Label>
-                <Select
-                  value={form.companyId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando empresas...</div>
-                    ) : companies.length > 0 ? (
-                      companies.map(e => (
-                        <SelectItem key={e.id} value={e.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-xs text-muted-foreground">{e.name}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhuma empresa encontrada</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Empresa</Label>
+                  <Select
+                    value={form.companyId}
+                    onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
+                    disabled={loadingData}
+                  >
+                    <SelectTrigger className="h-12 rounded-lg border border-input bg-muted/40 text-foreground font-medium shadow-sm transition-colors hover:bg-muted/60 focus:ring-2 focus:ring-primary/20 focus:border-primary/50 [&>span]:line-clamp-2 [&>span]:text-left [&>span]:normal-case">
+                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
+                      {loadingData ? (
+                        <div className="p-3 text-center text-sm text-muted-foreground">Carregando empresas...</div>
+                      ) : companies.length > 0 ? (
+                        companies.map(e => (
+                          <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
+                            <div className="flex flex-col gap-0.5 text-left">
+                              <span className="font-medium normal-case">
+                                {e.sigla || e.tradeName || e.name}
+                              </span>
+                              {(e.sigla || e.tradeName) && e.name && (
+                                <span className="text-xs text-muted-foreground">{e.name}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-3 text-center text-sm text-muted-foreground">Nenhuma empresa encontrada</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className={`grid grid-cols-1 gap-6 ${funcionario && empresa && costCenter
+          <div className={`grid grid-cols-1 gap-5 ${funcionario && empresa && costCenter
             ? 'lg:grid-cols-3'
             : funcionario && empresa
               ? 'lg:grid-cols-2'
               : 'lg:grid-cols-1'
             }`}>
-            {/* Detalhes do Funcionário */}
+            {/* Dados do Empregado */}
             {funcionario && (
-              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2 font-medium">
-                    <User className="h-4 w-4 text-primary" />
-                    Dados do Empregado
+              <div className="rounded-xl border bg-card shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+                <div className="px-4 py-3 border-b bg-muted/40">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">Dados do Empregado</span>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.name}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || funcionario.document || '-'}
-                      </div>
+                <div className="p-4 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
+                      {funcionario.name}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPF</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                      {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Endereço</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
                       {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
                     </div>
                   </div>
@@ -404,68 +423,68 @@ const ContratosTrabalhoForm = () => {
               </div>
             )}
 
-            {/* Detalhes da Empresa */}
+            {/* Dados do Empregador */}
             {empresa && (
-              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-100">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2 font-medium">
-                    <Building className="h-4 w-4 text-primary" />
-                    Dados do Empregador
+              <div className="rounded-xl border bg-card shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300 delay-100">
+                <div className="px-4 py-3 border-b bg-muted/40">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                      <Building className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">Dados do Empregador</span>
                   </div>
                 </div>
-                <div className="space-y-4">
+                <div className="p-4 space-y-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Razão Social</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
                       {empresa.name}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.cnpj}
-                      </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CNPJ</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                      {empresa.cnpj ? formatCNPJ(empresa.cnpj) : '-'}
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.sigla || '-'}
-                      </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sigla</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                      {empresa.sigla || '-'}
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Detalhes do Centro de Custos */}
+            {/* Centro de Custos Selecionado */}
             {costCenter && (
-              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-200">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2 font-medium">
-                    <Briefcase className="h-4 w-4 text-primary" />
-                    Centro de Custos Selecionado
+              <div className="rounded-xl border bg-card shadow-sm overflow-hidden animate-in fade-in zoom-in-95 duration-300 delay-200">
+                <div className="px-4 py-3 border-b bg-muted/40">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                      <Briefcase className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">Centro de Custos Selecionado</span>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {costCenter.name}
-                      </div>
+                <div className="p-4 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
+                      {costCenter.name}
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Código</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {costCenter.code || '-'}
-                      </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Código</Label>
+                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                      {costCenter.code || '-'}
                     </div>
                   </div>
                   {costCenter.description && (
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Descrição</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Descrição</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
                         {costCenter.description}
                       </div>
                     </div>
@@ -577,9 +596,9 @@ const ContratosTrabalhoForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Salário Base</Label>
+                <Label>Salário Base (R$)</Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R$</span>
                   <Input
                     value={form.salary}
                     onChange={(e) => setForm(prev => ({ ...prev, salary: e.target.value }))}

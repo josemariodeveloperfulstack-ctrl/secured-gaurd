@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class CompanyDataFormatter {
-    
+
     /**
      * Formata CNPJ com máscara: XX.XXX.XXX/XXXX-XX
      */
@@ -16,23 +16,62 @@ public class CompanyDataFormatter {
         if (cnpj == null || cnpj.isEmpty()) {
             return "";
         }
-        
+
         // Remover caracteres não numéricos
         String digits = cnpj.replaceAll("[^0-9]", "");
-        
+
         // Formatar: XX.XXX.XXX/XXXX-XX
         if (digits.length() == 14) {
             return String.format("%s.%s.%s/%s-%s",
-                digits.substring(0, 2),
-                digits.substring(2, 5),
-                digits.substring(5, 8),
-                digits.substring(8, 12),
-                digits.substring(12, 14));
+                    digits.substring(0, 2),
+                    digits.substring(2, 5),
+                    digits.substring(5, 8),
+                    digits.substring(8, 12),
+                    digits.substring(12, 14));
         }
-        
+
         return cnpj; // Retornar original se não tiver 14 dígitos
     }
-    
+
+    /**
+     * Formata CPF com máscara: XXX.XXX.XXX-XX
+     */
+    public static String formatCpf(String cpf) {
+        if (cpf == null || cpf.isEmpty()) {
+            return "";
+        }
+
+        String digits = cpf.replaceAll("[^0-9]", "");
+
+        if (digits.length() == 11) {
+            return String.format("%s.%s.%s-%s",
+                    digits.substring(0, 3),
+                    digits.substring(3, 6),
+                    digits.substring(6, 9),
+                    digits.substring(9, 11));
+        }
+
+        return cpf;
+    }
+
+    /**
+     * Formata CTPS.
+     * Se tiver 11 dígitos, assume-se CTPS Digital (CPF) e aplica a máscara de CPF.
+     */
+    public static String formatCtps(String ctps) {
+        if (ctps == null || ctps.isEmpty()) {
+            return "";
+        }
+
+        String digits = ctps.replaceAll("[^0-9]", "");
+
+        if (digits.length() == 11) {
+            return formatCpf(digits);
+        }
+
+        return ctps;
+    }
+
     /**
      * Formata telefone: (XX) XXXX-XXXX ou (XX) XXXXX-XXXX
      */
@@ -40,27 +79,27 @@ public class CompanyDataFormatter {
         if (phone == null || phone.isEmpty()) {
             return "";
         }
-        
+
         // Remover caracteres não numéricos
         String digits = phone.replaceAll("[^0-9]", "");
-        
+
         if (digits.length() == 10) {
             // Telefone fixo: (XX) XXXX-XXXX
             return String.format("(%s) %s-%s",
-                digits.substring(0, 2),
-                digits.substring(2, 6),
-                digits.substring(6, 10));
+                    digits.substring(0, 2),
+                    digits.substring(2, 6),
+                    digits.substring(6, 10));
         } else if (digits.length() == 11) {
             // Celular: (XX) XXXXX-XXXX
             return String.format("(%s) %s-%s",
-                digits.substring(0, 2),
-                digits.substring(2, 7),
-                digits.substring(7, 11));
+                    digits.substring(0, 2),
+                    digits.substring(2, 7),
+                    digits.substring(7, 11));
         }
-        
+
         return phone; // Retornar original se não tiver formato conhecido
     }
-    
+
     /**
      * Formata endereço completo da empresa
      * Formato: Rua, Número - Complemento - Bairro - Cidade/Estado - CEP
@@ -69,13 +108,13 @@ public class CompanyDataFormatter {
         if (company == null) {
             return "";
         }
-        
+
         StringBuilder address = new StringBuilder();
-        
+
         // Rua e número
         if (company.getEnderecoRua() != null && !company.getEnderecoRua().isEmpty()) {
             address.append(company.getEnderecoRua());
-            
+
             if (company.getEnderecoNumero() != null && !company.getEnderecoNumero().isEmpty()) {
                 address.append(", ").append(company.getEnderecoNumero());
             }
@@ -83,7 +122,7 @@ public class CompanyDataFormatter {
             // Fallback para campo address legado
             address.append(company.getAddress());
         }
-        
+
         // Complemento
         if (company.getEnderecoComplemento() != null && !company.getEnderecoComplemento().isEmpty()) {
             if (address.length() > 0) {
@@ -91,7 +130,7 @@ public class CompanyDataFormatter {
             }
             address.append(company.getEnderecoComplemento());
         }
-        
+
         // Bairro
         if (company.getEnderecoBairro() != null && !company.getEnderecoBairro().isEmpty()) {
             if (address.length() > 0) {
@@ -99,19 +138,19 @@ public class CompanyDataFormatter {
             }
             address.append(company.getEnderecoBairro());
         }
-        
+
         // Cidade/Estado
         if (company.getCity() != null && !company.getCity().isEmpty()) {
             if (address.length() > 0) {
                 address.append(" - ");
             }
             address.append(company.getCity());
-            
+
             if (company.getState() != null && !company.getState().isEmpty()) {
                 address.append("/").append(company.getState());
             }
         }
-        
+
         // CEP
         if (company.getZipCode() != null && !company.getZipCode().isEmpty()) {
             if (address.length() > 0) {
@@ -120,10 +159,10 @@ public class CompanyDataFormatter {
             String cep = formatZipCode(company.getZipCode());
             address.append(cep);
         }
-        
+
         return address.toString();
     }
-    
+
     /**
      * Formata CEP: XXXXX-XXX
      */
@@ -131,16 +170,16 @@ public class CompanyDataFormatter {
         if (zipCode == null || zipCode.isEmpty()) {
             return "";
         }
-        
+
         String digits = zipCode.replaceAll("[^0-9]", "");
-        
+
         if (digits.length() == 8) {
             return String.format("%s-%s", digits.substring(0, 5), digits.substring(5, 8));
         }
-        
+
         return zipCode;
     }
-    
+
     /**
      * Formata texto completo do rodapé da empresa
      * Formato: Nome | Endereço | Tel: XXX | Email: XXX
@@ -149,14 +188,14 @@ public class CompanyDataFormatter {
         if (company == null) {
             return "";
         }
-        
+
         StringBuilder footer = new StringBuilder();
-        
+
         // Nome da empresa
         if (company.getName() != null && !company.getName().isEmpty()) {
             footer.append(company.getName());
         }
-        
+
         // Endereço
         String address = formatFullAddress(company);
         if (!address.isEmpty()) {
@@ -165,7 +204,7 @@ public class CompanyDataFormatter {
             }
             footer.append(address);
         }
-        
+
         // Telefone
         if (company.getPhone() != null && !company.getPhone().isEmpty()) {
             if (footer.length() > 0) {
@@ -173,7 +212,7 @@ public class CompanyDataFormatter {
             }
             footer.append("Tel: ").append(formatPhone(company.getPhone()));
         }
-        
+
         // Email
         if (includeEmail && company.getEmail() != null && !company.getEmail().isEmpty()) {
             if (footer.length() > 0) {
@@ -181,10 +220,10 @@ public class CompanyDataFormatter {
             }
             footer.append("Email: ").append(company.getEmail());
         }
-        
+
         return footer.toString();
     }
-    
+
     /**
      * Formata CNPJ para exibição no cabeçalho
      * Retorna string vazia se CNPJ não estiver disponível
@@ -193,7 +232,7 @@ public class CompanyDataFormatter {
         if (company == null || company.getCnpj() == null || company.getCnpj().isEmpty()) {
             return "";
         }
-        
+
         String formatted = formatCnpj(company.getCnpj());
         return formatted.isEmpty() ? "" : "CNPJ: " + formatted;
     }

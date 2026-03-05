@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import TermoValeTransporteForm from './TermoValeTransporteForm';
 import FichaEntregaEPIForm from './FichaEntregaEPIForm';
-import FichaRegistroFuncionarioForm from './FichaRegistroFuncionarioForm';
 import TermoResponsabilidadeEquipamentoForm from './TermoResponsabilidadeEquipamentoForm';
 import TermoLGPDForm from './TermoLGPDForm';
 import ContratosTrabalhoForm from './ContratosTrabalhoForm';
@@ -15,13 +14,14 @@ import OrdemServicoForm from './OrdemServicoForm';
 import ModelosDocumentosForm from './ModelosDocumentosForm';
 import TermoResponsabilidadeEspecíficoForm from './TermoResponsabilidadeEspecíficoForm';
 import NppsForm from './NppsForm';
-import { FileText, Shield, FileSignature, FileCheck, UserX, File, ClipboardList, CreditCard } from 'lucide-react';
+import FichaEntregaEPIManualForm from './FichaEntregaEPIManualForm';
+import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard } from 'lucide-react';
 
 const tipos = [
   { key: 'modelos', label: 'Modelos de Documentos', icon: FileText, shortLabel: 'Modelos' },
   { key: 'vt', label: 'Termo de Compromisso de Vale-Transporte', icon: FileText, shortLabel: 'Vale-Transporte' },
   { key: 'epi', label: 'Ficha de Entrega de EPI', icon: Shield, shortLabel: 'EPI' },
-  { key: 'registro', label: 'Ficha de Registro do Funcionário', icon: ClipboardList, shortLabel: 'Registro' },
+  { key: 'epi-manual', label: 'Entrega de EPI Manual', icon: Shield, shortLabel: 'EPI Manual' },
   { key: 'termo-responsabilidade-especifico', label: 'Termo de Responsabilidade (VT/Celular)', icon: CreditCard, shortLabel: 'Vale/Celular' },
   { key: 'equipamento', label: 'Termo de Responsabilidade de Equipamento', icon: Shield, shortLabel: 'Equipamento' },
   { key: 'lgpd', label: 'Termo de Consentimento LGPD', icon: FileCheck, shortLabel: 'LGPD' },
@@ -31,14 +31,26 @@ const tipos = [
   { key: 'advertencia', label: 'Advertência Disciplinar', icon: UserX, shortLabel: 'Advertência' },
   { key: 'declaracao', label: 'Declaração', icon: FileCheck, shortLabel: 'Declaração' },
   { key: 'termo-ciencia', label: 'Termo de Ciência do Prestador de Serviços', icon: File, shortLabel: 'Termo Ciência' },
-  { key: 'ordem-servico-completa', label: 'Ordem de Serviço Completa (CRUD)', icon: FileText, shortLabel: 'OS Completa' },
 ];
 
-const DocumentosGerarTab = () => {
+interface DocumentosGerarTabProps {
+  employeeId?: string;
+  companyId?: string;
+  hideHeader?: boolean;
+}
+
+const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({ employeeId: propEmployeeId, companyId: propCompanyId, hideHeader }) => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const tipoFromUrl = params.get('tipo');
-  const [tipo, setTipo] = useState(tipoFromUrl || 'modelos');
+
+  const displayTipos = hideHeader ? tipos.filter(t => t.key !== 'modelos') : tipos;
+  const defaultTipo = tipoFromUrl || (hideHeader ? 'vt' : 'modelos');
+
+  const [tipo, setTipo] = useState(defaultTipo);
+
+  const finalEmployeeId = propEmployeeId || params.get('employeeId') || undefined;
+  const finalCompanyId = propCompanyId || params.get('companyId') || undefined;
 
   // Atualizar tipo quando mudar na URL
   useEffect(() => {
@@ -50,20 +62,22 @@ const DocumentosGerarTab = () => {
   return (
     <div className="space-y-6">
       {/* Header com título */}
-      <div>
-        <h2 className="text-2xl font-bold text-seguranca-lightgray flex items-center gap-2">
-          <FileText className="h-6 w-6 text-seguranca-red" />
-          <span>Gerar Documentos</span>
-        </h2>
-        <p className="text-sm text-gray-400 mt-1">
-          Selecione o tipo de documento que deseja gerar
-        </p>
-      </div>
+      {!hideHeader && (
+        <div>
+          <h2 className="text-2xl font-bold text-seguranca-lightgray flex items-center gap-2">
+            <FileText className="h-6 w-6 text-seguranca-red" />
+            <span>Gerar Documentos</span>
+          </h2>
+          <p className="text-sm text-gray-400 mt-1">
+            Selecione o tipo de documento que deseja gerar
+          </p>
+        </div>
+      )}
 
       {/* Botões de seleção de tipo */}
       <div className="w-full">
         <div className="flex flex-wrap gap-2 md:gap-3">
-          {tipos.map(t => {
+          {displayTipos.map(t => {
             const Icon = t.icon;
             const isActive = tipo === t.key;
             return (
@@ -97,20 +111,19 @@ const DocumentosGerarTab = () => {
 
       {/* Conteúdo do formulário selecionado */}
       <div>
-        {tipo === 'modelos' && <ModelosDocumentosForm />}
-        {tipo === 'vt' && <TermoValeTransporteForm />}
-        {tipo === 'epi' && <FichaEntregaEPIForm employeeId={params.get('employeeId') || undefined} />}
-        {tipo === 'registro' && <FichaRegistroFuncionarioForm employeeId={params.get('employeeId') || undefined} />}
+        {tipo === 'modelos' && <ModelosDocumentosForm hideHeaderStats={hideHeader} />}
+        {tipo === 'vt' && <TermoValeTransporteForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'epi' && <FichaEntregaEPIForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'epi-manual' && <FichaEntregaEPIManualForm companyId={finalCompanyId} employeeId={finalEmployeeId} />}
         {tipo === 'npps' && <NppsForm />}
-        {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecíficoForm />}
-        {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm />}
-        {tipo === 'lgpd' && <TermoLGPDForm />}
-        {tipo === 'contratos' && <ContratosTrabalhoForm />}
-        {tipo === 'ordens' && <OrdemServicosForm />}
-        {tipo === 'advertencia' && <AdvertenciaDisciplinarForm />}
-        {tipo === 'declaracao' && <DeclaracaoForm />}
-        {tipo === 'termo-ciencia' && <TermoCienciaPrestadorForm />}
-        {tipo === 'ordem-servico-completa' && <OrdemServicoForm />}
+        {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecíficoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'lgpd' && <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'contratos' && <ContratosTrabalhoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'ordens' && <OrdemServicosForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'advertencia' && <AdvertenciaDisciplinarForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'declaracao' && <DeclaracaoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'termo-ciencia' && <TermoCienciaPrestadorForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
       </div>
     </div>
   );

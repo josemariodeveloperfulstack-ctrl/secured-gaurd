@@ -46,6 +46,8 @@ public class EmploymentContractStandardPdfService {
                         ReportLayoutConfig config = ReportLayoutConfig.builder()
                                         .companyId(request.getCompanyId())
                                         .reportTitle(REPORT_TITLE)
+                                        .topMargin(100f)
+                                        .bottomMargin(50f)
                                         .includeEmailInFooter(true)
                                         .build();
 
@@ -109,8 +111,9 @@ public class EmploymentContractStandardPdfService {
         }
 
         private void addContent(Document document, EmploymentContractRequest request, Company company) {
-                // Seção: Identificação da Empregadora
-                document.add(createSectionHeader("IDENTIFICAÇÃO DA EMPREGADORA"));
+                // Espaço inicial para o conteúdo não ficar em cima da imagem do cabeçalho
+                document.add(new Paragraph("").setMarginBottom(14f));
+                document.add(createSectionHeader("IDENTIFICAÇÃO DA EMPREGADORA").setMarginTop(6f));
                 Table employerTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
                                 .useAllAvailableWidth();
                 employerTable.addCell(createLabelValueCell("NOME / RAZÃO SOCIAL:", company.getName()));
@@ -133,6 +136,9 @@ public class EmploymentContractStandardPdfService {
                                                                 ? request.getEmployeeCtpsSeries()
                                                                 : "")));
                 employeeTable.addCell(createLabelValueCell("ENDEREÇO:", request.getEmployeeAddress()));
+                if (request.getDepartment() != null && !request.getDepartment().trim().isEmpty()) {
+                        employeeTable.addCell(createLabelValueCell("SETOR DE TRABALHO:", request.getDepartment().trim()));
+                }
                 document.add(employeeTable);
 
                 // Texto Introdutório
@@ -151,8 +157,7 @@ public class EmploymentContractStandardPdfService {
                 addClauseAsSection(document, "CLÁUSULA 2ª - DA REMUNERAÇÃO",
                                 "A EMPREGADORA pagará ao EMPREGADO a remuneração mensal de R$ "
                                                 + formatMoney(request.getSalary()) +
-                                                " (" + request.getSalary()
-                                                + "), a ser efetuada até o 5º dia útil do mês subsequente ao vencido.");
+                                                ", a ser efetuada até o 5º dia útil do mês subsequente ao vencido.");
 
                 addClauseAsSection(document, "CLÁUSULA 3ª - DA JORNADA",
                                 "O horário de trabalho será de "
@@ -179,9 +184,9 @@ public class EmploymentContractStandardPdfService {
         }
 
         private void addClauseAsSection(Document document, String title, String content) {
-                document.add(new Paragraph(title).setBold().setFontSize(10f).setMarginTop(8f).setMarginBottom(2f));
+                document.add(new Paragraph(title).setBold().setFontSize(10f).setMarginTop(5f).setMarginBottom(2f));
                 document.add(new Paragraph(content).setFontSize(10f).setTextAlignment(TextAlignment.JUSTIFIED)
-                                .setMarginBottom(5f));
+                                .setMarginBottom(4f));
         }
 
         private Cell createLabelValueCell(String label, String value) {
@@ -212,8 +217,8 @@ public class EmploymentContractStandardPdfService {
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
                                 .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginTop(30f)
-                                .setMarginBottom(40f)
+                                .setMarginTop(12f)
+                                .setMarginBottom(8f)
                                 .setFontSize(10f);
                 document.add(dateLoc);
 

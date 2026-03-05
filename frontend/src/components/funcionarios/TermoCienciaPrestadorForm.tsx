@@ -10,15 +10,21 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Calendar, MapPin, Shield, CheckCircle2, Loader2, Building, Info } from 'lucide-react';
 import { termoCienciaPrestadorGenerator } from '@/utils/termoCienciaPrestadorGenerator';
+import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { employeeService } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 
-const TermoCienciaPrestadorForm = () => {
+interface TermoCienciaPrestadorFormProps {
+  employeeId?: string;
+  companyId?: string;
+}
+
+const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ employeeId, companyId }) => {
   const [form, setForm] = useState({
-    funcionarioId: '',
-    empresaId: '',
+    funcionarioId: employeeId || '',
+    empresaId: companyId || '',
     cidadeEmissao: 'Contagem/MG',
     dataEmissao: new Date().toISOString().split('T')[0],
     contractNumber: '',
@@ -30,6 +36,14 @@ const TermoCienciaPrestadorForm = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      funcionarioId: employeeId || prev.funcionarioId,
+      empresaId: companyId || prev.empresaId
+    }));
+  }, [employeeId, companyId]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -264,7 +278,7 @@ const TermoCienciaPrestadorForm = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || '-'}
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
                       </div>
                     </div>
                   </div>
@@ -317,7 +331,7 @@ const TermoCienciaPrestadorForm = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.cnpj}
+                        {empresa.cnpj ? formatCNPJ(empresa.cnpj) : '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">

@@ -11,13 +11,19 @@ import { FileText, Download, Eye, User, Building, Calendar, MapPin, CreditCard, 
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
+import { formatCPF, formatCNPJ } from '@/utils/validation';
 import api from '@/lib/axios';
 
-const TermoValeTransporteForm = () => {
+interface TermoValeTransporteFormProps {
+  employeeId?: string;
+  companyId?: string;
+}
+
+const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    funcionarioId: '',
-    empresaId: '',
+    funcionarioId: employeeId || '',
+    empresaId: companyId || '',
     valorVale: '',
     tipoVale: '',
     dataInicio: '',
@@ -32,6 +38,15 @@ const TermoValeTransporteForm = () => {
 
   const funcionario = employees.find(f => f.id === form.funcionarioId);
   const empresa = companies.find(e => e.id === form.empresaId);
+
+  // Sincronizar props com state
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      funcionarioId: employeeId || prev.funcionarioId,
+      empresaId: companyId || prev.empresaId
+    }));
+  }, [employeeId, companyId]);
 
   // Carregar dados do backend
   useEffect(() => {
@@ -100,7 +115,7 @@ const TermoValeTransporteForm = () => {
 
       const addressValue = typeof fullEmployee.address === 'string'
         ? fullEmployee.address
-        : fullEmployee.address?.street || '';
+        : (fullEmployee.address as any)?.street || '';
 
       const payload = {
         companyId: empresa.id,
@@ -174,7 +189,7 @@ const TermoValeTransporteForm = () => {
       // Preparar dados para o template
       const addressValue = typeof fullEmployee.address === 'string'
         ? fullEmployee.address
-        : fullEmployee.address?.street || '';
+        : (fullEmployee.address as any)?.street || '';
 
       const payload = {
         companyId: empresa.id,
@@ -347,7 +362,7 @@ const TermoValeTransporteForm = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || funcionario.document || '-'}
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
                       </div>
                     </div>
                   </div>
@@ -370,7 +385,7 @@ const TermoValeTransporteForm = () => {
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
+                      {typeof funcionario.address === 'string' ? funcionario.address : (funcionario.address as any)?.street || '-'}
                     </div>
                   </div>
                 </div>
@@ -398,7 +413,7 @@ const TermoValeTransporteForm = () => {
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.cnpj}
+                        {empresa.cnpj ? formatCNPJ(empresa.cnpj) : '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">

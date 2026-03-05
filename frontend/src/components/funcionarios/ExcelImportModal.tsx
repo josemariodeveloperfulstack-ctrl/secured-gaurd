@@ -133,7 +133,7 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ open, onOpenChange,
           </DialogTitle>
           <DialogDescription className="text-gray-400">
             Selecione uma planilha Excel (.xlsx ou .xls) com os dados dos funcionários.
-            A planilha deve conter uma coluna "CNPJ Empresa" para vincular os funcionários à empresa.
+            Se o funcionário já existir no banco (por CPF ou matrícula eSocial), os dados serão atualizados (setor, empresa, salário, etc.).
           </DialogDescription>
         </DialogHeader>
 
@@ -144,10 +144,10 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ open, onOpenChange,
             <AlertTitle className="text-blue-300">Requisitos da Planilha</AlertTitle>
             <AlertDescription className="text-gray-300 text-sm mt-2">
               <ul className="list-disc list-inside space-y-1">
-                <li>A planilha deve ter uma coluna <strong>"CNPJ Empresa"</strong> na primeira linha</li>
-                <li>A empresa deve estar cadastrada no sistema</li>
-                <li>Os funcionários serão vinculados à empresa encontrada pelo CNPJ</li>
-                <li>Colunas reconhecidas: Nome, CPF, Email, Telefone, Data Nascimento, Sexo, Município/Estado Nascimento, Grau Instrução, Matrícula eSocial, Endereço completo, etc.</li>
+                <li><strong>Análise dos dados:</strong> se o funcionário já existir (por CPF ou matrícula eSocial), apenas atualiza; caso contrário, cria novo.</li>
+                <li><strong>Empresa:</strong> use coluna &quot;CNPJ Empresa&quot; ou o sistema detecta o CNPJ no cabeçalho. Cada linha pode ter CNPJ diferente para vincular à empresa correta.</li>
+                <li><strong>Setor de trabalho:</strong> use coluna &quot;Setor de Trabalho&quot; ou &quot;Setor&quot; — o sistema vincula à Unidade ou ao Departamento pelo nome (quando cadastrados).</li>
+                <li>Colunas reconhecidas: Nome do Funcionário, CPF, Mãe, Admissão, Setor de Trabalho, Salário Base, Função, Matrícula eSocial, CNPJ Empresa, Email, Telefone, etc.</li>
               </ul>
             </AlertDescription>
           </Alert>

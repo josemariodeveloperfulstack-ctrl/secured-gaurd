@@ -11,6 +11,7 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.z7design.secured_guard.util.CompanyDataFormatter;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Company;
@@ -103,7 +104,7 @@ public class EmployeeRecordPdfService {
                         .useAllAvailableWidth()
                         .setMarginBottom(15);
                 addTableRow(companyTable, "Razão Social:", company.getName());
-                addTableRow(companyTable, "CNPJ/CEI:", company.getCnpj());
+                addTableRow(companyTable, "CNPJ/CEI:", CompanyDataFormatter.formatCnpj(company.getCnpj()));
                 addTableRow(companyTable, "Endereço:", company.getAddress());
                 document.add(companyTable);
             }
@@ -137,7 +138,7 @@ public class EmployeeRecordPdfService {
                     .setMarginBottom(15);
 
             addTableRow(personalTable, "Nome:", employee.getName());
-            addTableRow(personalTable, "CPF/CIC:", employee.getDocument());
+            addTableRow(personalTable, "CPF/CIC:", CompanyDataFormatter.formatCpf(employee.getDocument()));
             addTableRow(personalTable, "Data de Nascimento:", formatDate(employee.getBirthDate()));
             addTableRow(personalTable, "Nacionalidade:",
                     employee.getNationality() != null ? employee.getNationality() : "Brasileira");
@@ -397,7 +398,7 @@ public class EmployeeRecordPdfService {
     private String buildCTPSCompleto(Employee employee) {
         StringBuilder ctps = new StringBuilder();
         if (employee.getCtps() != null && !employee.getCtps().trim().isEmpty()) {
-            ctps.append(employee.getCtps());
+            ctps.append(CompanyDataFormatter.formatCtps(employee.getCtps()));
         }
         if (employee.getCtpsSeries() != null && !employee.getCtpsSeries().trim().isEmpty()) {
             if (ctps.length() > 0)
@@ -509,14 +510,16 @@ public class EmployeeRecordPdfService {
             if (company != null) {
                 rowIndex = addSection(sheet, rowIndex, "DADOS DA EMPRESA", lastColumn, workbook);
                 rowIndex = addRow(sheet, rowIndex, "Razão Social:", company.getName(), labelStyle, valueStyle);
-                rowIndex = addRow(sheet, rowIndex, "CNPJ/CEI:", company.getCnpj(), labelStyle, valueStyle);
+                rowIndex = addRow(sheet, rowIndex, "CNPJ/CEI:", CompanyDataFormatter.formatCnpj(company.getCnpj()),
+                        labelStyle, valueStyle);
                 rowIndex = addRow(sheet, rowIndex, "Endereço:", company.getAddress(), labelStyle, valueStyle);
             }
 
             // DADOS PESSOAIS
             rowIndex = addSection(sheet, rowIndex, "DADOS PESSOAIS", lastColumn, workbook);
             rowIndex = addRow(sheet, rowIndex, "Nome:", employee.getName(), labelStyle, valueStyle);
-            rowIndex = addRow(sheet, rowIndex, "CPF:", employee.getDocument(), labelStyle, valueStyle);
+            rowIndex = addRow(sheet, rowIndex, "CPF:", CompanyDataFormatter.formatCpf(employee.getDocument()),
+                    labelStyle, valueStyle);
             rowIndex = addRow(sheet, rowIndex, "Data de Nascimento:", formatDate(employee.getBirthDate()), labelStyle,
                     valueStyle);
             rowIndex = addRow(sheet, rowIndex, "Nacionalidade:",
@@ -847,7 +850,7 @@ public class EmployeeRecordPdfService {
         if (employee.getEnderecoCep() != null && !employee.getEnderecoCep().trim().isEmpty()) {
             if (address.length() > 0)
                 address.append(" - CEP: ");
-            address.append(employee.getEnderecoCep());
+            address.append(CompanyDataFormatter.formatZipCode(employee.getEnderecoCep()));
         }
 
         // Fallback para campo address antigo
