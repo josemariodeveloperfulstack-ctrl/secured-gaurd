@@ -26,6 +26,7 @@ public class EmployeeImportRowService {
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final PositionRepository positionRepository;
+    private final WorkPostRepository workPostRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean processRow(
@@ -36,7 +37,7 @@ public class EmployeeImportRowService {
             String maritalStatus, String grauInstrucao,
             String departamentoNome, String funcaoNome,
             String cbo, LocalDate hireDate,
-            BigDecimal salario, String horario,
+            BigDecimal salario, String horario, String escalaTrabalho,
             String pis, String ctps, String rg,
             String tituloEleitor, String rua, String numero,
             String complemento, String bairro, String cidade,
@@ -66,6 +67,7 @@ public class EmployeeImportRowService {
         if (salario != null)
             emp.setSalario(salario);
         emp.setHorarioTrabalho(horario);
+        emp.setEscalaTrabalho(escalaTrabalho);
         emp.setPis(pis);
         emp.setCtps(ctps);
         emp.setNumeroRg(rg);
@@ -81,7 +83,18 @@ public class EmployeeImportRowService {
         emp.setCompany(company);
 
         if (departamentoNome != null && !departamentoNome.isBlank()) {
-            emp.setDepartment(resolveOrCreateDepartment(departamentoNome.trim()));
+            String setorClean = departamentoNome.trim();
+            // Prioridade 1: Tentar vincular a um Posto de Trabalho (WorkPost) pelo nome
+            Optional<WorkPost> workPostOpt = workPostRepository.findByName(setorClean)
+                    .or(() -> workPostRepository.findByNameContainingIgnoreCase(setorClean).stream().findFirst());
+
+            if (workPostOpt.isPresent()) {
+                emp.setWorkPost(workPostOpt.get());
+                log.info("📌 Posto de Trabalho '{}' vinculado ao funcionário", setorClean);
+            } else {
+                // Prioridade 2: Tentar vincular a Unidade ou Departamento pelo nome (legado)
+                emp.setDepartment(resolveOrCreateDepartment(setorClean));
+            }
         }
         if (funcaoNome != null && !funcaoNome.isBlank()) {
             emp.setPosition(resolveOrCreatePosition(funcaoNome.trim()));
