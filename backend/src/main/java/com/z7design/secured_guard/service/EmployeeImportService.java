@@ -103,9 +103,9 @@ public class EmployeeImportService {
 
                 String cpf = null;
                 try {
-                    cpf = normalizeCpf(getCellString(row, 18));
+                    cpf = normalizeCpf(getCellString(row, 19));
                     if (cpf == null || cpf.length() != 11) {
-                        log.debug("   ⏭️ Linha {} ignorada: CPF inválido '{}'", rowIdx + 1, getCellString(row, 18));
+                        log.debug("   ⏭️ Linha {} ignorada: CPF inválido '{}'", rowIdx + 1, getCellString(row, 19));
                         continue;
                     }
 
@@ -120,7 +120,7 @@ public class EmployeeImportService {
                     String nationality = getCellString(row, 2);
                     LocalDate birthDate = parseDate(getCellString(row, 3));
                     String municipioNasc = getCellString(row, 4);
-                    String estadoNasc = getCellString(row, 5);
+                    String estadoNasc = normalizeUF(getCellString(row, 5));
                     String nomeMae = getCellString(row, 6);
                     String nomePai = getCellString(row, 7);
                     String sexo = normalizeSexo(getCellString(row, 8));
@@ -132,18 +132,19 @@ public class EmployeeImportService {
                     LocalDate hireDate = parseDate(getCellString(row, 14));
                     // col 15 = Demissão → ignorada
                     BigDecimal salario = parseSalario(getCellString(row, 16));
-                    String horario = getCellString(row, 17);
-                    String pis = normalizePis(getCellString(row, 19));
-                    String ctps = getCellString(row, 20);
-                    String rg = getCellString(row, 21);
-                    String titulo = getCellString(row, 22);
-                    String rua = getCellString(row, 23);
-                    String numero = getCellString(row, 24);
-                    String complemento = getCellString(row, 25);
-                    String bairro = getCellString(row, 26);
-                    String cidade = getCellString(row, 27);
-                    String estado = getCellString(row, 28);
-                    String cep = normalizeCep(getCellString(row, 29));
+                    String horario = getCellString(row, 18);
+                    String escalaTrabalho = getCellString(row, 17);
+                    String pis = normalizePis(getCellString(row, 20));
+                    String ctps = getCellString(row, 21);
+                    String rg = getCellString(row, 22);
+                    String titulo = getCellString(row, 23);
+                    String rua = getCellString(row, 24);
+                    String numero = getCellString(row, 25);
+                    String complemento = getCellString(row, 26);
+                    String bairro = getCellString(row, 27);
+                    String cidade = getCellString(row, 28);
+                    String estado = normalizeUF(getCellString(row, 29));
+                    String cep = normalizeCep(getCellString(row, 30));
 
                     boolean[] isNewRef = { false };
 
@@ -156,7 +157,7 @@ public class EmployeeImportService {
                             maritalStatus, grauInstrucao,
                             departamento, funcao,
                             cbo, hireDate,
-                            salario, horario,
+                            salario, horario, escalaTrabalho,
                             pis, ctps, rg,
                             titulo, rua, numero,
                             complemento, bairro, cidade,
@@ -274,6 +275,18 @@ public class EmployeeImportService {
             return null;
         String digits = raw.replaceAll("[^0-9]", "");
         return digits.length() == 8 ? digits.substring(0, 5) + "-" + digits.substring(5) : raw;
+    }
+
+    private String normalizeUF(String raw) {
+        if (raw == null || raw.isBlank())
+            return null;
+        String clean = raw.trim().toUpperCase();
+        // Se contém hífen (ex: "SP - São Paulo"), pega a parte antes
+        if (clean.contains("-")) {
+            clean = clean.split("-")[0].trim();
+        }
+        // Garante no máximo 2 caracteres para o banco (character varying(2))
+        return clean.length() > 2 ? clean.substring(0, 2) : clean;
     }
 
     private String normalizeSexo(String raw) {

@@ -301,8 +301,6 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'mensagens',
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
-    'gestao-patrimonial',
-    'modulo-fiscal',
   ]),
   DEPARTAMENTO_PESSOAL: new Set([
     'dashboard',
@@ -343,8 +341,6 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'mensagens',
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
-    'gestao-patrimonial',
-    'modulo-fiscal',
   ]),
   COMERCIAL: new Set([
     'dashboard',
@@ -432,52 +428,6 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     [user?.role]
   );
 
-  const allowedItemIds = useMemo(() => {
-    const roles: UserRole[] = [];
-
-    // Adicionar papel principal
-    if (normalizedRole) roles.push(normalizedRole);
-
-    // Adicionar outros papéis se houver
-    if (user?.roles && Array.isArray(user.roles)) {
-      user.roles.forEach(r => {
-        const roleName = typeof r === 'string' ? r : r.name;
-        const norm = roleName.replace(/^ROLE_/, '').toUpperCase() as UserRole;
-        if (!roles.includes(norm)) roles.push(norm);
-      });
-    }
-
-    const combinedSet = new Set<string>();
-    roles.forEach(role => {
-      const roleSet = ROLE_ALLOWED_ITEM_IDS[role];
-      if (roleSet) {
-        roleSet.forEach(id => combinedSet.add(id));
-      }
-    });
-
-    return combinedSet;
-  }, [user?.roles, normalizedRole]);
-
-  // Referências para controlar o scroll da própria sidebar
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const activeItemRef = useRef<HTMLAnchorElement | null>(null);
-
-  const filterItemsForRole = useCallback(<T extends { id: string }>(items: T[]): T[] => {
-    // SUPER_ADMIN sempre vê todos os itens
-    if (normalizedRole === 'SUPER_ADMIN') {
-      return items;
-    }
-
-    if (!allowedItemIds || allowedItemIds.size === 0) {
-      return items;
-    }
-    return items.filter(item => allowedItemIds.has(item.id));
-  }, [allowedItemIds, normalizedRole]);
-
-  const handleProfileClick = () => {
-    setIsProfileModalOpen(true);
-  };
-
   // Função para verificar se usuário tem permissão
   const hasPermission = useCallback((permission: string): boolean => {
     // SUPER_ADMIN tem acesso a tudo
@@ -510,13 +460,71 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
 
     // Verificar permissão específica no objeto (não é array!)
     return user.permissions[permission as keyof typeof user.permissions] === true;
-  }, [user]);
+  }, [user, normalizedRole]);
 
   // Função para verificar se módulo deve ser exibido
   const shouldShowModule = useCallback((requiredPermission?: string): boolean => {
     if (!requiredPermission) return true;
     return hasPermission(requiredPermission);
   }, [hasPermission]);
+
+  const allowedItemIds = useMemo(() => {
+    const roles: UserRole[] = [];
+
+    // Adicionar papel principal
+    if (normalizedRole) roles.push(normalizedRole);
+
+    // Adicionar outros papéis se houver
+    if (user?.roles && Array.isArray(user.roles)) {
+      user.roles.forEach(r => {
+        const roleName = typeof r === 'string' ? r : r.name;
+        const norm = roleName.replace(/^ROLE_/, '').toUpperCase() as UserRole;
+        if (!roles.includes(norm)) roles.push(norm);
+      });
+    }
+
+    const combinedSet = new Set<string>();
+    roles.forEach(role => {
+      const roleSet = ROLE_ALLOWED_ITEM_IDS[role];
+      if (roleSet) {
+        roleSet.forEach(id => combinedSet.add(id));
+      }
+    });
+
+    return combinedSet;
+  }, [user?.roles, normalizedRole]);
+
+  const filterItemsForRole = useCallback(<T extends { id: string, requiredPermission?: string }>(items: T[]): T[] => {
+    // SUPER_ADMIN sempre vê todos os itens
+    if (normalizedRole === 'SUPER_ADMIN') {
+      return items;
+    }
+
+    if (!allowedItemIds) {
+      return items;
+    }
+
+    return items.filter(item => {
+      // Se está na lista permitida pelo papel
+      if (allowedItemIds.has(item.id)) return true;
+
+      // Se tem uma permissão requerida e o usuário possui essa permissão (via grupo ou customizada)
+      if (item.requiredPermission && hasPermission(item.requiredPermission)) return true;
+
+      return false;
+    });
+  }, [allowedItemIds, normalizedRole, hasPermission]);
+
+  // Referências para controlar o scroll da própria sidebar
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const activeItemRef = useRef<HTMLAnchorElement | null>(null);
+
+
+  const handleProfileClick = () => {
+    setIsProfileModalOpen(true);
+  };
+
+
 
   const filteredMainMenuItems = useMemo(() => filterItemsForRole(mainMenuItems), [filterItemsForRole]);
   const filteredFinanceiroItems = useMemo(() => filterItemsForRole(financeiroMenuItems), [filterItemsForRole]);
