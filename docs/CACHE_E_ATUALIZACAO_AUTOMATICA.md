@@ -31,6 +31,12 @@ Quando uma nova versão do frontend é publicada:
 
 **Modo de desenvolvimento**: O PWA register não é ativado em `npm run dev`. O toast de atualização aparece apenas em builds de produção (ex.: após `npm run build` e deploy).
 
+**Ambiente CI** (`ci.z7botsolutions.com.br`): O proxy reverso (`nginx/ci.conf`) envia headers explícitos para o cache funcionar corretamente:
+- **Service Worker** (`sw.js`, `workbox-*.js`): `Cache-Control: no-cache, no-store` e `Service-Worker-Allowed: /` para o navegador sempre verificar nova versão.
+- **index.html**: `no-cache` para sempre buscar a versão mais recente.
+- **Assets** (`/assets/*.js`, `.css`, etc.): `Cache-Control: public, max-age=31536000, immutable` para cache de longa duração.
+- **Rotas SPA** (`/`): `no-cache` para que o HTML/SPA não seja cacheado e a atualização do app funcione.
+
 ## 3. Workbox (Cache de Assets)
 
 O `vite-plugin-pwa` com Workbox:

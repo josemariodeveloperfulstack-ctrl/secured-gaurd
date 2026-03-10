@@ -386,6 +386,40 @@ public class UserGroupService {
                 return "Operacional";
             case GRUPO_VIGILANTES:
                 return "Vigilantes";
+            case GRUPO_VIGIAS:
+                return "Vigias";
+            case GRUPO_FINANCEIRO:
+                return "Financeiro";
+            case GRUPO_TI_SUPORTE:
+                return "TI / Suporte";
+            case GRUPO_AUDITOR:
+                return "Auditor";
+            case GRUPO_AUXILIARES:
+                return "Auxiliares";
+            case GRUPO_COMERCIAL:
+                return "Comercial";
+            case GRUPO_ASSISTENTE_ADMINISTRATIVO:
+                return "Assistente Administrativo";
+            case GRUPO_ANALISTA_SUPRIMENTOS:
+                return "Analista de Suprimentos";
+            case GRUPO_SUPRIMENTOS:
+                return "Suprimentos";
+            case GRUPO_COMPRAS:
+                return "Compras";
+            case GRUPO_ESTOQUE:
+                return "Estoque";
+            case GRUPO_ASSISTENTE_COMERCIAL:
+                return "Assistente Comercial";
+            case GRUPO_GESTOR_COMERCIAL:
+                return "Gestor Comercial";
+            case GRUPO_GESTOR_SUPERVISAO:
+                return "Gestor de Supervisão";
+            case GRUPO_GESTOR_FINANCEIRO:
+                return "Gestor Financeiro";
+            case GRUPO_GESTOR_RH:
+                return "Gestor de Recursos Humanos";
+            case GRUPO_GESTOR_DPE:
+                return "Gestor de Departamento Pessoal";
             default:
                 return group.name();
         }
@@ -411,6 +445,40 @@ public class UserGroupService {
                 return "Equipe operacional";
             case GRUPO_VIGILANTES:
                 return "Vigilantes de segurança";
+            case GRUPO_VIGIAS:
+                return "Vigias";
+            case GRUPO_FINANCEIRO:
+                return "Área financeira";
+            case GRUPO_TI_SUPORTE:
+                return "TI e suporte técnico";
+            case GRUPO_AUDITOR:
+                return "Auditoria e consultoria";
+            case GRUPO_AUXILIARES:
+                return "Auxiliares";
+            case GRUPO_COMERCIAL:
+                return "Área comercial";
+            case GRUPO_ASSISTENTE_ADMINISTRATIVO:
+                return "Assistente administrativo";
+            case GRUPO_ANALISTA_SUPRIMENTOS:
+                return "Analista de suprimentos";
+            case GRUPO_SUPRIMENTOS:
+                return "Suprimentos e almoxarifado";
+            case GRUPO_COMPRAS:
+                return "Gestão de compras";
+            case GRUPO_ESTOQUE:
+                return "Controle de estoque";
+            case GRUPO_ASSISTENTE_COMERCIAL:
+                return "Assistente comercial";
+            case GRUPO_GESTOR_COMERCIAL:
+                return "Gestor comercial";
+            case GRUPO_GESTOR_SUPERVISAO:
+                return "Gestor de supervisão";
+            case GRUPO_GESTOR_FINANCEIRO:
+                return "Gestor financeiro";
+            case GRUPO_GESTOR_RH:
+                return "Gestor de recursos humanos";
+            case GRUPO_GESTOR_DPE:
+                return "Gestor de departamento pessoal";
             default:
                 return "";
         }
@@ -470,6 +538,77 @@ public class UserGroupService {
         // GRUPO_VIGILANTES - Vigilantes
         permissions.put(UserGroup.GRUPO_VIGILANTES, new HashSet<>(Arrays.asList(
                 "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE")));
+
+        // GRUPO_VIGIAS - Vigias
+        permissions.put(UserGroup.GRUPO_VIGIAS, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE")));
+
+        // GRUPO_FINANCEIRO - Financeiro
+        permissions.put(UserGroup.GRUPO_FINANCEIRO, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "FINANCIAL_READ",
+                "FINANCIAL_WRITE", "REPORTS_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
+
+        // GRUPO_SUPRIMENTOS - Suprimentos: Sistema de Holerites completo + módulo financeiro exceto Contas a Receber e Medição
+        permissions.put(UserGroup.GRUPO_SUPRIMENTOS, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "PAYSLIPS_DOWNLOAD",
+                "PAYROLL_READ", "PAYROLL_MANAGE",
+                "PROFILE_WRITE", "STOCK_READ", "STOCK_WRITE", "REPORTS_READ", "DASHBOARD_READ",
+                "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_PAYABLE_READ", "FINANCIAL_PAYABLE_WRITE",
+                "FINANCIAL_CASHFLOW_READ", "FINANCIAL_INVOICE_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
+
+        // GRUPO_ANALISTA_SUPRIMENTOS - Analista de Suprimentos: mesmo que Suprimentos (holerites completo + financeiro sem Contas a Receber/Medição)
+        permissions.put(UserGroup.GRUPO_ANALISTA_SUPRIMENTOS, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH", "PAYSLIPS_DOWNLOAD",
+                "PAYROLL_READ", "PAYROLL_MANAGE",
+                "PROFILE_WRITE", "STOCK_READ", "STOCK_WRITE", "REPORTS_READ", "DASHBOARD_READ",
+                "FINANCIAL_READ", "FINANCIAL_WRITE", "FINANCIAL_PAYABLE_READ", "FINANCIAL_PAYABLE_WRITE",
+                "FINANCIAL_CASHFLOW_READ", "FINANCIAL_INVOICE_READ", "CONTRACTS_READ", "EMPLOYEES_READ")));
+
+        // GRUPO_COMPRAS - Compras
+        permissions.put(UserGroup.GRUPO_COMPRAS, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "STOCK_READ",
+                "STOCK_WRITE", "REPORTS_READ")));
+
+        // GRUPO_ESTOQUE - Estoque
+        permissions.put(UserGroup.GRUPO_ESTOQUE, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "STOCK_READ",
+                "REPORTS_READ")));
+
+        // GRUPO_ASSISTENTE_COMERCIAL - Assistente Comercial
+        permissions.put(UserGroup.GRUPO_ASSISTENTE_COMERCIAL, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "LEADS_READ",
+                "LEADS_WRITE", "PROPOSALS_READ", "PROPOSALS_WRITE", "QUOTES_READ",
+                "QUOTES_WRITE", "CLIENTS_READ", "REPORTS_READ")));
+
+        // GRUPO_GESTOR_COMERCIAL - Gestor Comercial
+        permissions.put(UserGroup.GRUPO_GESTOR_COMERCIAL, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "LEADS_READ",
+                "LEADS_WRITE", "PROPOSALS_READ", "PROPOSALS_WRITE", "QUOTES_READ",
+                "QUOTES_WRITE", "CLIENTS_READ", "CLIENTS_WRITE", "CONTRACTS_READ",
+                "REPORTS_READ")));
+
+        // GRUPO_GESTOR_SUPERVISAO - Gestor de Supervisão
+        permissions.put(UserGroup.GRUPO_GESTOR_SUPERVISAO, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "EMPLOYEES_READ",
+                "EMPLOYEES_WRITE", "REPORTS_READ", "CONTRACTS_READ", "EQUIPMENTS_READ")));
+
+        // GRUPO_GESTOR_FINANCEIRO - Gestor Financeiro
+        permissions.put(UserGroup.GRUPO_GESTOR_FINANCEIRO, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PAYSLIPS_WRITE", "PROFILE_WRITE",
+                "FINANCIAL_READ", "FINANCIAL_WRITE", "REPORTS_READ", "CONTRACTS_READ",
+                "EMPLOYEES_READ")));
+
+        // GRUPO_GESTOR_RH - Gestor de Recursos Humanos
+        permissions.put(UserGroup.GRUPO_GESTOR_RH, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PAYSLIPS_WRITE", "PROFILE_WRITE",
+                "EMPLOYEES_READ", "EMPLOYEES_WRITE", "REPORTS_READ", "CONTRACTS_READ",
+                "CLIENTS_READ", "EQUIPMENTS_READ")));
+
+        // GRUPO_GESTOR_DPE - Gestor de Departamento Pessoal
+        permissions.put(UserGroup.GRUPO_GESTOR_DPE, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PAYSLIPS_WRITE", "PROFILE_WRITE",
+                "EMPLOYEES_READ", "EMPLOYEES_WRITE", "REPORTS_READ", "CONTRACTS_READ",
+                "CLIENTS_READ", "EQUIPMENTS_READ")));
 
         return permissions;
     }
