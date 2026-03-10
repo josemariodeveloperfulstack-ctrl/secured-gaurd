@@ -10,7 +10,7 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000, // 1 minuto - dados considerados frescos
+      staleTime: 0, // Sempre atualiza no background
       gcTime: 5 * 60 * 1000, // 5 minutos em cache após desmontar
       refetchOnWindowFocus: true, // Atualiza ao voltar à aba
       refetchOnReconnect: true, // Atualiza ao reconectar internet

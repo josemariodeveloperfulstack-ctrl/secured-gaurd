@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
     react(),
     // ...(mode === 'development' ? [componentTagger()] : []),
     VitePWA({
-      registerType: 'prompt', // Exibe toast "Nova versão disponível" em vez de exigir F5
+      registerType: 'autoUpdate', // Atualiza automaticamente no background
       devOptions: {
         enabled: true,
         type: 'module',
@@ -147,11 +147,11 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             // Core React
             'react-vendor': ['react', 'react-dom'],
-            
+
             // UI Libraries
             'radix-ui': [
-              '@radix-ui/react-dialog', 
-              '@radix-ui/react-dropdown-menu', 
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-dropdown-menu',
               '@radix-ui/react-select',
               '@radix-ui/react-toast',
               '@radix-ui/react-tooltip',
@@ -177,37 +177,37 @@ export default defineConfig(({ mode }) => {
               '@radix-ui/react-toggle',
               '@radix-ui/react-toggle-group'
             ],
-            
+
             // Icons
             'lucide': ['lucide-react'],
-            
+
             // Charts
             'charts': ['chart.js', 'react-chartjs-2', 'recharts'],
-            
+
             // Forms
             'forms': ['react-hook-form', '@hookform/resolvers', 'yup', 'zod'],
-            
+
             // Data fetching
             'query': ['@tanstack/react-query', '@tanstack/react-table'],
-            
+
             // Utils
             'utils': ['axios', 'date-fns', 'clsx', 'tailwind-merge', 'class-variance-authority'],
-            
+
             // Animations
             'animations': ['framer-motion', 'gsap'],
-            
+
             // PDF
             'pdf': ['html2pdf.js', 'pdf-lib'],
-            
+
             // WebSocket
             'websocket': ['@stomp/stompjs', 'sockjs-client'],
-            
+
             // Other UI
             'ui-other': [
-              'sonner', 
-              'vaul', 
-              'cmdk', 
-              'input-otp', 
+              'sonner',
+              'vaul',
+              'cmdk',
+              'input-otp',
               'react-currency-input-field',
               'react-datepicker',
               'react-day-picker',
