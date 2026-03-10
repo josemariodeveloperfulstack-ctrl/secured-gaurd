@@ -195,11 +195,11 @@ export interface AnaliseFluxoPagamento {
 
 export const contasAPagarService = {
   // ===== CONTAS A PAGAR =====
-  
+
   // Buscar contas com paginação básica (usando /api/invoices)
   async getContasAPagar(filters: ContasAPagarFilters = {}): Promise<ContaAPagar[]> {
     const params = new URLSearchParams();
-    
+
     if (filters.status) params.append('status', filters.status);
     if (filters.type) params.append('type', filters.type);
     if (filters.supplierId) params.append('supplierId', filters.supplierId);
@@ -213,24 +213,24 @@ export const contasAPagarService = {
 
     console.log('🔍 DEBUG: Fazendo requisição para /api/invoices com params:', params.toString());
     const response = await api.get(`/api/invoices?${params.toString()}`);
-    
+
     console.log('🔍 DEBUG: Resposta da API /api/invoices:', response.data);
-    
+
     // Transformar dados do backend para o formato do frontend
     const invoices = Array.isArray(response.data) ? response.data : response.data.content || [];
-    
+
     console.log('🔍 DEBUG: Invoices processados:', invoices);
-    
+
     return invoices.map((invoice: any): ContaAPagar => {
       // Garantir que supplierId seja convertido para string
-      const fornecedorId = invoice.supplierId 
+      const fornecedorId = invoice.supplierId
         ? (typeof invoice.supplierId === 'string' ? invoice.supplierId : String(invoice.supplierId))
         : undefined;
-      
+
       // Se não houver supplierName mas houver supplierId, usar 'Não informado' 
       // (o nome será preenchido quando o fornecedor for carregado)
       const fornecedorNome = invoice.supplierName || 'Não informado';
-      
+
       return {
         id: invoice.id,
         dataEmissao: parseDateFromBackend(invoice.issueDate),
@@ -270,16 +270,16 @@ export const contasAPagarService = {
 
   // Buscar conta por ID
   async getContaAPagarById(id: string): Promise<ContaAPagar> {
-      const response = await api.get(`/api/invoices/${id}`);
+    const response = await api.get(`/api/invoices/${id}`);
     const invoice = response.data;
-    
+
     // Garantir que supplierId seja convertido para string
-    const fornecedorId = invoice.supplierId 
+    const fornecedorId = invoice.supplierId
       ? (typeof invoice.supplierId === 'string' ? invoice.supplierId : String(invoice.supplierId))
       : undefined;
-    
+
     const fornecedorNome = invoice.supplierName || 'Não informado';
-    
+
     return {
       id: invoice.id,
       dataEmissao: parseDateFromBackend(invoice.issueDate),
@@ -310,7 +310,7 @@ export const contasAPagarService = {
   async createContaAPagar(conta: Omit<ContaAPagar, 'id'>): Promise<ContaAPagar> {
     // Buscar uma unidade padrão ou usar UUID padrão
     let unitId = '11111111-1111-1111-1111-111111111111'; // UUID padrão
-    
+
     try {
       const unitsResponse = await api.get('/api/units');
       if (unitsResponse.data && unitsResponse.data.length > 0) {
@@ -354,7 +354,7 @@ export const contasAPagarService = {
   // Atualizar conta
   async updateContaAPagar(id: string, conta: Partial<ContaAPagar>): Promise<ContaAPagar> {
     const requestData: Partial<CreateContaAPagarRequest> = {};
-    
+
     if (conta.descricao) requestData.description = conta.descricao;
     if (conta.fornecedorId) requestData.supplierId = conta.fornecedorId;
     if (conta.valor !== undefined) requestData.amount = conta.valor;
@@ -368,7 +368,7 @@ export const contasAPagarService = {
     if (conta.observacoes) requestData.notes = conta.observacoes;
     if (conta.centroCusto !== undefined) requestData.centroCusto = conta.centroCusto === 'NENHUM' ? undefined : conta.centroCusto;
     if (conta.companySigla !== undefined) requestData.companySigla = conta.companySigla;
-    
+
     // Se não há unitId, buscar uma unidade padrão
     if (!requestData.unitId) {
       try {
@@ -480,7 +480,7 @@ export const contasAPagarService = {
   },
 
   // ===== FORNECEDORES =====
-  
+
   // Buscar todos os fornecedores
   async getFornecedores(): Promise<Supplier[]> {
     try {
@@ -568,13 +568,13 @@ export const contasAPagarService = {
   },
 
   // ===== RELATÓRIOS =====
-  
+
   // Gerar relatório de contas a pagar
   async getRelatorioContasAPagar(startDate?: string, endDate?: string): Promise<ContasAPagarReport> {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
-    
+
     const response = await api.get(`/api/invoices/reports/summary?${params.toString()}`);
     return response.data;
   },
@@ -839,6 +839,7 @@ export const contasAPagarService = {
       observacoes: invoice.notes,
       categoria: invoice.category,
       centroCusto: invoice.centroCusto,
+      companySigla: invoice.companySigla,
       createdAt: parseDateFromBackend(invoice.createdAt)
     };
   }
