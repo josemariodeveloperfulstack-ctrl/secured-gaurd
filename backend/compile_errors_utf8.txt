@@ -1,0 +1,144 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.z7design:secured-guard >---------------------
+[INFO] Building secured-guard-backend 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- jacoco:0.8.11:prepare-agent (default) @ secured-guard ---
+[INFO] argLine set to "-javaagent:C:\\Users\\JosÚ Mßrio Ramos\\.m2\\repository\\org\\jacoco\\org.jacoco.agent\\0.8.11\\org.jacoco.agent-0.8.11-runtime.jar=destfile=C:\\dev\\secured-guard\\backend\\target\\jacoco.exec"
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ secured-guard ---
+[INFO] Copying 11 resources from src\main\resources to target\classes
+[INFO] Copying 454 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ secured-guard ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 1282 source files with javac [debug parameters release 17] to target\classes
+[INFO] -------------------------------------------------------------
+[WARNING] COMPILATION WARNING : 
+[INFO] -------------------------------------------------------------
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/JacksonConfig.java:[33,46] WRITE_BIGDECIMAL_AS_PLAIN in com.fasterxml.jackson.databind.SerializationFeature has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[17,50] io.github.bucket4j.Refill in io.github.bucket4j has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[17,56] greedy(long,java.time.Duration) in io.github.bucket4j.Refill has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[17,36] classic(long,io.github.bucket4j.Refill) in io.github.bucket4j.Bandwidth has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[26,49] io.github.bucket4j.Refill in io.github.bucket4j has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[26,55] greedy(long,java.time.Duration) in io.github.bucket4j.Refill has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[26,36] classic(long,io.github.bucket4j.Refill) in io.github.bucket4j.Bandwidth has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[35,48] io.github.bucket4j.Refill in io.github.bucket4j has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[35,54] greedy(long,java.time.Duration) in io.github.bucket4j.Refill has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RateLimitConfig.java:[35,36] classic(long,io.github.bucket4j.Refill) in io.github.bucket4j.Bandwidth has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RedisCacheConfig.java:[64,15] configure(com.fasterxml.jackson.databind.MapperFeature,boolean) in com.fasterxml.jackson.databind.ObjectMapper has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/config/RedisCacheConfig.java:[67,15] configure(com.fasterxml.jackson.databind.MapperFeature,boolean) in com.fasterxml.jackson.databind.ObjectMapper has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/PaymentReportService.java:[247,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/PaymentReportService.java:[489,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ActivityReportService.java:[514,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/controller/EmployeeController.java:[582,54] unchecked cast
+  required: java.util.List<java.lang.String>
+  found:    java.lang.Object
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/controller/EmployeeController.java:[592,54] unchecked cast
+  required: java.util.List<java.lang.String>
+  found:    java.lang.Object
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/controller/EmployeeController.java:[604,54] unchecked cast
+  required: java.util.List<java.lang.String>
+  found:    java.lang.Object
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/PayslipService.java:[3109,20] deprecated item is not annotated with @Deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/EquipmentReportService.java:[566,26] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/FineService.java:[559,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/DriverFuelConsumptionService.java:[403,117] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/DriverFuelConsumptionService.java:[403,62] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/FuelRecordReportService.java:[316,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[110,110] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[110,54] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[116,95] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[116,39] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[122,113] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[122,58] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[128,90] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/DriverFuelConsumptionStatsDTO.java:[128,50] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/InventoryItem.java:[147,89] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/InventoryItem.java:[147,50] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/Inventory.java:[131,80] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/Inventory.java:[131,47] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/Inventory.java:[153,61] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/Inventory.java:[153,28] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/Product.java:[185,63] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/Product.java:[185,28] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/controller/JobCandidateController.java:[57,48] io.github.bucket4j.Refill in io.github.bucket4j has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/controller/JobCandidateController.java:[57,54] greedy(long,java.time.Duration) in io.github.bucket4j.Refill has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/controller/JobCandidateController.java:[57,36] classic(long,io.github.bucket4j.Refill) in io.github.bucket4j.Bandwidth has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ReportService.java:[555,44] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ReportService.java:[649,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ReportService.java:[755,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ReportService.java:[924,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/MeasurementReportService.java:[244,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/OperationalOccurrenceService.java:[578,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/OrderOfServiceService.java:[209,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ReceiptProcessingService.java:[1508,30] setNonStrokingColor(int,int,int) in org.apache.pdfbox.pdmodel.PDPageContentStream has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ContasAPagarReportService.java:[318,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ContasAPagarReportService.java:[557,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ContasAPagarReportService.java:[780,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/ShiftChangeFormService.java:[150,26] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/SpecificActivityService.java:[359,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/TransportGuideService.java:[298,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/UnifiedDocumentService.java:[185,26] setNonStrokingColor(int,int,int) in org.apache.pdfbox.pdmodel.PDPageContentStream has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/UnifiedDocumentService.java:[250,26] setNonStrokingColor(int,int,int) in org.apache.pdfbox.pdmodel.PDPageContentStream has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/UnifiedDocumentService.java:[371,26] setNonStrokingColor(int,int,int) in org.apache.pdfbox.pdmodel.PDPageContentStream has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/UnifiedDocumentService.java:[2743,26] setNonStrokingColor(int,int,int) in org.apache.pdfbox.pdmodel.PDPageContentStream has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/VehicleMaintenanceService.java:[748,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/VehicleReportService.java:[192,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/VisitControlService.java:[418,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/WorkPostAssignmentService.java:[348,40] finalizeDocumentLayout(com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf) in com.z7design.secured_guard.service.StandardReportLayoutService has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[139,110] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[139,54] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[146,95] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[146,39] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[153,113] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[153,58] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[160,90] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/dto/FuelConsumptionStatsDTO.java:[160,50] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/MileageRecord.java:[96,110] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/MileageRecord.java:[96,75] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/MileageRecord.java:[100,97] ROUND_HALF_UP in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/model/MileageRecord.java:[100,38] divide(java.math.BigDecimal,int,int) in java.math.BigDecimal has been deprecated
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/worker/ParserWorker.java:[88,84] unchecked generic array creation for varargs parameter of type org.springframework.data.redis.connection.stream.StreamOffset<java.lang.String>[]
+[WARNING] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/worker/ParserWorker.java:[116,80] unchecked generic array creation for varargs parameter of type org.springframework.data.redis.connection.stream.StreamOffset<java.lang.String>[]
+[INFO] 79 warnings 
+[INFO] -------------------------------------------------------------
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/EmployeeService.java:[638,16] cannot find symbol
+  symbol:   method getTerminationReason()
+  location: variable dto of type com.z7design.secured_guard.dto.EmployeeDTO
+[ERROR] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/EmployeeService.java:[639,46] cannot find symbol
+  symbol:   method getTerminationReason()
+  location: variable dto of type com.z7design.secured_guard.dto.EmployeeDTO
+[ERROR] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/EmployeeService.java:[1365,20] cannot find symbol
+  symbol:   method setTerminationReason(java.lang.String)
+  location: variable dto of type com.z7design.secured_guard.dto.EmployeeDTO
+[INFO] 3 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:49 min
+[INFO] Finished at: 2026-03-03T16:41:52-03:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project secured-guard: Compilation failure: Compilation failure: 
+[ERROR] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/EmployeeService.java:[638,16] cannot find symbol
+[ERROR]   symbol:   method getTerminationReason()
+[ERROR]   location: variable dto of type com.z7design.secured_guard.dto.EmployeeDTO
+[ERROR] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/EmployeeService.java:[639,46] cannot find symbol
+[ERROR]   symbol:   method getTerminationReason()
+[ERROR]   location: variable dto of type com.z7design.secured_guard.dto.EmployeeDTO
+[ERROR] /C:/dev/secured-guard/backend/src/main/java/com/z7design/secured_guard/service/EmployeeService.java:[1365,20] cannot find symbol
+[ERROR]   symbol:   method setTerminationReason(java.lang.String)
+[ERROR]   location: variable dto of type com.z7design.secured_guard.dto.EmployeeDTO
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

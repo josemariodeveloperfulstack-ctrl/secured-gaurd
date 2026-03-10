@@ -86,7 +86,7 @@ public class PaymentReceiptController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_COLABORADOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_COLABORADOR', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_SUPRIMENTOS', 'ROLE_COMPRAS')")
     public ResponseEntity<List<PaymentReceiptDTO>> getAllPaymentReceipts(
             @RequestParam(value = "search", required = false) String search) {
         try {
@@ -284,7 +284,7 @@ public class PaymentReceiptController {
 
     // Processamento automático de comprovantes (NOVO ENDPOINT)
     @PostMapping("/process-automatic")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_SUPRIMENTOS', 'ROLE_COMPRAS')")
     public ResponseEntity<ReceiptProcessingResponse> processReceiptsAutomatic(
             @RequestParam("file") MultipartFile file) {
         try {

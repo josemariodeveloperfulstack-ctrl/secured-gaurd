@@ -159,6 +159,7 @@ public class SecurityConfig {
                                                 .requestMatchers(org.springframework.http.HttpMethod.DELETE,
                                                                 "/api/users/**")
                                                 .hasAnyAuthority("USERS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                                                .requestMatchers("/api/users/me/current-role").authenticated()
                                                 .requestMatchers("/api/users/**")
                                                 .hasAnyAuthority("USERS_READ", "USERS_WRITE", "USERS_CREATE",
                                                                 "USERS_DELETE",
@@ -392,7 +393,8 @@ public class SecurityConfig {
                                                                 "PAYSLIPS_PUBLISH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_RH", "ROLE_FINANCEIRO",
                                                                 "ROLE_COLABORADOR", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                "ROLE_COMPRAS")
                                                 // Endpoints de recibos - requerem permissões específicas
                                                 .requestMatchers("/api/receipts/**")
                                                 .hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE",
@@ -400,7 +402,8 @@ public class SecurityConfig {
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
                                                                 "ROLE_FINANCEIRO", "ROLE_COLABORADOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                "ROLE_COMPRAS")
                                                 // Endpoints de documentos unificados - arquivos públicos para
                                                 // download/visualização
                                                 .requestMatchers("/api/unified-documents/public/**").permitAll()
@@ -412,7 +415,8 @@ public class SecurityConfig {
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
                                                                 "ROLE_FINANCEIRO", "ROLE_COLABORADOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                "ROLE_COMPRAS")
                                                 // Endpoints de organização por setor - temporariamente público para
                                                 // debug
                                                 .requestMatchers("/api/sector-organization/**").permitAll()

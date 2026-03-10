@@ -1,0 +1,78 @@
+﻿
+> [ERROR] COMPILATION ERROR : 
+  [INFO] -----------------------
+--------------------------------
+------
+> [ERROR] /C:/dev/secured-guard/
+backend/src/main/java/com/z7desi
+gn/secured_guard/service/EPIDeli
+veryStandardPdfService.java:[187
+,48] cannot find symbol
+    symbol:   method getRg()
+    location: variable employee 
+of type com.z7design.secured_gua
+rd.model.Employee
+> [ERROR] /C:/dev/secured-guard/
+backend/src/main/java/com/z7desi
+gn/secured_guard/service/EPIDeli
+veryStandardPdfService.java:[187
+,75] cannot find symbol
+    symbol:   method getRg()
+    location: variable employee 
+of type com.z7design.secured_gua
+rd.model.Employee
+> [INFO] 2 errors 
+  [INFO] -----------------------
+--------------------------------
+------
+  [INFO] -----------------------
+--------------------------------
+-----------------
+  [INFO] BUILD FAILURE
+  [INFO] -----------------------
+--------------------------------
+-----------------
+> [ERROR] Failed to execute 
+goal org.apache.maven.plugins:ma
+ven-compiler-plugin:3.13.0:compi
+le (default-compile) on project 
+secured-guard: Compilation 
+failure: Compilation failure: 
+> [ERROR] /C:/dev/secured-guard/
+backend/src/main/java/com/z7desi
+gn/secured_guard/service/EPIDeli
+veryStandardPdfService.java:[187
+,48] cannot find symbol
+> [ERROR]   symbol:   method 
+getRg()
+> [ERROR]   location: variable 
+employee of type com.z7design.se
+cured_guard.model.Employee
+> [ERROR] /C:/dev/secured-guard/
+backend/src/main/java/com/z7desi
+gn/secured_guard/service/EPIDeli
+veryStandardPdfService.java:[187
+,75] cannot find symbol
+> [ERROR]   symbol:   method 
+getRg()
+> [ERROR]   location: variable 
+employee of type com.z7design.se
+cured_guard.model.Employee
+> [ERROR] -> [Help 1]
+> [ERROR] 
+> [ERROR] To see the full stack 
+trace of the errors, re-run 
+Maven with the -e switch.
+> [ERROR] Re-run Maven using 
+the -X switch to enable full 
+debug logging.
+> [ERROR] 
+> [ERROR] For more information 
+about the errors and possible 
+solutions, please read the 
+following articles:
+> [ERROR] [Help 1] http://cwiki.
+apache.org/confluence/display/MA
+VEN/MojoFailureException
+
+
