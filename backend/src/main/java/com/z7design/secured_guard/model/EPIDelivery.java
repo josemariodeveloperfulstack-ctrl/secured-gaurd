@@ -24,7 +24,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 public class EPIDelivery {
 
     @Id
@@ -34,13 +34,14 @@ public class EPIDelivery {
     @NotNull(message = "Funcionário é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "unit", "position", "user"})
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "unit", "position", "user", "workPost", "department",
+            "company", "exameMedicoDoctor" })
     private Employee employee;
 
     @NotNull(message = "EPI é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "epi_id", nullable = false)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private PersonalProtectiveEquipment epi;
 
     @NotNull(message = "Data de entrega é obrigatória")
@@ -59,7 +60,7 @@ public class EPIDelivery {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "delivered_by_user_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private User deliveredByUser;
 
     @Builder.Default
