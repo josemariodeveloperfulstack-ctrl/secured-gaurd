@@ -81,7 +81,7 @@ services:
     labels:
       # Traefik labels para backend - produção
       - "traefik.enable=true"
-      - "traefik.http.routers.secured-guard-api-prod.rule=Host(`securedguard.z7botsolutions.com.br`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.secured-guard-api-prod.rule=(Host(`securedguard.z7botsolutions.com.br`) || Host(`portal.promovervigilancia.com.br`)) && PathPrefix(`/api`)"
       - "traefik.http.routers.secured-guard-api-prod.entrypoints=websecure"
       - "traefik.http.routers.secured-guard-api-prod.tls.certresolver=letsencrypt"
       - "traefik.http.services.secured-guard-api-prod.loadbalancer.server.port=8080"
@@ -108,7 +108,7 @@ services:
     labels:
       # Traefik labels para frontend - produção
       - "traefik.enable=true"
-      - "traefik.http.routers.secured-guard-web-prod.rule=Host(`securedguard.z7botsolutions.com.br`)"
+      - "traefik.http.routers.secured-guard-web-prod.rule=Host(`securedguard.z7botsolutions.com.br`) || Host(`portal.promovervigilancia.com.br`)"
       - "traefik.http.routers.secured-guard-web-prod.entrypoints=websecure"
       - "traefik.http.routers.secured-guard-web-prod.tls.certresolver=letsencrypt"
       - "traefik.http.services.secured-guard-web-prod.loadbalancer.server.port=80"
