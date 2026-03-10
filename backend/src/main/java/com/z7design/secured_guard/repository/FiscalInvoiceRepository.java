@@ -14,11 +14,17 @@ import java.util.UUID;
 @Repository
 public interface FiscalInvoiceRepository extends JpaRepository<FiscalInvoice, UUID> {
 
-        @Query("SELECT f FROM FiscalInvoice f WHERE " +
+        @Query(value = "SELECT f FROM FiscalInvoice f LEFT JOIN FETCH f.createdBy WHERE " +
                         "(:periodYear <= 0 OR f.periodYear = :periodYear) AND " +
                         "(:periodMonth <= 0 OR f.periodMonth = :periodMonth) AND " +
                         "(:clientName = '' OR LOWER(f.clientName) LIKE LOWER(CONCAT('%', :clientName, '%'))) AND " +
-                        "(:fileType = '' OR f.fileType = :fileType)")
+                        "(:fileType = '' OR f.fileType = :fileType)", countQuery = "SELECT COUNT(f) FROM FiscalInvoice f WHERE "
+                                        +
+                                        "(:periodYear <= 0 OR f.periodYear = :periodYear) AND " +
+                                        "(:periodMonth <= 0 OR f.periodMonth = :periodMonth) AND " +
+                                        "(:clientName = '' OR LOWER(f.clientName) LIKE LOWER(CONCAT('%', :clientName, '%'))) AND "
+                                        +
+                                        "(:fileType = '' OR f.fileType = :fileType)")
         Page<FiscalInvoice> findByFilters(
                         @Param("periodYear") Integer periodYear,
                         @Param("periodMonth") Integer periodMonth,
@@ -26,7 +32,7 @@ public interface FiscalInvoiceRepository extends JpaRepository<FiscalInvoice, UU
                         @Param("fileType") String fileType,
                         Pageable pageable);
 
-        @Query("SELECT f FROM FiscalInvoice f WHERE " +
+        @Query("SELECT f FROM FiscalInvoice f LEFT JOIN FETCH f.createdBy WHERE " +
                         "(:periodYear <= 0 OR f.periodYear = :periodYear) AND " +
                         "(:periodMonth <= 0 OR f.periodMonth = :periodMonth) AND " +
                         "(:clientName = '' OR LOWER(f.clientName) LIKE LOWER(CONCAT('%', :clientName, '%'))) AND " +
