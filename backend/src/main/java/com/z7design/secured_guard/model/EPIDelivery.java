@@ -33,6 +33,7 @@ public class EPIDelivery {
 
     @NotNull(message = "Funcionário é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     @JoinColumn(name = "employee_id", nullable = false)
     @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "unit", "position", "user", "workPost", "department",
             "company", "exameMedicoDoctor" })
