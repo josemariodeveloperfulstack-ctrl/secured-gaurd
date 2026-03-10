@@ -106,8 +106,8 @@ jobs:
           } > .prod.env
 
           # Create deployment archive locally including the health check script
-          chmod +x scripts/health-check-prod.sh scripts/fix-404-prod.sh
-          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh scripts/health-check-prod.sh traefik-dynamic-prod.yml
+          chmod +x scripts/health-check-prod.sh scripts/fix-404-prod.sh scripts/diagnostico-502-prod.sh
+          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh scripts/health-check-prod.sh scripts/diagnostico-502-prod.sh traefik-dynamic-prod.yml
 
           # Encode archive in base64 to safely pass it into the heredoc
           B64_TAR=$(base64 -w 0 prod-deploy.tar.gz)
@@ -141,6 +141,7 @@ jobs:
             mv /tmp/deploy/nginx/nginx-prod.conf \$DEPLOY_DIR/nginx/
             mv /tmp/scripts/fix-404-prod.sh \$DEPLOY_DIR/
             mv /tmp/scripts/health-check-prod.sh \$SCRIPT_DIR/
+            mv /tmp/scripts/diagnostico-502-prod.sh \$SCRIPT_DIR/
             mv /tmp/traefik-dynamic-prod.yml \$TRAEFIK_DIR/prod.yml
             
             rm -rf /tmp/prod-deploy.tar.gz /tmp/deploy /tmp/scripts

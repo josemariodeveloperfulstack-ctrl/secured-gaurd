@@ -47,11 +47,11 @@ interface FuncionarioEditModalProps {
   onSuccess: () => void;
 }
 
-const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
-  open,
-  onOpenChange,
-  funcionario,
-  onSuccess
+const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({ 
+  open, 
+  onOpenChange, 
+  funcionario, 
+  onSuccess 
 }) => {
   const { toast } = useToast();
   const [form, setForm] = useState<UpdateEmployeeDTO>({
@@ -86,7 +86,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     spouseBirthDate: '',
     spousePhone: '',
     spouseEmail: '',
-
+    
     // Campos da ficha de registro
     empresaNome: '',
     empresaEndereco: '',
@@ -162,7 +162,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
-
+  
   // Estados para os dados dos selects
   const [positions, setPositions] = useState<Position[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -172,13 +172,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [loadingData, setLoadingData] = useState(false);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-
+  
   // Estados para busca e filtros
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
-
+  
   // Estados para médicos
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
@@ -186,7 +186,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
-
+  
   // Estados para modal de novo cargo
   const [novoCargoModalOpen, setNovoCargoModalOpen] = useState(false);
 
@@ -206,7 +206,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       console.log('💼 Funcionário position ID:', funcionario.position?.id);
       console.log('📋 Users disponíveis:', users.length);
       console.log('📋 Positions disponíveis:', positions.length);
-
+      
       // Preencher usuário selecionado
       if (funcionario.user?.id) {
         const user = users.find(u => u.id === funcionario.user?.id);
@@ -220,7 +220,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       } else {
         console.log('ℹ️ Funcionário não tem usuário associado');
       }
-
+      
       // Preencher cargo selecionado - comparar IDs como strings
       if (funcionario.position?.id) {
         const positionId = String(funcionario.position.id);
@@ -234,7 +234,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       } else {
         console.log('ℹ️ Funcionário não tem cargo associado');
       }
-
+      
       // Preencher usuário selecionado - comparar IDs como strings
       if (funcionario.user?.id) {
         const userId = String(funcionario.user.id);
@@ -249,7 +249,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       } else {
         console.log('ℹ️ Funcionário não tem usuário associado');
       }
-
+      
       // Preencher empresa selecionada - comparar IDs como strings
       if (funcionario.company?.id && companies.length > 0) {
         const companyId = String(funcionario.company.id);
@@ -271,7 +271,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     if (userSearchTerm.trim() === '') {
       setFilteredUsers(users);
     } else {
-      const filtered = users.filter(user =>
+      const filtered = users.filter(user => 
         user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.username?.toLowerCase().includes(userSearchTerm.toLowerCase())
@@ -291,7 +291,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         // Buscar dados completos do funcionário do backend
         console.log('🔍 Buscando dados completos do funcionário ID:', funcionario.id);
         const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-
+        
         if (!fullEmployee) {
           console.warn('⚠️ Funcionário não encontrado no backend');
           return;
@@ -302,23 +302,23 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           bankData: fullEmployee.bankData,
           bankInfo: (fullEmployee as any).bankInfo
         });
-
+        
         // Usar dados do funcionário completo buscado do backend
         const employeeData = fullEmployee || funcionario;
-
+        
         // Tratar address que pode ser string ou objeto
-        const addressValue = typeof employeeData.address === 'string'
-          ? employeeData.address
+        const addressValue = typeof employeeData.address === 'string' 
+          ? employeeData.address 
           : employeeData.address?.street || '';
-
+        
         // Tratar CPF que pode vir como cpf ou document
         const cpfValue = employeeData.cpf || (employeeData as any).document || '';
-
-        // Tratar dados bancários - verificar tanto bankData quanto bankInfo
-        let bankData = {
-          bank: '',
-          agency: '',
-          account: '',
+      
+      // Tratar dados bancários - verificar tanto bankData quanto bankInfo
+      let bankData = {
+        bank: '',
+        agency: '',
+        account: '',
           accountDigit: '',
           type: 'CORRENTE' as const,
           chavePix: ''
@@ -351,12 +351,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         } else {
           console.log('⚠️ Nenhum dado bancário encontrado no funcionário');
         }
-
+        
         console.log('💰 Dados bancários mapeados para o formulário:', bankData);
-
+        
         // Inicialmente usar phone do funcionário
         let initialPhone = employeeData.phone || '';
-
+        
         // Se endereço vier como objeto AddressDTO, extrair campos separados
         let enderecoRua = (employeeData as any).enderecoRua || '';
         let enderecoNumero = (employeeData as any).enderecoNumero || '';
@@ -365,7 +365,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         let enderecoCidade = (employeeData as any).enderecoCidade || '';
         let enderecoEstado = (employeeData as any).enderecoEstado || '';
         let enderecoCep = (employeeData as any).enderecoCep || '';
-
+        
         // Se endereço vier como objeto address com campos separados
         if (employeeData.address && typeof employeeData.address === 'object' && !addressValue) {
           const addr = employeeData.address as any;
@@ -377,7 +377,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           enderecoEstado = addr.state || enderecoEstado;
           enderecoCep = addr.zipCode || enderecoCep;
         }
-
+        
         setForm({
           name: employeeData.name || '',
           cpf: cpfValue,
@@ -418,7 +418,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           spouseBirthDate: employeeData.spouseBirthDate || '',
           spousePhone: employeeData.spousePhone || '',
           spouseEmail: employeeData.spouseEmail || '',
-
+          
           // Campos da ficha de registro
           empresaNome: employeeData.empresaNome || '',
           empresaEndereco: employeeData.empresaEndereco || '',
@@ -501,7 +501,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           cinDataEmissao: employeeData.cinDataEmissao || '',
           exameMedicoHorarioIntervalo: (employeeData as any).exameMedicoHorarioIntervalo || ''
         });
-
+        
         console.log('✅ Formulário preenchido com dados completos do funcionário');
         console.log('📋 Dados principais:', {
           name: employeeData.name,
@@ -524,7 +524,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         if ((employeeData as any).photoUrl) {
           setPhotoPreview((employeeData as any).photoUrl);
         }
-
+        
         // Buscar WhatsApp do usuário vinculado se existir
         if (employeeData.user?.id) {
           try {
@@ -617,11 +617,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const buscarCep = async (cep: string) => {
     const cepLimpo = cep.replace(/\D/g, '');
     if (cepLimpo.length !== 8) return;
-
+    
     setLoadingCep(true);
     try {
       const response = await fetch(`https://brasilapi.com.br/api/cep/v1/${cepLimpo}`);
-
+      
       if (response.ok) {
         const data = await response.json();
         setForm(prev => ({
@@ -665,7 +665,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       return numeros.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
     }
   };
-
+  
   // Função para aplicar máscara de CEP
   const aplicarMascaraCep = (valor: string) => {
     const numeros = valor.replace(/\D/g, '');
@@ -718,14 +718,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         workPostService.getAllWorkPosts(),
         departmentService.listActive()
       ]);
-
+      
       console.log('✅ Dados carregados:', {
         positions: positionsData.length,
         units: unitsData.length,
         users: usersData.length,
         companies: companiesData.length
       });
-
+      
       setPositions(positionsData);
       setUnits(unitsData);
       setUsers(usersData);
@@ -733,16 +733,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       setCompanies(companiesData);
       setWorkPosts(workPostsData);
       setDepartments(departmentsData);
-
+      
       // Carregar médicos
       await loadDoctors();
-
+      
       // Após carregar os dados, preencher os selects se houver funcionário
       if (funcionario) {
         console.log('🔍 Funcionário encontrado, preenchendo selects...');
         console.log('👤 Funcionário user ID:', funcionario.user?.id);
         console.log('💼 Funcionário position ID:', funcionario.position?.id);
-
+        
         // Preencher usuário selecionado - comparar IDs como strings
         if (funcionario.user?.id) {
           const userId = String(funcionario.user.id);
@@ -761,7 +761,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         } else {
           console.log('ℹ️ Funcionário não tem usuário associado');
         }
-
+        
         // Preencher cargo selecionado - comparar IDs como strings
         if (funcionario.position?.id) {
           const positionId = String(funcionario.position.id);
@@ -779,7 +779,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         } else {
           console.log('ℹ️ Funcionário não tem cargo associado');
         }
-
+        
         // Preencher empresa selecionada - comparar IDs como strings
         if (funcionario.company?.id) {
           const companyId = String(funcionario.company.id);
@@ -805,7 +805,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-
+    
     // Handle bankData fields
     if (name.startsWith('bankData.')) {
       const field = name.split('.')[1];
@@ -835,11 +835,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const handleSelectChange = (field: string, value: string) => {
     if (value) {
       const stringValue = String(value);
-      setForm((prev) => ({
-        ...prev,
-        [field]: { id: stringValue }
+      setForm((prev) => ({ 
+        ...prev, 
+        [field]: { id: stringValue } 
       }));
-
+      
       // Atualizar estados selecionados
       if (field === 'user') {
         const user = users.find(u => String(u.id) === stringValue);
@@ -873,7 +873,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       });
     }
   };
-
+  
   const handleCompanySelect = (companyId: string) => {
     if (companyId === 'none' || companyId === '') {
       setSelectedCompany(null);
@@ -911,9 +911,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!funcionario) return;
-
+    
     // Validação de formato de email (se preenchido)
     if (form.email && form.email.trim() !== '') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -922,7 +922,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         return;
       }
     }
-
+    
     // Validações
     if (!form.address) {
       setError('Endereço é obrigatório para editar um funcionário.');
@@ -946,7 +946,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       onSuccess();
     } catch (err: any) {
       console.error('Erro ao atualizar funcionário:', err);
-
+      
       // Tratar erros específicos
       if (err.message.includes('CPF já cadastrado')) {
         setError('CPF já cadastrado para outro funcionário');
@@ -1365,12 +1365,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 <UserIcon className="h-4 w-4 sm:h-6 sm:w-6" />
               </div>
               <span className="truncate">{isEditMode ? 'Editar Funcionário' : 'Editar Funcionário'}</span>
-            </DialogTitle>
+          </DialogTitle>
             <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
               Preencha os dados abaixo. Itens obrigatórios estão indicados em vermelho.
-            </DialogDescription>
-          </DialogHeader>
-
+          </DialogDescription>
+        </DialogHeader>
+        
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
             {/* Botão de Importação de PDF */}
             <div className="flex justify-end mt-4">
@@ -1398,8 +1398,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     <div>
                       <Label className="text-sm font-medium text-seguranca-lightgray">
                         Selecionar arquivo PDF
-                      </Label>
-                      <Input
+                </Label>
+                  <Input
                         type="file"
                         accept=".pdf"
                         onChange={handlePDFFileChange}
@@ -1408,7 +1408,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <p className="text-xs text-seguranca-lightgray/60 mt-1">
                         Apenas arquivos PDF. Máximo 10MB.
                       </p>
-                    </div>
+                </div>
 
                     {pdfFile && (
                       <div className="flex items-center gap-2 p-2 bg-seguranca-black rounded border border-seguranca-lightgray/30">
@@ -1416,8 +1416,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         <span className="text-sm text-white">{pdfFile.name}</span>
                         <span className="text-xs text-seguranca-lightgray/60">
                           ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      </div>
+                          </span>
+                        </div>
                     )}
 
                     {pdfError && (
@@ -1431,13 +1431,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-500/30 rounded text-green-400">
                         <FileCheck className="h-4 w-4" />
                         <span className="text-sm">PDF processado com sucesso! Formulário preenchido automaticamente.</span>
-                      </div>
+              </div>
                     )}
 
                     {extractedPreview && (
                       <div className="mt-3 p-3 bg-seguranca-black rounded border border-seguranca-lightgray/30 text-sm text-white">
                         <h5 className="font-semibold mb-2">Pré-visualização dos dados extraídos</h5>
-                        <div className="space-y-2">
+               <div className="space-y-2">
                           <details className="bg-[#2a2a2a] rounded p-2" open>
                             <summary className="cursor-pointer font-medium">Dados da Empresa</summary>
                             <div className="flex justify-end mb-2">
@@ -1581,7 +1581,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       </div>
                     )}
 
-                    <div className="flex gap-2">
+                 <div className="flex gap-2">
                       <Button
                         type="button"
                         onClick={handleProcessPDF}
@@ -1614,8 +1614,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       >
                         Cancelar
                       </Button>
-                    </div>
-                  </div>
+                             </div>
+                           </div>
                 </div>
               </Card>
             )}
@@ -1668,19 +1668,19 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                       className="px-3 py-2 hover:bg-gray-700 cursor-pointer border-b border-gray-600 last:border-b-0"
                                       onClick={() => handleUserSelect(user)}
                                     >
-                                      <div className="flex flex-col">
+                               <div className="flex flex-col">
                                         <span className="font-medium text-seguranca-lightgray">{user.name}</span>
                                         <span className="text-xs text-gray-400">
                                           {user.email} • {user.username} • {user.role}
                                         </span>
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
+                               </div>
+                             </div>
+                         ))
+                       ) : (
                                   userSearchTerm.trim() !== '' && (
                                     <div className="p-3">
                                       <p className="text-sm text-gray-400">Nenhum usuário encontrado</p>
-                                    </div>
+                         </div>
                                   )
                                 )}
                               </div>
@@ -1696,10 +1696,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                   <p className="text-sm text-seguranca-lightgray">{selectedUser.name}</p>
                                   <p className="text-xs text-gray-400">{selectedUser.email}</p>
                                 </div>
-                                <Button
-                                  type="button"
+                   <Button
+                     type="button"
                                   variant="ghost"
-                                  size="sm"
+                     size="sm"
                                   onClick={() => {
                                     setSelectedUser(null);
                                     setUserSearchTerm('');
@@ -1708,12 +1708,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                   className="text-red-400 hover:text-red-300"
                                 >
                                   <X className="h-4 w-4" />
-                                </Button>
-                              </div>
+                   </Button>
+                 </div>
                             </div>
                           )}
                           <div className="flex items-center justify-between">
-                            <p className="text-xs text-gray-300">
+                 <p className="text-xs text-gray-300">
                               O usuário selecionado será associado ao funcionário para acesso ao sistema. (Opcional)
                               {canCreateDefaultUser && (
                                 <span className="block mt-1 text-seguranca-yellow">
@@ -1734,8 +1734,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 <Link className="h-3 w-3 ml-1" />
                               </Button>
                             )}
-                          </div>
-                        </div>
+               </div>
+            </div>
 
                         {/* Nova Divisão para Empresa e Posto de Trabalho */}
                         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-2">
@@ -1766,7 +1766,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
+          </div>
                           <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Setor/Posto de Trabalho</span>
@@ -1793,40 +1793,40 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     </div>
                   </Card>
 
-                  {/* Seção: Informações Pessoais */}
+          {/* Seção: Informações Pessoais */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
                     <div className="p-4 space-y-4">
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-seguranca-red/20 rounded-lg">
                           <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-red" />
                         </div>
-                        <h3 className="text-lg font-semibold text-white">Informações Pessoais</h3>
+            <h3 className="text-lg font-semibold text-white">Informações Pessoais</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Nome Completo</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="name"
-                            value={form.name}
-                            onChange={handleChange}
-                            required
+                <Input 
+                  name="name" 
+                  value={form.name} 
+                  onChange={handleChange} 
+                  required 
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">CPF</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="cpf"
-                            value={form.cpf}
+                <Input 
+                  name="cpf" 
+                  value={form.cpf} 
                             onChange={handleCpfChange}
-                            required
-                            placeholder="000.000.000-00"
+                  required 
+                  placeholder="000.000.000-00"
                             className={`bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 ${cpfError ? 'border-red-500' : ''}`}
                           />
                           <p className="text-xs text-gray-400 mt-1">
@@ -1835,264 +1835,264 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           {cpfError && (
                             <p className="text-xs text-red-500 mt-1">{cpfError}</p>
                           )}
-                        </div>
-                        <div>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">RG</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="rg"
+                <Input 
+                  name="rg" 
                             value={form.rg || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="00.000.000-0"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Data de Nascimento</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="birthDate"
-                            type="date"
-                            value={form.birthDate}
-                            onChange={handleChange}
-                            required
+                <Input 
+                  name="birthDate" 
+                  type="date" 
+                  value={form.birthDate} 
+                  onChange={handleChange} 
+                  required 
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Sexo</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
-                            value={form.sexo || ''}
-                            onValueChange={(value) => setForm(prev => ({ ...prev, sexo: value }))}
-                          >
+                <Select 
+                  value={form.sexo || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, sexo: value }))}
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                              <SelectValue placeholder="Selecione o sexo" />
-                            </SelectTrigger>
+                    <SelectValue placeholder="Selecione o sexo" />
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                              <SelectItem value="MASCULINO">Masculino</SelectItem>
-                              <SelectItem value="FEMININO">Feminino</SelectItem>
-                              <SelectItem value="OUTRO">Outro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
+                    <SelectItem value="MASCULINO">Masculino</SelectItem>
+                    <SelectItem value="FEMININO">Feminino</SelectItem>
+                    <SelectItem value="OUTRO">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Município de Nascimento</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="municipioNascimento"
-                            value={form.municipioNascimento || ''}
-                            onChange={handleChange}
-                            placeholder="Ex: Belo Horizonte"
+                <Input 
+                  name="municipioNascimento" 
+                  value={form.municipioNascimento || ''} 
+                  onChange={handleChange} 
+                  placeholder="Ex: Belo Horizonte"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Estado de Nascimento</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
-                            value={form.estadoNascimento || ''}
-                            onValueChange={(value) => setForm(prev => ({ ...prev, estadoNascimento: value }))}
-                          >
+                <Select 
+                  value={form.estadoNascimento || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, estadoNascimento: value }))}
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                              <SelectValue placeholder="Selecione o estado" />
-                            </SelectTrigger>
+                    <SelectValue placeholder="Selecione o estado" />
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[300px]">
-                              <SelectItem value="AC">Acre</SelectItem>
-                              <SelectItem value="AL">Alagoas</SelectItem>
-                              <SelectItem value="AP">Amapá</SelectItem>
-                              <SelectItem value="AM">Amazonas</SelectItem>
-                              <SelectItem value="BA">Bahia</SelectItem>
-                              <SelectItem value="CE">Ceará</SelectItem>
-                              <SelectItem value="DF">Distrito Federal</SelectItem>
-                              <SelectItem value="ES">Espírito Santo</SelectItem>
-                              <SelectItem value="GO">Goiás</SelectItem>
-                              <SelectItem value="MA">Maranhão</SelectItem>
-                              <SelectItem value="MT">Mato Grosso</SelectItem>
-                              <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
-                              <SelectItem value="MG">Minas Gerais</SelectItem>
-                              <SelectItem value="PA">Pará</SelectItem>
-                              <SelectItem value="PB">Paraíba</SelectItem>
-                              <SelectItem value="PR">Paraná</SelectItem>
-                              <SelectItem value="PE">Pernambuco</SelectItem>
-                              <SelectItem value="PI">Piauí</SelectItem>
-                              <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-                              <SelectItem value="RN">Rio Grande do Norte</SelectItem>
-                              <SelectItem value="RS">Rio Grande do Sul</SelectItem>
-                              <SelectItem value="RO">Rondônia</SelectItem>
-                              <SelectItem value="RR">Roraima</SelectItem>
-                              <SelectItem value="SC">Santa Catarina</SelectItem>
-                              <SelectItem value="SP">São Paulo</SelectItem>
-                              <SelectItem value="SE">Sergipe</SelectItem>
-                              <SelectItem value="TO">Tocantins</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
+                    <SelectItem value="AC">Acre</SelectItem>
+                    <SelectItem value="AL">Alagoas</SelectItem>
+                    <SelectItem value="AP">Amapá</SelectItem>
+                    <SelectItem value="AM">Amazonas</SelectItem>
+                    <SelectItem value="BA">Bahia</SelectItem>
+                    <SelectItem value="CE">Ceará</SelectItem>
+                    <SelectItem value="DF">Distrito Federal</SelectItem>
+                    <SelectItem value="ES">Espírito Santo</SelectItem>
+                    <SelectItem value="GO">Goiás</SelectItem>
+                    <SelectItem value="MA">Maranhão</SelectItem>
+                    <SelectItem value="MT">Mato Grosso</SelectItem>
+                    <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
+                    <SelectItem value="MG">Minas Gerais</SelectItem>
+                    <SelectItem value="PA">Pará</SelectItem>
+                    <SelectItem value="PB">Paraíba</SelectItem>
+                    <SelectItem value="PR">Paraná</SelectItem>
+                    <SelectItem value="PE">Pernambuco</SelectItem>
+                    <SelectItem value="PI">Piauí</SelectItem>
+                    <SelectItem value="RJ">Rio de Janeiro</SelectItem>
+                    <SelectItem value="RN">Rio Grande do Norte</SelectItem>
+                    <SelectItem value="RS">Rio Grande do Sul</SelectItem>
+                    <SelectItem value="RO">Rondônia</SelectItem>
+                    <SelectItem value="RR">Roraima</SelectItem>
+                    <SelectItem value="SC">Santa Catarina</SelectItem>
+                    <SelectItem value="SP">São Paulo</SelectItem>
+                    <SelectItem value="SE">Sergipe</SelectItem>
+                    <SelectItem value="TO">Tocantins</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Grau de Instrução</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
-                            value={form.grauInstrucao || ''}
-                            onValueChange={(value) => setForm(prev => ({ ...prev, grauInstrucao: value }))}
-                          >
+                <Select 
+                  value={form.grauInstrucao || ''} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, grauInstrucao: value }))}
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                               <SelectValue placeholder="Selecione o grau" />
-                            </SelectTrigger>
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-h-[300px]">
-                              <SelectItem value="ANALFABETO">Analfabeto</SelectItem>
+                    <SelectItem value="ANALFABETO">Analfabeto</SelectItem>
                               <SelectItem value="FUNDAMENTAL_INCOMPLETO">Ens. Fundamental Incompleto</SelectItem>
                               <SelectItem value="FUNDAMENTAL_COMPLETO">Ens. Fundamental Completo</SelectItem>
                               <SelectItem value="MEDIO_INCOMPLETO">Ens. Médio Incompleto</SelectItem>
                               <SelectItem value="MEDIO_COMPLETO">Ens. Médio Completo</SelectItem>
                               <SelectItem value="SUPERIOR_INCOMPLETO">Ens. Superior Incompleto</SelectItem>
                               <SelectItem value="SUPERIOR_COMPLETO">Ens. Superior Completo</SelectItem>
-                              <SelectItem value="POS_GRADUACAO">Pós-Graduação</SelectItem>
-                              <SelectItem value="MESTRADO">Mestrado</SelectItem>
-                              <SelectItem value="DOUTORADO">Doutorado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
+                    <SelectItem value="POS_GRADUACAO">Pós-Graduação</SelectItem>
+                    <SelectItem value="MESTRADO">Mestrado</SelectItem>
+                    <SelectItem value="DOUTORADO">Doutorado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Matrícula eSocial</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="matriculaEsocial"
-                            value={form.matriculaEsocial || ''}
-                            onChange={handleChange}
+                <Input 
+                  name="matriculaEsocial" 
+                  value={form.matriculaEsocial || ''} 
+                  onChange={handleChange} 
                             placeholder="Matrícula"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Estado Civil</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
-                            value={form.maritalStatus}
-                            onValueChange={(value) => setForm(prev => ({ ...prev, maritalStatus: value }))}
-                          >
+                <Select 
+                  value={form.maritalStatus} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, maritalStatus: value }))}
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                               <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                              <SelectItem value="SINGLE">Solteiro</SelectItem>
-                              <SelectItem value="MARRIED">Casado</SelectItem>
-                              <SelectItem value="DIVORCED">Divorciado</SelectItem>
-                              <SelectItem value="WIDOWED">Viúvo</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
+                    <SelectItem value="SINGLE">Solteiro</SelectItem>
+                    <SelectItem value="MARRIED">Casado</SelectItem>
+                    <SelectItem value="DIVORCED">Divorciado</SelectItem>
+                    <SelectItem value="WIDOWED">Viúvo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Nacionalidade</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="nationality"
-                            value={form.nationality}
-                            onChange={handleChange}
+                <Input 
+                  name="nationality" 
+                  value={form.nationality} 
+                  onChange={handleChange} 
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Dados Familiares (Nomes dos pais) */}
-                      <div className="mt-4 pt-4 border-t border-gray-600">
+                />
+              </div>
+            </div>
+            
+            {/* Dados Familiares (Nomes dos pais) */}
+            <div className="mt-4 pt-4 border-t border-gray-600">
                         <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
                           <UsersIcon className="mr-2" size={16} />
                           Dados Familiares (Nomes dos pais)
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Nome da Mãe</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="nomeMae"
-                              value={form.nomeMae || ''}
-                              onChange={handleChange}
-                              placeholder="Nome completo da mãe"
+                  <Input 
+                    name="nomeMae" 
+                    value={form.nomeMae || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome completo da mãe"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
-                          <div>
+                  />
+                </div>
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Nome do Pai</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="nomePai"
-                              value={form.nomePai || ''}
-                              onChange={handleChange}
-                              placeholder="Nome completo do pai"
+                  <Input 
+                    name="nomePai" 
+                    value={form.nomePai || ''} 
+                    onChange={handleChange} 
+                    placeholder="Nome completo do pai"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Título de Eleitor */}
-                      <div className="mt-4 pt-4 border-t border-gray-600">
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Título de Eleitor */}
+            <div className="mt-4 pt-4 border-t border-gray-600">
                         <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
                           <FileText className="mr-2" size={16} />
                           Título de Eleitor
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Número</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="tituloEleitor"
-                              value={form.tituloEleitor || ''}
+                  <Input 
+                    name="tituloEleitor" 
+                    value={form.tituloEleitor || ''} 
                               onChange={handleTituloEleitorChange}
-                              placeholder="Ex: 2236.5048.0205"
+                    placeholder="Ex: 2236.5048.0205"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
-                          <div>
+                  />
+                </div>
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Zona</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="tituloEleitorZona"
-                              value={form.tituloEleitorZona || ''}
-                              onChange={handleChange}
-                              placeholder="Ex: 316"
+                  <Input 
+                    name="tituloEleitorZona" 
+                    value={form.tituloEleitorZona || ''} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 316"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
-                          <div>
+                  />
+                </div>
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Seção</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="tituloEleitorSecao"
-                              value={form.tituloEleitorSecao || ''}
-                              onChange={handleChange}
-                              placeholder="Ex: 0585"
+                  <Input 
+                    name="tituloEleitorSecao" 
+                    value={form.tituloEleitorSecao || ''} 
+                    onChange={handleChange} 
+                    placeholder="Ex: 0585"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
+                  />
+                </div>
                           <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Data de Expedição</span>
@@ -2119,29 +2119,29 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
                             />
                           </div>
-                        </div>
-                      </div>
-
+              </div>
+            </div>
+            
                       {/* Nome do Conselho Regional */}
-                      <div className="mt-4 pt-4 border-t border-gray-600">
+            <div className="mt-4 pt-4 border-t border-gray-600">
                         <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
                           <FileText className="mr-2" size={16} />
                           Nome do Conselho Regional
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Sigla</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
+                  <Input 
                               name="nomeConselhoRegional"
                               value={form.nomeConselhoRegional || ''}
-                              onChange={handleChange}
+                    onChange={handleChange} 
                               placeholder="Ex: CRM, CRO, etc."
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
+                  />
+                </div>
                         </div>
                       </div>
 
@@ -2153,20 +2153,20 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* CNH */}
-                          <div>
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Número da CNH</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
+                  <Input 
                               name="cnhNumber"
                               value={form.cnhNumber || ''}
-                              onChange={handleChange}
+                    onChange={handleChange} 
                               placeholder="00000000000"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
-                          <div>
+                  />
+                </div>
+                <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Categoria da CNH</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
@@ -2196,14 +2196,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Validade da CNH</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
+                  <Input 
                               name="cnhExpirationDate"
-                              type="date"
+                    type="date" 
                               value={form.cnhExpirationDate || ''}
-                              onChange={handleChange}
+                    onChange={handleChange} 
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                            />
-                          </div>
+                  />
+                </div>
 
                           {/* CTPS */}
                           <div>
@@ -2218,7 +2218,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               placeholder="0000000"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                             />
-                          </div>
+              </div>
                           <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Série da CTPS</span>
@@ -2231,7 +2231,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               placeholder="0000"
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                             />
-                          </div>
+            </div>
                           <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Data de Emissão da CTPS</span>
@@ -2244,7 +2244,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               onChange={handleChange}
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
                             />
-                          </div>
+          </div>
 
                           {/* CIN - Carteira de Identidade Nacional */}
                           <div>
@@ -2290,104 +2290,104 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       </div>
 
                       {/* Seção de dados do cônjuge - aparece apenas se estado civil for "Casado" */}
-                      {form.maritalStatus === 'MARRIED' && (
+          {form.maritalStatus === 'MARRIED' && (
                         <div className="mt-4 pt-4 border-t border-gray-600">
                           <h4 className="text-md font-semibold text-seguranca-yellow mb-4 flex items-center">
                             <UserIcon className="mr-2" size={16} />
                             Dados do Cônjuge
                           </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">Nome do Cônjuge</span>
                                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                               </Label>
-                              <Input
-                                name="spouseName"
+                  <Input 
+                    name="spouseName" 
                                 value={form.spouseName || ''}
-                                onChange={handleChange}
-                                required
+                    onChange={handleChange} 
+                    required 
                                 placeholder="Nome completo do cônjuge"
                                 className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
+                  />
+                </div>
+                <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">CPF do Cônjuge</span>
                                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                               </Label>
-                              <Input
-                                name="spouseCpf"
+                  <Input 
+                    name="spouseCpf" 
                                 value={form.spouseCpf || ''}
-                                onChange={handleChange}
-                                required
+                    onChange={handleChange} 
+                    required 
                                 placeholder="000.000.000-00"
                                 className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
+                  />
+                </div>
+                <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">RG do Cônjuge</span>
                                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                               </Label>
-                              <Input
-                                name="spouseRg"
+                  <Input 
+                    name="spouseRg" 
                                 value={form.spouseRg || ''}
-                                onChange={handleChange}
+                    onChange={handleChange} 
                                 required
                                 placeholder="Número do RG"
                                 className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
+                  />
+                </div>
+                <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">Data de Nascimento do Cônjuge</span>
                                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                               </Label>
-                              <Input
-                                name="spouseBirthDate"
-                                type="date"
+                  <Input 
+                    name="spouseBirthDate" 
+                    type="date" 
                                 value={form.spouseBirthDate || ''}
-                                onChange={handleChange}
+                    onChange={handleChange} 
                                 required
                                 className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                              />
-                            </div>
-                            <div>
+                  />
+                </div>
+                <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">Profissão do Cônjuge</span>
                                 <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                               </Label>
-                              <Input
+                  <Input 
                                 name="spouseProfession"
                                 value={form.spouseProfession || ''}
-                                onChange={handleChange}
+                    onChange={handleChange} 
                                 placeholder="Profissão do cônjuge"
                                 className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                            <div>
+                  />
+                </div>
+                <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">Telefone do Cônjuge</span>
                                 <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                               </Label>
-                              <Input
+                  <Input 
                                 name="spousePhone"
                                 value={form.spousePhone || ''}
-                                onChange={handleChange}
+                    onChange={handleChange} 
                                 placeholder="(00) 00000-0000"
                                 className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
                       {/* Seção de dependentes removida do formulário de criação. A gestão de dependentes permanece no modo de edição via modal dedicado. */}
                     </div>
                   </Card>
 
-                  {/* Seção: Informações de Contato */}
+          {/* Seção: Informações de Contato */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
                     <div className="p-4 sm:p-6 space-y-4">
                       <div className="flex items-center gap-2 sm:gap-3">
@@ -2396,61 +2396,61 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Informações de Contato</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Email</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="email"
-                            type="email"
-                            value={form.email}
-                            onChange={handleChange}
-                            placeholder="exemplo@email.com"
+                <Input 
+                  name="email" 
+                  type="email" 
+                  value={form.email} 
+                  onChange={handleChange}
+                  placeholder="exemplo@email.com"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">WhatsApp</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="phone"
+                <Input 
+                  name="phone" 
                             value={aplicarMascaraTelefone(form.phone || '')}
                             onChange={(e) => {
                               const valor = e.target.value.replace(/\D/g, '');
                               setForm(prev => ({ ...prev, phone: valor }));
                             }}
-                            required
-                            placeholder="(00) 00000-0000"
+                  required 
+                  placeholder="(00) 00000-0000"
                             maxLength={15}
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Telefone de Contato</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="telefoneContato"
+                <Input 
+                  name="telefoneContato" 
                             value={aplicarMascaraTelefone(form.telefoneContato || '')}
-                            onChange={(e) => {
-                              const valor = e.target.value.replace(/\D/g, '');
+                  onChange={(e) => {
+                    const valor = e.target.value.replace(/\D/g, '');
                               setForm(prev => ({ ...prev, telefoneContato: valor }));
-                            }}
-                            placeholder="(00) 00000-0000"
-                            maxLength={15}
+                  }}
+                  placeholder="(00) 00000-0000"
+                  maxLength={15}
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                      </div>
+                />
+              </div>
+            </div>
                     </div>
                   </Card>
-
-                  {/* Seção: Endereço Separado */}
+            
+            {/* Seção: Endereço Separado */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
                     <div className="p-4 sm:p-6 space-y-4">
                       <div className="flex items-center gap-2 sm:gap-3">
@@ -2459,7 +2459,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Endereço</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 sm:gap-4">
                           <div className="flex-1 min-w-0">
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
@@ -2480,86 +2480,86 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">CEP</span>
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                             </Label>
-                            <div className="flex gap-2">
-                              <Input
-                                name="enderecoCep"
+                  <div className="flex gap-2">
+                    <Input 
+                      name="enderecoCep" 
                                 value={aplicarMascaraCep(form.enderecoCep || '')}
-                                onChange={(e) => {
-                                  const valor = e.target.value.replace(/\D/g, '');
+                      onChange={(e) => {
+                        const valor = e.target.value.replace(/\D/g, '');
                                   setForm(prev => ({ ...prev, enderecoCep: valor }));
-                                  if (valor.length === 8) {
-                                    buscarCep(valor);
-                                  }
-                                }}
-                                placeholder="00000-000"
-                                maxLength={9}
-                                required
+                        if (valor.length === 8) {
+                          buscarCep(valor);
+                        }
+                      }}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      required
                                 className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                              />
-                              {loadingCep && (
+                    />
+                    {loadingCep && (
                                 <div className="flex items-center px-1 text-seguranca-yellow">
                                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-yellow"></div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                </div>
+                <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Número</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="enderecoNumero"
+                  <Input 
+                    name="enderecoNumero" 
                             value={form.enderecoNumero || ''}
-                            onChange={handleChange}
-                            placeholder="123"
-                            required
+                    onChange={handleChange} 
+                    placeholder="123"
+                    required
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                  />
+                </div>
+                <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Complemento</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="enderecoComplemento"
+                  <Input 
+                    name="enderecoComplemento" 
                             value={form.enderecoComplemento || ''}
-                            onChange={handleChange}
+                    onChange={handleChange} 
                             placeholder="Apt 101, Bloco B"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                  />
+                </div>
+                <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Bairro</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="enderecoBairro"
+                  <Input 
+                    name="enderecoBairro" 
                             value={form.enderecoBairro || ''}
-                            onChange={handleChange}
+                    onChange={handleChange} 
                             placeholder="Centro"
-                            required
+                    required
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
+                  />
+                </div>
                         <div className="flex gap-4">
                           <div className="flex-1">
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Cidade</span>
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                             </Label>
-                            <Input
-                              name="enderecoCidade"
+                  <Input 
+                    name="enderecoCidade" 
                               value={form.enderecoCidade || ''}
-                              onChange={handleChange}
+                    onChange={handleChange} 
                               placeholder="São Paulo"
-                              required
+                    required
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                            />
-                          </div>
+                  />
+                </div>
                           <div className="w-24">
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">UF</span>
@@ -2568,7 +2568,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <Select
                               value={form.enderecoUf || ''}
                               onValueChange={(value) => setForm(prev => ({ ...prev, enderecoUf: value }))}
-                              required
+                    required
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                                 <SelectValue placeholder="UF" />
@@ -2603,10 +2603,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 <SelectItem value="TO">Tocantins</SelectItem>
                               </SelectContent>
                             </Select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                </div>
+              </div>
+            </div>
+          </div>
                   </Card>
 
                   {/* Seção: Dados Bancários */}
@@ -2618,57 +2618,57 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg font-semibold text-white">Dados Bancários</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Banco</Label>
-                          <Input
+                <Input 
                             name="bankData.bank"
                             value={form.bankData?.bank || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Nome do banco"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Agência</Label>
-                          <Input
+                <Input 
                             name="bankData.agency"
                             value={form.bankData?.agency || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="0000"
-                          />
-                        </div>
+                />
+              </div>
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <Label className="text-sm font-medium text-gray-200">Conta Corrente</Label>
-                            <Input
+                <Input 
                               name="bankData.account"
                               value={form.bankData?.account || ''}
-                              onChange={handleChange}
+                  onChange={handleChange} 
                               placeholder="00000"
-                            />
-                          </div>
+                />
+              </div>
                           <div className="w-20">
                             <Label className="text-sm font-medium text-gray-200">Dígito</Label>
-                            <Input
+                <Input 
                               name="bankData.accountDigit"
                               value={form.bankData?.accountDigit || ''}
-                              onChange={handleChange}
+                  onChange={handleChange} 
                               placeholder="0"
                               maxLength={2}
-                            />
-                          </div>
-                        </div>
+                />
+              </div>
+              </div>
                         <div className="md:col-span-2">
                           <Label className="text-sm font-medium text-gray-200">Chave Pix</Label>
-                          <Input
+                <Input 
                             name="bankData.chavePix"
                             value={form.bankData?.chavePix || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="CPF, e-mail, telefone ou chave aleatória"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                />
+              </div>
+              </div>
+              </div>
                   </Card>
 
                   {/* Seção: Dados do Exame Médico (ASO) */}
@@ -2681,54 +2681,54 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         <h3 className="text-lg font-semibold text-white">Dados do Exame Médico (ASO)</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
-                          <Input
+                <Input 
                             name="exameMedicoData"
-                            type="date"
+                  type="date" 
                             value={form.exameMedicoData || ''}
                             onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value }))}
                             className="text-xs sm:text-sm h-9 sm:h-10"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
-                          <Input
+                <Input 
                             name="exameMedicoVencimento"
                             type="date"
                             value={form.exameMedicoVencimento || ''}
                             onChange={(e) => setForm(prev => ({ ...prev, exameMedicoVencimento: e.target.value }))}
                             className="text-xs sm:text-sm h-9 sm:h-10"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
-                          <Input
+                <Input 
                             name="exameMedicoVencimento"
                             type="date"
                             value={form.exameMedicoVencimento || ''}
                             onChange={(e) => setForm(prev => ({ ...prev, exameMedicoVencimento: e.target.value }))}
                             className="text-xs sm:text-sm h-9 sm:h-10"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Tipo de Exame Realizado</Label>
-                          <Select
+                <Select 
                             value={form.exameMedicoTipo || ''}
                             onValueChange={(value) => setForm(prev => ({ ...prev, exameMedicoTipo: value }))}
-                          >
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm h-9 sm:h-10">
                               <SelectValue placeholder="Selecione o tipo" />
-                            </SelectTrigger>
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-60 overflow-auto">
                               <SelectItem value="ADMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Admissional</SelectItem>
                               <SelectItem value="DEMISSIONAL" className="text-seguranca-lightgray hover:bg-gray-700">Demissional</SelectItem>
                               <SelectItem value="PERIODICO" className="text-seguranca-lightgray hover:bg-gray-700">Periódico</SelectItem>
                               <SelectItem value="MUDANCA_FUNCAO" className="text-seguranca-lightgray hover:bg-gray-700">Mudança de Função</SelectItem>
                               <SelectItem value="RETORNO_TRABALHO" className="text-seguranca-lightgray hover:bg-gray-700">Retorno ao Trabalho</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                  </SelectContent>
+                </Select>
+              </div>
                         <div className="md:col-span-2">
                           <div className="flex items-center justify-between mb-1.5">
                             <Label className="text-sm font-medium text-gray-200">Nome do Médico</Label>
@@ -2742,7 +2742,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             </button>
                           </div>
                           <div className="relative">
-                            <Input
+                <Input 
                               value={doctorSearchTerm}
                               onChange={(e) => {
                                 setDoctorSearchTerm(e.target.value);
@@ -2787,7 +2787,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                         }}
                                       >
                                         {doctor.name} - CRM {doctor.crmNumber}/{doctor.crmState}
-                                      </div>
+              </div>
                                     ))}
 
                                     <div className="p-2 border-t border-gray-600 sticky bottom-0 bg-seguranca-graphite">
@@ -2812,7 +2812,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           </div>
                         </div>
 
-                        <div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Este é o primeiro registro (1º emprego)?</Label>
                           <RadioGroup
                             value={form.exameMedicoPrimeiroEmprego === true ? 'sim' : form.exameMedicoPrimeiroEmprego === false ? 'nao' : ''}
@@ -2828,8 +2828,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <Label htmlFor="primeiro-nao" className="text-gray-300 cursor-pointer text-xs sm:text-sm">Não</Label>
                             </div>
                           </RadioGroup>
-                        </div>
-                        <div>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Contribuição Sindical está pago este ano?</Label>
                           <RadioGroup
                             value={form.exameMedicoContribuicaoSindicalPaga === true ? 'sim' : form.exameMedicoContribuicaoSindicalPaga === false ? 'nao' : ''}
@@ -2862,25 +2862,25 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-200">RNE nº</Label>
-                          <Input
+                <Input 
                             name="rneNumero"
                             value={form.rneNumero || ''}
                             onChange={(e) => setForm(prev => ({ ...prev, rneNumero: e.target.value }))}
                             placeholder="Número do RNE"
                             className="text-xs sm:text-sm h-9 sm:h-10"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Validade</Label>
-                          <Input
+                <Input 
                             name="rneValidade"
-                            type="date"
+                  type="date" 
                             value={form.rneValidade || ''}
                             onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value }))}
                             className="text-xs sm:text-sm h-9 sm:h-10"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200">Possui filhos com brasileiro?</Label>
                           <RadioGroup
                             value={form.temFilhosBrasileiros === true ? 'sim' : form.temFilhosBrasileiros === false ? 'nao' : ''}
@@ -2899,7 +2899,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-200">Quantos?</Label>
-                          <Input
+                <Input 
                             name="quantidadeFilhosBrasileiros"
                             type="number"
                             min="0"
@@ -2908,45 +2908,45 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             placeholder="Quantidade"
                             className="text-xs sm:text-sm h-9 sm:h-10"
                             disabled={form.temFilhosBrasileiros !== true}
-                          />
-                        </div>
+                />
+              </div>
                         <div className="md:col-span-2">
                           <Label className="text-sm font-medium text-gray-200 mb-2 block">
                             Em caso de estrangeiro naturalizado brasileiro, informar o Nº RIC / Órgão Emissor / Data Emissão:
                           </Label>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
+              <div>
                               <Label className="text-xs font-medium text-gray-300">Nº RIC</Label>
-                              <Input
+                <Input 
                                 name="ricNumero"
                                 value={form.ricNumero || ''}
                                 onChange={(e) => setForm(prev => ({ ...prev, ricNumero: e.target.value }))}
                                 placeholder="Número do RIC"
                                 className="text-xs sm:text-sm h-9 sm:h-10"
-                              />
-                            </div>
-                            <div>
+                />
+              </div>
+              <div>
                               <Label className="text-xs font-medium text-gray-300">Órgão Emissor</Label>
-                              <Input
+                <Input 
                                 name="ricOrgaoEmissor"
                                 value={form.ricOrgaoEmissor || ''}
                                 onChange={(e) => setForm(prev => ({ ...prev, ricOrgaoEmissor: e.target.value }))}
                                 placeholder="Órgão Emissor"
                                 className="text-xs sm:text-sm h-9 sm:h-10"
-                              />
-                            </div>
-                            <div>
+                />
+              </div>
+              <div>
                               <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
-                              <Input
+                <Input 
                                 name="ricDataEmissao"
-                                type="date"
+                  type="date" 
                                 value={form.ricDataEmissao || ''}
                                 onChange={(e) => setForm(prev => ({ ...prev, ricDataEmissao: e.target.value }))}
                                 className="text-xs sm:text-sm h-9 sm:h-10"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                />
+              </div>
+            </div>
+          </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-200">Tipo de Visto</Label>
                           <Input
@@ -2970,60 +2970,60 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Dados do Cadastro / Admissão</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">PIS</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="pis"
                             value={form.pis || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="000.00000.00-0"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Reservista nº</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="certificadoMilitar"
                             value={form.certificadoMilitar || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Número do certificado militar"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Data de Admissão</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="hireDate"
                             type="date"
                             value={form.hireDate}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             required
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Data de Demissão</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="dataRescisao"
                             type="date"
                             value={form.dataRescisao || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                          />
-                        </div>
+                />
+              </div>
                         {form.dataRescisao && (
                           <div className="md:col-span-2">
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
@@ -3062,7 +3062,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
+            </div>
                         )}
                         {/* Cargo */}
                         <div className="space-y-2 md:col-span-2">
@@ -3123,7 +3123,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               >
                                 <Plus size={16} />
                               </Button>
-                            </div>
+          </div>
 
                             {/* Cargo selecionado */}
                             {selectedPosition && (
@@ -3167,8 +3167,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Remuneração</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Salário (R$)</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
@@ -3236,7 +3236,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">Prazo de Experiência</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="prazoExperienciaTexto"
                             value={form.prazoExperienciaTexto || ''}
                             onChange={(e) => setForm(prev => ({ ...prev, prazoExperienciaTexto: e.target.value }))}
@@ -3265,38 +3265,38 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           <Input
                             name="folgaSemanal"
                             value={form.folgaSemanal || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Ex: 1ª Escola"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Escala de Trabalho</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="escalaTrabalho"
                             value={form.escalaTrabalho || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Ex: 12x36, 6x1, etc."
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Horário</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="horarioTrabalho"
                             value={form.horarioTrabalho || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Ex: 18:00 ÀS 06:00 H"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Intervalos Almoço/Janta</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
@@ -3321,14 +3321,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">Horário do Intervalo</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="horarioTrabalhoIntervalo"
                             value={form.horarioTrabalhoIntervalo || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Ex: 12:00 ÀS 13:00 H"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
+                />
+              </div>
 
                       </div>
                     </div>
@@ -3344,106 +3344,106 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Informações Profissionais</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Número de Registro</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="registrationNumber"
                             value={form.registrationNumber}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="EMP001"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
+                />
+              </div>
 
-                        <div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Status</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Select
-                            value={form.status}
-                            onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}
-                          >
+                <Select 
+                  value={form.status} 
+                  onValueChange={(value) => setForm(prev => ({ ...prev, status: value }))}
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                              <SelectValue placeholder="Selecione o status" />
-                            </SelectTrigger>
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
                               <SelectItem value="ACTIVE" className="hover:bg-gray-700">Ativo</SelectItem>
                               <SelectItem value="INACTIVE" className="hover:bg-gray-700">Inativo</SelectItem>
                               <SelectItem value="VACATION" className="hover:bg-gray-700">Férias</SelectItem>
                               <SelectItem value="TERMINATED" className="hover:bg-gray-700">Demitido</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                  </SelectContent>
+                </Select>
+              </div>
                         {form.status === 'TERMINATED' && (
                           <div className="md:col-span-2 bg-red-900/20 border border-red-500/40 rounded-lg p-3 sm:p-4">
                             <p className="text-red-300 text-sm sm:text-base flex items-center gap-2">
                               <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                               Ao definir o status como Demitido, é obrigatório informar a Data de Demissão na seção de Dados de Cadastro / Admissão.
                             </p>
-                          </div>
+              </div>
                         )}
-                        <div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">CBO</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="cbo"
                             value={form.cbo || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Ex: 517410"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Departamento</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
-                            value={(form as any).departmentId || ''}
-                            onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
-                          >
+                <Select 
+                  value={(form as any).departmentId || ''}
+                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                              <SelectValue placeholder="Selecione um departamento" />
-                            </SelectTrigger>
+                    <SelectValue placeholder="Selecione um departamento" />
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
                               {departments.map((d) => (
                                 <SelectItem key={d.id} value={d.id} className="hover:bg-gray-700">
                                   {d.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Unidade</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
-                            value={form.unit?.id || ''}
-                            onValueChange={(value) => handleSelectChange('unit', value)}
-                          >
+                <Select 
+                  value={form.unit?.id || ''} 
+                  onValueChange={(value) => handleSelectChange('unit', value)}
+                >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                              <SelectValue placeholder="Selecione uma unidade" />
-                            </SelectTrigger>
+                    <SelectValue placeholder="Selecione uma unidade" />
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                              {units.map((unit) => (
+                    {units.map((unit) => (
                                 <SelectItem key={unit.id} value={unit.id} className="hover:bg-gray-700">
-                                  <div className="flex items-center">
+                        <div className="flex items-center">
                                     <Building className="mr-2 text-seguranca-yellow" size={16} />
-                                    {unit.name}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {unit.name}
                         </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
                       </div>
                     </div>
                   </Card>
@@ -3458,65 +3458,65 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         <h3 className="text-lg sm:text-xl font-semibold text-white">FGTS</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Optante pelo FGTS?</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Select
+                <Select 
                             value={String(form.fgtsOptante ?? '')}
                             onValueChange={(value) => setForm(prev => ({ ...prev, fgtsOptante: value === 'true' }))}
                           >
                             <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                               <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
+                  </SelectTrigger>
                             <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
                               <SelectItem value="true" className="hover:bg-gray-700">Sim</SelectItem>
                               <SelectItem value="false" className="hover:bg-gray-700">Não</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Data da Opção</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="fgtsDataOpcao"
                             type="date"
                             value={form.fgtsDataOpcao || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Data de Retratação</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="fgtsDataRetratacao"
                             type="date"
                             value={form.fgtsDataRetratacao || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Banco Depositário</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="fgtsBancoDepositario"
                             value={form.fgtsBancoDepositario || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Ex: Banco do Brasil"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                />
+              </div>
+              </div>
+            </div>
                   </Card>
 
                   {/* Seção: PIS/PASEP */}
@@ -3525,38 +3525,38 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
                           <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                        </div>
+              </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">PIS / PASEP</h3>
-                      </div>
+              </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Número do PIS</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="pis"
                             value={form.pis || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             placeholder="Número do PIS"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
-                        <div>
+                />
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Data de Cadastro</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             name="pisDataCadastro"
                             type="date"
                             value={form.pisDataCadastro || ''}
-                            onChange={handleChange}
+                  onChange={handleChange} 
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                />
+              </div>
+            </div>
+          </div>
                   </Card>
 
                   {/* Seção: Foto e Observações */}
@@ -3568,13 +3568,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Documentos e Observações</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Foto 3x4</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
+                <Input 
                             type="file"
                             accept="image/*"
                             onChange={handlePhotoChange}
@@ -3587,8 +3587,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               className="mt-2 w-24 h-24 rounded-lg object-cover border border-gray-600 shadow-md"
                             />
                           )}
-                        </div>
-                        <div>
+              </div>
+              <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Observações</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
@@ -3627,7 +3627,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                           Adicionar Dependente
                         </Button>
-                      </div>
+                          </div>
 
                       {/* Permitir adicionar dependentes mesmo na criação - serão salvos após salvar o funcionário */}
                       {employeeDependents.length === 0 && !isEditMode ? (
@@ -3673,8 +3673,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                           <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
                                             Beneficiário
                                           </Badge>
-                                        )}
-                                      </div>
+                      )}
+                    </div>
                                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
                                         {dependent.cpf && (
                                           <p className="text-gray-400">
@@ -3690,9 +3690,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                           <p className="text-gray-400">
                                             <span className="font-medium">Telefone:</span> {dependent.phone}
                                           </p>
-                                        )}
-                                      </div>
-                                    </div>
+                  )}
+                </div>
+              </div>
                                     <div className="flex gap-2 ml-4">
                                       <Button
                                         type="button"
@@ -3712,14 +3712,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                       >
                                         <Trash2 size={16} />
                                       </Button>
-                                    </div>
-                                  </div>
-                                </div>
+              </div>
+              </div>
+            </div>
                               ))}
                               <p className="text-gray-400 text-xs mt-2">
                                 Total: {employeeDependents.length} dependente(s)
                               </p>
-                            </div>
+          </div>
                           )}
                         </div>
                       )}
@@ -3734,9 +3734,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
                           <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                        </div>
+              </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Gerar a ficha simples para contabilidade</h3>
-                      </div>
+              </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                         <Button
                           type="button"
@@ -3768,8 +3768,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           <FileSpreadsheet className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                           Gerar Excel
                         </Button>
-                      </div>
-                    </div>
+                  </div>
+                  </div>
                   </Card>
 
                   {!canGenerateReports ? (
@@ -3779,11 +3779,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <p className="text-gray-400 text-sm">
                         É necessário salvar o funcionário antes de ter acesso à geração de todos os documentos avançados.
                       </p>
-                    </div>
+              </div>
                   ) : (
                     <div className="mt-6 border-t border-gray-600 pt-6">
                       <DocumentosGerarTab hideHeader={true} employeeId={employeeToEdit?.id} companyId={selectedCompany?.id || ''} />
-                    </div>
+              </div>
                   )}
 
                   {/* Ficha de Registro - Principal */}
@@ -3792,9 +3792,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
                           <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                        </div>
+            </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Ficha de Registro do Funcionário</h3>
-                      </div>
+          </div>
                       <p className="text-xs sm:text-sm text-gray-400 -mt-2">
                         Emissão da ficha completa de registro do funcionário com todos os dados cadastrais.
                       </p>
@@ -3839,9 +3839,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       <div className="flex items-center gap-2 sm:gap-3">
                         <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
                           <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                        </div>
+              </div>
                         <h3 className="text-lg sm:text-xl font-semibold text-white">Ficha de Entrega de EPI</h3>
-                      </div>
+            </div>
                       <p className="text-xs sm:text-sm text-gray-400 -mt-2">
                         Gera uma ficha de EPI em branco para preenchimento manual ou gerencie os EPIs entregues.
                       </p>
@@ -3876,32 +3876,32 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           <Shield className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                           Cadastrar / Gerenciar EPIs
                         </Button>
-                      </div>
+          </div>
                     </div>
                   </Card>
                 </TabsContent>
               </Tabs>
-
-              {error && (
-                <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
-                  <p className="text-destructive text-sm">{error}</p>
-                </div>
-              )}
-
+         
+          {error && (
+            <div className="bg-destructive/10 border border-destructive rounded-lg p-4">
+              <p className="text-destructive text-sm">{error}</p>
+            </div>
+          )}
+         
               <DialogFooter className="flex flex-col gap-3 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-600 overflow-x-hidden mt-6">
                 {/* Botões de ação */}
                 <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onOpenChange(false)}
-                    disabled={loading}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)} 
+              disabled={loading}
                     className="w-full h-10 sm:h-12 text-sm sm:text-base border-gray-500 text-gray-300 hover:bg-gray-700 hover:text-white"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
                     disabled={loading}
                     className="w-full h-10 sm:h-12 text-sm sm:text-base font-semibold bg-gradient-to-r from-seguranca-red to-[#cc0000] hover:from-[#cc0000] hover:to-[#990000] text-white shadow-lg shadow-seguranca-red/20 border-0"
                   >
@@ -3913,19 +3913,19 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     ) : (
                       'Salvar'
                     )}
-                  </Button>
+            </Button>
                 </div>
-              </DialogFooter>
-            </form>
+          </DialogFooter>
+                 </form>
           </div>
-        </DialogContent>
-
-        {/* Modal de Novo Cargo */}
-        <NovoCargoModal
-          open={novoCargoModalOpen}
-          onClose={() => setNovoCargoModalOpen(false)}
-          onCargoCreated={handleCargoCreated}
-        />
+       </DialogContent>
+       
+       {/* Modal de Novo Cargo */}
+       <NovoCargoModal
+         open={novoCargoModalOpen}
+         onClose={() => setNovoCargoModalOpen(false)}
+         onCargoCreated={handleCargoCreated}
+       />
 
         {/* Modal de Criar Usuário Padrão */}
         <CriarUsuarioPadraoModal
@@ -3992,10 +3992,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               <FichaEntregaEPIForm employeeId={employeeIdValue || undefined} />
             </div>
           </DialogContent>
-        </Dialog>
+     </Dialog>
       </Dialog>
     </TooltipProvider >
-  );
-};
+   );
+ };
 
-export default FuncionarioEditModal; 
+export default FuncionarioEditModal;

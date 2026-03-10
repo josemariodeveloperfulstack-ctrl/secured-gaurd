@@ -220,7 +220,9 @@ public class SSTEPIService {
      */
     @Transactional(readOnly = true)
     public List<EPIDelivery> getAllDeliveries() {
-        return deliveryRepository.findAll();
+        // Usa consulta com FETCH JOIN para inicializar relações necessárias
+        // e evitar LazyInitializationException em ambientes com open-in-view=false (como CI).
+        return deliveryRepository.findAllWithDetails();
     }
 
     /**

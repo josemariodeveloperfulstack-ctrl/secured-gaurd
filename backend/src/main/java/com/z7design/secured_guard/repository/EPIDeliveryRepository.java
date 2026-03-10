@@ -75,4 +75,16 @@ public interface EPIDeliveryRepository extends JpaRepository<EPIDelivery, UUID> 
      */
     @Query("SELECT COUNT(e) FROM EPIDelivery e WHERE e.employee.id = :employeeId AND e.deliveryDate BETWEEN :startDate AND :endDate")
     Long countByEmployeeAndDeliveryDateBetween(@Param("employeeId") UUID employeeId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    /**
+     * Busca todas as entregas com relacionamentos necessários já inicializados
+     * para evitar LazyInitializationException quando open-in-view está desativado.
+     */
+    @Query("""
+            SELECT e FROM EPIDelivery e
+            LEFT JOIN FETCH e.employee
+            LEFT JOIN FETCH e.epi
+            LEFT JOIN FETCH e.deliveredByUser
+            """)
+    List<EPIDelivery> findAllWithDetails();
 }

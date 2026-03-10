@@ -4,7 +4,7 @@ Fluxo do tráfego: **Utilizador → Cloudflare → VPS (Traefik:443) → nginx (
 
 Se o site devolve 404 mas no servidor `curl http://127.0.0.1:8085/api/health` dá 200, o problema está no Cloudflare ou no Traefik.
 
-- **502 Bad Gateway**: Traefik não consegue alcançar o Nginx (config dinâmica incorreta ou rede)
+- **502 Bad Gateway**: O servidor de origem (backend ou nginx) não responde. Pode ser: backend parado/crashado, nginx não consegue conectar ao backend, ou Traefik não alcança o nginx.
 - **404**: Rota não encontrada (Traefik não está encaminhando corretamente)
 
 ---
@@ -84,6 +84,23 @@ O deploy copia `traefik-dynamic-prod.yml` para `/var/www/secured_guard/traefik/d
 - Prioridade 2000
 
 O Traefik recarrega automaticamente (providers.file.watch=true).
+
+## Diagnóstico e correção 502 (Bad Gateway)
+
+Execute na VPS para diagnosticar e tentar corrigir o 502:
+
+```bash
+cd /var/www/secured_guard/prod/deploy
+bash /var/www/secured_guard/prod/scripts/diagnostico-502-prod.sh
+```
+
+O script verifica: status dos containers, backend, conectividade nginx→backend, e tenta reiniciar backend/nginx se necessário. Se o backend não inicia, verifique os logs:
+
+```bash
+docker logs --tail=100 secured-guard-backend-prod
+```
+
+---
 
 ## Correção 502 (Traefik não acessa Nginx)
 
