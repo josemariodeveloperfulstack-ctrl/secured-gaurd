@@ -34,6 +34,19 @@ const GROUP_OPTIONS: { value: UserGroup; label: string }[] = [
   { value: 'GRUPO_AUDITOR', label: 'Auditor' },
   { value: 'GRUPO_AUXILIARES', label: 'Auxiliares' },
   { value: 'GRUPO_COMERCIAL', label: 'Comercial' },
+  { value: 'GRUPO_VIGILANTES', label: 'Vigilantes' },
+  { value: 'GRUPO_VIGIAS', label: 'Vigias' },
+  { value: 'GRUPO_ASSISTENTE_ADMINISTRATIVO', label: 'Assistente Administrativo' },
+  { value: 'GRUPO_ANALISTA_SUPRIMENTOS', label: 'Analista de Suprimentos' },
+  { value: 'GRUPO_SUPRIMENTOS', label: 'Suprimentos' },
+  { value: 'GRUPO_COMPRAS', label: 'Compras' },
+  { value: 'GRUPO_ESTOQUE', label: 'Estoque' },
+  { value: 'GRUPO_ASSISTENTE_COMERCIAL', label: 'Assistente Comercial' },
+  { value: 'GRUPO_GESTOR_COMERCIAL', label: 'Gestor Comercial' },
+  { value: 'GRUPO_GESTOR_SUPERVISAO', label: 'Gestor de Supervisão' },
+  { value: 'GRUPO_GESTOR_FINANCEIRO', label: 'Gestor Financeiro' },
+  { value: 'GRUPO_GESTOR_RH', label: 'Gestor de RH' },
+  { value: 'GRUPO_GESTOR_DPE', label: 'Gestor de Departamento Pessoal' }
 ];
 
 export const GroupFormModal: React.FC<GroupFormModalProps> = ({
