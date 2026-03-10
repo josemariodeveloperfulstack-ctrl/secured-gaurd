@@ -733,6 +733,26 @@ export function DynamicSidebar() {
           console.log(`🚫 ${normalizedRole} - escondendo item operacional: ${item.id}`);
           return false;
         }
+
+        // RH e Departamento Pessoal NÃO veem Módulo Financeiro nem Módulo Fiscal
+        const forbiddenFinancialIds = new Set([
+          'modulo-financeiro',
+          'gestao-financeira-dashboard',
+          'gestao-financeira-contas-pagar',
+          'gestao-financeira-contas-receber',
+          'gestao-financeira-fluxo-caixa',
+          'gestao-financeira-movimentacoes',
+          'gestao-financeira-conciliacao',
+          'gestao-financeira-relatorios',
+          'gestao-financeira-orcamento',
+          'gestao-financeira-centros-custo',
+          'gestao-patrimonial',
+          'modulo-fiscal',
+        ]);
+        if (forbiddenFinancialIds.has(item.id)) {
+          console.log(`🚫 ${normalizedRole} - escondendo item financeiro/fiscal: ${item.id}`);
+          return false;
+        }
       }
 
       // Se tem role específico, verificar se o usuário tem esse role

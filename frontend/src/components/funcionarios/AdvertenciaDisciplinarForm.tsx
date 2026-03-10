@@ -236,25 +236,32 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-base font-semibold">Funcionário</Label>
+                  <Label className="text-base font-semibold">
+                    Funcionário
+                    <span className="block text-[11px] font-normal text-muted-foreground/80">
+                      Colaborador que receberá a advertência.
+                    </span>
+                  </Label>
                   <Select
                     value={form.funcionarioId}
                     onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                     disabled={loadingData}
                   >
-                    <SelectTrigger className="h-11 bg-background">
+                    <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-red-500/30 focus:border-red-500/70 [&>span]:text-left [&>span]:truncate">
                       <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
                       {loadingData ? (
                         <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
                       ) : employees.length > 0 ? (
                         employees.map(f => (
-                          <SelectItem key={f.id} value={f.id}>
-                            <div className="flex flex-col py-1">
-                              <span className="font-medium text-base">{f.name}</span>
-                              {f.cpf && (
-                                <span className="text-xs text-muted-foreground">CPF: {f.cpf}</span>
+                          <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
+                            <div className="flex flex-col gap-0.5 text-left">
+                              <span className="font-medium text-sm normal-case">{f.name}</span>
+                              {(f.cpf || (f as any).document) && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  CPF: {formatCPF(f.cpf || (f as any).document || '')}
+                                </span>
                               )}
                             </div>
                           </SelectItem>
@@ -266,28 +273,52 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                   </Select>
                 </div>
 
+                {funcionario && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60 md:col-span-1">
+                    <User className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-semibold text-foreground">
+                      {funcionario.name}
+                    </span>
+                    {(funcionario.cpf || (funcionario as any).document) && (
+                      <span className="text-[11px] text-muted-foreground">
+                        · CPF: {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  <Label className="text-base font-semibold">Empresa</Label>
+                  <Label className="text-base font-semibold">
+                    Empresa
+                    <span className="block text-[11px] font-normal text-muted-foreground/80">
+                      Empresa que está emitindo a advertência.
+                    </span>
+                  </Label>
                   <Select
                     value={form.empresaId}
                     onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
                     disabled={loadingData}
                   >
-                    <SelectTrigger className="h-11 bg-background">
+                    <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-red-500/30 focus:border-red-500/70 [&>span]:text-left [&>span]:truncate">
                       <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
                       {loadingData ? (
                         <div className="p-2 text-center text-sm text-gray-500">Carregando empresas...</div>
                       ) : companies.length > 0 ? (
                         companies.map(e => (
-                          <SelectItem key={e.id} value={e.id}>
-                            <div className="flex flex-col py-1">
-                              <span className="font-medium text-base">
+                          <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
+                            <div className="flex flex-col gap-0.5 text-left">
+                              <span className="font-medium text-sm normal-case">
                                 {e.sigla || e.tradeName || e.name}
                               </span>
                               {(e.sigla || e.tradeName) && e.name && (
-                                <span className="text-xs text-muted-foreground">{e.name}</span>
+                                <span className="text-[11px] text-muted-foreground">{e.name}</span>
+                              )}
+                              {e.cnpj && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  CNPJ: {formatCNPJ(e.cnpj)}
+                                </span>
                               )}
                             </div>
                           </SelectItem>
@@ -298,6 +329,25 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {empresa && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60 md:col-span-1">
+                    <Building className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-xs font-semibold text-foreground">
+                      {empresa.sigla || empresa.tradeName || empresa.name}
+                    </span>
+                    {empresa.name && (
+                      <span className="text-[11px] text-muted-foreground">
+                        · Razão Social: {empresa.name}
+                      </span>
+                    )}
+                    {empresa.cnpj && (
+                      <span className="text-[11px] text-muted-foreground">
+                        · CNPJ: {formatCNPJ(empresa.cnpj)}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

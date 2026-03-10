@@ -40,7 +40,7 @@ public class PositionController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_RH')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_RH')")
     @Operation(summary = "Buscar cargos", description = "Busca cargos por nome com filtro dinâmico")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Cargos encontrados com sucesso"),
@@ -88,6 +88,7 @@ public class PositionController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_WRITE', 'ROLE_SUPER_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
     @Operation(summary = "Criar novo cargo", description = "Cria um novo cargo na empresa")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Cargo criado com sucesso"),
@@ -102,6 +103,7 @@ public class PositionController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_WRITE', 'ROLE_SUPER_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
     @Operation(summary = "Atualizar cargo", description = "Atualiza um cargo existente na empresa")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Cargo atualizado com sucesso"),
@@ -118,6 +120,7 @@ public class PositionController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_DELETE', 'ROLE_SUPER_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')")
     @Operation(summary = "Excluir cargo", description = "Exclui um cargo da empresa")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Cargo excluído com sucesso"),

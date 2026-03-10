@@ -10,7 +10,9 @@ import { SessionTimeoutManager } from '@/components/SessionTimeoutManager';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { AppUpdateNotifier } from '@/components/AppUpdateNotifier';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -247,8 +249,6 @@ const GestaoFerias = lazy(() => import('@/pages/GestaoFerias'));
 const GestaoTarefas = lazy(() => import('@/pages/GestaoTarefas'));
 const RelatoriosOperacionais = lazy(() => import('@/pages/RelatoriosOperacionais'));
 
-const queryClient = new QueryClient();
-
 function App() {
   useEffect(() => {
     // Tratamento global para erros de message channel (extensões do browser)
@@ -295,6 +295,7 @@ function App() {
                 }}
               >
                 <AuthProvider>
+                  <AppUpdateNotifier />
                   <SessionTimeoutManager />
                   <WebSocketConnector />
                   <Routes>

@@ -88,43 +88,43 @@ const ContasAPagarTab: React.FC = () => {
     vencendoEm7Dias: 0
   });
 
-  // Carregar dados
+  // Carregar dados - usa getAllContasAPagar() para trazer TODAS as contas (igual à página /contas-a-pagar)
+  // getContasAPagar() retorna apenas a primeira página (20 itens) da API paginada
   const loadData = async () => {
     try {
       setLoading(true);
-      const data = await contasAPagarService.getContasAPagar();
+      const data = await contasAPagarService.getAllContasAPagar();
       setContas(data);
 
-      // Calcular alertas de vencimento
       const hoje = new Date();
+
+      // Calcular alertas de vencimento (próximos 7 dias)
       const proximos7Dias = addDays(hoje, 7);
       const alertas = data.filter(conta =>
         conta.status === 'ABERTA' &&
-        isBefore(conta.vencimento, proximos7Dias) &&
-        !isBefore(conta.vencimento, hoje)
+        !isBefore(new Date(conta.vencimento), hoje) &&
+        isBefore(new Date(conta.vencimento), proximos7Dias)
       );
       setAlertasVencimento(alertas);
 
-      // Calcular estatísticas
-      const totalContas = data.length;
-      const contasAbertas = data.filter(c => c.status === 'ABERTA').length;
-      const contasVencidas = data.filter(c => c.status === 'VENCIDA').length;
-      const contasPagas = data.filter(c => c.status === 'PAGA').length;
-      const valorTotal = data.reduce((sum, c) => sum + c.valor, 0);
-      const valorVencidas = data.filter(c => c.status === 'VENCIDA').reduce((sum, c) => sum + c.valor, 0);
-      const vencendoEm7Dias = data.filter(c => {
-        const diasAteVencimento = Math.ceil((c.vencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-        return c.status === 'ABERTA' && diasAteVencimento <= 7 && diasAteVencimento >= 0;
-      }).length;
+      // Calcular estatísticas - mesma lógica da página ContasAPagar.tsx
+      const contasVencidas = data.filter(c =>
+        c.status === 'VENCIDA' || (c.status === 'ABERTA' && isBefore(new Date(c.vencimento), hoje))
+      );
+      const contasVencendoEm7Dias = data.filter(c =>
+        c.status === 'ABERTA' &&
+        new Date(c.vencimento) >= hoje &&
+        new Date(c.vencimento) <= addDays(hoje, 7)
+      );
 
       setStats({
-        totalContas,
-        contasAbertas,
-        contasVencidas,
-        contasPagas,
-        valorTotal,
-        valorVencidas,
-        vencendoEm7Dias
+        totalContas: data.length,
+        contasAbertas: data.filter(c => c.status === 'ABERTA').length,
+        contasVencidas: contasVencidas.length,
+        contasPagas: data.filter(c => c.status === 'PAGA').length,
+        valorTotal: data.reduce((sum, c) => sum + c.valor, 0),
+        valorVencidas: contasVencidas.reduce((sum, c) => sum + c.valor, 0),
+        vencendoEm7Dias: contasVencendoEm7Dias.length
       });
     } catch (error) {
       console.error('Erro ao carregar contas a pagar:', error);

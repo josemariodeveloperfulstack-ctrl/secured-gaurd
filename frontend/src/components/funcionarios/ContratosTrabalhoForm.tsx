@@ -317,7 +317,12 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
             <div className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-muted-foreground">Funcionário</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Funcionário
+                    <span className="block text-[11px] font-normal text-muted-foreground/80">
+                      Selecione o colaborador que terá o contrato gerado.
+                    </span>
+                  </Label>
                   <Select
                     value={form.employeeId}
                     onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
@@ -334,8 +339,10 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                           <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
                             <div className="flex flex-col gap-0.5 text-left">
                               <span className="font-medium normal-case">{f.name}</span>
-                              {f.document && (
-                                <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
+                              {(f.cpf || (f as any).document) && (
+                                <span className="text-xs text-muted-foreground">
+                                  CPF: {formatCPF(f.cpf || (f as any).document || '')}
+                                </span>
                               )}
                             </div>
                           </SelectItem>
@@ -345,10 +352,33 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                       )}
                     </SelectContent>
                   </Select>
+                  {funcionario && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
+                      <User className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">
+                        {funcionario.name}
+                      </span>
+                      {(funcionario.cpf || (funcionario as any).document) && (
+                        <span className="text-[11px] text-muted-foreground">
+                          · CPF: {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
+                        </span>
+                      )}
+                      {(funcionario as any).position?.name && (
+                        <span className="text-[11px] text-muted-foreground">
+                          · Cargo: {(funcionario as any).position?.name}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-muted-foreground">Empresa</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Empresa
+                    <span className="block text-[11px] font-normal text-muted-foreground/80">
+                      Escolha a empresa empregadora que assinará o contrato.
+                    </span>
+                  </Label>
                   <Select
                     value={form.companyId}
                     onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
@@ -370,6 +400,11 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                               {(e.sigla || e.tradeName) && e.name && (
                                 <span className="text-xs text-muted-foreground">{e.name}</span>
                               )}
+                              {e.cnpj && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  CNPJ: {formatCNPJ(e.cnpj)}
+                                </span>
+                              )}
                             </div>
                           </SelectItem>
                         ))
@@ -378,6 +413,24 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                       )}
                     </SelectContent>
                   </Select>
+                  {empresa && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
+                      <Building className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-semibold text-foreground">
+                        {empresa.sigla || empresa.tradeName || empresa.name}
+                      </span>
+                      {empresa.name && (
+                        <span className="text-[11px] text-muted-foreground">
+                          · Razão Social: {empresa.name}
+                        </span>
+                      )}
+                      {empresa.cnpj && (
+                        <span className="text-[11px] text-muted-foreground">
+                          · CNPJ: {formatCNPJ(empresa.cnpj)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

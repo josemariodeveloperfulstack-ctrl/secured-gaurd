@@ -56,8 +56,8 @@ public class TimeRecordController {
         @PostMapping("/register")
         @PreAuthorize("""
                         hasAnyAuthority('TIME_RECORD_CREATE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
-                                        'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
-                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+                                        'ASSISTENTE_ADMINISTRATIVO', 'ANALISTA_SUPRIMENTOS', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS')
+                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO','ANALISTA_SUPRIMENTOS')
                         """)
         public ResponseEntity<?> registerTimeRecord(@RequestBody Map<String, Object> request) {
                 try {

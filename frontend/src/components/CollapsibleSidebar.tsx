@@ -981,75 +981,84 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             </div>
           )}
 
-          {/* Grupo Estoque Simplificado */}
-          {shouldShowModule('STOCK_READ') && filteredEstoqueItems.length > 0 && (
+          {/* Grupo Suprimentos e Estoque (cabeçalho) + Estoque + Compras */}
+          {(shouldShowModule('STOCK_READ') || shouldShowModule('STOCK_MANAGE')) && (filteredEstoqueItems.length > 0 || filteredComprasItems.length > 0) && (
             <div className="mb-6">
               {!collapsed && (
                 <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                  Estoque
+                  Suprimentos e Estoque
                 </div>
               )}
-              <nav className="space-y-1 px-4">
-                {filteredEstoqueItems.map((item) => (
-                  <ScrollPreservingLink
-                    key={item.id}
-                    to={item.to}
-                    preserveScroll={true}
-                    ref={isActive(item.id) ? activeItemRef : undefined}
-                    className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <item.icon
-                      size={18}
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                    />
-                    {!collapsed && (
-                      <span className="truncate">{item.text}</span>
-                    )}
-                  </ScrollPreservingLink>
-                ))}
-              </nav>
-            </div>
-          )}
-
-          {/* Grupo Compras */}
-          {shouldShowModule('STOCK_MANAGE') && filteredComprasItems.length > 0 && (
-            <div className="mb-6">
-              {!collapsed && (
-                <div className="px-4 py-2 text-xs font-semibold text-seguranca-lightgray uppercase tracking-wider">
-                  Compras
-                </div>
+              {/* Subgrupo Estoque */}
+              {shouldShowModule('STOCK_READ') && filteredEstoqueItems.length > 0 && (
+                <>
+                  {!collapsed && (
+                    <div className="px-4 pt-1 pb-1 text-xs font-medium text-seguranca-lightgray/90 uppercase tracking-wider">
+                      Estoque
+                    </div>
+                  )}
+                  <nav className="space-y-1 px-4">
+                    {filteredEstoqueItems.map((item) => (
+                      <ScrollPreservingLink
+                        key={item.id}
+                        to={item.to}
+                        preserveScroll={true}
+                        ref={isActive(item.id) ? activeItemRef : undefined}
+                        className={`
+                          flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                          ${isActive(item.id)
+                            ? 'bg-seguranca-black text-seguranca-yellow'
+                            : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                          }
+                        `}
+                      >
+                        <item.icon
+                          size={18}
+                          className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
+                        />
+                        {!collapsed && (
+                          <span className="truncate">{item.text}</span>
+                        )}
+                      </ScrollPreservingLink>
+                    ))}
+                  </nav>
+                </>
               )}
-              <nav className="space-y-1 px-4">
-                {filteredComprasItems.map((item) => (
-                  <ScrollPreservingLink
-                    key={item.id}
-                    to={item.to}
-                    preserveScroll={true}
-                    ref={isActive(item.id) ? activeItemRef : undefined}
-                    className={`
-                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                      ${isActive(item.id)
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <item.icon
-                      size={18}
-                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                    />
-                    {!collapsed && (
-                      <span className="truncate">{item.text}</span>
-                    )}
-                  </ScrollPreservingLink>
-                ))}
-              </nav>
+              {/* Subgrupo Compras */}
+              {shouldShowModule('STOCK_MANAGE') && filteredComprasItems.length > 0 && (
+                <>
+                  {!collapsed && (
+                    <div className="px-4 pt-2 pb-1 text-xs font-medium text-seguranca-lightgray/90 uppercase tracking-wider">
+                      Compras
+                    </div>
+                  )}
+                  <nav className="space-y-1 px-4">
+                    {filteredComprasItems.map((item) => (
+                      <ScrollPreservingLink
+                        key={item.id}
+                        to={item.to}
+                        preserveScroll={true}
+                        ref={isActive(item.id) ? activeItemRef : undefined}
+                        className={`
+                          flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                          ${isActive(item.id)
+                            ? 'bg-seguranca-black text-seguranca-yellow'
+                            : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                          }
+                        `}
+                      >
+                        <item.icon
+                          size={18}
+                          className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
+                        />
+                        {!collapsed && (
+                          <span className="truncate">{item.text}</span>
+                        )}
+                      </ScrollPreservingLink>
+                    ))}
+                  </nav>
+                </>
+              )}
             </div>
           )}
 

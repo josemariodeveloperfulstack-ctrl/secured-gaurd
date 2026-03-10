@@ -11,7 +11,7 @@ import { FileText, Download, Eye, User, Building, Calendar, Clock, MapPin, Alert
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { clientService, Client } from '@/services/clientService';
-import { formatCPF } from '@/utils/validation';
+import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
@@ -290,27 +290,37 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
-                <Label className="text-base font-semibold">Empresa</Label>
+                <Label className="text-base font-semibold">
+                  Empresa
+                  <span className="block text-[11px] font-normal text-muted-foreground/80">
+                    Empresa contratante da ordem de serviço.
+                  </span>
+                </Label>
                 <Select
                   value={form.companyId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
                   disabled={loadingData}
                 >
-                  <SelectTrigger className="h-11 bg-background">
+                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
                     <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
                     {loadingData ? (
                       <div className="p-2 text-center text-sm text-gray-500">Carregando empresas...</div>
                     ) : companies.length > 0 ? (
                       companies.map(e => (
-                        <SelectItem key={e.id} value={e.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">
+                        <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
+                          <div className="flex flex-col gap-0.5 text-left">
+                            <span className="font-medium text-sm normal-case">
                               {e.sigla || e.tradeName || e.name}
                             </span>
                             {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-xs text-muted-foreground">{e.name}</span>
+                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
+                            )}
+                            {e.cnpj && (
+                              <span className="text-[11px] text-muted-foreground">
+                                CNPJ: {formatCNPJ(e.cnpj)}
+                              </span>
                             )}
                           </div>
                         </SelectItem>
@@ -322,26 +332,52 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 </Select>
               </div>
 
+              {empresa && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60 lg:col-span-1">
+                  <Building className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">
+                    {empresa.sigla || empresa.tradeName || empresa.name}
+                  </span>
+                  {empresa.name && (
+                    <span className="text-[11px] text-muted-foreground">
+                      · Razão Social: {empresa.name}
+                    </span>
+                  )}
+                  {empresa.cnpj && (
+                    <span className="text-[11px] text-muted-foreground">
+                      · CNPJ: {formatCNPJ(empresa.cnpj)}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label className="text-base font-semibold">Funcionário</Label>
+                <Label className="text-base font-semibold">
+                  Funcionário
+                  <span className="block text-[11px] font-normal text-muted-foreground/80">
+                    Executante principal desta ordem de serviço.
+                  </span>
+                </Label>
                 <Select
                   value={form.employeeId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                   disabled={loadingData}
                 >
-                  <SelectTrigger className="h-11 bg-background">
+                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
                     <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
                     {loadingData ? (
                       <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
                     ) : employees.length > 0 ? (
                       employees.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{f.name}</span>
-                            {f.document && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
+                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
+                          <div className="flex flex-col gap-0.5 text-left">
+                            <span className="font-medium text-sm normal-case">{f.name}</span>
+                            {(f.cpf || (f as any).document) && (
+                              <span className="text-[11px] text-muted-foreground">
+                                CPF: {formatCPF(f.cpf || (f as any).document || '')}
+                              </span>
                             )}
                           </div>
                         </SelectItem>
@@ -353,26 +389,47 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 </Select>
               </div>
 
+              {funcionario && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60 lg:col-span-1">
+                  <User className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">
+                    {funcionario.name}
+                  </span>
+                  {(funcionario.cpf || (funcionario as any).document) && (
+                    <span className="text-[11px] text-muted-foreground">
+                      · CPF: {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label className="text-base font-semibold">Cliente</Label>
+                <Label className="text-base font-semibold">
+                  Cliente
+                  <span className="block text-[11px] font-normal text-muted-foreground/80">
+                    Destinatário da prestação de serviço.
+                  </span>
+                </Label>
                 <Select
                   value={form.clientId}
                   onValueChange={(value) => setForm(prev => ({ ...prev, clientId: value }))}
                   disabled={loadingData}
                 >
-                  <SelectTrigger className="h-11 bg-background">
+                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
                     <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o cliente"} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
                     {loadingData ? (
                       <div className="p-2 text-center text-sm text-gray-500">Carregando clientes...</div>
                     ) : clients.length > 0 ? (
                       clients.map(c => (
-                        <SelectItem key={c.id} value={c.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{c.name}</span>
+                        <SelectItem key={c.id} value={c.id} className="py-2.5 cursor-pointer rounded-md">
+                          <div className="flex flex-col gap-0.5 text-left">
+                            <span className="font-medium text-sm normal-case">{c.name}</span>
                             {c.cnpj && (
-                              <span className="text-xs text-muted-foreground">CNPJ: {c.cnpj}</span>
+                              <span className="text-[11px] text-muted-foreground">
+                                CNPJ: {formatCNPJ(c.cnpj)}
+                              </span>
                             )}
                           </div>
                         </SelectItem>
@@ -383,6 +440,20 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                   </SelectContent>
                 </Select>
               </div>
+
+              {cliente && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60 lg:col-span-1">
+                  <Building className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">
+                    {cliente.name}
+                  </span>
+                  {cliente.cnpj && (
+                    <span className="text-[11px] text-muted-foreground">
+                      · CNPJ: {formatCNPJ(cliente.cnpj)}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

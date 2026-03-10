@@ -1,6 +1,6 @@
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'GESTOR_COMERCIAL' | 'ASSISTENTE_COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'GESTOR_COMERCIAL' | 'ASSISTENTE_COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO' | 'ANALISTA_SUPRIMENTOS' | 'ESTOQUE' | 'SUPRIMENTOS' | 'COMPRAS';
 
-export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_GESTOR' | 'GRUPO_RH' | 'GRUPO_DPE' | 'GRUPO_SUPERVISOR' | 'GRUPO_COLABORADORES' | 'GRUPO_OPERACIONAL' | 'GRUPO_VIGILANTES' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_AUXILIARES' | 'GRUPO_COMERCIAL' | 'GRUPO_ASSISTENTE_ADMINISTRATIVO';
+export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_GESTOR' | 'GRUPO_RH' | 'GRUPO_DPE' | 'GRUPO_SUPERVISOR' | 'GRUPO_COLABORADORES' | 'GRUPO_OPERACIONAL' | 'GRUPO_VIGILANTES' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_AUXILIARES' | 'GRUPO_COMERCIAL' | 'GRUPO_ASSISTENTE_ADMINISTRATIVO' | 'GRUPO_ANALISTA_SUPRIMENTOS';
 
 export interface UserPermissions {
   // Permissões de Usuários
@@ -362,6 +362,17 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
     { label: 'Fluxo de Caixa', path: '/gestao-financeira/fluxo-caixa', icon: 'ArrowUpDown', color: '🟨' },
     { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
     { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
+  ],
+  ANALISTA_SUPRIMENTOS: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Financeiro', path: '/financial', icon: 'DollarSign', color: '🟨' },
+    { label: 'Contas a Pagar', path: '/gestao-financeira/contas-pagar', icon: 'CreditCard', color: '🟨' },
+    { label: 'Contas a Receber', path: '/gestao-financeira/contas-receber', icon: 'Receipt', color: '🟨' },
+    { label: 'Fluxo de Caixa', path: '/gestao-financeira/fluxo-caixa', icon: 'ArrowUpDown', color: '🟨' },
+    { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
+    { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Holerites', path: '/payslips', icon: 'FileText', color: '🟨' },
     { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
   ],
   OPERACIONAL: [

@@ -18,6 +18,10 @@ export const USER_ROLE_LIST: UserRole[] = [
   'AUXI_ADMINISTRATIVO',
   'ASSISTENTE_ADMINISTRATIVO',
   'AUX_DEP',
+  'ANALISTA_SUPRIMENTOS',
+  'ESTOQUE',
+  'SUPRIMENTOS',
+  'COMPRAS',
 ];
 
 // Função para gerar permissões baseadas no role principal
@@ -401,13 +405,6 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         // Permissões de Atendimento
         ATTENDANCE_READ: true,
         ATTENDANCE_MANAGE: true,
-
-        // Gestão Patrimonial
-        PATRIMONIAL_READ: true,
-        PATRIMONIAL_WRITE: true,
-        // Módulo Fiscal
-        FISCAL_READ: true,
-        FISCAL_WRITE: true,
       };
 
     case 'FINANCEIRO':
@@ -644,10 +641,6 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         PAYROLL_READ: true,
         PAYROLL_CREATE: true,
         PAYROLL_MANAGE: true,
-
-        // Gestão Patrimonial
-        PATRIMONIAL_READ: true,
-        PATRIMONIAL_WRITE: true,
       };
 
     case 'OPERACIONAL':
@@ -721,6 +714,56 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         CONTRACTS_READ: true,
       };
 
+    case 'ANALISTA_SUPRIMENTOS':
+      return {
+        ...basePermissions,
+        FINANCIAL_READ: true,
+        FINANCIAL_WRITE: true,
+        FINANCIAL_PAYABLE_READ: true,
+        FINANCIAL_PAYABLE_WRITE: true,
+        STOCK_READ: true,
+        STOCK_WRITE: true,
+        STOCK_CREATE: true,
+        STOCK_MANAGE: true,
+        PAYSLIPS_READ: true,
+        PAYSLIPS_WRITE: true,
+        PAYSLIPS_CREATE: true,
+        PAYSLIPS_PUBLISH: true,
+        REPORTS_READ: true,
+        REPORTS_GENERATE: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        EMPLOYEES_READ: true,
+        CLIENTS_READ: true,
+        CONTRACTS_READ: true,
+      };
+
+    case 'ESTOQUE':
+      return {
+        ...basePermissions,
+        STOCK_READ: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+      };
+
+    case 'SUPRIMENTOS':
+    case 'COMPRAS':
+      return {
+        ...basePermissions,
+        STOCK_READ: true,
+        STOCK_WRITE: true,
+        STOCK_CREATE: true,
+        STOCK_MANAGE: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+      };
+
     case 'AUXI_ADMINISTRATIVO':
       return {
         ...basePermissions,
@@ -741,9 +784,6 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         LEADS_READ: true,
         PROPOSALS_READ: true,
       };
-
-
-
     case 'AUX_DEP':
       return {
         ...basePermissions,
@@ -1329,6 +1369,12 @@ export const getRoleDisplayName = (role: UserRole): string => {
     GESTOR: 'Gestor',
     COMERCIAL: 'Comercial',
     ASSISTENTE_ADMINISTRATIVO: 'Assistente Administrativo',
+    ANALISTA_SUPRIMENTOS: 'Analista de Suprimentos',
+    ESTOQUE: 'Estoque',
+    SUPRIMENTOS: 'Suprimentos',
+    COMPRAS: 'Compras',
+    GESTOR_COMERCIAL: 'Gestor Comercial',
+    ASSISTENTE_COMERCIAL: 'Assistente Comercial',
   };
   return roleNames[role] || role;
 };
@@ -1353,6 +1399,12 @@ export const getRoleColor = (role: UserRole): string => {
     GESTOR: 'bg-teal-100 text-teal-800',
     COMERCIAL: 'bg-indigo-100 text-indigo-800',
     ASSISTENTE_ADMINISTRATIVO: 'bg-yellow-100 text-yellow-800',
+    ANALISTA_SUPRIMENTOS: 'bg-amber-100 text-amber-800',
+    ESTOQUE: 'bg-sky-100 text-sky-800',
+    SUPRIMENTOS: 'bg-emerald-100 text-emerald-800',
+    COMPRAS: 'bg-violet-100 text-violet-800',
+    GESTOR_COMERCIAL: 'bg-teal-100 text-teal-800',
+    ASSISTENTE_COMERCIAL: 'bg-indigo-50 text-indigo-700',
   };
   return roleColors[role] || 'bg-gray-100 text-gray-800';
 };

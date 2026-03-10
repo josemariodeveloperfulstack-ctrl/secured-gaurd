@@ -386,22 +386,26 @@ export function AppSidebar() {
           </div>
         ))}
 
-        {/* Módulo Financeiro */}
-        <div className="text-seguranca-lightgray mb-2 mt-6 flex items-center">
-          <DollarSign size={16} className="mr-2 text-seguranca-yellow" />
-          Financeiro
-        </div>
-        {financeiroMenuItems.map(item => (
-          <div className="mb-2 ml-4" key={item.id}>
-            <a
-              href={item.to}
-              className="flex items-center p-3 rounded-lg text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
-            >
-              <item.icon size={18} className="text-seguranca-yellow mr-3" />
-              <span>{item.text}</span>
-            </a>
-          </div>
-        ))}
+        {/* Módulo Financeiro - Oculto para RH e Departamento Pessoal */}
+        {!['RH', 'DEPARTAMENTO_PESSOAL'].includes((user?.role ?? '').replace(/^ROLE_/, '')) && (
+          <>
+            <div className="text-seguranca-lightgray mb-2 mt-6 flex items-center">
+              <DollarSign size={16} className="mr-2 text-seguranca-yellow" />
+              Financeiro
+            </div>
+            {financeiroMenuItems.map(item => (
+              <div className="mb-2 ml-4" key={item.id}>
+                <a
+                  href={item.to}
+                  className="flex items-center p-3 rounded-lg text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow"
+                >
+                  <item.icon size={18} className="text-seguranca-yellow mr-3" />
+                  <span>{item.text}</span>
+                </a>
+              </div>
+            ))}
+          </>
+        )}
 
         {/* Grupo Empresas */}
         <div className="text-seguranca-lightgray mb-2 mt-6 flex items-center">

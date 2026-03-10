@@ -48,7 +48,7 @@ export const ContasAPagar: React.FC = () => {
   const loadContas = async () => {
     try {
       setLoading(true);
-      const data = await contasAPagarService.getContasAPagar();
+      const data = await contasAPagarService.getAllContasAPagar();
       setContas(data);
     } catch (error) {
       console.error('Erro ao carregar contas a pagar:', error);

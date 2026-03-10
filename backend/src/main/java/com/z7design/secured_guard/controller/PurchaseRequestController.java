@@ -26,7 +26,7 @@ public class PurchaseRequestController {
     private final PurchaseRequestReportService purchaseRequestReportService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS')")
     public ResponseEntity<List<PurchaseRequestDTO>> getAllPurchaseRequests() {
         log.info("Buscando todas as requisições de compra");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getAllPurchaseRequests();
@@ -34,7 +34,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS')")
     public ResponseEntity<PurchaseRequestDTO> getPurchaseRequestById(@PathVariable UUID id) {
         log.info("Buscando requisição de compra com ID: {}", id);
         return purchaseRequestService.getPurchaseRequestById(id)
@@ -202,7 +202,7 @@ public class PurchaseRequestController {
      * utilizando os mesmos filtros de data, status e valor do frontend.
      */
     @GetMapping("/reports/pdf")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS')")
     public ResponseEntity<byte[]> generatePurchaseRequestsReportPdf(
             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,

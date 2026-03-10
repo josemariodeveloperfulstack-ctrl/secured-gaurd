@@ -101,6 +101,35 @@ public class PermissionService {
             Permission.PAYSLIPS_READ,
             Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
         )));
+
+        // ESTOQUE - Consulta e relatórios de estoque
+        rolePermissions.put(UserRole.ESTOQUE, new HashSet<>(Arrays.asList(
+            Permission.STOCK_READ,
+            Permission.INVENTORY_READ, Permission.INVENTORY_MOVEMENTS_READ,
+            Permission.PRODUCTS_READ,
+            Permission.DASHBOARD_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE
+        )));
+
+        // SUPRIMENTOS - Suprimentos e almoxarifado
+        rolePermissions.put(UserRole.SUPRIMENTOS, new HashSet<>(Arrays.asList(
+            Permission.STOCK_READ, Permission.STOCK_WRITE, Permission.STOCK_CREATE,
+            Permission.INVENTORY_READ, Permission.INVENTORY_WRITE, Permission.INVENTORY_MOVEMENTS_READ, Permission.INVENTORY_MOVEMENTS_CREATE,
+            Permission.PRODUCTS_READ, Permission.PRODUCTS_WRITE,
+            Permission.PURCHASE_REQUESTS_READ,
+            Permission.DASHBOARD_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE
+        )));
+
+        // COMPRAS - Gestão de compras
+        rolePermissions.put(UserRole.COMPRAS, new HashSet<>(Arrays.asList(
+            Permission.STOCK_READ, Permission.STOCK_WRITE, Permission.STOCK_CREATE,
+            Permission.INVENTORY_READ, Permission.INVENTORY_WRITE, Permission.INVENTORY_MOVEMENTS_READ, Permission.INVENTORY_MOVEMENTS_CREATE,
+            Permission.PRODUCTS_READ, Permission.PRODUCTS_WRITE,
+            Permission.PURCHASE_REQUESTS_READ, Permission.PURCHASE_REQUESTS_WRITE, Permission.PURCHASE_REQUESTS_CREATE,
+            Permission.DASHBOARD_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE
+        )));
     }
 
     public Set<Permission> getPermissionsForRole(UserRole role) {

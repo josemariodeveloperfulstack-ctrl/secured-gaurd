@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
     react(),
     // ...(mode === 'development' ? [componentTagger()] : []),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt', // Exibe toast "Nova versão disponível" em vez de exigir F5
       devOptions: {
         enabled: true,
         type: 'module',

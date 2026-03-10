@@ -172,7 +172,11 @@ public class RoleMigrationService {
                 "COMERCIAL",
                 "GESTOR_COMERCIAL",
                 "ASSISTENTE_COMERCIAL",
-                "DEPARTAMENTO_PESSOAL"
+                "DEPARTAMENTO_PESSOAL",
+                "ANALISTA_SUPRIMENTOS",
+                "ESTOQUE",
+                "SUPRIMENTOS",
+                "COMPRAS"
         };
 
         for (String roleName : defaultRoles) {

@@ -1,13 +1,8 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.EmployeeDTO;
-import com.z7design.secured_guard.model.Company;
-import com.z7design.secured_guard.model.Department;
-import com.z7design.secured_guard.model.Employee;
-import com.z7design.secured_guard.model.Unit;
-import com.z7design.secured_guard.repository.CompanyRepository;
-import com.z7design.secured_guard.repository.DepartmentRepository;
-import com.z7design.secured_guard.repository.UnitRepository;
+import com.z7design.secured_guard.model.*;
+import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
@@ -31,6 +26,8 @@ public class EmployeeExcelImportService {
     private final CompanyRepository companyRepository;
     private final UnitRepository unitRepository;
     private final DepartmentRepository departmentRepository;
+    private final PositionRepository positionRepository;
+    private final WorkPostRepository workPostRepository;
 
     // Mapeamento de colunas possíveis da planilha para campos da entidade
     private static final Map<String, String> COLUMN_MAPPING = new HashMap<>();
@@ -258,7 +255,8 @@ public class EmployeeExcelImportService {
                     if (isRowEmpty(row))
                         continue;
 
-                    // Resolver empresa da linha: se existir coluna CNPJ Empresa, usar o CNPJ da linha; senão usar a empresa já encontrada
+                    // Resolver empresa da linha: se existir coluna CNPJ Empresa, usar o CNPJ da
+                    // linha; senão usar a empresa já encontrada
                     Company rowCompany = company;
                     if (companyCnpjColumnIndex != -1) {
                         Cell rowCnpjCell = row.getCell(companyCnpjColumnIndex);
@@ -266,13 +264,15 @@ public class EmployeeExcelImportService {
                         String rowNormalizedCnpj = rowCnpj != null ? rowCnpj.replaceAll("[^0-9]", "") : "";
 
                         if (rowNormalizedCnpj == null || rowNormalizedCnpj.isEmpty()) {
-                            result.addWarning("Linha " + (rowIndex + 1) + ": CNPJ da empresa vazio. Usando empresa padrão.");
+                            result.addWarning(
+                                    "Linha " + (rowIndex + 1) + ": CNPJ da empresa vazio. Usando empresa padrão.");
                         } else if (!rowNormalizedCnpj.equals(normalizedCnpj)) {
                             Optional<Company> rowCompanyOpt = companyRepository.findByNormalizedCnpj(rowNormalizedCnpj);
                             if (rowCompanyOpt.isPresent()) {
                                 rowCompany = rowCompanyOpt.get();
                             } else {
-                                result.addWarning("Linha " + (rowIndex + 1) + ": Empresa com CNPJ " + rowCnpj + " não cadastrada. Usando empresa padrão.");
+                                result.addWarning("Linha " + (rowIndex + 1) + ": Empresa com CNPJ " + rowCnpj
+                                        + " não cadastrada. Usando empresa padrão.");
                             }
                         }
                     }
@@ -291,19 +291,25 @@ public class EmployeeExcelImportService {
                         continue;
                     }
 
-                    // Análise: se já existir no banco (por CPF ou matrícula eSocial), apenas atualiza
+                    // Análise: se já existir no banco (por CPF ou matrícula eSocial), apenas
+                    // atualiza
                     String normalizedCpf = employeeDTO.getCpf().replaceAll("[^0-9]", "");
                     Optional<Employee> existingEmployee = employeeService.findByCpfExact(normalizedCpf);
 
-                    if (existingEmployee.isEmpty() && employeeDTO.getMatriculaEsocial() != null && !employeeDTO.getMatriculaEsocial().trim().isEmpty()) {
-                        existingEmployee = employeeService.findByMatriculaEsocial(employeeDTO.getMatriculaEsocial().trim());
+                    if (existingEmployee.isEmpty() && employeeDTO.getMatriculaEsocial() != null
+                            && !employeeDTO.getMatriculaEsocial().trim().isEmpty()) {
+                        existingEmployee = employeeService
+                                .findByMatriculaEsocial(employeeDTO.getMatriculaEsocial().trim());
                         if (existingEmployee.isPresent()) {
-                            log.info("📋 Funcionário encontrado por matrícula eSocial: {}. Atualizando...", employeeDTO.getMatriculaEsocial());
+                            log.info("📋 Funcionário encontrado por matrícula eSocial: {}. Atualizando...",
+                                    employeeDTO.getMatriculaEsocial());
                         }
                     }
 
                     if (existingEmployee.isPresent()) {
-                        log.info("✅ Funcionário já existe (CPF: {}). Atualizando com dados da planilha (setor, empresa, etc.).", normalizedCpf);
+                        log.info(
+                                "✅ Funcionário já existe (CPF: {}). Atualizando com dados da planilha (setor, empresa, etc.).",
+                                normalizedCpf);
                         employeeDTO.setId(existingEmployee.get().getId());
                         employeeService.update(existingEmployee.get().getId(), employeeDTO);
                         result.incrementUpdated();
@@ -472,29 +478,55 @@ public class EmployeeExcelImportService {
                         dto.setEscalaTrabalho(cellValue.trim());
                         break;
                     case "unitName":
-                        // Setor de trabalho: tentar vincular a Unidade ou Departamento pelo nome
+                        // Prioridade 1: Tentar vincular a um Posto de Trabalho (WorkPost) pelo nome
                         String setorNome = cellValue.trim();
-                        Optional<Unit> unitOpt = unitRepository.findByName(setorNome)
-                                .or(() -> unitRepository.findByNameContainingIgnoreCase(setorNome).stream().findFirst());
-                        if (unitOpt.isPresent()) {
-                            EmployeeDTO.UnitDTO unitDTO = new EmployeeDTO.UnitDTO();
-                            unitDTO.setId(unitOpt.get().getId());
-                            unitDTO.setName(unitOpt.get().getName());
-                            dto.setUnit(unitDTO);
+                        Optional<WorkPost> workPostOpt = workPostRepository.findByName(setorNome)
+                                .or(() -> workPostRepository.findByNameContainingIgnoreCase(setorNome).stream()
+                                        .findFirst());
+
+                        if (workPostOpt.isPresent()) {
+                            dto.setWorkPostId(workPostOpt.get().getId().toString());
+                            log.debug("📌 Posto de Trabalho '{}' vinculado ao funcionário", setorNome);
                         } else {
-                            List<Department> deps = departmentRepository.findByNameContainingIgnoreCase(setorNome);
-                            if (!deps.isEmpty()) {
-                                dto.setDepartmentId(deps.get(0).getId().toString());
+                            // Prioridade 2: Tentar vincular a Unidade ou Departamento pelo nome (legado)
+                            Optional<Unit> unitOpt = unitRepository.findByName(setorNome)
+                                    .or(() -> unitRepository.findByNameContainingIgnoreCase(setorNome).stream()
+                                            .findFirst());
+                            if (unitOpt.isPresent()) {
+                                EmployeeDTO.UnitDTO unitDTO = new EmployeeDTO.UnitDTO();
+                                unitDTO.setId(unitOpt.get().getId());
+                                unitDTO.setName(unitOpt.get().getName());
+                                dto.setUnit(unitDTO);
+                                log.debug("📌 Unidade '{}' vinculada ao funcionário", setorNome);
                             } else {
-                                dto.setNotes(
-                                        (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Setor: " + setorNome);
+                                List<Department> deps = departmentRepository.findByNameContainingIgnoreCase(setorNome);
+                                if (!deps.isEmpty()) {
+                                    dto.setDepartmentId(deps.get(0).getId().toString());
+                                    log.debug("📌 Departamento '{}' vinculado ao funcionário", setorNome);
+                                } else {
+                                    dto.setNotes(
+                                            (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Setor/Posto: "
+                                                    + setorNome);
+                                }
                             }
                         }
                         break;
                     case "positionName":
-                        // Guardar o nome do cargo (posição pode ser resolvida depois se houver PositionRepository por nome)
-                        dto.setNotes(
-                                (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Cargo: " + cellValue.trim());
+                        // Tentar vincular a um Cargo (Position) pelo nome
+                        String cargoNome = cellValue.trim();
+                        Optional<Position> positionOpt = positionRepository.findByName(cargoNome)
+                                .or(() -> positionRepository.searchPositions(cargoNome).stream().findFirst());
+
+                        if (positionOpt.isPresent()) {
+                            EmployeeDTO.PositionDTO positionDTO = new EmployeeDTO.PositionDTO();
+                            positionDTO.setId(positionOpt.get().getId());
+                            positionDTO.setName(positionOpt.get().getName());
+                            dto.setPosition(positionDTO);
+                            log.debug("📌 Cargo '{}' vinculado ao funcionário", cargoNome);
+                        } else {
+                            dto.setNotes(
+                                    (dto.getNotes() != null ? dto.getNotes() + " " : "") + "Cargo: " + cargoNome);
+                        }
                         break;
                 }
             } catch (Exception e) {

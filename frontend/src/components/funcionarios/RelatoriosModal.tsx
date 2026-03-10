@@ -376,6 +376,131 @@ export function RelatoriosModal({
         }
     };
 
+    const handleExportCompleteActiveExcel = async () => {
+        setIsGenerating(true);
+        setIsProcessing(true);
+        setProgress(0);
+        cancelRef.current = false;
+
+        try {
+            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay for UI
+
+            // Buscar todos os funcionários ativos DIRETAMENTE do backend ignorando a paginação local
+            const activeEmployees = await employeeService.getEmployeesByStatus('ACTIVE');
+
+            if (!activeEmployees || activeEmployees.length === 0) {
+                window.alert('Nenhum funcionário ativo encontrado no sistema.');
+                return;
+            }
+
+            const dataToExport = await processDataInChunks(activeEmployees, (emp) => {
+                const getAddressStr = (addr: any) => {
+                    if (!addr) return '';
+                    if (typeof addr === 'string') return addr;
+                    return `${addr.street || ''}, ${addr.number || ''} ${addr.complement ? `- ${addr.complement}` : ''} - ${addr.neighborhood || ''}, ${addr.city || ''}/${addr.state || ''} CEP: ${addr.zipCode || ''}`;
+                };
+
+                const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString() : '';
+
+                let dependentes = '';
+                if (emp.dependents && emp.dependents.length > 0) {
+                    dependentes = emp.dependents.map(d => `${d.name} (${d.relationship}) - Nasc: ${formatDate(d.birthDate)}${d.cpf ? ` CPF: ${d.cpf}` : ''}`).join(' | ');
+                }
+
+                // Extrai todos os campos possíveis do cadastro
+                return {
+                    'Matrícula': emp.matricula || emp.registrationNumber || '',
+                    'Matrícula eSocial': emp.matriculaEsocial || '',
+                    'Status': getStatusLabel(emp.status || 'ACTIVE'),
+                    'Nome Completo': emp.name || '',
+                    'Empresa': emp.company?.sigla || emp.company?.name || emp.empresaNome || '',
+                    'CNPJ Empresa': emp.company?.cnpj || emp.empresaCnpj || '',
+                    'Posto de Trabalho': typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name || '',
+                    'Departamento': emp.department?.name || '',
+                    'Cargo': typeof emp.position === 'string' ? emp.position : emp.position?.name || '',
+                    'CBO': emp.cbo || '',
+                    'Admissão': formatDate(emp.hireDate),
+                    'Data Rescisão': formatDate(emp.terminationDate || emp.dataRescisao),
+                    'Motivo Demissão': emp.terminationReason || '',
+
+                    // Informações Pessoais
+                    'CPF': emp.cpf || '',
+                    'RG': emp.rg || '',
+                    'Data Nascimento': formatDate(emp.birthDate),
+                    'Gênero/Sexo': emp.sexo || emp.gender || '',
+                    'Estado Civil': emp.maritalStatus || '',
+                    'Nacionalidade': emp.nationality || '',
+                    'Naturalidade': emp.naturalidade || '',
+                    'Grau de Instrução': emp.grauInstrucao || '',
+                    'Nome da Mãe': emp.motherName || emp.nomeMae || '',
+                    'Nome do Pai': emp.fatherName || emp.nomePai || '',
+
+                    // Documentos Adicionais
+                    'PIS': emp.pis || '',
+                    'Data Cadastro PIS': formatDate(emp.pisDataCadastro),
+                    'CTPS': emp.ctps || '',
+                    'Série CTPS': emp.ctpsSeries || '',
+                    'CTPS Data Emissão': formatDate(emp.ctpsIssueDate),
+                    'CTPS Órgão Emissor': emp.ctpsIssuingAgency || '',
+                    'Título de Eleitor': emp.tituloEleitor || '',
+                    'Zona Eleitoral': emp.tituloEleitorZona || '',
+                    'Seção Eleitoral': emp.tituloEleitorSecao || '',
+                    'Certificado Militar': emp.certificadoMilitar || '',
+                    'CNH': emp.cnhNumber || '',
+                    'Categoria CNH': emp.cnhCategory || '',
+                    'Validade CNH': formatDate(emp.cnhExpirationDate),
+
+                    // Contato e Endereço
+                    'Email': emp.email || '',
+                    'Telefone/Celular': emp.phone || emp.telefoneContato || '',
+                    'Possui WhatsApp?': emp.possuiWhatsapp ? 'Sim' : 'Não',
+                    'Endereço Completo': getAddressStr(emp.address),
+
+                    // Dados Bancários
+                    'Banco': emp.bankData?.bank || emp.bankInfo?.bank || '',
+                    'Agência': emp.bankData?.agency || emp.bankInfo?.agency || '',
+                    'Conta': emp.bankData?.account || emp.bankInfo?.account || '',
+                    'Tipo Conta': emp.bankData?.type || emp.bankInfo?.accountType || '',
+                    'Chave PIX': emp.bankData?.chavePix || emp.bankInfo?.pixKey || '',
+
+                    // Contrato e Trabalho
+                    'Salário': emp.salario ? `R$ ${emp.salario}` : '',
+                    'Período de Pagamento': emp.periodoPagamento || '',
+                    'Horário Trabalho': emp.horarioTrabalho || '',
+                    'Intervalo Trabalho': emp.horarioTrabalhoIntervalo || '',
+                    'Dias de Trabalho': emp.diasTrabalho || '',
+                    'Folga Semanal': emp.folgaSemanal || '',
+                    'Escala': emp.escalaTrabalho || emp.currentScale || '',
+
+                    // Relacionados a Sáude e Segurança
+                    'Data Referência Exame': formatDate(emp.exameMedicoData),
+                    'Tipo do ASO': emp.exameMedicoTipo || '',
+                    'Vencimento ASO': formatDate(emp.exameMedicoVencimento),
+                    'Vencimento Próx. Férias': formatDate(emp.proximasFeriasVencimento),
+
+                    // Familiares
+                    'Dependentes': dependentes,
+                    'Cônjuge': emp.spouseName || '',
+                    'Cônjuge CPF': emp.spouseCpf || '',
+                    'Filhos Brasileiros?': emp.temFilhosBrasileiros ? 'Sim' : 'Não',
+                    'Qtd Filhos Brasileiros': emp.quantidadeFilhosBrasileiros || '',
+                };
+            }, 100);
+
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Cadastro Completo Ativos");
+
+            XLSX.writeFile(workbook, `cadastro-completo-ativos-${new Date().toISOString().split('T')[0]}.xlsx`);
+        } catch (error: any) {
+            console.error('Erro ao gerar Excel Completo:', error);
+        } finally {
+            setIsProcessing(false);
+            setIsGenerating(false);
+            setProgress(0);
+        }
+    };
+
     const resetFilters = () => {
         setStatusFilter('all');
         setAsoFilter('all');
@@ -671,6 +796,14 @@ export function RelatoriosModal({
                         >
                             {isGenerating ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <FileText className="h-5 w-5 mr-2" />}
                             GERAR PDF
+                        </Button>
+                        <Button
+                            onClick={handleExportCompleteActiveExcel}
+                            disabled={isGenerating}
+                            className="flex-1 sm:flex-none bg-gradient-to-r from-green-600 to-green-700 hover:shadow-green-500/40 hover:scale-[1.02] text-white shadow-lg active:scale-100 transition-all duration-300 font-bold"
+                        >
+                            {isGenerating ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <FileSpreadsheet className="h-5 w-5 mr-2" />}
+                            EXPORTAR CADASTRO COMPLETO (ATIVOS)
                         </Button>
                         <Button
                             onClick={handleExportExcel}
