@@ -40,7 +40,7 @@ export const UserGroupsTable: React.FC<UserGroupsTableProps> = ({
       setGroups(groupsData);
     } catch (error: any) {
       console.error('Erro ao carregar grupos:', error);
-      
+
       // Verificar se é erro 403/401 (sem permissão)
       if (error.response?.status === 403 || error.response?.status === 401) {
         toast({
@@ -92,7 +92,7 @@ export const UserGroupsTable: React.FC<UserGroupsTableProps> = ({
       onDeleteGroup?.(groupId.toString());
     } catch (error: any) {
       console.error('Erro ao excluir grupo:', error);
-      
+
       if (error.response?.status === 403 || error.response?.status === 401) {
         toast({
           title: 'Acesso Negado',
@@ -123,22 +123,17 @@ export const UserGroupsTable: React.FC<UserGroupsTableProps> = ({
     loadGroups();
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Se não há grupos, mostrar mensagem amigável
-  if (groups.length === 0) {
-    return (
-      <>
+  return (
+    <>
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : groups.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -165,109 +160,97 @@ export const UserGroupsTable: React.FC<UserGroupsTableProps> = ({
             </div>
           </CardContent>
         </Card>
-
-        {/* Modal de Formulário */}
-        <GroupFormModal
-          open={showFormModal}
-          onClose={() => setShowFormModal(false)}
-          onSuccess={handleFormSuccess}
-          group={selectedGroup}
-        />
-      </>
-    );
-  }
-
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Grupos de Usuários</span>
-            <Button size="sm" onClick={handleCreateGroup}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Grupo
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Permissões</TableHead>
-                <TableHead>Usuários</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groups.map((group) => (
-                <TableRow key={group.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Badge className={getGroupColor(group.groupName)}>
-                        {getGroupDisplayName(group.groupName)}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {group.description}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {group.permissions.slice(0, 3).map((permission) => (
-                        <Badge key={permission} variant="outline" className="text-xs">
-                          {permission}
-                        </Badge>
-                      ))}
-                      {group.permissions.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{group.permissions.length - 3}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-1">
-                      <Users className="h-4 w-4 text-gray-500" />
-                      <span>{typeof group.userCount === 'number' && group.userCount >= 0 ? group.userCount : 0}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleManageUsers(group)}
-                        title="Gerenciar Usuários"
-                      >
-                        <Users className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditGroup(group)}
-                        title="Editar Grupo"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteGroup(group.id)}
-                        title="Excluir Grupo"
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Grupos de Usuários</span>
+              <Button size="sm" onClick={handleCreateGroup}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Grupo
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Permissões</TableHead>
+                  <TableHead>Usuários</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {groups.map((group) => (
+                  <TableRow key={group.id}>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Badge className={getGroupColor(group.groupName)}>
+                          {getGroupDisplayName(group.groupName)}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {group.description}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {group.permissions.slice(0, 3).map((permission) => (
+                          <Badge key={permission} variant="outline" className="text-xs">
+                            {permission}
+                          </Badge>
+                        ))}
+                        {group.permissions.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{group.permissions.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        <Users className="h-4 w-4 text-gray-500" />
+                        <span>{typeof group.userCount === 'number' && group.userCount >= 0 ? group.userCount : 0}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleManageUsers(group)}
+                          title="Gerenciar Usuários"
+                        >
+                          <Users className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditGroup(group)}
+                          title="Editar Grupo"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteGroup(group.id)}
+                          title="Excluir Grupo"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal de Formulário */}
       <GroupFormModal
