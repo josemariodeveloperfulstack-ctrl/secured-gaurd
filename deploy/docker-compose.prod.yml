@@ -169,13 +169,13 @@ services:
       - z7network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.secured-guard-prod-https.rule=Host(`securedguard.z7botsolutions.com.br`)"
+      - "traefik.http.routers.secured-guard-prod-https.rule=Host(`securedguard.z7botsolutions.com.br`) || Host(`portal.promovervigilancia.com.br`)"
       - "traefik.http.routers.secured-guard-prod-https.entrypoints=websecure"
       - "traefik.http.routers.secured-guard-prod-https.tls=true"
       - "traefik.http.routers.secured-guard-prod-https.tls.certresolver=letsencryptresolver"
       - "traefik.http.routers.secured-guard-prod-https.service=secured-guard-prod-service"
       - "traefik.http.routers.secured-guard-prod-https.priority=2000"
-      - "traefik.http.routers.secured-guard-prod-http.rule=Host(`securedguard.z7botsolutions.com.br`)"
+      - "traefik.http.routers.secured-guard-prod-http.rule=Host(`securedguard.z7botsolutions.com.br`) || Host(`portal.promovervigilancia.com.br`)"
       - "traefik.http.routers.secured-guard-prod-http.entrypoints=web"
       - "traefik.http.routers.secured-guard-prod-http.middlewares=redirect-https@docker"
       - "traefik.http.routers.secured-guard-prod-http.priority=2000"
