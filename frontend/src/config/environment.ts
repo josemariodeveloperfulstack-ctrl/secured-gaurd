@@ -47,7 +47,10 @@ export function detectEnvironment(): 'local' | 'ci' | 'dev' | 'test' | 'prod' {
   }
 
   // Ambiente PROD
-  if (hostname.includes('z7botsolutions.com.br') && !hostname.includes('ci.') && !hostname.includes('dev.') && !hostname.includes('test.')) {
+  if (
+    (hostname.includes('z7botsolutions.com.br') || hostname.includes('promovervigilancia.com.br')) &&
+    !hostname.includes('ci.') && !hostname.includes('dev.') && !hostname.includes('test.')
+  ) {
     return 'prod';
   }
 
@@ -193,13 +196,23 @@ export function getWsUrl(): string {
   }
 
   // Primeiro tenta usar variável de ambiente
-  if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL;
+  let url = import.meta.env.VITE_WS_URL;
+
+  // Se não houver variável, usa detecção automática
+  if (!url) {
+    const config = getCurrentEnvironmentConfig();
+    url = config.wsUrl;
   }
 
-  // Senão, usa detecção automática
-  const config = getCurrentEnvironmentConfig();
-  return config.wsUrl;
+  // Se for um caminho relativo (ex: /ws), constrói a URL completa baseada no host atual
+  if (url && url.startsWith('/') && typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.host;
+    url = `${protocol}://${host}${url}`;
+    console.log('🔧 WebSocket: convertido caminho relativo para', url);
+  }
+
+  return url;
 }
 
 /**

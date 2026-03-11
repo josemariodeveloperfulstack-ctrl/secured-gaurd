@@ -46,7 +46,7 @@ jobs:
       - name: 🎨 Build Frontend (Vite)
         working-directory: ./frontend
         env:
-          VITE_API_URL: https://securedguard.z7botsolutions.com.br/api
+          VITE_API_URL: /api
           VITE_ENVIRONMENT: prod
         run: |
           npm ci
@@ -68,8 +68,8 @@ jobs:
           # Build Frontend
           docker build --no-cache \
             -t z7design/secured-guard-frontend:prod \
-            --build-arg VITE_API_URL=https://securedguard.z7botsolutions.com.br/api \
-            --build-arg VITE_WS_URL=wss://securedguard.z7botsolutions.com.br/ws \
+            --build-arg VITE_API_URL=/api \
+            --build-arg VITE_WS_URL=/ws \
             --build-arg VITE_ENVIRONMENT=prod \
             -f frontend/Dockerfile.prod ./frontend
           
