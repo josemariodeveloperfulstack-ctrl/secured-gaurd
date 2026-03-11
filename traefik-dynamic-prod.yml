@@ -19,6 +19,7 @@ http:
       headers:
         accessControlAllowOriginList:
           - "https://securedguard.z7botsolutions.com.br"
+          - "https://portal.promovervigilancia.com.br"
         accessControlAllowMethods:
           - "GET"
           - "POST"
@@ -45,7 +46,7 @@ http:
   routers:
     # Router HTTPS para PROD - fallback quando Docker provider não descobre
     prod-https:
-      rule: "Host(`securedguard.z7botsolutions.com.br`)"
+      rule: "Host(`securedguard.z7botsolutions.com.br`) || Host(`portal.promovervigilancia.com.br`)"
       entryPoints:
         - websecure
       service: prod-service

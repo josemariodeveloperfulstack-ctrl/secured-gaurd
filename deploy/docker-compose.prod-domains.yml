@@ -17,7 +17,7 @@ services:
     networks:
       - secured-guard-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,7 +37,7 @@ services:
       - secured-guard-network
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,7 +73,7 @@ services:
     networks:
       - secured-guard-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -83,7 +83,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.secured-guard-api-prod.rule=(Host(`securedguard.z7botsolutions.com.br`) || Host(`portal.promovervigilancia.com.br`)) && PathPrefix(`/api`)"
       - "traefik.http.routers.secured-guard-api-prod.entrypoints=websecure"
-      - "traefik.http.routers.secured-guard-api-prod.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.secured-guard-api-prod.tls.certresolver=letsencryptresolver"
       - "traefik.http.services.secured-guard-api-prod.loadbalancer.server.port=8080"
       - "traefik.docker.network=secured-guard-network"
 
@@ -100,7 +100,7 @@ services:
     networks:
       - secured-guard-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
+      test: [ "CMD", "curl", "-f", "http://localhost/" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -110,7 +110,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.secured-guard-web-prod.rule=Host(`securedguard.z7botsolutions.com.br`) || Host(`portal.promovervigilancia.com.br`)"
       - "traefik.http.routers.secured-guard-web-prod.entrypoints=websecure"
-      - "traefik.http.routers.secured-guard-web-prod.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.secured-guard-web-prod.tls.certresolver=letsencryptresolver"
       - "traefik.http.services.secured-guard-web-prod.loadbalancer.server.port=80"
       - "traefik.docker.network=secured-guard-network"
 
@@ -123,9 +123,9 @@ volumes:
   backend_logs_prod:
   backend_uploads_prod:
 
-# ========================================
-# NETWORKS
-# ========================================
+    # ========================================
+    # NETWORKS
+    # ========================================
 networks:
   secured-guard-network:
     external: true
