@@ -170,6 +170,19 @@ export function getApiUrl(): string {
     return '/api';
   }
 
+  // portal.promovervigilancia.com.br pode estar em CDN/servidor diferente do backend.
+  // Usar URL absoluta do backend para garantir que as chamadas cheguem ao servidor correto.
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  const config = getCurrentEnvironmentConfig();
+
+  if (hostname.includes('promovervigilancia.com.br')) {
+    const backendUrl = config.apiUrl; // ex: https://app.z7botsolutions.com.br/api
+    if (backendUrl && backendUrl.startsWith('http')) {
+      console.log('🔧 Portal Promover: usando backend absoluto:', backendUrl);
+      return backendUrl;
+    }
+  }
+
   // Primeiro tenta usar variável de ambiente (para builds específicos)
   if (import.meta.env.VITE_API_URL) {
     console.log('🔧 Usando VITE_API_URL:', import.meta.env.VITE_API_URL);
@@ -177,7 +190,6 @@ export function getApiUrl(): string {
   }
 
   // Senão, usa detecção automática
-  const config = getCurrentEnvironmentConfig();
   console.log('🔄 Usando detecção automática:', config.apiUrl);
   return config.apiUrl;
 }
