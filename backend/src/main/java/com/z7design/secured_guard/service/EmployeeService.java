@@ -7,6 +7,8 @@ import java.util.UUID;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
+import java.math.BigDecimal;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,9 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.Remanejamento;
+import com.z7design.secured_guard.model.RemanejamentoTipo;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import com.z7design.secured_guard.model.enums.UserStatus;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.PositionRepository;
@@ -50,6 +56,10 @@ public class EmployeeService {
     private com.z7design.secured_guard.repository.WorkPostRepository workPostRepository;
     @Autowired
     private com.z7design.secured_guard.repository.DepartmentRepository departmentRepository;
+    @Autowired
+    private EmployeeChangeHistoryService employeeChangeHistoryService;
+    @Autowired
+    private RemanejamentoService remanejamentoService;
 
     @Transactional
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
@@ -94,11 +104,18 @@ public class EmployeeService {
     @Transactional
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public EmployeeDTO update(UUID id, EmployeeDTO dto) {
+        return update(id, dto, null);
+    }
+
+    @Transactional
+    @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
+    public EmployeeDTO update(UUID id, EmployeeDTO dto, UUID changedByUserId) {
         try {
             System.out.println("[DEBUG] EmployeeService.update - Iniciando atualização do funcionário ID: " + id);
             System.out.println("[DEBUG] DTO recebido - Nome: " + dto.getName() + ", Email: " + dto.getEmail());
 
             Employee existingEmployee = findById(id);
+            Map<String, String> oldSnapshot = (changedByUserId != null) ? buildOldSnapshot(existingEmployee) : null;
             System.out.println("[DEBUG] Funcionário existente encontrado: " + existingEmployee.getName());
             System.out.println("[DEBUG] Email existente: " + existingEmployee.getEmail());
 
@@ -323,12 +340,50 @@ public class EmployeeService {
                 existingEmployee.setCompany(companyRepository.findById(dto.getCompany().getId()).orElse(null));
             }
 
-            // Atualizar WorkPost se fornecido
+            // Atualizar WorkPost se fornecido - criar remanejamento quando houver alteração
+            WorkPost oldWorkPost = existingEmployee.getWorkPost();
             if (dto.getWorkPostId() != null && !dto.getWorkPostId().trim().isEmpty()) {
                 try {
                     UUID workPostId = UUID.fromString(dto.getWorkPostId());
-                    existingEmployee.setWorkPost(workPostRepository.findById(workPostId).orElse(null));
+                    WorkPost newWorkPost = workPostRepository.findById(workPostId).orElse(null);
+                    if (newWorkPost != null && (oldWorkPost == null || !oldWorkPost.getId().equals(newWorkPost.getId()))) {
+                        // Posto está mudando - data de início, escala e horário são obrigatórios para remanejamento
+                        if (dto.getRemanejamentoDataInicio() == null) {
+                            throw new IllegalArgumentException("Ao alterar o setor/posto de trabalho, informe a data de início no novo setor. A escala de trabalho e horário também são obrigatórios e serão registrados no histórico do funcionário.");
+                        }
+                        if (dto.getEscalaTrabalho() == null || dto.getEscalaTrabalho().trim().isEmpty()) {
+                            throw new IllegalArgumentException("Ao alterar o setor/posto de trabalho, a escala de trabalho é obrigatória.");
+                        }
+                        if (dto.getHorarioTrabalho() == null || dto.getHorarioTrabalho().trim().isEmpty()) {
+                            throw new IllegalArgumentException("Ao alterar o setor/posto de trabalho, o horário de trabalho é obrigatório.");
+                        }
+                        // Criar remanejamento e registrar no histórico
+                        if (dto.getRemanejamentoDataInicio() != null) {
+                            Remanejamento remanejamento = new Remanejamento();
+                            remanejamento.setEmployee(existingEmployee);
+                            remanejamento.setTipo(RemanejamentoTipo.TRANSFERENCIA_POSTO_TRABALHO);
+                            remanejamento.setOriginWorkstation(oldWorkPost);
+                            remanejamento.setDestinationWorkstation(newWorkPost);
+                            remanejamento.setOrigem(oldWorkPost != null ? oldWorkPost.getName() : "-");
+                            remanejamento.setDestino(newWorkPost.getName());
+                            remanejamento.setDataRemanejamento(dto.getRemanejamentoDataInicio());
+                            StringBuilder obs = new StringBuilder();
+                            if (dto.getEscalaTrabalho() != null && !dto.getEscalaTrabalho().trim().isEmpty()) {
+                                obs.append("Escala: ").append(dto.getEscalaTrabalho());
+                            }
+                            if (dto.getHorarioTrabalho() != null && !dto.getHorarioTrabalho().trim().isEmpty()) {
+                                if (obs.length() > 0) obs.append(" | ");
+                                obs.append("Horário: ").append(dto.getHorarioTrabalho());
+                            }
+                            if (obs.length() > 0) remanejamento.setObservacao(obs.toString());
+                            remanejamentoService.create(remanejamento, changedByUserId != null ? userRepository.findById(changedByUserId).orElse(null) : null, "Alteração de setor/posto via edição de funcionário");
+                        }
+                    }
+                    existingEmployee.setWorkPost(newWorkPost);
                 } catch (IllegalArgumentException e) {
+                    if (e.getMessage() != null && e.getMessage().contains("Ao alterar o setor")) {
+                        throw e; // Re-lançar validações de remanejamento para o cliente
+                    }
                     System.err.println("[WARNING] WorkPostId inválido: " + dto.getWorkPostId());
                 }
             } else {
@@ -434,6 +489,9 @@ public class EmployeeService {
             if (dto.getCarteiraIdentidadeDataEmissao() != null) {
                 existingEmployee.setCarteiraIdentidadeDataEmissao(dto.getCarteiraIdentidadeDataEmissao());
             }
+            if (dto.getRgUf() != null) {
+                existingEmployee.setRgUf(dto.getRgUf());
+            }
             if (dto.getCertificadoMilitar() != null) {
                 existingEmployee.setCertificadoMilitar(dto.getCertificadoMilitar());
             }
@@ -484,6 +542,10 @@ public class EmployeeService {
                 existingEmployee.setNomeMae(dto.getNomeMae());
             if (dto.getMatriculaEsocial() != null)
                 existingEmployee.setMatriculaEsocial(dto.getMatriculaEsocial());
+            if (dto.getRacaCor() != null)
+                existingEmployee.setRacaCor(dto.getRacaCor());
+            if (dto.getTipoSalarioContratual() != null)
+                existingEmployee.setTipoSalarioContratual(dto.getTipoSalarioContratual());
             if (dto.getCbo() != null)
                 existingEmployee.setCbo(dto.getCbo());
             if (dto.getFgtsOptante() != null)
@@ -549,6 +611,10 @@ public class EmployeeService {
                 existingEmployee.setAssinaturaFuncionario(dto.getAssinaturaFuncionario());
 
             applyTerminationRules(existingEmployee, dto);
+
+            if (changedByUserId != null && oldSnapshot != null) {
+                recordEmployeeChanges(existingEmployee, oldSnapshot, changedByUserId);
+            }
 
             // Atualizar timestamp
             existingEmployee.setUpdatedAt(LocalDateTime.now());
@@ -668,6 +734,68 @@ public class EmployeeService {
         });
     }
 
+    private Map<String, String> buildOldSnapshot(Employee e) {
+        Map<String, String> m = new HashMap<>();
+        if (e.getPosition() != null) m.put("position", e.getPosition().getName());
+        else m.put("position", null);
+        if (e.getUnit() != null) m.put("unit", e.getUnit().getName());
+        else m.put("unit", null);
+        if (e.getCompany() != null) m.put("company", e.getCompany().getName());
+        else m.put("company", null);
+        if (e.getDepartment() != null) m.put("department", e.getDepartment().getName());
+        else m.put("department", null);
+        if (e.getWorkPost() != null) m.put("workPost", e.getWorkPost().getName());
+        else m.put("workPost", null);
+        m.put("salario", e.getSalario() != null ? e.getSalario().toString() : null);
+        m.put("status", e.getStatus() != null ? e.getStatus().name() : null);
+        m.put("horarioTrabalho", e.getHorarioTrabalho());
+        m.put("escalaTrabalho", e.getEscalaTrabalho());
+        m.put("hireDate", e.getHireDate() != null ? e.getHireDate().toString() : null);
+        m.put("terminationDate", e.getTerminationDate() != null ? e.getTerminationDate().toString() : null);
+        m.put("exameMedicoVencimento", e.getExameMedicoVencimento() != null ? e.getExameMedicoVencimento().toString() : null);
+        return m;
+    }
+
+    private void recordEmployeeChanges(Employee emp, Map<String, String> oldSnapshot, UUID changedByUserId) {
+        UUID employeeId = emp.getId();
+        if (employeeId == null) return;
+        try {
+            String posNew = emp.getPosition() != null ? emp.getPosition().getName() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.CARGO, "position", "Cargo", oldSnapshot.get("position"), posNew, changedByUserId);
+
+            String unitNew = emp.getUnit() != null ? emp.getUnit().getName() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.UNIDADE, "unit", "Unidade", oldSnapshot.get("unit"), unitNew, changedByUserId);
+
+            String companyNew = emp.getCompany() != null ? emp.getCompany().getName() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.EMPRESA, "company", "Empresa", oldSnapshot.get("company"), companyNew, changedByUserId);
+
+            String deptNew = emp.getDepartment() != null ? emp.getDepartment().getName() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.SETOR, "department", "Setor/Departamento", oldSnapshot.get("department"), deptNew, changedByUserId);
+
+            String workPostNew = emp.getWorkPost() != null ? emp.getWorkPost().getName() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.POSTO_TRABALHO, "workPost", "Posto de trabalho", oldSnapshot.get("workPost"), workPostNew, changedByUserId);
+
+            String salNew = emp.getSalario() != null ? emp.getSalario().toString() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.SALARIO, "salario", "Salário", oldSnapshot.get("salario"), salNew, changedByUserId);
+
+            String statusNew = emp.getStatus() != null ? emp.getStatus().name() : null;
+            recordIfChanged(employeeId, EmployeeChangeCategory.STATUS, "status", "Status", oldSnapshot.get("status"), statusNew, changedByUserId);
+
+            recordIfChanged(employeeId, EmployeeChangeCategory.HORARIO, "horarioTrabalho", "Horário de trabalho", oldSnapshot.get("horarioTrabalho"), emp.getHorarioTrabalho(), changedByUserId);
+            recordIfChanged(employeeId, EmployeeChangeCategory.ESCALA, "escalaTrabalho", "Escala de trabalho", oldSnapshot.get("escalaTrabalho"), emp.getEscalaTrabalho(), changedByUserId);
+            recordIfChanged(employeeId, EmployeeChangeCategory.DADOS_CADASTRAIS, "hireDate", "Data de admissão", oldSnapshot.get("hireDate"), emp.getHireDate() != null ? emp.getHireDate().toString() : null, changedByUserId);
+            recordIfChanged(employeeId, EmployeeChangeCategory.DADOS_CADASTRAIS, "terminationDate", "Data de desligamento", oldSnapshot.get("terminationDate"), emp.getTerminationDate() != null ? emp.getTerminationDate().toString() : null, changedByUserId);
+            recordIfChanged(employeeId, EmployeeChangeCategory.EXAME_ASO, "exameMedicoVencimento", "Vencimento ASO", oldSnapshot.get("exameMedicoVencimento"), emp.getExameMedicoVencimento() != null ? emp.getExameMedicoVencimento().toString() : null, changedByUserId);
+        } catch (Exception ex) {
+            log.warn("Falha ao registrar histórico de alterações do funcionário {}: {}", emp.getId(), ex.getMessage());
+        }
+    }
+
+    private void recordIfChanged(UUID employeeId, EmployeeChangeCategory category, String fieldName, String fieldLabel, String oldVal, String newVal, UUID changedByUserId) {
+        if (Objects.equals(oldVal, newVal)) return;
+        employeeChangeHistoryService.recordChange(employeeId, category, fieldName, fieldLabel, oldVal, newVal, changedByUserId);
+    }
+
     @Transactional(readOnly = true)
     // Removido @Cacheable - entidade Employee tem relacionamentos circulares que
     // causam problemas no Redis
@@ -724,6 +852,10 @@ public class EmployeeService {
             e.printStackTrace();
             throw e;
         }
+    }
+
+    public List<Employee> findAllByIds(List<UUID> ids) {
+        return employeeRepository.findAllById(ids);
     }
 
     public List<Employee> findByNameContaining(String name) {
@@ -1124,6 +1256,7 @@ public class EmployeeService {
             e.setNomeConselhoRegional(dto.getNomeConselhoRegional());
             e.setCarteiraIdentidadeOrgaoEmissor(dto.getCarteiraIdentidadeOrgaoEmissor());
             e.setCarteiraIdentidadeDataEmissao(dto.getCarteiraIdentidadeDataEmissao());
+            e.setRgUf(dto.getRgUf());
             e.setCertificadoMilitar(dto.getCertificadoMilitar());
             e.setNomePai(dto.getNomePai());
             e.setNomeMae(dto.getNomeMae());
@@ -1136,6 +1269,8 @@ public class EmployeeService {
             }
             e.setSexo(dto.getSexo());
             e.setGrauInstrucao(dto.getGrauInstrucao());
+            e.setRacaCor(dto.getRacaCor());
+            e.setTipoSalarioContratual(dto.getTipoSalarioContratual());
             e.setMatriculaEsocial(dto.getMatriculaEsocial());
             e.setCbo(dto.getCbo());
             e.setPis(dto.getPis());
@@ -1445,6 +1580,7 @@ public class EmployeeService {
             dto.setNomeConselhoRegional(e.getNomeConselhoRegional());
             dto.setCarteiraIdentidadeOrgaoEmissor(e.getCarteiraIdentidadeOrgaoEmissor());
             dto.setCarteiraIdentidadeDataEmissao(e.getCarteiraIdentidadeDataEmissao());
+            dto.setRgUf(e.getRgUf());
             dto.setCertificadoMilitar(e.getCertificadoMilitar());
             dto.setNomePai(e.getNomePai());
             dto.setNomeMae(e.getNomeMae());
@@ -1453,6 +1589,8 @@ public class EmployeeService {
             dto.setEstadoNascimento(e.getEstadoNascimento());
             dto.setSexo(e.getSexo());
             dto.setGrauInstrucao(e.getGrauInstrucao());
+            dto.setRacaCor(e.getRacaCor());
+            dto.setTipoSalarioContratual(e.getTipoSalarioContratual());
             dto.setMatriculaEsocial(e.getMatriculaEsocial());
             dto.setCbo(e.getCbo());
             dto.setPis(e.getPis());
@@ -1513,11 +1651,24 @@ public class EmployeeService {
             dto.setCinDataEmissao(e.getCinDataEmissao());
 
             // Mapear relacionamento de Posto de Trabalho e Departamento
-            if (e.getWorkPost() != null) {
-                dto.setWorkPostId(e.getWorkPost().getId().toString());
+            try {
+                org.hibernate.Hibernate.initialize(e.getWorkPost());
+                if (e.getWorkPost() != null) {
+                    dto.setWorkPostId(e.getWorkPost().getId().toString());
+                    EmployeeDTO.IdOnlyDTO workPostDTO = new EmployeeDTO.IdOnlyDTO();
+                    workPostDTO.setId(e.getWorkPost().getId());
+                    workPostDTO.setName(e.getWorkPost().getName());
+                    dto.setWorkPost(workPostDTO);
+                }
+            } catch (Exception wpEx) {
+                System.err.println("[WARNING] Erro ao mapear workPost: " + wpEx.getMessage());
             }
             if (e.getDepartment() != null) {
                 dto.setDepartmentId(e.getDepartment().getId().toString());
+                EmployeeDTO.IdOnlyDTO deptDTO = new EmployeeDTO.IdOnlyDTO();
+                deptDTO.setId(e.getDepartment().getId());
+                deptDTO.setName(e.getDepartment().getName());
+                dto.setDepartment(deptDTO);
             }
 
             if (e.getExameMedicoDoctor() != null) {
@@ -1538,14 +1689,6 @@ public class EmployeeService {
                 bankInfo.setAccountType(e.getAccountType() != null ? e.getAccountType() : "CORRENTE");
                 bankInfo.setPixKey(e.getPixKey());
                 dto.setBankInfo(bankInfo);
-            }
-
-            // Mapear WorkPost e Department
-            if (e.getWorkPost() != null) {
-                dto.setWorkPostId(e.getWorkPost().getId().toString());
-            }
-            if (e.getDepartment() != null) {
-                dto.setDepartmentId(e.getDepartment().getId().toString());
             }
 
             // Mapear entidades relacionais com verificação de null
@@ -1608,11 +1751,33 @@ public class EmployeeService {
                 try {
                     EmployeeDTO.IdOnlyDTO companyDTO = new EmployeeDTO.IdOnlyDTO();
                     companyDTO.setId(e.getCompany().getId());
+                    companyDTO.setName(e.getCompany().getName());
+                    companyDTO.setSigla(e.getCompany().getSigla());
+                    companyDTO.setCnpj(e.getCompany().getCnpj());
                     dto.setCompany(companyDTO);
                 } catch (Exception companyEx) {
                     System.err.println("[WARNING] Erro ao mapear company: " + companyEx.getMessage());
                     dto.setCompany(null);
                 }
+            }
+
+            // Mapear Dependentes
+            try {
+                if (e.getDependents() != null && !e.getDependents().isEmpty()) {
+                    org.hibernate.Hibernate.initialize(e.getDependents());
+                    List<com.z7design.secured_guard.dto.DependentDTO> dependentsDTO = e.getDependents().stream()
+                            .map(d -> com.z7design.secured_guard.dto.DependentDTO.builder()
+                                    .id(d.getId())
+                                    .name(d.getName())
+                                    .cpf(d.getCpf())
+                                    .birthDate(d.getBirthDate())
+                                    .relationship(d.getRelationship() != null ? d.getRelationship().toString() : null)
+                                    .build())
+                            .collect(java.util.stream.Collectors.toList());
+                    dto.setDependents(dependentsDTO);
+                }
+            } catch (Exception depEx) {
+                System.err.println("[WARNING] Erro ao mapear dependentes: " + depEx.getMessage());
             }
 
             System.out.println("[DEBUG] DTO criado com sucesso para: " + dto.getName());

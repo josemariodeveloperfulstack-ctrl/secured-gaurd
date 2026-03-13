@@ -38,7 +38,9 @@ public record EmployeeCertificationResponse(
         var employee = certification.getEmployee();
         if (employee != null) {
             employeeName = employee.getName();
-            employeeDocument = employee.getDocument();
+            employeeDocument = employee.getDocument() != null && !employee.getDocument().isBlank()
+                    ? employee.getDocument()
+                    : employee.getCpf();
 
             // Tentar obter o cargo (Position)
             var position = employee.getPosition();
@@ -50,9 +52,8 @@ public record EmployeeCertificationResponse(
                 }
             }
 
-            // Tentar obter o setor (Unit/WorkPost)
-            // 1. Prioridade para o WorkPost da certificação (onde o treinamento ocorreu ou
-            // se aplica)
+            // Tentar obter o setor (WorkPost/Unit)
+            // 1. Prioridade para o WorkPost da certificação (onde o treinamento ocorreu ou se aplica)
             if (certification.getWorkPost() != null) {
                 try {
                     departmentName = certification.getWorkPost().getName();
@@ -60,7 +61,17 @@ public record EmployeeCertificationResponse(
                 }
             }
 
-            // 2. Fallback para o Setor/Unidade do funcionário
+            // 2. Fallback para o WorkPost atual do funcionário
+            if (departmentName == null || departmentName.isEmpty()) {
+                if (employee.getWorkPost() != null) {
+                    try {
+                        departmentName = employee.getWorkPost().getName();
+                    } catch (Exception e) {
+                    }
+                }
+            }
+
+            // 3. Fallback para a Unidade do funcionário
             if (departmentName == null || departmentName.isEmpty()) {
                 if (employee.getUnit() != null) {
                     try {

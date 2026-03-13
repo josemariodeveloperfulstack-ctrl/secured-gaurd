@@ -28,6 +28,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { ActivityReport, CreateActivityReportDTO } from '@/types/activityReport';
+import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
 import { activityReportService } from '@/services/activityReportService';
 import { workPostService } from '@/services/workPostService';
@@ -233,20 +234,17 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
       setLoadingData(true);
       console.log('🔄 Iniciando carregamento de dados dos dropdowns...');
       
-      // Carregar funcionários
+      // Carregar funcionários (usar api com token para evitar 403)
       try {
-        const employeesResponse = await fetch('/api/employees/basic');
-        if (employeesResponse.ok) {
-          const employeesData = await employeesResponse.json();
-          const mappedEmployees = (employeesData.employees || []).map((emp: any) => ({
-            id: emp.id?.toString() || emp.id,
-            name: emp.name || 'Sem nome'
-          }));
-          setEmployees(mappedEmployees);
-          console.log('✅ Funcionários carregados:', mappedEmployees.length);
-        } else {
-          console.error('❌ Erro ao carregar funcionários:', employeesResponse.status);
-        }
+        const employeesResponse = await api.get('/employees/basic');
+        const employeesData = employeesResponse.data;
+        const raw = employeesData?.employees || employeesData?.content || [];
+        const mappedEmployees = Array.isArray(raw) ? raw.map((emp: any) => ({
+          id: emp.id?.toString() || emp.id,
+          name: emp.name || 'Sem nome'
+        })) : [];
+        setEmployees(mappedEmployees);
+        console.log('✅ Funcionários carregados:', mappedEmployees.length);
       } catch (error) {
         console.error('❌ Erro ao buscar funcionários:', error);
       }

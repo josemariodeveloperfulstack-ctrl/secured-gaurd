@@ -5,6 +5,8 @@ import com.z7design.secured_guard.dto.VacationCoverageResponse;
 import com.z7design.secured_guard.model.VacationCoverage;
 import com.z7design.secured_guard.model.Vacation;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.repository.VacationCoverageRepository;
@@ -13,6 +15,8 @@ import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
@@ -61,6 +65,9 @@ public class VacationCoverageService {
 
     @Autowired
     private CompanyRepository companyRepository;
+
+    @Autowired
+    private EmployeeChangeHistoryService employeeChangeHistoryService;
 
     @Transactional(readOnly = true)
     public List<VacationCoverageResponse> getAllVacationCoverages() {
@@ -167,7 +174,12 @@ public class VacationCoverageService {
                 .updatedAt(java.time.LocalDateTime.now())
                 .build();
 
-        return mapToResponse(vacationCoverageRepository.save(coverage));
+        VacationCoverage saved = vacationCoverageRepository.save(coverage);
+        String desc = String.format("Férias %s a %s - Substituto: %s", request.getStartDate(), request.getEndDate(),
+                substitute != null ? substitute.getName() : "Sem substituto");
+        employeeChangeHistoryService.recordChange(employee.getId(), EmployeeChangeCategory.FERIAS,
+                "cobertura_ferias", "Cobertura de férias", null, desc, getCurrentUserId());
+        return mapToResponse(saved);
     }
 
     public VacationCoverageResponse updateVacationCoverage(UUID id, CreateVacationCoverageRequest request) {
@@ -212,7 +224,12 @@ public class VacationCoverageService {
 
         existingCoverage.setUpdatedAt(java.time.LocalDateTime.now());
 
-        return mapToResponse(vacationCoverageRepository.save(existingCoverage));
+        String oldDesc = String.format("Férias %s a %s", existingCoverage.getCoverageStartDate(), existingCoverage.getCoverageEndDate());
+        VacationCoverage saved = vacationCoverageRepository.save(existingCoverage);
+        String newDesc = String.format("Férias %s a %s", saved.getCoverageStartDate(), saved.getCoverageEndDate());
+        employeeChangeHistoryService.recordChange(saved.getVacation().getEmployee().getId(),
+                EmployeeChangeCategory.FERIAS, "cobertura_ferias", "Cobertura de férias", oldDesc, newDesc, getCurrentUserId());
+        return mapToResponse(saved);
     }
 
     public void deleteVacationCoverage(UUID id) {
@@ -237,6 +254,14 @@ public class VacationCoverageService {
         coverage.setUpdatedAt(java.time.LocalDateTime.now());
 
         return mapToResponse(vacationCoverageRepository.save(coverage));
+    }
+
+    private UUID getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            return ((User) auth.getPrincipal()).getId();
+        }
+        return null;
     }
 
     @Transactional(readOnly = true)

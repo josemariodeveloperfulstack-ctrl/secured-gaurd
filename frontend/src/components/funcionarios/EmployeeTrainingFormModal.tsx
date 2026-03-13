@@ -833,9 +833,10 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
         const certification = await trainingService.updateEmployeeCertification(form.id, {
           employeeId: form.employeeId,
           trainingId: existingCert.trainingId,
-          certificationNumber: existingCert.certificationNumber,
-          issueDate: existingCert.issueDate,
+          certificationNumber: existingCert.certificationNumber || `CERT-${form.id}`,
+          issueDate: existingCert.issueDate || new Date().toISOString().slice(0, 10),
           expirationDate: toIsoDate(form.validUntil) || undefined,
+          documentUrl: existingCert.documentUrl || undefined,
           workPostName: form.sector || undefined,
         });
         
@@ -868,12 +869,16 @@ const EmployeeTrainingFormModal = ({ open, onOpenChange, onSave, editData }) => 
       onSave({ ...form, id: certification.id });
       // Fechar o modal após salvar
       onOpenChange(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error('❌ Erro ao salvar treinamento/certificação:', e);
+      console.error('❌ Resposta da API:', e?.response?.data);
       const isEdit = !!form.id;
+      // Extrair mensagem da API (409, 400, etc.)
+      const apiMessage = e?.response?.data?.message;
+      const description = apiMessage || `Falha ao ${isEdit ? 'atualizar' : 'criar'} treinamento.`;
       toast({ 
         title: 'Erro', 
-        description: `Falha ao ${isEdit ? 'atualizar' : 'criar'} treinamento.`, 
+        description, 
         variant: 'destructive' 
       });
     } finally {

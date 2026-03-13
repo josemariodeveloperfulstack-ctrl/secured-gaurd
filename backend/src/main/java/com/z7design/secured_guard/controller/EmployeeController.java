@@ -3,8 +3,10 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.EmployeeDTO;
 import com.z7design.secured_guard.dto.SimpleEmployeeDTO;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.service.EmployeeRecordPdfService;
+import com.z7design.secured_guard.service.EmployeeChangeHistoryService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,6 +15,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,9 +24,17 @@ import org.springframework.web.multipart.MultipartFile;
 import com.z7design.secured_guard.service.EmployeeExcelImportService;
 import com.z7design.secured_guard.service.EmployeeImportService;
 
+import com.z7design.secured_guard.dto.EmployeeChangeHistoryDTO;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
+
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
@@ -37,6 +49,7 @@ public class EmployeeController {
     private final EmployeeRecordPdfService employeeRecordPdfService;
     private final EmployeeExcelImportService employeeExcelImportService;
     private final EmployeeImportService employeeImportService;
+    private final EmployeeChangeHistoryService employeeChangeHistoryService;
 
     @GetMapping("/count")
     @Operation(summary = "Contar funcionários", description = "Retorna o número total de funcionários")
@@ -430,15 +443,17 @@ public class EmployeeController {
                         employee.put("position", position);
                     }
 
-                    if (row.length > 20 && row[20] != null) {
+                    if (row.length > 25 && (row[20] != null || row[25] != null)) {
                         java.util.Map<String, Object> unit = new java.util.HashMap<>();
-                        unit.put("name", row[20]); // unit_name
+                        if (row[20] != null) unit.put("name", row[20]); // unit_name
+                        if (row[25] != null) unit.put("id", row[25]); // unit_id
                         employee.put("unit", unit);
                     }
 
-                    if (row.length > 21 && row[21] != null) {
+                    if (row.length > 26 && (row[21] != null || row[26] != null)) {
                         java.util.Map<String, Object> company = new java.util.HashMap<>();
-                        company.put("sigla", row[21]); // company_sigla
+                        if (row[21] != null) company.put("sigla", row[21]); // company_sigla
+                        if (row[26] != null) company.put("id", row[26]); // company_id
                         employee.put("company", company);
                     }
 
@@ -446,9 +461,10 @@ public class EmployeeController {
                         employee.put("userId", row[22]);
                     }
 
-                    if (row.length > 23 && row[23] != null) {
+                    if (row.length > 27 && (row[23] != null || row[27] != null)) {
                         java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                        workPost.put("name", row[23]); // work_post_name
+                        if (row[23] != null) workPost.put("name", row[23]); // work_post_name
+                        if (row[27] != null) workPost.put("id", row[27]); // work_post_id
                         employee.put("workPost", workPost);
                     }
 
@@ -553,8 +569,44 @@ public class EmployeeController {
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
     public ResponseEntity<EmployeeDTO> update(@PathVariable String id, @Valid @RequestBody EmployeeDTO employeeDTO) {
-        EmployeeDTO updatedEmployee = employeeService.update(UUID.fromString(id), employeeDTO);
+        UUID changedByUserId = null;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            changedByUserId = ((User) auth.getPrincipal()).getId();
+        }
+        EmployeeDTO updatedEmployee = employeeService.update(UUID.fromString(id), employeeDTO, changedByUserId);
         return ResponseEntity.ok(updatedEmployee);
+    }
+
+    @GetMapping("/{id}/change-history")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_HISTORY_READ', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE')")
+    @Operation(summary = "Histórico de mudanças do funcionário", description = "Lista paginada de alterações de dados do funcionário")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Sem permissão EMPLOYEE_HISTORY_READ"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado")
+    })
+    public ResponseEntity<Page<EmployeeChangeHistoryDTO>> getChangeHistory(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String dateFrom,
+            @RequestParam(required = false) String dateTo,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) UUID changedByUserId) {
+        UUID employeeId = UUID.fromString(id);
+        employeeService.findById(employeeId); // 404 se não existir
+        Pageable pageable = PageRequest.of(page, size);
+        Instant from = dateFrom != null && !dateFrom.isBlank() ? Instant.parse(dateFrom) : null;
+        Instant to = dateTo != null && !dateTo.isBlank() ? Instant.parse(dateTo) : null;
+        EmployeeChangeCategory cat = null;
+        if (category != null && !category.isBlank()) {
+            try {
+                cat = EmployeeChangeCategory.valueOf(category.toUpperCase());
+            } catch (IllegalArgumentException ignored) { }
+        }
+        Page<EmployeeChangeHistoryDTO> result = employeeChangeHistoryService.findByEmployeeId(employeeId, from, to, cat, changedByUserId, pageable);
+        return ResponseEntity.ok(result);
     }
 
     @DeleteMapping("/{id}")
@@ -573,7 +625,7 @@ public class EmployeeController {
     @Operation(summary = "Atualizar status do funcionário", description = "Atualiza apenas o status de um funcionário")
     public ResponseEntity<EmployeeDTO> updateStatus(@PathVariable String id, @RequestParam String status) {
         return ResponseEntity
-                .ok(employeeService.update(UUID.fromString(id), EmployeeDTO.builder().status(status).build()));
+                .ok(employeeService.update(UUID.fromString(id), EmployeeDTO.builder().status(status).build(), null));
     }
 
     @PostMapping("/bulk-status")
@@ -605,6 +657,29 @@ public class EmployeeController {
         List<UUID> uuids = ids.stream().map(UUID::fromString).toList();
         employeeService.bulkDelete(uuids);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/export-full")
+    @Operation(summary = "Exportar dados completos", description = "Retorna os dados completos de uma lista de funcionários")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de funcionários retornada com sucesso"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<EmployeeDTO>> getFullDataForExport(@RequestBody Map<String, List<String>> request) {
+        try {
+            List<String> ids = request.get("ids");
+            if (ids == null || ids.isEmpty()) {
+                return ResponseEntity.ok(java.util.Collections.emptyList());
+            }
+            List<UUID> uuids = ids.stream().map(UUID::fromString).toList();
+            List<Employee> employees = employeeService.findAllByIds(uuids);
+            List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO).toList();
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeController.getFullDataForExport - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 
     @GetMapping("/status/{status}")

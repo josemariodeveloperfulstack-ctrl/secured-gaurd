@@ -133,20 +133,27 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex,
             WebRequest request) {
-        log.warn("Violação de integridade de dados: {}", ex.getMessage());
+        String path = request.getDescription(false).replace("uri=", "");
+        log.warn("Violação de integridade de dados: {} | path: {}", ex.getMessage(), path);
+        if (ex.getCause() != null) {
+            log.warn("Causa: {}", ex.getCause().getMessage());
+        }
 
         String message = "Erro ao salvar dados. Verifique se os dados já existem (ex: username ou email já cadastrado).";
 
         // Tentar extrair uma mensagem mais específica da exceção
-        if (ex.getMessage() != null) {
-            String msg = ex.getMessage();
-            if (msg.contains("username") || (msg.contains("UK_") && msg.contains("username"))) {
-                message = "Nome de usuário já está em uso";
-            } else if (msg.contains("email") || (msg.contains("UK_") && msg.contains("email"))) {
-                message = "Email já está em uso";
-            } else if (msg.contains("contract_number") || msg.contains("contracts_contract_number")) {
-                message = "Número do contrato já está em uso por outro contrato.";
-            }
+        String msg = ex.getMessage() != null ? ex.getMessage() : "";
+        String causeMsg = ex.getCause() != null ? ex.getCause().getMessage() : "";
+        String fullMsg = msg + " " + causeMsg;
+
+        if (fullMsg.contains("username") || (fullMsg.contains("UK_") && fullMsg.contains("username"))) {
+            message = "Nome de usuário já está em uso";
+        } else if (fullMsg.contains("email") || (fullMsg.contains("UK_") && fullMsg.contains("email"))) {
+            message = "Email já está em uso";
+        } else if (fullMsg.contains("contract_number") || fullMsg.contains("contracts_contract_number")) {
+            message = "Número do contrato já está em uso por outro contrato.";
+        } else if (path.contains("employee-certifications")) {
+            message = "Erro ao salvar treinamento/certificação. Verifique se o número da certificação ou os dados já existem.";
         }
 
         ErrorResponse errorResponse = ErrorResponse.builder()

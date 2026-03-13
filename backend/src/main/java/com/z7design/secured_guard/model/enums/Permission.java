@@ -43,7 +43,8 @@ public enum Permission {
     EMPLOYEES_WRITE,
     EMPLOYEES_DELETE,
     EMPLOYEES_CREATE,
-    
+    EMPLOYEE_HISTORY_READ,
+
     // ===========================================
     // RH COMPLEMENTAR
     // ===========================================

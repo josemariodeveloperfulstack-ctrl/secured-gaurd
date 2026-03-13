@@ -93,6 +93,16 @@ public class EmployeeCertificationService {
             com.z7design.secured_guard.dto.UpdateEmployeeCertificationRequest request) {
         EmployeeCertification existingCertification = findById(id);
 
+        // Garantir que employee nunca seja null (evita employee_id=NULL no UPDATE - Hibernate batch pode perder referência)
+        UUID empId = request.getEmployeeId();
+        if (empId != null) {
+            Employee emp = employeeRepository.findById(empId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado"));
+            existingCertification.setEmployee(emp);
+        } else if (existingCertification.getEmployee() == null) {
+            throw new IllegalArgumentException("Funcionário é obrigatório para a certificação");
+        }
+
         // Converter DTO para entidade para validação
         EmployeeCertification certificationForValidation = new EmployeeCertification();
         certificationForValidation.setIssueDate(request.getIssueDate());
@@ -174,7 +184,7 @@ public class EmployeeCertificationService {
 
     @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findAll() {
-        List<EmployeeCertification> entities = certificationRepository.findAll();
+        List<EmployeeCertification> entities = certificationRepository.findAllWithDetails();
         System.out
                 .println("📋 EmployeeCertificationService.findAll - Entidades encontradas no Repo: " + entities.size());
         List<EmployeeCertificationResponse> responses = convertToResponse(entities);

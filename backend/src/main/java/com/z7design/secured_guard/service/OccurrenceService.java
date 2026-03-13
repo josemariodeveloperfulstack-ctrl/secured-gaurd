@@ -9,26 +9,52 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.z7design.secured_guard.model.Occurrence;
 import com.z7design.secured_guard.model.OccurrenceType;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.repository.OccurrenceRepository;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Service
 @RequiredArgsConstructor
 public class OccurrenceService {
     
     private final OccurrenceRepository occurrenceRepository;
+    private final EmployeeChangeHistoryService employeeChangeHistoryService;
     
     @Transactional
     public Occurrence create(Occurrence occurrence) {
-        return occurrenceRepository.save(occurrence);
+        Occurrence saved = occurrenceRepository.save(occurrence);
+        if (saved.getEmployee() != null) {
+            String desc = String.format("%s - %s", saved.getType(), saved.getDescription());
+            employeeChangeHistoryService.recordChange(saved.getEmployee().getId(), EmployeeChangeCategory.OCORRENCIA,
+                    "ocorrencia", "Ocorrência", null, desc, getCurrentUserId());
+        }
+        return saved;
     }
     
     @Transactional
     public Occurrence update(UUID id, Occurrence occurrence) {
         Occurrence existingOccurrence = findById(id);
         occurrence.setId(id);
-        return occurrenceRepository.save(occurrence);
+        Occurrence saved = occurrenceRepository.save(occurrence);
+        if (saved.getEmployee() != null) {
+            String oldDesc = String.format("%s - %s", existingOccurrence.getType(), existingOccurrence.getDescription());
+            String newDesc = String.format("%s - %s", saved.getType(), saved.getDescription());
+            employeeChangeHistoryService.recordChange(saved.getEmployee().getId(), EmployeeChangeCategory.OCORRENCIA,
+                    "ocorrencia", "Ocorrência", oldDesc, newDesc, getCurrentUserId());
+        }
+        return saved;
+    }
+
+    private UUID getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            return ((User) auth.getPrincipal()).getId();
+        }
+        return null;
     }
     
     @Transactional

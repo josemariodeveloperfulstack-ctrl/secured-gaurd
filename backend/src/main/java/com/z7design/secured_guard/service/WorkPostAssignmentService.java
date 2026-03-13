@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.CreateWorkPostAssignmentRequest;
 import com.z7design.secured_guard.dto.WorkPostAssignmentResponse;
 import com.z7design.secured_guard.model.WorkPostAssignment;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.Company;
@@ -20,8 +21,12 @@ import com.itextpdf.layout.properties.UnitValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.z7design.secured_guard.model.User;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -53,6 +58,9 @@ public class WorkPostAssignmentService {
 
     @Autowired
     private CompanyRepository companyRepository;
+
+    @Autowired
+    private EmployeeChangeHistoryService employeeChangeHistoryService;
 
     @Transactional(readOnly = true)
     public List<WorkPostAssignmentResponse> getAllWorkPostAssignments() {
@@ -162,7 +170,11 @@ public class WorkPostAssignmentService {
                 .updatedAt(java.time.LocalDateTime.now())
                 .build();
 
-        return mapToResponse(workPostAssignmentRepository.save(assignment));
+        WorkPostAssignmentResponse saved = mapToResponse(workPostAssignmentRepository.save(assignment));
+        String desc = String.format("Posto: %s em %s (%s)", workPost.getName(), request.getAssignmentDate(), shiftType);
+        employeeChangeHistoryService.recordChange(employee.getId(), EmployeeChangeCategory.POSTO_TRABALHO,
+                "atribuicao_posto", "Atribuição de posto", null, desc, getCurrentUserId());
+        return saved;
     }
 
     public WorkPostAssignmentResponse updateWorkPostAssignment(UUID id, CreateWorkPostAssignmentRequest request) {
@@ -194,6 +206,20 @@ public class WorkPostAssignmentService {
 
         existingAssignment.setUpdatedAt(java.time.LocalDateTime.now());
 
+        String oldDesc = existingAssignment.getWorkPost() != null
+                ? String.format("Posto: %s em %s", existingAssignment.getWorkPost().getName(), existingAssignment.getAssignmentDate())
+                : null;
+        String newDesc = request.getWorkPostId() != null
+                ? workPostRepository.findById(request.getWorkPostId())
+                        .map(wp -> String.format("Posto: %s em %s", wp.getName(), request.getAssignmentDate() != null ? request.getAssignmentDate() : existingAssignment.getAssignmentDate()))
+                        .orElse(null)
+                : oldDesc;
+        if (!java.util.Objects.equals(oldDesc, newDesc)) {
+            employeeChangeHistoryService.recordChange(existingAssignment.getEmployee().getId(),
+                    EmployeeChangeCategory.POSTO_TRABALHO, "atribuicao_posto", "Atribuição de posto",
+                    oldDesc, newDesc, getCurrentUserId());
+        }
+
         // Validar e atualizar funcionário se fornecido
         if (request.getEmployeeId() != null) {
             Employee employee = employeeRepository.findById(request.getEmployeeId())
@@ -216,6 +242,14 @@ public class WorkPostAssignmentService {
             throw new RuntimeException("Atribuição de posto não encontrada");
         }
         workPostAssignmentRepository.deleteById(id);
+    }
+
+    private UUID getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            return ((User) auth.getPrincipal()).getId();
+        }
+        return null;
     }
 
     public WorkPostAssignmentResponse updateStatus(UUID id, WorkPostAssignment.AssignmentStatus status) {

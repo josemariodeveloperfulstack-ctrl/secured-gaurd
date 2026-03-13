@@ -52,6 +52,8 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
+  const [currentEmployeeWorkPost, setCurrentEmployeeWorkPost] = useState<{ id: string; name: string } | null>(null);
+  const [loadingEmployeeDetails, setLoadingEmployeeDetails] = useState(false);
 
   // Carregar postos de trabalho
   const loadWorkPosts = async () => {
@@ -78,17 +80,22 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
   const loadEmployees = async () => {
     setLoadingEmployees(true);
     try {
-      const data = await employeeService.getAllEmployees();
-      setEmployees(data);
+      let data = await employeeService.getAllEmployees({}, 0, 1000);
+      if (!Array.isArray(data)) {
+        data = (data as any)?.content ?? (data as any)?.employees ?? [];
+      }
+      if (data.length === 0) {
+        data = await employeeService.getEmployees();
+      }
+      setEmployees(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.warn('Erro ao carregar funcionários, usando dados estáticos:', error);
-      // Dados estáticos como fallback
-      setEmployees([
-        { id: '1', name: 'João Silva', cpf: '123.456.789-00', rg: '12.345.678-9', email: 'joao.silva@empresa.com', phone: '(11) 99999-9999', address: 'Rua das Flores, 123', birthDate: '1985-03-15', maritalStatus: 'CASADO', nationality: 'Brasileira', registrationNumber: 'EMP001', hireDate: '2020-01-15', status: 'ACTIVE', position: { id: '1', name: 'Vigilante' }, createdAt: '2020-01-15T00:00:00Z', updatedAt: '2024-01-15T00:00:00Z' },
-        { id: '2', name: 'Maria Santos', cpf: '987.654.321-00', rg: '98.765.432-1', email: 'maria.santos@empresa.com', phone: '(11) 88888-8888', address: 'Av. Paulista, 456', birthDate: '1990-07-22', maritalStatus: 'SOLTEIRO', nationality: 'Brasileira', registrationNumber: 'EMP002', hireDate: '2021-03-10', status: 'ACTIVE', position: { id: '2', name: 'Supervisor' }, createdAt: '2021-03-10T00:00:00Z', updatedAt: '2024-01-15T00:00:00Z' },
-        { id: '3', name: 'Carlos Oliveira', cpf: '456.789.123-00', rg: '45.678.912-3', email: 'carlos.oliveira@empresa.com', phone: '(11) 77777-7777', address: 'Rua Central, 789', birthDate: '1988-12-05', maritalStatus: 'CASADO', nationality: 'Brasileira', registrationNumber: 'EMP003', hireDate: '2019-06-20', status: 'ACTIVE', position: { id: '1', name: 'Vigilante' }, createdAt: '2019-06-20T00:00:00Z', updatedAt: '2024-01-15T00:00:00Z' },
-        { id: '4', name: 'Ana Costa', cpf: '789.123.456-00', rg: '78.912.345-6', email: 'ana.costa@empresa.com', phone: '(11) 66666-6666', address: 'Av. Norte, 321', birthDate: '1992-04-18', maritalStatus: 'SOLTEIRO', nationality: 'Brasileira', registrationNumber: 'EMP004', hireDate: '2022-02-10', status: 'ACTIVE', position: { id: '3', name: 'Porteiro' }, createdAt: '2022-02-10T00:00:00Z', updatedAt: '2024-01-15T00:00:00Z' }
-      ]);
+      console.warn('Erro ao carregar funcionários:', error);
+      try {
+        const fallback = await employeeService.getEmployees();
+        setEmployees(Array.isArray(fallback) ? fallback : []);
+      } catch {
+        setEmployees([]);
+      }
     } finally {
       setLoadingEmployees(false);
     }
@@ -104,6 +111,56 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
     };
     loadAll();
   }, []);
+
+  // Ao selecionar funcionário, buscar posto atual para preencher posto de origem
+  useEffect(() => {
+    if (!form.employeeId) {
+      setCurrentEmployeeWorkPost(null);
+      setForm(prev => ({ ...prev, sourceWorkPostId: '' }));
+      return;
+    }
+    const fetchEmployeeWorkPost = async () => {
+      setLoadingEmployeeDetails(true);
+      try {
+        const emp = await employeeService.getEmployeeById(form.employeeId) as any;
+        const wp = emp?.workPost;
+        const wpId = emp?.workPostId || wp?.id;
+        const wpName = wp?.name;
+        if (wpId && wpName) {
+          setCurrentEmployeeWorkPost({ id: String(wpId), name: wpName });
+          setForm(prev => ({ ...prev, sourceWorkPostId: String(wpId) }));
+        } else if (wpId && workPosts.length > 0) {
+          const found = workPosts.find(p => String(p.id) === String(wpId));
+          if (found) {
+            setCurrentEmployeeWorkPost({ id: String(wpId), name: found.postCode ? `${found.postCode} - ${found.name}` : found.name });
+            setForm(prev => ({ ...prev, sourceWorkPostId: String(wpId) }));
+          } else {
+            setCurrentEmployeeWorkPost({ id: String(wpId), name: 'Posto ID ' + wpId });
+            setForm(prev => ({ ...prev, sourceWorkPostId: String(wpId) }));
+          }
+        } else {
+          setCurrentEmployeeWorkPost(null);
+          setForm(prev => ({ ...prev, sourceWorkPostId: '' }));
+        }
+      } catch {
+        setCurrentEmployeeWorkPost(null);
+        setForm(prev => ({ ...prev, sourceWorkPostId: '' }));
+      } finally {
+        setLoadingEmployeeDetails(false);
+      }
+    };
+    fetchEmployeeWorkPost();
+  }, [form.employeeId]);
+
+  // Atualizar nome do posto de origem quando workPosts carregar (caso tenha vindo só o ID da API)
+  useEffect(() => {
+    if (form.sourceWorkPostId && currentEmployeeWorkPost?.name?.startsWith?.('Posto ID ') && workPosts.length > 0) {
+      const found = workPosts.find(p => String(p.id) === form.sourceWorkPostId);
+      if (found) {
+        setCurrentEmployeeWorkPost({ id: form.sourceWorkPostId, name: found.postCode ? `${found.postCode} - ${found.name}` : found.name });
+      }
+    }
+  }, [workPosts, form.sourceWorkPostId, currentEmployeeWorkPost?.name]);
 
   // Função helper para verificar se uma string é um UUID válido
   const isValidUUID = (str: string | undefined | null): boolean => {
@@ -358,22 +415,20 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">Posto de Trabalho de Origem</label>
-                <select 
-                  name="sourceWorkPostId" 
-                  value={form.sourceWorkPostId || ''} 
-                  onChange={handleChange} 
-                  className="w-full p-2 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm" 
-                  disabled={loadingWorkPosts}
-                >
-                  <option value="">
-                    {loadingWorkPosts ? 'Carregando postos...' : 'Selecione o posto de origem'}
-                  </option>
-                  {workPosts.map((post) => (
-                    <option key={post.id} value={String(post.id)}>
-                      {post.postCode} - {post.name}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    loadingEmployeeDetails
+                      ? 'Carregando...'
+                      : currentEmployeeWorkPost
+                        ? `${currentEmployeeWorkPost.name}`
+                        : form.employeeId
+                          ? 'Nenhum posto atribuído'
+                          : 'Selecione o funcionário primeiro'
+                  }
+                  className="w-full p-2 rounded bg-seguranca-graphite/70 text-seguranca-lightgray border border-gray-600 cursor-not-allowed text-sm"
+                />
               </div>
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">Posto de Trabalho de Destino</label>

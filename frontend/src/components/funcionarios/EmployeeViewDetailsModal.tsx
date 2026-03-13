@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import { EmployeeDocuments } from './EmployeeDocuments';
+import employeeService from '@/services/employeeService';
 import dependentService from '@/services/dependentService';
 import { sstService, MedicalExam } from '@/services/sstService';
 import { feriasService } from '@/services/feriasService';
@@ -64,6 +65,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
 }) => {
     const [activeTab, setActiveTab] = useState('dados');
     const [loading, setLoading] = useState(false);
+    const [fullEmployee, setFullEmployee] = useState<Employee | null>(null);
 
     // Data states
     const [dependents, setDependents] = useState<any[]>([]);
@@ -76,6 +78,17 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [generatingReport, setGeneratingReport] = useState(false);
+
+    // Carregar funcionário completo ao abrir (lista paginada retorna document, não cpf/rg)
+    useEffect(() => {
+        if (open && employee?.id) {
+            employeeService.getEmployeeById(employee.id).then((fetched) => {
+                setFullEmployee(fetched || null);
+            }).catch(() => setFullEmployee(null));
+        } else {
+            setFullEmployee(null);
+        }
+    }, [open, employee?.id]);
 
     useEffect(() => {
         if (open && employee?.id) {
@@ -189,6 +202,9 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
+    // Usar funcionário completo quando disponível (cpf, rg, etc. vêm do endpoint /employees/:id)
+    const displayEmployee = fullEmployee ?? employee;
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-[98vw] md:w-full max-w-6xl h-[98vh] md:h-[85vh] overflow-hidden flex flex-col bg-seguranca-graphite border-gray-700 p-0">
@@ -201,30 +217,36 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                             </div>
                             <div>
                                 <DialogTitle className="text-xl md:text-2xl font-bold text-white mb-1">
-                                    {employee.name}
+                                    {displayEmployee.name}
                                 </DialogTitle>
                                 <DialogDescription className="text-seguranca-lightgray flex flex-wrap items-center gap-x-4 gap-y-1">
                                     <span className="flex items-center gap-1 font-mono">
                                         <Briefcase size={14} className="text-seguranca-yellow" />
-                                        Mat: {employee.registrationNumber || 'N/A'}
+                                        Mat: {displayEmployee.registrationNumber || 'N/A'}
                                     </span>
                                     <span className="flex items-center gap-1">
                                         <Building size={14} className="text-seguranca-yellow" />
-                                        {employee.company?.sigla || 'N/A'}
+                                        {displayEmployee.company?.sigla || 'N/A'}
                                     </span>
                                     <Badge className={`
-                    ${employee.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
-                                            employee.status === 'TERMINATED' ? 'bg-red-500/20 text-red-400' :
+                    ${displayEmployee.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
+                                            displayEmployee.status === 'TERMINATED' ? 'bg-red-500/20 text-red-400' :
                                                 'bg-yellow-500/20 text-yellow-400'}
                   `}>
-                                        {employee.status === 'ACTIVE' ? 'Ativo' :
-                                            employee.status === 'TERMINATED' ? 'Demitido' : 'Outro'}
+                                        {displayEmployee.status === 'ACTIVE' ? 'Ativo' :
+                                            displayEmployee.status === 'TERMINATED' ? 'Demitido' : 'Outro'}
                                     </Badge>
                                 </DialogDescription>
                             </div>
                         </div>
                         <Button
-                            onClick={() => onEdit(employee)}
+                            onClick={() => {
+                              const toEdit = { ...displayEmployee } as any;
+                              const listWp = (employee as any)?.workPost;
+                              if (listWp && !toEdit.workPost) toEdit.workPost = listWp;
+                              if (listWp?.id && !toEdit.workPostId) toEdit.workPostId = String(listWp.id);
+                              onEdit(toEdit);
+                            }}
                             className="bg-seguranca-red hover:bg-seguranca-darkred text-white w-full md:w-auto"
                         >
                             <Edit size={18} className="mr-2" /> Editar Dados
@@ -343,15 +365,15 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                     <CardContent className="p-4 space-y-3">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">CPF</span>
-                                            <span className="text-sm font-mono text-white">{formatCPF(employee.cpf)}</span>
+                                            <span className="text-sm font-mono text-white">{formatCPF(displayEmployee.cpf || (displayEmployee as any).document)}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">RG</span>
-                                            <span className="text-sm font-mono text-white">{formatRG(employee.rg)}</span>
+                                            <span className="text-sm font-mono text-white">{formatRG(displayEmployee.rg)}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Data de Nascimento</span>
-                                            <span className="text-sm text-white">{formatDate(employee.birthDate)}</span>
+                                            <span className="text-sm text-white">{formatDate(displayEmployee.birthDate)}</span>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -364,15 +386,15 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                     <CardContent className="p-4 space-y-3">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">E-mail</span>
-                                            <span className="text-sm text-white break-all">{employee.email || '-'}</span>
+                                            <span className="text-sm text-white break-all">{displayEmployee.email || '-'}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Telefone Principal</span>
-                                            <span className="text-sm text-white">{formatPhone(employee.phone)}</span>
+                                            <span className="text-sm text-white">{formatPhone(displayEmployee.phone)}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Telefone Contato</span>
-                                            <span className="text-sm text-white">{formatPhone((employee as any).telefoneContato)}</span>
+                                            <span className="text-sm text-white">{formatPhone((displayEmployee as any).telefoneContato)}</span>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -385,20 +407,20 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                     <CardContent className="p-4 space-y-3">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Cargo / Função</span>
-                                            <span className="text-sm text-white font-semibold">{employee.position?.name || '-'}</span>
+                                            <span className="text-sm text-white font-semibold">{displayEmployee.position?.name || '-'}</span>
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Posto / Unidade</span>
-                                            <span className="text-sm text-white">{employee.workPost?.name || employee.unit?.name || (employee as any).department?.name || '-'}</span>
+                                            <span className="text-sm text-white">{displayEmployee.workPost?.name || displayEmployee.unit?.name || (displayEmployee as any).department?.name || '-'}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] text-gray-500 uppercase font-bold">Admissão</span>
-                                                <span className="text-sm text-white">{formatDate(employee.hireDate)}</span>
+                                                <span className="text-sm text-white">{formatDate(displayEmployee.hireDate)}</span>
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] text-gray-500 uppercase font-bold">Termino</span>
-                                                <span className="text-sm text-white">{formatDate(employee.terminationDate)}</span>
+                                                <span className="text-sm text-white">{formatDate(displayEmployee.terminationDate)}</span>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -416,7 +438,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Endereço Residencial</span>
                                             <p className="text-sm text-white mt-1 leading-relaxed">
                                                 {(() => {
-                                                    const e = employee as any;
+                                                    const e = displayEmployee as any;
                                                     const parts = [
                                                         e.enderecoRua,
                                                         e.enderecoNumero ? `nº ${e.enderecoNumero}` : null,
@@ -426,7 +448,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                         e.enderecoEstado,
                                                         e.enderecoCep ? `CEP: ${e.enderecoCep}` : null
                                                     ].filter(Boolean);
-                                                    return parts.length > 0 ? parts.join(', ') : (typeof employee.address === 'string' ? employee.address : '-');
+                                                    return parts.length > 0 ? parts.join(', ') : (typeof displayEmployee.address === 'string' ? displayEmployee.address : '-');
                                                 })()}
                                             </p>
                                         </div>
@@ -442,7 +464,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                         <div className="flex flex-col">
                                             <span className="text-[10px] text-gray-500 uppercase font-bold">Observações Gerais</span>
                                             <p className="text-sm text-white mt-1 italic leading-relaxed">
-                                                {employee.notes || 'Nenhuma observação cadastrada.'}
+                                                {displayEmployee.notes || 'Nenhuma observação cadastrada.'}
                                             </p>
                                         </div>
                                     </CardContent>

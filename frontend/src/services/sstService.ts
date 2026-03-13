@@ -588,5 +588,28 @@ export const sstService = {
   async deleteCorrectiveAction(id: string): Promise<void> {
     await api.delete(`/api/sst/corrective-actions/${id}`);
   },
+
+  // CIPA - Comissão Interna de Prevenção de Acidentes
+  async getCIPAMembers(): Promise<CIPAMemberResponse[]> {
+    const response = await api.get('/api/sst/cipa/members');
+    return response.data;
+  },
+
+  async deleteCIPAMember(id: string): Promise<void> {
+    await api.delete(`/api/sst/cipa/members/${id}`);
+  },
 };
+
+export interface CIPAMemberResponse {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  position: string;
+  department: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
 

@@ -9,6 +9,7 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.RemanejamentoDTO;
 import com.z7design.secured_guard.model.*;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.RemanejamentoRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
@@ -55,11 +56,20 @@ public class RemanejamentoService {
     @Autowired
     private CompanyRepository companyRepository;
 
+    @Autowired
+    private EmployeeChangeHistoryService employeeChangeHistoryService;
+
     /**
      * Cria um novo remanejamento e registra no histórico
      */
     public Remanejamento create(Remanejamento remanejamento, User usuarioQueExecutou, String motivoAlteracao) {
         Remanejamento saved = remanejamentoRepository.save(remanejamento);
+
+        if (saved.getEmployee() != null) {
+            String desc = buildRemanejamentoDesc(saved);
+            employeeChangeHistoryService.recordChange(saved.getEmployee().getId(), EmployeeChangeCategory.REMANEJAMENTO,
+                    "remanejamento", "Remanejamento", null, desc, usuarioQueExecutou != null ? usuarioQueExecutou.getId() : null);
+        }
 
         // Registrar no histórico
         historicoService.registrarAcao(
@@ -84,6 +94,13 @@ public class RemanejamentoService {
         Remanejamento existing = existingOpt.get();
         remanejamento.setId(id);
         Remanejamento updated = remanejamentoRepository.save(remanejamento);
+
+        if (updated.getEmployee() != null) {
+            String oldDesc = buildRemanejamentoDesc(existing);
+            String newDesc = buildRemanejamentoDesc(updated);
+            employeeChangeHistoryService.recordChange(updated.getEmployee().getId(), EmployeeChangeCategory.REMANEJAMENTO,
+                    "remanejamento", "Remanejamento", oldDesc, newDesc, usuarioQueExecutou != null ? usuarioQueExecutou.getId() : null);
+        }
 
         // Registrar no histórico com dados anteriores
         historicoService.registrarAcao(
@@ -132,6 +149,12 @@ public class RemanejamentoService {
 
     public List<Remanejamento> findByEmployeeId(UUID employeeId) {
         return remanejamentoRepository.findByEmployeeId(employeeId);
+    }
+
+    private String buildRemanejamentoDesc(Remanejamento r) {
+        String orig = r.getOriginWorkstation() != null ? r.getOriginWorkstation().getName() : r.getOrigem();
+        String dest = r.getDestinationWorkstation() != null ? r.getDestinationWorkstation().getName() : r.getDestino();
+        return String.format("%s: %s → %s em %s", r.getTipo(), orig != null ? orig : "-", dest != null ? dest : "-", r.getDataRemanejamento());
     }
 
     /**
@@ -284,9 +307,37 @@ public class RemanejamentoService {
 
         dto.setTipo(entity.getTipo());
 
-        // Resolver origem e destino para nomes das unidades se forem UUIDs
-        dto.setOrigem(resolveUnitName(entity.getOrigem()));
-        dto.setDestino(resolveUnitName(entity.getDestino()));
+        // Resolver origem: usar WorkPost quando origem string estiver vazia
+        String origemVal = entity.getOrigem();
+        if (origemVal == null || origemVal.trim().isEmpty()) {
+            if (entity.getOriginWorkstation() != null) {
+                try {
+                    org.hibernate.Hibernate.initialize(entity.getOriginWorkstation());
+                    origemVal = entity.getOriginWorkstation().getName();
+                } catch (Exception e) {
+                    log.debug("Erro ao obter nome do posto de origem: {}", e.getMessage());
+                }
+            }
+        } else {
+            origemVal = resolveUnitName(origemVal);
+        }
+        dto.setOrigem(origemVal != null ? origemVal : "");
+
+        // Resolver destino: usar WorkPost quando destino string estiver vazia
+        String destinoVal = entity.getDestino();
+        if (destinoVal == null || destinoVal.trim().isEmpty()) {
+            if (entity.getDestinationWorkstation() != null) {
+                try {
+                    org.hibernate.Hibernate.initialize(entity.getDestinationWorkstation());
+                    destinoVal = entity.getDestinationWorkstation().getName();
+                } catch (Exception e) {
+                    log.debug("Erro ao obter nome do posto de destino: {}", e.getMessage());
+                }
+            }
+        } else {
+            destinoVal = resolveUnitName(destinoVal);
+        }
+        dto.setDestino(destinoVal != null ? destinoVal : "");
 
         dto.setDataRemanejamento(entity.getDataRemanejamento());
         dto.setObservacao(entity.getObservacao());

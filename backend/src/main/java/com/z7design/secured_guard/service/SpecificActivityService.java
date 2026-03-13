@@ -4,6 +4,8 @@ import com.z7design.secured_guard.dto.CreateSpecificActivityRequest;
 import com.z7design.secured_guard.dto.SpecificActivityResponse;
 import com.z7design.secured_guard.model.SpecificActivity;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.SpecificActivityRepository;
@@ -20,6 +22,8 @@ import com.itextpdf.layout.properties.UnitValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +57,9 @@ public class SpecificActivityService {
 
     @Autowired
     private CompanyRepository companyRepository;
+
+    @Autowired
+    private EmployeeChangeHistoryService employeeChangeHistoryService;
 
     @Transactional(readOnly = true)
     public List<SpecificActivityResponse> getAllSpecificActivities() {
@@ -163,7 +170,11 @@ public class SpecificActivityService {
                 .updatedAt(java.time.LocalDateTime.now())
                 .build();
 
-        return mapToResponse(specificActivityRepository.save(activity));
+        SpecificActivity saved = specificActivityRepository.save(activity);
+        String desc = String.format("%s em %s - %s", activityType, request.getActivityDate(), request.getDescription() != null ? request.getDescription() : "");
+        employeeChangeHistoryService.recordChange(employee.getId(), EmployeeChangeCategory.ATIVIDADE,
+                "atividade", "Atividade", null, desc, getCurrentUserId());
+        return mapToResponse(saved);
     }
 
     public SpecificActivityResponse updateSpecificActivity(UUID id, CreateSpecificActivityRequest request) {
@@ -203,7 +214,19 @@ public class SpecificActivityService {
 
         existingActivity.setUpdatedAt(java.time.LocalDateTime.now());
 
-        return mapToResponse(specificActivityRepository.save(existingActivity));
+        SpecificActivity saved = specificActivityRepository.save(existingActivity);
+        String desc = String.format("%s em %s", saved.getActivityType(), saved.getActivityDate());
+        employeeChangeHistoryService.recordChange(saved.getEmployee().getId(), EmployeeChangeCategory.ATIVIDADE,
+                "atividade", "Atividade atualizada", null, desc, getCurrentUserId());
+        return mapToResponse(saved);
+    }
+
+    private UUID getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            return ((User) auth.getPrincipal()).getId();
+        }
+        return null;
     }
 
     public void deleteSpecificActivity(UUID id) {

@@ -32,36 +32,38 @@ class ReportLayoutService {
       const containerWidth = isLandscape ? '1122px' : '800px';
       const minHeight = isLandscape ? '700px' : '1100px';
 
-      // 1. Create a temporary container to render the premium layout
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.top = '-9999px';
-      container.style.width = containerWidth;
-      container.style.backgroundColor = 'white';
-      container.style.padding = '40px 20px 60px 20px'; // Space for header and footer
-      container.style.fontFamily = 'Inter, sans-serif';
+      // 1. Determine target element for html2canvas
+      let targetElement: HTMLElement;
+      let tempContainer: HTMLDivElement | null = null;
 
       if (config.elementHasFullLayout) {
-        container.style.padding = '0';
-        container.innerHTML = element.innerHTML;
+        targetElement = element;
       } else {
+        tempContainer = document.createElement('div');
+        tempContainer.style.position = 'absolute';
+        tempContainer.style.left = '-9999px';
+        tempContainer.style.top = '-9999px';
+        tempContainer.style.width = containerWidth;
+        tempContainer.style.backgroundColor = 'white';
+        tempContainer.style.padding = '40px 20px 60px 20px'; // Space for header and footer
+        tempContainer.style.fontFamily = 'Inter, sans-serif';
+
         const currentDate = new Date().toLocaleDateString('pt-BR');
         const currentTime = new Date().toLocaleTimeString('pt-BR');
-        const header = this.buildHeaderHTML(config, currentDate);
+        const header = this.buildHeaderHTML(config, currentDate, isLandscape);
         const footer = this.buildFooterHTML(config, currentDate, currentTime);
-        container.innerHTML = `
+        tempContainer.innerHTML = `
         ${header}
         <div style="margin-top: 20px; min-height: ${minHeight}; space-y: 10px;">
           ${element.innerHTML}
         </div>
         ${footer}
       `;
+        document.body.appendChild(tempContainer);
+        targetElement = tempContainer;
       }
 
-      document.body.appendChild(container);
-
-      const canvas = await html2canvas(container, {
+      const canvas = await html2canvas(targetElement, {
         scale: 1.2, // Reduzido de 1.5 para 1.2 para ganhar muita performance mantendo boa qualidade
         useCORS: true,
         allowTaint: true,
@@ -69,7 +71,13 @@ class ReportLayoutService {
         logging: false
       });
 
-      container.remove();
+      if (tempContainer) {
+        tempContainer.remove();
+      }
+
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('O conteúdo do relatório está vazio ou não pôde ser renderizado.');
+      }
 
       // 6. Create PDF - Usando JPEG que é muuuito mais rápido e leve que PNG para relatórios grandes
       const imgData = canvas.toDataURL('image/jpeg', 0.85);
@@ -79,6 +87,11 @@ class ReportLayoutService {
       const pageWidth = isLandscape ? 297 : 210;
       const pageHeight = isLandscape ? 210 : 297;
       const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+      if (isNaN(imgHeight) || imgHeight <= 0) {
+        throw new Error('Altura da imagem calculada é inválida.');
+      }
+
       let heightLeft = imgHeight;
       let position = 0;
 
@@ -107,8 +120,36 @@ class ReportLayoutService {
     }
   }
 
-  private buildHeaderHTML(config: ReportConfig, date: string): string {
+  private buildHeaderHTML(config: ReportConfig, date: string, isLandscape: boolean = false): string {
     const companyName = config.company?.name || 'Secured Guard';
+
+    if (isLandscape) {
+      return `
+        <div style="position: relative; margin-bottom: 20px; width: 100%; height: 150px; font-family: 'Inter', sans-serif;">
+          <!-- Background Image Cropped for Header -->
+          <div style="position: absolute; top: 0; left: 0; right: 0; height: 150px; overflow: hidden; z-index: 0;">
+              <img src="/report-background-landscape.jpg" style="width: 100%; height: auto; object-fit: cover; object-position: top; min-width: 1122px;" alt="Header Background" />
+          </div>
+
+          <!-- Logo Area -->
+          <div style="position: absolute; top: 15px; left: 20px; width: 150px; height: 70px; z-index: 20; display: flex; align-items: center; justify-content: center;">
+               <img src="/logo-sistema.png" style="max-height: 60px; max-width: 100%; object-fit: contain;" alt="Logo" />
+          </div>
+
+          <!-- Title Area -->
+          <div style="position: absolute; top: 0; left: 260px; right: 0; height: 130px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; padding-right: 20px; padding-top: 28px;">
+              <h1 style="color: black; font-weight: 900; text-transform: uppercase; font-size: 26px; margin: 0; letter-spacing: -0.5px; text-align: right; line-height: 1.1;">
+                  ${config.title}
+              </h1>
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 12px; width: 100%; justify-content: flex-end;">
+                 <p style="color: #4b5563; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; font-size: 11px; margin: 0;">
+                     ${companyName}
+                 </p>
+              </div>
+          </div>
+        </div>
+      `;
+    }
 
     return `
       <div style="position: relative; margin-bottom: 20px; width: 100%; height: 150px; font-family: 'Inter', sans-serif;">

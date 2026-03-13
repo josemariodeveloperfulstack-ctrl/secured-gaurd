@@ -219,6 +219,17 @@ public class DocumentoGeradoService {
         }
     }
 
+    /** Remove todos os documentos gerados de um funcionário. */
+    public int excluirPorFuncionario(UUID funcionarioId) {
+        // Delete direto por funcionarioId evita carregar byte[] do PDF em memória
+        return documentoGeradoRepository.deleteByFuncionarioId(funcionarioId);
+    }
+
+    /** Remove um documento gerado por id. */
+    public void excluirPorId(UUID id) {
+        documentoGeradoRepository.deleteById(id);
+    }
+
     /**
      * Cancela um documento
      */

@@ -131,6 +131,7 @@ public class EmployeeDTO {
     private String carteiraIdentidadeOrgaoEmissor;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate carteiraIdentidadeDataEmissao;
+    private String rgUf; // UF de emissão do RG (planilha: U.F RG)
     private String certificadoMilitar;
     private String nomePai;
     private String nomeMae;
@@ -140,6 +141,8 @@ public class EmployeeDTO {
     private String sexo; // MASCULINO, FEMININO, OUTRO
     private String grauInstrucao;
     private String matriculaEsocial;
+    private String racaCor; // Raça/Cor (classificação IBGE/eSocial)
+    private String tipoSalarioContratual; // MENSAL, HORISTA, etc.
     private String cbo;
     private String pis;
     private BigDecimal salario;
@@ -169,9 +172,16 @@ public class EmployeeDTO {
 
     // Campo para Posto de Trabalho
     private String workPostId;
+    /** Objeto workPost para preenchimento no frontend (id + name) */
+    private IdOnlyDTO workPost;
+    /** Data de início no novo setor (obrigatória quando workPost é alterado - para remanejamento) */
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private LocalDate remanejamentoDataInicio;
 
     // Campo para Departamento
     private String departmentId;
+    private IdOnlyDTO department;
     private String cnhCategory;
     private String ctps;
     private String ctpsRural;
@@ -307,6 +317,8 @@ public class EmployeeDTO {
         private String name;
         private String username;
         private String email;
+        private String sigla;
+        private String cnpj;
     }
 
     @Data

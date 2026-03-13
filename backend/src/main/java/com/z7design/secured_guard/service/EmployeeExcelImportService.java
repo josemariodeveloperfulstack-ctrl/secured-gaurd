@@ -30,11 +30,13 @@ public class EmployeeExcelImportService {
     private final WorkPostRepository workPostRepository;
 
     // Mapeamento de colunas possíveis da planilha para campos da entidade
-    private static final Map<String, String> COLUMN_MAPPING = new HashMap<>();
+    // LinkedHashMap para preservar ordem: mapeamentos mais específicos devem vir depois
+    private static final Map<String, String> COLUMN_MAPPING = new LinkedHashMap<>();
 
     static {
         // Informações básicas
         COLUMN_MAPPING.put("nome", "name");
+        COLUMN_MAPPING.put("nome do colaborador", "name");
         COLUMN_MAPPING.put("nome completo", "name");
         COLUMN_MAPPING.put("name", "name");
         COLUMN_MAPPING.put("cpf", "cpf");
@@ -58,6 +60,8 @@ public class EmployeeExcelImportService {
         COLUMN_MAPPING.put("estado nascimento", "estadoNascimento");
         COLUMN_MAPPING.put("uf nascimento", "estadoNascimento");
         COLUMN_MAPPING.put("grau instrucao", "grauInstrucao");
+        COLUMN_MAPPING.put("grau instrução", "grauInstrucao");
+        COLUMN_MAPPING.put("grau de instrução", "grauInstrucao");
         COLUMN_MAPPING.put("escolaridade", "grauInstrucao");
         COLUMN_MAPPING.put("matricula esocial", "matriculaEsocial");
         COLUMN_MAPPING.put("matrícula esocial", "matriculaEsocial");
@@ -102,11 +106,22 @@ public class EmployeeExcelImportService {
 
         // Mapeamentos específicos da planilha do usuário
         COLUMN_MAPPING.put("funcionário", "name");
+        COLUMN_MAPPING.put("funcionario", "name");
         COLUMN_MAPPING.put("setor", "unitName");
         COLUMN_MAPPING.put("setor de trabalho", "unitName");
+        COLUMN_MAPPING.put("posto de trabalho", "unitName");
+        COLUMN_MAPPING.put("cargo", "positionName");
         COLUMN_MAPPING.put("função", "positionName");
+        COLUMN_MAPPING.put("cargo/função", "positionName");
         COLUMN_MAPPING.put("nome do funcionário", "name");
         COLUMN_MAPPING.put("salário base", "salario");
+        COLUMN_MAPPING.put("tipo sal. contratual", "tipoSalarioContratual");
+        COLUMN_MAPPING.put("tipo sal contratual", "tipoSalarioContratual");
+        COLUMN_MAPPING.put("tipo salário contratual", "tipoSalarioContratual");
+        COLUMN_MAPPING.put("raça/cor", "racaCor");
+        COLUMN_MAPPING.put("raca/cor", "racaCor");
+        COLUMN_MAPPING.put("raca cor", "racaCor");
+        COLUMN_MAPPING.put("raça cor", "racaCor");
         COLUMN_MAPPING.put("escala", "escalaTrabalho");
         COLUMN_MAPPING.put("nasc.", "birthDate");
         COLUMN_MAPPING.put("ag. itaú", "bank");
@@ -114,8 +129,60 @@ public class EmployeeExcelImportService {
         COLUMN_MAPPING.put("digito", "accountDigit");
         COLUMN_MAPPING.put("chave pix", "pixKey");
         COLUMN_MAPPING.put("salário / 26", "salario");
+        COLUMN_MAPPING.put("salário", "salario");
         COLUMN_MAPPING.put("situação", "status");
         COLUMN_MAPPING.put("aso feito em", "exameMedicoData");
+
+        // Mapeamentos da planilha padrão (ordem: NÚMERO CÓDIGO, Nome, Função, Depto, Raça/Cor, etc.)
+        COLUMN_MAPPING.put("depto", "unitName");
+        COLUMN_MAPPING.put("departamento", "unitName");
+        COLUMN_MAPPING.put("numero codigo", "registrationNumber");
+        COLUMN_MAPPING.put("número código", "registrationNumber");
+        COLUMN_MAPPING.put("data demissão", "terminationDate");
+        COLUMN_MAPPING.put("data demissao", "terminationDate");
+        COLUMN_MAPPING.put("pis", "pis");
+        COLUMN_MAPPING.put("cbo", "cbo");
+        COLUMN_MAPPING.put("banco", "bank");
+        COLUMN_MAPPING.put("agência", "agency");
+        COLUMN_MAPPING.put("agencia", "agency");
+        COLUMN_MAPPING.put("orgão exp", "carteiraIdentidadeOrgaoEmissor");
+        COLUMN_MAPPING.put("orgao exp", "carteiraIdentidadeOrgaoEmissor");
+        COLUMN_MAPPING.put("u.f rg", "rgUf");
+        COLUMN_MAPPING.put("uf rg", "rgUf");
+        COLUMN_MAPPING.put("data emissão", "carteiraIdentidadeDataEmissao");
+        COLUMN_MAPPING.put("data emissao", "carteiraIdentidadeDataEmissao");
+        COLUMN_MAPPING.put("numero de serie", "ctpsSeries");
+        COLUMN_MAPPING.put("nº de série", "ctpsSeries");
+        COLUMN_MAPPING.put("n° de série", "ctpsSeries");
+        COLUMN_MAPPING.put("formação", "grauInstrucao");
+        COLUMN_MAPPING.put("formacao", "grauInstrucao");
+        COLUMN_MAPPING.put("título eleitor", "tituloEleitor");
+        COLUMN_MAPPING.put("titulo eleitor", "tituloEleitor");
+        COLUMN_MAPPING.put("zona", "tituloEleitorZona");
+        COLUMN_MAPPING.put("seção", "tituloEleitorSecao");
+        COLUMN_MAPPING.put("secao", "tituloEleitorSecao");
+        COLUMN_MAPPING.put("categoria cnh", "cnhCategory");
+        COLUMN_MAPPING.put("vencimento cnh", "cnhExpirationDate");
+        COLUMN_MAPPING.put("nome do pai", "nomePai");
+        COLUMN_MAPPING.put("nome da mãe", "nomeMae");
+
+        // Planilha de alunos (Matrícula do Aluno, Nome do Aluno, etc.)
+        COLUMN_MAPPING.put("matrícula do aluno", "registrationNumber");
+        COLUMN_MAPPING.put("matricula do aluno", "registrationNumber");
+        COLUMN_MAPPING.put("nome do aluno", "name");
+        COLUMN_MAPPING.put("identidade civil", "rg");
+        COLUMN_MAPPING.put("naturalidade", "municipioNascimento");
+        COLUMN_MAPPING.put("cód. turma", "unitName");
+        COLUMN_MAPPING.put("cod. turma", "unitName");
+        COLUMN_MAPPING.put("cód turma", "unitName");
+        COLUMN_MAPPING.put("cod turma", "unitName");
+        COLUMN_MAPPING.put("data matrícula", "hireDate");
+        COLUMN_MAPPING.put("data matricula", "hireDate");
+        COLUMN_MAPPING.put("tipo de deficiência", "tipoDeficiencia");
+        COLUMN_MAPPING.put("tipo de deficiencia", "tipoDeficiencia");
+        COLUMN_MAPPING.put("ddd", "ddd");
+        COLUMN_MAPPING.put("cód.", "codigo");
+        COLUMN_MAPPING.put("cod.", "codigo");
     }
 
     @Transactional
@@ -168,10 +235,14 @@ public class EmployeeExcelImportService {
             String fixedCompanyCnpj = null;
 
             // Mapear colunas do cabeçalho
+            // Usar a chave MAIS ESPECÍFICA (mais longa) que corresponder para evitar conflitos:
+            // ex: "Nome do Pai" deve mapear para nomePai, não para name (que usa "nome")
             for (int i = 0; i < headerRow.getLastCellNum(); i++) {
                 Cell cell = headerRow.getCell(i);
                 if (cell != null) {
                     String columnName = getCellValueAsString(cell).toLowerCase().trim();
+                    if (columnName.isEmpty())
+                        continue;
 
                     // Verificar se é coluna de empresa (CNPJ)
                     if (columnName.contains("cnpj") && columnName.contains("empresa")) {
@@ -179,13 +250,20 @@ public class EmployeeExcelImportService {
                         log.info("📋 Coluna CNPJ da empresa encontrada na coluna: {}", i);
                     }
 
-                    // Mapear colunas de funcionário
+                    // Encontrar a chave mais específica (mais longa) que corresponde
+                    String bestTarget = null;
+                    int bestKeyLength = 0;
                     for (Map.Entry<String, String> entry : COLUMN_MAPPING.entrySet()) {
-                        if (columnName.contains(entry.getKey())) {
-                            columnIndexMap.put(entry.getValue(), i);
-                            log.debug("📋 Coluna '{}' mapeada para campo '{}' na posição {}",
-                                    columnName, entry.getValue(), i);
+                        String key = entry.getKey();
+                        if (columnName.contains(key) && key.length() > bestKeyLength) {
+                            bestTarget = entry.getValue();
+                            bestKeyLength = key.length();
                         }
+                    }
+                    if (bestTarget != null) {
+                        columnIndexMap.put(bestTarget, i);
+                        log.debug("📋 Coluna '{}' mapeada para campo '{}' na posição {}",
+                                columnName, bestTarget, i);
                     }
                 }
             }
@@ -342,6 +420,7 @@ public class EmployeeExcelImportService {
 
     private EmployeeDTO createEmployeeDTOFromRow(Row row, Map<String, Integer> columnIndexMap, Company company) {
         EmployeeDTO dto = new EmployeeDTO();
+        Map<String, String> tempValues = new HashMap<>(); // DDD e outros para combinar depois
 
         // Vincular empresa
         if (company != null) {
@@ -379,7 +458,9 @@ public class EmployeeExcelImportService {
                         dto.setEmail(cellValue.trim());
                         break;
                     case "phone":
-                        dto.setPhone(cellValue.replaceAll("[^0-9]", ""));
+                        String phoneDigits = cellValue.replaceAll("[^0-9]", "");
+                        String ddd = tempValues.get("ddd");
+                        dto.setPhone(ddd != null && !ddd.isEmpty() ? ddd + phoneDigits : phoneDigits);
                         break;
                     case "birthDate":
                         dto.setBirthDate(parseDate(cellValue));
@@ -397,8 +478,48 @@ public class EmployeeExcelImportService {
                     case "grauInstrucao":
                         dto.setGrauInstrucao(cellValue.trim());
                         break;
+                    case "racaCor":
+                        dto.setRacaCor(cellValue.trim());
+                        break;
+                    case "tipoSalarioContratual":
+                        dto.setTipoSalarioContratual(cellValue.trim());
+                        break;
                     case "matriculaEsocial":
                         dto.setMatriculaEsocial(cellValue.trim());
+                        break;
+                    case "pis":
+                        dto.setPis(cellValue.replaceAll("[^0-9]", "").trim());
+                        break;
+                    case "cbo":
+                        dto.setCbo(cellValue.trim());
+                        break;
+                    case "carteiraIdentidadeOrgaoEmissor":
+                        dto.setCarteiraIdentidadeOrgaoEmissor(cellValue.trim());
+                        break;
+                    case "carteiraIdentidadeDataEmissao":
+                        dto.setCarteiraIdentidadeDataEmissao(parseDate(cellValue));
+                        break;
+                    case "rgUf":
+                        String uf = cellValue.trim().toUpperCase();
+                        dto.setRgUf(uf.length() >= 2 ? uf.substring(0, 2) : uf);
+                        break;
+                    case "ctpsSeries":
+                        dto.setCtpsSeries(cellValue.trim());
+                        break;
+                    case "tituloEleitor":
+                        dto.setTituloEleitor(cellValue.replaceAll("[^0-9]", "").trim());
+                        break;
+                    case "tituloEleitorZona":
+                        dto.setTituloEleitorZona(cellValue.trim());
+                        break;
+                    case "tituloEleitorSecao":
+                        dto.setTituloEleitorSecao(cellValue.trim());
+                        break;
+                    case "cnhCategory":
+                        dto.setCnhCategory(cellValue.trim());
+                        break;
+                    case "cnhExpirationDate":
+                        dto.setCnhExpirationDate(parseDate(cellValue));
                         break;
                     case "enderecoRua":
                         dto.setEnderecoRua(cellValue.trim());
@@ -425,6 +546,9 @@ public class EmployeeExcelImportService {
                     case "hireDate":
                         dto.setHireDate(parseDate(cellValue));
                         break;
+                    case "terminationDate":
+                        dto.setTerminationDate(parseDate(cellValue));
+                        break;
                     case "registrationNumber":
                         dto.setRegistrationNumber(cellValue.trim());
                         break;
@@ -447,6 +571,11 @@ public class EmployeeExcelImportService {
                         if (dto.getBankInfo() == null)
                             dto.setBankInfo(new EmployeeDTO.BankInfoDTO());
                         dto.getBankInfo().setBank(cellValue.trim());
+                        break;
+                    case "agency":
+                        if (dto.getBankInfo() == null)
+                            dto.setBankInfo(new EmployeeDTO.BankInfoDTO());
+                        dto.getBankInfo().setAgency(cellValue.trim());
                         break;
                     case "account":
                         if (dto.getBankInfo() == null)
@@ -476,6 +605,22 @@ public class EmployeeExcelImportService {
                         break;
                     case "escalaTrabalho":
                         dto.setEscalaTrabalho(cellValue.trim());
+                        break;
+                    case "tipoDeficiencia":
+                        dto.setNotes((dto.getNotes() != null ? dto.getNotes() + " " : "") + "Tipo Deficiência: "
+                                + cellValue.trim());
+                        break;
+                    case "ddd":
+                        String dddVal = cellValue.trim().replaceAll("[^0-9]", "");
+                        if (!dddVal.isEmpty()) {
+                            tempValues.put("ddd", dddVal);
+                            if (dto.getPhone() != null && !dto.getPhone().isEmpty()) {
+                                dto.setPhone(dddVal + dto.getPhone());
+                            }
+                        }
+                        break;
+                    case "codigo":
+                        dto.setNotes((dto.getNotes() != null ? dto.getNotes() + " " : "") + "Cód: " + cellValue.trim());
                         break;
                     case "unitName":
                         // Prioridade 1: Tentar vincular a um Posto de Trabalho (WorkPost) pelo nome

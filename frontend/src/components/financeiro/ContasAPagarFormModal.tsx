@@ -183,11 +183,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
         })
         .catch(error => {
           console.error('Erro ao carregar empresas:', error);
-          const fallback = [
-            { id: '1', name: 'Empresa Exemplo 1' },
-            { id: '2', name: 'Empresa Exemplo 2' }
-          ];
-          setEmpresas(fallback);
+          setEmpresas([]);
           setSiglas(['ADM','TERC','VIG']);
         });
 
@@ -515,7 +511,7 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                       value={empresa.id}
                       className="text-seguranca-lightgray hover:bg-seguranca-graphite"
                     >
-                      {(empresa.sigla ? empresa.sigla : empresa.name)}
+                      {empresa.sigla ? `${empresa.sigla} - ${empresa.name}` : empresa.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

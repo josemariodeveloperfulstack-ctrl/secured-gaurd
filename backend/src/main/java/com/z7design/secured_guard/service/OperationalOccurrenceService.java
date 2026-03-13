@@ -8,6 +8,8 @@ import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.OperationalOccurrence;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.OperationalOccurrenceRepository;
@@ -19,6 +21,8 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +45,7 @@ public class OperationalOccurrenceService {
     private final EmployeeRepository employeeRepository;
     private final StandardReportLayoutService standardReportLayoutService;
     private final CompanyRepository companyRepository;
+    private final EmployeeChangeHistoryService employeeChangeHistoryService;
     
     /**
      * Criar nova ocorrência operacional a partir de DTO
@@ -105,6 +110,8 @@ public class OperationalOccurrenceService {
         
         OperationalOccurrence savedOccurrence = occurrenceRepository.save(occurrence);
         log.info("Ocorrência criada com sucesso: {}", savedOccurrence.getId());
+
+        recordOccurrenceToEmployeeHistory(savedOccurrence, null);
         
         return savedOccurrence;
     }
@@ -132,6 +139,8 @@ public class OperationalOccurrenceService {
         
         OperationalOccurrence savedOccurrence = occurrenceRepository.save(occurrence);
         log.info("Ocorrência criada com sucesso: {}", savedOccurrence.getId());
+
+        recordOccurrenceToEmployeeHistory(savedOccurrence, null);
         
         return savedOccurrence;
     }
@@ -190,8 +199,29 @@ public class OperationalOccurrenceService {
         
         OperationalOccurrence updatedOccurrence = occurrenceRepository.save(existingOccurrence);
         log.info("Ocorrência atualizada com sucesso: {}", updatedOccurrence.getId());
+
+        recordOccurrenceToEmployeeHistory(updatedOccurrence, existingOccurrence);
         
         return updatedOccurrence;
+    }
+
+    private void recordOccurrenceToEmployeeHistory(OperationalOccurrence occ, OperationalOccurrence oldOcc) {
+        if (occ.getEmployee() == null) return;
+        EmployeeChangeCategory cat = (occ.getType() == OperationalOccurrence.OccurrenceType.DISCIPLINAR || occ.getWarningNumber() != null)
+                ? EmployeeChangeCategory.ADVERTENCIA : EmployeeChangeCategory.OCORRENCIA;
+        String desc = String.format("%s - %s%s", occ.getType(), occ.getTitle(),
+                occ.getWarningNumber() != null ? " (Advertência nº " + occ.getWarningNumber() + ")" : "");
+        String oldDesc = oldOcc != null ? String.format("%s - %s", oldOcc.getType(), oldOcc.getTitle()) : null;
+        employeeChangeHistoryService.recordChange(occ.getEmployee().getId(), cat, "ocorrencia_operacional",
+                cat == EmployeeChangeCategory.ADVERTENCIA ? "Advertência" : "Ocorrência", oldDesc, desc, getCurrentUserId());
+    }
+
+    private UUID getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            return ((User) auth.getPrincipal()).getId();
+        }
+        return null;
     }
     
     /**

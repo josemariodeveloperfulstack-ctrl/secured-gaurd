@@ -58,8 +58,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN departments d ON e.department_id = d.id", nativeQuery = true)
         List<Object[]> findBasicData();
 
-        // Versão paginada (LIMIT/OFFSET) para ambientes com muitos registros
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name "
+        // Versão paginada (LIMIT/OFFSET) para ambientes com muitos registros - inclui unit_id, company_id, work_post_id para edição
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -87,8 +87,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTerm(@Param("searchTerm") String searchTerm);
 
-        // Versão paginada com termo de busca
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name "
+        // Versão paginada com termo de busca - inclui unit_id, company_id, work_post_id para edição
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +

@@ -23,32 +23,33 @@ public interface EmployeeCertificationRepository extends JpaRepository<EmployeeC
             "LEFT JOIN FETCH ec.employee e " +
             "LEFT JOIN FETCH e.position p " +
             "LEFT JOIN FETCH e.unit u " +
+            "LEFT JOIN FETCH e.workPost ewp " +
             "LEFT JOIN FETCH ec.training t " +
             "LEFT JOIN FETCH ec.workPost wp")
     List<EmployeeCertification> findAllWithDetails();
 
     @Override
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     List<EmployeeCertification> findAll();
 
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     List<EmployeeCertification> findByEmployeeId(UUID employeeId);
 
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     List<EmployeeCertification> findByEmployeeIdAndStatus(UUID employeeId, CertificationStatus status);
 
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     List<EmployeeCertification> findByTrainingId(UUID trainingId);
 
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     List<EmployeeCertification> findByExpirationDateBefore(LocalDate date);
 
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     List<EmployeeCertification> findByExpirationDateBetween(LocalDate startDate, LocalDate endDate);
 
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     List<EmployeeCertification> findByStatus(CertificationStatus status);
 
-    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "training", "workPost" })
+    @EntityGraph(attributePaths = { "employee", "employee.position", "employee.unit", "employee.workPost", "training", "workPost" })
     Optional<EmployeeCertification> findWithDetailsById(UUID id);
 }

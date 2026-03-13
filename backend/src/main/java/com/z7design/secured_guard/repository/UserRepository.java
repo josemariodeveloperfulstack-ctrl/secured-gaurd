@@ -14,6 +14,7 @@ import com.z7design.secured_guard.model.User;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByUsername(String username);
+    Optional<User> findByCpf(String cpf);
     boolean existsByUsername(String username);
     Optional<User> findByEmail(String email);
     Optional<User> findByWhatsapp(String whatsapp);

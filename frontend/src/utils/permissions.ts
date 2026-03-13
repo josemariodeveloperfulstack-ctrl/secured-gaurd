@@ -52,6 +52,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     EMPLOYEES_WRITE: false,
     EMPLOYEES_DELETE: false,
     EMPLOYEES_CREATE: false,
+    EMPLOYEE_HISTORY_READ: false,
 
     // Permissões de Contratos
     CONTRACTS_READ: false,
@@ -230,6 +231,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         EMPLOYEES_WRITE: true,
         EMPLOYEES_DELETE: true,
         EMPLOYEES_CREATE: true,
+        EMPLOYEE_HISTORY_READ: true,
 
         // Permissões de Contratos
         CONTRACTS_READ: true,
@@ -373,6 +375,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         EMPLOYEES_WRITE: true,
         EMPLOYEES_CREATE: true,
         EMPLOYEES_DELETE: true,
+        EMPLOYEE_HISTORY_READ: true,
         PAYSLIPS_READ: true,
         PAYSLIPS_WRITE: true,
         PAYSLIPS_CREATE: true,
@@ -507,6 +510,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         QUOTES_READ: true,
         DASHBOARD_READ: true,
         AUDIT_READ: true,
+        EMPLOYEE_HISTORY_READ: true,
         PROFILE_READ: true,
 
         // Permissões de Mensagens
@@ -610,6 +614,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         EMPLOYEES_WRITE: true,
         EMPLOYEES_CREATE: true,
         EMPLOYEES_DELETE: true,
+        EMPLOYEE_HISTORY_READ: true,
         PAYSLIPS_READ: true,
         PAYSLIPS_WRITE: true,
         PAYSLIPS_CREATE: true,
@@ -646,11 +651,13 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     case 'OPERACIONAL':
       return {
         ...basePermissions,
-        // Operacional - Gestão operacional e equipamentos
+        // Operacional - Gestão operacional e equipamentos (pode editar funcionários)
         EQUIPMENTS_READ: true,
         EQUIPMENTS_WRITE: true,
         EQUIPMENTS_ASSIGN: true,
         EMPLOYEES_READ: true,
+        EMPLOYEES_WRITE: true,
+        EMPLOYEE_HISTORY_READ: true,
         CONTRACTS_READ: true,
         REPORTS_READ: true,
         REPORTS_GENERATE: true,
@@ -906,6 +913,7 @@ export const PERMISSION_TRANSLATIONS: Record<keyof UserPermissions, string> = {
   EMPLOYEES_WRITE: 'Editar Funcionários',
   EMPLOYEES_DELETE: 'Excluir Funcionários',
   EMPLOYEES_CREATE: 'Criar Funcionários',
+  EMPLOYEE_HISTORY_READ: 'Visualizar Histórico de Mudanças do Funcionário',
 
   // Contratos
   CONTRACTS_READ: 'Visualizar Contratos',
@@ -1072,6 +1080,7 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     EMPLOYEES_WRITE: false,
     EMPLOYEES_DELETE: false,
     EMPLOYEES_CREATE: false,
+    EMPLOYEE_HISTORY_READ: false,
 
     // Permissões de Contratos
     CONTRACTS_READ: false,
@@ -1227,6 +1236,7 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     'EMPLOYEES_WRITE': 'EMPLOYEES_WRITE',
     'EMPLOYEES_DELETE': 'EMPLOYEES_DELETE',
     'EMPLOYEES_CREATE': 'EMPLOYEES_CREATE',
+    'EMPLOYEE_HISTORY_READ': 'EMPLOYEE_HISTORY_READ',
     'CONTRACTS_READ': 'CONTRACTS_READ',
     'CONTRACTS_WRITE': 'CONTRACTS_WRITE',
     'CONTRACTS_DELETE': 'CONTRACTS_DELETE',

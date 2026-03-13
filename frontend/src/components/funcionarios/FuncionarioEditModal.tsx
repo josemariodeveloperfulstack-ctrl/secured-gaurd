@@ -39,6 +39,10 @@ import { doctorService } from '@/services/doctorService';
 import { Doctor } from '@/types/doctor';
 import { formatTituloEleitorForInput, validateCPF, formatCpfForInput } from '@/utils/validation';
 import DocumentosGerarTab from './DocumentosGerarTab';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/utils/permissions';
+import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
+import { History, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface FuncionarioEditModalProps {
   open: boolean;
@@ -54,6 +58,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   onSuccess 
 }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '');
+  const isRHOrDPE = ['RH', 'DEPARTAMENTO_PESSOAL', 'ASSISTENCIA_RH', 'AUX_DEP', 'SUPER_ADMIN', 'ADMIN'].includes(normalizedRole);
+  const canSeeHistory = isRHOrDPE || (user?.permissions && hasPermission(user.permissions, 'EMPLOYEE_HISTORY_READ'));
   const [form, setForm] = useState<UpdateEmployeeDTO>({
     name: '',
     cpf: '',
@@ -96,6 +104,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     tituloEleitorSecao: '',
     carteiraIdentidadeOrgaoEmissor: '',
     carteiraIdentidadeDataEmissao: '',
+    rgUf: '',
+    racaCor: '',
+    tipoSalarioContratual: '',
     certificadoMilitar: '',
     nomePai: '',
     nomeMae: '',
@@ -157,8 +168,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     cinOrgaoEmissor: '',
     cinDataEmissao: '',
     workPostId: '',
-    departmentId: ''
+    departmentId: '',
+    remanejamentoDataInicio: ''
   });
+  const [temIntervaloRefeicao, setTemIntervaloRefeicao] = useState<'sim' | 'nao'>('nao');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
@@ -190,6 +203,36 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   // Estados para modal de novo cargo
   const [novoCargoModalOpen, setNovoCargoModalOpen] = useState(false);
 
+  // Histórico de mudanças do funcionário
+  const [historyData, setHistoryData] = useState<EmployeeChangeHistoryPage | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPageIndex, setHistoryPageIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('cadastro');
+
+  // Estados que devem estar antes de qualquer return (Rules of Hooks)
+  const [cpfError, setCpfError] = useState<string | null>(null);
+  const [showPDFImport, setShowPDFImport] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfSuccess, setPdfSuccess] = useState(false);
+  const [extractedPreview, setExtractedPreview] = useState<any | null>(null);
+  const [pdfProcessing, setPdfProcessing] = useState(false);
+  const [canCreateDefaultUser, setCanCreateDefaultUser] = useState(false);
+  const [criarUsuarioModalOpen, setCriarUsuarioModalOpen] = useState(false);
+  const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
+  const [dependentModalOpen, setDependentModalOpen] = useState(false);
+  const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [loadingDependents, setLoadingDependents] = useState(false);
+  const [positionSearchTerm, setPositionSearchTerm] = useState('');
+  const [showPositionDropdown, setShowPositionDropdown] = useState(false);
+  const [filteredPositions, setFilteredPositions] = useState<Position[]>([]);
+  const [epiModalOpen, setEpiModalOpen] = useState(false);
+  const [employeeDependents, setEmployeeDependents] = useState<Dependent[]>([]);
+  const [remanejamentoModalOpen, setRemanejamentoModalOpen] = useState(false);
+  const [pendingWorkPostId, setPendingWorkPostId] = useState<string>('');
+  const [remanejamentoForm, setRemanejamentoForm] = useState({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+
   // Carregar dados para os selects quando o modal abrir
   useEffect(() => {
     if (open) {
@@ -197,6 +240,39 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       loadSelectData();
     }
   }, [open]);
+
+  // Carregar histórico de mudanças quando abrir a aba Histórico
+  useEffect(() => {
+    if (!canSeeHistory || activeTab !== 'historico' || !funcionario?.id) {
+      return;
+    }
+    let cancelled = false;
+    setHistoryLoading(true);
+    employeeChangeHistoryService
+      .getByEmployeeId(funcionario.id, historyPageIndex, 20)
+      .then((data) => {
+        if (!cancelled) setHistoryData(data);
+      })
+      .catch(() => {
+        if (!cancelled) setHistoryData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [canSeeHistory, activeTab, funcionario?.id, historyPageIndex]);
+
+  // Sincronizar Empresa e Posto do formulário quando companies/workPosts carregarem (dados vêm do getEmployeeById)
+  useEffect(() => {
+    if (!open || !funcionario?.id) return;
+    const companyId = (form as any).company?.id;
+    if (companyId && companies.length > 0) {
+      const company = companies.find(c => String(c.id) === String(companyId));
+      if (company && (!selectedCompany || String(selectedCompany.id) !== String(companyId))) {
+        setSelectedCompany(company);
+      }
+    }
+  }, [(form as any).company?.id, companies, open, funcionario?.id]);
 
   // Atualizar usuário e cargo selecionados quando os dados forem carregados
   useEffect(() => {
@@ -306,6 +382,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         // Usar dados do funcionário completo buscado do backend
         const employeeData = fullEmployee || funcionario;
         
+        console.log('🔍 [DEBUG] employeeData.workPost:', (employeeData as any).workPost);
+        console.log('🔍 [DEBUG] employeeData.workPostId:', (employeeData as any).workPostId);
+        
         // Tratar address que pode ser string ou objeto
         const addressValue = typeof employeeData.address === 'string' 
           ? employeeData.address 
@@ -378,7 +457,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           enderecoCep = addr.zipCode || enderecoCep;
         }
         
-        setForm({
+        const formToSet = {
           name: employeeData.name || '',
           cpf: cpfValue,
           rg: employeeData.rg || '',
@@ -403,13 +482,20 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           position: { id: employeeData.position?.id ? String(employeeData.position.id) : '' },
           unit: { id: employeeData.unit?.id ? String(employeeData.unit.id) : '' },
           user: { id: employeeData.user?.id ? String(employeeData.user.id) : '' },
-          company: { id: employeeData.company?.id ? String(employeeData.company.id) : '' },
-          workPostId: (employeeData as any).workPost?.id
-            || (employeeData as any).workPostId
-            || '',
+          company: { id: (employeeData.company?.id ?? (employeeData as any).companyId) ? String(employeeData.company?.id ?? (employeeData as any).companyId) : '' },
+          workPostId: (() => {
+            const wp = (employeeData as any).workPost;
+            let id = wp?.id ?? (employeeData as any).workPostId;
+            if (!id && funcionario) {
+              const wpList = (funcionario as any).workPost;
+              id = wpList?.id ?? (funcionario as any).workPostId;
+            }
+            return (id != null && id !== '') ? String(id) : '';
+          })(),
           departmentId: (employeeData as any).department?.id
             || (employeeData as any).departmentId
             || '',
+          remanejamentoDataInicio: '',
           bankData: bankData,
           // Campos do cônjuge
           spouseName: employeeData.spouseName || '',
@@ -428,6 +514,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           tituloEleitorSecao: employeeData.tituloEleitorSecao || '',
           carteiraIdentidadeOrgaoEmissor: employeeData.carteiraIdentidadeOrgaoEmissor || '',
           carteiraIdentidadeDataEmissao: employeeData.carteiraIdentidadeDataEmissao || '',
+          rgUf: employeeData.rgUf || '',
+          racaCor: employeeData.racaCor || '',
+          tipoSalarioContratual: employeeData.tipoSalarioContratual || '',
           certificadoMilitar: employeeData.certificadoMilitar || '',
           nomePai: employeeData.nomePai || '',
           nomeMae: employeeData.nomeMae || '',
@@ -500,7 +589,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           cinOrgaoEmissor: employeeData.cinOrgaoEmissor || '',
           cinDataEmissao: employeeData.cinDataEmissao || '',
           exameMedicoHorarioIntervalo: (employeeData as any).exameMedicoHorarioIntervalo || ''
-        });
+        };
+        
+        console.log('🔍 [DEBUG] formToSet.workPostId:', formToSet.workPostId);
+        setForm(formToSet);
+        setTemIntervaloRefeicao(employeeData.horarioTrabalhoIntervalo ? 'sim' : 'nao');
         
         console.log('✅ Formulário preenchido com dados completos do funcionário');
         console.log('📋 Dados principais:', {
@@ -933,10 +1026,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setError(null);
     try {
       // Prepara os dados do funcionário, garantindo que o salário seja enviado como número
-      const employeeData = {
-        ...form,
+      const { remanejamentoDataInicio, ...formRest } = form as any;
+      const employeeData: any = {
+        ...formRest,
         salario: form.salario ? parseFloat(String(form.salario).replace(/\./g, '').replace(',', '.')) : 0
       };
+      if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
+        employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
+      }
 
       await employeeService.updateEmployee(funcionario.id, employeeData);
       toast({
@@ -994,7 +1091,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         position: { id: funcionario.position?.id || '' },
         unit: { id: funcionario.unit?.id || '' },
         user: { id: funcionario.user?.id || '' },
-        rg: funcionario.rg || '',
         nomePai: funcionario.nomePai || '',
         nomeMae: funcionario.nomeMae || '',
         // Garantir que todos os campos sejam resetados ou mantidos conforme o funcionário
@@ -1028,27 +1124,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   // Não renderizar se não houver funcionário e a modal estiver fechada
   if (!open) return null;
   if (!funcionario && open) {
-    // Se a modal está aberta mas não há funcionário, mostrar mensagem ou fechar
     return null;
   }
-
-
-  // Missing states
-  const [cpfError, setCpfError] = useState<string | null>(null);
-  const [showPDFImport, setShowPDFImport] = useState(false);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfSuccess, setPdfSuccess] = useState(false);
-  const [extractedPreview, setExtractedPreview] = useState<any | null>(null);
-  const [pdfProcessing, setPdfProcessing] = useState(false);
-  const [canCreateDefaultUser, setCanCreateDefaultUser] = useState(false);
-  const [criarUsuarioModalOpen, setCriarUsuarioModalOpen] = useState(false);
-  const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
-  const [dependentModalOpen, setDependentModalOpen] = useState(false);
-  const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
-
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [loadingDependents, setLoadingDependents] = useState(false);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1074,10 +1151,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setForm(prev => ({ ...prev, [name]: finalValue }));
   };
 
-  const [positionSearchTerm, setPositionSearchTerm] = useState('');
-  const [showPositionDropdown, setShowPositionDropdown] = useState(false);
-  const [filteredPositions, setFilteredPositions] = useState<Position[]>([]);
-
   const handlePositionInputFocus = () => { };
   const handlePositionInputBlur = () => { };
   const handlePositionSelect = (position: Position) => {
@@ -1090,9 +1163,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setDependentToEdit(null);
     setDependentModalOpen(true);
   };
-
-  const [epiModalOpen, setEpiModalOpen] = useState(false);
-  const [employeeDependents, setEmployeeDependents] = useState<Dependent[]>([]);
 
   const isEditMode = true;
   const employeeIdValue = funcionario?.id;
@@ -1621,11 +1691,17 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-              <Tabs defaultValue="cadastro" className="space-y-4 sm:space-y-6">
-                <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border border-gray-600">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+                <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-4' : 'grid-cols-3'} bg-seguranca-graphite border border-gray-600`}>
                   <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
                   <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
                   <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+                  {canSeeHistory && (
+                    <TabsTrigger value="historico" className="flex items-center gap-1.5">
+                      <History className="h-4 w-4" />
+                      Histórico
+                    </TabsTrigger>
+                  )}
                 </TabsList>
                 <TabsContent value="cadastro" className="space-y-4 sm:space-y-6">
                   {/* Seção: Relacionamentos Obrigatórios */}
@@ -1745,7 +1821,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
                             <Select
-                              value={selectedCompany?.id || 'none'}
+                              value={(form as any).company?.id || selectedCompany?.id || 'none'}
                               onValueChange={handleCompanySelect}
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
@@ -1773,15 +1849,39 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
                             <Select
-                              value={(form as any).workPostId || ''}
-                              onValueChange={(value) => setForm(prev => ({ ...(prev as any), workPostId: value }))}
+                              value={String((form as any).workPostId || 'none').toLowerCase()}
+                              onValueChange={(value) => {
+                                const currentWorkPostId = String((form as any).workPostId || 'none').toLowerCase();
+                                const newValue = value === 'none' ? '' : value;
+                                
+                                if (value !== currentWorkPostId) {
+                                  // Se o funcionário já tinha um posto e está mudando para OUTRO,
+                                  // abrimos o modal de remanejamento. Se ele NÃO tinha posto (none ou vazio),
+                                  // é apenas uma atribuição inicial ou atualização simples.
+                                  if (currentWorkPostId !== 'none' && currentWorkPostId !== '') {
+                                    setPendingWorkPostId(newValue);
+                                    const hoje = new Date().toISOString().split('T')[0];
+                                    setRemanejamentoForm({
+                                      dataInicio: hoje,
+                                      escalaTrabalho: form.escalaTrabalho || '',
+                                      horarioTrabalho: form.horarioTrabalho || ''
+                                    });
+                                    setRemanejamentoModalOpen(true);
+                                  } else {
+                                    setForm(prev => ({ ...prev, workPostId: newValue }));
+                                  }
+                                }
+                              }}
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                                 <SelectValue placeholder="Selecione um posto" />
                               </SelectTrigger>
                               <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                                <SelectItem value="none" className="hover:bg-gray-700">
+                                  <span className="text-gray-400">Nenhum posto</span>
+                                </SelectItem>
                                 {workPosts.map((wp) => (
-                                  <SelectItem key={wp.id} value={wp.id} className="hover:bg-gray-700">
+                                  <SelectItem key={wp.id} value={String(wp.id).toLowerCase()} className="hover:bg-gray-700">
                                     {wp.name}
                                   </SelectItem>
                                 ))}
@@ -1841,12 +1941,26 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">RG</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                <Input 
-                  name="rg" 
+                <Input
+                  name="rg"
                             value={form.rg || ''}
-                  onChange={handleChange} 
+                  onChange={handleChange}
                             placeholder="00.000.000-0"
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                />
+              </div>
+              <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">U.F RG</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                <Input
+                  name="rgUf"
+                  value={form.rgUf || ''}
+                  onChange={(e) => setForm(prev => ({ ...prev, rgUf: e.target.value.toUpperCase().slice(0, 2) }))}
+                  placeholder="UF"
+                  maxLength={2}
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                 />
               </div>
               <div>
@@ -3216,6 +3330,47 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             </SelectContent>
                           </Select>
                         </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Tipo Sal. Contratual</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.tipoSalarioContratual || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, tipoSalarioContratual: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="MENSAL" className="hover:bg-gray-700">Mensal</SelectItem>
+                              <SelectItem value="HORISTA" className="hover:bg-gray-700">Horista</SelectItem>
+                              <SelectItem value="DIARISTA" className="hover:bg-gray-700">Diarista</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Raça/Cor</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.racaCor || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, racaCor: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="BRANCA" className="hover:bg-gray-700">Branca</SelectItem>
+                              <SelectItem value="PRETA" className="hover:bg-gray-700">Preta</SelectItem>
+                              <SelectItem value="PARDA" className="hover:bg-gray-700">Parda</SelectItem>
+                              <SelectItem value="AMARELA" className="hover:bg-gray-700">Amarela</SelectItem>
+                              <SelectItem value="INDIGENA" className="hover:bg-gray-700">Indígena</SelectItem>
+                              <SelectItem value="NAO_INFORMADO" className="hover:bg-gray-700">Não informado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -3302,8 +3457,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
                           <RadioGroup
-                            value={form.horarioTrabalhoIntervalo ? 'sim' : 'nao'}
-                            onValueChange={(value) => value === 'nao' && setForm(prev => ({ ...prev, horarioTrabalhoIntervalo: '' }))}
+                            value={temIntervaloRefeicao}
+                            onValueChange={(value) => {
+                              setTemIntervaloRefeicao(value as 'sim' | 'nao');
+                              if (value === 'nao') setForm(prev => ({ ...prev, horarioTrabalhoIntervalo: '' }));
+                            }}
                             className="flex gap-4 mt-3"
                           >
                             <div className="flex items-center space-x-2">
@@ -3316,19 +3474,21 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             </div>
                           </RadioGroup>
                         </div>
-                        <div className="md:col-span-2">
-                          <Label className="text-sm font-medium text-seguranca-yellow flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                            <span className="truncate">Horário do Intervalo</span>
-                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                          </Label>
-                <Input 
-                            name="horarioTrabalhoIntervalo"
-                            value={form.horarioTrabalhoIntervalo || ''}
-                  onChange={handleChange} 
-                            placeholder="Ex: 12:00 ÀS 13:00 H"
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                />
-              </div>
+                        {temIntervaloRefeicao === 'sim' && (
+                          <div className="md:col-span-2">
+                            <Label className="text-sm font-medium text-seguranca-yellow flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Horário do Intervalo</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input 
+                              name="horarioTrabalhoIntervalo"
+                              value={form.horarioTrabalhoIntervalo || ''}
+                              onChange={handleChange} 
+                              placeholder="Ex: 12:00 ÀS 13:00 H"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                        )}
 
                       </div>
                     </div>
@@ -3880,6 +4040,93 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     </div>
                   </Card>
                 </TabsContent>
+
+                {canSeeHistory && (
+                  <TabsContent value="historico" className="space-y-4 sm:space-y-6">
+                    <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                      <div className="p-4 sm:p-6 space-y-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                            <History className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                          </div>
+                          <h3 className="text-lg sm:text-xl font-semibold text-white">Histórico de Mudanças</h3>
+                        </div>
+                        {historyLoading ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-seguranca-yellow mx-auto" />
+                            <p className="text-gray-400 text-sm mt-2">Carregando histórico...</p>
+                          </div>
+                        ) : !historyData?.content?.length ? (
+                          <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-6 text-center">
+                            <History className="mx-auto mb-2 text-gray-400" size={32} />
+                            <p className="text-gray-400 text-sm">Nenhuma alteração registrada ainda.</p>
+                            <p className="text-gray-500 text-xs mt-1">As mudanças no cadastro passam a ser registradas a partir de agora.</p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="overflow-x-auto rounded-lg border border-gray-600">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-800/80 text-gray-300">
+                                  <tr>
+                                    <th className="text-left p-3">Data/Hora</th>
+                                    <th className="text-left p-3">Categoria</th>
+                                    <th className="text-left p-3">Campo</th>
+                                    <th className="text-left p-3">Valor antigo</th>
+                                    <th className="text-left p-3">Valor novo</th>
+                                    <th className="text-left p-3">Alterado por</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="text-gray-400 divide-y divide-gray-600">
+                                  {historyData.content.map((row) => (
+                                    <tr key={row.id} className="hover:bg-gray-800/50">
+                                      <td className="p-3 whitespace-nowrap">
+                                        {row.changedAt ? new Date(row.changedAt).toLocaleString('pt-BR') : '-'}
+                                      </td>
+                                      <td className="p-3">{row.categoryLabel || row.category}</td>
+                                      <td className="p-3">{row.fieldLabel || row.fieldName}</td>
+                                      <td className="p-3 max-w-[180px] truncate" title={row.oldValue ?? ''}>{row.oldValue ?? '-'}</td>
+                                      <td className="p-3 max-w-[180px] truncate" title={row.newValue ?? ''}>{row.newValue ?? '-'}</td>
+                                      <td className="p-3">{row.changedByUserName ?? '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {(historyData.totalPages ?? 0) > 1 && (
+                              <div className="flex items-center justify-between pt-2">
+                                <p className="text-gray-500 text-xs">
+                                  Página {historyData.number + 1} de {historyData.totalPages} ({historyData.totalElements} registros)
+                                </p>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={historyData.first}
+                                    onClick={() => setHistoryPageIndex((p) => Math.max(0, p - 1))}
+                                    className="border-gray-600 text-gray-300"
+                                  >
+                                    <ChevronLeft className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={historyData.last}
+                                    onClick={() => setHistoryPageIndex((p) => p + 1)}
+                                    className="border-gray-600 text-gray-300"
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </Card>
+                  </TabsContent>
+                )}
               </Tabs>
          
           {error && (
@@ -3976,6 +4223,118 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             }
           }}
         />
+
+        {/* Modal de Remanejamento - ao alterar Setor/Posto de Trabalho */}
+        <Dialog open={remanejamentoModalOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setRemanejamentoModalOpen(false);
+            setPendingWorkPostId('');
+            setRemanejamentoForm({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+          }
+        }}>
+          <DialogContent className="max-w-md bg-seguranca-graphite border-gray-600">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-seguranca-lightgray">
+                Remanejamento - Novo Setor/Posto
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-400">
+                Ao alterar o setor/posto de trabalho, é obrigatório informar a data de início no novo setor, a escala e o horário de trabalho. O registro será salvo como remanejamento e refletirá no histórico do funcionário.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
+                  Data de início no novo setor <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={remanejamentoForm.dataInicio}
+                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: e.target.value }))}
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
+                  Escala de trabalho <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  placeholder="Ex: 12x36, 6x1"
+                  value={remanejamentoForm.escalaTrabalho}
+                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, escalaTrabalho: e.target.value }))}
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
+                  Horário de trabalho <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  placeholder="Ex: 18:00 às 06:00"
+                  value={remanejamentoForm.horarioTrabalho}
+                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, horarioTrabalho: e.target.value }))}
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRemanejamentoModalOpen(false);
+                  setPendingWorkPostId('');
+                  setRemanejamentoForm({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+                }}
+                className="border-gray-600 text-gray-300"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!remanejamentoForm.dataInicio.trim()) {
+                    toast({
+                      title: "Campo obrigatório",
+                      description: "Informe a data de início no novo setor.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  if (!remanejamentoForm.escalaTrabalho.trim()) {
+                    toast({
+                      title: "Campo obrigatório",
+                      description: "Informe a escala de trabalho.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  if (!remanejamentoForm.horarioTrabalho.trim()) {
+                    toast({
+                      title: "Campo obrigatório",
+                      description: "Informe o horário de trabalho.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  setForm(prev => ({
+                    ...prev,
+                    workPostId: pendingWorkPostId,
+                    escalaTrabalho: remanejamentoForm.escalaTrabalho,
+                    horarioTrabalho: remanejamentoForm.horarioTrabalho,
+                    remanejamentoDataInicio: remanejamentoForm.dataInicio
+                  }));
+                  setRemanejamentoModalOpen(false);
+                  setPendingWorkPostId('');
+                  toast({
+                    title: "Dados confirmados",
+                    description: "Clique em Salvar para registrar o remanejamento e atualizar o funcionário.",
+                  });
+                }}
+                className="bg-seguranca-yellow text-seguranca-dark hover:bg-seguranca-yellow/90"
+              >
+                Confirmar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Modal de Ficha de Entrega de EPI */}
         <Dialog open={epiModalOpen} onOpenChange={setEpiModalOpen}>

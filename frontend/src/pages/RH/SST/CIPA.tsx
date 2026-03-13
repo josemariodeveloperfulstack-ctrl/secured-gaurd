@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { sstService, type CIPAMemberResponse } from '@/services/sstService';
 
 interface CIPAMember {
   id: string;
@@ -98,40 +99,21 @@ const CIPA: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      // TODO: Implementar chamadas para API
-      // const [membersData, reunionsData] = await Promise.all([
-      //   sstService.getCIPAMembers(),
-      //   sstService.getCIPAReunions()
-      // ]);
-      
-      // Mock data para demonstração
-      setMembers([
-        {
-          id: '1',
-          employeeId: 'emp1',
-          employeeName: 'João Silva',
-          position: 'PRESIDENTE',
-          department: 'Administrativo',
-          startDate: '2024-01-01',
-          endDate: '2024-12-31',
-          status: 'ATIVO',
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '2',
-          employeeId: 'emp2',
-          employeeName: 'Maria Santos',
-          position: 'VICE_PRESIDENTE',
-          department: 'Operacional',
-          startDate: '2024-01-01',
-          endDate: '2024-12-31',
-          status: 'ATIVO',
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z'
-        }
-      ]);
+      const membersData = await sstService.getCIPAMembers();
+      setMembers(membersData.map((m: CIPAMemberResponse) => ({
+        id: m.id,
+        employeeId: m.employeeId,
+        employeeName: m.employeeName,
+        position: m.position as CIPAMember['position'],
+        department: m.department,
+        startDate: m.startDate,
+        endDate: m.endDate,
+        status: m.status as CIPAMember['status'],
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt
+      })));
 
+      // Reuniões: ainda sem API - manter mock
       setReunions([
         {
           id: '1',
@@ -151,6 +133,7 @@ const CIPA: React.FC = () => {
     } catch (err) {
       console.error('Erro ao carregar dados da CIPA:', err);
       setError('Erro ao carregar dados da CIPA');
+      setMembers([]);
       toast({
         title: "Erro",
         description: "Erro ao carregar dados da CIPA",
@@ -263,7 +246,7 @@ const CIPA: React.FC = () => {
     if (!window.confirm('Tem certeza que deseja remover este membro da CIPA?')) return;
     
     try {
-      // TODO: Implementar exclusão
+      await sstService.deleteCIPAMember(id);
       toast({
         title: "Sucesso",
         description: "Membro da CIPA removido com sucesso!",

@@ -2,9 +2,13 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.Absence;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.repository.AbsenceRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +45,9 @@ public class AbsenceService {
 
     @Autowired
     private CompanyRepository companyRepository;
+
+    @Autowired
+    private EmployeeChangeHistoryService employeeChangeHistoryService;
 
     @Transactional(readOnly = true)
     public List<Absence> getAllAbsences() {
@@ -152,7 +159,12 @@ public class AbsenceService {
 
         absence.setEmployee(employee);
 
-        return absenceRepository.save(absence);
+        Absence saved = absenceRepository.save(absence);
+        String tipo = saved.getIsJustified() != null && saved.getIsJustified() ? "justificada" : "não justificada";
+        String desc = String.format("%s - %s (%s)", saved.getAbsenceDate(), saved.getAbsenceType(), tipo);
+        employeeChangeHistoryService.recordChange(employee.getId(), EmployeeChangeCategory.FALTA,
+                "falta", "Falta", null, desc, getCurrentUserId());
+        return saved;
     }
 
     public Absence updateAbsence(UUID id, Absence updatedAbsence) {
@@ -198,7 +210,14 @@ public class AbsenceService {
             existingAbsence.setCoverageEmployee(coverageEmployee);
         }
 
-        return absenceRepository.save(existingAbsence);
+        String oldDesc = String.format("%s - %s (%s)", existingAbsence.getAbsenceDate(), existingAbsence.getAbsenceType(),
+                existingAbsence.getIsJustified() != null && existingAbsence.getIsJustified() ? "justificada" : "não justificada");
+        Absence saved = absenceRepository.save(existingAbsence);
+        String newDesc = String.format("%s - %s (%s)", saved.getAbsenceDate(), saved.getAbsenceType(),
+                saved.getIsJustified() != null && saved.getIsJustified() ? "justificada" : "não justificada");
+        employeeChangeHistoryService.recordChange(saved.getEmployee().getId(), EmployeeChangeCategory.FALTA,
+                "falta", "Falta", oldDesc, newDesc, getCurrentUserId());
+        return saved;
     }
 
     public void deleteAbsence(UUID id) {
@@ -228,6 +247,14 @@ public class AbsenceService {
 
     public Long getEmployeeAbsenceCount(UUID employeeId, LocalDate startDate, LocalDate endDate) {
         return absenceRepository.countApprovedAbsencesByEmployeeAndDateRange(employeeId, startDate, endDate);
+    }
+
+    private UUID getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            return ((User) auth.getPrincipal()).getId();
+        }
+        return null;
     }
 
     @Transactional

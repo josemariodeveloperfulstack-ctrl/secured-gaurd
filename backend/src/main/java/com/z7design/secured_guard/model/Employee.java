@@ -305,6 +305,9 @@ public class Employee {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate carteiraIdentidadeDataEmissao;
 
+    @Column(name = "rg_uf", length = 2)
+    private String rgUf; // UF de emissão do RG (planilha: U.F RG)
+
     // CIN - Carteira de Identidade Nacional
     @Column(name = "cin_numero", length = 30)
     private String cinNumero;
@@ -418,6 +421,12 @@ public class Employee {
 
     @Column(name = "matricula_esocial", length = 50)
     private String matriculaEsocial;
+
+    @Column(name = "raca_cor", length = 50)
+    private String racaCor; // Raça/Cor (classificação IBGE/eSocial)
+
+    @Column(name = "tipo_salario_contratual", length = 50)
+    private String tipoSalarioContratual; // MENSAL, HORISTA, etc.
 
     // PIS
     @Column(name = "pis_data_cadastro")

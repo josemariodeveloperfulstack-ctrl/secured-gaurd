@@ -24,6 +24,9 @@ interface FuncionariosTableProps {
   onViewDetails: (employee: Employee) => void;
   isLoading?: boolean;
   isMobileSelectionMode?: boolean;
+  sortKey?: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status';
+  sortDir?: 'asc' | 'desc';
+  onSort?: (key: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status') => void;
 }
 
 export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
@@ -38,7 +41,10 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
   onViewDependents,
   onViewDetails,
   isLoading = false,
-  isMobileSelectionMode = false
+  isMobileSelectionMode = false,
+  sortKey = 'name',
+  sortDir = 'asc',
+  onSort
 }) => {
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
@@ -74,7 +80,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
 
     const config = statusConfig[status] || statusConfig['INACTIVE'];
     return (
-      <Badge className={`${config.className} px-3 py-1 font-medium border`}>
+      <Badge className={`${config.className} px-2 py-0.5 text-xs font-medium border`}>
         {config.label}
       </Badge>
     );
@@ -83,6 +89,32 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
   const formatDate = (date?: string) => {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('pt-BR');
+  };
+
+  const getWorkPostsLabel = (employee: Employee) => {
+    const wp = (employee.workPost as any)?.name;
+    const wps = (employee as any)?.workPosts;
+    if (Array.isArray(wps) && wps.length) {
+      const names = wps.map((x: any) => x?.name).filter(Boolean);
+      if (names.length) return names.join(', ');
+    }
+    return wp || null;
+  };
+
+  const SortHead = ({ k, children }: { k: NonNullable<FuncionariosTableProps['sortKey']>; children: React.ReactNode }) => {
+    const active = sortKey === k;
+    const arrow = active ? (sortDir === 'asc' ? '↑' : '↓') : '';
+    return (
+      <button
+        type="button"
+        onClick={() => onSort?.(k)}
+        className={`inline-flex items-center gap-2 ${onSort ? 'hover:text-white' : ''} ${active ? 'text-white' : ''}`}
+        title="Ordenar"
+      >
+        <span>{children}</span>
+        <span className="text-xs text-gray-400">{arrow}</span>
+      </button>
+    );
   };
 
   if (isLoading) {
@@ -124,13 +156,27 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
                 />
               </TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Funcionário</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Cargo/Função</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Empresa</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Posto de Trabalho</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Admissão</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Demissão</TableHead>
-              <TableHead className="text-seguranca-yellow font-semibold">Status</TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="name">Funcionário</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="position">Cargo/Função</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="company">Empresa</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="workPost">Posto de Trabalho</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="hireDate">Admissão</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="terminationDate">Demissão</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="status">Status</SortHead>
+              </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold w-[100px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -141,32 +187,38 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 className={`border-gray-600/30 hover:bg-seguranca-black/30 transition-all duration-200 group ${selectedIds.includes(employee.id) ? 'bg-seguranca-red/5' : ''}`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <TableCell className="py-4">
+                <TableCell className="py-2">
                   <Checkbox
                     checked={selectedIds.includes(employee.id)}
                     onCheckedChange={(checked) => onSelect(employee.id, !!checked)}
                     className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
                   />
                 </TableCell>
-                <TableCell className="py-4">
+                <TableCell className="py-2">
                   <div
                     className="flex items-start gap-3 cursor-pointer group/name"
                     onClick={() => onViewDetails(employee)}
                   >
-                    <div className="mt-1 p-2 rounded-lg bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 group-hover/name:border-seguranca-red/50 transition-colors">
-                      <User className="h-5 w-5 text-seguranca-red" />
+                    <div className="mt-0.5 p-1.5 rounded-md bg-seguranca-red/10 border border-seguranca-red/20 group-hover:bg-seguranca-red/20 group-hover/name:border-seguranca-red/50 transition-colors">
+                      <User className="h-4 w-4 text-seguranca-red" />
                     </div>
                     <div>
-                      <div className="font-semibold text-seguranca-lightgray group-hover:text-white group-hover/name:text-seguranca-yellow transition-colors">
-                        {employee.name}
+                      <div className="font-semibold text-seguranca-lightgray group-hover:text-white group-hover/name:text-seguranca-yellow transition-colors leading-tight">
+                        {(() => {
+                          const name = employee.name?.trim();
+                          const mat = employee.registrationNumber?.trim();
+                          if (name && !/^\d+$/.test(name)) return name;
+                          if (mat) return mat;
+                          return <span className="italic text-gray-500">Nome não informado</span>;
+                        })()}
                       </div>
-                      {employee.registrationNumber && (
-                        <div className="text-sm text-gray-400 mt-1 font-mono">
+                      {employee.registrationNumber && employee.name && !/^\d+$/.test(employee.name) && (
+                        <div className="text-xs text-gray-400 mt-0.5 font-mono leading-tight">
                           Mat: {employee.registrationNumber}
                         </div>
                       )}
                       {employee.cpf && (
-                        <div className="text-sm text-gray-500 mt-1 font-mono">
+                        <div className="text-xs text-gray-500 mt-0.5 font-mono leading-tight">
                           CPF: {employee.cpf}
                         </div>
                       )}
@@ -174,63 +226,76 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {employee.position?.name && (
-                      <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
-                        <Building className="h-4 w-4 text-gray-400" />
+                      <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                        <Building className="h-3.5 w-3.5 text-gray-400" />
                         {employee.position.name}
                       </div>
                     )}
                     {employee.position?.description && (
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <Briefcase className="h-4 w-4" />
+                      <div className="flex items-center gap-2 text-xs text-gray-400 leading-tight">
+                        <Briefcase className="h-3.5 w-3.5" />
                         {employee.position.description}
                       </div>
                     )}
                     {!employee.position?.name && !employee.position?.description && (
-                      <span className="text-gray-500 italic text-sm">Não definido</span>
+                      <span className="text-gray-500 italic text-xs">Não definido</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
                     {employee.company?.sigla ? (
                       <>
-                        <Building className="h-4 w-4 text-gray-400" />
+                        <Building className="h-3.5 w-3.5 text-gray-400" />
                         <span className="truncate max-w-[200px] font-semibold">{employee.company.sigla}</span>
                       </>
                     ) : (
-                      <span className="text-gray-500 italic text-sm">Não definido</span>
+                      <span className="text-gray-500 italic text-xs">Não definido</span>
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
                     {(() => {
-                      // Priorizar workPost, depois department (NÃO exibir unit)
-                      const workPostName = employee.workPost?.name;
+                      const workPostsLabel = getWorkPostsLabel(employee);
                       const departmentName = (employee as any).department?.name;
-                      const displayName = workPostName || departmentName;
-                      return displayName ? (
-                        <>
-                          <MapPin className="h-4 w-4 text-gray-400" />
-                          <span className="truncate max-w-[200px]">{displayName}</span>
-                        </>
-                      ) : (
-                        <span className="text-gray-500 italic text-sm">Não definido</span>
+                      
+                      return (
+                        <div className="flex flex-col gap-1">
+                          {workPostsLabel ? (
+                            <div className="flex items-center gap-2" title="Posto de Trabalho">
+                              <MapPin className="h-3.5 w-3.5 text-seguranca-yellow" />
+                              <span className="truncate max-w-[200px]">{workPostsLabel}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2" title="Sem Posto de Trabalho">
+                              <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                              <span className="text-gray-500 italic text-xs">Sem posto</span>
+                            </div>
+                          )}
+                          
+                              {departmentName && !workPostsLabel && (
+                                <div className="flex items-center gap-2" title="Posto de Trabalho">
+                                  <MapPin className="h-3.5 w-3.5 text-seguranca-yellow" />
+                                  <span className="truncate max-w-[200px]">{departmentName}</span>
+                                </div>
+                              )}
+                        </div>
                       );
                     })()}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
-                    <Calendar className="h-4 w-4 text-gray-400" />
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
                     {formatDate(employee.hireDate)}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2 text-sm text-seguranca-lightgray">
-                    <Calendar className="h-4 w-4 text-gray-400" />
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
                     {formatDate(employee.terminationDate)}
                   </div>
                 </TableCell>
@@ -243,7 +308,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => onViewDetails(employee)}
-                      className="h-8 w-8 p-0 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors"
+                      className="h-7 w-7 p-0 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors"
                       title="Ver Detalhes"
                     >
                       <Eye className="h-4 w-4" />
@@ -252,7 +317,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="h-8 w-8 p-0 hover:bg-seguranca-red/20 hover:text-seguranca-red transition-colors"
+                          className="h-7 w-7 p-0 hover:bg-seguranca-red/20 hover:text-seguranca-red transition-colors"
                         >
                           <span className="sr-only">Abrir menu</span>
                           <MoreHorizontal className="h-4 w-4" />
@@ -348,9 +413,15 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-seguranca-lightgray group-hover:text-seguranca-yellow transition-colors truncate text-sm">
-                      {employee.name}
+                      {(() => {
+                        const name = employee.name?.trim();
+                        const mat = employee.registrationNumber?.trim();
+                        if (name && !/^\d+$/.test(name)) return name;
+                        if (mat) return mat;
+                        return 'Nome não informado';
+                      })()}
                     </h3>
-                    {employee.registrationNumber && (
+                    {employee.registrationNumber && employee.name && !/^\d+$/.test(employee.name) && (
                       <p className="text-[10px] text-gray-500 font-mono">
                         Mat: {employee.registrationNumber}
                       </p>
@@ -377,13 +448,25 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   </div>
                 )}
                 {(() => {
-                  const displayName = employee.workPost?.name || (employee as any).department?.name;
-                  return displayName ? (
-                    <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
-                      <MapPin className="h-3 w-3 flex-shrink-0 text-red-400/70" />
-                      <span className="truncate">{displayName}</span>
+                  const workPostsLabel = getWorkPostsLabel(employee);
+                  const departmentName = (employee as any).department?.name;
+                  
+                  return (
+                    <div className="flex flex-col gap-0.5">
+                      {workPostsLabel && (
+                        <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Posto de Trabalho">
+                          <MapPin className="h-3 w-3 flex-shrink-0 text-seguranca-yellow/70" />
+                          <span className="truncate">{workPostsLabel}</span>
+                        </div>
+                      )}
+                      {departmentName && !workPostsLabel && (
+                        <div className="flex items-center gap-1.5 text-gray-500 min-w-0" title="Posto de Trabalho">
+                          <MapPin className="h-2.5 w-2.5 flex-shrink-0 text-seguranca-yellow/70" />
+                          <span className="truncate text-[10px]">{departmentName}</span>
+                        </div>
+                      )}
                     </div>
-                  ) : null;
+                  );
                 })()}
                 {employee.hireDate && (
                   <div className="flex items-center gap-1.5 text-gray-400 min-w-0">

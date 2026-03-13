@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { employeeService } from '@/services/employeeService';
-import { CreateEmployeeDTO } from '@/types/employee';
+import { CreateEmployeeDTO, Employee } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
 import workPostService, { WorkPost } from '@/services/workPostService';
 import departmentService, { Department } from '@/services/departmentService';
@@ -16,7 +16,7 @@ import { userService } from '@/services/userService';
 import { User } from '@/types/user';
 import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
-import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
@@ -37,6 +37,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { validateCPF, formatCpfForInput, formatTituloEleitorForInput } from '@/utils/validation';
 import CurrencyInput from 'react-currency-input-field';
 import DocumentosGerarTab from './DocumentosGerarTab';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/utils/permissions';
+import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -108,13 +111,22 @@ const initialState: CreateEmployeeDTO = {
   // Campos de CIN
   cinNumero: '',
   cinOrgaoEmissor: '',
-  cinDataEmissao: ''
+  cinDataEmissao: '',
+  // Campos da planilha
+  rgUf: '',
+  racaCor: '',
+  tipoSalarioContratual: ''
 };
 
 const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClose, onCreated, employeeToEdit }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '');
+  const isRHOrDPE = ['RH', 'DEPARTAMENTO_PESSOAL', 'ASSISTENCIA_RH', 'AUX_DEP', 'SUPER_ADMIN', 'ADMIN'].includes(normalizedRole);
+  const canSeeHistory = isRHOrDPE || (user?.permissions && hasPermission(user.permissions, 'EMPLOYEE_HISTORY_READ'));
   const [form, setForm] = useState<CreateEmployeeDTO>(initialState);
   const [isEditMode, setIsEditMode] = useState(false);
+  const showHistoryTab = canSeeHistory && isEditMode;
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -257,6 +269,44 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
   const [loadingDependents, setLoadingDependents] = useState(false);
 
+  // Estados para modal de remanejamento ao alterar setor/posto
+  const [remanejamentoModalOpen, setRemanejamentoModalOpen] = useState(false);
+  const [pendingWorkPostId, setPendingWorkPostId] = useState<string>('');
+  const [remanejamentoForm, setRemanejamentoForm] = useState({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+
+  // Estados para aba Histórico
+  const [historyData, setHistoryData] = useState<EmployeeChangeHistoryPage | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPageIndex, setHistoryPageIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState('cadastro');
+
+  // Resetar aba ativa ao fechar ou quando Histórico não está disponível
+  useEffect(() => {
+    if (!open) setActiveTab('cadastro');
+    else if (!showHistoryTab && activeTab === 'historico') setActiveTab('cadastro');
+  }, [open, showHistoryTab, activeTab]);
+
+  // Carregar histórico de mudanças quando abrir a aba Histórico (modo edição)
+  useEffect(() => {
+    if (!showHistoryTab || activeTab !== 'historico' || !currentEmployeeId) {
+      return;
+    }
+    let cancelled = false;
+    setHistoryLoading(true);
+    employeeChangeHistoryService
+      .getByEmployeeId(currentEmployeeId, historyPageIndex, 20)
+      .then((data) => {
+        if (!cancelled) setHistoryData(data);
+      })
+      .catch(() => {
+        if (!cancelled) setHistoryData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [showHistoryTab, activeTab, currentEmployeeId, historyPageIndex]);
+
   // useEffect para carregar dados do funcionário em modo de edição
   useEffect(() => {
     if (employeeToEdit && open) {
@@ -317,6 +367,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         nomeConselhoRegional: employeeToEdit.nomeConselhoRegional || '',
         carteiraIdentidadeOrgaoEmissor: employeeToEdit.carteiraIdentidadeOrgaoEmissor || '',
         carteiraIdentidadeDataEmissao: employeeToEdit.carteiraIdentidadeDataEmissao || '',
+        rgUf: (employeeToEdit as any).rgUf || '',
+        racaCor: (employeeToEdit as any).racaCor || '',
+        tipoSalarioContratual: (employeeToEdit as any).tipoSalarioContratual || '',
         certificadoMilitar: employeeToEdit.certificadoMilitar || '',
         nomePai: employeeToEdit.nomePai || '',
         nomeMae: employeeToEdit.nomeMae || '',
@@ -411,9 +464,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           chavePix: ''
         },
 
-        // Campos relacionais
-        workPostId: (employeeToEdit as any).workPostId || '',
-        departmentId: (employeeToEdit as any).departmentId || ''
+        // Campos relacionais - workPost pode vir como objeto { id, name } ou workPostId
+        workPostId: (employeeToEdit as any).workPostId || (employeeToEdit as any).workPost?.id || '',
+        departmentId: (employeeToEdit as any).departmentId || (employeeToEdit as any).department?.id || ''
       });
 
       // Preencher seleções
@@ -421,9 +474,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         position: employeeToEdit.position,
         unit: employeeToEdit.unit,
         user: employeeToEdit.user,
-        company: employeeToEdit.company
-        // workPostId e departmentId não existem na entidade Employee
+        company: employeeToEdit.company,
+        workPost: (employeeToEdit as any).workPost,
+        workPostId: (employeeToEdit as any).workPostId,
+        department: (employeeToEdit as any).department,
+        departmentId: (employeeToEdit as any).departmentId
       });
+      console.log('🔍 [DEBUG] form.workPostId:', (employeeToEdit as any).workPostId || (employeeToEdit as any).workPost?.id || '');
+      console.log('🔍 [DEBUG] workPosts disponíveis:', workPosts.length, workPosts.map(wp => wp.id));
 
       if (employeeToEdit.position) {
         console.log('🔍 Carregando posição:', employeeToEdit.position);
@@ -1911,11 +1969,17 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-              <Tabs defaultValue="cadastro" className="space-y-4 sm:space-y-6">
-                <TabsList className="grid w-full grid-cols-3 bg-seguranca-graphite border border-gray-600">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+                <TabsList className={`grid w-full ${showHistoryTab ? 'grid-cols-4' : 'grid-cols-3'} bg-seguranca-graphite border border-gray-600`}>
                   <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
                   <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
                   <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+                  {showHistoryTab && (
+                    <TabsTrigger value="historico" className="flex items-center gap-1.5">
+                      <History className="h-4 w-4" />
+                      Histórico
+                    </TabsTrigger>
+                  )}
                 </TabsList>
                 <TabsContent value="cadastro" className="space-y-4 sm:space-y-6">
                   {/* Seção: Relacionamentos Obrigatórios */}
@@ -2062,15 +2126,29 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
                             <Select
-                              value={(form as any).workPostId || ''}
-                              onValueChange={(value) => setForm(prev => ({ ...(prev as any), workPostId: value }))}
+                              value={String((form as any).workPostId || '').toLowerCase()}
+                              onValueChange={(value) => {
+                                const currentWorkPostId = String((form as any).workPostId || '').toLowerCase();
+                                if (value !== currentWorkPostId && isEditMode) {
+                                  setPendingWorkPostId(value);
+                                  const hoje = new Date().toISOString().split('T')[0];
+                                  setRemanejamentoForm({
+                                    dataInicio: hoje,
+                                    escalaTrabalho: (form as any).escalaTrabalho || '',
+                                    horarioTrabalho: (form as any).horarioTrabalho || ''
+                                  });
+                                  setRemanejamentoModalOpen(true);
+                                } else {
+                                  setForm(prev => ({ ...(prev as any), workPostId: value }));
+                                }
+                              }}
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
                                 <SelectValue placeholder="Selecione um posto" />
                               </SelectTrigger>
                               <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
                                 {workPosts.map((wp) => (
-                                  <SelectItem key={wp.id} value={wp.id} className="hover:bg-gray-700">
+                                  <SelectItem key={wp.id} value={String(wp.id).toLowerCase()} className="hover:bg-gray-700">
                                     {wp.name}
                                   </SelectItem>
                                 ))}
@@ -2135,6 +2213,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             value={form.rg || ''}
                             onChange={handleChange}
                             placeholder="00.000.000-0"
+                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">U.F RG</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Input
+                            name="rgUf"
+                            value={form.rgUf || ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, rgUf: e.target.value.toUpperCase().slice(0, 2) }))}
+                            placeholder="UF"
+                            maxLength={2}
                             className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                           />
                         </div>
@@ -3493,6 +3585,47 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             </SelectContent>
                           </Select>
                         </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Tipo Sal. Contratual</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.tipoSalarioContratual || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, tipoSalarioContratual: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="MENSAL" className="hover:bg-gray-700">Mensal</SelectItem>
+                              <SelectItem value="HORISTA" className="hover:bg-gray-700">Horista</SelectItem>
+                              <SelectItem value="DIARISTA" className="hover:bg-gray-700">Diarista</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Raça/Cor</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                          <Select
+                            value={form.racaCor || ''}
+                            onValueChange={(value) => setForm(prev => ({ ...prev, racaCor: value }))}
+                          >
+                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Selecione" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                              <SelectItem value="BRANCA" className="hover:bg-gray-700">Branca</SelectItem>
+                              <SelectItem value="PRETA" className="hover:bg-gray-700">Preta</SelectItem>
+                              <SelectItem value="PARDA" className="hover:bg-gray-700">Parda</SelectItem>
+                              <SelectItem value="AMARELA" className="hover:bg-gray-700">Amarela</SelectItem>
+                              <SelectItem value="INDIGENA" className="hover:bg-gray-700">Indígena</SelectItem>
+                              <SelectItem value="NAO_INFORMADO" className="hover:bg-gray-700">Não informado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -4095,6 +4228,93 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                     </div>
                   </Card>
                 </TabsContent>
+
+                {showHistoryTab && (
+                  <TabsContent value="historico" className="space-y-4 sm:space-y-6">
+                    <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                      <div className="p-4 sm:p-6 space-y-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                            <History className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                          </div>
+                          <h3 className="text-lg sm:text-xl font-semibold text-white">Histórico de Mudanças</h3>
+                        </div>
+                        {historyLoading ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-seguranca-yellow mx-auto" />
+                            <p className="text-gray-400 text-sm mt-2">Carregando histórico...</p>
+                          </div>
+                        ) : !historyData?.content?.length ? (
+                          <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-6 text-center">
+                            <History className="mx-auto mb-2 text-gray-400" size={32} />
+                            <p className="text-gray-400 text-sm">Nenhuma alteração registrada ainda.</p>
+                            <p className="text-gray-500 text-xs mt-1">As mudanças no cadastro passam a ser registradas a partir de agora.</p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="overflow-x-auto rounded-lg border border-gray-600">
+                              <table className="w-full text-sm">
+                                <thead className="bg-gray-800/80 text-gray-300">
+                                  <tr>
+                                    <th className="text-left p-3">Data/Hora</th>
+                                    <th className="text-left p-3">Categoria</th>
+                                    <th className="text-left p-3">Campo</th>
+                                    <th className="text-left p-3">Valor antigo</th>
+                                    <th className="text-left p-3">Valor novo</th>
+                                    <th className="text-left p-3">Alterado por</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="text-gray-400 divide-y divide-gray-600">
+                                  {historyData.content.map((row) => (
+                                    <tr key={row.id} className="hover:bg-gray-800/50">
+                                      <td className="p-3 whitespace-nowrap">
+                                        {row.changedAt ? new Date(row.changedAt).toLocaleString('pt-BR') : '-'}
+                                      </td>
+                                      <td className="p-3">{row.categoryLabel || row.category}</td>
+                                      <td className="p-3">{row.fieldLabel || row.fieldName}</td>
+                                      <td className="p-3 max-w-[180px] truncate" title={row.oldValue ?? ''}>{row.oldValue ?? '-'}</td>
+                                      <td className="p-3 max-w-[180px] truncate" title={row.newValue ?? ''}>{row.newValue ?? '-'}</td>
+                                      <td className="p-3">{row.changedByUserName ?? '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            {(historyData.totalPages ?? 0) > 1 && (
+                              <div className="flex items-center justify-between pt-2">
+                                <p className="text-gray-500 text-xs">
+                                  Página {historyData.number + 1} de {historyData.totalPages} ({historyData.totalElements} registros)
+                                </p>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={historyData.first}
+                                    onClick={() => setHistoryPageIndex((p) => Math.max(0, p - 1))}
+                                    className="border-gray-600 text-gray-300"
+                                  >
+                                    <ChevronLeft className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={historyData.last}
+                                    onClick={() => setHistoryPageIndex((p) => p + 1)}
+                                    className="border-gray-600 text-gray-300"
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </Card>
+                  </TabsContent>
+                )}
               </Tabs>
 
               {error && (
@@ -4206,6 +4426,118 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             <div className="pt-2">
               <FichaEntregaEPIForm employeeId={employeeIdValue || undefined} />
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal de Remanejamento - ao alterar Setor/Posto de Trabalho */}
+        <Dialog open={remanejamentoModalOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setRemanejamentoModalOpen(false);
+            setPendingWorkPostId('');
+            setRemanejamentoForm({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+          }
+        }}>
+          <DialogContent className="max-w-md bg-seguranca-graphite border-gray-600">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-seguranca-lightgray">
+                Remanejamento - Novo Setor/Posto
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-400">
+                Ao alterar o setor/posto de trabalho, é obrigatório informar a data de início no novo setor, a escala e o horário de trabalho. O registro será salvo como remanejamento e refletirá no histórico do funcionário.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
+                  Data de início no novo setor <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={remanejamentoForm.dataInicio}
+                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: e.target.value }))}
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
+                  Escala de trabalho <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  placeholder="Ex: 12x36, 6x1, 10:00 às 22:00"
+                  value={remanejamentoForm.escalaTrabalho}
+                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, escalaTrabalho: e.target.value }))}
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
+                  Horário de trabalho <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  placeholder="Ex: 18:00 às 06:00"
+                  value={remanejamentoForm.horarioTrabalho}
+                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, horarioTrabalho: e.target.value }))}
+                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRemanejamentoModalOpen(false);
+                  setPendingWorkPostId('');
+                  setRemanejamentoForm({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+                }}
+                className="border-gray-600 text-gray-300"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!remanejamentoForm.dataInicio.trim()) {
+                    toast({
+                      title: "Campo obrigatório",
+                      description: "Informe a data de início no novo setor.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  if (!remanejamentoForm.escalaTrabalho.trim()) {
+                    toast({
+                      title: "Campo obrigatório",
+                      description: "Informe a escala de trabalho.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  if (!remanejamentoForm.horarioTrabalho.trim()) {
+                    toast({
+                      title: "Campo obrigatório",
+                      description: "Informe o horário de trabalho.",
+                      variant: "destructive"
+                    });
+                    return;
+                  }
+                  setForm(prev => ({
+                    ...prev,
+                    workPostId: pendingWorkPostId,
+                    escalaTrabalho: remanejamentoForm.escalaTrabalho,
+                    horarioTrabalho: remanejamentoForm.horarioTrabalho,
+                    remanejamentoDataInicio: remanejamentoForm.dataInicio
+                  } as any));
+                  setRemanejamentoModalOpen(false);
+                  setPendingWorkPostId('');
+                  toast({
+                    title: "Dados confirmados",
+                    description: "Clique em Salvar para registrar o remanejamento e atualizar o funcionário.",
+                  });
+                }}
+                className="bg-seguranca-yellow text-seguranca-dark hover:bg-seguranca-yellow/90"
+              >
+                Confirmar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </Dialog>

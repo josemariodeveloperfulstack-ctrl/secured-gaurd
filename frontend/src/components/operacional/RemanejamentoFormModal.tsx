@@ -113,8 +113,8 @@ export default function RemanejamentoFormModal({
       
       setValue('employeeId', remanejamento.employeeId || '');
       setValue('tipo', remanejamento.tipo || 'TRANSFERENCIA_UNIDADE');
-      setValue('origem', remanejamento.origem || '');
-      setValue('destino', remanejamento.destino || '');
+      setValue('origem', remanejamento.originWorkstationId || remanejamento.origem || '');
+      setValue('destino', remanejamento.destinationWorkstationId || remanejamento.destino || '');
       setValue('dataRemanejamento', dataFormatada);
       setValue('observacao', remanejamento.observacao || remanejamento.notes || '');
     } else {
@@ -139,6 +139,8 @@ export default function RemanejamentoFormModal({
         destino: data.destino,
         dataRemanejamento: data.dataRemanejamento,
         observacao: data.observacao,
+        originWorkstationId: data.origem || undefined,
+        destinationWorkstationId: data.destino || undefined,
       });
       onOpenChange(false);
       reset();
@@ -264,8 +266,8 @@ export default function RemanejamentoFormModal({
                       <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de origem"} />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      {workPosts.map((post) => (
-                        <SelectItem key={post.id} value={post.name} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                      {workPosts.map((post, idx) => (
+                        <SelectItem key={post.id || `origem-${idx}`} value={String(post.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
                           {post.postCode} - {post.name}
                         </SelectItem>
                       ))}
@@ -290,8 +292,8 @@ export default function RemanejamentoFormModal({
                       <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de destino"} />
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      {workPosts.map((post) => (
-                        <SelectItem key={post.id} value={post.name} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
+                      {workPosts.map((post, idx) => (
+                        <SelectItem key={post.id || `destino-${idx}`} value={String(post.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
                           {post.postCode} - {post.name}
                         </SelectItem>
                       ))}

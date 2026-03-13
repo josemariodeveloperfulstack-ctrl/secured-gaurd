@@ -52,6 +52,9 @@ import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { workPostService, WorkPost } from '@/services/workPostService';
+import { positionService, Position } from '@/services/positionService';
+import { departmentService, Department } from '@/services/departmentService';
 import { Employee } from '@/types/employee';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 import { EmployeeDocuments } from '@/components/funcionarios/EmployeeDocuments';
@@ -101,9 +104,58 @@ const Funcionarios: React.FC = () => {
   const [promoverCnpj, setPromoverCnpj] = useState<string>('43576260000112'); // Padrão
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [bulkBarPos, setBulkBarPos] = useState<{ x: number; y: number } | null>(null);
+  const [bulkBarDragging, setBulkBarDragging] = useState(false);
+  const [bulkBarDragOffset, setBulkBarDragOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [companies, setCompanies] = useState<any[]>([]);
+  const [positionFilter, setPositionFilter] = useState<string>('all');
+  const [workPostFilter, setWorkPostFilter] = useState<string>('all');
+  const [hireDateFrom, setHireDateFrom] = useState<string>('');
+  const [hireDateTo, setHireDateTo] = useState<string>('');
+  const [terminationDateFrom, setTerminationDateFrom] = useState<string>('');
+  const [terminationDateTo, setTerminationDateTo] = useState<string>('');
+  // Listas da API para opções dos filtros (empresas, postos, departamentos, cargos)
+  const [filterCompanies, setFilterCompanies] = useState<Array<{ id: string; name?: string; sigla?: string }>>([]);
+  const [filterWorkPosts, setFilterWorkPosts] = useState<WorkPost[]>([]);
+  const [filterDepartments, setFilterDepartments] = useState<Department[]>([]);
+  const [filterPositions, setFilterPositions] = useState<Position[]>([]);
   const [isMobileSelectionMode, setIsMobileSelectionMode] = useState(false);
+
+  // Barra de ações em massa: posição inicial no centro + drag (mouse/touch)
+  useEffect(() => {
+    if (bulkBarPos != null) return;
+    setBulkBarPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!bulkBarDragging) return;
+
+    const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+    const margin = 12;
+
+    const onMove = (e: PointerEvent) => {
+      if (!bulkBarDragging) return;
+      const x = e.clientX - bulkBarDragOffset.dx;
+      const y = e.clientY - bulkBarDragOffset.dy;
+      setBulkBarPos({
+        x: clamp(x, margin, window.innerWidth - margin),
+        y: clamp(y, margin, window.innerHeight - margin),
+      });
+    };
+
+    const onUp = () => {
+      setBulkBarDragging(false);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [bulkBarDragging, bulkBarDragOffset.dx, bulkBarDragOffset.dy]);
   const [confirmConfig, setConfirmConfig] = useState<{
     open: boolean;
     title: string;
@@ -187,30 +239,48 @@ const Funcionarios: React.FC = () => {
     loadEmployeesWithFilters();
   }, [currentPage]);
 
-  // Carregar funcionários com filtros atuais
+  // Carregar funcionários com filtros atuais (backend /paged só aceita searchTerm; demais filtros são no frontend)
   const loadEmployeesWithFilters = async () => {
     const filters: EmployeeFilters = {
       searchTerm: searchTerm.trim() || undefined,
-      status: statusFilter !== 'all' ? statusFilter : undefined,
-      companyId: companyFilter !== 'all' ? companyFilter : undefined,
     };
     await loadEmployees(filters, currentPage);
   };
 
-  // Carregar funcionários (único efeito - evita carregamento duplo)
+  // Carregar funcionários ao mudar filtros (só searchTerm vai para a API; resto filtra no frontend)
   useEffect(() => {
-    // Resetar para página 0 ao mudar filtros
     setCurrentPage(0);
-
     const filters: EmployeeFilters = {
       searchTerm: searchTerm.trim() || undefined,
-      status: statusFilter !== 'all' ? statusFilter : undefined,
-      companyId: companyFilter !== 'all' ? companyFilter : undefined,
     };
     const debounceMs = filters.searchTerm ? 500 : 0;
     const timeoutId = setTimeout(() => loadEmployees(filters as any, 0), debounceMs);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, statusFilter, companyFilter]);
+  }, [searchTerm, statusFilter, companyFilter, positionFilter, workPostFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo]);
+
+  // Carregar opções dos filtros (empresas, postos de trabalho, departamentos, unidades, cargos) da API
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [companiesRes, workPostsRes, departmentsRes, positionsRes] = await Promise.all([
+          companyService.getAllCompanies(),
+          workPostService.getAllWorkPosts(),
+          departmentService.listActive().catch(() => []),
+          positionService.getPositions().catch(() => []),
+        ]);
+        if (cancelled) return;
+        setFilterCompanies(Array.isArray(companiesRes) ? companiesRes : []);
+        setFilterWorkPosts(Array.isArray(workPostsRes) ? workPostsRes : []);
+        setFilterDepartments(Array.isArray(departmentsRes) ? departmentsRes : []);
+        setFilterPositions(Array.isArray(positionsRes) ? positionsRes : []);
+      } catch (e) {
+        if (!cancelled) console.warn('Erro ao carregar opções dos filtros:', e);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (shouldOpenModal) setModalOpen(true);
@@ -266,10 +336,21 @@ const Funcionarios: React.FC = () => {
         throw new Error('Dados do funcionário não foram retornados corretamente');
       }
 
+      // Garantir workPost: se a API não retornou mas a lista tem (paged inclui work_post)
+      const fullData = fullEmployeeData as any;
+      const listWp = (employee as any).workPost;
+      if (listWp && !fullData.workPost) {
+        fullData.workPost = listWp;
+      }
+      const wpId = listWp?.id ?? (employee as any).workPostId;
+      if (wpId && !fullData.workPostId) {
+        fullData.workPostId = String(wpId);
+      }
+
       // Definir dados primeiro, depois abrir modal
       // IMPORTANTE: Garantir que modalOpen está false antes de abrir editModalOpen
       setModalOpen(false);
-      setEmployeeToEdit(fullEmployeeData);
+      setEmployeeToEdit(fullData);
       setEditModalOpen(true);
 
       console.log('🔍 Estado após setEditModalOpen:', true);
@@ -300,15 +381,37 @@ const Funcionarios: React.FC = () => {
     loadEmployeesWithFilters(); // Recarregar lista
   };
 
-  // Filtrar funcionários por departamento, status e busca (filtro local)
+  // Normalizar valor de filtro (vazio ou 'all' = todos)
+  const isAll = (v: string) => !v || v === 'all';
+  const norm = (s: string | undefined) => (s || '').trim().toLowerCase();
+  const same = (a: string | undefined, b: string | undefined) => norm(a) === norm(b);
+
+  // Filtrar funcionários por todos os critérios (filtro local)
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const searchDigits = searchTerm.replace(/\D/g, '');
   const filteredEmployees = employees.filter(employee => {
-    const matchesDepartment = departmentFilter === 'all' ||
-      employee.unit?.id === departmentFilter ||
-      employee.position?.id === departmentFilter;
+    const matchesDepartment = isAll(departmentFilter) ||
+      same((employee.department as any)?.name, departmentFilter);
 
-    const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
+    const matchesStatus = isAll(statusFilter) || (employee.status || '').toUpperCase() === (statusFilter || '').toUpperCase();
+
+    const matchesCompany = isAll(companyFilter) ||
+      same((employee.company as any)?.sigla, companyFilter) ||
+      same((employee.company as any)?.id, companyFilter);
+
+    const matchesPosition = isAll(positionFilter) ||
+      same((employee.position as any)?.name, positionFilter);
+
+    const matchesWorkPost = isAll(workPostFilter) ||
+      same((employee.workPost as any)?.name, workPostFilter);
+
+    const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
+    const matchesHireDateFrom = !hireDateFrom || (hireDate && hireDate >= new Date(hireDateFrom));
+    const matchesHireDateTo = !hireDateTo || (hireDate && hireDate <= new Date(hireDateTo + 'T23:59:59'));
+
+    const termDate = employee.terminationDate ? new Date(employee.terminationDate) : null;
+    const matchesTerminationDateFrom = !terminationDateFrom || (termDate && termDate >= new Date(terminationDateFrom));
+    const matchesTerminationDateTo = !terminationDateTo || (termDate && termDate <= new Date(terminationDateTo + 'T23:59:59'));
 
     const matchesSearch = !normalizedSearch || (() => {
       const nameMatch = (employee.name || '').toLowerCase().includes(normalizedSearch);
@@ -322,14 +425,67 @@ const Funcionarios: React.FC = () => {
       return nameMatch || emailMatch || registrationMatch || cpfMatch;
     })();
 
-    return matchesDepartment && matchesStatus && matchesSearch;
+    return matchesDepartment && matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesWorkPost
+      && matchesHireDateFrom && matchesHireDateTo && matchesTerminationDateFrom && matchesTerminationDateTo;
   });
+
+  type SortKey = 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status';
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (key: SortKey) => {
+    setSortKey(prev => {
+      if (prev === key) {
+        setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+        return prev;
+      }
+      setSortDir('asc');
+      return key;
+    });
+  };
+
+  const sortedEmployees = React.useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    const getString = (e: Employee, k: SortKey) => {
+      switch (k) {
+        case 'name': return e.name || '';
+        case 'position': return e.position?.name || '';
+        case 'company': return (e.company as any)?.sigla || (e.company as any)?.name || '';
+        case 'workPost': return (e.workPost as any)?.name || '';
+        case 'status': return e.status || '';
+        default: return '';
+      }
+    };
+    const getDate = (e: Employee, k: SortKey) => {
+      const v = k === 'hireDate' ? e.hireDate : e.terminationDate;
+      return v ? new Date(v).getTime() : null;
+    };
+
+    return [...filteredEmployees].sort((a, b) => {
+      if (sortKey === 'hireDate' || sortKey === 'terminationDate') {
+        const da = getDate(a, sortKey);
+        const db = getDate(b, sortKey);
+        if (da == null && db == null) return 0;
+        if (da == null) return 1; // vazios no final
+        if (db == null) return -1;
+        return (da - db) * dir;
+      }
+      return getString(a, sortKey).localeCompare(getString(b, sortKey), 'pt-BR', { sensitivity: 'base' }) * dir;
+    });
+  }, [filteredEmployees, sortKey, sortDir]);
 
   // Limpar filtros
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
+    setCompanyFilter('all');
     setDepartmentFilter('all');
+    setPositionFilter('all');
+    setWorkPostFilter('all');
+    setHireDateFrom('');
+    setHireDateTo('');
+    setTerminationDateFrom('');
+    setTerminationDateTo('');
     loadEmployees();
   };
 
@@ -525,14 +681,38 @@ Para excluir este funcionário:
       return;
     }
 
+    // 2. Verificar pendências (dependentes/documentos/documentos gerados)
+    toast({
+      title: "🔍 Verificando pendências...",
+      description: "Vamos conferir se existem dados vinculados aos funcionários selecionados.",
+    });
+
+    const depsByEmployee = await Promise.all(selectedIds.map(async (id) => {
+      const deps = await employeeService.checkDeletionDependencies(id);
+      return { id, deps };
+    }));
+
+    const withDeps = depsByEmployee.filter(x => x.deps.hasDependencies);
+    const totalDependents = withDeps.reduce((acc, x) => acc + x.deps.dependentsCount, 0);
+    const totalDocuments = withDeps.reduce((acc, x) => acc + x.deps.documentsCount, 0);
+    const totalGenerated = withDeps.reduce((acc, x) => acc + x.deps.generatedDocsCount, 0);
+
     setConfirmConfig({
       open: true,
       title: '🗑️ Confirmar Exclusão em Massa',
-      description: `Tem certeza que deseja excluir permanentemente os ${selectedIds.length} funcionários selecionados? Esta ação é irreversível e removerá todos os dados do sistema.`,
+      description: withDeps.length > 0
+        ? `Existem pendências vinculadas aos funcionários selecionados.\n\nPendências encontradas:\n- Dependentes: ${totalDependents}\n- Documentos anexados: ${totalDocuments}\n- Documentos gerados: ${totalGenerated}\n\nAo confirmar, o sistema irá excluir TODAS as pendências e em seguida excluir definitivamente os ${selectedIds.length} funcionários.\n\n⚠️ Exclusão definitiva: todos serão removidos, perderá o histórico do funcionário e NÃO será possível restaurar.`
+        : `Tem certeza que deseja excluir permanentemente os ${selectedIds.length} funcionários selecionados? Esta ação é irreversível e removerá todos os dados do sistema.\n\n⚠️ Exclusão definitiva: perderá o histórico do funcionário e NÃO será possível restaurar.`,
       variant: 'destructive',
       onConfirm: async () => {
         try {
           setBulkActionLoading(true);
+          if (withDeps.length > 0) {
+            // Excluir pendências de todos os selecionados antes do bulk-delete
+            for (const { id } of withDeps) {
+              await employeeService.deleteDeletionDependencies(id);
+            }
+          }
           await employeeService.bulkDeleteEmployees(selectedIds);
 
           toast({
@@ -546,7 +726,7 @@ Para excluir este funcionário:
           console.error('Erro ao excluir em massa:', err);
           toast({
             title: "❌ Erro ao excluir",
-            description: err.message || "Não foi possível excluir os funcionários.",
+            description: err.message || "Não foi possível excluir os funcionários. Pode haver pendências adicionais vinculadas (ex.: folha, ponto, histórico, etc.).",
             variant: "destructive"
           });
         } finally {
@@ -581,11 +761,6 @@ Para excluir este funcionário:
       default: return 'Desconhecido';
     }
   };
-
-  // Obter departamentos únicos
-  const departments = Array.from(new Set(
-    employees.map(emp => emp.unit?.id || emp.position?.id).filter(Boolean)
-  ));
 
   const handleViewDocuments = (employee: Employee) => {
     setSelectedEmployee(employee);
@@ -973,7 +1148,7 @@ Para excluir este funcionário:
               </div>
 
               {/* Search Filters */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <div className="relative sm:col-span-2 lg:col-span-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                   <Input
@@ -1005,11 +1180,9 @@ Para excluir este funcionário:
                   className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
                 >
                   <option value="all">🏢 Todas as Empresas</option>
-                  {/* Idealmente buscaríamos do backend, mas aqui podemos extrair das empresas presentes nos funcionários carregados */}
-                  {Array.from(new Set(employees.map(e => e.company?.id).filter(Boolean))).map(companyId => {
-                    const companyName = employees.find(e => e.company?.id === companyId)?.company?.sigla || companyId;
-                    return <option key={companyId} value={companyId}>{companyName}</option>;
-                  })}
+                  {filterCompanies.map(c => (
+                    <option key={c.id} value={c.sigla || c.id}>{c.sigla || c.name || c.id}</option>
+                  ))}
                 </select>
 
                 <select
@@ -1017,18 +1190,81 @@ Para excluir este funcionário:
                   onChange={(e) => setDepartmentFilter(e.target.value)}
                   className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
                 >
-                  <option value="all">🏢 Todos os departamentos</option>
-                  {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                  <option value="all">📂 Todos os departamentos</option>
+                  {filterDepartments.map(d => (
+                    <option key={d.id} value={d.name || d.id}>{d.name}</option>
                   ))}
                 </select>
+
+                <select
+                  value={positionFilter}
+                  onChange={(e) => setPositionFilter(e.target.value)}
+                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
+                >
+                  <option value="all">💼 Todos os cargos</option>
+                  {filterPositions.map(p => (
+                    <option key={p.id} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={workPostFilter}
+                  onChange={(e) => setWorkPostFilter(e.target.value)}
+                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
+                >
+                  <option value="all">📍 Todos os postos</option>
+                  {filterWorkPosts.map(wp => (
+                    <option key={wp.id} value={wp.name}>{wp.name}</option>
+                  ))}
+                </select>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="hire-date-from" className="text-xs text-gray-400">Admissão (de)</label>
+                  <Input
+                    id="hire-date-from"
+                    type="date"
+                    value={hireDateFrom}
+                    onChange={(e) => setHireDateFrom(e.target.value)}
+                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="hire-date-to" className="text-xs text-gray-400">Admissão (até)</label>
+                  <Input
+                    id="hire-date-to"
+                    type="date"
+                    value={hireDateTo}
+                    onChange={(e) => setHireDateTo(e.target.value)}
+                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="termination-date-from" className="text-xs text-gray-400">Demissão (de)</label>
+                  <Input
+                    id="termination-date-from"
+                    type="date"
+                    value={terminationDateFrom}
+                    onChange={(e) => setTerminationDateFrom(e.target.value)}
+                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="termination-date-to" className="text-xs text-gray-400">Demissão (até)</label>
+                  <Input
+                    id="termination-date-to"
+                    type="date"
+                    value={terminationDateTo}
+                    onChange={(e) => setTerminationDateTo(e.target.value)}
+                    className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
+                  />
+                </div>
               </div>
             </Card>
 
             {/* Lista de Funcionários Moderna */}
             <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               <FuncionariosTable
-                employees={filteredEmployees}
+                employees={sortedEmployees}
                 selectedIds={selectedIds}
                 onSelect={handleSelectEmployee}
                 onSelectAll={handleSelectAllEmployees}
@@ -1038,15 +1274,15 @@ Para excluir este funcionário:
                 onViewDocuments={handleViewDocuments}
                 onViewDependents={(employee) => {
                   setSelectedEmployee(employee);
-                  const tabsList = document.querySelector('[role="tablist"]');
-                  const dependentesTab = tabsList?.querySelector('[value="dependentes"]');
-                  if (dependentesTab) {
-                    (dependentesTab as HTMLElement).click();
-                  }
+                  setActiveTab('dependentes');
+                  navigate('/rh/funcionarios?tab=dependentes', { replace: true });
                 }}
                 onViewDetails={handleViewDetails}
                 isLoading={loading}
                 isMobileSelectionMode={isMobileSelectionMode}
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
               />
 
               {/* Paginação */}
@@ -1104,8 +1340,41 @@ Para excluir este funcionário:
 
               {/* Barra de Ações em Massa */}
               {selectedIds.length > 0 && (
-                <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                  <Card className="bg-seguranca-black border-seguranca-red shadow-2xl shadow-seguranca-red/20 px-6 py-4 flex items-center gap-6">
+                <div
+                  className="fixed z-50 animate-in fade-in zoom-in-95 duration-200"
+                  style={{
+                    left: bulkBarPos?.x ?? window.innerWidth / 2,
+                    top: bulkBarPos?.y ?? window.innerHeight / 2,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  <Card
+                    className={`bg-seguranca-black border-seguranca-red shadow-2xl shadow-seguranca-red/20 px-6 py-4 flex items-center gap-6 select-none ${bulkBarDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    style={{ touchAction: 'none' }}
+                    onPointerDown={(e) => {
+                      const target = e.target as HTMLElement | null;
+                      // Se clicou em um botão/link/checkbox dentro da barra, não iniciar drag
+                      if (target?.closest('button,[role="button"],a,input,select,textarea,label')) return;
+                      e.preventDefault();
+                      const x = bulkBarPos?.x ?? window.innerWidth / 2;
+                      const y = bulkBarPos?.y ?? window.innerHeight / 2;
+                      setBulkBarDragOffset({ dx: e.clientX - x, dy: e.clientY - y });
+                      setBulkBarDragging(true);
+                      try {
+                        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    onPointerUp={(e) => {
+                      try {
+                        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                      } catch {
+                        // ignore
+                      }
+                      setBulkBarDragging(false);
+                    }}
+                  >
                     <div className="flex items-center gap-2 border-r border-gray-700 pr-6">
                       <div className="bg-seguranca-red/20 text-seguranca-red h-8 w-8 rounded-full flex items-center justify-center font-bold">
                         {selectedIds.length}
@@ -1437,6 +1706,9 @@ Para excluir este funcionário:
         open={relatoriosModalOpen}
         onOpenChange={setRelatoriosModalOpen}
         employees={employees}
+        filterCompanies={filterCompanies}
+        filterWorkPosts={filterWorkPosts}
+        filterPositions={filterPositions}
       />
     </StandardLayout>
   );

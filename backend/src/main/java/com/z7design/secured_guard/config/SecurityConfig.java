@@ -279,6 +279,7 @@ public class SecurityConfig {
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ASSISTENTE_ADMINISTRATIVO",
+                                                                "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS",
                                                                 "ROLE_SUPRIMENTOS", "ROLE_COMPRAS")
                                                 // Endpoints de cotações de compras - requerem permissões financeiras ou
                                                 // administrativas
@@ -481,14 +482,19 @@ public class SecurityConfig {
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
                                                                 "ROLE_SUPERVISOR")
                                                 // Endpoints de funcionários, unidades, empresas e cargos - requerem
-                                                // permissões de RH ou admin
+                                                // permissões de RH, admin ou financeiro (empresas usadas em Contas a Pagar)
                                                 .requestMatchers("/api/employees/**", "/api/units/**",
                                                                 "/api/companies/**", "/api/positions/**",
                                                                 "/api/doctors/**", "/api/work-posts/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
-                                                                "EMPLOYEES_READ", "EMPLOYEES_WRITE")
+                                                                "EMPLOYEES_READ", "EMPLOYEES_WRITE",
+                                                                "OPERACIONAL", "ROLE_OPERACIONAL",
+                                                                "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR",
+                                                                "COMERCIAL", "ROLE_COMERCIAL",
+                                                                "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
+                                                                "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS")
                                                 // Endpoints de clientes - temporariamente públicos para debug
                                                 .requestMatchers("/api/clients/**").permitAll()
                                                 // Endpoints de documentos - temporariamente públicos para debug

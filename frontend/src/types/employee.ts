@@ -88,7 +88,10 @@ export interface Employee {
   tituloEleitorSecao?: string;
   carteiraIdentidadeOrgaoEmissor?: string;
   carteiraIdentidadeDataEmissao?: string;
+  rgUf?: string; // UF de emissão do RG (planilha: U.F RG)
   certificadoMilitar?: string;
+  racaCor?: string; // Raça/Cor (planilha: Raça/Cor)
+  tipoSalarioContratual?: string; // MENSAL, HORISTA, etc. (planilha: Tipo Sal. Contratual)
 
   // Informações de trabalho
   cbo?: string;
@@ -365,7 +368,10 @@ export interface CreateEmployeeDTO {
   tituloEleitorSecao?: string;
   carteiraIdentidadeOrgaoEmissor?: string;
   carteiraIdentidadeDataEmissao?: string;
+  rgUf?: string; // UF de emissão do RG (planilha: U.F RG)
   certificadoMilitar?: string;
+  racaCor?: string; // Raça/Cor (planilha: Raça/Cor)
+  tipoSalarioContratual?: string; // MENSAL, HORISTA, etc. (planilha: Tipo Sal. Contratual)
 
   // Informações de trabalho
   cbo?: string;
@@ -541,6 +547,8 @@ export interface CreateEmployeeDTO {
 
   // Campo para Posto de Trabalho
   workPostId?: string;
+  /** Data de início no novo setor (obrigatória ao alterar workPost - para remanejamento) */
+  remanejamentoDataInicio?: string;
 
   // Campo para Departamento
   departmentId?: string;

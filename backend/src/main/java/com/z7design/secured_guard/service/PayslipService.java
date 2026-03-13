@@ -1820,11 +1820,20 @@ public class PayslipService {
         return alternativeEmail;
     }
 
+    /** Normaliza CPF para uso em username/cpf na tabela users (apenas dígitos). */
+    private String normalizeCpfForUser(String cpf) {
+        if (cpf == null) return null;
+        String digits = cpf.replaceAll("\\D", "");
+        return digits.length() == 11 ? digits : cpf.trim();
+    }
+
     /**
-     * Criar usuário automaticamente a partir dos dados do holerite
+     * Criar usuário automaticamente a partir dos dados do holerite.
+     * Só insere em users se CPF e username forem diferentes dos já existentes na tabela users.
      */
     private void createUserFromPayslip(Payslip payslip) {
-        String username = payslip.getCpf();
+        String cpfNormalized = normalizeCpfForUser(payslip.getCpf());
+        String username = cpfNormalized != null && !cpfNormalized.isEmpty() ? cpfNormalized : payslip.getCpf();
         String email = generateUniqueEmail(payslip.getCpf(), payslip.getEmployeeName());
         String password = "Promover@2026"; // Senha padrão - usuário deve trocar no primeiro acesso
         String name = payslip.getEmployeeName();
@@ -1832,19 +1841,21 @@ public class PayslipService {
         log.info("🔐 INÍCIO - Verificando se usuário existe para funcionário: {} (CPF: {})", name, username);
 
         try {
-            // VERIFICAÇÃO DO AMBIENTE
-            log.info("🔧 VERIFICAÇÃO DE AMBIENTE:");
-            log.info("   UserRepository: {}", userRepository.getClass().getSimpleName());
-            log.info("   RoleRepository: {}", roleRepository.getClass().getSimpleName());
-
-            // Verificar se já existe usuário com este CPF (username)
-            Optional<com.z7design.secured_guard.model.User> existingUser = userRepository.findByUsername(username);
-            if (existingUser.isPresent()) {
-                log.info("👤 Usuário já existe para CPF: {} - PULANDO criação", username);
+            // Só inserir se CPF e username forem diferentes dos existentes na tabela users
+            Optional<com.z7design.secured_guard.model.User> existingByUsername = userRepository.findByUsername(username);
+            if (existingByUsername.isPresent()) {
+                log.info("👤 Usuário já existe com username: {} - PULANDO criação", username);
                 return;
             }
+            if (cpfNormalized != null && !cpfNormalized.isEmpty()) {
+                Optional<com.z7design.secured_guard.model.User> existingByCpf = userRepository.findByCpf(cpfNormalized);
+                if (existingByCpf.isPresent()) {
+                    log.info("👤 Usuário já existe com CPF: {} - PULANDO criação", cpfNormalized);
+                    return;
+                }
+            }
 
-            log.info("🆕 Usuário não existe - PROSSEGUINDO com criação para CPF: {}", username);
+            log.info("🆕 Nenhum usuário com este CPF/username - PROSSEGUINDO com criação para CPF: {}", username);
 
             // Buscar role COLABORADOR
             log.info("🔍 Buscando role COLABORADOR no banco de dados...");
@@ -1869,6 +1880,9 @@ public class PayslipService {
 
             com.z7design.secured_guard.model.User novoUser = new com.z7design.secured_guard.model.User();
             novoUser.setUsername(username);
+            if (cpfNormalized != null && !cpfNormalized.isEmpty()) {
+                novoUser.setCpf(cpfNormalized);
+            }
             novoUser.setPassword(password);
             novoUser.setEmail(email);
             novoUser.setName(name);
@@ -2231,33 +2245,14 @@ public class PayslipService {
         }
     }
 
+    /**
+     * O processamento de holerites NÃO deve inserir nem atualizar registros na tabela de funcionários (employees).
+     * Apenas a tabela users pode ser populada, e somente quando CPF e username forem diferentes dos existentes.
+     * Este método foi esvaziado para atender a essa regra.
+     */
     private void salvarFuncionario(Payslip payslip, String caminhoPdf) {
-        try {
-            // Verificar se já existe funcionário com este CPF/documento
-            Optional<Employee> employeeExistente = employeeRepository.findByDocument(payslip.getCpf());
-            if (employeeExistente.isPresent()) {
-                // Atualizar funcionário existente
-                Employee employee = employeeExistente.get();
-                // employee.setCaminhoPdf(caminhoPdf); // Campo comentado temporariamente
-                // employee.setMesReferencia(String.valueOf(payslip.getMonth())); // Campo
-                // comentado temporariamente
-                // employee.setAnoReferencia(String.valueOf(payslip.getYear())); // Campo
-                // comentado temporariamente
-                employee.setUpdatedAt(LocalDateTime.now());
-                employeeRepository.save(employee);
-                log.info("🔄 Funcionário atualizado: {} - CPF: {}", employee.getName(), employee.getDocument());
-            } else {
-                // Para funcionários criados via processamento de holerites,
-                // vamos apenas registrar na tabela de dados extraídos
-                // e não criar um Employee completo pois faltam dados obrigatórios
-                log.info("📋 Funcionário não existe na base. Dados salvos apenas na tabela de dados extraídos.");
-                log.info("   Para criar funcionário completo, use o formulário de cadastro de funcionários.");
-                log.info("   Nome extraído: {} - CPF: {}", payslip.getEmployeeName(), payslip.getCpf());
-            }
-        } catch (Exception e) {
-            log.error("❌ Erro ao processar funcionário: {}", e.getMessage());
-            // Não interromper o processamento por erro na tabela de funcionários
-        }
+        // Intencionalmente vazio: não inserir nem atualizar employees no processamento de holerites
+        log.debug("Processamento de holerite: tabela de funcionários não é alterada (apenas users quando aplicável).");
     }
 
     /**

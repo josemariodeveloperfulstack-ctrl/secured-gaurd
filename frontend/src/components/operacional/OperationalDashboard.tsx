@@ -33,6 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { operationalService, VacationCoverage, Absence, WorkPostAssignment, SpecificActivity, CreateAbsenceDTO, CreateWorkPostAssignmentDTO, CreateSpecificActivityDTO, CreateVacationCoverageDTO } from '@/services/operationalService';
 import { remanejamentoService, Remanejamento, CreateRemanejamentoDTO } from '@/services/remanejamentoService';
+import api from '@/lib/axios';
 import operationalReportGenerator from '@/utils/operationalReportGenerator';
 import OperationalStatsCards from './OperationalStatsCards';
 import AbsenceFormModal from './AbsenceFormModal';
@@ -43,6 +44,7 @@ import VacationCoverageFormModal from './VacationCoverageFormModal';
 import VacationCoverageStatusModal from './VacationCoverageStatusModal';
 import ChangeStatusModal from './ChangeStatusModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { OperationalEmployeesTab } from './OperationalEmployeesTab';
 
 const OperationalDashboard: React.FC = () => {
   const [vacationCoverages, setVacationCoverages] = useState<VacationCoverage[]>([]);
@@ -117,9 +119,10 @@ const OperationalDashboard: React.FC = () => {
 
   const loadEmployees = async (): Promise<Array<{ id: string; name: string }>> => {
     try {
-      const response = await fetch('/api/employees/basic');
-      const data = await response.json();
-      return data.employees || [];
+      const response = await api.get('/employees/basic');
+      const data = response.data;
+      const employees = data?.employees ?? data?.content ?? (Array.isArray(data) ? data : []);
+      return Array.isArray(employees) ? employees.map((e: any) => ({ id: String(e.id), name: e.name || '' })) : [];
     } catch (error) {
       console.error('Erro ao carregar funcionários:', error);
       return [];
@@ -810,7 +813,7 @@ const OperationalDashboard: React.FC = () => {
               w-full
               flex md:grid
               overflow-x-auto md:overflow-x-visible
-              md:grid-cols-5
+              md:grid-cols-6
               glass-card border-0
               p-2
               gap-2
@@ -895,6 +898,22 @@ const OperationalDashboard: React.FC = () => {
                 <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
                   <p className="font-semibold">Remanejamentos</p>
                   <p className="text-xs text-gray-400">Transferências e mudanças de função</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger
+                    value="funcionarios"
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Users className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Funcionários</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Lista de Funcionários</p>
+                  <p className="text-xs text-gray-400">Posto atual, histórico e relatórios</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -1346,6 +1365,11 @@ const OperationalDashboard: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Aba de Funcionários */}
+        <TabsContent value="funcionarios" className="space-y-4">
+          <OperationalEmployeesTab />
         </TabsContent>
       </Tabs>
 

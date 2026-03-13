@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useDeferredValue, useRef } from 'react';
+import React, { useState, useMemo, useDeferredValue, useRef, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -46,17 +46,24 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { generateEmployeeReportPDF } from '@/utils/employeeReportExport';
 
 interface RelatoriosModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     employees: Employee[];
+    filterCompanies?: Array<{ id: string; name?: string; sigla?: string }>;
+    filterWorkPosts?: Array<{ id: string; name: string }>;
+    filterPositions?: Array<{ id: string; name: string }>;
 }
 
 export function RelatoriosModal({
     open,
     onOpenChange,
-    employees
+    employees,
+    filterCompanies,
+    filterWorkPosts,
+    filterPositions
 }: RelatoriosModalProps) {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [asoFilter, setAsoFilter] = useState<string>('all');
@@ -79,9 +86,34 @@ export function RelatoriosModal({
     const [isProcessing, setIsProcessing] = useState(false);
     const cancelRef = useRef(false);
 
+    const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+    const [isLoadingAll, setIsLoadingAll] = useState(false);
+
+    // Fetch all employees when modal opens
+    useEffect(() => {
+        if (open) {
+            const fetchAll = async () => {
+                setIsLoadingAll(true);
+                try {
+                    // Fetch up to 10000 employees for the report
+                    const data = await employeeService.getAllEmployees({}, 0, 10000);
+                    setAllEmployees(data);
+                } catch (e) {
+                    console.error('Erro ao buscar todos os funcionários para relatório:', e);
+                } finally {
+                    setIsLoadingAll(false);
+                }
+            };
+            fetchAll();
+        } else {
+            // Clear when closed to save memory
+            setAllEmployees([]);
+        }
+    }, [open]);
+
     // Optimized: Pre-process employees to have numeric timestamps for lightning-fast filtering
     const processedEmployees = useMemo(() => {
-        return employees.map(emp => {
+        return allEmployees.map(emp => {
             // Pre-calculate timestamps to avoid new Date() in the filtering loop
             const hireTime = emp.hireDate ? new Date(emp.hireDate).setHours(0, 0, 0, 0) : undefined;
             const termTime = (emp.dataRescisao || emp.terminationDate)
@@ -102,19 +134,32 @@ export function RelatoriosModal({
                 _feriasVencTime: feriasVencTime
             };
         });
-    }, [employees]);
+    }, [allEmployees]);
 
-    // Extract unique filter options from the employees list - optimized
+    // Extract unique filter options from the employees list or use provided full lists
     const { companies, workPosts, positions } = useMemo(() => {
-        const comps = new Set<string>();
-        const posts = new Set<string>();
-        const pos = new Set<string>();
+        let finalCompanies: string[] = [];
+        let finalWorkPosts: string[] = [];
+        let finalPositions: string[] = [];
 
-        employees.forEach(emp => {
+        if (filterCompanies && filterWorkPosts && filterPositions) {
+            finalCompanies = filterCompanies.map(c => c.sigla || c.name || '').filter(Boolean).sort();
+            finalWorkPosts = filterWorkPosts.map(wp => wp.name).filter(Boolean).sort();
+            finalPositions = filterPositions.map(p => p.name).filter(Boolean).sort();
+        }
+
+        const comps = new Set<string>(finalCompanies);
+        const posts = new Set<string>(finalWorkPosts);
+        const pos = new Set<string>(finalPositions);
+
+        allEmployees.forEach(emp => {
             const cName = emp.company?.sigla || emp.company?.name;
             if (cName) comps.add(cName);
 
-            const wpName = typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name;
+            let wpName = typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name;
+            if (!wpName && emp.department?.name) {
+                wpName = emp.department.name;
+            }
             if (wpName) posts.add(wpName);
 
             const posName = typeof emp.position === 'string' ? emp.position : emp.position?.name;
@@ -126,7 +171,7 @@ export function RelatoriosModal({
             workPosts: Array.from(posts).sort(),
             positions: Array.from(pos).sort(),
         };
-    }, [employees]);
+    }, [allEmployees, filterCompanies, filterWorkPosts, filterPositions]);
 
     // Use deferred value for filtering to keep UI responsive
     // Unified deferred value for all filters - much more efficient than multiple hooks
@@ -180,7 +225,10 @@ export function RelatoriosModal({
 
             // WorkPost Filter
             if (deferredFilters.workPost !== 'all') {
-                const wpName = typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name;
+                let wpName = typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name;
+                if (!wpName && emp.department?.name) {
+                    wpName = emp.department.name;
+                }
                 if (wpName !== deferredFilters.workPost) return false;
             }
 
@@ -259,7 +307,8 @@ export function RelatoriosModal({
                 throw new Error('Processo cancelado pelo usuário');
             }
 
-            setProgress(Math.round(((i + chunk.length) / total) * 100));
+            // Progress from 30% to 100%
+            setProgress(30 + Math.round(((i + chunk.length) / total) * 70));
             // Let the UI breathe and show the progress modal
             await new Promise(resolve => setTimeout(resolve, 5));
         }
@@ -276,7 +325,33 @@ export function RelatoriosModal({
         try {
             await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to allow UI to update
 
-            const dataToExport = await processDataInChunks(filteredEmployees, (emp) => {
+            // Obter os IDs dos funcionários filtrados
+            const employeeIds = filteredEmployees.map(e => e.id);
+            
+            if (employeeIds.length === 0) {
+                window.alert('Nenhum funcionário encontrado com os filtros atuais.');
+                return;
+            }
+
+            // Buscar os dados completos do backend em chunks para evitar sobrecarga
+            const fullEmployeesData: any[] = [];
+            const chunkSize = 500;
+            for (let i = 0; i < employeeIds.length; i += chunkSize) {
+                if (cancelRef.current) throw new Error('Processo cancelado pelo usuário');
+                const chunkIds = employeeIds.slice(i, i + chunkSize);
+                const chunkData = await employeeService.getFullDataForExport(chunkIds);
+                if (chunkData && chunkData.length > 0) {
+                    fullEmployeesData.push(...chunkData);
+                }
+                setProgress(Math.round(((i + chunkIds.length) / employeeIds.length) * 30)); // First 30% is fetching data
+            }
+
+            if (fullEmployeesData.length === 0) {
+                window.alert('Não foi possível carregar os dados dos funcionários.');
+                return;
+            }
+
+            const dataToExport = await processDataInChunks(fullEmployeesData, (emp) => {
                 let age = '';
                 if (emp.birthDate) {
                     const birthDate = new Date(emp.birthDate);
@@ -284,9 +359,10 @@ export function RelatoriosModal({
                     age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)).toString();
                 }
 
-                const hireDateStr = emp.hireDate ? new Date(emp.hireDate).toLocaleDateString() : '';
-                const asoDateStr = emp.exameMedicoVencimento ? new Date(emp.exameMedicoVencimento).toLocaleDateString() : '';
-                const termDateStr = (emp.dataRescisao || emp.terminationDate) ? new Date(emp.dataRescisao || emp.terminationDate!).toLocaleDateString() : '';
+                const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString() : '';
+                const hireDateStr = formatDate(emp.hireDate);
+                const asoDateStr = formatDate(emp.exameMedicoVencimento);
+                const termDateStr = formatDate(emp.dataRescisao || emp.terminationDate);
 
                 const getAddress = (addr: any) => {
                     if (!addr) return '';
@@ -294,27 +370,82 @@ export function RelatoriosModal({
                     return `${addr.street || ''}, ${addr.number || ''} ${addr.complement ? `- ${addr.complement}` : ''} - ${addr.neighborhood || ''}, ${addr.city || ''}/${addr.state || ''} CEP: ${addr.zipCode || ''}`;
                 };
 
+                let dependentes = '';
+                if (emp.dependents && emp.dependents.length > 0) {
+                    dependentes = emp.dependents.map((d: any) => `${d.name} (${d.relationship}) - Nasc: ${formatDate(d.birthDate)}${d.cpf ? ` CPF: ${d.cpf}` : ''}`).join(' | ');
+                }
+
                 return {
+                    'Matrícula': emp.matricula || emp.registrationNumber || '',
+                    'Matrícula eSocial': emp.matriculaEsocial || '',
                     'Status': getStatusLabel(emp.status),
-                    'Matrícula': emp.matricula || '',
-                    'Nome': emp.name,
-                    'Empresa': emp.company?.sigla || emp.company?.name || '',
-                    'Posto de Trabalho': typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name || '',
+                    'Nome Completo': emp.name,
+                    'Empresa': emp.company?.sigla || emp.company?.name || emp.empresaNome || '',
+                    'CNPJ Empresa': emp.company?.cnpj || emp.empresaCnpj || '',
+                    'Posto de Trabalho': typeof emp.workPost === 'string' ? emp.workPost : (emp.workPost?.name || emp.department?.name || ''),
                     'Cargo': typeof emp.position === 'string' ? emp.position : emp.position?.name || '',
-                    'Sexo': emp.sexo || emp.gender || '',
-                    'CPF': emp.cpf || '',
-                    'RG': emp.rg || '',
-                    'Nascimento': emp.birthDate ? new Date(emp.birthDate).toLocaleDateString() : '',
-                    'Idade': age,
+                    'CBO': emp.cbo || '',
                     'Admissão': hireDateStr,
-                    'Demissão': termDateStr,
+                    'Data Rescisão': termDateStr,
                     'Motivo Demissão': emp.terminationReason || '',
-                    'Próximo ASO': asoDateStr,
-                    'Telefone': emp.phone || '',
+                    'CPF': emp.cpf || (emp as any).document || '',
+                    'RG': emp.rg || '',
+                    'Data Nascimento': formatDate(emp.birthDate),
+                    'Gênero/Sexo': emp.sexo || emp.gender || '',
+                    'Estado Civil': emp.maritalStatus || '',
+                    'Grau de Instrução': emp.grauInstrucao || '',
+                    'Nacionalidade': emp.nationality || '',
+                    'Naturalidade': emp.naturalidade || '',
+                    'Nome da Mãe': emp.motherName || emp.nomeMae || '',
+                    'Nome do Pai': emp.fatherName || emp.nomePai || '',
+                    'Telefone': emp.phone || emp.telefoneContato || '',
                     'Email': emp.email || '',
+                    'CEP': emp.address?.zipCode || '',
                     'Endereço': getAddress(emp.address),
-                    'Pai': emp.fatherName || '',
-                    'Mãe': emp.motherName || '',
+                    'Número': emp.address?.number || '',
+                    'Complemento': emp.address?.complement || '',
+                    'Bairro': emp.address?.neighborhood || '',
+                    'Cidade': emp.address?.city || '',
+                    'Estado': emp.address?.state || '',
+                    'CTPS': emp.ctps || '',
+                    'Série CTPS': emp.ctpsSerie || emp.ctpsSeries || '',
+                    'UF CTPS': emp.ctpsUf || '',
+                    'Data Emissão CTPS': formatDate(emp.ctpsIssueDate),
+                    'Órgão Emissor CTPS': emp.ctpsIssuingAgency || '',
+                    'PIS/PASEP': emp.pis || '',
+                    'Data Cadastro PIS': formatDate(emp.pisDataCadastro),
+                    'Título de Eleitor': emp.tituloEleitor || '',
+                    'Zona Eleitoral': emp.tituloEleitorZona || '',
+                    'Seção Eleitoral': emp.tituloEleitorSecao || '',
+                    'Certificado Militar': emp.certificadoMilitar || '',
+                    'CNH': emp.cnh || emp.cnhNumber || '',
+                    'Categoria CNH': emp.cnhCategory || '',
+                    'Validade CNH': formatDate(emp.cnhExpirationDate),
+                    'Salário': emp.salario ? `R$ ${emp.salario}` : '',
+                    'Período de Pagamento': emp.periodoPagamento || '',
+                    'Horário de Trabalho': emp.horarioTrabalho || '',
+                    'Intervalo Trabalho': emp.horarioTrabalhoIntervalo || '',
+                    'Escala de Trabalho': emp.escalaTrabalho || emp.currentScale || '',
+                    'Dias de Trabalho': emp.diasTrabalho || '',
+                    'Folga Semanal': emp.folgaSemanal || '',
+                    'Banco': emp.bankData?.bank || emp.bankInfo?.bank || '',
+                    'Agência': emp.bankData?.agency || emp.bankInfo?.agency || '',
+                    'Conta': emp.bankData?.account || emp.bankInfo?.account || '',
+                    'Tipo Conta': emp.bankData?.type || emp.bankInfo?.accountType || '',
+                    'Chave PIX': emp.bankData?.chavePix || emp.bankInfo?.pixKey || '',
+                    'Optante FGTS': emp.fgtsOptante ? 'Sim' : 'Não',
+                    'Data Opção FGTS': formatDate(emp.fgtsDataOpcao),
+                    'Banco Depositário FGTS': emp.fgtsBancoDepositario || '',
+                    'Data Referência Exame': formatDate(emp.exameMedicoData),
+                    'Tipo do ASO': emp.exameMedicoTipo || '',
+                    'Próximo ASO': asoDateStr,
+                    'Vencimento Próx. Férias': formatDate(emp.proximasFeriasVencimento),
+                    'Dependentes': dependentes,
+                    'Cônjuge': emp.spouseName || '',
+                    'Cônjuge CPF': emp.spouseCpf || '',
+                    'Filhos Brasileiros?': emp.temFilhosBrasileiros ? 'Sim' : 'Não',
+                    'Qtd Filhos Brasileiros': emp.quantidadeFilhosBrasileiros || '',
+                    'Idade': age,
                 };
             }, 100);
 
@@ -338,165 +469,62 @@ export function RelatoriosModal({
 
     const handleExportPDF = async () => {
         const selectedCompanyObj = companyFilter !== 'all'
-            ? employees.find(emp => (emp.company?.sigla || emp.company?.name || String(emp.company?.id)) === companyFilter)?.company
+            ? allEmployees.find(emp => (emp.company?.sigla || emp.company?.name || String(emp.company?.id)) === companyFilter)?.company
             : undefined;
-        const companyId = selectedCompanyObj?.id ?? filteredEmployees.find(e => e.company?.id)?.company?.id ?? undefined;
 
         setIsProcessing(true);
         setProgress(0);
         setIsGenerating(true);
         cancelRef.current = false;
-        const progressInterval = setInterval(() => {
-            if (cancelRef.current) { clearInterval(progressInterval); return; }
-            setProgress(prev => (prev >= 95 ? prev : prev + Math.floor(Math.random() * 5) + 1));
-        }, 300);
-
+        
         try {
+            // Obter os IDs dos funcionários filtrados
             const employeeIds = filteredEmployees.map(e => e.id);
-            const blob = await employeeService.exportEmployeesReportPdf(companyId ?? null, employeeIds);
-            if (cancelRef.current) return;
-            clearInterval(progressInterval);
-            setProgress(100);
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `Relatorio_Funcionarios_${new Date().toISOString().split('T')[0]}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Erro ao gerar PDF:', error);
-            window.alert(error instanceof Error ? error.message : 'Erro ao gerar relatório PDF.');
-        } finally {
-            clearInterval(progressInterval);
-            setIsGenerating(false);
-            setIsProcessing(false);
-            setProgress(0);
-        }
-    };
-
-    const handleExportCompleteActiveExcel = async () => {
-        setIsGenerating(true);
-        setIsProcessing(true);
-        setProgress(0);
-        cancelRef.current = false;
-
-        try {
-            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay for UI
-
-            // Buscar todos os funcionários ativos DIRETAMENTE do backend ignorando a paginação local
-            const activeEmployees = await employeeService.getEmployeesByStatus('ACTIVE');
-
-            if (!activeEmployees || activeEmployees.length === 0) {
-                window.alert('Nenhum funcionário ativo encontrado no sistema.');
+            
+            if (employeeIds.length === 0) {
+                window.alert('Nenhum funcionário encontrado com os filtros atuais.');
                 return;
             }
 
-            const dataToExport = await processDataInChunks(activeEmployees, (emp) => {
-                const getAddressStr = (addr: any) => {
-                    if (!addr) return '';
-                    if (typeof addr === 'string') return addr;
-                    return `${addr.street || ''}, ${addr.number || ''} ${addr.complement ? `- ${addr.complement}` : ''} - ${addr.neighborhood || ''}, ${addr.city || ''}/${addr.state || ''} CEP: ${addr.zipCode || ''}`;
-                };
+            setProgress(10);
 
-                const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString() : '';
-
-                let dependentes = '';
-                if (emp.dependents && emp.dependents.length > 0) {
-                    dependentes = emp.dependents.map(d => `${d.name} (${d.relationship}) - Nasc: ${formatDate(d.birthDate)}${d.cpf ? ` CPF: ${d.cpf}` : ''}`).join(' | ');
+            // Buscar os dados completos do backend em chunks
+            const fullEmployeesData: any[] = [];
+            const chunkSize = 500;
+            for (let i = 0; i < employeeIds.length; i += chunkSize) {
+                if (cancelRef.current) throw new Error('Processo cancelado pelo usuário');
+                const chunkIds = employeeIds.slice(i, i + chunkSize);
+                const chunkData = await employeeService.getFullDataForExport(chunkIds);
+                if (chunkData && chunkData.length > 0) {
+                    fullEmployeesData.push(...chunkData);
                 }
+                setProgress(10 + Math.round(((i + chunkIds.length) / employeeIds.length) * 40)); // Up to 50%
+            }
 
-                // Extrai todos os campos possíveis do cadastro
-                return {
-                    'Matrícula': emp.matricula || emp.registrationNumber || '',
-                    'Matrícula eSocial': emp.matriculaEsocial || '',
-                    'Status': getStatusLabel(emp.status || 'ACTIVE'),
-                    'Nome Completo': emp.name || '',
-                    'Empresa': emp.company?.sigla || emp.company?.name || emp.empresaNome || '',
-                    'CNPJ Empresa': emp.company?.cnpj || emp.empresaCnpj || '',
-                    'Posto de Trabalho': typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name || '',
-                    'Departamento': emp.department?.name || '',
-                    'Cargo': typeof emp.position === 'string' ? emp.position : emp.position?.name || '',
-                    'CBO': emp.cbo || '',
-                    'Admissão': formatDate(emp.hireDate),
-                    'Data Rescisão': formatDate(emp.terminationDate || emp.dataRescisao),
-                    'Motivo Demissão': emp.terminationReason || '',
+            if (fullEmployeesData.length === 0) {
+                window.alert('Não foi possível carregar os dados dos funcionários.');
+                return;
+            }
 
-                    // Informações Pessoais
-                    'CPF': emp.cpf || '',
-                    'RG': emp.rg || '',
-                    'Data Nascimento': formatDate(emp.birthDate),
-                    'Gênero/Sexo': emp.sexo || emp.gender || '',
-                    'Estado Civil': emp.maritalStatus || '',
-                    'Nacionalidade': emp.nationality || '',
-                    'Naturalidade': emp.naturalidade || '',
-                    'Grau de Instrução': emp.grauInstrucao || '',
-                    'Nome da Mãe': emp.motherName || emp.nomeMae || '',
-                    'Nome do Pai': emp.fatherName || emp.nomePai || '',
+            setProgress(60);
 
-                    // Documentos Adicionais
-                    'PIS': emp.pis || '',
-                    'Data Cadastro PIS': formatDate(emp.pisDataCadastro),
-                    'CTPS': emp.ctps || '',
-                    'Série CTPS': emp.ctpsSeries || '',
-                    'CTPS Data Emissão': formatDate(emp.ctpsIssueDate),
-                    'CTPS Órgão Emissor': emp.ctpsIssuingAgency || '',
-                    'Título de Eleitor': emp.tituloEleitor || '',
-                    'Zona Eleitoral': emp.tituloEleitorZona || '',
-                    'Seção Eleitoral': emp.tituloEleitorSecao || '',
-                    'Certificado Militar': emp.certificadoMilitar || '',
-                    'CNH': emp.cnhNumber || '',
-                    'Categoria CNH': emp.cnhCategory || '',
-                    'Validade CNH': formatDate(emp.cnhExpirationDate),
+            // Generate PDF
+            await generateEmployeeReportPDF({
+                reportTitle: 'Relatório de Funcionários',
+                employees: fullEmployeesData,
+                company: selectedCompanyObj,
+                filename: `Relatorio_Funcionarios_${new Date().toISOString().split('T')[0]}.pdf`
+            });
 
-                    // Contato e Endereço
-                    'Email': emp.email || '',
-                    'Telefone/Celular': emp.phone || emp.telefoneContato || '',
-                    'Possui WhatsApp?': emp.possuiWhatsapp ? 'Sim' : 'Não',
-                    'Endereço Completo': getAddressStr(emp.address),
-
-                    // Dados Bancários
-                    'Banco': emp.bankData?.bank || emp.bankInfo?.bank || '',
-                    'Agência': emp.bankData?.agency || emp.bankInfo?.agency || '',
-                    'Conta': emp.bankData?.account || emp.bankInfo?.account || '',
-                    'Tipo Conta': emp.bankData?.type || emp.bankInfo?.accountType || '',
-                    'Chave PIX': emp.bankData?.chavePix || emp.bankInfo?.pixKey || '',
-
-                    // Contrato e Trabalho
-                    'Salário': emp.salario ? `R$ ${emp.salario}` : '',
-                    'Período de Pagamento': emp.periodoPagamento || '',
-                    'Horário Trabalho': emp.horarioTrabalho || '',
-                    'Intervalo Trabalho': emp.horarioTrabalhoIntervalo || '',
-                    'Dias de Trabalho': emp.diasTrabalho || '',
-                    'Folga Semanal': emp.folgaSemanal || '',
-                    'Escala': emp.escalaTrabalho || emp.currentScale || '',
-
-                    // Relacionados a Sáude e Segurança
-                    'Data Referência Exame': formatDate(emp.exameMedicoData),
-                    'Tipo do ASO': emp.exameMedicoTipo || '',
-                    'Vencimento ASO': formatDate(emp.exameMedicoVencimento),
-                    'Vencimento Próx. Férias': formatDate(emp.proximasFeriasVencimento),
-
-                    // Familiares
-                    'Dependentes': dependentes,
-                    'Cônjuge': emp.spouseName || '',
-                    'Cônjuge CPF': emp.spouseCpf || '',
-                    'Filhos Brasileiros?': emp.temFilhosBrasileiros ? 'Sim' : 'Não',
-                    'Qtd Filhos Brasileiros': emp.quantidadeFilhosBrasileiros || '',
-                };
-            }, 100);
-
-            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Cadastro Completo Ativos");
-
-            XLSX.writeFile(workbook, `cadastro-completo-ativos-${new Date().toISOString().split('T')[0]}.xlsx`);
+            setProgress(100);
         } catch (error: any) {
-            console.error('Erro ao gerar Excel Completo:', error);
+            console.error('Erro ao gerar PDF:', error);
+            if (error.message !== 'Processo cancelado pelo usuário') {
+                window.alert(error instanceof Error ? error.message : 'Erro ao gerar relatório PDF.');
+            }
         } finally {
-            setIsProcessing(false);
             setIsGenerating(false);
+            setIsProcessing(false);
             setProgress(0);
         }
     };
@@ -769,7 +797,11 @@ export function RelatoriosModal({
                             {feriasFilter !== 'all' && <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold">FÉRIAS: {feriasFilter === 'vencidas' ? 'Vencidas' : 'A Vencer'}</Badge>}
                             {companyFilter !== 'all' && <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold">EMPRESA: {companyFilter}</Badge>}
                             {workPostFilter !== 'all' && <Badge variant="outline" className="text-white border-white/20">POSTO: {workPostFilter}</Badge>}
-                            {filteredEmployees.length === 0 ? (
+                            {isLoadingAll ? (
+                                <span className="text-seguranca-yellow text-sm font-bold animate-pulse flex items-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Carregando base completa...
+                                </span>
+                            ) : filteredEmployees.length === 0 ? (
                                 <span className="text-seguranca-red text-sm font-bold animate-pulse">Nenhum funcionário encontrado com estes filtros.</span>
                             ) : (
                                 <span className="text-gray-400 text-sm italic">O relatório incluirá {filteredEmployees.length} registros.</span>
@@ -790,7 +822,7 @@ export function RelatoriosModal({
                     <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto order-1 sm:order-2">
                         <Button
                             onClick={handleExportPDF}
-                            disabled={filteredEmployees.length === 0 || isGenerating}
+                            disabled={isLoadingAll || filteredEmployees.length === 0 || isGenerating}
                             className="flex-1 sm:flex-none border-seguranca-red text-seguranca-red hover:bg-seguranca-red hover:text-white transition-all duration-300 font-bold"
                             variant="outline"
                         >
@@ -798,16 +830,8 @@ export function RelatoriosModal({
                             GERAR PDF
                         </Button>
                         <Button
-                            onClick={handleExportCompleteActiveExcel}
-                            disabled={isGenerating}
-                            className="flex-1 sm:flex-none bg-gradient-to-r from-green-600 to-green-700 hover:shadow-green-500/40 hover:scale-[1.02] text-white shadow-lg active:scale-100 transition-all duration-300 font-bold"
-                        >
-                            {isGenerating ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <FileSpreadsheet className="h-5 w-5 mr-2" />}
-                            EXPORTAR CADASTRO COMPLETO (ATIVOS)
-                        </Button>
-                        <Button
                             onClick={handleExportExcel}
-                            disabled={filteredEmployees.length === 0 || isGenerating}
+                            disabled={isLoadingAll || filteredEmployees.length === 0 || isGenerating}
                             className="flex-1 sm:flex-none bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:shadow-seguranca-red/40 hover:scale-[1.02] text-white shadow-lg active:scale-100 transition-all duration-300 font-bold"
                         >
                             {isGenerating ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Download className="h-5 w-5 mr-2" />}

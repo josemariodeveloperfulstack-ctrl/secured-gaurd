@@ -248,13 +248,8 @@ public class DocumentoGeradoController {
     @GetMapping("/funcionario/{funcionarioId}/paginated")
     public ResponseEntity<Page<DocumentoGerado>> listarPorFuncionarioComPaginacao(
             @PathVariable UUID funcionarioId, Pageable pageable) {
-        try {
-            List<DocumentoGerado> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId);
-            // Implementar paginação manual se necessário
-            return ResponseEntity.ok(null); // TODO: Implementar paginação
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        // TODO: implementar paginação real (por enquanto, retorna página vazia)
+        return ResponseEntity.ok(Page.empty());
     }
     
     /**
@@ -263,13 +258,8 @@ public class DocumentoGeradoController {
     @GetMapping("/modelo/{modeloId}/paginated")
     public ResponseEntity<Page<DocumentoGerado>> listarPorModeloComPaginacao(
             @PathVariable UUID modeloId, Pageable pageable) {
-        try {
-            List<DocumentoGerado> documentos = documentoGeradoService.listarPorModelo(modeloId);
-            // Implementar paginação manual se necessário
-            return ResponseEntity.ok(null); // TODO: Implementar paginação
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        // TODO: implementar paginação real (por enquanto, retorna página vazia)
+        return ResponseEntity.ok(Page.empty());
     }
     
     /**
@@ -348,5 +338,25 @@ public class DocumentoGeradoController {
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    /** Exclui um documento gerado por ID (ação irreversível). */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('EMPLOYEES_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    public ResponseEntity<Void> excluirDocumento(@PathVariable UUID id) {
+        try {
+            documentoGeradoService.excluirPorId(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /** Exclui TODOS os documentos gerados de um funcionário (ação irreversível). */
+    @DeleteMapping("/funcionario/{funcionarioId}")
+    @PreAuthorize("hasAuthority('EMPLOYEES_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> excluirPorFuncionario(@PathVariable UUID funcionarioId) {
+        int deleted = documentoGeradoService.excluirPorFuncionario(funcionarioId);
+        return ResponseEntity.ok(Map.of("deleted", deleted));
     }
 }

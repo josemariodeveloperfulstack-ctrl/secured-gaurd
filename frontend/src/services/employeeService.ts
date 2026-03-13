@@ -154,6 +154,19 @@ export const employeeService = {
   },
 
   /**
+   * Exportar dados completos de funcionários por IDs
+   */
+  async getFullDataForExport(ids: string[]): Promise<any[]> {
+    try {
+      const response = await api.post('/api/employees/export-full', { ids });
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar dados completos para exportação:', error);
+      return [];
+    }
+  },
+
+  /**
    * Buscar funcionários por nome
    */
   async searchEmployeesByName(name: string): Promise<Employee[]> {
@@ -511,6 +524,57 @@ export const employeeService = {
         messages: []
       };
     }
+  }
+  ,
+
+  /**
+   * Excluir dependências que impedem a exclusão (dependentes, documentos anexados e documentos gerados)
+   * ATENÇÃO: ação irreversível.
+   */
+  async deleteDeletionDependencies(id: string): Promise<{
+    deletedDependents: number;
+    deletedDocuments: number;
+    deletedGeneratedDocs: number;
+  }> {
+    const [dependents, documents] = await Promise.all([
+      api.get(`/api/dependents/employee/${id}`).then(res => res.data).catch(() => []),
+      api.get(`/api/documents/employee/${id}`).then(res => res.data).catch(() => []),
+    ]);
+
+    const dependentsArr = Array.isArray(dependents) ? dependents : [];
+    const documentsArr = Array.isArray(documents) ? documents : [];
+
+    // Dependentes
+    await Promise.allSettled(
+      dependentsArr
+        .map((d: any) => d?.id)
+        .filter(Boolean)
+        .map((depId: string) => api.delete(`/api/dependents/${depId}`))
+    );
+
+    // Documentos anexados
+    await Promise.allSettled(
+      documentsArr
+        .map((d: any) => d?.id)
+        .filter(Boolean)
+        .map((docId: string) => api.delete(`/api/documents/${docId}`))
+    );
+
+    // Documentos gerados (endpoint novo no backend)
+    let deletedGeneratedDocs = 0;
+    try {
+      const res = await api.delete(`/api/documentos-gerados/funcionario/${id}`);
+      deletedGeneratedDocs = res.data?.deleted ?? 0;
+    } catch {
+      // se falhar, a exclusão do funcionário provavelmente vai continuar bloqueada; tratamos no caller
+      deletedGeneratedDocs = 0;
+    }
+
+    return {
+      deletedDependents: dependentsArr.length,
+      deletedDocuments: documentsArr.length,
+      deletedGeneratedDocs,
+    };
   }
 };
 

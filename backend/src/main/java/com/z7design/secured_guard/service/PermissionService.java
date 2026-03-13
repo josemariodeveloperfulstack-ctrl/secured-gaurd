@@ -27,6 +27,7 @@ public class PermissionService {
             Permission.GROUPS_READ, Permission.GROUPS_WRITE, Permission.GROUPS_CREATE,
             Permission.CLIENTS_READ, Permission.CLIENTS_WRITE, Permission.CLIENTS_CREATE, Permission.CLIENTS_DELETE,
             Permission.EMPLOYEES_READ, Permission.EMPLOYEES_WRITE, Permission.EMPLOYEES_CREATE, Permission.EMPLOYEES_DELETE,
+            Permission.EMPLOYEE_HISTORY_READ,
             Permission.CONTRACTS_READ, Permission.CONTRACTS_WRITE, Permission.CONTRACTS_CREATE, Permission.CONTRACTS_DELETE,
             Permission.FINANCIAL_READ, Permission.FINANCIAL_WRITE, Permission.FINANCIAL_CREATE,
             Permission.PAYSLIPS_READ, Permission.PAYSLIPS_WRITE, Permission.PAYSLIPS_CREATE, Permission.PAYSLIPS_PUBLISH,
@@ -53,6 +54,7 @@ public class PermissionService {
         // 🟨 RH - Gerencia informações contratuais e pessoais
         rolePermissions.put(UserRole.RH, new HashSet<>(Arrays.asList(
             Permission.EMPLOYEES_READ, Permission.EMPLOYEES_WRITE, Permission.EMPLOYEES_CREATE, Permission.EMPLOYEES_DELETE,
+            Permission.EMPLOYEE_HISTORY_READ,
             Permission.PAYSLIPS_READ, Permission.PAYSLIPS_WRITE, Permission.PAYSLIPS_CREATE, Permission.PAYSLIPS_PUBLISH,
             Permission.EQUIPMENTS_READ, Permission.EQUIPMENTS_WRITE, Permission.EQUIPMENTS_CREATE, Permission.EQUIPMENTS_ASSIGN,
             Permission.REPORTS_READ, Permission.REPORTS_GENERATE,
@@ -83,6 +85,7 @@ public class PermissionService {
             Permission.USERS_READ,
             Permission.CLIENTS_READ,
             Permission.EMPLOYEES_READ,
+            Permission.EMPLOYEE_HISTORY_READ,
             Permission.CONTRACTS_READ,
             Permission.FINANCIAL_READ,
             Permission.PAYSLIPS_READ,

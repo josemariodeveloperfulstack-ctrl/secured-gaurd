@@ -6,6 +6,7 @@ import com.z7design.secured_guard.model.ModeloDocumento;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -127,4 +128,8 @@ public interface DocumentoGeradoRepository extends JpaRepository<DocumentoGerado
      */
     @Query("SELECT dg FROM DocumentoGerado dg WHERE dg.dataVencimento < :dataAtual AND dg.status = 'PENDENTE'")
     List<DocumentoGerado> findDocumentsToUpdateStatus(@Param("dataAtual") LocalDateTime dataAtual);
+
+    @Modifying
+    @Query("DELETE FROM DocumentoGerado dg WHERE dg.funcionario.id = :funcionarioId")
+    int deleteByFuncionarioId(@Param("funcionarioId") UUID funcionarioId);
 }

@@ -26,6 +26,7 @@ export interface UserPermissions {
   EMPLOYEES_WRITE: boolean;
   EMPLOYEES_DELETE: boolean;
   EMPLOYEES_CREATE: boolean;
+  EMPLOYEE_HISTORY_READ: boolean;
 
   // Permissões de Contratos
   CONTRACTS_READ: boolean;
