@@ -35,35 +35,36 @@ export interface UpdateUserRequest {
   address?: string;
 }
 
+// Usa paths relativos - o axios já tem baseURL configurado (getApiUrl)
 export const userService = {
   async getAllUsers(): Promise<User[]> {
-    const response = await api.get('/api/users');
+    const response = await api.get('/users');
     return response.data;
   },
 
   async searchUsers(query?: string): Promise<User[]> {
     const params = query ? { query } : {};
-    const response = await api.get('/api/users/search', { params });
+    const response = await api.get('/users/search', { params });
     return response.data;
   },
 
   async getUserById(id: string): Promise<User> {
-    const response = await api.get(`/api/users/${id}`);
+    const response = await api.get(`/users/${id}`);
     return response.data;
   },
 
   async createUser(data: CreateUserRequest): Promise<User> {
-    const response = await api.post('/api/users', data);
+    const response = await api.post('/users', data);
     return response.data;
   },
 
   async updateUser(id: string, data: UpdateUserRequest): Promise<User> {
-    const response = await api.put(`/api/users/${id}`, data);
+    const response = await api.put(`/users/${id}`, data);
     return response.data;
   },
 
   async deleteUser(id: string): Promise<void> {
-    await api.delete(`/api/users/${id}`);
+    await api.delete(`/users/${id}`);
   },
 
   async toggleUserStatus(id: string, active: boolean): Promise<User> {
@@ -71,13 +72,13 @@ export const userService = {
   },
 
   async addUserPermissions(userId: string, permissionIds: string[]): Promise<any[]> {
-    const response = await api.post(`/api/users/${userId}/permissions`, permissionIds);
+    const response = await api.post(`/users/${userId}/permissions`, permissionIds);
     return response.data;
   },
 
   async removeUserPermissions(userId: string, permissionIds: string[]): Promise<any[]> {
     // Axios delete with body requires 'data' property
-    const response = await api.delete(`/api/users/${userId}/permissions`, {
+    const response = await api.delete(`/users/${userId}/permissions`, {
       data: permissionIds
     });
     return response.data;

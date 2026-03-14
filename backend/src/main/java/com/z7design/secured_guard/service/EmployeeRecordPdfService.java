@@ -669,17 +669,17 @@ public class EmployeeRecordPdfService {
                 .add(new Paragraph(text != null ? text : "")
                         .setBold()
                         .setFontSize(10)
-                        .setMultipliedLeading(1.0f))
+                        .setMultipliedLeading(1.25f))
                 .setBackgroundColor(new DeviceRgb(240, 240, 240))
-                .setPadding(1.5f); // Reduced padding to compress rows
+                .setPadding(4f);
     }
 
     private Cell createValueCell(String text) {
         return new Cell()
                 .add(new Paragraph(text != null ? text : "")
                         .setFontSize(10)
-                        .setMultipliedLeading(1.0f))
-                .setPadding(1.5f); // Reduced padding to compress rows
+                        .setMultipliedLeading(1.25f))
+                .setPadding(4f);
     }
 
     private UUID resolveCompanyId(Company company) {

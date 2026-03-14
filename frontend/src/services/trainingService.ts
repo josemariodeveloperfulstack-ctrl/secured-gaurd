@@ -65,7 +65,7 @@ class TrainingService {
   }
 
   async getEmployeeCertifications(params?: { employeeId?: string; trainingId?: string; status?: string; expiringBefore?: string; }): Promise<EmployeeCertification[]> {
-    const response = await api.get('/api/employee-certifications', { params });
+    const response = await api.get('/employee-certifications', { params });
     console.log('📋 TrainingService.getEmployeeCertifications - Resposta recebida:', {
       count: Array.isArray(response.data) ? response.data.length : 0,
       data: response.data

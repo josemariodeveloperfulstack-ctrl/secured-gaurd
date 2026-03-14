@@ -6,6 +6,7 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.service.EmployeeRecordPdfService;
+import com.z7design.secured_guard.service.EmployeeHistoryPdfService;
 import com.z7design.secured_guard.service.EmployeeChangeHistoryService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +48,7 @@ public class EmployeeController {
 
     private final EmployeeService employeeService;
     private final EmployeeRecordPdfService employeeRecordPdfService;
+    private final EmployeeHistoryPdfService employeeHistoryPdfService;
     private final EmployeeExcelImportService employeeExcelImportService;
     private final EmployeeImportService employeeImportService;
     private final EmployeeChangeHistoryService employeeChangeHistoryService;
@@ -831,6 +833,30 @@ public class EmployeeController {
             System.err.println("[ERROR] EmployeeController.findByCpfExact - Erro: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Erro ao buscar funcionário por CPF: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/{id}/generate-history-pdf")
+    @Operation(summary = "Gerar PDF do histórico completo do funcionário", description = "Gera e retorna o PDF com postos, alterações, ASO e treinamentos")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "PDF gerado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Funcionário não encontrado"),
+            @ApiResponse(responseCode = "500", description = "Erro ao gerar PDF")
+    })
+    public ResponseEntity<byte[]> generateEmployeeHistoryPdf(@PathVariable String id) {
+        try {
+            UUID employeeId = UUID.fromString(id);
+            byte[] pdf = employeeHistoryPdfService.generateEmployeeHistoryPdf(employeeId);
+            String fileName = "historico-funcionario-" + id + ".pdf";
+            return ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + fileName + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/pdf")
+                    .body(pdf);
+        } catch (Exception e) {
+            System.err.println("[ERROR] EmployeeController.generateEmployeeHistoryPdf - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

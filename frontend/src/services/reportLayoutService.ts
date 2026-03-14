@@ -64,11 +64,13 @@ class ReportLayoutService {
       }
 
       const canvas = await html2canvas(targetElement, {
-        scale: 1.2, // Reduzido de 1.5 para 1.2 para ganhar muita performance mantendo boa qualidade
+        scale: 1.2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        logging: false
+        logging: false,
+        windowWidth: isLandscape ? 1122 : 800,
+        windowHeight: isLandscape ? 800 : 1200
       });
 
       if (tempContainer) {

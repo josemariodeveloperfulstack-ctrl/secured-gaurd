@@ -15,49 +15,70 @@ export interface EmployeeReportExportParams {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const cellStyle: React.CSSProperties = {
+  padding: '8px 10px',
+  border: '1px solid #d1d5db',
+  fontSize: '11px',
+  lineHeight: 1.5,
+  fontFamily: 'Inter, system-ui, sans-serif',
+  whiteSpace: 'normal' as const,
+  wordBreak: 'break-word' as const,
+  overflowWrap: 'break-word',
+  letterSpacing: 'normal',
+  verticalAlign: 'top',
+};
+
 const EmployeeReportPrintable: React.FC<{ employees: EmployeeWithDetails[] }> = ({ employees }) => {
-          const getCurrentWorkPost = (emp: EmployeeWithDetails) => {
-            if (emp.workPosts && emp.workPosts.length > 0) {
-              return emp.workPosts.map(w => w.name).filter(Boolean).join(', ') || '-';
-            }
-            if (emp.workPost?.name) return emp.workPost.name;
-            if (emp.department?.name) return emp.department.name;
-            return '-';
-          };
+  const getCurrentWorkPost = (emp: EmployeeWithDetails) => {
+    if (emp.workPosts && emp.workPosts.length > 0) {
+      return emp.workPosts.map(w => w.name).filter(Boolean).join(', ') || '-';
+    }
+    if (emp.workPost?.name) return emp.workPost.name;
+    if (emp.department?.name) return emp.department.name;
+    return '-';
+  };
 
   return (
-    <div className="w-full">
-      <div className="mb-4 text-sm text-gray-600">
-        <p><strong>Total de funcionários:</strong> {employees.length}</p>
+    <div style={{ width: '100%', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <div style={{ marginBottom: 16, fontSize: 14, fontWeight: 700, color: '#111827' }}>
+        <p style={{ margin: 0 }}>Total de funcionários: {employees.length}</p>
       </div>
-      
-      <table className="w-full text-left border-collapse text-xs">
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, tableLayout: 'fixed' }}>
+        <colgroup>
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '20%' }} />
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '30%' }} />
+          <col style={{ width: '8%' }} />
+        </colgroup>
         <thead>
-          <tr className="bg-[#dc2626] text-white">
-            <th className="p-2 border border-gray-300 font-bold uppercase">Nome</th>
-            <th className="p-2 border border-gray-300 font-bold uppercase">Matrícula</th>
-            <th className="p-2 border border-gray-300 font-bold uppercase">Cargo</th>
-            <th className="p-2 border border-gray-300 font-bold uppercase">Posto</th>
-            <th className="p-2 border border-gray-300 font-bold uppercase">Empresa</th>
-            <th className="p-2 border border-gray-300 font-bold uppercase">Status</th>
+          <tr style={{ backgroundColor: '#dc2626', color: 'white' }}>
+            <th style={{ ...cellStyle, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', minWidth: 140 }}>Nome</th>
+            <th style={{ ...cellStyle, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', width: 90 }}>Matrícula</th>
+            <th style={{ ...cellStyle, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', minWidth: 160 }}>Cargo</th>
+            <th style={{ ...cellStyle, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', minWidth: 100 }}>Posto</th>
+            <th style={{ ...cellStyle, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', minWidth: 180 }}>Empresa</th>
+            <th style={{ ...cellStyle, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', width: 80 }}>Status</th>
           </tr>
         </thead>
         <tbody>
           {employees.map((emp, index) => (
-            <tr key={emp.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-              <td className="p-2 border border-gray-300">{emp.name || '-'}</td>
-              <td className="p-2 border border-gray-300">{emp.registrationNumber || '-'}</td>
-              <td className="p-2 border border-gray-300">{emp.position?.name || '-'}</td>
-              <td className="p-2 border border-gray-300">{getCurrentWorkPost(emp)}</td>
-              <td className="p-2 border border-gray-300">{emp.company?.name || emp.company?.sigla || '-'}</td>
-              <td className="p-2 border border-gray-300">
+            <tr key={emp.id} style={{ backgroundColor: index % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+              <td style={cellStyle}>{emp.name || '-'}</td>
+              <td style={cellStyle}>{emp.registrationNumber || '-'}</td>
+              <td style={cellStyle}>{emp.position?.name || '-'}</td>
+              <td style={cellStyle}>{getCurrentWorkPost(emp)}</td>
+              <td style={cellStyle}>{emp.company?.name || emp.company?.sigla || '-'}</td>
+              <td style={cellStyle}>
                 {emp.status === 'ACTIVE' ? 'Ativo' : emp.status === 'TERMINATED' ? 'Demitido' : emp.status || '-'}
               </td>
             </tr>
           ))}
           {employees.length === 0 && (
             <tr>
-              <td colSpan={6} className="p-4 text-center text-gray-500 border border-gray-300">
+              <td colSpan={6} style={{ ...cellStyle, padding: 16, textAlign: 'center', color: '#6b7280' }}>
                 Nenhum funcionário encontrado.
               </td>
             </tr>
@@ -73,7 +94,7 @@ export async function generateEmployeeReportPDF(params: EmployeeReportExportPara
     throw new TypeError('Geração de PDF disponível apenas no ambiente do navegador.');
   }
 
-  // Preload images to ensure html2canvas captures them
+  // Preload templates para html2canvas capturar
   await Promise.all([
     new Promise((resolve) => {
       const img = new Image();
@@ -85,7 +106,7 @@ export async function generateEmployeeReportPDF(params: EmployeeReportExportPara
       const img = new Image();
       img.onload = resolve;
       img.onerror = resolve;
-      img.src = '/logo-sistema.png';
+      img.src = '/report-background-template.png';
     })
   ]);
 
@@ -96,13 +117,15 @@ export async function generateEmployeeReportPDF(params: EmployeeReportExportPara
     filename
   } = params;
 
-  // Container oculto para renderizar o layout premium
+  // Container visível na viewport — html2canvas precisa capturar elemento visível (opacity quebrava)
   const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '-9999px';
-  container.style.width = '1122px'; // Landscape width
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '0';
+  container.style.width = '1122px';
+  container.style.minHeight = '800px';
   container.style.backgroundColor = '#ffffff';
+  container.style.zIndex = '99999';
 
   document.body.appendChild(container);
 
@@ -117,8 +140,8 @@ export async function generateEmployeeReportPDF(params: EmployeeReportExportPara
       );
     });
 
-    // Dar um tick para garantir que imagens e estilos foram aplicados
-    await sleep(300);
+    // Aguardar template e conteúdo renderizarem (html2canvas precisa que imagens estejam carregadas)
+    await sleep(600);
 
     const normalizedTitle = reportTitle.trim().replace(/\s+/g, '_').toLowerCase();
     const effectiveFilename =
