@@ -127,9 +127,24 @@ jobs:
             sshpass -p "${{ secrets.VPS_PASSWORD_PROD }}" ssh $SSH_OPTS $VPS_STR << EOF
             set -e
             
+            export DOCKER_CLIENT_TIMEOUT=600
+            export DOCKER_HTTP_TIMEOUT=600
+            export COMPOSE_HTTP_TIMEOUT=600
             export DEPLOY_DIR="/var/www/secured_guard/prod/deploy"
             export TRAEFIK_DIR="/var/www/secured_guard/traefik/dynamic"
             export SCRIPT_DIR="/var/www/secured_guard/prod/scripts"
+            
+            echo "🔎 Verificando acesso ao Docker Hub (forçar IPv4)..."
+            for j in 1 2 3 4 5; do
+              if curl -4 --connect-timeout 30 -fsSL https://registry-1.docker.io/v2/ >/dev/null 2>&1; then
+                echo "✅ Docker Hub acessível"
+                break
+              fi
+              WAIT=\$((j * 10))
+              echo "⚠️ Tentativa \$j de acesso ao Docker Hub falhou, aguardando \${WAIT}s..."
+              sleep \$WAIT
+              [ \$j -eq 5 ] && { echo "❌ Docker Hub inacessível após 5 tentativas"; exit 1; }
+            done
             
             echo "📦 Extracting deployment files..."
             mkdir -p \$DEPLOY_DIR/nginx \$TRAEFIK_DIR \$SCRIPT_DIR
@@ -155,8 +170,14 @@ jobs:
             if ! docker network ls | grep -q "secured-guard"; then docker network create secured-guard; fi
             if ! docker network ls | grep -q "z7network"; then docker network create z7network; fi
             
-            echo "📥 Pull das imagens..."
-            docker-compose -f docker-compose.prod.yml pull
+            echo "📥 Pull das imagens (retry com backoff: 15s, 25s, 35s, 45s)..."
+            for attempt in 1 2 3 4 5; do
+              if docker-compose -f docker-compose.prod.yml pull; then break; fi
+              WAIT=\$((attempt * 10 + 5))
+              echo "⚠️ Pull falhou (\$attempt/5), aguardando \${WAIT}s..."
+              sleep \$WAIT
+              [ \$attempt -eq 5 ] && { echo "❌ Pull falhou após 5 tentativas"; exit 1; }
+            done
             
             echo "🚀 Subindo containers..."
             docker-compose -f docker-compose.prod.yml up -d --remove-orphans
@@ -202,8 +223,8 @@ jobs:
               SUCCESS=1
               break
             else
-              echo "⚠️ Erro na execução SSH (Código: $SSH_EXIT_CODE). Aguardando 15s para tentar novamente..."
-              sleep 15
+              echo "⚠️ Erro na execução SSH (Código: $SSH_EXIT_CODE). Aguardando 20s para tentar novamente..."
+              sleep 20
             fi
           done
           

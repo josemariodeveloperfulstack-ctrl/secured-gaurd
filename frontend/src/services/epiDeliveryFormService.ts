@@ -67,7 +67,7 @@ export const epiDeliveryFormService = {
    */
   async create(data: CreateEPIDeliveryForm): Promise<EPIDeliveryForm> {
     try {
-      const response = await api.post('/api/epi-delivery-forms', data);
+      const response = await api.post('/epi-delivery-forms', data);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar ficha de entrega de EPI:', error);
@@ -80,7 +80,7 @@ export const epiDeliveryFormService = {
    */
   async getById(id: string): Promise<EPIDeliveryForm> {
     try {
-      const response = await api.get(`/api/epi-delivery-forms/${id}`);
+      const response = await api.get(`/epi-delivery-forms/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar ficha de entrega de EPI:', error);
@@ -93,7 +93,7 @@ export const epiDeliveryFormService = {
    */
   async getAll(page = 0, size = 10, sortBy = 'createdAt', sortDir: 'ASC' | 'DESC' = 'DESC'): Promise<EPIDeliveryFormPage> {
     try {
-      const response = await api.get('/api/epi-delivery-forms', {
+      const response = await api.get('/epi-delivery-forms', {
         params: { page, size, sortBy, sortDir }
       });
       return response.data;
@@ -120,7 +120,7 @@ export const epiDeliveryFormService = {
       if (filters.endDate) cleanFilters.endDate = filters.endDate;
 
       console.log('📤 Enviando requisição de busca:', cleanFilters);
-      const response = await api.get('/api/epi-delivery-forms/search', {
+      const response = await api.get('/epi-delivery-forms/search', {
         params: cleanFilters
       });
       console.log('📥 Resposta da busca:', response.data);
@@ -141,7 +141,7 @@ export const epiDeliveryFormService = {
    */
   async getByEmployeeId(employeeId: string): Promise<EPIDeliveryForm[]> {
     try {
-      const response = await api.get(`/api/epi-delivery-forms/employee/${employeeId}`);
+      const response = await api.get(`/epi-delivery-forms/employee/${employeeId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar fichas por funcionário:', error);
@@ -154,7 +154,7 @@ export const epiDeliveryFormService = {
    */
   async getByCompanyId(companyId: string): Promise<EPIDeliveryForm[]> {
     try {
-      const response = await api.get(`/api/epi-delivery-forms/company/${companyId}`);
+      const response = await api.get(`/epi-delivery-forms/company/${companyId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar fichas por empresa:', error);
@@ -167,7 +167,7 @@ export const epiDeliveryFormService = {
    */
   async delete(id: string): Promise<void> {
     try {
-      await api.delete(`/api/epi-delivery-forms/${id}`);
+      await api.delete(`/epi-delivery-forms/${id}`);
     } catch (error) {
       console.error('Erro ao deletar ficha de entrega de EPI:', error);
       throw error;
@@ -179,7 +179,7 @@ export const epiDeliveryFormService = {
    */
   async generatePdfById(id: string): Promise<Blob> {
     try {
-      const response = await api.get(`/api/epi-delivery-forms/${id}/generate-pdf`, {
+      const response = await api.get(`/epi-delivery-forms/${id}/generate-pdf`, {
         responseType: 'blob'
       });
       return response.data;
@@ -194,7 +194,7 @@ export const epiDeliveryFormService = {
    */
   async generateAndSavePdf(data: CreateEPIDeliveryForm): Promise<Blob> {
     try {
-      const response = await api.post('/api/epi-delivery-forms/generate-pdf', data, {
+      const response = await api.post('/epi-delivery-forms/generate-pdf', data, {
         responseType: 'blob'
       });
       return response.data;
@@ -209,7 +209,7 @@ export const epiDeliveryFormService = {
    */
   async generateAndSaveExcel(data: CreateEPIDeliveryForm): Promise<Blob> {
     try {
-      const response = await api.post('/api/epi-delivery-forms/generate-excel', data, {
+      const response = await api.post('/epi-delivery-forms/generate-excel', data, {
         responseType: 'blob'
       });
       return response.data;
@@ -227,7 +227,7 @@ export const epiDeliveryFormService = {
     try {
       const params: { companyId: string; employeeId?: string } = { companyId };
       if (employeeId) params.employeeId = employeeId;
-      const response = await api.get('/api/epi-delivery-forms/generate-blank-pdf', {
+      const response = await api.get('/epi-delivery-forms/generate-blank-pdf', {
         params,
         responseType: 'blob'
       });

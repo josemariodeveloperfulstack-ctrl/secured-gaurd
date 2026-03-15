@@ -40,7 +40,6 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { generateEmployeeReportPDF } from '@/utils/employeeReportExport';
 import { RelatoriosModal } from '@/components/funcionarios/RelatoriosModal';
 import { Employee } from '@/types/employee';
 
@@ -170,11 +169,15 @@ export const OperationalEmployeesTab: React.FC = () => {
 
   const generatePdfReport = async (title: string, data: EmployeeWithDetails[]) => {
     try {
-      await generateEmployeeReportPDF({
-        reportTitle: title,
-        employees: data,
-        company: user?.company || undefined
-      });
+      const employeeIds = data.map(e => e.id);
+      const companyId = user?.company?.id ?? undefined;
+      const blob = await employeeService.exportEmployeesReportPdf(companyId, employeeIds);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Relatorio_Funcionarios_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
       toast({
         title: 'Sucesso',
         description: 'Relatório gerado com sucesso.',
@@ -588,7 +591,7 @@ const EmployeeHistoryPanel: React.FC<EmployeeHistoryPanelProps> = ({ employee, h
     setReportLoading(true);
     try {
       const blob = format === 'pdf'
-        ? await employeeService.generateEmployeeRecordPdf(employee.id)
+        ? await employeeService.generateEmployeeHistoryPdf(employee.id)
         : await employeeService.generateEmployeeRecordExcel(employee.id);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

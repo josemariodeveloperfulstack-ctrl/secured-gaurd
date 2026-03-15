@@ -331,6 +331,21 @@ export const employeeService = {
   },
 
   /**
+   * Gerar PDF do histórico completo do funcionário (postos, alterações, ASO, treinamentos)
+   */
+  async generateEmployeeHistoryPdf(id: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/employees/${id}/generate-history-pdf`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao gerar PDF do histórico:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao gerar PDF do histórico');
+    }
+  },
+
+  /**
    * Gerar PDF da ficha de registro do funcionário
    */
   async generateEmployeeRecordPdf(id: string): Promise<Blob> {
@@ -485,9 +500,9 @@ export const employeeService = {
 
       // Buscar dependências em paralelo
       const [dependents, documents, generatedDocs] = await Promise.all([
-        api.get(`/api/dependents/employee/${id}`).then(res => res.data).catch(() => []),
-        api.get(`/api/documents/employee/${id}`).then(res => res.data).catch(() => []),
-        api.get(`/api/documentos-gerados/funcionario/${id}`).then(res => res.data).catch(() => [])
+        api.get(`/dependents/employee/${id}`).then(res => res.data).catch(() => []),
+        api.get(`/documents/employee/${id}`).then(res => res.data).catch(() => []),
+        api.get(`/documentos-gerados/funcionario/${id}`).then(res => res.data).catch(() => [])
       ]);
 
       const dependentsCount = Array.isArray(dependents) ? dependents.length : 0;
@@ -537,8 +552,8 @@ export const employeeService = {
     deletedGeneratedDocs: number;
   }> {
     const [dependents, documents] = await Promise.all([
-      api.get(`/api/dependents/employee/${id}`).then(res => res.data).catch(() => []),
-      api.get(`/api/documents/employee/${id}`).then(res => res.data).catch(() => []),
+      api.get(`/dependents/employee/${id}`).then(res => res.data).catch(() => []),
+      api.get(`/documents/employee/${id}`).then(res => res.data).catch(() => []),
     ]);
 
     const dependentsArr = Array.isArray(dependents) ? dependents : [];
@@ -549,7 +564,7 @@ export const employeeService = {
       dependentsArr
         .map((d: any) => d?.id)
         .filter(Boolean)
-        .map((depId: string) => api.delete(`/api/dependents/${depId}`))
+        .map((depId: string) => api.delete(`/dependents/${depId}`))
     );
 
     // Documentos anexados

@@ -227,13 +227,12 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     log "Tentativa $ATTEMPT de $MAX_ATTEMPTS..."
     
-    # Verificar Traefik a cada 3 tentativas
+    # Verificar Traefik a cada 3 tentativas (script roda na VPS, executar localmente)
     if [ $((ATTEMPT % 3)) -eq 0 ]; then
         if ! check_traefik; then
             log "💡 Tentando iniciar Traefik..."
-            sshpass -p "${SSH_PASSWORD}" ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
-                "cd /var/www/secured_guard && docker-compose -f docker-compose.traefik.yml up -d 2>&1" || true
-            sleep 10
+            (cd /var/www/secured_guard && docker-compose -f docker-compose.traefik.yml up -d 2>&1) || true
+            sleep 15
         fi
     fi
     

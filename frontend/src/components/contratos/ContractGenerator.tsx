@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -23,7 +24,7 @@ import { clientService } from '@/services/clientService';
 import { companyService } from '@/services/companyService';
 import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import { Client } from '@/types/client';
-import { formatDateForBackend, parseDateFromBackend, parseBrazilianDateString } from '@/utils/dateUtils';
+import { formatDateForBackend, formatDateForDisplay, parseDateFromBackend, parseBrazilianDateString } from '@/utils/dateUtils';
 import { getApiUrl } from '@/config/environment';
 
 interface ContractGeneratorProps {
@@ -250,7 +251,9 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    if (!dateString) return '';
+    const d = parseDateFromBackend(dateString) || parseBrazilianDateString(dateString);
+    return d ? formatDateForDisplay(d) : '';
   };
 
   const getLogoDisplayUrl = (logoUrl: string | undefined): string | null => {
@@ -536,10 +539,10 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       }
 
       const startDateParsed = contractData.startDate
-        ? (parseDateFromBackend(contractData.startDate) || parseBrazilianDateString(contractData.startDate) || new Date(contractData.startDate))
+        ? (parseDateFromBackend(contractData.startDate) || parseBrazilianDateString(contractData.startDate))
         : null;
       const endDateParsed = contractData.endDate
-        ? (parseDateFromBackend(contractData.endDate) || parseBrazilianDateString(contractData.endDate) || new Date(contractData.endDate))
+        ? (parseDateFromBackend(contractData.endDate) || parseBrazilianDateString(contractData.endDate))
         : null;
 
       const payload = {
@@ -768,6 +771,71 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
               onClose={() => setIsClientModalOpen(false)}
               onSuccess={handleClientCreated}
             />
+
+            {/* Dados do Contrato */}
+            <Card className="bg-seguranca-black border-gray-600">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-4">
+                <CardTitle className="text-seguranca-lightgray text-xs sm:text-sm">
+                  Dados do Contrato
+                </CardTitle>
+                <p className="text-xs text-gray-400 mt-1">Número, valor, datas e descrição</p>
+              </CardHeader>
+              <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-6 pb-3 sm:pb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">Número do Contrato *</Label>
+                    <Input
+                      value={contractData.contractNumber}
+                      onChange={(e) => setContractData(prev => ({ ...prev, contractNumber: e.target.value }))}
+                      placeholder="Ex: CON-2024-001"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">Valor Total (R$) *</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={contractData.value || ''}
+                      onChange={(e) => setContractData(prev => ({ ...prev, value: parseFloat(e.target.value) || 0 }))}
+                      placeholder="0,00"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray mt-1"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">Data de Início *</Label>
+                    <Input
+                      type="date"
+                      value={formatDateForBackend(parseDateFromBackend(contractData.startDate) || parseBrazilianDateString(contractData.startDate)) ?? (contractData.startDate?.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? '')}
+                      onChange={(e) => setContractData(prev => ({ ...prev, startDate: e.target.value || '' }))}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-seguranca-lightgray text-xs sm:text-sm">Data de Término</Label>
+                    <Input
+                      type="date"
+                      value={formatDateForBackend(parseDateFromBackend(contractData.endDate) || parseBrazilianDateString(contractData.endDate)) ?? (contractData.endDate?.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? '')}
+                      onChange={(e) => setContractData(prev => ({ ...prev, endDate: e.target.value || '' }))}
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray mt-1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-seguranca-lightgray text-xs sm:text-sm">Descrição dos Serviços</Label>
+                  <Textarea
+                    value={contractData.description}
+                    onChange={(e) => setContractData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Descreva os serviços contratados..."
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray mt-1"
+                    rows={3}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Termos Adicionais */}
             <Card className="bg-seguranca-black border-gray-600">

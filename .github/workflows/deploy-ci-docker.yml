@@ -241,10 +241,12 @@ jobs:
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
           do_transfer() {
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} "mkdir -p /var/www/secured_guard/ci/nginx /var/www/secured_guard/ci/scripts"
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.traefik.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/health-check-ci.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/clear-service-worker-cache.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/recover-ci-502.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
           }
           for i in 1 2 3 4 5; do
             echo "📤 Tentativa $i de transferência..."
@@ -322,8 +324,9 @@ jobs:
             set +e
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             set -e
-            export DOCKER_CLIENT_TIMEOUT=300
-            export DOCKER_HTTP_TIMEOUT=300
+            export DOCKER_CLIENT_TIMEOUT=600
+            export DOCKER_HTTP_TIMEOUT=600
+            export COMPOSE_HTTP_TIMEOUT=600
 
             echo "🔧 Force exit Swarm mode and complete cleanup..."
             docker swarm leave --force 2>/dev/null || true
@@ -331,36 +334,50 @@ jobs:
             docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
             docker ps -a | grep "secured-guard-.*-ci" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
 
-            echo "🔎 Verificando acesso ao Docker Hub..."
-            for j in 1 2 3; do
-              if curl -fsSL https://registry-1.docker.io/v2/ >/dev/null; then
+            echo "🔎 Verificando acesso ao Docker Hub (forçar IPv4)..."
+            DOCKER_HUB_OK=0
+            for j in 1 2 3 4 5; do
+              if curl -4 --connect-timeout 30 -fsSL https://registry-1.docker.io/v2/ >/dev/null 2>&1; then
                 echo "✅ Docker Hub acessível"
+                DOCKER_HUB_OK=1
                 break
               fi
-              echo "⚠️ Tentativa $j de acesso ao Docker Hub falhou, aguardando 10s..."
-              sleep 10
+              WAIT=$((j * 10))
+              echo "⚠️ Tentativa $j de acesso ao Docker Hub falhou, aguardando ${WAIT}s..."
+              sleep $WAIT
             done
+            if [ $DOCKER_HUB_OK -eq 0 ]; then
+              echo "⚠️ Docker Hub inacessível da VPS (Contabo). Tentando usar imagens em cache..."
+            fi
 
             echo "🔐 Login no Docker Hub..."
-            echo '${{ secrets.DOCKER_PASSWORD }}' | docker login -u '${{ secrets.DOCKER_USERNAME }}' --password-stdin
+            echo '${{ secrets.DOCKER_PASSWORD }}' | docker login -u '${{ secrets.DOCKER_USERNAME }}' --password-stdin 2>/dev/null || echo "⚠️ Login falhou (Docker Hub pode estar inacessível)"
 
-            echo "🧹 Removendo imagens antigas..."
-            docker image rm -f z7design/secured-guard-backend:ci z7design/secured-guard-frontend:ci z7design/secured-guard-whatsapp:ci 2>/dev/null || true
+            # Pull com fallback: se falhar, usar imagens em cache
+            pull_or_use_cache() {
+              local img=$1
+              local name=$2
+              for j in 1 2 3 4 5; do
+                if docker pull "$img" 2>/dev/null; then echo "✅ $name baixado"; return 0; fi
+                WAIT=$((j * 10 + 5))
+                echo "⚠️ Pull $name falhou ($j/5), aguardando ${WAIT}s..."
+                sleep $WAIT
+              done
+              if docker image inspect "$img" >/dev/null 2>&1; then
+                echo "⚠️ Usando imagem $name em cache (Docker Hub inacessível)"
+                return 0
+              fi
+              echo "❌ $name não disponível e sem cache"; return 1
+            }
+            echo "📥 Pull backend..."
+            pull_or_use_cache z7design/secured-guard-backend:ci "backend" || exit 1
+            echo "📥 Pull frontend..."
+            pull_or_use_cache z7design/secured-guard-frontend:ci "frontend" || exit 1
+            echo "📥 Pull whatsapp..."
+            pull_or_use_cache z7design/secured-guard-whatsapp:ci "whatsapp" || exit 1
 
-            echo "📥 Pull backend (retry)..."
-            for j in 1 2 3; do
-              docker pull z7design/secured-guard-backend:ci && break || { echo "⚠️ Pull backend falhou ($j)"; sleep 10; }
-            done
-
-            echo "📥 Pull frontend (retry)..."
-            for j in 1 2 3; do
-              docker pull z7design/secured-guard-frontend:ci && break || { echo "⚠️ Pull frontend falhou ($j)"; sleep 10; }
-            done
-
-            echo "📥 Pull whatsapp (retry)..."
-            for j in 1 2 3; do
-              docker pull z7design/secured-guard-whatsapp:ci && break || { echo "⚠️ Pull whatsapp falhou ($j)"; sleep 10; }
-            done
+            echo "🧹 Removendo imagens antigas (após pull bem-sucedido)..."
+            docker image prune -f --filter "dangling=true" 2>/dev/null || true
 
             echo "🔎 Labels das imagens:"
             docker image inspect z7design/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
@@ -384,16 +401,31 @@ jobs:
             done
             sleep 3
             
-            echo "🔧 Removendo registros de migrações falhas..."
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427','429') AND success = false;" 2>/dev/null || true
+            echo "🔧 Removendo registros de migrações falhas (incluindo V452)..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE success = false;" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
             
-            echo "🚀 Iniciando todos os containers..."
-            docker-compose -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
+            echo "🚀 Iniciando todos os containers (usando imagens já baixadas)..."
+            docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
             
-            echo "⏳ Aguardando backend subir..."
-            sleep 15
+            echo "⏳ Aguardando backend subir (Flyway pode demorar 3-5 min)..."
+            for j in $(seq 1 36); do
+              BACKEND_STATE=$(docker inspect secured-guard-backend-ci --format '{{.State.Status}}' 2>/dev/null || echo "missing")
+              if [ "$BACKEND_STATE" = "exited" ] || [ "$BACKEND_STATE" = "dead" ]; then
+                echo "❌ Backend crashou (status: $BACKEND_STATE). Logs:"
+                docker logs --tail 100 secured-guard-backend-ci 2>&1 || true
+                exit 1
+              fi
+              if curl -sf http://localhost:8081/api/health >/dev/null 2>&1; then
+                echo "✅ Backend respondendo após ${j}0s!"
+                break
+              fi
+              echo "   Aguardando... ${j}0s (backend status: $BACKEND_STATE)"
+              sleep 10
+              [ $j -eq 36 ] && echo "⚠️ Timeout 6min - continuando para health check script"
+            done
+            
             docker-compose -f docker-compose.ci.yml ps
             
             echo "🔐 Verificando JWT_SECRET e configs..."
@@ -428,8 +460,8 @@ jobs:
               SUCCESS=1
               break
             else
-              echo "⚠️ Erro na execução SSH (Código: $SSH_EXIT_CODE). Aguardando 15s para tentar novamente..."
-              sleep 15
+              echo "⚠️ Erro na execução SSH (Código: $SSH_EXIT_CODE). Aguardando 20s para tentar novamente..."
+              sleep 20
             fi
           done
           

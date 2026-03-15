@@ -46,7 +46,6 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { generateEmployeeReportPDF } from '@/utils/employeeReportExport';
 
 interface RelatoriosModalProps {
     open: boolean;
@@ -468,54 +467,31 @@ export function RelatoriosModal({
     };
 
     const handleExportPDF = async () => {
-        const selectedCompanyObj = companyFilter !== 'all'
-            ? allEmployees.find(emp => (emp.company?.sigla || emp.company?.name || String(emp.company?.id)) === companyFilter)?.company
-            : undefined;
+        const employeeIds = filteredEmployees.map(e => e.id);
+        if (employeeIds.length === 0) {
+            window.alert('Nenhum funcionário encontrado com os filtros atuais.');
+            return;
+        }
+
+        const companyId = companyFilter !== 'all'
+            ? allEmployees.find(emp => (emp.company?.sigla || emp.company?.name || String(emp.company?.id)) === companyFilter)?.company?.id
+            : null;
 
         setIsProcessing(true);
         setProgress(0);
         setIsGenerating(true);
         cancelRef.current = false;
-        
+
         try {
-            // Obter os IDs dos funcionários filtrados
-            const employeeIds = filteredEmployees.map(e => e.id);
-            
-            if (employeeIds.length === 0) {
-                window.alert('Nenhum funcionário encontrado com os filtros atuais.');
-                return;
-            }
-
-            setProgress(10);
-
-            // Buscar os dados completos do backend em chunks
-            const fullEmployeesData: any[] = [];
-            const chunkSize = 500;
-            for (let i = 0; i < employeeIds.length; i += chunkSize) {
-                if (cancelRef.current) throw new Error('Processo cancelado pelo usuário');
-                const chunkIds = employeeIds.slice(i, i + chunkSize);
-                const chunkData = await employeeService.getFullDataForExport(chunkIds);
-                if (chunkData && chunkData.length > 0) {
-                    fullEmployeesData.push(...chunkData);
-                }
-                setProgress(10 + Math.round(((i + chunkIds.length) / employeeIds.length) * 40)); // Up to 50%
-            }
-
-            if (fullEmployeesData.length === 0) {
-                window.alert('Não foi possível carregar os dados dos funcionários.');
-                return;
-            }
-
-            setProgress(60);
-
-            // Generate PDF
-            await generateEmployeeReportPDF({
-                reportTitle: 'Relatório de Funcionários',
-                employees: fullEmployeesData,
-                company: selectedCompanyObj,
-                filename: `Relatorio_Funcionarios_${new Date().toISOString().split('T')[0]}.pdf`
-            });
-
+            setProgress(30);
+            const blob = await employeeService.exportEmployeesReportPdf(companyId ?? undefined, employeeIds);
+            setProgress(80);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Relatorio_Funcionarios_${new Date().toISOString().split('T')[0]}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
             setProgress(100);
         } catch (error: any) {
             console.error('Erro ao gerar PDF:', error);

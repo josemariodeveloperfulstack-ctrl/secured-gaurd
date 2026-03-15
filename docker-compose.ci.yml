@@ -171,10 +171,12 @@ services:
     volumes:
       - ./nginx/ci.conf:/etc/nginx/nginx.conf:ro
     depends_on:
+      # service_started: nginx sobe assim que backend/frontend iniciam (não espera healthy)
+      # O script health-check-ci.sh faz polling até backend responder (Flyway pode demorar 5+ min)
       backend-ci:
-        condition: service_healthy
+        condition: service_started
       frontend-ci:
-        condition: service_healthy
+        condition: service_started
     networks:
       - secured-guard-ci-network
       - z7network
