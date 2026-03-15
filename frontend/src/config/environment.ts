@@ -189,6 +189,14 @@ export function getApiUrl(): string {
     return import.meta.env.VITE_API_URL;
   }
 
+  // PROD: portal.promovervigilancia.com.br e securedguard servem frontend+backend no mesmo host.
+  // Usar /api relativo evita ERR_CERT_AUTHORITY_INVALID e CORS (nginx faz proxy de /api para backend).
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (hostname === 'portal.promovervigilancia.com.br' || hostname === 'securedguard.z7botsolutions.com.br') {
+    console.log('🔧 Portal/Prod: usando API no mesmo host (/api)');
+    return '/api';
+  }
+
   // Senão, usa detecção automática
   console.log('🔄 Usando detecção automática:', config.apiUrl);
   return config.apiUrl;
@@ -209,6 +217,16 @@ export function getWsUrl(): string {
 
   // Primeiro tenta usar variável de ambiente
   let url = import.meta.env.VITE_WS_URL;
+
+  // PROD: portal/securedguard - WebSocket no mesmo host
+  if (!url && typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'portal.promovervigilancia.com.br' || hostname === 'securedguard.z7botsolutions.com.br') {
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      url = `${protocol}://${window.location.host}/ws`;
+      console.log('🔧 Portal/Prod: WebSocket no mesmo host:', url);
+    }
+  }
 
   // Se não houver variável, usa detecção automática
   if (!url) {
@@ -261,8 +279,11 @@ export function getEnvironmentInfo() {
 export function getChatFileUrl(filePath: string): string {
   if (!filePath) return '';
 
-  const config = getCurrentEnvironmentConfig();
-  const baseUrl = config.apiUrl.replace('/api', ''); // Base URL sem /api (ex: http://localhost:8083)
+  const apiUrl = getApiUrl();
+  // Quando API é relativa (/api), base é a origem atual (portal/securedguard)
+  const baseUrl = apiUrl.startsWith('/')
+    ? (typeof window !== 'undefined' ? window.location.origin : '')
+    : apiUrl.replace('/api', '');
 
   // Se já for uma URL completa ou um blob, retorna como está
   if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('blob:')) {
