@@ -81,6 +81,7 @@ public class ClientContractStandardPdfService {
                                         .reportTitle(reportTitle)
                                         .includeEmailInFooter(true)
                                         .landscape(false)
+                                        .useProgrammaticLayout(true) // Layout correto: gradiente, forma escura (ORIENTACAO_LAYOUT)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -139,6 +140,7 @@ public class ClientContractStandardPdfService {
                                         .reportTitle(reportTitle)
                                         .includeEmailInFooter(true)
                                         .landscape(false)
+                                        .useProgrammaticLayout(true) // Layout correto: gradiente, forma escura (ORIENTACAO_LAYOUT)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);

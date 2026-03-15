@@ -280,6 +280,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [historyPageIndex, setHistoryPageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('cadastro');
 
+  // Intervalos Almoço/Janta: controla visibilidade do campo Horário do Intervalo
+  const [temIntervaloAlmoco, setTemIntervaloAlmoco] = useState<'sim' | 'nao'>('nao');
+
   // Resetar aba ativa ao fechar ou quando Histórico não está disponível
   useEffect(() => {
     if (!open) setActiveTab('cadastro');
@@ -469,6 +472,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         departmentId: (employeeToEdit as any).departmentId || (employeeToEdit as any).department?.id || ''
       });
 
+      setTemIntervaloAlmoco(employeeToEdit.horarioTrabalhoIntervalo ? 'sim' : 'nao');
+
       // Preencher seleções
       console.log('🔍 Dados de relacionamento:', {
         position: employeeToEdit.position,
@@ -525,6 +530,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       // Modo de criação - resetar formulário
       setIsEditMode(false);
       setForm(initialState);
+      setTemIntervaloAlmoco('nao');
       setCpfError(null);
       setSelectedPosition(null);
       setSelectedUnit(null);
@@ -1065,6 +1071,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setCurrentEmployeeId(null);
     setIsEditMode(false);
     setForm(initialState);
+    setTemIntervaloAlmoco('nao');
     setPhotoPreview(null);
     setError(null);
     setUserSearchTerm('');
@@ -3712,8 +3719,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
                           <RadioGroup
-                            value={form.horarioTrabalhoIntervalo ? 'sim' : 'nao'}
-                            onValueChange={(value) => value === 'nao' && setForm(prev => ({ ...prev, horarioTrabalhoIntervalo: '' }))}
+                            value={temIntervaloAlmoco}
+                            onValueChange={(value) => {
+                              setTemIntervaloAlmoco(value as 'sim' | 'nao');
+                              if (value === 'nao') setForm(prev => ({ ...prev, horarioTrabalhoIntervalo: '' }));
+                            }}
                             className="flex gap-4 mt-3"
                           >
                             <div className="flex items-center space-x-2">
@@ -3726,19 +3736,21 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             </div>
                           </RadioGroup>
                         </div>
-                        <div className="md:col-span-2">
-                          <Label className="text-sm font-medium text-seguranca-yellow flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                            <span className="truncate">Horário do Intervalo</span>
-                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                          </Label>
-                          <Input
-                            name="horarioTrabalhoIntervalo"
-                            value={form.horarioTrabalhoIntervalo || ''}
-                            onChange={handleChange}
-                            placeholder="Ex: 12:00 ÀS 13:00 H"
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
-                          />
-                        </div>
+                        {temIntervaloAlmoco === 'sim' && (
+                          <div className="md:col-span-2">
+                            <Label className="text-sm font-medium text-seguranca-yellow flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                              <span className="truncate">Horário do Intervalo</span>
+                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                            </Label>
+                            <Input
+                              name="horarioTrabalhoIntervalo"
+                              value={form.horarioTrabalhoIntervalo || ''}
+                              onChange={handleChange}
+                              placeholder="Ex: 12:00 ÀS 13:00 H"
+                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                            />
+                          </div>
+                        )}
 
                       </div>
                     </div>

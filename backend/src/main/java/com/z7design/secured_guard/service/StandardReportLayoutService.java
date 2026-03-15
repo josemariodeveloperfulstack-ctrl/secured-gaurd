@@ -237,8 +237,9 @@ public class StandardReportLayoutService {
                 // 1. Camada de Background (abaixo do conteúdo)
                 PdfCanvas backgroundCanvas = new PdfCanvas(page.newContentStreamBefore(), page.getResources(), pdfDoc);
 
-                // Tentar carregar template de fundo (retrato ou paisagem conforme orientação)
-                ImageData backgroundTemplateData = service.loadReportBackgroundTemplateData(config.isLandscape());
+                // Usar layout programático quando configurado (ex: contrato de cliente com layout correto)
+                boolean useProgrammatic = config.isUseProgrammaticLayout();
+                ImageData backgroundTemplateData = useProgrammatic ? null : service.loadReportBackgroundTemplateData(config.isLandscape());
                 if (backgroundTemplateData != null) {
                     try {
                         Image backgroundImage = new Image(backgroundTemplateData);

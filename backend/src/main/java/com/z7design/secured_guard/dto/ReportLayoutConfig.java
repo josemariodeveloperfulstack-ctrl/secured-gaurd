@@ -98,4 +98,13 @@ public class ReportLayoutConfig {
      */
     @Builder.Default
     private boolean landscape = false;
+
+    /**
+     * Usar layout programático (gradiente, forma escura) em vez do template PNG.
+     * Quando true, ignora report-background-template.png e desenha o layout correto
+     * conforme ORIENTACAO_LAYOUT_RELATORIOS.md.
+     * Padrão: false (usa template se existir)
+     */
+    @Builder.Default
+    private boolean useProgrammaticLayout = false;
 }
