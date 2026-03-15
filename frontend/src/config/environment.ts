@@ -191,8 +191,8 @@ export function getApiUrl(): string {
 
   // PROD: portal.promovervigilancia.com.br e securedguard servem frontend+backend no mesmo host.
   // Usar /api relativo evita ERR_CERT_AUTHORITY_INVALID e CORS (nginx faz proxy de /api para backend).
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  if (hostname === 'portal.promovervigilancia.com.br' || hostname === 'securedguard.z7botsolutions.com.br') {
+  const hn = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (hn === 'portal.promovervigilancia.com.br' || hn === 'securedguard.z7botsolutions.com.br') {
     console.log('🔧 Portal/Prod: usando API no mesmo host (/api)');
     return '/api';
   }
@@ -220,8 +220,8 @@ export function getWsUrl(): string {
 
   // PROD: portal/securedguard - WebSocket no mesmo host
   if (!url && typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'portal.promovervigilancia.com.br' || hostname === 'securedguard.z7botsolutions.com.br') {
+    const hn = window.location.hostname;
+    if (hn === 'portal.promovervigilancia.com.br' || hn === 'securedguard.z7botsolutions.com.br') {
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
       url = `${protocol}://${window.location.host}/ws`;
       console.log('🔧 Portal/Prod: WebSocket no mesmo host:', url);
