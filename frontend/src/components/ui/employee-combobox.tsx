@@ -29,6 +29,8 @@ interface EmployeeComboboxProps {
   disabled?: boolean;
   /** Mínimo de caracteres para disparar a busca (padrão: 3) */
   minChars?: number;
+  /** Nome do funcionário para exibir quando value está preenchido (ex.: ao editar) e o combobox ainda não carregou o item */
+  initialDisplayName?: string;
 }
 
 export function EmployeeCombobox({ 
@@ -38,7 +40,8 @@ export function EmployeeCombobox({
   searchPlaceholder = "Digite o nome do funcionário para buscar",
   emptyPlaceholder = "Nenhum funcionário encontrado.",
   disabled = false,
-  minChars = 3
+  minChars = 3,
+  initialDisplayName
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -100,6 +103,11 @@ export function EmployeeCombobox({
   }))
 
   const effectiveSelected = selectedEmployee || employees.find(emp => emp.id === value)
+  const displayLabel = effectiveSelected
+    ? `${effectiveSelected.name}${effectiveSelected.positionName ? ` - ${effectiveSelected.positionName}` : ''}${effectiveSelected.unitName ? ` (${effectiveSelected.unitName})` : ''}`
+    : value && initialDisplayName
+      ? initialDisplayName
+      : null
 
   return (
     <Popover open={open} onOpenChange={setOpen} modal={false}>
@@ -111,14 +119,10 @@ export function EmployeeCombobox({
           disabled={disabled}
           className="w-full justify-between border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50"
         >
-          {effectiveSelected ? (
+          {displayLabel ? (
             <div className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              <span className="truncate">
-                {effectiveSelected.name}
-                {effectiveSelected.positionName && ` - ${effectiveSelected.positionName}`}
-                {effectiveSelected.unitName && ` (${effectiveSelected.unitName})`}
-              </span>
+              <span className="truncate">{displayLabel}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">

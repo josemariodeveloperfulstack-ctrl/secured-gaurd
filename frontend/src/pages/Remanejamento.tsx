@@ -7,7 +7,6 @@ import { remanejamentoService, Remanejamento } from '@/services/remanejamentoSer
 import { Loader2, Plus, Filter, Search, RefreshCw, Download, Eye, Trash2 } from 'lucide-react';
 import { employeeService, Employee } from '@/services/employeeService';
 import { workPostService, WorkPost } from '@/services/workPostService';
-import { RemanejamentoTipo } from '@/types/remanejamento';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -16,29 +15,34 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatWorkPostDisplayName } from '@/utils/formatters';
-import ConfirmDeleteModal from '@/components/operacional/ConfirmDeleteModal';
+import { companyService } from '@/services/companyService';
 
-const tipoOptions = [
+const tipoOptions: { value: string; label: string }[] = [
   { value: '', label: 'Todos' },
   { value: 'TRANSFERENCIA_UNIDADE', label: 'Transferência de Unidade' },
+  { value: 'TRANSFERENCIA_POSTO_TRABALHO', label: 'Transferência de Posto de Trabalho' },
   { value: 'TROCA_FUNCAO', label: 'Troca de Função' },
   { value: 'PROMOCAO', label: 'Promoção' },
+  { value: 'COBRIR_FERIAS', label: 'Cobrir Férias' },
+  { value: 'COBRIR_FALTA', label: 'Cobrir Falta' },
+  { value: 'PLANTAO', label: 'Plantão' },
   { value: 'OUTROS', label: 'Outros' },
 ];
+
+const getTipoLabel = (tipo: string): string => tipoOptions.find(o => o.value === tipo)?.label || tipo || '-';
 
 const RemanejamentoPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRemanejamento, setSelectedRemanejamento] = useState<Remanejamento | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [remanejamentoToDelete, setRemanejamentoToDelete] = useState<Remanejamento | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     tipo: '',
     funcionarioId: '',
     dataInicio: '',
     dataFim: ''
   });
+  const [cannotDeleteModalOpen, setCannotDeleteModalOpen] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [companies, setCompanies] = useState<{ id: string; name: string; sigla?: string }[]>([]);
@@ -92,25 +96,14 @@ const RemanejamentoPage: React.FC = () => {
     return uuidRegex.test(str);
   };
 
-  // Função helper para obter o nome do posto de trabalho (sem prefixo WP)
-  const getWorkPostName = (workstationId: string | undefined | null): string => {
-    if (!workstationId) {
-      return '-';
-    }
-
-    // Se é um UUID válido, buscar na lista de postos de trabalho
-    if (isValidUUID(workstationId)) {
+  // Função helper para obter o nome do posto de trabalho (com fallback origem/destino)
+  const getWorkPostName = (workstationId: string | undefined | null, fallback?: string): string => {
+    if (workstationId && isValidUUID(workstationId)) {
       const workPost = workPosts.find(wp => wp.id === workstationId);
-      if (workPost) {
-        return formatWorkPostDisplayName(workPost);
-      }
-      
-      // Se não encontrar e ainda está carregando, mostrar mensagem
-      if (workPosts.length === 0) {
-        return 'Carregando...';
-      }
+      if (workPost) return formatWorkPostDisplayName(workPost);
     }
-
+    if (fallback && fallback.trim()) return fallback.trim();
+    if (workstationId && workPosts.length === 0) return 'Carregando...';
     return '-';
   };
 
@@ -120,20 +113,26 @@ const RemanejamentoPage: React.FC = () => {
     queryFn: () => remanejamentoService.getRemanejamentosTyped(),
   });
 
-  // Filtrar no frontend
+  // Filtrar no frontend (filtros + busca por texto)
   const remanejamentos = React.useMemo(() => {
     if (!remanejamentosRaw) return [];
+    const term = searchTerm.trim().toLowerCase();
     return remanejamentosRaw.filter(rem => {
-      // Corrigir: usar rem.tipo ao invés de rem.status
       if (filters.tipo && rem.tipo !== filters.tipo) return false;
       if (filters.funcionarioId && rem.employeeId !== filters.funcionarioId) return false;
-      // Usar dataRemanejamento ou remanejamentoDate
       const remanejamentoDate = rem.dataRemanejamento || rem.remanejamentoDate;
       if (filters.dataInicio && remanejamentoDate && remanejamentoDate < filters.dataInicio) return false;
       if (filters.dataFim && remanejamentoDate && remanejamentoDate > filters.dataFim) return false;
+      if (term) {
+        const employeeName = (rem.employeeName || employees.find(e => e.id === rem.employeeId)?.name || '').toLowerCase();
+        const observacao = (rem.observacao || rem.notes || '').toLowerCase();
+        const origem = (rem.origem || '').toLowerCase();
+        const destino = (rem.destino || '').toLowerCase();
+        if (!employeeName.includes(term) && !observacao.includes(term) && !origem.includes(term) && !destino.includes(term)) return false;
+      }
       return true;
     });
-  }, [remanejamentosRaw, filters]);
+  }, [remanejamentosRaw, filters, searchTerm, employees]);
 
   const handleOpenModal = () => {
     setSelectedRemanejamento(null);
@@ -159,35 +158,8 @@ const RemanejamentoPage: React.FC = () => {
     setViewModalOpen(true);
   };
 
-  const handleDelete = (rem: Remanejamento) => {
-    setRemanejamentoToDelete(rem);
-    setDeleteModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!remanejamentoToDelete) return;
-
-    setIsDeleting(true);
-    try {
-      await remanejamentoService.deleteRemanejamento(remanejamentoToDelete.id);
-      toast({
-        title: "Sucesso!",
-        description: "Remanejamento excluído com sucesso.",
-        variant: "default",
-      });
-      setDeleteModalOpen(false);
-      setRemanejamentoToDelete(null);
-      refetch();
-    } catch (error: any) {
-      console.error('Erro ao excluir remanejamento:', error);
-      toast({
-        title: "Erro!",
-        description: error?.response?.data?.message || "Erro ao excluir remanejamento. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
+  const handleDelete = (_rem: Remanejamento) => {
+    setCannotDeleteModalOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -197,6 +169,7 @@ const RemanejamentoPage: React.FC = () => {
   };
 
   const handleClearFilters = () => {
+    setSearchTerm('');
     setFilters({
       tipo: '',
       funcionarioId: '',
@@ -361,6 +334,8 @@ const RemanejamentoPage: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
                     type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Buscar por funcionário, unidade ou observação..."
                     className="w-full pl-10 pr-4 py-2 bg-seguranca-black border border-gray-600 rounded text-seguranca-lightgray focus:border-seguranca-yellow focus:outline-none text-sm"
                   />
@@ -421,11 +396,11 @@ const RemanejamentoPage: React.FC = () => {
                           <td className="p-3 text-sm font-medium">{rem.employeeName || employees.find(e => e.id === rem.employeeId)?.name || '-'}</td>
                           <td className="p-3 text-sm">
                             <Badge className="bg-blue-500 text-white text-xs">
-                              {rem.tipo || rem.status || '-'}
+                              {getTipoLabel(rem.tipo || rem.status || '')}
                             </Badge>
                           </td>
-                          <td className="p-3 text-sm">{getWorkPostName(rem.originWorkstationId)}</td>
-                          <td className="p-3 text-sm">{getWorkPostName(rem.destinationWorkstationId)}</td>
+                          <td className="p-3 text-sm">{getWorkPostName(rem.originWorkstationId, rem.origem)}</td>
+                          <td className="p-3 text-sm">{getWorkPostName(rem.destinationWorkstationId, rem.destino)}</td>
                           <td className="p-3 text-sm">{new Date(rem.dataRemanejamento || rem.remanejamentoDate || '').toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 text-sm max-w-xs truncate">{rem.observacao || rem.notes || '-'}</td>
                           <td className="p-3 text-sm w-40">
@@ -678,7 +653,7 @@ const RemanejamentoPage: React.FC = () => {
                   <Label className="text-seguranca-lightgray">Tipo</Label>
                   <div className="bg-seguranca-black border border-gray-600 rounded p-3">
                     <Badge className="bg-blue-500 text-white text-xs">
-                      {selectedRemanejamento.tipo || selectedRemanejamento.status || '-'}
+                      {getTipoLabel(selectedRemanejamento.tipo || selectedRemanejamento.status || '')}
                     </Badge>
                   </div>
                 </div>
@@ -688,14 +663,14 @@ const RemanejamentoPage: React.FC = () => {
                 <div className="space-y-2">
                   <Label className="text-seguranca-lightgray">Posto de Trabalho de Origem</Label>
                   <div className="bg-seguranca-black border border-gray-600 rounded p-3 text-seguranca-lightgray">
-                    {getWorkPostName(selectedRemanejamento.originWorkstationId)}
+                    {getWorkPostName(selectedRemanejamento.originWorkstationId, selectedRemanejamento.origem)}
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <Label className="text-seguranca-lightgray">Posto de Trabalho de Destino</Label>
                   <div className="bg-seguranca-black border border-gray-600 rounded p-3 text-seguranca-lightgray">
-                    {getWorkPostName(selectedRemanejamento.destinationWorkstationId)}
+                    {getWorkPostName(selectedRemanejamento.destinationWorkstationId, selectedRemanejamento.destino)}
                   </div>
                 </div>
               </div>
@@ -739,17 +714,32 @@ const RemanejamentoPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Confirmação de Exclusão */}
-      <ConfirmDeleteModal
-        open={deleteModalOpen}
-        onOpenChange={setDeleteModalOpen}
-        onConfirm={confirmDelete}
-        title="Excluir Remanejamento"
-        description="Tem certeza que deseja excluir este remanejamento?"
-        itemName={remanejamentoToDelete ? 
-          `${remanejamentoToDelete.employeeName || employees.find(e => e.id === remanejamentoToDelete.employeeId)?.name || 'Remanejamento'} - ${remanejamentoToDelete.tipo || remanejamentoToDelete.status || ''}` : 
-          ''}
-      />
+      {/* Modal informativo: remanejamento não pode ser excluído */}
+      <Dialog open={cannotDeleteModalOpen} onOpenChange={setCannotDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md bg-seguranca-graphite border-gray-600">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray">Remanejamento não pode ser excluído</DialogTitle>
+            <DialogDescription asChild>
+              <div className="text-gray-400 text-sm space-y-2 pt-1">
+                <p>
+                  A exclusão de um remanejamento repercutiria no <strong className="text-seguranca-lightgray">Módulo Operacional</strong> e no <strong className="text-seguranca-lightgray">histórico do funcionário</strong>, por isso esta ação não é permitida.
+                </p>
+                <p>
+                  Para alterar dados do remanejamento, utilize a opção <strong className="text-seguranca-yellow">Editar</strong>.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setCannotDeleteModalOpen(false)}
+              className="bg-seguranca-yellow hover:bg-yellow-500 text-black"
+            >
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </StandardLayout>
   );
 };

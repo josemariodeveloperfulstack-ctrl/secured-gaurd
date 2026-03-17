@@ -225,6 +225,7 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
                   placeholder="Selecione o funcionário"
                   searchPlaceholder="Digite pelo menos 3 caracteres para buscar pelo nome..."
                   minChars={3}
+                  initialDisplayName={initialRemanejamento?.employeeName}
                 />
               </div>
               <div>
