@@ -107,4 +107,11 @@ public class ReportLayoutConfig {
      */
     @Builder.Default
     private boolean useProgrammaticLayout = false;
+
+    /**
+     * Exibir numeração de páginas no rodapé (ex: "Página 1", "Página 2", ...).
+     * Padrão: true
+     */
+    @Builder.Default
+    private boolean showPageNumbers = true;
 }

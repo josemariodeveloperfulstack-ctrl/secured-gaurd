@@ -190,21 +190,14 @@ export default function RemanejamentoFormModal({
                 <Label htmlFor="employeeId" className="text-seguranca-lightgray font-medium">
                   Funcionário <span className="text-seguranca-red">*</span>
                 </Label>
-                <Select
+                <EmployeeCombobox
                   value={watch('employeeId')}
-                  onValueChange={(value) => setValue('employeeId', value)}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder="Selecione o funcionário" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setValue('employeeId', value)}
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite pelo menos 3 caracteres para buscar pelo nome..."
+                  emptyPlaceholder="Nenhum funcionário encontrado."
+                  minChars={3}
+                />
                 {errors.employeeId && (
                   <p className="text-sm text-seguranca-red">{errors.employeeId.message}</p>
                 )}
@@ -284,9 +277,9 @@ export default function RemanejamentoFormModal({
                   <WorkPostCombobox
                     value={watch('destino')}
                     onChange={(value) => setValue('destino', value)}
-                    placeholder="Selecione o posto de destino (qualquer posto do sistema)"
+                    placeholder="Selecione o posto de trabalho de destino"
                     searchPlaceholder="Digite para buscar pelo nome ou código..."
-                    emptyPlaceholder="Nenhum posto encontrado."
+                    emptyPlaceholder="Nenhum posto de trabalho encontrado."
                   />
                   {errors.destino && (
                     <p className="text-sm text-seguranca-red">{errors.destino.message}</p>

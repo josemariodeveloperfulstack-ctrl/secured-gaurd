@@ -401,12 +401,25 @@ export const employeeService = {
    * Gerar PDF do relatório detalhado de funcionários (mesmo layout do Relatório de Veículos).
    * companyId opcional (quando filtro "Todas as Empresas", o backend usa empresa dos funcionários ou primeira ativa).
    * employeeIds opcional (lista vazia = todos).
+   * columns opcional (lista de colunas a exibir no PDF; se vazia, usa padrão).
    */
-  async exportEmployeesReportPdf(companyId: string | null | undefined, employeeIds: string[]): Promise<Blob> {
+  async exportEmployeesReportPdf(
+    companyId: string | null | undefined,
+    employeeIds: string[],
+    columns?: string[],
+    groupBy?: 'FUNCIONARIO' | 'POSTO_TRABALHO',
+    orderBy?: 'FUNCIONARIO' | 'POSTO_TRABALHO'
+  ): Promise<Blob> {
     try {
       const response = await api.post(
         '/api/employees/report/pdf',
-        { companyId: companyId || null, employeeIds: employeeIds || [] },
+        {
+          companyId: companyId || null,
+          employeeIds: employeeIds || [],
+          columns: columns && columns.length > 0 ? columns : undefined,
+          groupBy: groupBy || null,
+          orderBy: orderBy || null,
+        },
         { responseType: 'blob' }
       );
       if (response.data instanceof Blob && response.data.type === 'application/json') {

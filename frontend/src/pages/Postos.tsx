@@ -342,13 +342,45 @@ const Postos: React.FC = () => {
     }
   };
 
-  // Estatísticas
+  // Estatísticas (conjunto completo)
   const stats = {
     total: workPosts.length,
     ativos: workPosts.filter(wp => wp.status === 'ATIVO').length,
     emImplantacao: workPosts.filter(wp => wp.status === 'EM_IMPLANTACAO').length,
     inativos: workPosts.filter(wp => wp.status === 'INATIVO').length,
-    totalVigilantes: workPosts.reduce((total, wp) => total + wp.requiredVigilantes, 0)
+    totalVigilantes: workPosts.reduce((total, wp) => total + (wp.requiredVigilantes ?? 0), 0)
+  };
+
+  const handleGeneratePdf = async () => {
+    try {
+      const blob = await workPostService.exportReportPdf({
+        searchTerm: searchTerm.trim() || undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        clientId: clientFilter !== 'all' ? clientFilter : undefined,
+        city: cityFilter.trim() || undefined,
+        state: stateFilter.trim() || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `postos-de-trabalho-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({
+        title: 'Relatório gerado',
+        description: 'O PDF foi gerado com o layout padrão do sistema.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar o relatório em PDF.',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (loading) {
@@ -375,10 +407,16 @@ const Postos: React.FC = () => {
               Gerencie os postos de trabalho e suas implantações
             </p>
           </div>
-          <Button onClick={handleCreateWorkPost}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Posto
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleGeneratePdf}>
+              <FileText className="h-4 w-4 mr-2" />
+              Gerar Relatório PDF
+            </Button>
+            <Button onClick={handleCreateWorkPost}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Posto
+            </Button>
+          </div>
         </div>
 
         {/* Estatísticas */}

@@ -223,7 +223,8 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
                   value={form.employeeId}
                   onChange={(v) => setForm(prev => ({ ...prev, employeeId: v }))}
                   placeholder="Selecione o funcionário"
-                  searchPlaceholder="Digite para buscar pelo nome..."
+                  searchPlaceholder="Digite pelo menos 3 caracteres para buscar pelo nome..."
+                  minChars={3}
                 />
               </div>
               <div>

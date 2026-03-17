@@ -585,4 +585,13 @@ public class Employee {
     public String getFullName() {
         return this.name;
     }
+
+    /**
+     * Data de vencimento das próximas férias (computada externamente ou via DTO).
+     * Campo transiente para compatibilidade com relatórios; retorna null se não calculado.
+     */
+    @Transient
+    public LocalDate getProximasFeriasVencimento() {
+        return null;
+    }
 }

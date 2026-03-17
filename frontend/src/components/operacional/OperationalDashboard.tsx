@@ -41,6 +41,7 @@ import AbsenceFormModal from './AbsenceFormModal';
 import WorkPostAssignmentFormModal from './WorkPostAssignmentFormModal';
 import SpecificActivityFormModal from './SpecificActivityFormModal';
 import RemanejamentoFormModal from './RemanejamentoFormModal';
+import RemanejamentoReportModal from './RemanejamentoReportModal';
 import VacationCoverageFormModal from './VacationCoverageFormModal';
 import VacationCoverageStatusModal from './VacationCoverageStatusModal';
 import ChangeStatusModal from './ChangeStatusModal';
@@ -85,6 +86,7 @@ const OperationalDashboard: React.FC = () => {
   const [selectedRemanejamento, setSelectedRemanejamento] = useState<Remanejamento | null>(null);
   const [showDeleteRemanejamentoModal, setShowDeleteRemanejamentoModal] = useState(false);
   const [remanejamentoToDelete, setRemanejamentoToDelete] = useState<Remanejamento | null>(null);
+  const [showRemanejamentoReportModal, setShowRemanejamentoReportModal] = useState(false);
 
   const { toast } = useToast();
 
@@ -570,24 +572,8 @@ const OperationalDashboard: React.FC = () => {
     }
   };
 
-  const handleGenerateRemanejamentoReport = async () => {
-    try {
-      toast({ title: 'Aguarde', description: 'Gerando relatório PDF...' });
-      const blob = await remanejamentoService.exportRemanejamentosReportPDF({});
-      downloadBlob(blob, `relatorio-remanejamentos-${new Date().toISOString().split('T')[0]}.pdf`);
-
-      toast({
-        title: 'Sucesso',
-        description: 'Relatório de Remanejamentos gerado com sucesso.',
-      });
-    } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao gerar relatório PDF. Tente novamente.',
-        variant: 'destructive',
-      });
-    }
+  const handleOpenRemanejamentoReportModal = () => {
+    setShowRemanejamentoReportModal(true);
   };
 
   const handleSubmitAssignment = async (data: CreateWorkPostAssignmentDTO) => {
@@ -1333,7 +1319,7 @@ const OperationalDashboard: React.FC = () => {
                   Remanejamentos ({remanejamentos.length})
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Button onClick={handleGenerateRemanejamentoReport} size="sm" variant="outline">
+                  <Button onClick={handleOpenRemanejamentoReportModal} size="sm" variant="outline">
                     <FileText className="h-4 w-4 mr-2" />
                     Gerar Relatório
                   </Button>
@@ -1525,6 +1511,12 @@ const OperationalDashboard: React.FC = () => {
         remanejamento={selectedRemanejamento}
         onSubmit={handleSubmitRemanejamento}
         employees={employees}
+      />
+
+      {/* Modal de Relatório de Remanejamentos */}
+      <RemanejamentoReportModal
+        open={showRemanejamentoReportModal}
+        onOpenChange={setShowRemanejamentoReportModal}
       />
 
       {/* Modal de Confirmação de Exclusão - Remanejamento */}

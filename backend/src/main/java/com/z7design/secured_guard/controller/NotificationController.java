@@ -2,10 +2,13 @@ package com.z7design.secured_guard.controller;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,8 +20,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.z7design.secured_guard.model.Notification;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.NotificationStatus;
 import com.z7design.secured_guard.model.enums.NotificationType;
+import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.service.NotificationService;
 import com.z7design.secured_guard.service.EmailService;
 import com.z7design.secured_guard.dto.ErrorResponse;
@@ -46,6 +51,7 @@ public class NotificationController {
 
         private final NotificationService notificationService;
         private final EmailService emailService;
+        private final UserRepository userRepository;
 
         @PostMapping
         public ResponseEntity<com.z7design.secured_guard.model.Notification> create(
@@ -128,11 +134,41 @@ public class NotificationController {
         @PostMapping("/panel")
         public ResponseEntity<PanelNotificationDTO> createPanelNotification(
                         @RequestBody PanelNotificationDTO notificationDTO) {
-                com.z7design.secured_guard.model.Notification n = new com.z7design.secured_guard.model.Notification();
-                n.setMessage(notificationDTO.getTitulo() + ": " + notificationDTO.getDescricao());
-                n.setType(com.z7design.secured_guard.model.enums.NotificationType.INFO);
-                n.setStatus(com.z7design.secured_guard.model.enums.NotificationStatus.UNREAD);
+                User targetUser = resolveTargetUser(notificationDTO.getDestinatario());
+                if (targetUser == null) {
+                        return ResponseEntity.badRequest().build();
+                }
+                String titulo = notificationDTO.getTitulo() != null ? notificationDTO.getTitulo() : "Notificação";
+                String descricao = notificationDTO.getDescricao() != null ? notificationDTO.getDescricao() : "";
+                String message = (titulo + ": " + descricao).trim();
+                if (message.length() < 10) {
+                        message = message + " (painel)";
+                }
+                if (message.length() > 1000) {
+                        message = message.substring(0, 997) + "...";
+                }
+                Notification n = Notification.builder()
+                        .user(targetUser)
+                        .title(titulo.length() > 100 ? titulo.substring(0, 97) + "..." : titulo)
+                        .message(message)
+                        .type(NotificationType.INFO)
+                        .status(NotificationStatus.UNREAD)
+                        .build();
                 notificationService.create(n);
                 return ResponseEntity.ok(notificationDTO);
+        }
+
+        private User resolveTargetUser(String destinatario) {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth == null || !auth.isAuthenticated()) {
+                        return null;
+                }
+                if (destinatario != null && !destinatario.isBlank() && destinatario.contains("@")) {
+                        Optional<User> byEmail = userRepository.findByEmail(destinatario.trim());
+                        if (byEmail.isPresent()) {
+                                return byEmail.get();
+                        }
+                }
+                return userRepository.findByUsername(auth.getName()).orElse(null);
         }
 }

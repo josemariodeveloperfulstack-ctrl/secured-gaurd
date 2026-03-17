@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.model.enums.ReportGroupBy;
+import com.z7design.secured_guard.model.enums.ReportOrderBy;
 import com.z7design.secured_guard.service.EmployeeReportPdfService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,10 +37,13 @@ public class EmployeeReportController {
     public static class EmployeeReportPdfRequest {
         private UUID companyId;
         private List<UUID> employeeIds;
+        private List<String> columns; // Colunas customizadas para o relatório (ex: name, registrationNumber, status, ...)
+        private ReportGroupBy groupBy; // Agrupar por FUNCIONARIO ou POSTO_TRABALHO
+        private ReportOrderBy orderBy; // Ordenação primária: FUNCIONARIO ou POSTO_TRABALHO (alfabética)
     }
 
     @PostMapping("/pdf")
-    @Operation(summary = "Gerar PDF do relatório de funcionários", description = "Gera PDF com o mesmo layout do Relatório de Veículos. companyId opcional (quando 'Todas as Empresas'); employeeIds opcional.")
+    @Operation(summary = "Gerar PDF do relatório de funcionários", description = "Gera PDF personalizado. companyId opcional; employeeIds opcional; columns opcional (lista de colunas a exibir).")
     public ResponseEntity<?> generateEmployeeReportPdf(@RequestBody EmployeeReportPdfRequest request) {
         try {
             if (request == null) {
@@ -49,7 +54,10 @@ public class EmployeeReportController {
 
             byte[] pdfBytes = employeeReportPdfService.generateEmployeeReportPDF(
                     request.getCompanyId(),
-                    request.getEmployeeIds());
+                    request.getEmployeeIds(),
+                    request.getColumns(),
+                    request.getGroupBy(),
+                    request.getOrderBy());
 
             if (pdfBytes == null || pdfBytes.length == 0) {
                 Map<String, String> error = new HashMap<>();

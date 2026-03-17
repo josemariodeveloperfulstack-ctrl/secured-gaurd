@@ -42,7 +42,7 @@ export function WorkPostCombobox({
   const [loading, setLoading] = React.useState(false)
   const [selectedPostCache, setSelectedPostCache] = React.useState<WorkPost | null>(null)
 
-  // Carregar postos ao abrir
+  // Carregar postos de trabalho ao abrir (apenas Postos de Trabalho da tabela work_posts)
   React.useEffect(() => {
     if (!open) return
     setLoading(true)
@@ -71,7 +71,7 @@ export function WorkPostCombobox({
   const selectedPost = workPosts.find(wp => String(wp.id) === value) ?? selectedPostCache
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -95,7 +95,7 @@ export function WorkPostCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[var(--radix-popover-trigger-width)] p-0 bg-seguranca-graphite border-gray-600 z-[10002] shadow-lg"
+        className="w-[var(--radix-popover-trigger-width)] p-0 bg-seguranca-graphite border-gray-600 z-[10100] shadow-lg"
       >
         <Command className="bg-seguranca-graphite text-seguranca-lightgray" shouldFilter={true}>
           <CommandInput

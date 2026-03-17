@@ -553,22 +553,40 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     }
   }, [open]);
 
-  // Carregar Postos de Trabalho e Departamentos
+  // Carregar Departamentos
   useEffect(() => {
-    const loadWorkPostsAndDepartments = async () => {
+    const loadDepartments = async () => {
       try {
-        const [wp, deps] = await Promise.all([
-          workPostService.getAllWorkPosts(),
-          departmentService.listActive(),
-        ]);
-        setWorkPosts(wp);
+        const deps = await departmentService.listActive();
         setDepartments(deps);
       } catch (e) {
-        console.error('Erro ao carregar postos/departamentos', e);
+        console.error('Erro ao carregar departamentos', e);
       }
     };
-    loadWorkPostsAndDepartments();
+    loadDepartments();
   }, []);
+
+  // Função para carregar Postos de Trabalho (pode ser filtrado por empresa)
+  const loadWorkPostsData = async (companyId?: string) => {
+    try {
+      let wp;
+      if (companyId) {
+        wp = await workPostService.getWorkPostsByCompany(companyId);
+      } else {
+        wp = await workPostService.getAllWorkPosts();
+      }
+      setWorkPosts(wp);
+    } catch (e) {
+      console.error('Erro ao carregar postos de trabalho', e);
+    }
+  };
+
+  // Carregar Postos de Trabalho quando a empresa mudar
+  useEffect(() => {
+    if (open) {
+      loadWorkPostsData(selectedCompany?.id);
+    }
+  }, [selectedCompany?.id, open]); // Re-carregar também ao abrir o modal
 
   // Atualizar selectedCompany quando companies forem carregadas e houver employeeToEdit
   useEffect(() => {
@@ -1382,12 +1400,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const handleCompanySelect = (companyId: string) => {
     if (companyId === 'none') {
       setSelectedCompany(null);
-      setForm(prev => ({ ...prev, company: { id: '' } }));
+      setForm(prev => ({ 
+        ...prev, 
+        company: { id: '' },
+        workPostId: '' // Limpar posto ao remover empresa
+      }));
     } else {
       const company = companies.find(c => c.id === companyId);
       if (company) {
         setSelectedCompany(company);
-        setForm(prev => ({ ...prev, company: { id: company.id } }));
+        setForm(prev => ({ 
+          ...prev, 
+          company: { id: company.id },
+          workPostId: '' // Limpar posto ao trocar empresa
+        }));
       }
     }
   };

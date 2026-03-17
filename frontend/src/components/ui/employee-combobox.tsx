@@ -27,6 +27,8 @@ interface EmployeeComboboxProps {
   searchPlaceholder?: string;
   emptyPlaceholder?: string;
   disabled?: boolean;
+  /** Mínimo de caracteres para disparar a busca (padrão: 3) */
+  minChars?: number;
 }
 
 export function EmployeeCombobox({ 
@@ -35,7 +37,8 @@ export function EmployeeCombobox({
   placeholder = "Selecione o funcionário",
   searchPlaceholder = "Digite o nome do funcionário para buscar",
   emptyPlaceholder = "Nenhum funcionário encontrado.",
-  disabled = false
+  disabled = false,
+  minChars = 3
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -44,9 +47,9 @@ export function EmployeeCombobox({
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const [selectedEmployee, setSelectedEmployee] = React.useState<SimpleEmployee | null>(null)
 
-  // Buscar funcionários quando o usuário digitar (a partir de 1 caractere)
+  // Buscar funcionários quando o usuário digitar (a partir de minChars caracteres)
   React.useEffect(() => {
-    if (debouncedSearchTerm.trim().length >= 1) {
+    if (debouncedSearchTerm.trim().length >= minChars) {
       setLoading(true)
       employeeService.searchSimpleEmployees(debouncedSearchTerm.trim())
         .then(setEmployees)
@@ -58,7 +61,7 @@ export function EmployeeCombobox({
     } else {
       setEmployees([])
     }
-  }, [debouncedSearchTerm])
+  }, [debouncedSearchTerm, minChars])
 
   // Garantir que o funcionário selecionado apareça na lista mesmo se não estiver carregado
   React.useEffect(() => {
@@ -99,7 +102,7 @@ export function EmployeeCombobox({
   const effectiveSelected = selectedEmployee || employees.find(emp => emp.id === value)
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -127,7 +130,7 @@ export function EmployeeCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-full p-0 bg-seguranca-graphite border-gray-600 z-[10002] shadow-lg"
+        className="w-full p-0 bg-seguranca-graphite border-gray-600 z-[10100] shadow-lg"
       >
         <Command
           filter={() => true}
@@ -147,8 +150,8 @@ export function EmployeeCombobox({
             ) : (
               <>
                 <CommandEmpty className="text-seguranca-lightgray">
-                  {searchTerm.trim().length < 1
-                    ? "Digite o nome do funcionário para buscar..."
+                  {searchTerm.trim().length < minChars
+                    ? `Digite pelo menos ${minChars} caracteres para buscar...`
                     : emptyPlaceholder
                   }
                 </CommandEmpty>

@@ -1117,22 +1117,6 @@ Para excluir este funcionário:
                   Atualizar
                 </Button>
                 <Button
-                  variant="outline"
-                  className="border-blue-600/50 text-blue-400 hover:bg-blue-900/20"
-                  onClick={() => setExcelImportModalOpen(true)}
-                >
-                  <FileSpreadsheet size={20} className="mr-2" />
-                  Importar Excel
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-yellow-600/50 text-yellow-400 hover:bg-yellow-900/20"
-                  onClick={() => { setPromoverImportResult(null); setPromoverImportModalOpen(true); }}
-                >
-                  <Upload size={20} className="mr-2" />
-                  Importar Planilha Promover
-                </Button>
-                <Button
                   onClick={() => setIsMobileSelectionMode(!isMobileSelectionMode)}
                   variant={isMobileSelectionMode ? "destructive" : "outline"}
                   className={`lg:hidden h-11 px-4 border-gray-600 transition-all duration-300 ${isMobileSelectionMode ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-white'}`}

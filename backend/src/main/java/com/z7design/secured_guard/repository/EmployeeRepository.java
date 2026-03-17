@@ -68,7 +68,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN companies c ON e.company_id = c.id " +
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
-                        "WHERE (:status IS NULL OR e.status::text = :status) " +
+                        "WHERE (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.created_at DESC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataPaged(@Param("limit") int limit, @Param("offset") int offset, @Param("status") String status);
@@ -82,7 +82,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN companies c ON e.company_id = c.id " +
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
-                        "WHERE e.company_id = :companyId AND (:status IS NULL OR e.status::text = :status) " +
+                        "WHERE e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.created_at DESC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataPagedByCompany(@Param("limit") int limit, @Param("offset") int offset, @Param("companyId") UUID companyId, @Param("status") String status);
@@ -116,7 +116,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) "
                         +
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
-                        "AND (:status IS NULL OR e.status::text = :status) " +
+                        "AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.created_at DESC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTermPaged(@Param("searchTerm") String searchTerm,
@@ -137,7 +137,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) "
                         +
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
-                        "AND e.company_id = :companyId AND (:status IS NULL OR e.status::text = :status) " +
+                        "AND e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.created_at DESC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTermPagedByCompany(@Param("searchTerm") String searchTerm,

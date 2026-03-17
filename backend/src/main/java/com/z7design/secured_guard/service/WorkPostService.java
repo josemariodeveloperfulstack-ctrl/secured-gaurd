@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.WorkPostDTO;
+import com.z7design.secured_guard.dto.WorkPostReportFilterDTO;
 import com.z7design.secured_guard.exception.BusinessException;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.WorkPost;
@@ -232,7 +233,58 @@ public class WorkPostService {
     public Page<WorkPost> findByFilters(UUID clientId, WorkPostStatus status, WorkPostType type, String searchTerm, Pageable pageable) {
         return workPostRepository.findByFilters(clientId, status, type, searchTerm, pageable);
     }
-    
+
+    /**
+     * Busca postos aplicando os filtros do relatório (mesma lógica da tela de listagem).
+     */
+    @Transactional(readOnly = true)
+    public List<WorkPost> findForReport(WorkPostReportFilterDTO filters) {
+        List<WorkPost> all = workPostRepository.findAllWithRelationships();
+        if (all == null) all = workPostRepository.findAll();
+        if (all == null || all.isEmpty()) return List.of();
+
+        String search = filters != null && filters.getSearchTerm() != null ? filters.getSearchTerm().trim() : "";
+        String statusStr = filters != null && filters.getStatus() != null && !"all".equalsIgnoreCase(filters.getStatus()) ? filters.getStatus().trim() : null;
+        String typeStr = filters != null && filters.getType() != null && !"all".equalsIgnoreCase(filters.getType()) ? filters.getType().trim() : null;
+        String clientIdStr = filters != null && filters.getClientId() != null && !"all".equalsIgnoreCase(filters.getClientId()) ? filters.getClientId().trim() : null;
+        String city = filters != null && filters.getCity() != null ? filters.getCity().trim() : "";
+        String state = filters != null && filters.getState() != null ? filters.getState().trim() : "";
+
+        WorkPostStatus statusFilter = null;
+        if (statusStr != null && !statusStr.isEmpty()) {
+            try {
+                statusFilter = WorkPostStatus.valueOf(statusStr);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        WorkPostType typeFilter = null;
+        if (typeStr != null && !typeStr.isEmpty()) {
+            try {
+                typeFilter = WorkPostType.valueOf(typeStr);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        UUID clientUuid = null;
+        if (clientIdStr != null && !clientIdStr.isEmpty()) {
+            try {
+                clientUuid = UUID.fromString(clientIdStr);
+            } catch (IllegalArgumentException ignored) { }
+        }
+
+        final WorkPostStatus s = statusFilter;
+        final WorkPostType t = typeFilter;
+        final UUID cId = clientUuid;
+        return all.stream()
+                .filter(wp -> search.isEmpty() ||
+                        (wp.getName() != null && wp.getName().toLowerCase().contains(search.toLowerCase())) ||
+                        (wp.getPostCode() != null && wp.getPostCode().toLowerCase().contains(search.toLowerCase())) ||
+                        (wp.getAddress() != null && wp.getAddress().toLowerCase().contains(search.toLowerCase())))
+                .filter(wp -> s == null || wp.getStatus() == s)
+                .filter(wp -> t == null || wp.getType() == t)
+                .filter(wp -> cId == null || (wp.getClient() != null && cId.equals(wp.getClient().getId())))
+                .filter(wp -> city.isEmpty() || (wp.getCity() != null && wp.getCity().toLowerCase().contains(city.toLowerCase())))
+                .filter(wp -> state.isEmpty() || (wp.getState() != null && wp.getState().toLowerCase().contains(state.toLowerCase())))
+                .toList();
+    }
+
     // Métodos de criação e atualização
     public WorkPost createWorkPost(WorkPostDTO workPostDTO) {
         // Validar se o código do posto já existe

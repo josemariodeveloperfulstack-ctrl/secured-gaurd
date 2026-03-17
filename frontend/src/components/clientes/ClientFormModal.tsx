@@ -113,6 +113,50 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [isPostDeleteDialogOpen, setIsPostDeleteDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<WorkPost | null>(null);
   const [editingPost, setEditingPost] = useState<WorkPost | null>(null);
+  const [loadingCep, setLoadingCep] = useState(false);
+
+  const buscarCep = async (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return;
+
+    setLoadingCep(true);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cep/v1/${cepLimpo}`);
+
+      if (response.ok) {
+        const data = await response.json();
+        const enderecoCompleto = [data.street, data.neighborhood, data.city]
+          .filter(Boolean)
+          .join(', ');
+        setFormData(prev => ({
+          ...prev,
+          address: enderecoCompleto || prev.address,
+          city: data.city || prev.city,
+          state: data.state || prev.state,
+          zipCode: formatZipCode(cepLimpo)
+        }));
+        toast({
+          title: "CEP encontrado",
+          description: "Endereço preenchido automaticamente.",
+        });
+      } else {
+        toast({
+          title: "CEP não encontrado",
+          description: "Verifique o CEP digitado.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível buscar o CEP.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCep(false);
+    }
+  };
 
   const loadWorkPosts = async () => {
     if (!client?.id) return;
@@ -508,14 +552,28 @@ export const ClientFormModal: React.FC<ClientFormModalProps> = ({
                       <Hash className="h-4 w-4" />
                       CEP
                     </Label>
-                    <Input
-                      id="zipCode"
-                      value={formData.zipCode}
-                      onChange={(e) => handleInputChange('zipCode', formatZipCode(e.target.value))}
-                      placeholder="00000-000"
-                      maxLength={9}
-                      className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 font-mono h-11"
-                    />
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        id="zipCode"
+                        value={formData.zipCode}
+                        onChange={(e) => {
+                          const valor = formatZipCode(e.target.value);
+                          handleInputChange('zipCode', valor);
+                          const cepLimpo = valor.replace(/\D/g, '');
+                          if (cepLimpo.length === 8) {
+                            buscarCep(cepLimpo);
+                          }
+                        }}
+                        placeholder="00000-000"
+                        maxLength={9}
+                        className="border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 font-mono h-11"
+                      />
+                      {loadingCep && (
+                        <div className="flex-shrink-0 text-seguranca-yellow">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-yellow" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </TabsContent>

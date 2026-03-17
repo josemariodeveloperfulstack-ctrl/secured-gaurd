@@ -25,6 +25,7 @@ import {
   User,
   Building2,
   ArrowRightLeft,
+  Search,
 } from 'lucide-react';
 import { employeeService } from '@/services/employeeService';
 import { operationalService, WorkPostAssignment } from '@/services/operationalService';
@@ -40,6 +41,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import { RelatoriosModal } from '@/components/funcionarios/RelatoriosModal';
 import { Employee } from '@/types/employee';
 
@@ -99,6 +101,7 @@ export const OperationalEmployeesTab: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState<string | null>(null);
   const [employeeToEdit, setEmployeeToEdit] = useState<EmployeeWithDetails | null>(null);
   const [relatoriosModalOpen, setRelatoriosModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -136,14 +139,32 @@ export const OperationalEmployeesTab: React.FC = () => {
 
   const sortedEmployees = [...employees].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-  const employeesByCompany = sortedEmployees.reduce((acc, emp) => {
+  const searchLower = searchTerm.trim().toLowerCase();
+  const filteredEmployees = searchLower
+    ? sortedEmployees.filter((emp) => {
+        const name = (emp.name || '').toLowerCase();
+        const matricula = (emp.registrationNumber || '').toLowerCase();
+        const company = (emp.company?.name || emp.company?.sigla || '').toLowerCase();
+        const post = (getCurrentWorkPost(emp) || '').toLowerCase();
+        const cargo = (emp.position?.name || '').toLowerCase();
+        return (
+          name.includes(searchLower) ||
+          matricula.includes(searchLower) ||
+          company.includes(searchLower) ||
+          post.includes(searchLower) ||
+          cargo.includes(searchLower)
+        );
+      })
+    : sortedEmployees;
+
+  const employeesByCompany = filteredEmployees.reduce((acc, emp) => {
     const companyName = emp.company?.name || emp.company?.sigla || 'Sem Empresa';
     if (!acc[companyName]) acc[companyName] = [];
     acc[companyName].push(emp);
     return acc;
   }, {} as Record<string, EmployeeWithDetails[]>);
 
-  const employeesByWorkPost = sortedEmployees.reduce((acc, emp) => {
+  const employeesByWorkPost = filteredEmployees.reduce((acc, emp) => {
     const workPosts = [];
     if (emp.workPosts && emp.workPosts.length > 0) {
       workPosts.push(...emp.workPosts.map(w => w.name).filter(Boolean));
@@ -207,7 +228,7 @@ export const OperationalEmployeesTab: React.FC = () => {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Lista de Funcionários ({employees.length})
+            Lista de Funcionários ({filteredEmployees.length}{searchTerm.trim() ? ` de ${employees.length}` : ''})
           </CardTitle>
           <div className="flex gap-2">
             <Button onClick={loadEmployees} variant="outline" size="sm">
@@ -217,6 +238,28 @@ export const OperationalEmployeesTab: React.FC = () => {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Pesquisar por nome, matrícula, empresa, posto ou cargo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 bg-slate-800/50 border-slate-600 text-white placeholder:text-slate-500"
+            />
+          </div>
+          <Button 
+            onClick={() => setRelatoriosModalOpen(true)} 
+            variant="outline" 
+            size="sm"
+            className="text-slate-300 hover:text-white"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Gerar Relatório
+          </Button>
+        </div>
+
         <Tabs defaultValue="todos" className="w-full">
           <TabsList className="mb-4 bg-slate-800/50">
             <TabsTrigger value="todos">Todos</TabsTrigger>
@@ -225,24 +268,13 @@ export const OperationalEmployeesTab: React.FC = () => {
           </TabsList>
 
           <TabsContent value="todos" className="space-y-4">
-            <div className="flex justify-end mb-2">
-              <Button 
-                onClick={() => setRelatoriosModalOpen(true)} 
-                variant="outline" 
-                size="sm"
-                className="text-slate-300 hover:text-white"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Gerar Relatório
-              </Button>
-            </div>
             <div className="space-y-2">
-              {sortedEmployees.length === 0 ? (
+              {filteredEmployees.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  Nenhum funcionário encontrado.
+                  {searchTerm.trim() ? 'Nenhum funcionário encontrado para esta pesquisa.' : 'Nenhum funcionário encontrado.'}
                 </p>
               ) : (
-                sortedEmployees.map((emp) => (
+                filteredEmployees.map((emp) => (
                   <EmployeeRow
                     key={emp.id}
                     employee={emp}
@@ -260,18 +292,11 @@ export const OperationalEmployeesTab: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="empresa" className="space-y-6">
-            <div className="flex justify-end mb-2">
-              <Button 
-                onClick={() => setRelatoriosModalOpen(true)} 
-                variant="outline" 
-                size="sm"
-                className="text-slate-300 hover:text-white"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Gerar Relatório
-              </Button>
-            </div>
-            
+            {Object.keys(employeesByCompany).length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                {searchTerm.trim() ? 'Nenhum funcionário encontrado para esta pesquisa.' : 'Nenhum funcionário encontrado.'}
+              </p>
+            ) : (
             <Tabs defaultValue={Object.keys(employeesByCompany).sort((a, b) => a.localeCompare(b))[0]} className="w-full">
               <TabsList className="mb-4 bg-slate-800/50 flex-wrap h-auto p-1">
                 {Object.keys(employeesByCompany).sort((a, b) => a.localeCompare(b)).map(company => (
@@ -315,21 +340,15 @@ export const OperationalEmployeesTab: React.FC = () => {
                 </TabsContent>
               ))}
             </Tabs>
+            )}
           </TabsContent>
 
           <TabsContent value="posto" className="space-y-6">
-            <div className="flex justify-end mb-2">
-              <Button 
-                onClick={() => setRelatoriosModalOpen(true)} 
-                variant="outline" 
-                size="sm"
-                className="text-slate-300 hover:text-white"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Gerar Relatório
-              </Button>
-            </div>
-            
+            {Object.keys(employeesByWorkPost).length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                {searchTerm.trim() ? 'Nenhum funcionário encontrado para esta pesquisa.' : 'Nenhum funcionário encontrado.'}
+              </p>
+            ) : (
             <Tabs defaultValue={Object.keys(employeesByWorkPost).sort((a, b) => a.localeCompare(b))[0]} className="w-full">
               <TabsList className="mb-4 bg-slate-800/50 flex-wrap h-auto p-1">
                 {Object.keys(employeesByWorkPost).sort((a, b) => a.localeCompare(b)).map(wp => (
@@ -378,6 +397,7 @@ export const OperationalEmployeesTab: React.FC = () => {
                 </TabsContent>
               ))}
             </Tabs>
+            )}
           </TabsContent>
         </Tabs>
       </CardContent>
