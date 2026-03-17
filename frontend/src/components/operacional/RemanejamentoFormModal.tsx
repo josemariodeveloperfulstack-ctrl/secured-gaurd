@@ -24,7 +24,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Remanejamento, CreateRemanejamentoDTO } from '@/services/remanejamentoService';
 import { Loader2, User, ArrowRightLeft, Calendar, MapPin, FileText } from 'lucide-react';
-import { workPostService, WorkPost } from '@/services/workPostService';
+import { employeeService } from '@/services/employeeService';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { WorkPostCombobox } from '@/components/ui/work-post-combobox';
 
 const remanejamentoSchema = z.object({
   employeeId: z.string().min(1, 'Funcionário é obrigatório'),
@@ -64,8 +66,7 @@ export default function RemanejamentoFormModal({
   employees,
 }: RemanejamentoFormModalProps) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
-  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
+  const [loadingEmployeePost, setLoadingEmployeePost] = useState(false);
 
   const {
     register,
@@ -80,26 +81,6 @@ export default function RemanejamentoFormModal({
       tipo: 'TRANSFERENCIA_UNIDADE',
     },
   });
-
-  // Carregar postos de trabalho
-  useEffect(() => {
-    if (open) {
-      loadWorkPosts();
-    }
-  }, [open]);
-
-  const loadWorkPosts = async () => {
-    setLoadingWorkPosts(true);
-    try {
-      const posts = await workPostService.getAllWorkPosts();
-      setWorkPosts(posts);
-    } catch (error) {
-      console.error('Erro ao carregar postos de trabalho:', error);
-      setWorkPosts([]);
-    } finally {
-      setLoadingWorkPosts(false);
-    }
-  };
 
   useEffect(() => {
     if (remanejamento) {
@@ -128,6 +109,31 @@ export default function RemanejamentoFormModal({
       });
     }
   }, [remanejamento, setValue, reset, open]);
+
+  // Ao selecionar funcionário (novo remanejamento), buscar e preencher posto de origem com o posto atual do banco
+  const employeeId = watch('employeeId');
+  useEffect(() => {
+    if (!open || !employeeId || remanejamento) return; // Não sobrescrever ao editar
+    const fetchEmployeeWorkPost = async () => {
+      setLoadingEmployeePost(true);
+      try {
+        const emp = await employeeService.getEmployeeById(employeeId);
+        if (!emp) {
+          setValue('origem', '');
+          return;
+        }
+        // Extrair ID do posto: workPostId (string) ou workPost.id (pode ser string ou UUID)
+        const wp = emp.workPost;
+        const wpId = emp.workPostId ?? (wp?.id != null ? String(wp.id) : '');
+        setValue('origem', wpId || '');
+      } catch {
+        setValue('origem', '');
+      } finally {
+        setLoadingEmployeePost(false);
+      }
+    };
+    fetchEmployeeWorkPost();
+  }, [open, employeeId, remanejamento, setValue]);
 
   const handleFormSubmit = async (data: RemanejamentoFormData) => {
     setIsSubmitting(true);
@@ -257,22 +263,14 @@ export default function RemanejamentoFormModal({
                   <Label htmlFor="origem" className="text-seguranca-lightgray font-medium">
                     Posto de Origem <span className="text-seguranca-red">*</span>
                   </Label>
-                  <Select
+                  <WorkPostCombobox
                     value={watch('origem')}
-                    onValueChange={(value) => setValue('origem', value)}
-                    disabled={loadingWorkPosts}
-                  >
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de origem"} />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      {workPosts.map((post, idx) => (
-                        <SelectItem key={post.id || `origem-${idx}`} value={String(post.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                          {post.postCode} - {post.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setValue('origem', value)}
+                    placeholder={loadingEmployeePost ? 'Carregando posto atual do funcionário...' : 'Selecione o posto de origem'}
+                    searchPlaceholder="Digite para buscar pelo nome ou código..."
+                    emptyPlaceholder="Nenhum posto encontrado."
+                    disabled={loadingEmployeePost}
+                  />
                   {errors.origem && (
                     <p className="text-sm text-seguranca-red">{errors.origem.message}</p>
                   )}
@@ -283,22 +281,13 @@ export default function RemanejamentoFormModal({
                   <Label htmlFor="destino" className="text-seguranca-lightgray font-medium">
                     Posto de Destino <span className="text-seguranca-red">*</span>
                   </Label>
-                  <Select
+                  <WorkPostCombobox
                     value={watch('destino')}
-                    onValueChange={(value) => setValue('destino', value)}
-                    disabled={loadingWorkPosts}
-                  >
-                    <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                      <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de destino"} />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                      {workPosts.map((post, idx) => (
-                        <SelectItem key={post.id || `destino-${idx}`} value={String(post.id)} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                          {post.postCode} - {post.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setValue('destino', value)}
+                    placeholder="Selecione o posto de destino (qualquer posto do sistema)"
+                    searchPlaceholder="Digite para buscar pelo nome ou código..."
+                    emptyPlaceholder="Nenhum posto encontrado."
+                  />
                   {errors.destino && (
                     <p className="text-sm text-seguranca-red">{errors.destino.message}</p>
                   )}

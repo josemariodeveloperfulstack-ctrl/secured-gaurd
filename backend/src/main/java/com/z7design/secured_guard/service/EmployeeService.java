@@ -922,6 +922,40 @@ public class EmployeeService {
         return employeeRepository.count();
     }
 
+    /**
+     * Retorna estatísticas de funcionários (total, ativos, férias/atestado, demitidos/suspensos).
+     * Se companyId for null, retorna totais globais. Caso contrário, retorna totais da empresa.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> getStatsByCompany(UUID companyId) {
+        long total, active, vacation, medicalCertificate, terminated, suspended;
+        if (companyId == null) {
+            total = employeeRepository.count();
+            active = employeeRepository.countByStatus(EmploymentStatus.ACTIVE);
+            vacation = employeeRepository.countByStatus(EmploymentStatus.VACATION);
+            medicalCertificate = employeeRepository.countByStatus(EmploymentStatus.MEDICAL_CERTIFICATE)
+                    + employeeRepository.countByStatus(EmploymentStatus.MATERNITY_LEAVE);
+            terminated = employeeRepository.countByStatus(EmploymentStatus.TERMINATED);
+            suspended = employeeRepository.countByStatus(EmploymentStatus.SUSPENDED);
+        } else {
+            total = employeeRepository.countByCompanyId(companyId);
+            active = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.ACTIVE);
+            vacation = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.VACATION);
+            medicalCertificate = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.MEDICAL_CERTIFICATE)
+                    + employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.MATERNITY_LEAVE);
+            terminated = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.TERMINATED);
+            suspended = employeeRepository.countByCompanyIdAndStatus(companyId, EmploymentStatus.SUSPENDED);
+        }
+        Map<String, Long> stats = new HashMap<>();
+        stats.put("total", total);
+        stats.put("active", active);
+        stats.put("vacation", vacation);
+        stats.put("medicalCertificate", medicalCertificate);
+        stats.put("terminated", terminated);
+        stats.put("suspended", suspended);
+        return stats;
+    }
+
     public List<Employee> findByUnit(UUID unitId) {
         return employeeRepository.findByUnitId(unitId);
     }
@@ -1008,15 +1042,18 @@ public class EmployeeService {
 
     /**
      * Versão paginada de findBasicData para ambientes com muitos registros.
+     * status: opcional, ex. "ACTIVE" para filtrar apenas ativos
      */
     @Transactional(readOnly = true)
-    public List<Object[]> findBasicDataPaged(int page, int size) {
+    public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500); // evitar pageSize muito grande
             int offset = Math.max(page, 0) * pageSize;
             System.out.println(
-                    "🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset);
-            List<Object[]> data = employeeRepository.findBasicDataPaged(pageSize, offset);
+                    "🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset + " companyId=" + companyId + " status=" + status);
+            List<Object[]> data = companyId == null
+                    ? employeeRepository.findBasicDataPaged(pageSize, offset, status)
+                    : employeeRepository.findBasicDataPagedByCompany(pageSize, offset, companyId, status);
             System.out.println("✅ EmployeeService.findBasicDataPaged - Encontrados " + data.size() + " registros");
             return data;
         } catch (Exception e) {
@@ -1028,16 +1065,18 @@ public class EmployeeService {
 
     /**
      * Versão paginada de findBasicDataBySearchTerm para ambientes com muitos
-     * registros.
+     * registros. status: opcional para filtrar por status.
      */
     @Transactional(readOnly = true)
-    public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size) {
+    public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId, String status) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
             System.out.println("🔍 EmployeeService.findBasicDataBySearchTermPaged - termo=" + searchTerm + " page="
-                    + page + " size=" + pageSize + " offset=" + offset);
-            List<Object[]> data = employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset);
+                    + page + " size=" + pageSize + " offset=" + offset + " companyId=" + companyId + " status=" + status);
+            List<Object[]> data = companyId == null
+                    ? employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset, status)
+                    : employeeRepository.findBasicDataBySearchTermPagedByCompany(searchTerm, pageSize, offset, companyId, status);
             System.out.println(
                     "✅ EmployeeService.findBasicDataBySearchTermPaged - Encontrados " + data.size() + " registros");
             return data;

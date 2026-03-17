@@ -482,7 +482,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
       case 'valor_litro':
         return !formData.valor_litro || formData.valor_litro <= 0;
       case 'posto':
-        return !formData.posto.trim();
+        return false; // Posto é opcional
       default:
         return false;
     }
@@ -588,7 +588,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
       quantity: Number(formData.litros),
       cost: Number(formData.valor_total),
       mileage: Number(formData.quilometragem.replace(/\./g, '')), // Remover pontos e converter para número
-      station: formData.posto,
+      station: formData.posto?.trim() || null,
       driverId: formData.driverId || null,
       notes: formData.observacoes || '',
       costCenter: formData.centro_custo || null
@@ -603,19 +603,13 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
     createFuelRecordMutation.mutate(data);
   };
 
-  const handleCreateDriver = (e: React.FormEvent) => {
+const handleCreateDriver = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDriverData.name.trim()) {
-      toast({
-        title: "Erro",
-        description: "Nome do motorista é obrigatório",
-        variant: "destructive"
-      });
-      return;
-    }
-    
+    const selectedEmployee = employees.find((emp: any) => emp.id === newDriverData.employeeId);
+    const name = newDriverData.name.trim() || (selectedEmployee?.name ?? '');
+
     createDriverMutation.mutate({
-      name: newDriverData.name.trim(),
+      name: name || 'Motorista',
       licenseNumber: newDriverData.licenseNumber.trim() || undefined,
       status: 'ATIVO'
     });
@@ -927,7 +921,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
             <div className="flex flex-col">
               <div className="flex items-center justify-between mb-2">
                 <Label htmlFor="posto" className="text-sm sm:text-base text-seguranca-lightgray">
-                  Posto <span className="text-seguranca-red">*</span>
+                  Posto
                 </Label>
                 <Button
                   type="button"
@@ -967,9 +961,6 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
                   )}
                 </SelectContent>
               </Select>
-              {isFieldInvalid('posto') && (
-                <p className="text-sm text-seguranca-red mt-1">Fornecedor é obrigatório</p>
-              )}
               {suppliersLoading && (
                 <p className="text-xs text-gray-400 mt-1">Carregando fornecedores...</p>
               )}
@@ -1110,15 +1101,18 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
               </Label>
               <Select
                 value={newDriverData.employeeId}
-                onValueChange={(value) => {
-                  const selectedEmployee = employees.find(emp => emp.id === value);
-                  setNewDriverData(prev => ({ 
-                    ...prev, 
+onValueChange={(value) => {
+                  const selectedEmployee = employees.find((emp: any) => emp.id === value);
+                  const workPostId = selectedEmployee?.workPost?.id != null
+                    ? String(selectedEmployee.workPost.id)
+                    : '';
+                  setNewDriverData(prev => ({
+                    ...prev,
                     employeeId: value,
-                    name: selectedEmployee ? selectedEmployee.name : ''
+                    name: selectedEmployee ? selectedEmployee.name : '',
+                    workPost: workPostId
                   }));
                 }}
-                required
               >
                 <SelectTrigger className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors">
                   <SelectValue placeholder="Selecione o funcionário" />
@@ -1164,12 +1158,11 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
             
             <div className="flex flex-col">
               <Label htmlFor="driverWorkPost" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
-                Posto de Trabalho/Setor <span className="text-seguranca-red">*</span>
+                Posto de Trabalho/Setor
               </Label>
               <Select
                 value={newDriverData.workPost}
                 onValueChange={(value) => setNewDriverData(prev => ({ ...prev, workPost: value }))}
-                required
               >
                 <SelectTrigger className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors">
                   <SelectValue placeholder="Selecione o posto de trabalho" />
@@ -1209,7 +1202,7 @@ const AbastecimentoFormModal: React.FC<AbastecimentoFormModalProps> = ({
               </Button>
               <Button
                 type="submit"
-                disabled={createDriverMutation.isPending || !newDriverData.employeeId || !newDriverData.licenseNumber.trim() || !newDriverData.workPost.trim()}
+                disabled={createDriverMutation.isPending}
                 className="w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-darkred text-white disabled:opacity-50 disabled:cursor-not-allowed h-10 sm:h-11 text-sm sm:text-base"
               >
                 {createDriverMutation.isPending ? 'Criando...' : 'Criar Motorista'}

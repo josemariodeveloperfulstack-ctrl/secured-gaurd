@@ -110,4 +110,8 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     @EntityGraph(attributePaths = {"client", "contract", "responsible"})
     @Query("SELECT wp FROM WorkPost wp")
     List<WorkPost> findAllWithRelationships();
+
+    // Buscar postos que possuem funcionários de uma empresa específica
+    @Query("SELECT DISTINCT e.workPost FROM Employee e WHERE e.company.id = :companyId AND e.workPost IS NOT NULL")
+    List<WorkPost> findByCompanyId(@Param("companyId") UUID companyId);
 }

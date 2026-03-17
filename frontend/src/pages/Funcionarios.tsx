@@ -54,7 +54,6 @@ import { employeeService, EmployeeFilters } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { workPostService, WorkPost } from '@/services/workPostService';
 import { positionService, Position } from '@/services/positionService';
-import { departmentService, Department } from '@/services/departmentService';
 import { Employee } from '@/types/employee';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 import { EmployeeDocuments } from '@/components/funcionarios/EmployeeDocuments';
@@ -78,7 +77,6 @@ const Funcionarios: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'ACTIVE' | 'INACTIVE' | 'VACATION' | 'MATERNITY_LEAVE' | 'MEDICAL_CERTIFICATE' | 'TERMINATED' | 'SUSPENDED'>('all');
-  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [documentsModalOpen, setDocumentsModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -118,8 +116,15 @@ const Funcionarios: React.FC = () => {
   // Listas da API para opções dos filtros (empresas, postos, departamentos, cargos)
   const [filterCompanies, setFilterCompanies] = useState<Array<{ id: string; name?: string; sigla?: string }>>([]);
   const [filterWorkPosts, setFilterWorkPosts] = useState<WorkPost[]>([]);
-  const [filterDepartments, setFilterDepartments] = useState<Department[]>([]);
   const [filterPositions, setFilterPositions] = useState<Position[]>([]);
+  const [statsFromApi, setStatsFromApi] = useState<{
+    total: number;
+    active: number;
+    vacation: number;
+    medicalCertificate: number;
+    terminated: number;
+    suspended: number;
+  } | null>(null);
   const [isMobileSelectionMode, setIsMobileSelectionMode] = useState(false);
 
   // Barra de ações em massa: posição inicial no centro + drag (mouse/touch)
@@ -239,40 +244,40 @@ const Funcionarios: React.FC = () => {
     loadEmployeesWithFilters();
   }, [currentPage]);
 
-  // Carregar funcionários com filtros atuais (backend /paged só aceita searchTerm; demais filtros são no frontend)
+  // Carregar funcionários com filtros atuais (searchTerm, companyId e status vão para a API; demais filtros no frontend)
   const loadEmployeesWithFilters = async () => {
     const filters: EmployeeFilters = {
       searchTerm: searchTerm.trim() || undefined,
+      companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
+      status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
     };
     await loadEmployees(filters, currentPage);
   };
 
-  // Carregar funcionários ao mudar filtros (só searchTerm vai para a API; resto filtra no frontend)
+  // Carregar funcionários ao mudar filtros (searchTerm, companyId e status vão para a API; resto filtra no frontend)
   useEffect(() => {
     setCurrentPage(0);
     const filters: EmployeeFilters = {
       searchTerm: searchTerm.trim() || undefined,
+      companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
+      status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
     };
     const debounceMs = filters.searchTerm ? 500 : 0;
     const timeoutId = setTimeout(() => loadEmployees(filters as any, 0), debounceMs);
     return () => clearTimeout(timeoutId);
   }, [searchTerm, statusFilter, companyFilter, positionFilter, workPostFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo]);
 
-  // Carregar opções dos filtros (empresas, postos de trabalho, departamentos, unidades, cargos) da API
+  // Carregar opções dos filtros (empresas, cargos) da API (uma vez)
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const [companiesRes, workPostsRes, departmentsRes, positionsRes] = await Promise.all([
+        const [companiesRes, positionsRes] = await Promise.all([
           companyService.getAllCompanies(),
-          workPostService.getAllWorkPosts(),
-          departmentService.listActive().catch(() => []),
           positionService.getPositions().catch(() => []),
         ]);
         if (cancelled) return;
         setFilterCompanies(Array.isArray(companiesRes) ? companiesRes : []);
-        setFilterWorkPosts(Array.isArray(workPostsRes) ? workPostsRes : []);
-        setFilterDepartments(Array.isArray(departmentsRes) ? departmentsRes : []);
         setFilterPositions(Array.isArray(positionsRes) ? positionsRes : []);
       } catch (e) {
         if (!cancelled) console.warn('Erro ao carregar opções dos filtros:', e);
@@ -281,6 +286,54 @@ const Funcionarios: React.FC = () => {
     load();
     return () => { cancelled = true; };
   }, []);
+
+  // Carregar postos de trabalho conforme empresa selecionada (ao escolher empresa, carregar apenas postos daquela empresa)
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (companyFilter && companyFilter !== 'all') {
+          const posts = await workPostService.getWorkPostsByCompany(companyFilter);
+          if (!cancelled) {
+            setFilterWorkPosts(Array.isArray(posts) ? posts : []);
+            setWorkPostFilter('all'); // Resetar filtro de posto ao trocar empresa
+          }
+        } else {
+          const posts = await workPostService.getAllWorkPosts();
+          if (!cancelled) {
+            setFilterWorkPosts(Array.isArray(posts) ? posts : []);
+            setWorkPostFilter('all');
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.warn('Erro ao carregar postos:', e);
+          setFilterWorkPosts([]);
+        }
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [companyFilter]);
+
+  // Carregar estatísticas por empresa (cards exibem totais da empresa selecionada)
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const companyId = companyFilter && companyFilter !== 'all' ? companyFilter : undefined;
+        const stats = await employeeService.getEmployeesStats(companyId);
+        if (!cancelled) setStatsFromApi(stats);
+      } catch (e) {
+        if (!cancelled) {
+          console.warn('Erro ao carregar estatísticas:', e);
+          setStatsFromApi(null);
+        }
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [companyFilter]);
 
   useEffect(() => {
     if (shouldOpenModal) setModalOpen(true);
@@ -390,14 +443,10 @@ const Funcionarios: React.FC = () => {
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const searchDigits = searchTerm.replace(/\D/g, '');
   const filteredEmployees = employees.filter(employee => {
-    const matchesDepartment = isAll(departmentFilter) ||
-      same((employee.department as any)?.name, departmentFilter);
-
     const matchesStatus = isAll(statusFilter) || (employee.status || '').toUpperCase() === (statusFilter || '').toUpperCase();
 
     const matchesCompany = isAll(companyFilter) ||
-      same((employee.company as any)?.sigla, companyFilter) ||
-      same((employee.company as any)?.id, companyFilter);
+      String((employee.company as any)?.id) === String(companyFilter);
 
     const matchesPosition = isAll(positionFilter) ||
       same((employee.position as any)?.name, positionFilter);
@@ -425,7 +474,7 @@ const Funcionarios: React.FC = () => {
       return nameMatch || emailMatch || registrationMatch || cpfMatch;
     })();
 
-    return matchesDepartment && matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesWorkPost
+    return matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesWorkPost
       && matchesHireDateFrom && matchesHireDateTo && matchesTerminationDateFrom && matchesTerminationDateTo;
   });
 
@@ -479,7 +528,6 @@ const Funcionarios: React.FC = () => {
     setSearchTerm('');
     setStatusFilter('all');
     setCompanyFilter('all');
-    setDepartmentFilter('all');
     setPositionFilter('all');
     setWorkPostFilter('all');
     setHireDateFrom('');
@@ -818,8 +866,15 @@ Para excluir este funcionário:
     );
   }
 
-  // Calcular estatísticas (total usa contagem real quando disponível)
-  const stats = {
+  // Estatísticas: usar API (totais por empresa) quando disponível; senão, calcular dos dados carregados
+  const stats = statsFromApi ? {
+    total: statsFromApi.total,
+    active: statsFromApi.active,
+    vacation: statsFromApi.vacation,
+    medicalCertificate: statsFromApi.medicalCertificate,
+    terminated: statsFromApi.terminated,
+    suspended: statsFromApi.suspended,
+  } : {
     total: (totalCount != null && !searchTerm?.trim()) ? totalCount : employees.length,
     active: employees.filter(e => e.status === 'ACTIVE').length,
     vacation: employees.filter(e => e.status === 'VACATION').length,
@@ -829,7 +884,16 @@ Para excluir este funcionário:
   };
 
   const subtitleLoaded = employees.length;
-  const subtitleTotal = totalCount ?? subtitleLoaded;
+  // Total para exibição: quando há filtro de status, usar a estatística correspondente
+  const displayTotal = statsFromApi && statusFilter && statusFilter !== 'all'
+    ? (statusFilter === 'ACTIVE' ? statsFromApi.active
+      : statusFilter === 'TERMINATED' ? statsFromApi.terminated
+      : statusFilter === 'SUSPENDED' ? statsFromApi.suspended
+      : statusFilter === 'VACATION' ? statsFromApi.vacation
+      : statusFilter === 'MEDICAL_CERTIFICATE' || statusFilter === 'MATERNITY_LEAVE' ? statsFromApi.medicalCertificate
+      : statsFromApi.total)
+    : (statsFromApi?.total ?? totalCount ?? subtitleLoaded);
+  const subtitleTotal = displayTotal;
   const subtitleText = subtitleTotal > subtitleLoaded
     ? `${subtitleTotal} funcionários no sistema (${subtitleLoaded} carregados)`
     : `${subtitleLoaded} funcionário${subtitleLoaded !== 1 ? 's' : ''} no sistema`;
@@ -1181,18 +1245,7 @@ Para excluir este funcionário:
                 >
                   <option value="all">🏢 Todas as Empresas</option>
                   {filterCompanies.map(c => (
-                    <option key={c.id} value={c.sigla || c.id}>{c.sigla || c.name || c.id}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
-                >
-                  <option value="all">📂 Todos os departamentos</option>
-                  {filterDepartments.map(d => (
-                    <option key={d.id} value={d.name || d.id}>{d.name}</option>
+                    <option key={c.id} value={c.id}>{c.sigla ? `${c.sigla} - ${c.name}` : c.name}</option>
                   ))}
                 </select>
 
@@ -1286,10 +1339,10 @@ Para excluir este funcionário:
               />
 
               {/* Paginação */}
-              {totalCount !== null && totalCount > pageSize && (
+              {subtitleTotal > pageSize && (
                 <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 bg-seguranca-black/30 p-4 rounded-lg border border-gray-700/50">
                   <div className="text-sm text-gray-400">
-                    Mostrando <span className="text-white font-medium">{employees.length}</span> de <span className="text-white font-medium">{totalCount}</span> funcionários
+                    Mostrando <span className="text-white font-medium">{employees.length}</span> de <span className="text-white font-medium">{subtitleTotal}</span> funcionários
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1328,7 +1381,7 @@ Para excluir este funcionário:
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCurrentPage(Math.floor((totalCount - 1) / pageSize))}
+                      onClick={() => setCurrentPage(Math.floor((subtitleTotal - 1) / pageSize))}
                       disabled={employees.length < pageSize || loading}
                       className="border-gray-700 text-gray-400 hover:text-white"
                     >
@@ -1486,7 +1539,7 @@ Para excluir este funcionário:
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-gray-400">
-              Selecione a empresa e o arquivo <strong className="text-white">.xlsx</strong> da planilha de funcionários rede Promover.
+              Selecione a empresa e o arquivo <strong className="text-white">.xlsx ou .csv</strong> da planilha de funcionários rede Promover.
               O sistema irá criar ou atualizar os funcionários pelo CPF automaticamente.
             </p>
 
@@ -1519,10 +1572,10 @@ Para excluir este funcionário:
             {!promoverImportLoading && !promoverImportResult && (
               <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-seguranca-yellow/40 rounded-xl cursor-pointer hover:border-seguranca-yellow/70 hover:bg-seguranca-yellow/5 transition-all">
                 <Upload className="text-seguranca-yellow mb-2" size={32} />
-                <span className="text-sm text-gray-400">Clique para selecionar o arquivo .xlsx</span>
+                <span className="text-sm text-gray-400">Clique para selecionar o arquivo .xlsx ou .csv</span>
                 <input
                   type="file"
-                  accept=".xlsx"
+                  accept=".xlsx,.csv"
                   className="hidden"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];

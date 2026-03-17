@@ -68,6 +68,14 @@ public class EmployeeController {
         }
     }
 
+    @GetMapping("/stats")
+    @Operation(summary = "Estatísticas de funcionários", description = "Retorna totais por status. Use companyId para filtrar por empresa.")
+    public ResponseEntity<Map<String, Long>> getStats(
+            @RequestParam(required = false) UUID companyId) {
+        Map<String, Long> stats = employeeService.getStatsByCompany(companyId);
+        return ResponseEntity.ok(stats);
+    }
+
     @GetMapping("/status/test")
     @Operation(summary = "Teste simples de status", description = "Endpoint de teste para verificar funcionamento")
     public ResponseEntity<Object> testStatus() {
@@ -394,19 +402,22 @@ public class EmployeeController {
     })
     @Transactional(readOnly = true)
     public ResponseEntity<Object> getAllPaged(@RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) java.util.UUID companyId,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "500") int size) {
         try {
             int safePage = Math.max(page, 0);
             int safeSize = Math.min(Math.max(size, 1), 500);
+            String statusFilter = (status != null && !status.trim().isEmpty() && !"all".equalsIgnoreCase(status.trim())) ? status.trim().toUpperCase() : null;
             System.out.println("🔍 EmployeeController.getAllPaged - page=" + safePage + " size=" + safeSize
-                    + " searchTerm=" + searchTerm);
+                    + " searchTerm=" + searchTerm + " companyId=" + companyId + " status=" + statusFilter);
 
             List<Object[]> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
-                data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize);
+                data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize, companyId, statusFilter);
             } else {
-                data = employeeService.findBasicDataPaged(safePage, safeSize);
+                data = employeeService.findBasicDataPaged(safePage, safeSize, companyId, statusFilter);
             }
             System.out.println(
                     "🔍 EmployeeController.getAllPaged - Encontrados " + data.size() + " funcionários no banco");

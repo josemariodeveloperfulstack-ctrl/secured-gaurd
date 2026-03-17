@@ -69,4 +69,27 @@ export const formatPhone = (phone: string | null | undefined): string => {
     return digits.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
   }
   return phone;
-}; 
+};
+
+/**
+ * Formata o nome do posto para exibição, removendo o prefixo "WP" do código.
+ * O nome do posto não deve exibir "WP" na frente (ex: "WP-ABC - Portaria" → "Portaria").
+ * @param post Objeto com postCode e/ou name
+ * @returns Nome formatado para exibição
+ */
+export const formatWorkPostDisplayName = (post: { postCode?: string; name?: string } | string | null | undefined): string => {
+  if (!post) return '-';
+  if (typeof post === 'string') {
+    return post.replace(/^WP\s*-?\s*/i, '').trim() || '-';
+  }
+  const name = (post.name?.trim() || '').replace(/^WP\s*-?\s*/i, '');
+  const postCode = post.postCode?.trim() || '';
+  // Se o postCode começa com "WP" (case insensitive), não exibir - usar apenas o nome
+  if (postCode && /^WP/i.test(postCode)) {
+    return (name || post.name?.trim() || '').trim() || '-';
+  }
+  if (postCode && name) {
+    return `${postCode} - ${name}`;
+  }
+  return (name || post.name || postCode || '').trim() || '-';
+};

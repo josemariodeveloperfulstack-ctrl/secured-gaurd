@@ -359,6 +359,16 @@ public class WorkPostService {
     public List<WorkPost> findByStatusAndImplementationDateBetween(WorkPostStatus status, LocalDate startDate, LocalDate endDate) {
         return workPostRepository.findByStatusAndImplementationDateBetween(status, startDate, endDate);
     }
+
+    /**
+     * Busca postos de trabalho que possuem funcionários de uma empresa específica.
+     * Usado para popular o dropdown de postos ao selecionar uma empresa.
+     */
+    @Transactional(readOnly = true)
+    public List<WorkPostDTO> findByCompanyId(UUID companyId) {
+        List<WorkPost> workPosts = workPostRepository.findByCompanyId(companyId);
+        return convertToDTOList(workPosts);
+    }
     
     // Métodos para conversão DTO
     // NOTA: Removido @Transactional para evitar problemas em ambientes CI

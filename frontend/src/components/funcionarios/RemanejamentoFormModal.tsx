@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { remanejamentoService, Remanejamento, CreateRemanejamentoDTO } from '../../services/remanejamentoService';
-import { employeeService, Employee } from '../../services/employeeService';
-import { workPostService, WorkPost } from '../../services/workPostService';
+import { employeeService } from '../../services/employeeService';
+import { workPostService } from '../../services/workPostService';
 import type { RemanejamentoTipo } from '../../types/remanejamento';
+import { formatWorkPostDisplayName } from '../../utils/formatters';
 import { X } from 'lucide-react';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import { WorkPostCombobox } from '../ui/work-post-combobox';
 
 interface Props {
   onSuccess: () => void;
@@ -48,71 +51,10 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loadingEmployees, setLoadingEmployees] = useState(false);
-  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
-  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
   const [currentEmployeeWorkPost, setCurrentEmployeeWorkPost] = useState<{ id: string; name: string } | null>(null);
   const [loadingEmployeeDetails, setLoadingEmployeeDetails] = useState(false);
 
-  // Carregar postos de trabalho
-  const loadWorkPosts = async () => {
-    setLoadingWorkPosts(true);
-    try {
-      const data = await workPostService.getWorkPosts();
-      setWorkPosts(data);
-    } catch (error) {
-      console.warn('Erro ao carregar postos de trabalho, usando dados estáticos:', error);
-      // Dados estáticos como fallback
-      setWorkPosts([
-        { id: '1', postCode: 'P001', name: 'Portaria Principal', address: 'Entrada Principal', type: 'POSTO_24H', status: 'ATIVO', clientId: '1', requiredVigilantes: 2, workSchedule: '24h', shiftStart: '00:00', shiftEnd: '23:59' },
-        { id: '2', postCode: 'P002', name: 'Ronda Perimetral', address: 'Área Externa', type: 'POSTO_12H_DIURNO', status: 'ATIVO', clientId: '1', requiredVigilantes: 1, workSchedule: '12h', shiftStart: '06:00', shiftEnd: '18:00' },
-        { id: '3', postCode: 'P003', name: 'Central de Monitoramento', address: 'Sala de Controle', type: 'POSTO_24H', status: 'ATIVO', clientId: '1', requiredVigilantes: 1, workSchedule: '24h', shiftStart: '00:00', shiftEnd: '23:59' },
-        { id: '4', postCode: 'P004', name: 'Acesso Veicular', address: 'Garagem', type: 'POSTO_8H', status: 'ATIVO', clientId: '1', requiredVigilantes: 1, workSchedule: '8h', shiftStart: '08:00', shiftEnd: '16:00' },
-        { id: '5', postCode: 'P005', name: 'Recepção', address: 'Hall Principal', type: 'POSTO_8H', status: 'ATIVO', clientId: '1', requiredVigilantes: 1, workSchedule: '8h', shiftStart: '08:00', shiftEnd: '18:00' }
-      ] as WorkPost[]);
-    } finally {
-      setLoadingWorkPosts(false);
-    }
-  };
-
-  // Carregar funcionários
-  const loadEmployees = async () => {
-    setLoadingEmployees(true);
-    try {
-      let data = await employeeService.getAllEmployees({}, 0, 1000);
-      if (!Array.isArray(data)) {
-        data = (data as any)?.content ?? (data as any)?.employees ?? [];
-      }
-      if (data.length === 0) {
-        data = await employeeService.getEmployees();
-      }
-      setEmployees(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.warn('Erro ao carregar funcionários:', error);
-      try {
-        const fallback = await employeeService.getEmployees();
-        setEmployees(Array.isArray(fallback) ? fallback : []);
-      } catch {
-        setEmployees([]);
-      }
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
-
-  // Carregar funcionários e postos de trabalho ao montar o componente
-  useEffect(() => {
-    const loadAll = async () => {
-      await Promise.all([
-        loadEmployees(),
-        loadWorkPosts()
-      ]);
-    };
-    loadAll();
-  }, []);
-
-  // Ao selecionar funcionário, buscar posto atual para preencher posto de origem
+  // Ao selecionar funcionário, buscar posto atual do banco para preencher posto de origem
   useEffect(() => {
     if (!form.employeeId) {
       setCurrentEmployeeWorkPost(null);
@@ -122,19 +64,24 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
     const fetchEmployeeWorkPost = async () => {
       setLoadingEmployeeDetails(true);
       try {
-        const emp = await employeeService.getEmployeeById(form.employeeId) as any;
-        const wp = emp?.workPost;
-        const wpId = emp?.workPostId || wp?.id;
+        const emp = await employeeService.getEmployeeById(form.employeeId);
+        if (!emp) {
+          setCurrentEmployeeWorkPost(null);
+          setForm(prev => ({ ...prev, sourceWorkPostId: '' }));
+          return;
+        }
+        const wp = emp.workPost;
+        const wpId = emp.workPostId ?? (wp?.id != null ? String(wp.id) : '');
         const wpName = wp?.name;
         if (wpId && wpName) {
-          setCurrentEmployeeWorkPost({ id: String(wpId), name: wpName });
+          setCurrentEmployeeWorkPost({ id: String(wpId), name: formatWorkPostDisplayName({ name: wpName }) });
           setForm(prev => ({ ...prev, sourceWorkPostId: String(wpId) }));
-        } else if (wpId && workPosts.length > 0) {
-          const found = workPosts.find(p => String(p.id) === String(wpId));
-          if (found) {
-            setCurrentEmployeeWorkPost({ id: String(wpId), name: found.postCode ? `${found.postCode} - ${found.name}` : found.name });
+        } else if (wpId) {
+          try {
+            const found = await workPostService.getWorkPostById(String(wpId));
+            setCurrentEmployeeWorkPost({ id: String(wpId), name: formatWorkPostDisplayName(found) });
             setForm(prev => ({ ...prev, sourceWorkPostId: String(wpId) }));
-          } else {
+          } catch {
             setCurrentEmployeeWorkPost({ id: String(wpId), name: 'Posto ID ' + wpId });
             setForm(prev => ({ ...prev, sourceWorkPostId: String(wpId) }));
           }
@@ -152,37 +99,10 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
     fetchEmployeeWorkPost();
   }, [form.employeeId]);
 
-  // Atualizar nome do posto de origem quando workPosts carregar (caso tenha vindo só o ID da API)
-  useEffect(() => {
-    if (form.sourceWorkPostId && currentEmployeeWorkPost?.name?.startsWith?.('Posto ID ') && workPosts.length > 0) {
-      const found = workPosts.find(p => String(p.id) === form.sourceWorkPostId);
-      if (found) {
-        setCurrentEmployeeWorkPost({ id: form.sourceWorkPostId, name: found.postCode ? `${found.postCode} - ${found.name}` : found.name });
-      }
-    }
-  }, [workPosts, form.sourceWorkPostId, currentEmployeeWorkPost?.name]);
-
   // Função helper para verificar se uma string é um UUID válido
-  const isValidUUID = (str: string | undefined | null): boolean => {
-    if (!str) return false;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(str);
-  };
-
-  // Atualizar formulário quando initialRemanejamento ou workPosts mudarem
+  // Atualizar formulário quando initialRemanejamento mudar
   useEffect(() => {
     if (initialRemanejamento) {
-      // Aguardar que os postos de trabalho sejam carregados antes de preencher
-      if (loadingWorkPosts) {
-        return;
-      }
-      
-      console.log('🔄 Atualizando formulário com remanejamento:', initialRemanejamento);
-      console.log('📍 originWorkstationId:', initialRemanejamento.originWorkstationId);
-      console.log('📍 destinationWorkstationId:', initialRemanejamento.destinationWorkstationId);
-      console.log('📍 workPosts carregados:', workPosts.length);
-        
-      // Converter data para formato YYYY-MM-DD se necessário
       let dataFormatada = '';
       if (initialRemanejamento.dataRemanejamento) {
         dataFormatada = initialRemanejamento.dataRemanejamento.split('T')[0];
@@ -190,71 +110,8 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
         dataFormatada = initialRemanejamento.remanejamentoDate.split('T')[0];
       }
         
-      // Tratar campos de postos de trabalho - converter null/undefined para string vazia apenas se não existir
-      let sourceWorkPostId = '';
-      let destinationWorkPostId = '';
-        
-      // Normalizar IDs para comparação (remover espaços, converter para lowercase)
-      const normalizeId = (id: string | undefined | null): string => {
-        if (!id) return '';
-        return String(id).trim().toLowerCase();
-      };
-        
-      if (initialRemanejamento.originWorkstationId) {
-        const originId = normalizeId(initialRemanejamento.originWorkstationId);
-        console.log('🔍 Buscando posto de origem:', originId);
-        console.log('📋 IDs disponíveis nos workPosts:', workPosts.map(wp => normalizeId(wp.id)));
-          
-        // Buscar posto na lista - comparar normalizando ambos os IDs
-        const foundPost = workPosts.find(wp => normalizeId(wp.id) === originId);
-        if (foundPost) {
-          sourceWorkPostId = String(foundPost.id); // Usar o ID original do posto encontrado
-          console.log('✅ Posto de origem encontrado:', foundPost.name);
-        } else {
-          // Tentar também com o ID original sem normalização
-          const foundPostOriginal = workPosts.find(wp => String(wp.id) === String(initialRemanejamento.originWorkstationId));
-          if (foundPostOriginal) {
-            sourceWorkPostId = String(foundPostOriginal.id);
-            console.log('✅ Posto de origem encontrado (comparação direta):', foundPostOriginal.name);
-          } else {
-            console.warn('⚠️ Posto de origem não encontrado na lista:', {
-              buscado: initialRemanejamento.originWorkstationId,
-              tipoBuscado: typeof initialRemanejamento.originWorkstationId,
-              totalPostos: workPosts.length,
-              primeiroPostoId: workPosts[0]?.id,
-              primeiroPostoTipo: typeof workPosts[0]?.id
-            });
-          }
-        }
-      }
-        
-      if (initialRemanejamento.destinationWorkstationId) {
-        const destinationId = normalizeId(initialRemanejamento.destinationWorkstationId);
-        console.log('🔍 Buscando posto de destino:', destinationId);
-          
-        // Buscar posto na lista - comparar normalizando ambos os IDs
-        const foundPost = workPosts.find(wp => normalizeId(wp.id) === destinationId);
-        if (foundPost) {
-          destinationWorkPostId = String(foundPost.id); // Usar o ID original do posto encontrado
-          console.log('✅ Posto de destino encontrado:', foundPost.name);
-        } else {
-          // Tentar também com o ID original sem normalização
-          const foundPostOriginal = workPosts.find(wp => String(wp.id) === String(initialRemanejamento.destinationWorkstationId));
-          if (foundPostOriginal) {
-            destinationWorkPostId = String(foundPostOriginal.id);
-            console.log('✅ Posto de destino encontrado (comparação direta):', foundPostOriginal.name);
-          } else {
-            console.warn('⚠️ Posto de destino não encontrado na lista:', {
-              buscado: initialRemanejamento.destinationWorkstationId,
-              tipoBuscado: typeof initialRemanejamento.destinationWorkstationId,
-              totalPostos: workPosts.length
-            });
-          }
-        }
-      }
-        
-      console.log('✅ sourceWorkPostId processado:', sourceWorkPostId);
-      console.log('✅ destinationWorkPostId processado:', destinationWorkPostId);
+      const sourceWorkPostId = initialRemanejamento.originWorkstationId ? String(initialRemanejamento.originWorkstationId) : '';
+      const destinationWorkPostId = initialRemanejamento.destinationWorkstationId ? String(initialRemanejamento.destinationWorkstationId) : '';
         
       setForm(prev => ({
         ...prev,
@@ -262,14 +119,9 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
         tipo: initialRemanejamento.tipo || initialRemanejamento.status || '',
         dataRemanejamento: dataFormatada,
         observacao: initialRemanejamento.observacao || initialRemanejamento.notes || '',
-        sourceWorkPostId: sourceWorkPostId,
-        destinationWorkPostId: destinationWorkPostId,
+        sourceWorkPostId,
+        destinationWorkPostId,
       }));
-        
-      console.log('📝 Formulário atualizado:', {
-        sourceWorkPostId: sourceWorkPostId,
-        destinationWorkPostId: destinationWorkPostId
-      });
     } else {
       // Resetar formulário quando não há remanejamento inicial
       setForm({
@@ -284,7 +136,7 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
         notifyDepartamentoPessoal: false
       });
     }
-  }, [initialRemanejamento, workPosts, loadingWorkPosts]);
+  }, [initialRemanejamento]);
 
   // Fechar com ESC
   useEffect(() => {
@@ -367,23 +219,12 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">Nome do funcionário</label>
-                <select 
-                  name="employeeId" 
-                  value={form.employeeId} 
-                  onChange={handleChange} 
-                  className="w-full p-2 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm" 
-                  required
-                  disabled={loadingEmployees}
-                >
-                  <option value="">
-                    {loadingEmployees ? 'Carregando funcionários...' : 'Selecione o funcionário'}
-                  </option>
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name} - {employee.registrationNumber}
-                    </option>
-                  ))}
-                </select>
+                <EmployeeCombobox
+                  value={form.employeeId}
+                  onChange={(v) => setForm(prev => ({ ...prev, employeeId: v }))}
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite para buscar pelo nome..."
+                />
               </div>
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">Tipo de Remanejamento</label>
@@ -432,22 +273,12 @@ const RemanejamentoFormModal: React.FC<Props> = ({ onSuccess, onClose, initialRe
               </div>
               <div>
                 <label className="block text-seguranca-lightgray mb-1 text-sm font-medium">Posto de Trabalho de Destino</label>
-                <select 
-                  name="destinationWorkPostId" 
-                  value={form.destinationWorkPostId || ''} 
-                  onChange={handleChange} 
-                  className="w-full p-2 rounded bg-seguranca-graphite text-seguranca-lightgray border border-gray-600 focus:border-seguranca-yellow focus:outline-none text-sm" 
-                  disabled={loadingWorkPosts}
-                >
-                  <option value="">
-                    {loadingWorkPosts ? 'Carregando postos...' : 'Selecione o posto de destino'}
-                  </option>
-                  {workPosts.map((post) => (
-                    <option key={post.id} value={String(post.id)}>
-                      {post.postCode} - {post.name}
-                    </option>
-                  ))}
-                </select>
+                <WorkPostCombobox
+                  value={form.destinationWorkPostId || ''}
+                  onChange={(v) => setForm(prev => ({ ...prev, destinationWorkPostId: v }))}
+                  placeholder="Selecione o posto de destino (qualquer posto do sistema)"
+                  searchPlaceholder="Digite para buscar pelo nome ou código..."
+                />
               </div>
             </div>
 

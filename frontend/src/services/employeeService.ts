@@ -1,5 +1,10 @@
 import api from '@/lib/axios';
 
+export interface EmployeeWorkPost {
+  id: string;
+  name?: string;
+}
+
 export interface Employee {
   id: string;
   name: string;
@@ -24,6 +29,8 @@ export interface Employee {
   rg?: string;
   nomePai?: string;
   nomeMae?: string;
+  workPost?: EmployeeWorkPost;
+  workPostId?: string;
 }
 
 export interface SimpleEmployee {
@@ -53,7 +60,7 @@ export const employeeService = {
         params.searchTerm = filters.searchTerm.trim();
       }
       if (filters?.status && filters.status !== 'all') {
-        params.status = filters.status;
+        params.status = filters.status; // Enviado para API filtrar no backend (ACTIVE, TERMINATED, etc.)
       }
       if (filters?.companyId && filters.companyId !== 'all') {
         params.companyId = filters.companyId;
@@ -70,6 +77,36 @@ export const employeeService = {
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
       return [];
+    }
+  },
+
+  /**
+   * Obter estatísticas de funcionários (total, ativos, férias, demitidos/suspensos).
+   * Se companyId for informado, retorna estatísticas da empresa.
+   */
+  async getEmployeesStats(companyId?: string): Promise<{
+    total: number;
+    active: number;
+    vacation: number;
+    medicalCertificate: number;
+    terminated: number;
+    suspended: number;
+  }> {
+    try {
+      const params = companyId && companyId !== 'all' ? { companyId } : {};
+      const response = await api.get('/api/employees/stats', { params });
+      const d = response.data ?? {};
+      return {
+        total: Number(d.total ?? 0),
+        active: Number(d.active ?? 0),
+        vacation: Number(d.vacation ?? 0),
+        medicalCertificate: Number(d.medicalCertificate ?? 0),
+        terminated: Number(d.terminated ?? 0),
+        suspended: Number(d.suspended ?? 0),
+      };
+    } catch (error) {
+      console.error('Erro ao obter estatísticas de funcionários:', error);
+      return { total: 0, active: 0, vacation: 0, medicalCertificate: 0, terminated: 0, suspended: 0 };
     }
   },
 

@@ -32,8 +32,8 @@ interface EmployeeComboboxProps {
 export function EmployeeCombobox({ 
   value,
   onChange,
-  placeholder = "Selecione um funcionário...",
-  searchPlaceholder = "Buscar funcionário...",
+  placeholder = "Selecione o funcionário",
+  searchPlaceholder = "Digite o nome do funcionário para buscar",
   emptyPlaceholder = "Nenhum funcionário encontrado.",
   disabled = false
 }: EmployeeComboboxProps) {
@@ -44,31 +44,21 @@ export function EmployeeCombobox({
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const [selectedEmployee, setSelectedEmployee] = React.useState<SimpleEmployee | null>(null)
 
-  // Buscar funcionários quando o termo de busca mudar
+  // Buscar funcionários quando o usuário digitar (a partir de 1 caractere)
   React.useEffect(() => {
-    if (debouncedSearchTerm.length >= 2) {
+    if (debouncedSearchTerm.trim().length >= 1) {
       setLoading(true)
-      employeeService.searchSimpleEmployees(debouncedSearchTerm)
+      employeeService.searchSimpleEmployees(debouncedSearchTerm.trim())
         .then(setEmployees)
         .catch(error => {
           console.error('Erro ao buscar funcionários:', error)
           setEmployees([])
         })
         .finally(() => setLoading(false))
+    } else {
+      setEmployees([])
     }
   }, [debouncedSearchTerm])
-
-  // Carregar lista básica ao abrir para ter opções iniciais
-  React.useEffect(() => {
-    if (!open || employees.length > 0 || loading) return
-    setLoading(true)
-    employeeService.getSimpleEmployees()
-      .then(setEmployees)
-      .catch(err => {
-        console.error('Erro ao carregar funcionários básicos:', err)
-      })
-      .finally(() => setLoading(false))
-  }, [open, employees.length, loading])
 
   // Garantir que o funcionário selecionado apareça na lista mesmo se não estiver carregado
   React.useEffect(() => {
@@ -139,7 +129,10 @@ export function EmployeeCombobox({
       <PopoverContent
         className="w-full p-0 bg-seguranca-graphite border-gray-600 z-[10002] shadow-lg"
       >
-        <Command className="bg-seguranca-graphite text-seguranca-lightgray">
+        <Command
+          filter={() => true}
+          className="bg-seguranca-graphite text-seguranca-lightgray"
+        >
           <CommandInput 
             placeholder={searchPlaceholder} 
             value={searchTerm}
@@ -154,8 +147,8 @@ export function EmployeeCombobox({
             ) : (
               <>
                 <CommandEmpty className="text-seguranca-lightgray">
-                  {searchTerm.length < 2 
-                    ? "Digite pelo menos 2 caracteres para buscar..." 
+                  {searchTerm.trim().length < 1
+                    ? "Digite o nome do funcionário para buscar..."
                     : emptyPlaceholder
                   }
                 </CommandEmpty>

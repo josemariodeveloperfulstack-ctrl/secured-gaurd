@@ -154,7 +154,13 @@ public class RemanejamentoService {
     private String buildRemanejamentoDesc(Remanejamento r) {
         String orig = r.getOriginWorkstation() != null ? r.getOriginWorkstation().getName() : r.getOrigem();
         String dest = r.getDestinationWorkstation() != null ? r.getDestinationWorkstation().getName() : r.getDestino();
-        return String.format("%s: %s → %s em %s", r.getTipo(), orig != null ? orig : "-", dest != null ? dest : "-", r.getDataRemanejamento());
+        return String.format("%s: %s → %s em %s", r.getTipo(), stripWPPrefix(orig), stripWPPrefix(dest), r.getDataRemanejamento());
+    }
+
+    /** Remove o prefixo "WP" do nome do posto para exibição (RH, Depto Pessoal, histórico). */
+    private String stripWPPrefix(String name) {
+        if (name == null || name.trim().isEmpty()) return "-";
+        return name.replaceFirst("(?i)^WP\\s*-?\\s*", "").trim();
     }
 
     /**
@@ -183,7 +189,29 @@ public class RemanejamentoService {
 
         Remanejamento saved = remanejamentoRepository.save(remanejamento);
 
-        // Registrar no histórico
+        // Atualizar o posto atual do funcionário para o posto de destino e registrar no histórico do funcionário
+        if (saved.getEmployee() != null) {
+            String desc = buildRemanejamentoDesc(saved);
+            employeeChangeHistoryService.recordChange(saved.getEmployee().getId(), EmployeeChangeCategory.REMANEJAMENTO,
+                    "remanejamento", "Remanejamento", null, desc, usuarioQueExecutou != null ? usuarioQueExecutou.getId() : null);
+
+            // Atualizar posto de trabalho do funcionário para o destino (qualquer posto do sistema)
+            if (dto.getDestinationWorkstationId() != null) {
+                WorkPost destWorkPost = workPostRepository.findById(dto.getDestinationWorkstationId()).orElse(null);
+                if (destWorkPost != null) {
+                    Employee employee = saved.getEmployee();
+                    String oldPosto = employee.getWorkPost() != null ? employee.getWorkPost().getName() : null;
+                    String newPosto = destWorkPost.getName();
+                    employee.setWorkPost(destWorkPost);
+                    employeeRepository.save(employee);
+                    employeeChangeHistoryService.recordChange(employee.getId(), EmployeeChangeCategory.POSTO_TRABALHO,
+                            "workPost", "Posto de trabalho", stripWPPrefix(oldPosto), stripWPPrefix(newPosto),
+                            usuarioQueExecutou != null ? usuarioQueExecutou.getId() : null);
+                }
+            }
+        }
+
+        // Registrar no histórico de remanejamentos
         historicoService.registrarAcao(
                 saved,
                 AcaoHistorico.CRIACAO,
@@ -201,12 +229,35 @@ public class RemanejamentoService {
         }
 
         Remanejamento existing = existingOpt.get();
+        String oldDesc = buildRemanejamentoDesc(existing);
         mapDTOToEntity(dto, existing);
         existing.setId(id);
 
         Remanejamento updated = remanejamentoRepository.save(existing);
+        String newDesc = buildRemanejamentoDesc(updated);
 
-        // Registrar no histórico
+        // Registrar remanejamento e atualizar posto no histórico do funcionário (RH, DPE, Operacional)
+        if (updated.getEmployee() != null) {
+            employeeChangeHistoryService.recordChange(updated.getEmployee().getId(), EmployeeChangeCategory.REMANEJAMENTO,
+                    "remanejamento", "Remanejamento", oldDesc, newDesc, usuarioQueExecutou != null ? usuarioQueExecutou.getId() : null);
+
+            // Atualizar posto de trabalho do funcionário para o destino (qualquer posto do sistema)
+            if (dto.getDestinationWorkstationId() != null) {
+                WorkPost destWorkPost = workPostRepository.findById(dto.getDestinationWorkstationId()).orElse(null);
+                if (destWorkPost != null) {
+                    Employee employee = updated.getEmployee();
+                    String oldPosto = employee.getWorkPost() != null ? employee.getWorkPost().getName() : null;
+                    String newPosto = destWorkPost.getName();
+                    employee.setWorkPost(destWorkPost);
+                    employeeRepository.save(employee);
+                    employeeChangeHistoryService.recordChange(employee.getId(), EmployeeChangeCategory.POSTO_TRABALHO,
+                            "workPost", "Posto de trabalho", stripWPPrefix(oldPosto), stripWPPrefix(newPosto),
+                            usuarioQueExecutou != null ? usuarioQueExecutou.getId() : null);
+                }
+            }
+        }
+
+        // Registrar no histórico de remanejamentos
         historicoService.registrarAcao(
                 updated,
                 AcaoHistorico.EDICAO,
@@ -307,37 +358,41 @@ public class RemanejamentoService {
 
         dto.setTipo(entity.getTipo());
 
-        // Resolver origem: usar WorkPost quando origem string estiver vazia
-        String origemVal = entity.getOrigem();
+        // Resolver origem: SEMPRE preferir nome do WorkPost quando existir (evita exibir UUID na lista)
+        String origemVal = null;
+        if (entity.getOriginWorkstation() != null) {
+            try {
+                org.hibernate.Hibernate.initialize(entity.getOriginWorkstation());
+                origemVal = entity.getOriginWorkstation().getName();
+            } catch (Exception e) {
+                log.debug("Erro ao obter nome do posto de origem: {}", e.getMessage());
+            }
+        }
         if (origemVal == null || origemVal.trim().isEmpty()) {
-            if (entity.getOriginWorkstation() != null) {
-                try {
-                    org.hibernate.Hibernate.initialize(entity.getOriginWorkstation());
-                    origemVal = entity.getOriginWorkstation().getName();
-                } catch (Exception e) {
-                    log.debug("Erro ao obter nome do posto de origem: {}", e.getMessage());
-                }
+            origemVal = entity.getOrigem();
+            if (origemVal != null && !origemVal.trim().isEmpty()) {
+                origemVal = resolveUnitName(origemVal);
             }
-        } else {
-            origemVal = resolveUnitName(origemVal);
         }
-        dto.setOrigem(origemVal != null ? origemVal : "");
+        dto.setOrigem(origemVal != null && !origemVal.trim().isEmpty() ? stripWPPrefix(origemVal) : "");
 
-        // Resolver destino: usar WorkPost quando destino string estiver vazia
-        String destinoVal = entity.getDestino();
-        if (destinoVal == null || destinoVal.trim().isEmpty()) {
-            if (entity.getDestinationWorkstation() != null) {
-                try {
-                    org.hibernate.Hibernate.initialize(entity.getDestinationWorkstation());
-                    destinoVal = entity.getDestinationWorkstation().getName();
-                } catch (Exception e) {
-                    log.debug("Erro ao obter nome do posto de destino: {}", e.getMessage());
-                }
+        // Resolver destino: SEMPRE preferir nome do WorkPost quando existir (evita exibir UUID na lista)
+        String destinoVal = null;
+        if (entity.getDestinationWorkstation() != null) {
+            try {
+                org.hibernate.Hibernate.initialize(entity.getDestinationWorkstation());
+                destinoVal = entity.getDestinationWorkstation().getName();
+            } catch (Exception e) {
+                log.debug("Erro ao obter nome do posto de destino: {}", e.getMessage());
             }
-        } else {
-            destinoVal = resolveUnitName(destinoVal);
         }
-        dto.setDestino(destinoVal != null ? destinoVal : "");
+        if (destinoVal == null || destinoVal.trim().isEmpty()) {
+            destinoVal = entity.getDestino();
+            if (destinoVal != null && !destinoVal.trim().isEmpty()) {
+                destinoVal = resolveUnitName(destinoVal);
+            }
+        }
+        dto.setDestino(destinoVal != null && !destinoVal.trim().isEmpty() ? stripWPPrefix(destinoVal) : "");
 
         dto.setDataRemanejamento(entity.getDataRemanejamento());
         dto.setObservacao(entity.getObservacao());
@@ -376,17 +431,23 @@ public class RemanejamentoService {
 
     @Transactional(readOnly = true)
     public byte[] generatePDFReport(UUID employeeId, RemanejamentoTipo tipo, String origem, String destino,
-            LocalDate startDate, LocalDate endDate) throws IOException {
+            UUID workPostId, UUID companyId, Integer lastDays, LocalDate startDate, LocalDate endDate) throws IOException {
+        // Se lastDays informado, calcular período
+        LocalDate effectiveStart = startDate;
+        LocalDate effectiveEnd = endDate;
+        if (lastDays != null && lastDays > 0) {
+            effectiveEnd = LocalDate.now();
+            effectiveStart = effectiveEnd.minusDays(lastDays);
+        }
         log.info(
-                "Gerando relatório PDF de remanejamentos - EmployeeId: {}, Tipo: {}, Origem: {}, Destino: {}, StartDate: {}, EndDate: {}",
-                employeeId, tipo, origem, destino, startDate, endDate);
+                "Gerando relatório PDF de remanejamentos - EmployeeId: {}, Tipo: {}, WorkPostId: {}, CompanyId: {}, LastDays: {}, StartDate: {}, EndDate: {}",
+                employeeId, tipo, workPostId, companyId, lastDays, effectiveStart, effectiveEnd);
 
-        List<Remanejamento> remanejamentos = getRemanejamentosFiltered(employeeId, tipo, origem, destino, startDate,
-                endDate);
+        List<Remanejamento> remanejamentos = getRemanejamentosFiltered(employeeId, tipo, origem, destino, workPostId, companyId, effectiveStart, effectiveEnd);
         log.info("Total de remanejamentos encontrados para o relatório: {}", remanejamentos.size());
 
-        // Determinar companyId
-        UUID companyId = resolveCompanyId(remanejamentos, employeeId);
+        // Determinar companyId para o cabeçalho do relatório
+        UUID reportCompanyId = resolveCompanyId(remanejamentos, employeeId);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
@@ -394,7 +455,7 @@ public class RemanejamentoService {
             // Configurar layout premium
             ReportLayoutConfig config = ReportLayoutConfig.builder()
                     .reportTitle("RELATÓRIO DE REMANEJAMENTOS")
-                    .companyId(companyId)
+                    .companyId(reportCompanyId)
                     .build();
 
             StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer,
@@ -402,7 +463,7 @@ public class RemanejamentoService {
             Document document = docWithPdf.getDocument();
 
             // Filtros aplicados
-            if (employeeId != null || tipo != null || startDate != null || endDate != null) {
+            if (employeeId != null || tipo != null || workPostId != null || companyId != null || lastDays != null || effectiveStart != null || effectiveEnd != null) {
                 Paragraph filtersInfo = new Paragraph("Filtros aplicados:")
                         .setFontSize(10)
                         .setBold()
@@ -419,10 +480,25 @@ public class RemanejamentoService {
                 if (tipo != null) {
                     document.add(new Paragraph("Tipo: " + getTipoLabel(tipo)).setFontSize(10).setMarginBottom(2));
                 }
-                if (startDate != null && endDate != null) {
+                if (workPostId != null) {
+                    String workPostName = workPostRepository.findById(workPostId)
+                            .map(wp -> wp.getPostCode() != null ? wp.getPostCode() + " - " + stripWPPrefix(wp.getName()) : stripWPPrefix(wp.getName()))
+                            .orElse("ID: " + workPostId);
+                    document.add(new Paragraph("Setor de Trabalho: " + workPostName).setFontSize(10).setMarginBottom(2));
+                }
+                if (companyId != null) {
+                    String companyName = companyRepository.findById(companyId)
+                            .map(c -> c.getName() != null ? c.getName() : c.getSigla())
+                            .orElse("ID: " + companyId);
+                    document.add(new Paragraph("Empresa: " + companyName).setFontSize(10).setMarginBottom(2));
+                }
+                if (lastDays != null && lastDays > 0) {
+                    document.add(new Paragraph("Últimos: " + lastDays + " dias").setFontSize(10).setMarginBottom(2));
+                }
+                if (effectiveStart != null && effectiveEnd != null) {
                     document.add(
-                            new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
-                                    " a " + endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10)
+                            new Paragraph("Período: " + effectiveStart.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
+                                    " a " + effectiveEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).setFontSize(10)
                                     .setMarginBottom(2));
                 }
                 document.add(new Paragraph("").setMarginBottom(10));
@@ -461,28 +537,30 @@ public class RemanejamentoService {
                     table.addCell(
                             createCell(remanejamento.getTipo() != null ? getTipoLabel(remanejamento.getTipo()) : ""));
 
-                    // Posto de Origem
+                    // Posto de Origem (sem prefixo WP)
                     String postoOrigem = "-";
                     try {
                         if (remanejamento.getOriginWorkstation() != null) {
                             WorkPost originPost = remanejamento.getOriginWorkstation();
-                            postoOrigem = (originPost.getPostCode() != null ? originPost.getPostCode() + " - " : "") +
-                                    (originPost.getName() != null ? originPost.getName() : "");
+                            String code = originPost.getPostCode();
+                            String name = originPost.getName();
+                            postoOrigem = (code != null && !code.matches("(?i)^WP.*") ? code + " - " : "") +
+                                    stripWPPrefix(name != null ? name : "");
                         }
                     } catch (Exception e) {
                         log.debug("Erro ao carregar posto de origem: {}", e.getMessage());
                     }
                     table.addCell(createCell(postoOrigem));
 
-                    // Posto de Destino
+                    // Posto de Destino (sem prefixo WP)
                     String postoDestino = "-";
                     try {
                         if (remanejamento.getDestinationWorkstation() != null) {
                             WorkPost destinationPost = remanejamento.getDestinationWorkstation();
-                            postoDestino = (destinationPost.getPostCode() != null
-                                    ? destinationPost.getPostCode() + " - "
-                                    : "") +
-                                    (destinationPost.getName() != null ? destinationPost.getName() : "");
+                            String code = destinationPost.getPostCode();
+                            String name = destinationPost.getName();
+                            postoDestino = (code != null && !code.matches("(?i)^WP.*") ? code + " - " : "") +
+                                    stripWPPrefix(name != null ? name : "");
                         }
                     } catch (Exception e) {
                         log.debug("Erro ao carregar posto de destino: {}", e.getMessage());
@@ -516,13 +594,14 @@ public class RemanejamentoService {
     }
 
     private List<Remanejamento> getRemanejamentosFiltered(UUID employeeId, RemanejamentoTipo tipo, String origem,
-            String destino,
-            LocalDate startDate, LocalDate endDate) {
-        log.debug("Aplicando filtros - employeeId: {}, tipo: {}, origem: {}, destino: {}, startDate: {}, endDate: {}",
-                employeeId, tipo, origem, destino, startDate, endDate);
+            String destino, UUID workPostId, UUID companyId, LocalDate startDate, LocalDate endDate) {
+        log.debug("Aplicando filtros - employeeId: {}, tipo: {}, workPostId: {}, companyId: {}, startDate: {}, endDate: {}",
+                employeeId, tipo, workPostId, companyId, startDate, endDate);
 
         try {
-            List<Remanejamento> remanejamentos = remanejamentoRepository.findAllWithEmployee();
+            List<Remanejamento> remanejamentos = (companyId != null)
+                    ? remanejamentoRepository.findAllWithEmployeeAndCompany()
+                    : remanejamentoRepository.findAllWithEmployee();
 
             // Aplicar filtros
             if (employeeId != null) {
@@ -537,8 +616,24 @@ public class RemanejamentoService {
                         .collect(Collectors.toList());
             }
 
-            // Filtros de origem e destino removidos - campos não são mais usados no
-            // formulário
+            // Filtro por Setor de Trabalho (origem OU destino)
+            if (workPostId != null) {
+                remanejamentos = remanejamentos.stream()
+                        .filter(r -> {
+                            boolean matchOrigin = r.getOriginWorkstation() != null && r.getOriginWorkstation().getId().equals(workPostId);
+                            boolean matchDest = r.getDestinationWorkstation() != null && r.getDestinationWorkstation().getId().equals(workPostId);
+                            return matchOrigin || matchDest;
+                        })
+                        .collect(Collectors.toList());
+            }
+
+            // Filtro por Empresa (via funcionário)
+            if (companyId != null) {
+                remanejamentos = remanejamentos.stream()
+                        .filter(r -> r.getEmployee() != null && r.getEmployee().getCompany() != null
+                                && r.getEmployee().getCompany().getId().equals(companyId))
+                        .collect(Collectors.toList());
+            }
 
             if (startDate != null) {
                 remanejamentos = remanejamentos.stream()

@@ -231,6 +231,19 @@ public class WorkPostController {
         return ResponseEntity.ok(workPostDTOs);
     }
     
+    @GetMapping("/by-company/{companyId}")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
+    @Operation(summary = "Listar postos por empresa", description = "Retorna postos de trabalho que possuem funcionários da empresa informada")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
+        @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<WorkPostDTO>> getWorkPostsByCompany(
+            @Parameter(description = "ID da empresa") @PathVariable String companyId) {
+        List<WorkPostDTO> workPostDTOs = workPostService.findByCompanyId(UUID.fromString(companyId));
+        return ResponseEntity.ok(workPostDTOs);
+    }
+
     @GetMapping("/client/{clientId}/all")
     @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL')")
     @Operation(summary = "Listar todos os postos por cliente (sem paginação)", description = "Retorna todos os postos de um cliente específico")

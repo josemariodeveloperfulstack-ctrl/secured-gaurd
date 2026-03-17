@@ -118,6 +118,17 @@ export const workPostService = {
     return this.getAllWorkPosts();
   },
 
+  // Buscar postos por empresa (postos que possuem funcionários da empresa)
+  async getWorkPostsByCompany(companyId: string): Promise<WorkPost[]> {
+    try {
+      const response = await api.get(`/api/work-posts/by-company/${companyId}`);
+      return response.data ?? [];
+    } catch (error) {
+      console.error('Erro ao buscar postos por empresa:', error);
+      return [];
+    }
+  },
+
   // Buscar postos por cliente
   async getWorkPostsByClient(clientId: string): Promise<WorkPost[]> {
     try {

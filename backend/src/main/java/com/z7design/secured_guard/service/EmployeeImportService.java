@@ -4,12 +4,17 @@ import com.z7design.secured_guard.model.*;
 import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -71,6 +76,14 @@ public class EmployeeImportService {
      */
     // SEM @Transactional aqui — cada linha tem sua própria transação via rowService
     public ImportResult importar(MultipartFile file, String targetCnpj) throws Exception {
+        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+        if (filename.endsWith(".csv")) {
+            return importFromCsv(file, targetCnpj);
+        }
+        return importFromExcel(file, targetCnpj);
+    }
+
+    private ImportResult importFromExcel(MultipartFile file, String targetCnpj) throws Exception {
         int criados = 0, atualizados = 0, erros = 0;
         List<String> mensagens = new ArrayList<>();
 
@@ -198,6 +211,152 @@ public class EmployeeImportService {
         log.info("📊 Importação concluída: {} total | {} criados | {} atualizados | {} erros", total, criados,
                 atualizados, erros);
         return new ImportResult(total, criados, atualizados, erros, mensagens);
+    }
+
+    private ImportResult importFromCsv(MultipartFile file, String targetCnpj) throws Exception {
+        int criados = 0, atualizados = 0, erros = 0;
+        List<String> mensagens = new ArrayList<>();
+
+        String activeCnpj = (targetCnpj != null && !targetCnpj.trim().isEmpty()) ? targetCnpj.replaceAll("[^0-9]", "")
+                : COMPANY_CNPJ;
+
+        Company company = companyRepository.findByNormalizedCnpj(activeCnpj).orElse(null);
+
+        if (company == null) {
+            log.warn("⚠️ Empresa com CNPJ {} não encontrada — funcionários serão importados sem vínculo de empresa",
+                    activeCnpj);
+            mensagens.add("Aviso: empresa CNPJ " + activeCnpj
+                    + " não encontrada no sistema. Funcionários importados sem vínculo.");
+        }
+
+        try (InputStream is = file.getInputStream();
+             InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8);
+             CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT.builder()
+                     .setIgnoreEmptyLines(true)
+                     .setTrim(true)
+                     .build())) {
+
+            List<CSVRecord> records = parser.getRecords();
+            int dataStartRow = 0;
+            if (!records.isEmpty()) {
+                CSVRecord first = records.get(0);
+                boolean isHeader = false;
+                for (int i = 0; i < Math.min(first.size(), 25); i++) {
+                    String v = first.get(i);
+                    if (v != null && (v.equalsIgnoreCase("CPF") || v.equalsIgnoreCase("Nome do Funcionário")
+                            || v.equalsIgnoreCase("Nome") || v.equalsIgnoreCase("Matrícula eSocial"))) {
+                        isHeader = true;
+                        break;
+                    }
+                }
+                if (isHeader) {
+                    dataStartRow = 1;
+                }
+            }
+
+            log.info("📊 Importação CSV Promover: {} linhas, dados a partir da linha {}", records.size(), dataStartRow + 1);
+
+            for (int i = dataStartRow; i < records.size(); i++) {
+                CSVRecord record = records.get(i);
+                int rowIdx = i + 1;
+
+                String cpf = null;
+                try {
+                    cpf = normalizeCpf(getCsvValue(record, 19));
+                    if (cpf == null || cpf.length() != 11) {
+                        log.debug("   ⏭️ Linha {} ignorada: CPF inválido '{}'", rowIdx, getCsvValue(record, 19));
+                        continue;
+                    }
+
+                    String nome = getCsvValue(record, 1);
+                    if (nome == null || nome.isBlank()) {
+                        log.debug("   ⏭️ Linha {} ignorada: nome vazio", rowIdx);
+                        continue;
+                    }
+
+                    String matricula = getCsvValue(record, 0);
+                    String nationality = getCsvValue(record, 2);
+                    LocalDate birthDate = parseDate(getCsvValue(record, 3));
+                    String municipioNasc = getCsvValue(record, 4);
+                    String estadoNasc = normalizeUF(getCsvValue(record, 5));
+                    String nomeMae = getCsvValue(record, 6);
+                    String nomePai = getCsvValue(record, 7);
+                    String sexo = normalizeSexo(getCsvValue(record, 8));
+                    String maritalStatus = getCsvValue(record, 9);
+                    String grauInstrucao = getCsvValue(record, 10);
+                    String departamento = getCsvValue(record, 11);
+                    String funcao = getCsvValue(record, 12);
+                    String cbo = getCsvValue(record, 13);
+                    LocalDate hireDate = parseDate(getCsvValue(record, 14));
+                    BigDecimal salario = parseSalario(getCsvValue(record, 16));
+                    String horario = getCsvValue(record, 18);
+                    String escalaTrabalho = getCsvValue(record, 17);
+                    String pis = normalizePis(getCsvValue(record, 20));
+                    String ctps = getCsvValue(record, 21);
+                    String rg = getCsvValue(record, 22);
+                    String titulo = getCsvValue(record, 23);
+                    String rua = getCsvValue(record, 24);
+                    String numero = getCsvValue(record, 25);
+                    String complemento = getCsvValue(record, 26);
+                    String bairro = getCsvValue(record, 27);
+                    String cidade = getCsvValue(record, 28);
+                    String estado = normalizeUF(getCsvValue(record, 29));
+                    String cep = normalizeCep(getCsvValue(record, 30));
+
+                    boolean[] isNewRef = { false };
+
+                    rowService.processRow(
+                            cpf, nome,
+                            matricula, nationality,
+                            birthDate, municipioNasc, estadoNasc,
+                            nomeMae, nomePai, sexo,
+                            maritalStatus, grauInstrucao,
+                            departamento, funcao,
+                            cbo, hireDate,
+                            salario, horario, escalaTrabalho,
+                            pis, ctps, rg,
+                            titulo, rua, numero,
+                            complemento, bairro, cidade,
+                            estado, cep,
+                            company,
+                            isNewRef);
+
+                    if (isNewRef[0]) {
+                        criados++;
+                        log.info("✅ [{}] Criado: {} - CPF: {}", rowIdx, nome.trim().toUpperCase(), cpf);
+                    } else {
+                        atualizados++;
+                        log.info("🔄 [{}] Atualizado: {} - CPF: {}", rowIdx, nome.trim().toUpperCase(), cpf);
+                    }
+
+                } catch (Exception e) {
+                    erros++;
+                    Throwable rootCause = e;
+                    while (rootCause.getCause() != null && rootCause != rootCause.getCause()) {
+                        rootCause = rootCause.getCause();
+                    }
+                    String errorMsg = rootCause.getMessage() != null ? rootCause.getMessage() : rootCause.getClass().getSimpleName();
+                    String cpfDisplay = (cpf != null) ? " (CPF " + cpf + ")" : "";
+                    mensagens.add(String.format("Linha %d%s: %s", rowIdx, cpfDisplay, errorMsg));
+                    log.error("❌ Erro na linha {}: {}", rowIdx, errorMsg);
+                }
+            }
+
+            int total = criados + atualizados + erros;
+            log.info("📊 Importação CSV concluída: {} total | {} criados | {} atualizados | {} erros",
+                    total, criados, atualizados, erros);
+            return new ImportResult(total, criados, atualizados, erros, mensagens);
+
+        } catch (Exception e) {
+            log.error("❌ Erro ao processar CSV Promover: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    private String getCsvValue(CSVRecord record, int colIdx) {
+        if (record.size() <= colIdx) return null;
+        String v = record.get(colIdx);
+        return (v != null && !v.isBlank()) ? v.trim() : null;
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

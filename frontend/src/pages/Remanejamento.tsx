@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { formatWorkPostDisplayName } from '@/utils/formatters';
 import ConfirmDeleteModal from '@/components/operacional/ConfirmDeleteModal';
 
 const tipoOptions = [
@@ -40,6 +41,7 @@ const RemanejamentoPage: React.FC = () => {
   });
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string; sigla?: string }[]>([]);
   const { toast } = useToast();
   
   // State for PDF report modal
@@ -47,6 +49,9 @@ const RemanejamentoPage: React.FC = () => {
   const [pdfFilters, setPdfFilters] = useState({
     employeeId: '',
     tipo: '',
+    workPostId: '',
+    companyId: '',
+    lastDays: '' as string | number,
     startDate: '',
     endDate: ''
   });
@@ -55,15 +60,18 @@ const RemanejamentoPage: React.FC = () => {
   React.useEffect(() => {
     const loadData = async () => {
       try {
-        const [employeesData, workPostsData] = await Promise.all([
+        const [employeesData, workPostsData, companiesData] = await Promise.all([
           employeeService.getAllEmployees(),
-          workPostService.getAllWorkPosts()
+          workPostService.getAllWorkPosts(),
+          companyService.getAllCompanies().catch(() => [])
         ]);
         setEmployees(employeesData);
         setWorkPosts(workPostsData);
+        setCompanies((companiesData || []).map((c: any) => ({ id: c.id, name: c.name || c.sigla || '', sigla: c.sigla })));
         console.log('✅ Dados carregados:', {
           employees: employeesData.length,
-          workPosts: workPostsData.length
+          workPosts: workPostsData.length,
+          companies: companiesData.length
         });
       } catch (error) {
         console.error('❌ Erro ao carregar dados:', error);
@@ -84,7 +92,7 @@ const RemanejamentoPage: React.FC = () => {
     return uuidRegex.test(str);
   };
 
-  // Função helper para obter o nome do posto de trabalho
+  // Função helper para obter o nome do posto de trabalho (sem prefixo WP)
   const getWorkPostName = (workstationId: string | undefined | null): string => {
     if (!workstationId) {
       return '-';
@@ -94,7 +102,7 @@ const RemanejamentoPage: React.FC = () => {
     if (isValidUUID(workstationId)) {
       const workPost = workPosts.find(wp => wp.id === workstationId);
       if (workPost) {
-        return `${workPost.postCode} - ${workPost.name}`;
+        return formatWorkPostDisplayName(workPost);
       }
       
       // Se não encontrar e ainda está carregando, mostrar mensagem
@@ -200,13 +208,23 @@ const RemanejamentoPage: React.FC = () => {
   const handleGeneratePDF = async () => {
     setIsGeneratingPDF(true);
     try {
-      const filters: any = {};
+      const filters: Record<string, string | number | undefined> = {};
       
       if (pdfFilters.employeeId && pdfFilters.employeeId !== 'all') {
         filters.employeeId = pdfFilters.employeeId;
       }
       if (pdfFilters.tipo && pdfFilters.tipo !== 'all') {
         filters.tipo = pdfFilters.tipo;
+      }
+      if (pdfFilters.workPostId && pdfFilters.workPostId !== 'all') {
+        filters.workPostId = pdfFilters.workPostId;
+      }
+      if (pdfFilters.companyId && pdfFilters.companyId !== 'all') {
+        filters.companyId = pdfFilters.companyId;
+      }
+      if (pdfFilters.lastDays && pdfFilters.lastDays !== 'all') {
+        const days = typeof pdfFilters.lastDays === 'string' ? parseInt(pdfFilters.lastDays, 10) : pdfFilters.lastDays;
+        if (!isNaN(days) && days > 0) filters.lastDays = days;
       }
       if (pdfFilters.startDate) {
         filters.startDate = pdfFilters.startDate;
@@ -474,16 +492,63 @@ const RemanejamentoPage: React.FC = () => {
         <DialogContent className="sm:max-w-2xl bg-seguranca-graphite border-gray-600 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-seguranca-lightgray">
-              Gerar Relatório PDF de Remanejamentos
+              Gerar Relatório de Remanejamentos
             </DialogTitle>
+            <DialogDescription asChild>
+              <p className="text-gray-400 text-sm">
+                Filtre por setor de trabalho, empresa, período ou últimos remanejamentos. Disponível para RH e DPE.
+              </p>
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Por Setor de Trabalho</Label>
+                <Select 
+                  value={pdfFilters.workPostId || 'all'} 
+                  onValueChange={(value) => setPdfFilters({ ...pdfFilters, workPostId: value })}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                    <SelectValue placeholder="Todos os setores" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="all">Todos os setores</SelectItem>
+                    {workPosts.map((wp) => (
+                      <SelectItem key={wp.id} value={wp.id}>
+                        {formatWorkPostDisplayName(wp)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Por Empresa</Label>
+                <Select 
+                  value={pdfFilters.companyId || 'all'} 
+                  onValueChange={(value) => setPdfFilters({ ...pdfFilters, companyId: value })}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                    <SelectValue placeholder="Todas as empresas" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="all">Todas as empresas</SelectItem>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}{c.sigla ? ` (${c.sigla})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label className="text-seguranca-lightgray">Funcionário</Label>
                 <Select 
-                  value={pdfFilters.employeeId} 
+                  value={pdfFilters.employeeId || 'all'} 
                   onValueChange={(value) => setPdfFilters({ ...pdfFilters, employeeId: value })}
                 >
                   <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
@@ -501,9 +566,9 @@ const RemanejamentoPage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label className="text-seguranca-lightgray">Tipo</Label>
+                <Label className="text-seguranca-lightgray">Tipo de Movimentação</Label>
                 <Select 
-                  value={pdfFilters.tipo} 
+                  value={pdfFilters.tipo || 'all'} 
                   onValueChange={(value) => setPdfFilters({ ...pdfFilters, tipo: value })}
                 >
                   <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
@@ -521,24 +586,46 @@ const RemanejamentoPage: React.FC = () => {
               </div>
             </div>
             
+            <div className="space-y-2">
+              <Label className="text-seguranca-lightgray">Últimos Remanejamentos</Label>
+              <Select 
+                value={String(pdfFilters.lastDays || 'all')} 
+                onValueChange={(value) => setPdfFilters({ ...pdfFilters, lastDays: value === 'all' ? '' : value })}
+              >
+                <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                  <SelectValue placeholder="Período personalizado" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  <SelectItem value="all">Período personalizado (usar datas abaixo)</SelectItem>
+                  <SelectItem value="7">Últimos 7 dias</SelectItem>
+                  <SelectItem value="15">Últimos 15 dias</SelectItem>
+                  <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  <SelectItem value="60">Últimos 60 dias</SelectItem>
+                  <SelectItem value="90">Últimos 90 dias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-seguranca-lightgray">Data Início</Label>
+                <Label className="text-seguranca-lightgray">Data Início (período personalizado)</Label>
                 <Input
                   type="date"
                   value={pdfFilters.startDate}
                   onChange={(e) => setPdfFilters({ ...pdfFilters, startDate: e.target.value })}
                   className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  disabled={!!pdfFilters.lastDays}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label className="text-seguranca-lightgray">Data Fim</Label>
+                <Label className="text-seguranca-lightgray">Data Fim (período personalizado)</Label>
                 <Input
                   type="date"
                   value={pdfFilters.endDate}
                   onChange={(e) => setPdfFilters({ ...pdfFilters, endDate: e.target.value })}
                   className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  disabled={!!pdfFilters.lastDays}
                 />
               </div>
             </div>

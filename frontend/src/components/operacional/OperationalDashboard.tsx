@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +28,8 @@ import {
   Loader2,
   PlayCircle,
   ArrowRightLeft,
-  FileText
+  FileText,
+  Truck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { operationalService, VacationCoverage, Absence, WorkPostAssignment, SpecificActivity, CreateAbsenceDTO, CreateWorkPostAssignmentDTO, CreateSpecificActivityDTO, CreateVacationCoverageDTO } from '@/services/operationalService';
@@ -46,6 +47,9 @@ import ChangeStatusModal from './ChangeStatusModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { OperationalEmployeesTab } from './OperationalEmployeesTab';
 import LancamentoManualFolhaPonto from '@/pages/RH/LancamentoManualFolhaPonto';
+import { formatWorkPostDisplayName } from '@/utils/formatters';
+
+const Frota = lazy(() => import('@/pages/Frota'));
 
 const OperationalDashboard: React.FC = () => {
   const [vacationCoverages, setVacationCoverages] = useState<VacationCoverage[]>([]);
@@ -814,7 +818,7 @@ const OperationalDashboard: React.FC = () => {
               w-full
               flex md:grid
               overflow-x-auto md:overflow-x-visible
-              md:grid-cols-7
+              md:grid-cols-8
               glass-card border-0
               p-2
               gap-2
@@ -931,6 +935,22 @@ const OperationalDashboard: React.FC = () => {
                 <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
                   <p className="font-semibold">Lançamento Manual de Folha de Ponto</p>
                   <p className="text-xs text-gray-400">Preencha horários de entrada, intervalo e saída por dia</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger
+                    value="frota"
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Truck className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Frota</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Gestão de Frota</p>
+                  <p className="text-xs text-gray-400">Veículos, abastecimentos, manutenções, multas e motoristas</p>
                 </TooltipContent>
               </Tooltip>
 
@@ -1349,7 +1369,7 @@ const OperationalDashboard: React.FC = () => {
                           </span>
                           <span className="flex items-center gap-1">
                             <ArrowRightLeft className="h-3.5 w-3.5" />
-                            De: <strong>{remanejamento.origem}</strong> → Para: <strong>{remanejamento.destino}</strong>
+                            De: <strong>{formatWorkPostDisplayName(remanejamento.origem)}</strong> → Para: <strong>{formatWorkPostDisplayName(remanejamento.destino)}</strong>
                           </span>
                         </div>
                         {remanejamento.observacao && (
@@ -1391,6 +1411,17 @@ const OperationalDashboard: React.FC = () => {
 
         <TabsContent value="lancamento-manual" className="space-y-4">
           <LancamentoManualFolhaPonto />
+        </TabsContent>
+
+        <TabsContent value="frota" className="space-y-4">
+          <Suspense fallback={
+            <div className="flex items-center justify-center p-12">
+              <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+              <span className="ml-2">Carregando Gestão de Frota...</span>
+            </div>
+          }>
+            <Frota embedded />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
