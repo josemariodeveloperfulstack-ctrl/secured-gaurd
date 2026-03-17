@@ -217,9 +217,19 @@ jobs:
       # ============================================
       - name: 📤 Push images to Docker Hub
         run: |
-          docker push z7design/secured-guard-backend:ci
-          docker push z7design/secured-guard-frontend:ci
-          docker push z7design/secured-guard-whatsapp:ci
+          push_with_retry() {
+            local img=$1
+            for i in 1 2 3; do
+              echo "Push attempt $i/3: $img"
+              if docker push "$img"; then return 0; fi
+              echo "Retry in 30s..."
+              sleep 30
+            done
+            return 1
+          }
+          push_with_retry z7design/secured-guard-backend:ci
+          push_with_retry z7design/secured-guard-frontend:ci
+          push_with_retry z7design/secured-guard-whatsapp:ci
 
       # ============================================
       # 7️⃣ INSTALL SSHPASS AND CONFIGURE SSH
