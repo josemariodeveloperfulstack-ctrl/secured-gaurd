@@ -244,6 +244,22 @@ jobs:
           done
 
       # ============================================
+      # 7b Validar VPS_HOST_CI (evitar IP inválido ex: 0.0.7.234)
+      # ============================================
+      - name: 🔍 Validar host VPS (CI)
+        run: |
+          HOST="${{ secrets.VPS_HOST_CI }}"
+          if [ -z "$HOST" ]; then
+            echo "::error::VPS_HOST_CI está vazio. Configure em Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [[ "$HOST" == 0.* ]]; then
+            echo "::error::VPS_HOST_CI parece inválido (IP começa com 0.). Ex.: use 10.0.7.234 em vez de 0.0.7.234. Corrija o secret VPS_HOST_CI no repositório."
+            exit 1
+          fi
+          echo "✓ Host VPS validado"
+
+      # ============================================
       # 8️⃣ TRANSFER FILES TO VPS (com retry para Connection reset)
       # ============================================
       - name: 📤 Transfer files to VPS
