@@ -59,7 +59,7 @@ public class EmployeeReportPdfServiceTest {
         mockCompany.setId(companyId);
         
         when(companyRepository.findById(companyId)).thenReturn(Optional.of(mockCompany));
-        when(employeeRepository.findAllById(anyList())).thenReturn(List.of());
+        when(employeeRepository.findAllByIdIn(anyList())).thenReturn(List.of());
 
         // Act
         try {
@@ -71,6 +71,6 @@ public class EmployeeReportPdfServiceTest {
         }
 
         // Assert
-        verify(employeeRepository).findAllById(List.of(duplicateIds.get(0)));
+        verify(employeeRepository).findAllByIdIn(List.of(duplicateIds.get(0)));
     }
 }

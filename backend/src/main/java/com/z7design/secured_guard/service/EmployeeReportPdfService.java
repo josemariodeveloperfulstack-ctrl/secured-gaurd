@@ -65,7 +65,7 @@ public class EmployeeReportPdfService {
         if (employeeIds != null && !employeeIds.isEmpty()) {
             // Lista sem duplicados evita "Duplicate row was found and ASSERT was specified" no Hibernate
             List<UUID> distinctIds = employeeIds.stream().distinct().toList();
-            employees = employeeRepository.findAllById(distinctIds);
+            employees = employeeRepository.findAllByIdIn(distinctIds);
         } else {
             employees = employeeRepository.findAll();
         }

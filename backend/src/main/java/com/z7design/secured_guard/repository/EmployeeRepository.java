@@ -47,6 +47,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         @Query("SELECT e.id FROM Employee e")
         List<UUID> findAllIds();
 
+        // Busca customizada com DISTINCT para evitar erro de duplicidade no Hibernate 6
+        @Query("SELECT DISTINCT e FROM Employee e WHERE e.id IN :ids")
+        List<Employee> findAllByIdIn(@Param("ids") List<UUID> ids);
+
         // Buscar dados básicos COM relacionamentos de cargo, unidade, empresa, workPost
         // e department
         @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name "
