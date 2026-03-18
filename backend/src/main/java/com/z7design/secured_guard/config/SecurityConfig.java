@@ -184,44 +184,44 @@ public class SecurityConfig {
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
                                                 .requestMatchers("/api/epis/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
                                                 .requestMatchers("/api/epi-control/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
                                                 // Endpoints da frota - requerem permissões operacionais
                                                 .requestMatchers("/api/frota/**")
-                                                .hasAnyAuthority("OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de fuel-records
                                                 .requestMatchers("/api/fuel-records/**")
-                                                .hasAnyAuthority("OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de veículos
                                                 .requestMatchers("/api/vehicles/**")
-                                                .hasAnyAuthority("OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de work-posts
                                                 .requestMatchers("/api/work-posts/**")
-                                                .hasAnyAuthority("OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_RH")
@@ -490,7 +490,7 @@ public class SecurityConfig {
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
-                                                                "OPERACIONAL", "ROLE_OPERACIONAL",
+                                                                "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR",
                                                                 "COMERCIAL", "ROLE_COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",

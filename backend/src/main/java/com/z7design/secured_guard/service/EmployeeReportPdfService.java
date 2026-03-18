@@ -62,7 +62,7 @@ public class EmployeeReportPdfService {
                 companyId, employeeIds != null ? employeeIds.size() : 0, columns != null ? columns.size() : 0, groupBy, orderBy);
 
         List<Employee> employees = employeeIds != null && !employeeIds.isEmpty()
-                ? employeeRepository.findAllById(employeeIds)
+                ? employeeRepository.findAllById(employeeIds.stream().distinct().toList())
                 : employeeRepository.findAll();
 
         List<String> effectiveColumns = (columns != null && !columns.isEmpty()) ? columns : DEFAULT_COLUMNS;

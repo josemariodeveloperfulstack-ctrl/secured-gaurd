@@ -19,5 +19,6 @@ public enum UserRole {
     ANALISTA_SUPRIMENTOS,
     ESTOQUE,      // Módulo estoque (leitura/consulta)
     SUPRIMENTOS,   // Suprimentos e almoxarifado
-    COMPRAS        // Gestão de compras
+    COMPRAS,       // Gestão de compras
+    GESTOR_OPERACIONAL // Acesso total ao módulo Operacional; sem acesso ao módulo Financeiro
 }

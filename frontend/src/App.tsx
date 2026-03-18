@@ -248,6 +248,7 @@ const GestaoEscalas = lazy(() => import('@/pages/GestaoEscalas'));
 const GestaoFerias = lazy(() => import('@/pages/GestaoFerias'));
 const GestaoTarefas = lazy(() => import('@/pages/GestaoTarefas'));
 const RelatoriosOperacionais = lazy(() => import('@/pages/RelatoriosOperacionais'));
+const ApuracaoHoras = lazy(() => import('@/pages/operacional/ApuracaoHoras'));
 
 function App() {
   useEffect(() => {
@@ -1302,6 +1303,13 @@ function App() {
                       <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
                           <RelatoriosOperacionais />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/apuracao-horas" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ApuracaoHoras />
                         </Suspense>
                       </ProtectedRoute>
                     } />

@@ -16,7 +16,9 @@ import {
   Download,
   RefreshCw,
   AlertCircle,
-  Search
+  Search,
+  Clock,
+  FileSpreadsheet
 } from 'lucide-react';
 import { payrollClosureService, PayrollClosure, PayPeriod } from '@/services/payrollClosureService';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +27,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/axios';
 import { timeSheetService } from '@/services/timeSheetService';
+import { overtimeService, Overtime } from '@/services/overtimeService';
 import LancamentoManualFolhaPonto from './LancamentoManualFolhaPonto';
 
 const FechamentoHoras: React.FC = () => {
@@ -52,6 +55,8 @@ const FechamentoHoras: React.FC = () => {
   } | null>(null);
   const [bankHoursLoading, setBankHoursLoading] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [approvedOvertimes, setApprovedOvertimes] = useState<Overtime[]>([]);
+  const [approvedOvertimesLoading, setApprovedOvertimesLoading] = useState(false);
 
   const filteredClosures = useMemo(() => {
     const term = employeeSearch.trim().toLowerCase();
@@ -63,9 +68,22 @@ const FechamentoHoras: React.FC = () => {
     });
   }, [closures, employeeSearch]);
 
+  const loadApprovedOvertimes = async () => {
+    setApprovedOvertimesLoading(true);
+    try {
+      const data = await overtimeService.getApprovedByMonth(selectedYear, selectedMonth);
+      setApprovedOvertimes(data);
+    } catch {
+      setApprovedOvertimes([]);
+    } finally {
+      setApprovedOvertimesLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
     loadBankHours();
+    loadApprovedOvertimes();
   }, [selectedYear, selectedMonth]);
 
   const loadBankHours = async () => {
@@ -362,6 +380,7 @@ const FechamentoHoras: React.FC = () => {
           <TabsTrigger value="periods">Períodos</TabsTrigger>
           <TabsTrigger value="bank-hours">Banco de Horas</TabsTrigger>
           <TabsTrigger value="lancamento-manual">Lançamento Manual</TabsTrigger>
+          <TabsTrigger value="horas-extras">Horas Extras Aprovadas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="closures" className="space-y-4">
@@ -669,6 +688,107 @@ const FechamentoHoras: React.FC = () => {
 
         <TabsContent value="lancamento-manual" className="space-y-4">
           <LancamentoManualFolhaPonto />
+        </TabsContent>
+
+        <TabsContent value="horas-extras" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Horas Extras Aprovadas
+                </CardTitle>
+                <CardDescription>
+                  {months.find(m => m.value === selectedMonth)?.label} {selectedYear} — Relatório para contabilidade
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const blob = await overtimeService.downloadExcel(selectedYear, selectedMonth);
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `horas-extras-aprovadas-${selectedYear}-${String(selectedMonth).padStart(2, '0')}.xlsx`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast({ title: 'Sucesso', description: 'Planilha exportada.' });
+                    } catch {
+                      toast({ title: 'Erro', description: 'Falha ao exportar Excel.', variant: 'destructive' });
+                    }
+                  }}
+                  disabled={approvedOvertimesLoading}
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Exportar Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const blob = await overtimeService.downloadPdf(selectedYear, selectedMonth);
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `horas-extras-aprovadas-${selectedYear}-${String(selectedMonth).padStart(2, '0')}.pdf`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast({ title: 'Sucesso', description: 'PDF exportado.' });
+                    } catch {
+                      toast({ title: 'Erro', description: 'Falha ao exportar PDF.', variant: 'destructive' });
+                    }
+                  }}
+                  disabled={approvedOvertimesLoading}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar PDF
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {approvedOvertimesLoading ? (
+                <div className="text-center py-8">Carregando...</div>
+              ) : approvedOvertimes.length === 0 ? (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Nenhuma hora extra aprovada no período selecionado.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Funcionário</TableHead>
+                      <TableHead>Matrícula</TableHead>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Início</TableHead>
+                      <TableHead>Fim</TableHead>
+                      <TableHead>Total (h)</TableHead>
+                      <TableHead>Posto</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {approvedOvertimes.map((o) => (
+                      <TableRow key={o.id}>
+                        <TableCell className="font-medium">{o.employee?.name ?? '—'}</TableCell>
+                        <TableCell>{o.employee?.registrationNumber ?? '—'}</TableCell>
+                        <TableCell>{new Date(o.overtimeDate).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell>{typeof o.startTime === 'string' ? o.startTime.substring(0, 5) : '—'}</TableCell>
+                        <TableCell>{typeof o.endTime === 'string' ? o.endTime.substring(0, 5) : '—'}</TableCell>
+                        <TableCell>{o.totalHours != null ? Number(o.totalHours).toFixed(2) : '—'}</TableCell>
+                        <TableCell>{o.workPost?.name ?? '—'}</TableCell>
+                        <TableCell className="max-w-[200px] truncate" title={o.reason}>{o.reason ?? '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

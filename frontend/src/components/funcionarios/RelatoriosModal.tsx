@@ -4,6 +4,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -1003,6 +1004,8 @@ export function RelatoriosModal({
                 <DialogContent
                     className="sm:max-w-[400px] bg-seguranca-dark/95 backdrop-blur-xl border-seguranca-gray/20 text-white flex flex-col items-center py-12 rounded-2xl shadow-2xl [&>button]:hidden"
                 >
+                    <DialogTitle className="sr-only">Gerando Relatório</DialogTitle>
+                    <DialogDescription className="sr-only">Processando registros do relatório. Por favor, mantenha esta janela aberta.</DialogDescription>
                     <div className="flex flex-col items-center gap-6 w-full px-6">
                         <div className="relative flex items-center justify-center">
                             <div className="absolute inset-0 bg-seguranca-orange/20 blur-2xl rounded-full" />

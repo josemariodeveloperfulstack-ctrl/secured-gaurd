@@ -139,8 +139,13 @@ const WhatsAppConnection: React.FC = () => {
         // Iniciar verificação periódica de conexão
         startConnectionPolling();
       } else if (!createResponse.data.success) {
-        // Backend retornou erro mas com status 200
-        console.error('❌ Erro do backend:', createResponse.data.error);
+        // Backend retornou erro mas com status 200 (ex.: serviço indisponível em CI)
+        const errMsg = createResponse.data.error || '';
+        if (errMsg.includes('Serviço WhatsApp não disponível')) {
+          console.warn('⚠️ WhatsApp indisponível (esperado em CI):', errMsg);
+        } else {
+          console.error('❌ Erro do backend:', errMsg);
+        }
         toast({
           title: "⚠️ Erro ao gerar QR Code",
           description: createResponse.data.error || "Serviço WhatsApp indisponível. Verifique se o container está rodando.",

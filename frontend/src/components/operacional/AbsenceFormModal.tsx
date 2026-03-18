@@ -23,9 +23,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Absence, CreateAbsenceDTO } from '@/services/operationalService';
-import { Loader2, Upload, FileText, X, User, Calendar, UserCheck } from 'lucide-react';
+import { Loader2, Upload, FileText, X, User, Calendar, UserCheck, Clock, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { WorkPostCombobox } from '@/components/ui/work-post-combobox';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useNavigate } from 'react-router-dom';
+import { workPostService } from '@/services/workPostService';
 
 const absenceSchema = z.object({
   employeeId: z.string().min(1, 'Funcionário é obrigatório'),
@@ -40,10 +45,18 @@ const absenceSchema = z.object({
     'OTHER'
   ]),
   reason: z.string().min(1, 'Motivo é obrigatório'),
-  medicalCertificateDays: z.number().optional(),
+  medicalCertificateDays: z.preprocess(
+    (v) => (v === '' || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+    z.number().optional()
+  ),
   documentUrl: z.string().optional(),
-  justifiedHours: z.number().min(0).max(24).optional(),
+  justifiedHours: z.preprocess(
+    (v) => (v === '' || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+    z.number().min(0).max(24).optional()
+  ),
   coverageEmployeeId: z.string().optional(),
+  coverageWorkPostId: z.string().optional(),
+  coverageIsOvertime: z.boolean().optional(),
   coverageNotes: z.string().optional(),
 });
 
@@ -74,6 +87,7 @@ export default function AbsenceFormModal({
   onSubmit,
   employees,
 }: AbsenceFormModalProps) {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [uploadingFile, setUploadingFile] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -89,6 +103,8 @@ export default function AbsenceFormModal({
   } = useForm<AbsenceFormData>({
     resolver: zodResolver(absenceSchema),
     defaultValues: {
+      employeeId: '',
+      coverageEmployeeId: '',
       absenceType: 'SICK_LEAVE',
     },
   });
@@ -107,6 +123,8 @@ export default function AbsenceFormModal({
       setValue('justifiedHours', absence.justifiedHours ?? undefined);
       setUploadedFileUrl(absence.documentUrl || '');
       setValue('coverageEmployeeId', absence.coverageEmployee?.id || '');
+      setValue('coverageWorkPostId', absence.coverageWorkPost?.id || '');
+      setValue('coverageIsOvertime', !!absence.coverageIsOvertime);
       setValue('coverageNotes', absence.coverageNotes || '');
     } else if (open && !absence) {
       // Novo registro: valores padrão
@@ -119,10 +137,17 @@ export default function AbsenceFormModal({
         documentUrl: '',
         justifiedHours: undefined,
         coverageEmployeeId: '',
+        coverageWorkPostId: '',
+        coverageIsOvertime: false,
         coverageNotes: '',
       });
       setUploadedFileUrl('');
       setSelectedFile(null);
+      // Valor padrão Posto: "Promover Reserva" se existir
+      workPostService.getAllWorkPosts().then((posts) => {
+        const promoverReserva = posts.find((p) => p.name?.toLowerCase().includes('promover reserva'));
+        if (promoverReserva) setValue('coverageWorkPostId', promoverReserva.id);
+      }).catch(() => {});
     }
   }, [open, absence, setValue, reset]);
 
@@ -230,17 +255,24 @@ export default function AbsenceFormModal({
         return;
       }
       
-      await onSubmit({
-        employeeId: data.employeeId,
+      const payload = {
+        employeeId: data.employeeId.trim(),
         absenceDate: data.absenceDate,
         absenceType: data.absenceType,
-        reason: data.reason,
-        medicalCertificateDays: data.medicalCertificateDays,
+        reason: data.reason.trim(),
+        medicalCertificateDays:
+          data.medicalCertificateDays != null && !Number.isNaN(data.medicalCertificateDays)
+            ? data.medicalCertificateDays
+            : undefined,
         documentUrl: data.documentUrl || undefined,
-        justifiedHours: data.justifiedHours != null && !Number.isNaN(data.justifiedHours) ? data.justifiedHours : undefined,
-        coverageEmployeeId: data.coverageEmployeeId || undefined,
-        coverageNotes: data.coverageNotes || undefined,
-      });
+        justifiedHours:
+          data.justifiedHours != null && !Number.isNaN(data.justifiedHours) ? data.justifiedHours : undefined,
+        coverageEmployeeId: data.coverageEmployeeId?.trim() || undefined,
+        coverageWorkPostId: data.coverageWorkPostId?.trim() || undefined,
+        coverageIsOvertime: data.coverageIsOvertime ?? undefined,
+        coverageNotes: data.coverageNotes?.trim() || undefined,
+      };
+      await onSubmit(payload);
       
       toast({
         title: 'Sucesso',
@@ -251,14 +283,15 @@ export default function AbsenceFormModal({
       reset();
     } catch (error: any) {
       console.error('❌ Erro ao salvar falta:', error);
-      const errorMessage = error?.response?.data?.message || 
-                          error?.response?.data?.error || 
-                          error?.message || 
-                          'Erro ao salvar falta. Verifique os dados e tente novamente.';
-      
+      const errData = error?.response?.data;
+      const errorMessage =
+        (typeof errData === 'object' && (errData?.message || errData?.error)) ||
+        error?.message ||
+        'Erro ao salvar falta. Verifique os dados e tente novamente. Abra o console (F12) para mais detalhes.';
+
       toast({
-        title: 'Erro',
-        description: errorMessage,
+        title: 'Erro ao salvar',
+        description: String(errorMessage),
         variant: 'destructive',
       });
     } finally {
@@ -286,6 +319,17 @@ export default function AbsenceFormModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+          {/* Erros de validação em destaque para o usuário ver ao clicar em Salvar */}
+          {Object.keys(errors).length > 0 && (
+            <div className="rounded-lg bg-seguranca-red/20 border border-seguranca-red/50 p-3 text-sm text-seguranca-lightgray">
+              <p className="font-medium text-seguranca-red mb-1">Corrija os campos antes de salvar:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {Object.entries(errors).map(([key, err]) => (
+                  <li key={key}>{err?.message as string}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {/* Seção: Dados da Falta */}
           <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
             <CardHeader className="pb-3">
@@ -302,25 +346,14 @@ export default function AbsenceFormModal({
                 <Label htmlFor="employeeId" className="text-seguranca-lightgray font-medium">
                   Funcionário <span className="text-seguranca-red">*</span>
                 </Label>
-                <Select
-                  value={watch('employeeId')}
-                  onValueChange={(value) => setValue('employeeId', value)}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder="Selecione o funcionário" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {employees.map((employee) => (
-                      <SelectItem
-                        key={employee.id}
-                        value={employee.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                      >
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <EmployeeCombobox
+                  value={watch('employeeId') ?? ''}
+                  onChange={(v) => setValue('employeeId', v)}
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite ao menos 3 caracteres para buscar"
+                  minChars={3}
+                  initialDisplayName={absence?.employee?.name}
+                />
                 {errors.employeeId && (
                   <p className="text-sm text-seguranca-red">{errors.employeeId.message}</p>
                 )}
@@ -353,7 +386,7 @@ export default function AbsenceFormModal({
                     Tipo de Falta <span className="text-seguranca-red">*</span>
                   </Label>
                   <Select
-                    value={absenceType}
+                    value={watch('absenceType') ?? 'SICK_LEAVE'}
                     onValueChange={(value) => setValue('absenceType', value as any)}
                   >
                     <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
@@ -560,6 +593,54 @@ export default function AbsenceFormModal({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Posto de Trabalho (Cobertura) */}
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray font-medium">
+                  Posto de Trabalho
+                </Label>
+                <WorkPostCombobox
+                  value={watch('coverageWorkPostId') || ''}
+                  onChange={(value) => setValue('coverageWorkPostId', value)}
+                  placeholder="Selecione o posto (ex.: Promover Reserva)"
+                />
+              </div>
+
+              {/* Hora Extra ou Hora Normal */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="coverageIsOvertime"
+                  checked={!!watch('coverageIsOvertime')}
+                  onCheckedChange={(checked) => setValue('coverageIsOvertime', !!checked)}
+                  className="border-gray-500 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                />
+                <Label
+                  htmlFor="coverageIsOvertime"
+                  className="text-seguranca-lightgray font-medium cursor-pointer"
+                >
+                  Cobertura em Hora Extra
+                </Label>
+              </div>
+
+              {watch('coverageIsOvertime') && (
+                <div className="flex items-center gap-2 rounded-lg bg-seguranca-red/10 border border-seguranca-red/30 p-3">
+                  <Clock className="h-5 w-5 text-seguranca-red shrink-0" />
+                  <span className="text-sm text-seguranca-lightgray">Apuração de Horas na Gestão Operacional</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-seguranca-yellow hover:text-seguranca-yellow/90 hover:bg-seguranca-yellow/10 shrink-0"
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate('/operacional/apuracao-horas');
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Abrir
+                  </Button>
+                </div>
+              )}
+
               {/* Funcionário de Cobertura */}
               <div className="space-y-2">
                 <Label
@@ -568,25 +649,14 @@ export default function AbsenceFormModal({
                 >
                   Funcionário de Cobertura
                 </Label>
-                <Select
-                  value={watch('coverageEmployeeId') || undefined}
-                  onValueChange={(value) => setValue('coverageEmployeeId', value)}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder="Selecione quem cobriu a falta (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {employees.map((employee) => (
-                      <SelectItem
-                        key={employee.id}
-                        value={employee.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                      >
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <EmployeeCombobox
+                  value={watch('coverageEmployeeId') ?? ''}
+                  onChange={(v) => setValue('coverageEmployeeId', v)}
+                  placeholder="Selecione quem cobriu a falta (opcional)"
+                  searchPlaceholder="Digite ao menos 3 caracteres para buscar"
+                  minChars={3}
+                  initialDisplayName={absence?.coverageEmployee?.name}
+                />
               </div>
 
               {/* Observações de Cobertura */}

@@ -2,8 +2,11 @@ package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.model.Absence;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.Overtime;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
+import com.z7design.secured_guard.model.enums.OvertimeStatus;
+import com.z7design.secured_guard.model.enums.OvertimeType;
 import com.z7design.secured_guard.repository.AbsenceRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -49,6 +53,9 @@ public class AbsenceService {
     @Autowired
     private EmployeeChangeHistoryService employeeChangeHistoryService;
 
+    @Autowired
+    private OvertimeService overtimeService;
+
     @Transactional(readOnly = true)
     public List<Absence> getAllAbsences() {
         try {
@@ -68,6 +75,10 @@ public class AbsenceService {
                 if (absence.getCoverageEmployee() != null) {
                     absence.getCoverageEmployee().getName();
                     absence.getCoverageEmployee().getId();
+                }
+                if (absence.getCoverageWorkPost() != null) {
+                    absence.getCoverageWorkPost().getId();
+                    absence.getCoverageWorkPost().getName();
                 }
                 if (absence.getApprovedBy() != null) {
                     absence.getApprovedBy().getName();
@@ -107,6 +118,10 @@ public class AbsenceService {
                 if (absence.getCoverageEmployee() != null) {
                     absence.getCoverageEmployee().getName();
                     absence.getCoverageEmployee().getId();
+                }
+                if (absence.getCoverageWorkPost() != null) {
+                    absence.getCoverageWorkPost().getId();
+                    absence.getCoverageWorkPost().getName();
                 }
                 if (absence.getApprovedBy() != null) {
                     absence.getApprovedBy().getName();
@@ -160,6 +175,30 @@ public class AbsenceService {
         absence.setEmployee(employee);
 
         Absence saved = absenceRepository.save(absence);
+
+        if (Boolean.TRUE.equals(saved.getCoverageIsOvertime()) && saved.getCoverageEmployee() != null) {
+            try {
+                String reason = (saved.getCoverageNotes() != null && saved.getCoverageNotes().length() >= 10)
+                        ? saved.getCoverageNotes()
+                        : "Cobertura de falta - " + (saved.getReason() != null ? saved.getReason() : "Sem detalhes");
+                Overtime overtime = Overtime.builder()
+                        .employee(saved.getCoverageEmployee())
+                        .overtimeDate(saved.getAbsenceDate())
+                        .startTime(LocalTime.of(8, 0))
+                        .endTime(LocalTime.of(16, 0))
+                        .type(OvertimeType.EXTRA)
+                        .reason(reason.length() > 500 ? reason.substring(0, 500) : reason)
+                        .status(OvertimeStatus.PENDING)
+                        .workPost(saved.getCoverageWorkPost())
+                        .absence(saved)
+                        .build();
+                overtimeService.create(overtime);
+                log.info("Hora extra de cobertura criada para funcionário {} na data {}", saved.getCoverageEmployee().getId(), saved.getAbsenceDate());
+            } catch (Exception e) {
+                log.error("Falha ao criar hora extra de cobertura (falta {} salva): {}", saved.getId(), e.getMessage(), e);
+            }
+        }
+
         String tipo = saved.getIsJustified() != null && saved.getIsJustified() ? "justificada" : "não justificada";
         String desc = String.format("%s - %s (%s)", saved.getAbsenceDate(), saved.getAbsenceType(), tipo);
         employeeChangeHistoryService.recordChange(employee.getId(), EmployeeChangeCategory.FALTA,
@@ -201,6 +240,10 @@ public class AbsenceService {
         }
         if (updatedAbsence.getCoverageNotes() != null) {
             existingAbsence.setCoverageNotes(updatedAbsence.getCoverageNotes());
+        }
+        existingAbsence.setCoverageWorkPost(updatedAbsence.getCoverageWorkPost());
+        if (updatedAbsence.getCoverageIsOvertime() != null) {
+            existingAbsence.setCoverageIsOvertime(updatedAbsence.getCoverageIsOvertime());
         }
 
         // Validar e atualizar funcionário que cobriu a falta se fornecido

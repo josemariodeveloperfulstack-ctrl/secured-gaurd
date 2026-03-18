@@ -47,7 +47,7 @@ public class CompanyController {
             @ApiResponse(responseCode = "200", description = "Empresas listadas com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','COMERCIAL','ASSISTENTE_ADMINISTRATIVO','ANALISTA_SUPRIMENTOS','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COMERCIAL','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','GESTOR_OPERACIONAL','COMERCIAL','ASSISTENTE_ADMINISTRATIVO','ANALISTA_SUPRIMENTOS','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_GESTOR_OPERACIONAL','ROLE_COMERCIAL','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS')")
     public ResponseEntity<List<CompanyDTO>> getAllCompanies() {
         try {
             log.info("Buscando todas as empresas");

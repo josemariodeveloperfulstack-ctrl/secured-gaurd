@@ -31,6 +31,9 @@ public class AbsenceDTO {
     private LocalDateTime approvalDate;
     private UUID coverageEmployeeId;
     private String coverageEmployeeName;
+    private UUID coverageWorkPostId;
+    private String coverageWorkPostName;
+    private Boolean coverageIsOvertime;
     private String coverageNotes;
     private BigDecimal justifiedHours;
     private LocalDateTime createdAt;
@@ -53,6 +56,9 @@ public class AbsenceDTO {
                 .approvalDate(absence.getApprovalDate())
                 .coverageEmployeeId(absence.getCoverageEmployee() != null ? absence.getCoverageEmployee().getId() : null)
                 .coverageEmployeeName(absence.getCoverageEmployee() != null ? absence.getCoverageEmployee().getName() : null)
+                .coverageWorkPostId(absence.getCoverageWorkPost() != null ? absence.getCoverageWorkPost().getId() : null)
+                .coverageWorkPostName(absence.getCoverageWorkPost() != null ? absence.getCoverageWorkPost().getName() : null)
+                .coverageIsOvertime(absence.getCoverageIsOvertime())
                 .coverageNotes(absence.getCoverageNotes())
                 .justifiedHours(absence.getJustifiedHours())
                 .createdAt(absence.getCreatedAt())
@@ -71,6 +77,7 @@ public class AbsenceDTO {
                 .medicalCertificateDays(this.medicalCertificateDays)
                 .isJustified(this.isJustified != null ? this.isJustified : false)
                 .approvalDate(this.approvalDate)
+                .coverageIsOvertime(this.coverageIsOvertime != null ? this.coverageIsOvertime : false)
                 .coverageNotes(this.coverageNotes)
                 .justifiedHours(this.justifiedHours)
                 .build();

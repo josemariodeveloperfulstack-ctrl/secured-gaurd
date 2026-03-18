@@ -8,7 +8,7 @@ import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.z7design.secured_guard.model.enums.OvertimeStatus;
 import com.z7design.secured_guard.model.enums.OvertimeType;
 
@@ -46,7 +46,6 @@ public class Overtime {
     @NotNull(message = "Employee is required")
     @ManyToOne
     @JoinColumn(name = "employee_id", nullable = false)
-    @JsonBackReference
     private Employee employee;
     
     @NotNull(message = "Overtime date is required")
@@ -90,6 +89,15 @@ public class Overtime {
     
     @Column(name = "approval_date")
     private LocalDateTime approvalDate;
+
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "work_post_id")
+    private WorkPost workPost;
+
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "absence_id")
+    @JsonIgnore
+    private Absence absence;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -592,7 +592,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/{id}/change-history")
-    @PreAuthorize("hasAnyAuthority('EMPLOYEE_HISTORY_READ', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE')")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_HISTORY_READ', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE')")
     @Operation(summary = "Histórico de mudanças do funcionário", description = "Lista paginada de alterações de dados do funcionário")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),

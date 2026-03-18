@@ -275,8 +275,13 @@ public class RemanejamentoService {
     }
 
     public Optional<RemanejamentoDTO> findByIdAsDTO(UUID id) {
-        return remanejamentoRepository.findByIdWithRelations(id)
-                .map(this::convertToDTO);
+        try {
+            return remanejamentoRepository.findByIdWithRelations(id)
+                    .map(this::convertToDTO);
+        } catch (Exception e) {
+            log.warn("Erro ao carregar remanejamento por ID {}: {}. Retornando vazio (404).", id, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     public List<RemanejamentoDTO> findByEmployeeIdAsDTO(UUID employeeId) {

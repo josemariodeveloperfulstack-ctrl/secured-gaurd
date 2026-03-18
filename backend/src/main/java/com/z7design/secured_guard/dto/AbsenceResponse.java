@@ -28,6 +28,8 @@ public class AbsenceResponse {
     private SimpleUser approvedBy;
     private LocalDateTime approvalDate;
     private SimpleEmployee coverageEmployee;
+    private SimpleWorkPost coverageWorkPost;
+    private Boolean coverageIsOvertime;
     private String coverageNotes;
     private BigDecimal justifiedHours;
     private LocalDateTime createdAt;
@@ -48,6 +50,15 @@ public class AbsenceResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SimpleUser {
+        private UUID id;
+        private String name;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SimpleWorkPost {
         private UUID id;
         private String name;
     }
@@ -101,6 +112,18 @@ public class AbsenceResponse {
                 // Log warning mas continua
                 System.err.println("⚠️ Erro ao acessar coverageEmployee da falta " + absence.getId() + ": " + e.getMessage());
             }
+
+            SimpleWorkPost coverageWorkPost = null;
+            try {
+                if (absence.getCoverageWorkPost() != null) {
+                    coverageWorkPost = SimpleWorkPost.builder()
+                            .id(absence.getCoverageWorkPost().getId())
+                            .name(absence.getCoverageWorkPost().getName())
+                            .build();
+                }
+            } catch (Exception e) {
+                System.err.println("⚠️ Erro ao acessar coverageWorkPost da falta " + absence.getId() + ": " + e.getMessage());
+            }
             
             return AbsenceResponse.builder()
                     .id(absence.getId())
@@ -115,6 +138,8 @@ public class AbsenceResponse {
                     .approvedBy(approvedBy)
                     .approvalDate(absence.getApprovalDate())
                     .coverageEmployee(coverageEmployee)
+                    .coverageWorkPost(coverageWorkPost)
+                    .coverageIsOvertime(absence.getCoverageIsOvertime())
                     .coverageNotes(absence.getCoverageNotes())
                     .justifiedHours(absence.getJustifiedHours())
                     .createdAt(absence.getCreatedAt())

@@ -6,6 +6,7 @@ import com.z7design.secured_guard.dto.AbsenceDTO;
 import com.z7design.secured_guard.dto.AbsenceResponse;
 import com.z7design.secured_guard.service.AbsenceService;
 import com.z7design.secured_guard.service.EmployeeService;
+import com.z7design.secured_guard.service.WorkPostService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,9 @@ public class AbsenceController {
 
     @Autowired
     private EmployeeService employeeService;
+
+    @Autowired
+    private WorkPostService workPostService;
 
     @GetMapping
     public ResponseEntity<List<AbsenceResponse>> getAllAbsences() {
@@ -179,6 +183,14 @@ public class AbsenceController {
                 }
             }
 
+            if (absenceDTO.getCoverageWorkPostId() != null) {
+                try {
+                    absence.setCoverageWorkPost(workPostService.getById(absenceDTO.getCoverageWorkPostId()));
+                } catch (Exception e) {
+                    log.warn("Posto de trabalho de cobertura não encontrado: {}", absenceDTO.getCoverageWorkPostId());
+                }
+            }
+
             Absence createdAbsence = absenceService.createAbsence(absence);
             return ResponseEntity.ok(AbsenceResponse.fromEntity(createdAbsence));
         } catch (IllegalArgumentException e) {
@@ -212,6 +224,16 @@ public class AbsenceController {
             if (absenceDTO.getCoverageEmployeeId() != null) {
                 Employee coverageEmployee = employeeService.findById(absenceDTO.getCoverageEmployeeId());
                 absence.setCoverageEmployee(coverageEmployee);
+            }
+
+            if (absenceDTO.getCoverageWorkPostId() != null) {
+                try {
+                    absence.setCoverageWorkPost(workPostService.getById(absenceDTO.getCoverageWorkPostId()));
+                } catch (Exception e) {
+                    log.warn("Posto de trabalho de cobertura não encontrado: {}", absenceDTO.getCoverageWorkPostId());
+                }
+            } else {
+                absence.setCoverageWorkPost(null);
             }
 
             Absence updatedAbsence = absenceService.updateAbsence(id, absence);

@@ -1,11 +1,14 @@
 package com.z7design.secured_guard.controller;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -140,6 +143,59 @@ public class OvertimeController {
     @GetMapping("/{id}")
     public ResponseEntity<Overtime> findById(@PathVariable UUID id) {
         return ResponseEntity.ok(overtimeService.findById(id));
+    }
+
+    @Operation(summary = "Lista todas as solicitações de horas extras (Gestão Operacional)",
+               description = "Retorna todas as horas extras, opcionalmente filtradas por status. Para Apuração de Horas.")
+    @GetMapping
+    public ResponseEntity<List<Overtime>> findAll(@RequestParam(required = false) String status) {
+        if (status != null && !status.isBlank()) {
+            return ResponseEntity.ok(overtimeService.findByStatus(OvertimeStatus.valueOf(status)));
+        }
+        return ResponseEntity.ok(overtimeService.findAll());
+    }
+
+    @Operation(summary = "Lista horas extras aprovadas por mês/ano (Departamento Pessoal)",
+               description = "Retorna horas extras com status APPROVED no período para relatórios e contabilidade.")
+    @GetMapping("/approved")
+    public ResponseEntity<List<Overtime>> findApprovedByMonth(
+            @RequestParam int year,
+            @RequestParam int month) {
+        return ResponseEntity.ok(overtimeService.findApprovedByMonth(year, month));
+    }
+
+    @Operation(summary = "Exportar horas extras aprovadas em Excel",
+               description = "Gera planilha Excel das horas extras aprovadas no mês/ano para contabilidade.")
+    @GetMapping(value = "/export/excel", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> exportExcel(
+            @RequestParam int year,
+            @RequestParam int month) {
+        try {
+            byte[] bytes = overtimeService.exportExcel(year, month);
+            String filename = "horas-extras-aprovadas-" + year + "-" + String.format("%02d", month) + ".xlsx";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .body(bytes);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @Operation(summary = "Exportar horas extras aprovadas em PDF",
+               description = "Gera PDF das horas extras aprovadas no mês/ano para contabilidade.")
+    @GetMapping(value = "/export/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> exportPdf(
+            @RequestParam int year,
+            @RequestParam int month) {
+        try {
+            byte[] bytes = overtimeService.exportPdf(year, month);
+            String filename = "horas-extras-aprovadas-" + year + "-" + String.format("%02d", month) + ".pdf";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .body(bytes);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @Operation(summary = "Busca solicitações de horas extras por ID de funcionário",

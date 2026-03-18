@@ -531,29 +531,38 @@ public class UserController {
     @GetMapping("/me/current-role")
     @Operation(summary = "Verificar role atual", description = "Retorna o role atual do usuário no banco e um JWT atualizado")
     public ResponseEntity<?> getCurrentRole() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(401).build();
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(401).build();
+            }
+
+            String username = authentication.getName();
+            User currentUser = userService.findByUsername(username).orElse(null);
+            if (currentUser == null) {
+                return ResponseEntity.status(404).body(Map.of("error", "Usuário não encontrado"));
+            }
+
+            // Role atual direto do banco (evitar NPE se roles for null)
+            String currentRole = "COLABORADOR";
+            if (currentUser.getRoles() != null && !currentUser.getRoles().isEmpty()) {
+                currentRole = currentUser.getRoles().stream()
+                        .findFirst()
+                        .map(role -> role != null ? role.getName() : null)
+                        .filter(n -> n != null && !n.isEmpty())
+                        .orElse("COLABORADOR");
+            }
+
+            // Gera um novo token com o role atualizado
+            String newToken = jwtService.generateToken(currentUser);
+
+            return ResponseEntity.ok(Map.of(
+                    "role", currentRole,
+                    "token", newToken,
+                    "userId", currentUser.getId().toString()));
+        } catch (Exception e) {
+            log.error("Erro ao obter role atual: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Erro ao obter role: " + e.getMessage()));
         }
-
-        String username = authentication.getName();
-        User currentUser = userService.findByUsername(username).orElse(null);
-        if (currentUser == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "Usuário não encontrado"));
-        }
-
-        // Role atual direto do banco
-        String currentRole = currentUser.getRoles().stream()
-                .findFirst()
-                .map(role -> role.getName())
-                .orElse("COLABORADOR");
-
-        // Gera um novo token com o role atualizado
-        String newToken = jwtService.generateToken(currentUser);
-
-        return ResponseEntity.ok(Map.of(
-                "role", currentRole,
-                "token", newToken,
-                "userId", currentUser.getId().toString()));
     }
 }

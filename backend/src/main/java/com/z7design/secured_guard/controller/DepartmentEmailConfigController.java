@@ -31,7 +31,7 @@ public class DepartmentEmailConfigController {
 
     @GetMapping("/department-emails")
     @Operation(summary = "Obter configuração de emails dos departamentos")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','COMERCIAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_COMERCIAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','GESTOR','RH','FINANCEIRO','OPERACIONAL','GESTOR_OPERACIONAL','COMERCIAL','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_GESTOR','ROLE_RH','ROLE_FINANCEIRO','ROLE_OPERACIONAL','ROLE_GESTOR_OPERACIONAL','ROLE_COMERCIAL')")
     public ResponseEntity<Map<String, String>> getDepartmentEmails() {
         try {
             log.info("📧 Buscando configuração de emails dos departamentos");
