@@ -48,12 +48,16 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         List<UUID> findAllIds();
 
         // Busca customizada com DISTINCT para evitar erro de duplicidade no Hibernate 6
+        // Usamos Set para garantir que o Hibernate deduplique os resultados em memória se necessário
         @Query("SELECT DISTINCT e FROM Employee e WHERE e.id IN :ids")
-        List<Employee> findAllByIdIn(@Param("ids") List<UUID> ids);
+        java.util.Set<Employee> findAllByIdIn(@Param("ids") List<UUID> ids);
+
+        @Query("SELECT DISTINCT e FROM Employee e")
+        java.util.Set<Employee> findAllDistinct();
 
         // Buscar dados básicos COM relacionamentos de cargo, unidade, empresa, workPost
         // e department
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -93,7 +97,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
         // Buscar dados básicos COM relacionamentos por termo de busca (nome, CPF ou
         // email)
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +

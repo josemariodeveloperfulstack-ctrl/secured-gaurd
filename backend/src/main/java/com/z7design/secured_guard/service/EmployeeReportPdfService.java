@@ -65,9 +65,13 @@ public class EmployeeReportPdfService {
         if (employeeIds != null && !employeeIds.isEmpty()) {
             // Lista sem duplicados evita "Duplicate row was found and ASSERT was specified" no Hibernate
             List<UUID> distinctIds = employeeIds.stream().distinct().toList();
-            employees = employeeRepository.findAllByIdIn(distinctIds);
+            // Retorna Set para garantir deduplicação pelo Hibernate 6 em ambiente CI com dados inconsistentes
+            java.util.Set<Employee> employeeSet = employeeRepository.findAllByIdIn(distinctIds);
+            employees = new ArrayList<>(employeeSet);
         } else {
-            employees = employeeRepository.findAll();
+            // Retorna Set para garantir deduplicação no caso geral (todos os funcionários)
+            java.util.Set<Employee> allSet = employeeRepository.findAllDistinct();
+            employees = new ArrayList<>(allSet);
         }
 
         List<String> effectiveColumns = (columns != null && !columns.isEmpty()) ? columns : DEFAULT_COLUMNS;

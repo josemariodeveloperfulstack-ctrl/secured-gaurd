@@ -17,10 +17,10 @@ public interface UserGroupRepository extends JpaRepository<UserGroupEntity, java
     
     Optional<UserGroupEntity> findByGroupName(UserGroup groupName);
     
-    @Query("SELECT ug FROM UserGroupEntity ug JOIN ug.users u WHERE u.id = :userId")
+    @Query("SELECT DISTINCT ug FROM UserGroupEntity ug JOIN ug.users u WHERE u.id = :userId")
     List<UserGroupEntity> findByUserId(@Param("userId") UUID userId);
     
-    @Query("SELECT ug FROM UserGroupEntity ug WHERE ug.groupName IN :groupNames")
+    @Query("SELECT DISTINCT ug FROM UserGroupEntity ug WHERE ug.groupName IN :groupNames")
     List<UserGroupEntity> findByGroupNames(@Param("groupNames") List<UserGroup> groupNames);
     
     boolean existsByGroupName(UserGroup groupName);

@@ -36,7 +36,7 @@ public class UserService {
     }
 
     public List<User> findAll() {
-        return userRepository.findAll();
+        return new java.util.ArrayList<>(userRepository.findAllDistinct());
     }
 
     public User createFromRequest(CreateUserRequest request) {

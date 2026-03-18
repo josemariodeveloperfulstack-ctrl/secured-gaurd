@@ -17,10 +17,10 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
     
     boolean existsByName(String name);
     
-    @Query("SELECT r FROM Role r JOIN r.permissions p WHERE p.name = :permissionName")
+    @Query("SELECT DISTINCT r FROM Role r JOIN r.permissions p WHERE p.name = :permissionName")
     List<Role> findByPermissionName(@Param("permissionName") String permissionName);
     
-    @Query("SELECT r FROM Role r WHERE r.name IN :roleNames")
+    @Query("SELECT DISTINCT r FROM Role r WHERE r.name IN :roleNames")
     List<Role> findByNames(@Param("roleNames") List<String> roleNames);
     
     @Query("SELECT r FROM Role r ORDER BY r.name")

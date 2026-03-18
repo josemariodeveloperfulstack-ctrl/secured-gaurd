@@ -93,12 +93,16 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
 
   const getWorkPostsLabel = (employee: Employee) => {
     const wp = (employee.workPost as any)?.name;
+    const wpId = (employee.workPost as any)?.id;
     const wps = (employee as any)?.workPosts;
     if (Array.isArray(wps) && wps.length) {
       const names = wps.map((x: any) => x?.name).filter(Boolean);
       if (names.length) return names.join(', ');
     }
-    return wp || null;
+    
+    if (wp) return wp;
+    if (wpId) return `Posto [ID: ${String(wpId).substring(0, 8)}]`;
+    return null;
   };
 
   const SortHead = ({ k, children }: { k: NonNullable<FuncionariosTableProps['sortKey']>; children: React.ReactNode }) => {

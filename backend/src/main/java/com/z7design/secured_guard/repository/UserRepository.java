@@ -13,6 +13,9 @@ import com.z7design.secured_guard.model.User;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
+    @Query("SELECT DISTINCT u FROM User u")
+    java.util.Set<User> findAllDistinct();
+
     Optional<User> findByUsername(String username);
     Optional<User> findByCpf(String cpf);
     boolean existsByUsername(String username);
@@ -57,7 +60,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /**
      * Busca usuário através do CPF do funcionário associado
      */
-    @Query("SELECT u FROM User u " +
+    @Query("SELECT DISTINCT u FROM User u " +
            "JOIN Employee e ON e.user.id = u.id " +
            "WHERE e.document = :cpf")
     Optional<User> findByEmployeeCpf(@Param("cpf") String cpf);
