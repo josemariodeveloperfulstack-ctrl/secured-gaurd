@@ -434,10 +434,15 @@ export const employeeService = {
           const text = await error.response.data.text();
           const err = JSON.parse(text);
           throw new Error(err.message || err.error || 'Erro ao gerar relatório PDF');
-        } catch {
+        } catch (parseError: any) {
+          // Re-throw if it's already our parsed error
+          if (parseError instanceof Error && parseError.message !== 'Erro ao processar resposta do servidor') {
+            throw parseError;
+          }
           throw new Error('Erro ao processar resposta do servidor');
         }
       }
+      console.error('Erro ao gerar relatório PDF:', error?.response?.status, error?.message);
       throw error;
     }
   },

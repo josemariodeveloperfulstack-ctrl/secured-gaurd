@@ -13,23 +13,27 @@ DELETE FROM public.roles WHERE ctid NOT IN (
     SELECT MIN(ctid) FROM public.roles GROUP BY id
 );
 
--- User Roles (Muitos-para-Muitos) - Aqui usamos composite key se existir, mas se for corrompido, melhor limpar por ID se houver
--- Se não houver ID único, podemos usar a combinação user_id e role_id
-DELETE FROM public.users_roles WHERE ctid NOT IN (
-    SELECT MIN(ctid) FROM public.users_roles GROUP BY user_id, role_id
+-- User Roles (join table: user_roles, conforme @JoinTable em User.java)
+DELETE FROM public.user_roles WHERE ctid NOT IN (
+    SELECT MIN(ctid) FROM public.user_roles GROUP BY user_id, role_id
 );
 
--- Groups
+-- User Groups (join table: user_group, entidade UserGroupEntity)
 DELETE FROM public.user_group WHERE ctid NOT IN (
     SELECT MIN(ctid) FROM public.user_group GROUP BY id
 );
 
--- Group Members (User Groups)
-DELETE FROM public.user_groups WHERE ctid NOT IN (
-    SELECT MIN(ctid) FROM public.user_groups GROUP BY user_id, group_id
-);
+-- User Group Membership (join table: user_group_membership, conforme @JoinTable em User.java)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_group_membership') THEN
+        DELETE FROM public.user_group_membership WHERE ctid NOT IN (
+            SELECT MIN(ctid) FROM public.user_group_membership GROUP BY user_id, group_id
+        );
+    END IF;
+END $$;
 
--- 2. Garantir Restauración de Constraints de PRIMARY KEY
+-- 2. Garantir Restauração de Constraints de PRIMARY KEY
 
 DO $$
 BEGIN
