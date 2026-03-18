@@ -1,5 +1,5 @@
 -- Cobertura de falta: posto de trabalho e indicação de hora extra
--- Colunas sem FK inline; FKs criadas só se work_posts(id) tiver PRIMARY KEY (evita erro em CI com schema 999)
+-- Apenas colunas; FKs criadas só se as tabelas referenciadas tiverem PRIMARY KEY (CI schema 999 pode não ter)
 ALTER TABLE absences
   ADD COLUMN IF NOT EXISTS coverage_work_post_id UUID,
   ADD COLUMN IF NOT EXISTS coverage_is_overtime BOOLEAN NOT NULL DEFAULT false;
@@ -8,16 +8,20 @@ ALTER TABLE overtime
   ADD COLUMN IF NOT EXISTS work_post_id UUID,
   ADD COLUMN IF NOT EXISTS absence_id UUID;
 
--- FK para absences(id) em overtime (absences sempre tem PK em id)
-ALTER TABLE overtime
-  DROP CONSTRAINT IF EXISTS fk_overtime_absence;
-ALTER TABLE overtime
-  ADD CONSTRAINT fk_overtime_absence
-  FOREIGN KEY (absence_id) REFERENCES absences(id) ON DELETE SET NULL;
-
--- FKs para work_posts(id) só se a tabela tiver PRIMARY KEY (ex.: CI com version 999 pode não ter)
+-- FKs só quando existir constraint única na coluna referenciada (evita erro em ambientes com schema atípico)
 DO $$
 BEGIN
+  -- overtime.absence_id -> absences(id)
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'absences'::regclass AND contype = 'p'
+  ) THEN
+    ALTER TABLE overtime DROP CONSTRAINT IF EXISTS fk_overtime_absence;
+    ALTER TABLE overtime ADD CONSTRAINT fk_overtime_absence
+      FOREIGN KEY (absence_id) REFERENCES absences(id) ON DELETE SET NULL;
+  END IF;
+
+  -- absences.coverage_work_post_id e overtime.work_post_id -> work_posts(id)
   IF EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conrelid = 'work_posts'::regclass AND contype = 'p'
