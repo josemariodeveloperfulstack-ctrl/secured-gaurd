@@ -647,7 +647,7 @@ public class EmployeeService {
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void bulkUpdateStatus(List<UUID> ids, String statusStr) {
         EmploymentStatus status = EmploymentStatus.valueOf(statusStr.toUpperCase());
-        List<Employee> employees = employeeRepository.findAllById(ids);
+        List<Employee> employees = employeeRepository.findAllByIdIn(ids);
         for (Employee employee : employees) {
             employee.setStatus(status);
             employee.setUpdatedAt(LocalDateTime.now());
@@ -658,7 +658,7 @@ public class EmployeeService {
     @Transactional
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void bulkTerminate(List<UUID> ids, java.time.LocalDate terminationDate) {
-        List<Employee> employees = employeeRepository.findAllById(ids);
+        List<Employee> employees = employeeRepository.findAllByIdIn(ids);
         for (Employee employee : employees) {
             employee.setStatus(EmploymentStatus.TERMINATED);
             employee.setTerminationDate(terminationDate);
@@ -673,7 +673,7 @@ public class EmployeeService {
     @Transactional
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void bulkDelete(List<UUID> ids) {
-        List<Employee> employees = employeeRepository.findAllById(ids);
+        List<Employee> employees = employeeRepository.findAllByIdIn(ids);
         for (Employee employee : employees) {
             if (employee.getStatus() != EmploymentStatus.TERMINATED) {
                 throw new RuntimeException(
@@ -859,7 +859,7 @@ public class EmployeeService {
             return java.util.Collections.emptyList();
         }
         List<UUID> distinctIds = ids.stream().distinct().toList();
-        return employeeRepository.findAllById(distinctIds);
+        return employeeRepository.findAllByIdIn(distinctIds);
     }
 
     public List<Employee> findByNameContaining(String name) {
