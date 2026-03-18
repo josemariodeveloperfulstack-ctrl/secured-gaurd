@@ -50,20 +50,29 @@ public class PositionDTO {
 
     private LocalDateTime updatedAt;
 
-    // Método para converter entidade para DTO
+    // Método para converter entidade para DTO (tolera Unit inexistente/FK órfã em CI)
     public static PositionDTO fromEntity(com.z7design.secured_guard.model.Position entity) {
         if (entity == null) {
             return null;
         }
-        
+        UUID unitId = null;
+        String unitName = "Sem unidade";
+        try {
+            if (entity.getUnit() != null) {
+                unitId = entity.getUnit().getId();
+                unitName = entity.getUnit().getName();
+            }
+        } catch (Exception e) {
+            // Unit referenciada não existe (ex.: FK órfã em ambiente CI) — não falhar a conversão
+        }
         return PositionDTO.builder()
                 .id(entity.getId())
                 .name(entity.getName())
                 .description(entity.getDescription())
                 .cbo(entity.getCbo())
                 .baseSalary(entity.getBaseSalary())
-                .unitId(entity.getUnit() != null ? entity.getUnit().getId() : null)
-                .unitName(entity.getUnit() != null ? entity.getUnit().getName() : "Sem unidade")
+                .unitId(unitId)
+                .unitName(unitName)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

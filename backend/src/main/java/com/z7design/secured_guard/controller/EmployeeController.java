@@ -428,71 +428,57 @@ public class EmployeeController {
 
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
             for (Object[] row : data) {
-                try {
-                    java.util.Map<String, Object> employee = new java.util.HashMap<>();
-                    employee.put("id", row[0]);
-                    employee.put("name", row[1]);
-                    employee.put("document", row[2]);
-                    employee.put("birthDate", row[3]);
-                    employee.put("registrationNumber", row[4]);
-                    employee.put("hireDate", row[5]);
-                    employee.put("terminationDate", row[6]);
-                    employee.put("status", row[7]);
-                    employee.put("notes", row[8]);
-                    employee.put("address", row[9]);
-                    employee.put("phone", row[10]);
-                    employee.put("email", row[11]);
-                    employee.put("cnhNumber", row[12]);
-                    employee.put("ctps", row[13]);
-                    employee.put("cbo", row[14]);
-                    employee.put("pis", row[15]);
-                    employee.put("salario", row[16]);
-                    employee.put("createdAt", row[17]);
-                    employee.put("updatedAt", row[18]);
+                java.util.Map<String, Object> employee = new java.util.HashMap<>();
+                employee.put("id", safeAt(row, 0));
+                employee.put("name", safeAt(row, 1));
+                employee.put("document", safeAt(row, 2));
+                employee.put("birthDate", safeAt(row, 3));
+                employee.put("registrationNumber", safeAt(row, 4));
+                employee.put("hireDate", safeAt(row, 5));
+                employee.put("terminationDate", safeAt(row, 6));
+                employee.put("status", safeAt(row, 7));
+                employee.put("notes", safeAt(row, 8));
+                employee.put("address", safeAt(row, 9));
+                employee.put("phone", safeAt(row, 10));
+                employee.put("email", safeAt(row, 11));
+                employee.put("cnhNumber", safeAt(row, 12));
+                employee.put("ctps", safeAt(row, 13));
+                employee.put("cbo", safeAt(row, 14));
+                employee.put("pis", safeAt(row, 15));
+                employee.put("salario", safeAt(row, 16));
+                employee.put("createdAt", safeAt(row, 17));
+                employee.put("updatedAt", safeAt(row, 18));
 
-                    if (row.length > 19 && row[19] != null) {
-                        java.util.Map<String, Object> position = new java.util.HashMap<>();
-                        position.put("name", row[19]); // position_name
-                        employee.put("position", position);
-                    }
-
-                    if (row.length > 25 && (row[20] != null || row[25] != null)) {
-                        java.util.Map<String, Object> unit = new java.util.HashMap<>();
-                        if (row[20] != null) unit.put("name", row[20]); // unit_name
-                        if (row[25] != null) unit.put("id", row[25]); // unit_id
-                        employee.put("unit", unit);
-                    }
-
-                    if (row.length > 26 && (row[21] != null || row[26] != null)) {
-                        java.util.Map<String, Object> company = new java.util.HashMap<>();
-                        if (row[21] != null) company.put("sigla", row[21]); // company_sigla
-                        if (row[26] != null) company.put("id", row[26]); // company_id
-                        employee.put("company", company);
-                    }
-
-                    if (row.length > 22 && row[22] != null) {
-                        employee.put("userId", row[22]);
-                    }
-
-                    if (row.length > 27 && (row[23] != null || row[27] != null)) {
-                        java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                        if (row[23] != null) workPost.put("name", row[23]); // work_post_name
-                        if (row[27] != null) workPost.put("id", row[27]); // work_post_id
-                        employee.put("workPost", workPost);
-                    }
-
-                    if (row.length > 24 && row[24] != null) {
-                        java.util.Map<String, Object> department = new java.util.HashMap<>();
-                        department.put("name", row[24]); // department_name
-                        employee.put("department", department);
-                    }
-
-                    employees.add(employee);
-                } catch (Exception dtoError) {
-                    System.err.println("❌ EmployeeController.getAllPaged - Erro ao converter funcionário: "
-                            + dtoError.getMessage());
-                    dtoError.printStackTrace();
+                if (safeAt(row, 19) != null) {
+                    java.util.Map<String, Object> position = new java.util.HashMap<>();
+                    position.put("name", safeAt(row, 19));
+                    employee.put("position", position);
                 }
+                if (safeAt(row, 20) != null || safeAt(row, 25) != null) {
+                    java.util.Map<String, Object> unit = new java.util.HashMap<>();
+                    if (safeAt(row, 20) != null) unit.put("name", safeAt(row, 20));
+                    if (safeAt(row, 25) != null) unit.put("id", safeAt(row, 25));
+                    employee.put("unit", unit);
+                }
+                if (safeAt(row, 21) != null || safeAt(row, 26) != null) {
+                    java.util.Map<String, Object> company = new java.util.HashMap<>();
+                    if (safeAt(row, 21) != null) company.put("sigla", safeAt(row, 21));
+                    if (safeAt(row, 26) != null) company.put("id", safeAt(row, 26));
+                    employee.put("company", company);
+                }
+                if (safeAt(row, 22) != null) employee.put("userId", safeAt(row, 22));
+                if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
+                    java.util.Map<String, Object> workPost = new java.util.HashMap<>();
+                    if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23));
+                    if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27));
+                    employee.put("workPost", workPost);
+                }
+                if (safeAt(row, 24) != null) {
+                    java.util.Map<String, Object> department = new java.util.HashMap<>();
+                    department.put("name", safeAt(row, 24));
+                    employee.put("department", department);
+                }
+                employees.add(employee);
             }
 
             System.out.println("✅ EmployeeController.getAllPaged - Retornando " + employees.size()
@@ -1015,5 +1001,9 @@ public class EmployeeController {
                     "success", false,
                     "message", "Erro ao processar importação: " + e.getMessage()));
         }
+    }
+
+    private static Object safeAt(Object[] row, int i) {
+        return (row != null && i >= 0 && i < row.length) ? row[i] : null;
     }
 }

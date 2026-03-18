@@ -61,9 +61,16 @@ public class EmployeeReportPdfService {
         log.info("Gerando relatório PDF de funcionários - Empresa: {}, Funcionários: {}, Colunas: {}, GroupBy: {}, OrderBy: {}",
                 companyId, employeeIds != null ? employeeIds.size() : 0, columns != null ? columns.size() : 0, groupBy, orderBy);
 
-        List<Employee> employees = employeeIds != null && !employeeIds.isEmpty()
-                ? employeeRepository.findAllById(employeeIds.stream().distinct().toList())
-                : employeeRepository.findAll();
+        List<Employee> employees;
+        if (employeeIds != null && !employeeIds.isEmpty()) {
+            List<UUID> distinctIds = employeeIds.stream().distinct().toList();
+            employees = new ArrayList<>(distinctIds.size());
+            for (UUID id : distinctIds) {
+                employeeRepository.findById(id).ifPresent(employees::add);
+            }
+        } else {
+            employees = employeeRepository.findAll();
+        }
 
         List<String> effectiveColumns = (columns != null && !columns.isEmpty()) ? columns : DEFAULT_COLUMNS;
         Company company = resolveCompanyForLayout(companyId, employees);
