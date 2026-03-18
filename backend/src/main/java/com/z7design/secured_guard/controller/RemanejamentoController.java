@@ -133,13 +133,16 @@ public class RemanejamentoController {
     }
     
     @Operation(summary = "Gerar relatório PDF de remanejamentos",
-               description = "Gera relatório PDF filtrado por funcionário, tipo, origem, destino e período")
+               description = "Gera relatório PDF filtrado por funcionário, tipo, setor (posto), empresa, período ou últimos dias")
     @GetMapping("/report/pdf")
     public ResponseEntity<byte[]> generatePDFReport(
             @RequestParam(required = false) UUID employeeId,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String origem,
             @RequestParam(required = false) String destino,
+            @RequestParam(required = false) UUID workPostId,
+            @RequestParam(required = false) UUID companyId,
+            @RequestParam(required = false) Integer lastDays,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate) {
         try {
@@ -152,7 +155,7 @@ public class RemanejamentoController {
                 }
             }
 
-            byte[] pdfBytes = remanejamentoService.generatePDFReport(employeeId, tipoEnum, origem, destino, startDate, endDate);
+            byte[] pdfBytes = remanejamentoService.generatePDFReport(employeeId, tipoEnum, origem, destino, workPostId, companyId, lastDays, startDate, endDate);
             String fileName = "relatorio-remanejamentos-" + java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) + ".pdf";
 
             return ResponseEntity.ok()

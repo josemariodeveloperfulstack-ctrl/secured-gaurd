@@ -1,7 +1,9 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.WorkPostDTO;
+import com.z7design.secured_guard.dto.WorkPostReportFilterDTO;
 import com.z7design.secured_guard.model.WorkPost;
+import com.z7design.secured_guard.service.WorkPostReportService;
 import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
 import com.z7design.secured_guard.service.WorkPostService;
@@ -16,7 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +43,7 @@ public class WorkPostController {
     
     private final WorkPostService workPostService;
     private final WorkPostRepository workPostRepository;
+    private final WorkPostReportService workPostReportService;
     
     @GetMapping
     @Operation(summary = "Listar postos de trabalho", description = "Retorna uma lista paginada de postos de trabalho")
@@ -55,7 +60,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/all")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_RH', 'RH', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_RH', 'RH', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
     @Operation(summary = "Listar todos os postos de trabalho (sem paginação)", description = "Retorna uma lista completa de todos os postos de trabalho")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -231,6 +236,19 @@ public class WorkPostController {
         return ResponseEntity.ok(workPostDTOs);
     }
     
+    @GetMapping("/by-company/{companyId}")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
+    @Operation(summary = "Listar postos por empresa", description = "Retorna postos de trabalho que possuem funcionários da empresa informada")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
+        @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<WorkPostDTO>> getWorkPostsByCompany(
+            @Parameter(description = "ID da empresa") @PathVariable String companyId) {
+        List<WorkPostDTO> workPostDTOs = workPostService.findByCompanyId(UUID.fromString(companyId));
+        return ResponseEntity.ok(workPostDTOs);
+    }
+
     @GetMapping("/client/{clientId}/all")
     @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL')")
     @Operation(summary = "Listar todos os postos por cliente (sem paginação)", description = "Retorna todos os postos de um cliente específico")
@@ -338,6 +356,21 @@ public class WorkPostController {
         WorkPostStats stats = new WorkPostStats(emImplantacaoCount, ativoCount, inativoCount, 
                                               suspensoCount, canceladoCount, emAnaliseCount, pendenteCount);
         return ResponseEntity.ok(stats);
+    }
+
+    @PostMapping("/report/pdf")
+    @Operation(summary = "Gerar relatório PDF de postos de trabalho", description = "Gera PDF com layout padrão do sistema (cabeçalho, gradiente, tabela, numeração de páginas)")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "PDF gerado com sucesso"),
+        @ApiResponse(responseCode = "403", description = "Acesso negado"),
+        @ApiResponse(responseCode = "500", description = "Erro ao gerar relatório")
+    })
+    public ResponseEntity<byte[]> generateReportPdf(@RequestBody(required = false) WorkPostReportFilterDTO filters) {
+        byte[] pdf = workPostReportService.generatePdf(filters);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "postos-de-trabalho.pdf");
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
     
     @GetMapping("/test")

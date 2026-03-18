@@ -176,7 +176,8 @@ public class RoleMigrationService {
                 "ANALISTA_SUPRIMENTOS",
                 "ESTOQUE",
                 "SUPRIMENTOS",
-                "COMPRAS"
+                "COMPRAS",
+                "GESTOR_OPERACIONAL"
         };
 
         for (String roleName : defaultRoles) {

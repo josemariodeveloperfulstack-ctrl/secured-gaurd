@@ -7,7 +7,6 @@ import { remanejamentoService, Remanejamento } from '@/services/remanejamentoSer
 import { Loader2, Plus, Filter, Search, RefreshCw, Download, Eye, Trash2 } from 'lucide-react';
 import { employeeService, Employee } from '@/services/employeeService';
 import { workPostService, WorkPost } from '@/services/workPostService';
-import { RemanejamentoTipo } from '@/types/remanejamento';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -15,31 +14,38 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import ConfirmDeleteModal from '@/components/operacional/ConfirmDeleteModal';
+import { formatWorkPostDisplayName } from '@/utils/formatters';
+import { companyService } from '@/services/companyService';
 
-const tipoOptions = [
+const tipoOptions: { value: string; label: string }[] = [
   { value: '', label: 'Todos' },
   { value: 'TRANSFERENCIA_UNIDADE', label: 'Transferência de Unidade' },
+  { value: 'TRANSFERENCIA_POSTO_TRABALHO', label: 'Transferência de Posto de Trabalho' },
   { value: 'TROCA_FUNCAO', label: 'Troca de Função' },
   { value: 'PROMOCAO', label: 'Promoção' },
+  { value: 'COBRIR_FERIAS', label: 'Cobrir Férias' },
+  { value: 'COBRIR_FALTA', label: 'Cobrir Falta' },
+  { value: 'PLANTAO', label: 'Plantão' },
   { value: 'OUTROS', label: 'Outros' },
 ];
+
+const getTipoLabel = (tipo: string): string => tipoOptions.find(o => o.value === tipo)?.label || tipo || '-';
 
 const RemanejamentoPage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRemanejamento, setSelectedRemanejamento] = useState<Remanejamento | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [remanejamentoToDelete, setRemanejamentoToDelete] = useState<Remanejamento | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     tipo: '',
     funcionarioId: '',
     dataInicio: '',
     dataFim: ''
   });
+  const [cannotDeleteModalOpen, setCannotDeleteModalOpen] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string; sigla?: string }[]>([]);
   const { toast } = useToast();
   
   // State for PDF report modal
@@ -47,6 +53,9 @@ const RemanejamentoPage: React.FC = () => {
   const [pdfFilters, setPdfFilters] = useState({
     employeeId: '',
     tipo: '',
+    workPostId: '',
+    companyId: '',
+    lastDays: '' as string | number,
     startDate: '',
     endDate: ''
   });
@@ -55,15 +64,18 @@ const RemanejamentoPage: React.FC = () => {
   React.useEffect(() => {
     const loadData = async () => {
       try {
-        const [employeesData, workPostsData] = await Promise.all([
+        const [employeesData, workPostsData, companiesData] = await Promise.all([
           employeeService.getAllEmployees(),
-          workPostService.getAllWorkPosts()
+          workPostService.getAllWorkPosts(),
+          companyService.getAllCompanies().catch(() => [])
         ]);
         setEmployees(employeesData);
         setWorkPosts(workPostsData);
+        setCompanies((companiesData || []).map((c: any) => ({ id: c.id, name: c.name || c.sigla || '', sigla: c.sigla })));
         console.log('✅ Dados carregados:', {
           employees: employeesData.length,
-          workPosts: workPostsData.length
+          workPosts: workPostsData.length,
+          companies: companiesData.length
         });
       } catch (error) {
         console.error('❌ Erro ao carregar dados:', error);
@@ -84,25 +96,14 @@ const RemanejamentoPage: React.FC = () => {
     return uuidRegex.test(str);
   };
 
-  // Função helper para obter o nome do posto de trabalho
-  const getWorkPostName = (workstationId: string | undefined | null): string => {
-    if (!workstationId) {
-      return '-';
-    }
-
-    // Se é um UUID válido, buscar na lista de postos de trabalho
-    if (isValidUUID(workstationId)) {
+  // Função helper para obter o nome do posto de trabalho (com fallback origem/destino)
+  const getWorkPostName = (workstationId: string | undefined | null, fallback?: string): string => {
+    if (workstationId && isValidUUID(workstationId)) {
       const workPost = workPosts.find(wp => wp.id === workstationId);
-      if (workPost) {
-        return `${workPost.postCode} - ${workPost.name}`;
-      }
-      
-      // Se não encontrar e ainda está carregando, mostrar mensagem
-      if (workPosts.length === 0) {
-        return 'Carregando...';
-      }
+      if (workPost) return formatWorkPostDisplayName(workPost);
     }
-
+    if (fallback && fallback.trim()) return fallback.trim();
+    if (workstationId && workPosts.length === 0) return 'Carregando...';
     return '-';
   };
 
@@ -112,20 +113,26 @@ const RemanejamentoPage: React.FC = () => {
     queryFn: () => remanejamentoService.getRemanejamentosTyped(),
   });
 
-  // Filtrar no frontend
+  // Filtrar no frontend (filtros + busca por texto)
   const remanejamentos = React.useMemo(() => {
     if (!remanejamentosRaw) return [];
+    const term = searchTerm.trim().toLowerCase();
     return remanejamentosRaw.filter(rem => {
-      // Corrigir: usar rem.tipo ao invés de rem.status
       if (filters.tipo && rem.tipo !== filters.tipo) return false;
       if (filters.funcionarioId && rem.employeeId !== filters.funcionarioId) return false;
-      // Usar dataRemanejamento ou remanejamentoDate
       const remanejamentoDate = rem.dataRemanejamento || rem.remanejamentoDate;
       if (filters.dataInicio && remanejamentoDate && remanejamentoDate < filters.dataInicio) return false;
       if (filters.dataFim && remanejamentoDate && remanejamentoDate > filters.dataFim) return false;
+      if (term) {
+        const employeeName = (rem.employeeName || employees.find(e => e.id === rem.employeeId)?.name || '').toLowerCase();
+        const observacao = (rem.observacao || rem.notes || '').toLowerCase();
+        const origem = (rem.origem || '').toLowerCase();
+        const destino = (rem.destino || '').toLowerCase();
+        if (!employeeName.includes(term) && !observacao.includes(term) && !origem.includes(term) && !destino.includes(term)) return false;
+      }
       return true;
     });
-  }, [remanejamentosRaw, filters]);
+  }, [remanejamentosRaw, filters, searchTerm, employees]);
 
   const handleOpenModal = () => {
     setSelectedRemanejamento(null);
@@ -151,35 +158,8 @@ const RemanejamentoPage: React.FC = () => {
     setViewModalOpen(true);
   };
 
-  const handleDelete = (rem: Remanejamento) => {
-    setRemanejamentoToDelete(rem);
-    setDeleteModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!remanejamentoToDelete) return;
-
-    setIsDeleting(true);
-    try {
-      await remanejamentoService.deleteRemanejamento(remanejamentoToDelete.id);
-      toast({
-        title: "Sucesso!",
-        description: "Remanejamento excluído com sucesso.",
-        variant: "default",
-      });
-      setDeleteModalOpen(false);
-      setRemanejamentoToDelete(null);
-      refetch();
-    } catch (error: any) {
-      console.error('Erro ao excluir remanejamento:', error);
-      toast({
-        title: "Erro!",
-        description: error?.response?.data?.message || "Erro ao excluir remanejamento. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
+  const handleDelete = (_rem: Remanejamento) => {
+    setCannotDeleteModalOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -189,6 +169,7 @@ const RemanejamentoPage: React.FC = () => {
   };
 
   const handleClearFilters = () => {
+    setSearchTerm('');
     setFilters({
       tipo: '',
       funcionarioId: '',
@@ -200,13 +181,23 @@ const RemanejamentoPage: React.FC = () => {
   const handleGeneratePDF = async () => {
     setIsGeneratingPDF(true);
     try {
-      const filters: any = {};
+      const filters: Record<string, string | number | undefined> = {};
       
       if (pdfFilters.employeeId && pdfFilters.employeeId !== 'all') {
         filters.employeeId = pdfFilters.employeeId;
       }
       if (pdfFilters.tipo && pdfFilters.tipo !== 'all') {
         filters.tipo = pdfFilters.tipo;
+      }
+      if (pdfFilters.workPostId && pdfFilters.workPostId !== 'all') {
+        filters.workPostId = pdfFilters.workPostId;
+      }
+      if (pdfFilters.companyId && pdfFilters.companyId !== 'all') {
+        filters.companyId = pdfFilters.companyId;
+      }
+      if (pdfFilters.lastDays && pdfFilters.lastDays !== 'all') {
+        const days = typeof pdfFilters.lastDays === 'string' ? parseInt(pdfFilters.lastDays, 10) : pdfFilters.lastDays;
+        if (!isNaN(days) && days > 0) filters.lastDays = days;
       }
       if (pdfFilters.startDate) {
         filters.startDate = pdfFilters.startDate;
@@ -343,6 +334,8 @@ const RemanejamentoPage: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
                     type="text"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Buscar por funcionário, unidade ou observação..."
                     className="w-full pl-10 pr-4 py-2 bg-seguranca-black border border-gray-600 rounded text-seguranca-lightgray focus:border-seguranca-yellow focus:outline-none text-sm"
                   />
@@ -403,11 +396,11 @@ const RemanejamentoPage: React.FC = () => {
                           <td className="p-3 text-sm font-medium">{rem.employeeName || employees.find(e => e.id === rem.employeeId)?.name || '-'}</td>
                           <td className="p-3 text-sm">
                             <Badge className="bg-blue-500 text-white text-xs">
-                              {rem.tipo || rem.status || '-'}
+                              {getTipoLabel(rem.tipo || rem.status || '')}
                             </Badge>
                           </td>
-                          <td className="p-3 text-sm">{getWorkPostName(rem.originWorkstationId)}</td>
-                          <td className="p-3 text-sm">{getWorkPostName(rem.destinationWorkstationId)}</td>
+                          <td className="p-3 text-sm">{getWorkPostName(rem.originWorkstationId, rem.origem)}</td>
+                          <td className="p-3 text-sm">{getWorkPostName(rem.destinationWorkstationId, rem.destino)}</td>
                           <td className="p-3 text-sm">{new Date(rem.dataRemanejamento || rem.remanejamentoDate || '').toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 text-sm max-w-xs truncate">{rem.observacao || rem.notes || '-'}</td>
                           <td className="p-3 text-sm w-40">
@@ -474,16 +467,63 @@ const RemanejamentoPage: React.FC = () => {
         <DialogContent className="sm:max-w-2xl bg-seguranca-graphite border-gray-600 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-seguranca-lightgray">
-              Gerar Relatório PDF de Remanejamentos
+              Gerar Relatório de Remanejamentos
             </DialogTitle>
+            <DialogDescription asChild>
+              <p className="text-gray-400 text-sm">
+                Filtre por setor de trabalho, empresa, período ou últimos remanejamentos. Disponível para RH e DPE.
+              </p>
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Por Setor de Trabalho</Label>
+                <Select 
+                  value={pdfFilters.workPostId || 'all'} 
+                  onValueChange={(value) => setPdfFilters({ ...pdfFilters, workPostId: value })}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                    <SelectValue placeholder="Todos os setores" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="all">Todos os setores</SelectItem>
+                    {workPosts.map((wp) => (
+                      <SelectItem key={wp.id} value={wp.id}>
+                        {formatWorkPostDisplayName(wp)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-seguranca-lightgray">Por Empresa</Label>
+                <Select 
+                  value={pdfFilters.companyId || 'all'} 
+                  onValueChange={(value) => setPdfFilters({ ...pdfFilters, companyId: value })}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                    <SelectValue placeholder="Todas as empresas" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600">
+                    <SelectItem value="all">Todas as empresas</SelectItem>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}{c.sigla ? ` (${c.sigla})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label className="text-seguranca-lightgray">Funcionário</Label>
                 <Select 
-                  value={pdfFilters.employeeId} 
+                  value={pdfFilters.employeeId || 'all'} 
                   onValueChange={(value) => setPdfFilters({ ...pdfFilters, employeeId: value })}
                 >
                   <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
@@ -501,9 +541,9 @@ const RemanejamentoPage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label className="text-seguranca-lightgray">Tipo</Label>
+                <Label className="text-seguranca-lightgray">Tipo de Movimentação</Label>
                 <Select 
-                  value={pdfFilters.tipo} 
+                  value={pdfFilters.tipo || 'all'} 
                   onValueChange={(value) => setPdfFilters({ ...pdfFilters, tipo: value })}
                 >
                   <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
@@ -521,24 +561,46 @@ const RemanejamentoPage: React.FC = () => {
               </div>
             </div>
             
+            <div className="space-y-2">
+              <Label className="text-seguranca-lightgray">Últimos Remanejamentos</Label>
+              <Select 
+                value={String(pdfFilters.lastDays || 'all')} 
+                onValueChange={(value) => setPdfFilters({ ...pdfFilters, lastDays: value === 'all' ? '' : value })}
+              >
+                <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                  <SelectValue placeholder="Período personalizado" />
+                </SelectTrigger>
+                <SelectContent className="bg-seguranca-graphite border-gray-600">
+                  <SelectItem value="all">Período personalizado (usar datas abaixo)</SelectItem>
+                  <SelectItem value="7">Últimos 7 dias</SelectItem>
+                  <SelectItem value="15">Últimos 15 dias</SelectItem>
+                  <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  <SelectItem value="60">Últimos 60 dias</SelectItem>
+                  <SelectItem value="90">Últimos 90 dias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-seguranca-lightgray">Data Início</Label>
+                <Label className="text-seguranca-lightgray">Data Início (período personalizado)</Label>
                 <Input
                   type="date"
                   value={pdfFilters.startDate}
                   onChange={(e) => setPdfFilters({ ...pdfFilters, startDate: e.target.value })}
                   className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  disabled={!!pdfFilters.lastDays}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label className="text-seguranca-lightgray">Data Fim</Label>
+                <Label className="text-seguranca-lightgray">Data Fim (período personalizado)</Label>
                 <Input
                   type="date"
                   value={pdfFilters.endDate}
                   onChange={(e) => setPdfFilters({ ...pdfFilters, endDate: e.target.value })}
                   className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  disabled={!!pdfFilters.lastDays}
                 />
               </div>
             </div>
@@ -591,7 +653,7 @@ const RemanejamentoPage: React.FC = () => {
                   <Label className="text-seguranca-lightgray">Tipo</Label>
                   <div className="bg-seguranca-black border border-gray-600 rounded p-3">
                     <Badge className="bg-blue-500 text-white text-xs">
-                      {selectedRemanejamento.tipo || selectedRemanejamento.status || '-'}
+                      {getTipoLabel(selectedRemanejamento.tipo || selectedRemanejamento.status || '')}
                     </Badge>
                   </div>
                 </div>
@@ -601,14 +663,14 @@ const RemanejamentoPage: React.FC = () => {
                 <div className="space-y-2">
                   <Label className="text-seguranca-lightgray">Posto de Trabalho de Origem</Label>
                   <div className="bg-seguranca-black border border-gray-600 rounded p-3 text-seguranca-lightgray">
-                    {getWorkPostName(selectedRemanejamento.originWorkstationId)}
+                    {getWorkPostName(selectedRemanejamento.originWorkstationId, selectedRemanejamento.origem)}
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <Label className="text-seguranca-lightgray">Posto de Trabalho de Destino</Label>
                   <div className="bg-seguranca-black border border-gray-600 rounded p-3 text-seguranca-lightgray">
-                    {getWorkPostName(selectedRemanejamento.destinationWorkstationId)}
+                    {getWorkPostName(selectedRemanejamento.destinationWorkstationId, selectedRemanejamento.destino)}
                   </div>
                 </div>
               </div>
@@ -652,17 +714,32 @@ const RemanejamentoPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Confirmação de Exclusão */}
-      <ConfirmDeleteModal
-        open={deleteModalOpen}
-        onOpenChange={setDeleteModalOpen}
-        onConfirm={confirmDelete}
-        title="Excluir Remanejamento"
-        description="Tem certeza que deseja excluir este remanejamento?"
-        itemName={remanejamentoToDelete ? 
-          `${remanejamentoToDelete.employeeName || employees.find(e => e.id === remanejamentoToDelete.employeeId)?.name || 'Remanejamento'} - ${remanejamentoToDelete.tipo || remanejamentoToDelete.status || ''}` : 
-          ''}
-      />
+      {/* Modal informativo: remanejamento não pode ser excluído */}
+      <Dialog open={cannotDeleteModalOpen} onOpenChange={setCannotDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md bg-seguranca-graphite border-gray-600">
+          <DialogHeader>
+            <DialogTitle className="text-seguranca-lightgray">Remanejamento não pode ser excluído</DialogTitle>
+            <DialogDescription asChild>
+              <div className="text-gray-400 text-sm space-y-2 pt-1">
+                <p>
+                  A exclusão de um remanejamento repercutiria no <strong className="text-seguranca-lightgray">Módulo Operacional</strong> e no <strong className="text-seguranca-lightgray">histórico do funcionário</strong>, por isso esta ação não é permitida.
+                </p>
+                <p>
+                  Para alterar dados do remanejamento, utilize a opção <strong className="text-seguranca-yellow">Editar</strong>.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setCannotDeleteModalOpen(false)}
+              className="bg-seguranca-yellow hover:bg-yellow-500 text-black"
+            >
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </StandardLayout>
   );
 };

@@ -1,3 +1,7 @@
+# Deploy CI: faz pull na VPS e sobe os containers.
+# IMPORTANTE: TOKEN_GITHUB deve ser um Personal Access Token (PAT), NÃO a senha da conta.
+# Criar em: GitHub → Settings → Developer settings → Personal access tokens (repo scope).
+# USER_GITHUB = seu usuário GitHub (ex: zemarioramos).
 name: Deploy CI
 
 on:
@@ -20,12 +24,17 @@ jobs:
           username: ${{ secrets.VPS_USER_CI }}
           password: ${{ secrets.VPS_PASSWORD_CI }}
           port: ${{ secrets.VPS_SSH_PORT_CI || 22 }}
+          script_timeout: 10m
           script: |
             set -e
             APP_PATH="${{ secrets.VPS_APP_PATH_CI }}"
             if [ -z "$APP_PATH" ]; then APP_PATH="/var/www/secured_guard/ci"; fi
             cd "$APP_PATH"
-            git pull https://${{ secrets.USER_GITHUB }}:${{ secrets.TOKEN_GITHUB }}@github.com/zemarioramos/secured-guard.git ci
+            # Usar PAT (Personal Access Token), não senha da conta
+            git remote set-url origin https://${{ secrets.USER_GITHUB }}:${{ secrets.TOKEN_GITHUB }}@github.com/zemarioramos/secured-guard.git 2>/dev/null || true
+            git fetch origin ci
+            git reset --hard origin/ci
+            git checkout ci
             cd deploy
             docker-compose -f docker-compose.env-ci.yml build --no-cache backend-ci frontend-ci
             docker-compose -f docker-compose.env-ci.yml up -d --force-recreate

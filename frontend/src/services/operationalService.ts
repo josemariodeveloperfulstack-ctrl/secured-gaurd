@@ -53,6 +53,11 @@ export interface Absence {
     id: string;
     name: string;
   };
+  coverageWorkPost?: {
+    id: string;
+    name: string;
+  };
+  coverageIsOvertime?: boolean;
   coverageNotes?: string;
   createdAt: string;
   updatedAt: string;
@@ -67,6 +72,8 @@ export interface CreateAbsenceDTO {
   documentUrl?: string;
   justifiedHours?: number;
   coverageEmployeeId?: string;
+  coverageWorkPostId?: string;
+  coverageIsOvertime?: boolean;
   coverageNotes?: string;
 }
 

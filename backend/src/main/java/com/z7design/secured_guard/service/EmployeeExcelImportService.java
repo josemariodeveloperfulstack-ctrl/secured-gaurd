@@ -5,13 +5,17 @@ import com.z7design.secured_guard.model.*;
 import com.z7design.secured_guard.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -86,8 +90,11 @@ public class EmployeeExcelImportService {
 
         // Dados profissionais
         COLUMN_MAPPING.put("data admissao", "hireDate");
+        COLUMN_MAPPING.put("data admissão", "hireDate");
         COLUMN_MAPPING.put("data de admissão", "hireDate");
         COLUMN_MAPPING.put("admissao", "hireDate");
+        COLUMN_MAPPING.put("centro de custo", "centroCusto"); // opcional - armazenado em notes
+        COLUMN_MAPPING.put("centro custo", "centroCusto");
         COLUMN_MAPPING.put("matricula", "registrationNumber");
         COLUMN_MAPPING.put("matrícula", "registrationNumber");
         COLUMN_MAPPING.put("status", "status");
@@ -198,13 +205,20 @@ public class EmployeeExcelImportService {
                 return result;
             }
 
-            if (!file.getOriginalFilename().endsWith(".xlsx") &&
-                    !file.getOriginalFilename().endsWith(".xls")) {
-                result.addError("Apenas arquivos Excel (.xlsx ou .xls) são aceitos");
+            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+            boolean isCsv = filename.endsWith(".csv");
+            boolean isExcel = filename.endsWith(".xlsx") || filename.endsWith(".xls");
+
+            if (!isCsv && !isExcel) {
+                result.addError("Apenas arquivos Excel (.xlsx, .xls) ou CSV (.csv) são aceitos");
                 return result;
             }
 
-            // Ler planilha
+            if (isCsv) {
+                return importFromCsv(file.getInputStream(), result);
+            }
+
+            // Ler planilha Excel
             Workbook workbook = WorkbookFactory.create(file.getInputStream());
             Sheet sheet = workbook.getSheetAt(0); // Primeira aba
 
@@ -418,11 +432,163 @@ public class EmployeeExcelImportService {
         return result;
     }
 
-    private EmployeeDTO createEmployeeDTOFromRow(Row row, Map<String, Integer> columnIndexMap, Company company) {
-        EmployeeDTO dto = new EmployeeDTO();
-        Map<String, String> tempValues = new HashMap<>(); // DDD e outros para combinar depois
+    private ImportResult importFromCsv(InputStream inputStream, ImportResult result) {
+        try (Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+             CSVParser parser = new CSVParser(reader, CSVFormat.DEFAULT.builder()
+                     .setHeader()
+                     .setSkipHeaderRecord(true)
+                     .setIgnoreEmptyLines(true)
+                     .setTrim(true)
+                     .build())) {
 
-        // Vincular empresa
+            List<String> headerNames = parser.getHeaderNames();
+            if (headerNames == null || headerNames.isEmpty()) {
+                result.addError("CSV sem cabeçalho ou vazio");
+                return result;
+            }
+
+            Map<String, Integer> columnIndexMap = new HashMap<>();
+            int companyCnpjColumnIndex = -1;
+            String fixedCompanyCnpj = null;
+
+            for (int i = 0; i < headerNames.size(); i++) {
+                String columnName = headerNames.get(i).toLowerCase().trim();
+                if (columnName.isEmpty()) continue;
+
+                if (columnName.contains("cnpj") && columnName.contains("empresa")) {
+                    companyCnpjColumnIndex = i;
+                }
+
+                String bestTarget = null;
+                int bestKeyLength = 0;
+                for (Map.Entry<String, String> entry : COLUMN_MAPPING.entrySet()) {
+                    if (columnName.contains(entry.getKey()) && entry.getKey().length() > bestKeyLength) {
+                        bestTarget = entry.getValue();
+                        bestKeyLength = entry.getKey().length();
+                    }
+                }
+                if (bestTarget != null) {
+                    columnIndexMap.put(bestTarget, i);
+                }
+            }
+
+            List<CSVRecord> records = parser.getRecords();
+            Company company;
+            if (companyCnpjColumnIndex >= 0 && !records.isEmpty()) {
+                CSVRecord firstRecord = records.get(0);
+                String companyCnpj = firstRecord.size() > companyCnpjColumnIndex
+                        ? firstRecord.get(companyCnpjColumnIndex) : "";
+                if (companyCnpj == null || companyCnpj.trim().isEmpty()) {
+                    company = companyRepository.findAll().stream().findFirst().orElse(null);
+                    if (company == null) {
+                        result.addError("CNPJ da empresa não encontrado e nenhuma empresa cadastrada");
+                        return result;
+                    }
+                    result.addWarning("CNPJ da empresa vazio. Usando primeira empresa cadastrada.");
+                } else {
+                    String normalizedCnpj = companyCnpj.replaceAll("[^0-9]", "");
+                    Optional<Company> companyOpt = companyRepository.findByNormalizedCnpj(normalizedCnpj);
+                    if (companyOpt.isEmpty()) {
+                        result.addError("Empresa não encontrada com CNPJ: " + companyCnpj);
+                        return result;
+                    }
+                    company = companyOpt.get();
+                }
+            } else {
+                company = companyRepository.findAll().stream().findFirst().orElse(null);
+                if (company == null) {
+                    result.addError("Coluna 'CNPJ Empresa' não encontrada e nenhuma empresa cadastrada");
+                    return result;
+                }
+                if (companyCnpjColumnIndex < 0) {
+                    result.addWarning("Coluna 'CNPJ Empresa' não encontrada. Usando primeira empresa cadastrada.");
+                }
+            }
+
+            int rowNum = 1;
+            for (CSVRecord record : records) {
+                rowNum++;
+                if (record.size() == 0) continue;
+
+                Map<String, String> values = new HashMap<>();
+                for (Map.Entry<String, Integer> entry : columnIndexMap.entrySet()) {
+                    int idx = entry.getValue();
+                    if (record.size() > idx) {
+                        String v = record.get(idx);
+                        if (v != null && !v.trim().isEmpty()) {
+                            values.put(entry.getKey(), v);
+                        }
+                    }
+                }
+
+                Company rowCompany = company;
+                if (companyCnpjColumnIndex >= 0 && record.size() > companyCnpjColumnIndex) {
+                    String rowCnpj = record.get(companyCnpjColumnIndex);
+                    String rowNormalizedCnpj = rowCnpj != null ? rowCnpj.replaceAll("[^0-9]", "") : "";
+                    if (rowNormalizedCnpj != null && !rowNormalizedCnpj.isEmpty()) {
+                        rowCompany = companyRepository.findByNormalizedCnpj(rowNormalizedCnpj).orElse(company);
+                    }
+                }
+
+                try {
+                    EmployeeDTO employeeDTO = createEmployeeDTOFromValues(values, rowCompany);
+
+                    if (employeeDTO.getName() == null || employeeDTO.getName().trim().isEmpty()) {
+                        result.addWarning("Linha " + rowNum + ": Nome não informado. Ignorando linha.");
+                        continue;
+                    }
+                    if (employeeDTO.getCpf() == null || employeeDTO.getCpf().trim().isEmpty()) {
+                        result.addWarning("Linha " + rowNum + ": CPF não informado. Ignorando linha.");
+                        continue;
+                    }
+
+                    String normalizedCpf = employeeDTO.getCpf().replaceAll("[^0-9]", "");
+                    Optional<Employee> existingEmployee = employeeService.findByCpfExact(normalizedCpf);
+                    if (existingEmployee.isEmpty() && employeeDTO.getMatriculaEsocial() != null
+                            && !employeeDTO.getMatriculaEsocial().trim().isEmpty()) {
+                        existingEmployee = employeeService.findByMatriculaEsocial(employeeDTO.getMatriculaEsocial().trim());
+                    }
+
+                    if (existingEmployee.isPresent()) {
+                        employeeDTO.setId(existingEmployee.get().getId());
+                        employeeService.update(existingEmployee.get().getId(), employeeDTO);
+                        result.incrementUpdated();
+                    } else {
+                        employeeService.create(employeeDTO);
+                        result.incrementCreated();
+                    }
+                } catch (Exception e) {
+                    log.error("❌ Erro ao processar linha {}: {}", rowNum, e.getMessage(), e);
+                    result.addError("Linha " + rowNum + ": " + e.getMessage());
+                }
+            }
+
+            log.info("✅ Importação CSV concluída: {} criados, {} atualizados",
+                    result.getCreated(), result.getUpdated());
+
+        } catch (IOException e) {
+            log.error("❌ Erro ao ler CSV: {}", e.getMessage(), e);
+            result.addError("Erro ao ler arquivo CSV: " + e.getMessage());
+        }
+        return result;
+    }
+
+    private EmployeeDTO createEmployeeDTOFromRow(Row row, Map<String, Integer> columnIndexMap, Company company) {
+        Map<String, String> values = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : columnIndexMap.entrySet()) {
+            Cell cell = row.getCell(entry.getValue());
+            String v = getCellValueAsString(cell);
+            if (v != null && !v.trim().isEmpty()) {
+                values.put(entry.getKey(), v);
+            }
+        }
+        return createEmployeeDTOFromValues(values, company);
+    }
+
+    private EmployeeDTO createEmployeeDTOFromValues(Map<String, String> values, Company company) {
+        EmployeeDTO dto = new EmployeeDTO();
+        Map<String, String> tempValues = new HashMap<>();
+
         if (company != null) {
             EmployeeDTO.IdOnlyDTO companyDTO = new EmployeeDTO.IdOnlyDTO();
             companyDTO.setId(company.getId());
@@ -430,16 +596,9 @@ public class EmployeeExcelImportService {
             dto.setCompany(companyDTO);
         }
 
-        // Mapear campos da planilha
-        for (Map.Entry<String, Integer> entry : columnIndexMap.entrySet()) {
+        for (Map.Entry<String, String> entry : values.entrySet()) {
             String fieldName = entry.getKey();
-            int columnIndex = entry.getValue();
-
-            Cell cell = row.getCell(columnIndex);
-            if (cell == null)
-                continue;
-
-            String cellValue = getCellValueAsString(cell);
+            String cellValue = entry.getValue();
             if (cellValue == null || cellValue.trim().isEmpty())
                 continue;
 
@@ -621,6 +780,10 @@ public class EmployeeExcelImportService {
                         break;
                     case "codigo":
                         dto.setNotes((dto.getNotes() != null ? dto.getNotes() + " " : "") + "Cód: " + cellValue.trim());
+                        break;
+                    case "centroCusto":
+                        // Centro de custo é opcional - armazenado em notes para referência
+                        dto.setNotes((dto.getNotes() != null ? dto.getNotes() + " " : "") + "Centro Custo: " + cellValue.trim());
                         break;
                     case "unitName":
                         // Prioridade 1: Tentar vincular a um Posto de Trabalho (WorkPost) pelo nome

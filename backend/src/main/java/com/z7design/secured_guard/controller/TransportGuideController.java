@@ -29,7 +29,7 @@ public class TransportGuideController {
 
     @GetMapping
     @Operation(summary = "Listar todas as guias de transporte")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL')")
     public ResponseEntity<List<TransportGuideDTO>> getAllTransportGuides(
             @RequestParam(required = false) TransportGuideStatus status,
             @RequestParam(required = false) String empresa,
@@ -43,7 +43,7 @@ public class TransportGuideController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Buscar guia de transporte por ID")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL')")
     public ResponseEntity<TransportGuideDTO> getTransportGuideById(@PathVariable Long id) {
         log.info("GET /api/transport-guides/{} - Buscando guia de transporte", id);
         TransportGuideDTO guide = transportGuideService.getTransportGuideById(id);
@@ -52,7 +52,7 @@ public class TransportGuideController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Criar nova guia de transporte")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL')")
     public ResponseEntity<TransportGuideDTO> createTransportGuide(
             @RequestParam String cnpj,
             @RequestParam String empresa,
@@ -90,7 +90,7 @@ public class TransportGuideController {
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Atualizar guia de transporte")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL')")
     public ResponseEntity<TransportGuideDTO> updateTransportGuide(
             @PathVariable Long id,
             @RequestParam String cnpj,
@@ -126,7 +126,7 @@ public class TransportGuideController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir guia de transporte")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL')")
     public ResponseEntity<Void> deleteTransportGuide(@PathVariable Long id) {
         log.info("DELETE /api/transport-guides/{} - Excluindo guia de transporte", id);
         transportGuideService.deleteTransportGuide(id);
@@ -160,7 +160,7 @@ public class TransportGuideController {
 
     @GetMapping(value = "/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @Operation(summary = "Gerar relatório PDF de guias de transporte")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL')")
     public ResponseEntity<byte[]> generatePDFReport(
             @RequestParam(required = false) TransportGuideStatus status,
             @RequestParam(required = false) String empresa,

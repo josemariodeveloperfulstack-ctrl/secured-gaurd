@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDate;
 import java.util.UUID;
 import jakarta.validation.constraints.Positive;
@@ -44,8 +43,7 @@ public class CreateFuelRecordDTO {
     @PositiveOrZero(message = "Quilometragem final não pode ser negativa")
     private Integer finalMileage;
     
-    @NotBlank(message = "Posto é obrigatório")
-    private String station;
+    private String station; // Opcional
     
     private UUID driverId;
     

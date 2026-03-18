@@ -4,6 +4,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -44,8 +45,45 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+
+/** Colunas disponíveis para o relatório PDF (chave usada no backend, label exibido) */
+const REPORT_COLUMNS: { key: string; label: string }[] = [
+    { key: 'name', label: 'Nome' },
+    { key: 'registrationNumber', label: 'Matrícula' },
+    { key: 'position', label: 'Cargo' },
+    { key: 'workPost', label: 'Posto de Trabalho' },
+    { key: 'company', label: 'Empresa' },
+    { key: 'status', label: 'Status' },
+    { key: 'cpf', label: 'CPF' },
+    { key: 'rg', label: 'RG' },
+    { key: 'birthDate', label: 'Data Nasc.' },
+    { key: 'hireDate', label: 'Admissão' },
+    { key: 'terminationDate', label: 'Data Rescisão' },
+    { key: 'terminationReason', label: 'Motivo Demissão' },
+    { key: 'email', label: 'E-mail' },
+    { key: 'phone', label: 'Telefone' },
+    { key: 'sexo', label: 'Gênero' },
+    { key: 'maritalStatus', label: 'Estado Civil' },
+    { key: 'salario', label: 'Salário' },
+    { key: 'ctps', label: 'CTPS' },
+    { key: 'pis', label: 'PIS' },
+    { key: 'cbo', label: 'CBO' },
+    { key: 'matriculaEsocial', label: 'Matr. eSocial' },
+    { key: 'cnhNumber', label: 'CNH' },
+    { key: 'cnhCategory', label: 'Categ. CNH' },
+    { key: 'cnhExpirationDate', label: 'Validade CNH' },
+    { key: 'exameMedicoVencimento', label: 'Próx. ASO' },
+    { key: 'proximasFeriasVencimento', label: 'Venc. Férias' },
+    { key: 'address', label: 'Endereço' },
+    { key: 'nationality', label: 'Nacionalidade' },
+    { key: 'motherName', label: 'Nome Mãe' },
+    { key: 'fatherName', label: 'Nome Pai' },
+];
+
+const DEFAULT_PDF_COLUMNS = ['name', 'registrationNumber', 'position', 'workPost', 'company', 'status'];
 
 interface RelatoriosModalProps {
     open: boolean;
@@ -81,9 +119,16 @@ export function RelatoriosModal({
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+    const [isColumnsOpen, setIsColumnsOpen] = useState(false);
+    const [isOrganizationOpen, setIsOrganizationOpen] = useState(false);
+    const [groupBy, setGroupBy] = useState<'FUNCIONARIO' | 'POSTO_TRABALHO'>('FUNCIONARIO');
+    const [orderBy, setOrderBy] = useState<'FUNCIONARIO' | 'POSTO_TRABALHO'>('FUNCIONARIO');
     const [progress, setProgress] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const cancelRef = useRef(false);
+
+    // Colunas selecionadas para o PDF (Set para lookup rápido)
+    const [selectedColumns, setSelectedColumns] = useState<Set<string>>(() => new Set(DEFAULT_PDF_COLUMNS));
 
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
     const [isLoadingAll, setIsLoadingAll] = useState(false);
@@ -381,7 +426,10 @@ export function RelatoriosModal({
                     'Nome Completo': emp.name,
                     'Empresa': emp.company?.sigla || emp.company?.name || emp.empresaNome || '',
                     'CNPJ Empresa': emp.company?.cnpj || emp.empresaCnpj || '',
-                    'Posto de Trabalho': typeof emp.workPost === 'string' ? emp.workPost : (emp.workPost?.name || emp.department?.name || ''),
+                    'Posto de Trabalho': (() => {
+                const wp = typeof emp.workPost === 'string' ? emp.workPost : (emp.workPost?.name || emp.department?.name || '');
+                return wp && String(wp).trim() ? wp : 'Não alocado';
+              })(),
                     'Cargo': typeof emp.position === 'string' ? emp.position : emp.position?.name || '',
                     'CBO': emp.cbo || '',
                     'Admissão': hireDateStr,
@@ -484,7 +532,8 @@ export function RelatoriosModal({
 
         try {
             setProgress(30);
-            const blob = await employeeService.exportEmployeesReportPdf(companyId ?? undefined, employeeIds);
+            const columnsToSend = selectedColumns.size > 0 ? Array.from(selectedColumns) : DEFAULT_PDF_COLUMNS;
+            const blob = await employeeService.exportEmployeesReportPdf(companyId ?? undefined, employeeIds, columnsToSend, groupBy, orderBy);
             setProgress(80);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -519,6 +568,21 @@ export function RelatoriosModal({
         setTermDateStart(undefined);
         setTermDateEnd(undefined);
     };
+
+    const toggleColumn = (key: string) => {
+        setSelectedColumns(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) {
+                next.delete(key);
+            } else {
+                next.add(key);
+            }
+            return next;
+        });
+    };
+
+    const selectAllColumns = () => setSelectedColumns(new Set(REPORT_COLUMNS.map(c => c.key)));
+    const selectDefaultColumns = () => setSelectedColumns(new Set(DEFAULT_PDF_COLUMNS));
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -764,6 +828,124 @@ export function RelatoriosModal({
                         </CollapsibleContent>
                     </Collapsible>
 
+                    {/* Organização do Relatório */}
+                    <Collapsible
+                        open={isOrganizationOpen}
+                        onOpenChange={setIsOrganizationOpen}
+                        className="mt-6 space-y-4"
+                    >
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-600">
+                            <div className="flex items-center gap-2">
+                                <Briefcase className="h-5 w-5 text-seguranca-yellow" />
+                                <h3 className="text-lg font-semibold text-white">Organização do Relatório</h3>
+                            </div>
+                            <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white">
+                                    {isOrganizationOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </Button>
+                            </CollapsibleTrigger>
+                        </div>
+                        <CollapsibleContent>
+                            <p className="text-sm text-gray-400 mb-3">
+                                Defina como o relatório será organizado e ordenado. Ordenação alfabética aplicada automaticamente.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                                        Organizar por
+                                    </Label>
+                                    <Select value={groupBy} onValueChange={(v: 'FUNCIONARIO' | 'POSTO_TRABALHO') => setGroupBy(v)}>
+                                        <SelectTrigger className="w-full bg-seguranca-black border-gray-600 text-gray-200">
+                                            <SelectValue placeholder="Organizar por" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
+                                            <SelectItem value="FUNCIONARIO">Funcionário (todos os postos que já passou)</SelectItem>
+                                            <SelectItem value="POSTO_TRABALHO">Posto de Trabalho</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                                        Ordenar por (alfabética)
+                                    </Label>
+                                    <Select value={orderBy} onValueChange={(v: 'FUNCIONARIO' | 'POSTO_TRABALHO') => setOrderBy(v)}>
+                                        <SelectTrigger className="w-full bg-seguranca-black border-gray-600 text-gray-200">
+                                            <SelectValue placeholder="Ordenar por" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
+                                            <SelectItem value="FUNCIONARIO">Funcionário</SelectItem>
+                                            <SelectItem value="POSTO_TRABALHO">Posto de Trabalho</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </CollapsibleContent>
+                    </Collapsible>
+
+                    {/* Colunas do Relatório PDF */}
+                    <Collapsible
+                        open={isColumnsOpen}
+                        onOpenChange={setIsColumnsOpen}
+                        className="mt-6 space-y-4"
+                    >
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-600">
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-seguranca-yellow" />
+                                <h3 className="text-lg font-semibold text-white">Colunas do Relatório PDF</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={selectDefaultColumns}
+                                    className="text-xs text-seguranca-yellow hover:bg-seguranca-yellow/10 h-8 font-bold"
+                                >
+                                    Padrão
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={selectAllColumns}
+                                    className="text-xs text-seguranca-yellow hover:bg-seguranca-yellow/10 h-8 font-bold"
+                                >
+                                    Todas
+                                </Button>
+                                <CollapsibleTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white">
+                                        {isColumnsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    </Button>
+                                </CollapsibleTrigger>
+                            </div>
+                        </div>
+                        <CollapsibleContent>
+                            <p className="text-sm text-gray-400 mb-3">
+                                Marque as colunas que deseja incluir no PDF. O relatório será gerado apenas com os campos selecionados.
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                                {REPORT_COLUMNS.map(({ key, label }) => (
+                                    <label
+                                        key={key}
+                                        className={cn(
+                                            "flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors",
+                                            "hover:bg-seguranca-black/50 border border-transparent",
+                                            selectedColumns.has(key) && "bg-seguranca-yellow/10 border-seguranca-yellow/30"
+                                        )}
+                                    >
+                                        <Checkbox
+                                            checked={selectedColumns.has(key)}
+                                            onCheckedChange={() => toggleColumn(key)}
+                                            className="border-gray-500 data-[state=checked]:bg-seguranca-yellow data-[state=checked]:border-seguranca-yellow"
+                                        />
+                                        <span className="text-sm text-gray-200 truncate">{label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                                {selectedColumns.size} coluna(s) selecionada(s)
+                            </p>
+                        </CollapsibleContent>
+                    </Collapsible>
+
                     <div className="mt-8 border-t border-gray-600 pt-6">
                         <div className="flex items-center gap-2 mb-4">
                             <span className="text-xs text-gray-400 uppercase tracking-widest font-bold">Resumo da Seleção Atual</span>
@@ -822,6 +1004,8 @@ export function RelatoriosModal({
                 <DialogContent
                     className="sm:max-w-[400px] bg-seguranca-dark/95 backdrop-blur-xl border-seguranca-gray/20 text-white flex flex-col items-center py-12 rounded-2xl shadow-2xl [&>button]:hidden"
                 >
+                    <DialogTitle className="sr-only">Gerando Relatório</DialogTitle>
+                    <DialogDescription className="sr-only">Processando registros do relatório. Por favor, mantenha esta janela aberta.</DialogDescription>
                     <div className="flex flex-col items-center gap-6 w-full px-6">
                         <div className="relative flex items-center justify-center">
                             <div className="absolute inset-0 bg-seguranca-orange/20 blur-2xl rounded-full" />

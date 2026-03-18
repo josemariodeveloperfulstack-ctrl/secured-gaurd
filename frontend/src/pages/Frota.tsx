@@ -161,7 +161,11 @@ const mapFuelRecordToComponent = (record: FuelRecord): AbastecimentoComponent =>
   }
 });
 
-const Frota: React.FC = () => {
+interface FrotaProps {
+  embedded?: boolean;
+}
+
+const Frota: React.FC<FrotaProps> = ({ embedded = false }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -810,58 +814,55 @@ const Frota: React.FC = () => {
 
   // Loading state
   if (vehiclesLoading || fuelRecordsLoading || finesLoading || driversLoading || maintenancesLoading || kmControlsLoading) {
-    return (
-      <StandardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
-          <span className="ml-2 text-seguranca-lightgray">Carregando dados da frota...</span>
-        </div>
-      </StandardLayout>
+    const loadingContent = (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
+        <span className="ml-2 text-seguranca-lightgray">Carregando dados da frota...</span>
+      </div>
     );
+    return embedded ? loadingContent : <StandardLayout>{loadingContent}</StandardLayout>;
   }
 
   // Error state para veículos
   if (vehiclesError) {
-    return (
-      <StandardLayout>
-        <div className="flex flex-col items-center justify-center h-64 space-y-4">
-          <AlertTriangle className="h-12 w-12 text-red-500" />
-          <div className="text-center">
-            <h3 className="text-lg font-semibold text-red-500 mb-2">Erro ao carregar veículos</h3>
-            <p className="text-gray-400 mb-4">Não foi possível carregar a lista de veículos.</p>
-            <Button onClick={() => refetchVehicles()} className="bg-seguranca-red hover:bg-seguranca-darkred">
-              Tentar Novamente
-            </Button>
-          </div>
+    const errorContent = (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <AlertTriangle className="h-12 w-12 text-red-500" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-red-500 mb-2">Erro ao carregar veículos</h3>
+          <p className="text-gray-400 mb-4">Não foi possível carregar a lista de veículos.</p>
+          <Button onClick={() => refetchVehicles()} className="bg-seguranca-red hover:bg-seguranca-darkred">
+            Tentar Novamente
+          </Button>
         </div>
-      </StandardLayout>
+      </div>
     );
+    return embedded ? errorContent : <StandardLayout>{errorContent}</StandardLayout>;
   }
 
   // Error state
   if (fuelRecordsError || finesError || driversError || maintenancesError || kmControlsError) {
-    return (
-      <StandardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <AlertTriangle className="h-8 w-8 text-seguranca-red mx-auto mb-2" />
-            <p className="text-seguranca-lightgray">Erro ao carregar dados da frota</p>
-            <Button
-              onClick={() => {
-                refetchVehicles();
-                refetchFuelRecords();
-                refetchFines();
-                refetchMaintenances();
-                refetchKmControls();
-              }}
-              className="mt-2 bg-seguranca-red hover:bg-seguranca-darkred"
-            >
-              Tentar novamente
-            </Button>
-          </div>
+    const errorContent = (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="h-8 w-8 text-seguranca-red mx-auto mb-2" />
+          <p className="text-seguranca-lightgray">Erro ao carregar dados da frota</p>
+          <Button
+            onClick={() => {
+              refetchVehicles();
+              refetchFuelRecords();
+              refetchFines();
+              refetchMaintenances();
+              refetchKmControls();
+            }}
+            className="mt-2 bg-seguranca-red hover:bg-seguranca-darkred"
+          >
+            Tentar novamente
+          </Button>
         </div>
-      </StandardLayout>
+      </div>
     );
+    return embedded ? errorContent : <StandardLayout>{errorContent}</StandardLayout>;
   }
 
   // Função para gerar HTML do relatório
@@ -1285,9 +1286,9 @@ const Frota: React.FC = () => {
     }
   };
 
-  return (
-    <StandardLayout>
-      <div className="space-y-6">
+  const mainContent = (
+    <>
+    <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray">Gestão de Frota</h1>
@@ -2022,7 +2023,7 @@ const Frota: React.FC = () => {
         />
 
       </div>
-      {/* Printable Area (Hidden) */}
+      {/* Printable Area (Hidden) - Sibling of space-y-6 div */}
       {fineToDownload && (
         <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
           <div id="frota-multa-printable">
@@ -2066,8 +2067,9 @@ const Frota: React.FC = () => {
           </div>
         </div>
       )}
-    </StandardLayout>
+    </>
   );
+  return embedded ? mainContent : <StandardLayout>{mainContent}</StandardLayout>;
 };
 
 export default Frota;

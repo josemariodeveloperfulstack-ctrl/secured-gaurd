@@ -33,4 +33,12 @@ public interface RemanejamentoRepository extends JpaRepository<Remanejamento, UU
            "LEFT JOIN FETCH r.destinationWorkstation " +
            "WHERE r.id = :id")
     java.util.Optional<Remanejamento> findByIdWithRelations(@org.springframework.data.repository.query.Param("id") UUID id);
+
+    @Query("SELECT DISTINCT r FROM Remanejamento r " +
+           "LEFT JOIN FETCH r.employee e " +
+           "LEFT JOIN FETCH e.company " +
+           "LEFT JOIN FETCH r.originWorkstation " +
+           "LEFT JOIN FETCH r.destinationWorkstation " +
+           "ORDER BY r.dataRemanejamento DESC")
+    List<Remanejamento> findAllWithEmployeeAndCompany();
 } 

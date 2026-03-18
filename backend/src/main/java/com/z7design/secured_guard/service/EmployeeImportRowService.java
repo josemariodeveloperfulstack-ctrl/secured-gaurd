@@ -49,36 +49,36 @@ public class EmployeeImportRowService {
         Employee emp = existing.orElseGet(Employee::new);
         isNewRef[0] = existing.isEmpty();
 
-        emp.setName(nome.trim().toUpperCase());
-        emp.setDocument(cpf);
-        emp.setMatriculaEsocial(matricula);
-        emp.setNationality(nationality);
+        emp.setName(truncate(nome != null ? nome.trim().toUpperCase() : null, 500));
+        emp.setDocument(truncate(cpf, 14));
+        emp.setMatriculaEsocial(truncate(matricula, 50));
+        emp.setNationality(truncate(nationality, 50));
         emp.setBirthDate(birthDate);
-        emp.setMunicipioNascimento(municipioNasc);
-        emp.setEstadoNascimento(estadoNasc);
-        emp.setNomeMae(nomeMae);
-        emp.setNomePai(nomePai);
-        emp.setSexo(sexo);
-        emp.setMaritalStatus(maritalStatus);
-        emp.setGrauInstrucao(grauInstrucao);
-        emp.setCbo(cbo);
+        emp.setMunicipioNascimento(truncate(municipioNasc, 100));
+        emp.setEstadoNascimento(truncate(estadoNasc, 2));
+        emp.setNomeMae(truncate(nomeMae, 100));
+        emp.setNomePai(truncate(nomePai, 100));
+        emp.setSexo(truncate(sexo, 50));
+        emp.setMaritalStatus(truncate(maritalStatus, 50));
+        emp.setGrauInstrucao(truncate(grauInstrucao, 50));
+        emp.setCbo(truncate(cbo, 50));
         emp.setHireDate(hireDate);
         emp.setTerminationDate(null);
         if (salario != null)
             emp.setSalario(salario);
         emp.setHorarioTrabalho(horario);
         emp.setEscalaTrabalho(escalaTrabalho);
-        emp.setPis(pis);
-        emp.setCtps(ctps);
-        emp.setNumeroRg(rg);
-        emp.setTituloEleitor(tituloEleitor);
-        emp.setEnderecoRua(rua);
-        emp.setEnderecoNumero(numero);
-        emp.setEnderecoComplemento(complemento);
-        emp.setEnderecoBairro(bairro);
-        emp.setEnderecoCidade(cidade);
-        emp.setEnderecoEstado(estado);
-        emp.setEnderecoCep(cep);
+        emp.setPis(truncate(pis, 50));
+        emp.setCtps(truncate(ctps, 30));
+        emp.setNumeroRg(truncate(rg, 30));
+        emp.setTituloEleitor(truncate(tituloEleitor, 50));
+        emp.setEnderecoRua(truncate(rua, 255));
+        emp.setEnderecoNumero(truncate(numero, 50));
+        emp.setEnderecoComplemento(truncate(complemento, 100));
+        emp.setEnderecoBairro(truncate(bairro, 100));
+        emp.setEnderecoCidade(truncate(cidade, 100));
+        emp.setEnderecoEstado(truncate(estado, 2));
+        emp.setEnderecoCep(truncate(cep, 10));
         emp.setStatus(EmploymentStatus.ACTIVE);
         emp.setCompany(company);
 
@@ -102,6 +102,12 @@ public class EmployeeImportRowService {
 
         employeeRepository.save(emp);
         return isNewRef[0];
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.isBlank()) return value;
+        if (value.length() <= maxLength) return value;
+        return value.substring(0, maxLength).trim();
     }
 
     private Department resolveOrCreateDepartment(String nome) {

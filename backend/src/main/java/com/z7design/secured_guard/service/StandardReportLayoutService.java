@@ -263,7 +263,9 @@ public class StandardReportLayoutService {
                 Canvas canvasLayout = new Canvas(headerFooterCanvas, pageSize);
 
                 service.addHeader(canvasLayout, pageSize, company, config, pdfDoc);
-                service.addFooter(canvasLayout, pageSize, company, config);
+                int pageNum = pdfDoc.getPageNumber(page);
+                int totalPages = pdfDoc.getNumberOfPages();
+                service.addFooter(canvasLayout, pageSize, company, config, pageNum, totalPages);
 
                 canvasLayout.close();
                 headerFooterCanvas.release();
@@ -351,8 +353,11 @@ public class StandardReportLayoutService {
     /**
      * Adiciona rodapé ao documento
      * Nota: O fundo já foi desenhado no método addHeaderFooterToAllPages
+     * @param pageNum número da página atual (1-based)
+     * @param totalPages total de páginas (pode ser aproximado durante a geração)
      */
-    private void addFooter(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config) {
+    private void addFooter(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config,
+            int pageNum, int totalPages) {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
 
@@ -390,6 +395,19 @@ public class StandardReportLayoutService {
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
             canvas.add(cnpjFooter.setFixedPosition(0, yPosition + 10f, pageWidth));
+        }
+
+        // Numeração de páginas (canto inferior direito) — destaque visual
+        if (config.isShowPageNumbers()) {
+            String pageText = totalPages > 1 ? "Página " + pageNum + " de " + totalPages : "Página " + pageNum;
+            DeviceRgb pageNumColor = new DeviceRgb(45, 45, 45); // cinza escuro para boa leitura
+            Paragraph pageNumFooter = new Paragraph(pageText)
+                    .setFontSize(10)
+                    .setBold()
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontColor(pageNumColor)
+                    .setMarginBottom(0f);
+            canvas.add(pageNumFooter.setFixedPosition(pageWidth - 110f, yPosition + 8f, 100f));
         }
     }
 

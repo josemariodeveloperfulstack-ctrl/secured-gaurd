@@ -78,6 +78,9 @@ class RemanejamentoService {
     tipo?: string;
     origem?: string;
     destino?: string;
+    workPostId?: string;
+    companyId?: string;
+    lastDays?: number;
     startDate?: string;
     endDate?: string;
   }): Promise<Blob> {
@@ -85,8 +88,11 @@ class RemanejamentoService {
       const params = new URLSearchParams();
       if (filters.employeeId) params.append('employeeId', filters.employeeId);
       if (filters.tipo) params.append('tipo', filters.tipo);
-      if (filters.origem) params.append('origem', filters.origem);
-      if (filters.destino) params.append('destino', filters.destino);
+      if (filters.origem) params.append('origem', filters.origem || '');
+      if (filters.destino) params.append('destino', filters.destino || '');
+      if (filters.workPostId) params.append('workPostId', filters.workPostId);
+      if (filters.companyId) params.append('companyId', filters.companyId);
+      if (filters.lastDays != null && filters.lastDays > 0) params.append('lastDays', String(filters.lastDays));
       if (filters.startDate) params.append('startDate', filters.startDate);
       if (filters.endDate) params.append('endDate', filters.endDate);
 

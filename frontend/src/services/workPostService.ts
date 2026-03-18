@@ -118,6 +118,17 @@ export const workPostService = {
     return this.getAllWorkPosts();
   },
 
+  // Buscar postos por empresa (postos que possuem funcionários da empresa)
+  async getWorkPostsByCompany(companyId: string): Promise<WorkPost[]> {
+    try {
+      const response = await api.get(`/api/work-posts/by-company/${companyId}`);
+      return response.data ?? [];
+    } catch (error) {
+      console.error('Erro ao buscar postos por empresa:', error);
+      return [];
+    }
+  },
+
   // Buscar postos por cliente
   async getWorkPostsByClient(clientId: string): Promise<WorkPost[]> {
     try {
@@ -201,6 +212,25 @@ export const workPostService = {
       console.error('Erro ao excluir posto de trabalho:', error);
       throw error;
     }
+  },
+
+  /**
+   * Gera relatório PDF de postos com layout padrão do sistema (cabeçalho, gradiente, tabela, numeração).
+   */
+  async exportReportPdf(filters: {
+    searchTerm?: string;
+    status?: string;
+    type?: string;
+    clientId?: string;
+    city?: string;
+    state?: string;
+  }): Promise<Blob> {
+    const response = await api.post(
+      '/api/work-posts/report/pdf',
+      filters ?? {},
+      { responseType: 'blob' }
+    );
+    return response.data as Blob;
   }
 };
 

@@ -31,14 +31,14 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ open, onOpenChange,
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       // Validar tipo de arquivo
-      const validExtensions = ['.xlsx', '.xls'];
+      const validExtensions = ['.xlsx', '.xls', '.csv'];
       const fileName = selectedFile.name.toLowerCase();
       const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
 
       if (!isValidExtension) {
         toast({
           title: "Erro",
-          description: "Apenas arquivos Excel (.xlsx ou .xls) são aceitos",
+          description: "Apenas arquivos Excel (.xlsx, .xls) ou CSV (.csv) são aceitos",
           variant: "destructive"
         });
         return;
@@ -132,7 +132,7 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ open, onOpenChange,
             Importar Funcionários do Excel
           </DialogTitle>
           <DialogDescription className="text-gray-400">
-            Selecione uma planilha Excel (.xlsx ou .xls) com os dados dos funcionários.
+            Selecione uma planilha Excel (.xlsx, .xls) ou CSV (.csv) com os dados dos funcionários.
             Se o funcionário já existir no banco (por CPF ou matrícula eSocial), os dados serão atualizados (setor, empresa, salário, etc.).
           </DialogDescription>
         </DialogHeader>
@@ -147,18 +147,19 @@ const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ open, onOpenChange,
                 <li><strong>Análise dos dados:</strong> se o funcionário já existir (por CPF ou matrícula eSocial), apenas atualiza; caso contrário, cria novo.</li>
                 <li><strong>Empresa:</strong> use coluna &quot;CNPJ Empresa&quot; ou o sistema detecta o CNPJ no cabeçalho. Cada linha pode ter CNPJ diferente para vincular à empresa correta.</li>
                 <li><strong>Setor de trabalho:</strong> use coluna &quot;Setor de Trabalho&quot; ou &quot;Setor&quot; — o sistema vincula à Unidade ou ao Departamento pelo nome (quando cadastrados).</li>
-                <li>Colunas reconhecidas: Nome do Funcionário, CPF, Mãe, Admissão, Setor de Trabalho, Salário Base, Função, Matrícula eSocial, CNPJ Empresa, Email, Telefone, etc.</li>
+                <li><strong>Centro de custo:</strong> opcional — se presente, será armazenado em observações.</li>
+                <li>Colunas reconhecidas: MATRICULA, NOME, DATA ADMISSÃO, CARGO, SALÁRIO, SITUAÇÃO, CENTRO DE CUSTO (opcional), DATA NASCIMENTO, CPF, RG, PIS, ENDEREÇO, BAIRRO, CIDADE, UF, CEP, TELEFONE, E-MAIL.</li>
               </ul>
             </AlertDescription>
           </Alert>
 
           {/* Upload de arquivo */}
           <div className="space-y-2">
-            <Label className="text-gray-200">Arquivo Excel</Label>
+            <Label className="text-gray-200">Arquivo Excel ou CSV</Label>
             <div className="flex items-center gap-4">
               <Input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.csv"
                 onChange={handleFileChange}
                 disabled={loading}
                 className="text-gray-200 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"

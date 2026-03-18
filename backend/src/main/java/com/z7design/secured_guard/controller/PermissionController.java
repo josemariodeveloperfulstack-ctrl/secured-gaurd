@@ -266,9 +266,18 @@ public class PermissionController {
             case SUPERVISOR: return "Supervisor";
             case RH: return "Recursos Humanos";
             case FINANCEIRO: return "Financeiro";
+            case GESTOR_OPERACIONAL: return "Gestor Operacional";
             case TI_SUPORTE: return "TI / Suporte Técnico";
             case AUDITOR: return "Auditor / Consultor";
             case COLABORADOR: return "Colaborador";
+            case COMERCIAL: return "Comercial";
+            case GESTOR_COMERCIAL: return "Gestor Comercial";
+            case ASSISTENTE_COMERCIAL: return "Assistente Comercial";
+            case ASSISTENTE_ADMINISTRATIVO: return "Assistente Administrativo";
+            case ANALISTA_SUPRIMENTOS: return "Analista de Suprimentos";
+            case ESTOQUE: return "Estoque";
+            case SUPRIMENTOS: return "Suprimentos";
+            case COMPRAS: return "Compras";
             default: return role.name();
         }
     }
@@ -280,9 +289,18 @@ public class PermissionController {
             case SUPERVISOR: return "Coordena operações de equipes ou setores";
             case RH: return "Gerencia informações contratuais e pessoais dos colaboradores";
             case FINANCEIRO: return "Controla relatórios financeiros, movimentações e conferências de pagamento";
+            case GESTOR_OPERACIONAL: return "Acesso total ao módulo Operacional; sem acesso ao módulo Financeiro";
             case TI_SUPORTE: return "Gerencia configuração técnica, logs, backups e integrações";
             case AUDITOR: return "Acesso somente leitura para fins de auditoria ou análise externa";
             case COLABORADOR: return "Acesso limitado exclusivamente ao seu próprio perfil";
+            case COMERCIAL: return "Acesso ao módulo Comercial (Legado)";
+            case GESTOR_COMERCIAL: return "Gestão total do módulo comercial e CRM";
+            case ASSISTENTE_COMERCIAL: return "Assistência em propostas, orçamentos e CRM";
+            case ASSISTENTE_ADMINISTRATIVO: return "Suporte administrativo e financeiro";
+            case ANALISTA_SUPRIMENTOS: return "Análise e gestão de suprimentos";
+            case ESTOQUE: return "Consulta e movimentação de estoque";
+            case SUPRIMENTOS: return "Gestão de suprimentos e almoxarifado";
+            case COMPRAS: return "Gestão de processos de compras";
             default: return "Descrição não disponível";
         }
     }
@@ -294,9 +312,18 @@ public class PermissionController {
             case SUPERVISOR: return "🟩";
             case RH: return "🟨";
             case FINANCEIRO: return "🟧";
+            case GESTOR_OPERACIONAL: return "🟦";
             case TI_SUPORTE: return "🟪";
             case AUDITOR: return "🟫";
             case COLABORADOR: return "🟨";
+            case COMERCIAL: return "🟦";
+            case GESTOR_COMERCIAL: return "🟦";
+            case ASSISTENTE_COMERCIAL: return "🟦";
+            case ASSISTENTE_ADMINISTRATIVO: return "🟦";
+            case ANALISTA_SUPRIMENTOS: return "🟦";
+            case ESTOQUE: return "🟦";
+            case SUPRIMENTOS: return "🟦";
+            case COMPRAS: return "🟦";
             default: return "⚪";
         }
     }

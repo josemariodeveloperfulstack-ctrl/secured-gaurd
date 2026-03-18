@@ -273,7 +273,9 @@ export const messageService = {
         headers: getAuthHeaders()
       });
 
-      console.log('[MessageService] Resposta da API /api/users:', response.data);
+      if (import.meta.env.DEV) {
+        console.log('[MessageService] Resposta da API /api/users:', response.data);
+      }
 
       // Garantir que response.data é um array
       if (!Array.isArray(response.data)) {
@@ -300,8 +302,13 @@ export const messageService = {
 
       console.log('[MessageService] Usuários disponíveis processados:', users.length);
       return users;
-    } catch (error) {
-      console.error('[MessageService] Erro ao buscar usuários disponíveis:', error);
+    } catch (error: unknown) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 400) {
+        console.warn('[MessageService] GET /api/users retornou 400 (possível ambiente CI ou validação). Retornando lista vazia.');
+      } else {
+        console.error('[MessageService] Erro ao buscar usuários disponíveis:', error);
+      }
       return [];
     }
   },

@@ -70,6 +70,14 @@ public class Absence {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "coverage_employee_id")
     private Employee coverageEmployee;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coverage_work_post_id")
+    private WorkPost coverageWorkPost;
+
+    @Column(name = "coverage_is_overtime", nullable = false)
+    @Builder.Default
+    private Boolean coverageIsOvertime = false;
     
     @Column(name = "coverage_notes", columnDefinition = "TEXT")
     private String coverageNotes;

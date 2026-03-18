@@ -20,6 +20,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         Optional<Employee> findByUserId(UUID userId);
 
         List<Employee> findByStatus(EmploymentStatus status);
+        long countByStatus(EmploymentStatus status);
 
         List<Employee> findByUnitId(UUID unitId);
 
@@ -58,7 +59,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN departments d ON e.department_id = d.id", nativeQuery = true)
         List<Object[]> findBasicData();
 
-        // Versão paginada (LIMIT/OFFSET) para ambientes com muitos registros - inclui unit_id, company_id, work_post_id para edição
+        // Versão paginada SEM filtro de empresa (status opcional)
         @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
                         +
                         "FROM employees e " +
@@ -67,9 +68,24 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN companies c ON e.company_id = c.id " +
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
+                        "WHERE (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.created_at DESC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
-        List<Object[]> findBasicDataPaged(@Param("limit") int limit, @Param("offset") int offset);
+        List<Object[]> findBasicDataPaged(@Param("limit") int limit, @Param("offset") int offset, @Param("status") String status);
+
+        // Versão paginada COM filtro de empresa (status opcional)
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+                        +
+                        "FROM employees e " +
+                        "LEFT JOIN positions p ON e.position_id = p.id " +
+                        "LEFT JOIN units u ON e.unit_id = u.id " +
+                        "LEFT JOIN companies c ON e.company_id = c.id " +
+                        "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
+                        "LEFT JOIN departments d ON e.department_id = d.id " +
+                        "WHERE e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
+                        "ORDER BY e.created_at DESC " +
+                        "LIMIT :limit OFFSET :offset", nativeQuery = true)
+        List<Object[]> findBasicDataPagedByCompany(@Param("limit") int limit, @Param("offset") int offset, @Param("companyId") UUID companyId, @Param("status") String status);
 
         // Buscar dados básicos COM relacionamentos por termo de busca (nome, CPF ou
         // email)
@@ -87,7 +103,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTerm(@Param("searchTerm") String searchTerm);
 
-        // Versão paginada com termo de busca - inclui unit_id, company_id, work_post_id para edição
+        // Versão paginada com termo de busca SEM filtro de empresa (status opcional)
         @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
                         +
                         "FROM employees e " +
@@ -96,15 +112,39 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "LEFT JOIN companies c ON e.company_id = c.id " +
                         "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
                         "LEFT JOIN departments d ON e.department_id = d.id " +
-                        "WHERE UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "WHERE (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
                         "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) "
                         +
-                        "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
+                        "AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
                         "ORDER BY e.created_at DESC " +
                         "LIMIT :limit OFFSET :offset", nativeQuery = true)
         List<Object[]> findBasicDataBySearchTermPaged(@Param("searchTerm") String searchTerm,
                         @Param("limit") int limit,
-                        @Param("offset") int offset);
+                        @Param("offset") int offset,
+                        @Param("status") String status);
+
+        // Versão paginada com termo de busca COM filtro de empresa (status opcional)
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+                        +
+                        "FROM employees e " +
+                        "LEFT JOIN positions p ON e.position_id = p.id " +
+                        "LEFT JOIN units u ON e.unit_id = u.id " +
+                        "LEFT JOIN companies c ON e.company_id = c.id " +
+                        "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
+                        "LEFT JOIN departments d ON e.department_id = d.id " +
+                        "WHERE (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) " +
+                        "OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) "
+                        +
+                        "OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) " +
+                        "AND e.company_id = :companyId AND (:status IS NULL OR CAST(e.status AS text) = :status) " +
+                        "ORDER BY e.created_at DESC " +
+                        "LIMIT :limit OFFSET :offset", nativeQuery = true)
+        List<Object[]> findBasicDataBySearchTermPagedByCompany(@Param("searchTerm") String searchTerm,
+                        @Param("limit") int limit,
+                        @Param("offset") int offset,
+                        @Param("companyId") UUID companyId,
+                        @Param("status") String status);
 
         // Buscar apenas o nome por ID para evitar carregar toda a entidade (e colunas
         // inexistentes em alguns ambientes)
@@ -142,4 +182,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
          * Usado na importação Excel para atualizar registro existente quando CPF não for encontrado.
          */
         Optional<Employee> findByMatriculaEsocialIgnoreCase(String matriculaEsocial);
+
+        // Contagens para estatísticas por empresa
+        long countByCompanyId(UUID companyId);
+        long countByCompanyIdAndStatus(UUID companyId, EmploymentStatus status);
 }

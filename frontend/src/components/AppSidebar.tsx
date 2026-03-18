@@ -244,6 +244,7 @@ const operacionalMenuItems = [
   { icon: Calendar, text: 'Gestão de Férias', to: '/operacional/ferias', id: 'operacional-ferias' },
   { icon: CheckSquare, text: 'Gestão de Tarefas', to: '/operacional/tarefas', id: 'operacional-tarefas' },
   { icon: FileText, text: 'Relatórios Operacionais', to: '/operacional/relatorios', id: 'operacional-relatorios' },
+  { icon: Clock, text: 'Apuração de Horas', to: '/operacional/apuracao-horas', id: 'operacional-apuracao-horas' },
   { icon: CheckSquare, text: 'Controle de Visitas de Supervisor', to: '/gestao-visitas-supervisor', id: 'gestao-visitas-supervisor' },
   { icon: ClipboardList, text: 'Serviços', to: '/operacional?tab=servicos', id: 'operacional-servicos' },
   { icon: BarChart3, text: 'Controle de Visitas', to: '/controle-visitas-avancado', id: 'controle-visitas-avancado' },
@@ -307,11 +308,13 @@ export function AppSidebar() {
 
 
 
-  // Menu principal - incluir Roles apenas para SUPER_ADMIN
+  const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '');
+
+  // Menu principal - incluir Roles apenas para SUPER_ADMIN; ocultar Financeiro para GESTOR_OPERACIONAL
   const getMainMenuItems = () => {
     const baseItems = [
       { icon: BarChart3, text: 'Dashboard', to: '/dashboard', id: 'dashboard' },
-      { icon: DollarSign, text: 'Financeiro', to: '/financeiro', id: 'financeiro' },
+      ...(normalizedRole !== 'GESTOR_OPERACIONAL' ? [{ icon: DollarSign, text: 'Financeiro', to: '/financeiro', id: 'financeiro' }] : []),
       { icon: FileSpreadsheet, text: 'Holerites', to: '/holerites', id: 'holerites' },
       { icon: FileSpreadsheet, text: 'Folha de Pagamento', to: '/payrolls', id: 'payrolls' },
       { icon: FileText, text: 'Documentos Unificados', to: '/documentos-unificados', id: 'documentos-unificados' },
@@ -386,8 +389,8 @@ export function AppSidebar() {
           </div>
         ))}
 
-        {/* Módulo Financeiro - Oculto para RH e Departamento Pessoal */}
-        {!['RH', 'DEPARTAMENTO_PESSOAL'].includes((user?.role ?? '').replace(/^ROLE_/, '')) && (
+        {/* Módulo Financeiro - Oculto para RH, Departamento Pessoal e Gestor Operacional */}
+        {!['RH', 'DEPARTAMENTO_PESSOAL', 'GESTOR_OPERACIONAL'].includes(normalizedRole) && (
           <>
             <div className="text-seguranca-lightgray mb-2 mt-6 flex items-center">
               <DollarSign size={16} className="mr-2 text-seguranca-yellow" />

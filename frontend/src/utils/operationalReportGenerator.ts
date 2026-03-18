@@ -257,8 +257,8 @@ class OperationalReportGenerator {
         : '-';
 
       const rows = [
-        item.employee?.name || '-',
-        item.workPost?.name || '-',
+        item.employee?.name || 'Não alocado',
+        item.workPost?.name || 'Não alocado',
         this.formatDate(item.assignmentDate),
         this.formatShift(item.shift),
         timeRange,
