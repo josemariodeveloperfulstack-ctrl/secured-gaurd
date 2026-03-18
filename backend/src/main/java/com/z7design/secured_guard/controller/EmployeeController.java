@@ -427,9 +427,14 @@ public class EmployeeController {
             }
 
             List<java.util.Map<String, Object>> employees = new java.util.ArrayList<>();
+            java.util.Set<UUID> seenIds = new java.util.HashSet<>();
             for (Object[] row : data) {
+                Object idObj = safeAt(row, 0);
+                if (idObj == null) continue;
+                UUID rowId = idObj instanceof UUID ? (UUID) idObj : UUID.fromString(idObj.toString());
+                if (!seenIds.add(rowId)) continue; // evita duplicados (mesmo funcionário em mais de uma linha)
                 java.util.Map<String, Object> employee = new java.util.HashMap<>();
-                employee.put("id", safeAt(row, 0));
+                employee.put("id", idObj);
                 employee.put("name", safeAt(row, 1));
                 employee.put("document", safeAt(row, 2));
                 employee.put("birthDate", safeAt(row, 3));
