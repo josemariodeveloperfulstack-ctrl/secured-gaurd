@@ -855,7 +855,11 @@ public class EmployeeService {
     }
 
     public List<Employee> findAllByIds(List<UUID> ids) {
-        return employeeRepository.findAllById(ids);
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<UUID> distinctIds = ids.stream().distinct().toList();
+        return employeeRepository.findAllById(distinctIds);
     }
 
     public List<Employee> findByNameContaining(String name) {
