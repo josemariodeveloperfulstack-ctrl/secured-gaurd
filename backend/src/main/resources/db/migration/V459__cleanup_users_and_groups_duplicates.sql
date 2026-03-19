@@ -18,9 +18,9 @@ DELETE FROM public.user_roles WHERE ctid NOT IN (
     SELECT MIN(ctid) FROM public.user_roles GROUP BY user_id, role_id
 );
 
--- User Groups (join table: user_group, entidade UserGroupEntity)
-DELETE FROM public.user_group WHERE ctid NOT IN (
-    SELECT MIN(ctid) FROM public.user_group GROUP BY id
+-- User Groups (entidade UserGroupEntity)
+DELETE FROM public.user_groups WHERE ctid NOT IN (
+    SELECT MIN(ctid) FROM public.user_groups GROUP BY id
 );
 
 -- User Group Membership (join table: user_group_membership, conforme @JoinTable em User.java)
@@ -48,8 +48,8 @@ BEGIN
     END IF;
 
     -- Groups
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.user_group'::regclass AND contype = 'p') THEN
-        ALTER TABLE public.user_group ADD PRIMARY KEY (id);
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.user_groups'::regclass AND contype = 'p') THEN
+        ALTER TABLE public.user_groups ADD PRIMARY KEY (id);
     END IF;
 
 END $$;
