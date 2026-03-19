@@ -34,6 +34,11 @@ DELETE FROM public.departments WHERE ctid NOT IN (
     SELECT MIN(ctid) FROM public.departments GROUP BY id
 );
 
+-- Clients
+DELETE FROM public.clients WHERE ctid NOT IN (
+    SELECT MIN(ctid) FROM public.clients GROUP BY id
+);
+
 -- 2. Garantir Restauración de Constraints de PRIMARY KEY
 -- (V142 removeu todas as FKs e PKs, algumas podem não ter sido restauradas corretamente no CI)
 
