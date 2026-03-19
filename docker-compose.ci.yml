@@ -181,7 +181,7 @@ services:
       - secured-guard-ci-network
       - z7network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health || exit 1"]
+      test: [ "CMD", "curl", "-f", "http://localhost/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -189,7 +189,17 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      # Rotas são manipuladas pelo arquivo traefik-dynamic-ci.yml
+      - "traefik.http.routers.nginx-ci-https.rule=Host(`ci.z7botsolutions.com.br`)"
+      - "traefik.http.routers.nginx-ci-https.entrypoints=websecure"
+      - "traefik.http.routers.nginx-ci-https.tls=true"
+      - "traefik.http.routers.nginx-ci-https.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.nginx-ci-https.service=nginx-ci-service"
+      - "traefik.http.routers.nginx-ci-https.priority=2000"
+      - "traefik.http.routers.nginx-ci-http.rule=Host(`ci.z7botsolutions.com.br`)"
+      - "traefik.http.routers.nginx-ci-http.entrypoints=web"
+      - "traefik.http.routers.nginx-ci-http.middlewares=redirect-https@docker"
+      - "traefik.http.routers.nginx-ci-http.priority=2000"
+      - "traefik.http.services.nginx-ci-service.loadbalancer.server.port=80"
       - "traefik.docker.network=z7network"
 
   # ========================================
