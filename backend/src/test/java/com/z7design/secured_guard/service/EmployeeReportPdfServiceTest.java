@@ -59,7 +59,7 @@ public class EmployeeReportPdfServiceTest {
         mockCompany.setId(companyId);
         
         when(companyRepository.findById(companyId)).thenReturn(Optional.of(mockCompany));
-        when(employeeRepository.findAllByIdIn(anyList())).thenReturn(List.of());
+        when(employeeRepository.findAllByIdIn(anyList())).thenReturn(java.util.Set.of());
 
         // Act
         try {
