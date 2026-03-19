@@ -58,7 +58,7 @@ services:
   # BACKEND API CI
   # ========================================
   backend-ci:
-    image: z7design/secured-guard-backend:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-backend:ci
     container_name: secured-guard-backend-ci
     env_file:
       - .env
@@ -127,7 +127,7 @@ services:
   # WHATSAPP SERVICE (Baileys)
   # ========================================
   whatsapp-service-ci:
-    image: z7design/secured-guard-whatsapp:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci
     container_name: secured-guard-whatsapp-ci
     environment:
       PORT: 3333
@@ -223,7 +223,7 @@ services:
     #     VITE_API_URL: https://ci.z7botsolutions.com.br/api
     #     VITE_WS_URL: wss://ci.z7botsolutions.com.br/ws
     #     VITE_ENVIRONMENT: ci
-    image: z7design/secured-guard-frontend:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
     ports:
       - "3000:80"
