@@ -1,19 +1,20 @@
 FROM node:20-bullseye
 
 # Instalar Chromium e dependências necessárias com retry e tratamento de erros
-# Dividir em múltiplas etapas para melhor resiliência a problemas de rede
 RUN set -eux; \
-    # Atualizar lista de pacotes com retry
-    for i in 1 2 3; do \
-        apt-get update && break || sleep 5; \
-    done; \
+    # Função de retry para apt-get update
+    apt_update_retry() { for i in 1 2 3 4 5; do apt-get update && return 0 || sleep $((i * 2)); done; return 1; }; \
+    apt_update_retry; \
     # Instalar pacotes essenciais primeiro
-    apt-get install -y --no-install-recommends --fix-missing \
-        ca-certificates \
-        curl \
-    || (apt-get update && apt-get install -y --no-install-recommends --fix-missing ca-certificates curl); \
-    # Instalar dependências do Chromium em grupos menores
-    apt-get install -y --no-install-recommends --fix-missing \
+    apt-get install -y --no-install-recommends ca-certificates curl; \
+    # Instalar gsettings-desktop-schemas ANTES das dependências GTK (resolve cadeia de deps)
+    apt_update_retry; \
+    apt-get install -y --no-install-recommends \
+        gsettings-desktop-schemas \
+        libdbus-1-3; \
+    # Instalar dependências do Chromium
+    apt_update_retry; \
+    apt-get install -y --no-install-recommends \
         fonts-liberation \
         libasound2 \
         libatk-bridge2.0-0 \
@@ -26,20 +27,15 @@ RUN set -eux; \
         libxcomposite1 \
         libxdamage1 \
         libxrandr2 \
-        xdg-utils \
-    || (apt-get update && apt-get install -y --no-install-recommends --fix-missing \
-        fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 libcups2 \
-        libgdk-pixbuf2.0-0 libnspr4 libnss3 libx11-xcb1 libxcomposite1 \
-        libxdamage1 libxrandr2 xdg-utils); \
-    # Instalar libdbus-1-3 separadamente (geralmente causa problemas)
-    apt-get install -y --no-install-recommends --fix-missing libdbus-1-3 \
-    || (apt-get update && apt-get install -y --no-install-recommends --fix-missing libdbus-1-3); \
-    # Instalar libappindicator3-1 separadamente
-    apt-get install -y --no-install-recommends --fix-missing libappindicator3-1 \
-    || (apt-get update && apt-get install -y --no-install-recommends --fix-missing libappindicator3-1); \
+        xdg-utils; \
+    # Instalar libappindicator3-1 (depende de GTK que depende de gsettings-desktop-schemas)
+    apt_update_retry; \
+    apt-get install -y --no-install-recommends libappindicator3-1 \
+    || (apt --fix-broken install -y && apt-get install -y --no-install-recommends libappindicator3-1); \
     # Instalar Chromium por último
-    apt-get install -y --no-install-recommends --fix-missing chromium \
-    || (apt-get update && apt-get install -y --no-install-recommends --fix-missing chromium); \
+    apt_update_retry; \
+    apt-get install -y --no-install-recommends chromium \
+    || (apt --fix-broken install -y && apt-get install -y --no-install-recommends chromium); \
     # Limpar cache
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
