@@ -1,0 +1,68 @@
+# ========================================
+# Configuração Dinâmica do Traefik para CI
+# ========================================
+# Colocar em /var/www/secured_guard/traefik/dynamic/ no servidor
+# Traefik monta esse diretório em /etc/traefik/dynamic
+# Este é um fallback - a configuração principal vem das Docker labels no nginx-ci
+
+http:
+  middlewares:
+    # Middleware para permitir todos os métodos HTTP
+    ci-allow-methods:
+      headers:
+        customRequestHeaders:
+          Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
+        customResponseHeaders:
+          Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
+
+    # Middleware CORS para CI
+    ci-cors:
+      headers:
+        accessControlAllowOriginList:
+          - "https://ci.z7botsolutions.com.br"
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "PATCH"
+          - "OPTIONS"
+          - "HEAD"
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 3600
+        addVaryHeader: true
+
+    # Timeout para uploads (5 min)
+    ci-timeout:
+      buffering:
+        maxRequestBodyBytes: 52428800   # 50MB
+        maxResponseBodyBytes: 52428800  # 50MB
+        memRequestBodyBytes: 2097152
+        memResponseBodyBytes: 2097152
+        retryExpression: "IsNetworkError() && Attempts() < 2"
+
+  routers:
+    # Router HTTPS para CI - fallback quando Docker provider não descobre
+    ci-https:
+      rule: "Host(`ci.z7botsolutions.com.br`)"
+      entryPoints:
+        - websecure
+      service: ci-service
+      middlewares:
+        - ci-cors
+        - ci-allow-methods
+        - ci-timeout
+      tls:
+        certResolver: letsencryptresolver
+      priority: 1500
+
+  services:
+    ci-service:
+      loadBalancer:
+        servers:
+          - url: "http://secured-guard-nginx-ci:80"
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: 100ms
