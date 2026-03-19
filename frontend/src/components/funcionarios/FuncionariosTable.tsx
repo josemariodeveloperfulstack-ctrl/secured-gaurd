@@ -101,7 +101,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
     }
     
     if (wp) return wp;
-    if (wpId) return `Posto [ID: ${String(wpId).substring(0, 8)}]`;
+    if (wpId) return `Posto Inválido/Excluído`;
     return null;
   };
 
