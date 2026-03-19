@@ -277,6 +277,7 @@ jobs:
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/health-check-ci.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ || return 1
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/clear-service-worker-cache.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ || return 1
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/recover-ci-502.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/fix-404-traefik.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || true
             return 0
           }
@@ -474,8 +475,9 @@ jobs:
             echo "🌐 Testando conexão local..."
             curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
             
-            echo "🔄 Reiniciando Traefik para capturar novas rotas Nginx (previne erro 404)..."
-            docker restart traefik 2>/dev/null || true
+            echo "🔄 Rodando script proativo de correção 404 do Traefik..."
+            chmod +x /var/www/secured_guard/ci/scripts/fix-404-traefik.sh 2>/dev/null || true
+            bash /var/www/secured_guard/ci/scripts/fix-404-traefik.sh 2>/dev/null || true
             sleep 5
             
             echo "🏥 Iniciando script de Health Check internamente..."
