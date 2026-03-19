@@ -473,11 +473,9 @@ jobs:
             echo "🌐 Testando conexão local..."
             curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
             
-            echo "🔄 Garantindo que o traefik está a rodar..."
-            if ! docker ps | grep -q traefik; then
-              cd /var/www/secured_guard
-              docker-compose -f docker-compose.traefik.yml up -d
-            fi
+            echo "🔄 Reiniciando Traefik para capturar novas rotas Nginx (previne erro 404)..."
+            docker restart traefik 2>/dev/null || true
+            sleep 5
             
             echo "🏥 Iniciando script de Health Check internamente..."
             chmod +x /var/www/secured_guard/ci/scripts/health-check-ci.sh
