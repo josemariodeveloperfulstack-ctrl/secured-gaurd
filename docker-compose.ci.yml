@@ -189,26 +189,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      # Router HTTPS - usando labels diretas
-      - "traefik.http.routers.nginx-ci-https.rule=Host(`ci.z7botsolutions.com.br`)"
-      - "traefik.http.routers.nginx-ci-https.entrypoints=websecure"
-      - "traefik.http.routers.nginx-ci-https.tls.certresolver=letsencryptresolver"
-      - "traefik.http.routers.nginx-ci-https.service=nginx-ci-service"
-      - "traefik.http.routers.nginx-ci-https.priority=2000"
-      # Router HTTP (redireciona para HTTPS)
-      - "traefik.http.routers.nginx-ci-http.rule=Host(`ci.z7botsolutions.com.br`)"
-      - "traefik.http.routers.nginx-ci-http.entrypoints=web"
-      - "traefik.http.routers.nginx-ci-http.middlewares=redirect-https@docker"
-      - "traefik.http.routers.nginx-ci-http.priority=2000"
-      # Serviço
-      - "traefik.http.services.nginx-ci-service.loadbalancer.server.port=80"
-      # Middlewares CORS
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolalloworiginlist=*"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowcredentials=true"
-      - "traefik.http.routers.nginx-ci-https.middlewares=nginx-ci-cors@docker"
-      # Forçar detecção na rede correta
+      # Rotas são manipuladas pelo arquivo traefik-dynamic-ci.yml
       - "traefik.docker.network=z7network"
 
   # ========================================
