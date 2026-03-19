@@ -365,20 +365,20 @@ jobs:
             docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
             docker ps -a | grep "secured-guard-.*-ci" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
 
-            echo "🔎 Verificando acesso ao Docker Hub (forçar IPv4)..."
-            DOCKER_HUB_OK=0
+            echo "🔎 Verificando acesso ao GHCR (forçar IPv4)..."
+            GHCR_OK=0
             for j in 1 2 3 4 5; do
-              if curl -4 --connect-timeout 30 -fsSL https://registry-1.docker.io/v2/ >/dev/null 2>&1; then
-                echo "✅ Docker Hub acessível"
-                DOCKER_HUB_OK=1
+              if curl -4 --connect-timeout 30 -fsSL https://ghcr.io/v2/ >/dev/null 2>&1; then
+                echo "✅ GHCR acessível"
+                GHCR_OK=1
                 break
               fi
               WAIT=$((j * 10))
-              echo "⚠️ Tentativa $j de acesso ao Docker Hub falhou, aguardando ${WAIT}s..."
+              echo "⚠️ Tentativa $j de acesso ao GHCR falhou, aguardando ${WAIT}s..."
               sleep $WAIT
             done
-            if [ $DOCKER_HUB_OK -eq 0 ]; then
-              echo "⚠️ Docker Hub inacessível da VPS (Contabo). Tentando usar imagens em cache..."
+            if [ $GHCR_OK -eq 0 ]; then
+              echo "⚠️ GHCR inacessível da VPS (Contabo). Tentando usar imagens em cache..."
             fi
 
             echo "🔐 Login no GitHub Container Registry..."
