@@ -268,8 +268,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     const companyId = (form as any).company?.id;
     if (companyId && companies.length > 0) {
       const company = companies.find(c => String(c.id) === String(companyId));
+      console.log('🔍 Sincronizando empresa selecionada:', { 
+        formCompanyId: companyId, 
+        found: !!company,
+        totalCompanies: companies.length,
+        selectedCompanyId: selectedCompany?.id
+      });
       if (company && (!selectedCompany || String(selectedCompany.id) !== String(companyId))) {
         setSelectedCompany(company);
+      } else if (!company) {
+        console.warn(`⚠️ Empresa ID ${companyId} não encontrada na lista de ${companies.length} empresas.`);
       }
     }
   }, [(form as any).company?.id, companies, open, funcionario?.id]);
@@ -804,12 +812,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     try {
       console.log('📥 Carregando dados dos selects...');
       const [positionsData, unitsData, usersData, companiesData, workPostsData, departmentsData] = await Promise.all([
-        positionService.getPositions(),
-        unitService.getAllUnits(),
-        userService.getAllUsers(),
-        companyService.getAllCompanies(),
-        workPostService.getAllWorkPosts(),
-        departmentService.listActive()
+        positionService.getPositions().catch(err => { console.warn('⚠️ Erro ao carregar cargos:', err); return []; }),
+        unitService.getAllUnits().catch(err => { console.warn('⚠️ Erro ao carregar unidades:', err); return []; }),
+        userService.getAllUsers().catch(err => { console.warn('⚠️ Erro ao carregar usuários:', err); return []; }),
+        companyService.getAllCompanies().catch(err => { 
+          console.error('❌ CRITICAL: Erro ao carregar empresas:', err); 
+          return []; 
+        }),
+        workPostService.getAllWorkPosts().catch(err => { console.warn('⚠️ Erro ao carregar postos de trabalho:', err); return []; }),
+        departmentService.listActive().catch(err => { console.warn('⚠️ Erro ao carregar departamentos:', err); return []; })
       ]);
       
       console.log('✅ Dados carregados:', {
@@ -819,6 +830,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         companies: companiesData.length
       });
       
+      if (companiesData.length === 0) {
+        console.warn('⚠️ AVISO: A lista de empresas retornou vazia do backend.');
+      } else {
+        console.log(`✅ ${companiesData.length} empresas carregadas com sucesso.`);
+      }
+
       setPositions(positionsData);
       setUnits(unitsData);
       setUsers(usersData);

@@ -619,9 +619,20 @@ public class SecurityConfig {
                                                 // (dados por funcionário/CPF no serviço)
                                                 .requestMatchers("/api/time-sheets/**").authenticated()
                                                 // Todo o resto requer autenticação
-                                                .anyRequest().authenticated())
-                                .authenticationProvider(authenticationProvider())
-                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                                .anyRequest().authenticated())
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                                response.setContentType("application/json");
+                                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                                response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"" + authException.getMessage() + "\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                                response.setContentType("application/json");
+                                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                                response.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"Access denied\"}");
+                        }))
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
                 return http.build();
         }
