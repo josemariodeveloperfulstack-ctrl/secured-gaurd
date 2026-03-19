@@ -1709,19 +1709,27 @@ public class EmployeeService {
             } catch (Exception wpEx) {
                 System.err.println("[WARNING] Erro ao mapear workPost: " + wpEx.getMessage());
             }
-            if (e.getDepartment() != null) {
-                dto.setDepartmentId(e.getDepartment().getId().toString());
-                EmployeeDTO.IdOnlyDTO deptDTO = new EmployeeDTO.IdOnlyDTO();
-                deptDTO.setId(e.getDepartment().getId());
-                deptDTO.setName(e.getDepartment().getName());
-                dto.setDepartment(deptDTO);
+            try {
+                if (e.getDepartment() != null) {
+                    dto.setDepartmentId(e.getDepartment().getId().toString());
+                    EmployeeDTO.IdOnlyDTO deptDTO = new EmployeeDTO.IdOnlyDTO();
+                    deptDTO.setId(e.getDepartment().getId());
+                    deptDTO.setName(e.getDepartment().getName());
+                    dto.setDepartment(deptDTO);
+                }
+            } catch (Exception deptEx) {
+                System.err.println("[WARNING] Erro ao mapear department: " + deptEx.getMessage());
             }
 
-            if (e.getExameMedicoDoctor() != null) {
-                EmployeeDTO.IdOnlyDTO doctorDTO = new EmployeeDTO.IdOnlyDTO();
-                doctorDTO.setId(e.getExameMedicoDoctor().getId());
-                doctorDTO.setName(e.getExameMedicoDoctor().getName());
-                dto.setExameMedicoDoctor(doctorDTO);
+            try {
+                if (e.getExameMedicoDoctor() != null) {
+                    EmployeeDTO.IdOnlyDTO doctorDTO = new EmployeeDTO.IdOnlyDTO();
+                    doctorDTO.setId(e.getExameMedicoDoctor().getId());
+                    doctorDTO.setName(e.getExameMedicoDoctor().getName());
+                    dto.setExameMedicoDoctor(doctorDTO);
+                }
+            } catch (Exception docEx) {
+                System.err.println("[WARNING] Erro ao mapear exameMedicoDoctor: " + docEx.getMessage());
             }
 
             // Mapear dados bancários
