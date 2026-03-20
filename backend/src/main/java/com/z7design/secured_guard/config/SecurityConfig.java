@@ -481,6 +481,14 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
                                                                 "ROLE_SUPERVISOR")
+                                                // Endpoints de departamentos - requerem permissões de RH ou admin
+                                                .requestMatchers("/api/departments/**")
+                                                .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_DEPARTAMENTO_PESSOAL",
+                                                                "EMPLOYEES_READ", "EMPLOYEES_WRITE",
+                                                                "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                                "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR")
                                                 // Endpoints de funcionários, unidades, empresas e cargos - requerem
                                                 // permissões de RH, admin ou financeiro (empresas usadas em Contas a Pagar)
                                                 .requestMatchers("/api/employees/**", "/api/units/**",
