@@ -401,20 +401,20 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         // Tratar CPF que pode vir como cpf ou document
         const cpfValue = employeeData.cpf || (employeeData as any).document || '';
       
-      // Tratar dados bancários - verificar tanto bankData quanto bankInfo
-      let bankData = {
-        bank: '',
-        agency: '',
-        account: '',
+        // Tratar dados bancários - verificar tanto bankData quanto bankInfo
+        let bankData = {
+          bank: '',
+          agency: '',
+          account: '',
           accountDigit: '',
           type: 'CORRENTE' as const,
           chavePix: ''
         };
-
-        // Backend envia como bankData (via @JsonProperty alias)
+ 
+        // Backend envia como bankData ou bankInfo
         const rawBankData = (employeeData as any).bankData;
         const rawBankInfo = (employeeData as any).bankInfo;
-
+ 
         if (rawBankData) {
           bankData = {
             bank: rawBankData.bank || '',
@@ -424,7 +424,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             type: rawBankData.type || rawBankData.accountType || 'CORRENTE',
             chavePix: rawBankData.chavePix || rawBankData.pixKey || ''
           };
-          console.log('💰 Dados bancários encontrados em bankData:', rawBankData);
         } else if (rawBankInfo) {
           bankData = {
             bank: rawBankInfo.bank || '',
@@ -434,9 +433,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
             type: rawBankInfo.type || rawBankInfo.accountType || 'CORRENTE',
             chavePix: rawBankInfo.chavePix || rawBankInfo.pixKey || ''
           };
-          console.log('💰 Dados bancários encontrados em bankInfo:', rawBankInfo);
-        } else {
-          console.log('⚠️ Nenhum dado bancário encontrado no funcionário');
         }
         
         console.log('💰 Dados bancários mapeados para o formulário:', bankData);
@@ -466,27 +462,24 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         }
         
         const formToSet = {
+          ...employeeData,
           name: employeeData.name || '',
           cpf: cpfValue,
           rg: employeeData.rg || '',
           email: employeeData.email || '',
           phone: initialPhone,
-          telefoneContato: (employeeData as any).telefoneContato || '',
-          address: addressValue,
-          enderecoRua: enderecoRua,
-          enderecoNumero: enderecoNumero,
-          enderecoComplemento: enderecoComplemento,
-          enderecoBairro: enderecoBairro,
-          enderecoCidade: enderecoCidade,
-          enderecoEstado: enderecoEstado,
-          enderecoCep: enderecoCep,
           birthDate: employeeData.birthDate || '',
           maritalStatus: employeeData.maritalStatus || 'SINGLE',
           nationality: employeeData.nationality || 'Brasileiro',
           registrationNumber: employeeData.registrationNumber || '',
           hireDate: employeeData.hireDate || '',
           status: employeeData.status || 'ACTIVE',
-          notes: employeeData.notes || '',
+          bankData: bankData,
+          // Pais - Fallback para .pai e .mae
+          nomePai: employeeData.nomePai || (employeeData as any).pai || '',
+          nomeMae: employeeData.nomeMae || (employeeData as any).mae || '',
+          
+          // Relacionamentos
           position: { id: employeeData.position?.id ? String(employeeData.position.id) : '' },
           unit: { id: employeeData.unit?.id ? String(employeeData.unit.id) : '' },
           user: { id: employeeData.user?.id ? String(employeeData.user.id) : '' },
@@ -494,18 +487,21 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           workPostId: (() => {
             const wp = (employeeData as any).workPost;
             let id = wp?.id ?? (employeeData as any).workPostId;
-            if (!id && funcionario) {
-              const wpList = (funcionario as any).workPost;
-              id = wpList?.id ?? (funcionario as any).workPostId;
-            }
             return (id != null && id !== '') ? String(id) : '';
           })(),
-          departmentId: (employeeData as any).department?.id
-            || (employeeData as any).departmentId
-            || '',
-          remanejamentoDataInicio: '',
-          bankData: bankData,
-          // Campos do cônjuge
+          departmentId: (employeeData as any).department?.id || (employeeData as any).departmentId || '',
+
+          // Explicitly set fields that might be overwritten by `...employeeData` if they are objects or need specific formatting
+          address: addressValue, // Ensure address is handled correctly
+          enderecoRua: enderecoRua,
+          enderecoNumero: enderecoNumero,
+          enderecoComplemento: enderecoComplemento,
+          enderecoBairro: enderecoBairro,
+          enderecoCidade: enderecoCidade,
+          enderecoEstado: enderecoEstado,
+          enderecoCep: enderecoCep,
+          telefoneContato: (employeeData as any).telefoneContato || '',
+          notes: employeeData.notes || '',
           spouseName: employeeData.spouseName || '',
           spouseCpf: employeeData.spouseCpf || '',
           spouseRg: employeeData.spouseRg || '',
@@ -526,8 +522,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           racaCor: employeeData.racaCor || '',
           tipoSalarioContratual: employeeData.tipoSalarioContratual || '',
           certificadoMilitar: employeeData.certificadoMilitar || '',
-          nomePai: employeeData.nomePai || '',
-          nomeMae: employeeData.nomeMae || '',
           localNascimento: employeeData.localNascimento || '',
           municipioNascimento: employeeData.municipioNascimento || '',
           estadoNascimento: employeeData.estadoNascimento || '',

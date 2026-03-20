@@ -73,7 +73,8 @@ export const employeeService = {
       }
 
       const response = await api.get('/api/employees/paged', { params });
-      return response.data || [];
+      const employees = response.data || [];
+      return employees.map((e: any) => this.normalizeEmployee(e));
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
       return [];
@@ -183,11 +184,70 @@ export const employeeService = {
   async getEmployeeById(id: string): Promise<Employee | null> {
     try {
       const response = await api.get(`/api/employees/${id}`);
-      return response.data;
+      return this.normalizeEmployee(response.data);
     } catch (error) {
       console.error('Erro ao buscar funcionário:', error);
       return null;
     }
+  },
+
+  /**
+   * Normaliza dados do funcionário do backend para o frontend
+   */
+  normalizeEmployee(data: any): Employee | null {
+    if (!data) return null;
+
+    // Criar cópia para não mutar o original se necessário
+    const employee = { ...data };
+
+    // Mapear bankInfo (backend) para bankData (frontend) se necessário
+    if (data.bankInfo && !data.bankData) {
+      employee.bankData = {
+        bank: data.bankInfo.bank || '',
+        agency: data.bankInfo.agency || '',
+        account: data.bankInfo.account || '',
+        accountDigit: data.bankInfo.accountDigit || '',
+        type: data.bankInfo.accountType || 'CORRENTE',
+        chavePix: data.bankInfo.pixKey || data.bankInfo.chavePix || ''
+      };
+    }
+
+    // Mapear pai/mae para nomePai/nomeMae (compatibilidade com planilhas e DTOs variados)
+    if (data.pai && !data.nomePai) employee.nomePai = data.pai;
+    if (data.mae && !data.nomeMae) employee.nomeMae = data.mae;
+    // Mapear work_post para workPost (snake_case -> camelCase)
+    if (data.work_post && !data.workPost) {
+      employee.workPost = data.work_post;
+    }
+    
+    // Suporte para quando workPost vem apenas como ID em formato string
+    if (typeof employee.workPost === 'string') {
+      const id = employee.workPost;
+      employee.workPost = { id, name: data.workPostName || data.work_post_name || data.department?.name || '' };
+    }
+
+    // Se workPost existe mas não tem nome, tentar buscar em outros lugares
+    if (employee.workPost && !employee.workPost.name) {
+      const foundName = data.workPostName || data.work_post_name || data.department?.name || (data as any).nomePosto;
+      if (foundName) {
+        employee.workPost.name = foundName;
+      }
+    }
+
+    // Garantir que workPostId esteja sincronizado
+    if (employee.workPost?.id && !employee.workPostId) {
+      employee.workPostId = employee.workPost.id;
+    } else if (data.work_post_id && !employee.workPostId) {
+      employee.workPostId = data.work_post_id;
+    }
+
+    // Mapear array de work_posts se existir
+    if (data.work_posts && !data.workPosts) {
+      employee.workPosts = data.work_posts;
+    }
+
+    // Garantir que campos de data estão em formato string ISO ou similar
+    return employee as Employee;
   },
 
   /**
@@ -209,7 +269,8 @@ export const employeeService = {
   async searchEmployeesByName(name: string): Promise<Employee[]> {
     try {
       const response = await api.get(`/api/employees/search/name?name=${encodeURIComponent(name)}`);
-      return response.data;
+      const employees = response.data || [];
+      return employees.map((e: any) => this.normalizeEmployee(e));
     } catch (error) {
       console.error('Erro ao buscar funcionários por nome:', error);
       return [];
@@ -222,7 +283,8 @@ export const employeeService = {
   async searchEmployees(query: string): Promise<Employee[]> {
     try {
       const response = await api.get(`/api/employees/search?q=${encodeURIComponent(query)}`);
-      return response.data;
+      const employees = response.data || [];
+      return employees.map((e: any) => this.normalizeEmployee(e));
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
       return [];
@@ -236,18 +298,9 @@ export const employeeService = {
     try {
       console.log(`[EmployeeService] Buscando funcionários com status: ${status}`);
       const response = await api.get(`/api/employees/status/${status.toUpperCase()}`);
-      console.log(`[EmployeeService] Resposta recebida:`, response.data);
-
-      if (!response.data) {
-        console.warn('[EmployeeService] Resposta vazia do backend');
-        return [];
-      }
-
-      // Garantir que seja um array
-      const employees = Array.isArray(response.data) ? response.data : [];
-      console.log(`[EmployeeService] ${employees.length} funcionários encontrados`);
-
-      return employees;
+      
+      const rawEmployees = Array.isArray(response.data) ? response.data : [];
+      return rawEmployees.map((e: any) => this.normalizeEmployee(e));
     } catch (error: any) {
       console.error('[EmployeeService] Erro ao buscar funcionários por status:', error);
       console.error('[EmployeeService] Status do erro:', error.response?.status);
@@ -274,7 +327,7 @@ export const employeeService = {
         const empCpf = (emp.document || emp.cpf || '').replace(/\D/g, '');
         return empCpf === normalizedCpf;
       });
-      return exact || employees[0] || null;
+      return exact ? this.normalizeEmployee(exact) : (employees[0] ? this.normalizeEmployee(employees[0]) : null);
     } catch (error: any) {
       if (error.response?.status === 404) {
         // Funcionário não encontrado - não é erro

@@ -1,4 +1,4 @@
-﻿-- =====================================================
+-- =====================================================
 -- SEED DE DADOS ESSENCIAIS PARA AMBIENTE CI
 -- Executado automaticamente via Flyway após migrations
 -- =====================================================
@@ -168,11 +168,11 @@ WHERE NOT EXISTS (
 -- =====================================================
 -- 7. EMPRESA DE TESTE
 -- =====================================================
-INSERT INTO companies (id, name, trade_name, cnpj, email, phone, address, city, state, zip_code, status, type, sector, size, created_by, created_at, updated_at)
+INSERT INTO companies (id, name, sigla, cnpj, email, phone, address, city, state, zip_code, status, created_at, updated_at)
 SELECT 
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     'Empresa Teste CI',
-    'Empresa Teste CI Ltda',
+    'TESTECI',
     '98.765.432/0001-10',
     'empresa@teste.ci',
     '(11) 2222-2222',
@@ -181,10 +181,6 @@ SELECT
     'SP',
     '01234-567',
     'ACTIVE',
-    'LTDA',
-    'Segurança',
-    'Média',
-    '11111111-1111-1111-1111-111111111111'::uuid,
     NOW(),
     NOW()
 WHERE NOT EXISTS (
@@ -287,7 +283,7 @@ WHERE NOT EXISTS (
 -- com os funcionários reais inseridos acima
 INSERT INTO employees (
     id, user_id, position_id, registration_number, name, document, cpf, rg, 
-    birth_date, gender, marital_status, nationality, address, phone, email, 
+    birth_date, sexo, marital_status, nationality, address, phone, email, 
     unit_id, company_id, hire_date, termination_date, status, notes,
     cnh_number, cnh_expiration_date, cnh_category,
     ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
@@ -351,7 +347,7 @@ WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'cccccccc-cccc-cccc-cccc-cc
 
 INSERT INTO employees (
     id, user_id, position_id, registration_number, name, document, cpf, rg, 
-    birth_date, gender, marital_status, nationality, address, phone, email, 
+    birth_date, sexo, marital_status, nationality, address, phone, email, 
     unit_id, company_id, hire_date, termination_date, status, notes,
     cnh_number, cnh_expiration_date, cnh_category,
     ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
