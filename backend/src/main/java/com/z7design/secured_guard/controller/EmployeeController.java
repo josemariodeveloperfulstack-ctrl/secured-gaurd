@@ -364,10 +364,10 @@ public class EmployeeController {
                         employee.put("userId", safeAt(row, 22));
                     }
 
-                    // Adicionar workPost se existir (index 23 e 27)
-                    if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
+                    // Adicionar workPost apenas se tiver nome (evita "Posto Inválido" no front)
+                    if (safeAt(row, 23) != null) {
                         java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                        if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23)); // work_post_name
+                        workPost.put("name", safeAt(row, 23)); // work_post_name
                         if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27)); // work_post_id
                         employee.put("workPost", workPost);
                     }
@@ -475,9 +475,9 @@ public class EmployeeController {
                     employee.put("company", company);
                 }
                 if (safeAt(row, 22) != null) employee.put("userId", safeAt(row, 22));
-                if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
+                if (safeAt(row, 23) != null) {
                     java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                    if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23));
+                    workPost.put("name", safeAt(row, 23));
                     if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27));
                     employee.put("workPost", workPost);
                 }
