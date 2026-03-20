@@ -25,7 +25,11 @@ public class PermissionSyncService {
         int updated = 0;
         for (com.z7design.secured_guard.model.enums.Permission perm : com.z7design.secured_guard.model.enums.Permission.values()) {
             String name = perm.name();
-            Permission entity = permissionRepository.findByName(name).orElse(null);
+            var byName = permissionRepository.findAllByName(name);
+            if (byName.size() > 1) {
+                log.warn("Permissão duplicada no banco: '{}' ({} registros). Usando o primeiro para sync.", name, byName.size());
+            }
+            Permission entity = byName.stream().findFirst().orElse(null);
             String description = buildDescription(name);
             if (entity == null) {
                 Permission newPerm = new Permission();

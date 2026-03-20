@@ -95,9 +95,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.debug("Extracted username from token: {}", username);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                log.debug("Found valid username '{}', loading user details", username);
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-                log.debug("Loaded user details for username: {}", username);
-                log.debug("User authorities: {}", userDetails.getAuthorities());
+                log.debug("User authorities for '{}': {}", username, userDetails.getAuthorities());
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -106,19 +106,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    log.debug("Authentication successful for user: {} with authorities: {}", username,
+                    log.info("Authentication successful for user: {} with authorities: {}", username,
                             userDetails.getAuthorities());
                 } else {
-                    log.warn("Invalid JWT token for user: {}", username);
+                    log.warn("JWT token validation FAILED for user: {}", username);
                 }
             } else if (username == null) {
-                log.warn("Could not extract username from JWT token");
+                log.warn("Username extraction failed from token: {}", jwt.substring(0, Math.min(jwt.length(), 10)) + "...");
             } else {
-                log.debug("User already authenticated: {}", username);
+                log.debug("Request already authenticated for user: {}", username);
             }
         } catch (Exception e) {
-            log.error("Error processing JWT token for request {} {}: {}",
-                    request.getMethod(), request.getRequestURI(), e.getMessage(), e);
+            log.error("CRITICAL: Error processing JWT token for {} {}: {}",
+                    request.getMethod(), request.getRequestURI(), e.getMessage());
+            log.debug("Full error stack trace: ", e);
         }
 
         filterChain.doFilter(request, response);

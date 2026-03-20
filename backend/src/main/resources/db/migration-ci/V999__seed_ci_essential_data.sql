@@ -168,11 +168,11 @@ WHERE NOT EXISTS (
 -- =====================================================
 -- 7. EMPRESA DE TESTE
 -- =====================================================
-INSERT INTO companies (id, name, trade_name, cnpj, email, phone, address, city, state, zip_code, status, type, sector, size, created_by, created_at, updated_at)
+INSERT INTO companies (id, name, sigla, cnpj, email, phone, address, city, state, zip_code, status, created_at, updated_at)
 SELECT 
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     'Empresa Teste CI',
-    'Empresa Teste CI Ltda',
+    'TESTECI',
     '98.765.432/0001-10',
     'empresa@teste.ci',
     '(11) 2222-2222',
@@ -181,10 +181,6 @@ SELECT
     'SP',
     '01234-567',
     'ACTIVE',
-    'LTDA',
-    'Segurança',
-    'Média',
-    '11111111-1111-1111-1111-111111111111'::uuid,
     NOW(),
     NOW()
 WHERE NOT EXISTS (
@@ -287,7 +283,7 @@ WHERE NOT EXISTS (
 -- com os funcionários reais inseridos acima
 INSERT INTO employees (
     id, user_id, position_id, registration_number, name, document, cpf, rg, 
-    birth_date, gender, marital_status, nationality, address, phone, email, 
+    birth_date, sexo, marital_status, nationality, address, phone, email, 
     unit_id, company_id, hire_date, termination_date, status, notes,
     cnh_number, cnh_expiration_date, cnh_category,
     ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
@@ -351,7 +347,7 @@ WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'cccccccc-cccc-cccc-cccc-cc
 
 INSERT INTO employees (
     id, user_id, position_id, registration_number, name, document, cpf, rg, 
-    birth_date, gender, marital_status, nationality, address, phone, email, 
+    birth_date, sexo, marital_status, nationality, address, phone, email, 
     unit_id, company_id, hire_date, termination_date, status, notes,
     cnh_number, cnh_expiration_date, cnh_category,
     ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
@@ -486,6 +482,56 @@ BEGIN
     RAISE NOTICE '   - Funcionários do banco secured_guard_test: Incluídos via INSERTs hardcoded';
     RAISE NOTICE '   - Funcionários de teste (fallback): 2 funcionários completos';
     RAISE NOTICE '   - Frota: 3 veículos de teste';
+END $$;
+
+-- =====================================================
+-- 10. CLIENTES REFERENCIADOS PELOS POSTOS DE TRABALHO
+-- =====================================================
+DO $$
+DECLARE
+    client_ids uuid[] := ARRAY[
+        '07a31427-7e91-4aab-8659-9f08efd933d9', '276c0b0c-bb1f-4107-9aa0-3b93a2e547a2', '7c5e4e3c-4fcb-4111-b0b9-71cb07cfd9e6', 
+        '4e52b832-5226-4647-a23f-60fe0877521f', '1319af0a-218e-417c-9205-3258a9f4dced', '02b04d58-c043-47da-9ef0-2f02c5db1e9a', 
+        '5f1cb241-be50-434c-930c-51cdb59d2e17', 'f170a64a-560e-4d14-863d-85caedd52646', '65e59abc-db76-410f-8194-a85ad4cc22c7', 
+        'ec93e79f-b966-4fb2-9526-78b9cc88eb89', 'eade6ca4-fb2b-4864-8d6e-4c91eea4308e', 'c2a10090-b719-4cf0-8696-a55513a97d7c', 
+        'b37c8f45-ff80-4eee-a74d-3e47bf7b6ebe', '6a3cedeb-09bc-4d59-ab8f-ade6b84956d4', '5b642694-8431-4a39-a74b-3f5fccfcf43d', 
+        '5d19a2f9-316b-4d00-8ebd-6297363d524d', '89c2ff1a-6e1b-4c36-8c2c-e7d21d91ebbf', 'd637b119-a0aa-4297-99a2-fc226846d25d', 
+        '10d89142-fef7-46f7-a366-4a82c3325f50', '63963541-bd1d-415c-af64-c868ff52f033', '63f78ae1-a955-4f61-b719-b6af0fec2a2f', 
+        'ddede840-e36a-4e27-8ead-884a955809ed', '9f3671db-c150-4ceb-a69d-2b04b8af46b8', 'fb94f83c-73e0-4277-893f-507f4be05d5f', 
+        '2a806237-9548-4dc4-b4ea-2ccfde1671c7', '2fa8aa05-54ec-4bcd-b39c-480b47ae4067', '7424e80e-b1c5-47db-b2af-fb4c4efa2215', 
+        '1d9cd74f-00d8-4bd4-b026-d17b12e92eaa', '3b5d0291-aa03-4903-8180-bb093d4fb72d', '5baac85a-9794-427e-81c2-815117d19b2c', 
+        'df3ab2d6-d71d-4257-92d0-a30dfb82b043', 'c64e8e02-46d8-4932-986c-a68203126767', '6716064d-ce6f-4263-82da-f3b838eaef5b', 
+        '62c88888-7d3b-42d9-af18-6de29c173edb'
+    ]::uuid[];
+    cid uuid;
+BEGIN
+    FOREACH cid IN ARRAY client_ids
+    LOOP
+        INSERT INTO clients (id, name, cnpj, status, created_at, updated_at)
+        SELECT cid, 'Cliente Migrado ' || cid, '00.000.000/0001-00', 'ACTIVE', NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM clients WHERE id = cid);
+    END LOOP;
+END $$;
+
+-- =====================================================
+-- 11. POSTOS DE TRABALHO (SEED CI)
+-- =====================================================
+
+
+-- =====================================================
+-- 12. LIMPEZA DE REFERÊNCIAS ÓRFÃS DE POSTOS
+-- =====================================================
+UPDATE employees 
+SET work_post_id = NULL 
+WHERE work_post_id IS NOT NULL 
+  AND work_post_id NOT IN (SELECT id FROM work_posts);
+
+-- =====================================================
+-- LOG DE CONCLUSÃO FINAL
+-- =====================================================
+DO $$
+BEGIN
+    RAISE NOTICE '✅ Seed de postos de trabalho e limpeza concluída!';
 END $$;
 
 

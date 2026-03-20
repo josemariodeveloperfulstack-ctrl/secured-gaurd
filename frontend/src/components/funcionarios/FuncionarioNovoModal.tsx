@@ -374,8 +374,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         racaCor: (employeeToEdit as any).racaCor || '',
         tipoSalarioContratual: (employeeToEdit as any).tipoSalarioContratual || '',
         certificadoMilitar: employeeToEdit.certificadoMilitar || '',
-        nomePai: employeeToEdit.nomePai || '',
-        nomeMae: employeeToEdit.nomeMae || '',
+        nomePai: employeeToEdit.nomePai || (employeeToEdit as any).pai || '', // Fallback para .pai
+        nomeMae: employeeToEdit.nomeMae || (employeeToEdit as any).mae || '', // Fallback para .mae
         localNascimento: employeeToEdit.localNascimento || '',
         municipioNascimento: employeeToEdit.municipioNascimento || '',
         estadoNascimento: employeeToEdit.estadoNascimento || '',
@@ -450,22 +450,16 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         cinOrgaoEmissor: employeeToEdit.cinOrgaoEmissor || '',
         cinDataEmissao: employeeToEdit.cinDataEmissao || '',
 
-        // Dados bancários - converter de bankInfo (backend) para bankData (frontend)
-        bankData: employeeToEdit.bankData ? {
-          bank: employeeToEdit.bankData.bank || '',
-          agency: employeeToEdit.bankData.agency || '',
-          account: employeeToEdit.bankData.account || '',
-          accountDigit: employeeToEdit.bankData.accountDigit || '',
-          type: employeeToEdit.bankData.type || 'CORRENTE',
-          chavePix: (employeeToEdit.bankData as any).chavePix || (employeeToEdit.bankData as any).pixKey || ''
-        } : {
-          bank: '',
-          agency: '',
-          account: '',
-          accountDigit: '',
-          type: 'CORRENTE',
-          chavePix: ''
-        },
+        // Dados bancários - priorizar bankData, cair para bankInfo se necessário
+        bankData: (employeeToEdit.bankData || (employeeToEdit as any).bankInfo) ? {
+          bank: (employeeToEdit.bankData?.bank || (employeeToEdit as any).bankInfo?.bank || ''),
+          agency: (employeeToEdit.bankData?.agency || (employeeToEdit as any).bankInfo?.agency || ''),
+          account: (employeeToEdit.bankData?.account || (employeeToEdit as any).bankInfo?.account || ''),
+          accountDigit: (employeeToEdit.bankData?.accountDigit || (employeeToEdit as any).bankInfo?.accountDigit || ''),
+          type: (employeeToEdit.bankData?.type || (employeeToEdit as any).bankInfo?.accountType || 'CORRENTE'),
+          chavePix: (employeeToEdit.bankData as any)?.chavePix || (employeeToEdit.bankData as any)?.pixKey ||
+                    (employeeToEdit as any).bankInfo?.pixKey || (employeeToEdit as any).bankInfo?.chavePix || ''
+        } : initialState.bankData,
 
         // Campos relacionais - workPost pode vir como objeto { id, name } ou workPostId
         workPostId: (employeeToEdit as any).workPostId || (employeeToEdit as any).workPost?.id || '',
@@ -502,27 +496,31 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setSelectedUser(employeeToEdit.user);
         setUserSearchTerm(employeeToEdit.user.name || employeeToEdit.user.username || '');
       }
-      if (employeeToEdit.company && employeeToEdit.company.id) {
-        console.log('🔍 Carregando empresa:', employeeToEdit.company);
-        // Buscar empresa completa da lista de empresas
+
+      if (employeeToEdit.company) {
+        // Tentar encontrar a empresa completa na lista para garantir que temos todos os dados (CNPJ, sigla, etc)
         const fullCompany = companies.find(c => c.id === employeeToEdit.company?.id);
         if (fullCompany) {
           setSelectedCompany(fullCompany);
         } else {
-          // Se não encontrou, usar os dados disponíveis ou buscar depois
+          // Se não encontrou na lista, usar o que veio do funcionário (que pode ser só o id e nome)
           setSelectedCompany(employeeToEdit.company as Company);
         }
       }
 
       // Carregar dependentes do funcionário
-      loadEmployeeDependents(employeeToEdit.id);
+      if (employeeToEdit.id) {
+        loadEmployeeDependents(employeeToEdit.id);
+      }
 
-      // Carregar médico se houver
+      // Carregar médico se houver (uso de optional chaining para segurança)
       if (employeeToEdit.exameMedicoDoctor?.id) {
         doctorService.getById(employeeToEdit.exameMedicoDoctor.id)
           .then(doctor => {
-            setSelectedDoctor(doctor);
-            setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
+            if (doctor) {
+              setSelectedDoctor(doctor);
+              setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
+            }
           })
           .catch(err => console.error('Erro ao carregar médico:', err));
       }

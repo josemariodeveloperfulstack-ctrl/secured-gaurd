@@ -23,6 +23,7 @@ if (Get-Command psql -ErrorAction SilentlyContinue) {
 } else {
     # Procurar em locais comuns do PostgreSQL no Windows
     $commonPaths = @(
+        "C:\Program Files\PostgreSQL\17\bin\psql.exe",
         "C:\Program Files\PostgreSQL\16\bin\psql.exe",
         "C:\Program Files\PostgreSQL\15\bin\psql.exe",
         "C:\Program Files\PostgreSQL\14\bin\psql.exe",
@@ -152,6 +153,23 @@ ORDER BY u.username, r.name;
     
     $employeeCount = (Get-Content $employeesFile | Measure-Object -Line).Lines
     Write-Host "[OK] $employeeCount funcionarios gerados" -ForegroundColor Green
+    
+    # Exportar postos de trabalho
+    Write-Host "[*] Gerando INSERTs de postos de trabalho..." -ForegroundColor Yellow
+    $workPostsFile = Join-Path $TEMP_DIR "work_posts.sql"
+    $exportWpScript = Join-Path $SCRIPT_DIR "export_work_posts_from_test_db.sql"
+    
+    if (Test-Path $exportWpScript) {
+        & $psqlPath -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A -f $exportWpScript | 
+            Where-Object { $_ -match "INSERT INTO work_posts" } | 
+            Out-File -FilePath $workPostsFile -Encoding UTF8
+    } else {
+        Write-Host "[AVISO] Script de exportacao nao encontrado, pulando postos de trabalho" -ForegroundColor Yellow
+        "" | Out-File -FilePath $workPostsFile -Encoding UTF8
+    }
+    
+    $wpCount = (Get-Content $workPostsFile | Measure-Object -Line).Lines
+    Write-Host "[OK] $wpCount postos de trabalho gerados" -ForegroundColor Green
     Write-Host ""
     
     # Atualizar migration
@@ -174,6 +192,7 @@ ORDER BY u.username, r.name;
     $usersInserts = if (Test-Path $usersFile) { Get-Content $usersFile -Raw -Encoding UTF8 } else { "" }
     $userRolesInserts = if (Test-Path $userRolesFile) { Get-Content $userRolesFile -Raw -Encoding UTF8 } else { "" }
     $employeesInserts = if (Test-Path $employeesFile) { Get-Content $employeesFile -Raw -Encoding UTF8 } else { "" }
+    $workPostsInserts = if (Test-Path $workPostsFile) { Get-Content $workPostsFile -Raw -Encoding UTF8 } else { "" }
     
     # Atualizar seção 7.1.1 (usuários)
     $marker1 = "-- COLE OS INSERTs DE USUÁRIOS AQUI (se dblink não funcionar):"
@@ -194,6 +213,17 @@ ORDER BY u.username, r.name;
     if ($employeesInserts -and $content -match $marker3) {
         $content = $content -replace ([regex]::Escape($marker3), "$marker3`n`n$employeesInserts")
         Write-Host "[OK] Secao 8.1 atualizada (funcionarios)" -ForegroundColor Green
+    }
+    
+    # Atualizar seção 11 (postos de trabalho)
+    if ($workPostsInserts) {
+        $pattern = "(?s)INSERT INTO public\.work_posts[^;]*ON CONFLICT \(id\) DO NOTHING;"
+        if ($content -match $pattern) {
+            $content = $content -replace $pattern, $workPostsInserts
+            Write-Host "[OK] Secao 11 atualizada (postos de trabalho)" -ForegroundColor Green
+        } else {
+            Write-Host "[AVISO] Nao achou o bloco INSERT INTO public.work_posts" -ForegroundColor Yellow
+        }
     }
     
     # Salvar migration atualizada

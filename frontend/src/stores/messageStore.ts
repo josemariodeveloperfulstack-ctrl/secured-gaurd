@@ -410,7 +410,8 @@ export const useMessageStore = create<MessageState>()(
             }
         }),
         {
-            name: 'message-store'
+            name: 'message-store',
+            enabled: false // Desabilitado para evitar TypeError: Cannot read properties of undefined (reading 'payload') causado por extensões do navegador
         }
     )
 );

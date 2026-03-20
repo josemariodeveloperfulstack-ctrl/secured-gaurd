@@ -1,30 +1,25 @@
 # ========================================
 # Configuração Dinâmica do Traefik para CI
 # ========================================
-# Este arquivo deve ser colocado em /etc/traefik/dynamic/ no servidor
-# ou no diretório configurado para dynamic configuration do Traefik
+# Colocar em /var/www/secured_guard/traefik/dynamic/ no servidor
+# Traefik monta esse diretório em /etc/traefik/dynamic
+# Este é um fallback - a configuração principal vem das Docker labels no nginx-ci
 
 http:
   middlewares:
-    # Middleware para redirecionar HTTP para HTTPS
-    redirect-to-https:
-      redirectScheme:
-        scheme: https
-        permanent: true
-    
     # Middleware para permitir todos os métodos HTTP
-    allow-all-methods:
+    ci-allow-methods:
       headers:
         customRequestHeaders:
           Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
         customResponseHeaders:
           Access-Control-Allow-Methods: "GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
-    
-    # Middleware CORS permissivo para CI
+
+    # Middleware CORS para CI
     ci-cors:
       headers:
-        accessControlAllowOriginListRegex:
-          - ".*"
+        accessControlAllowOriginList:
+          - "https://ci.z7botsolutions.com.br"
         accessControlAllowMethods:
           - "GET"
           - "POST"
@@ -38,40 +33,36 @@ http:
         accessControlAllowCredentials: true
         accessControlMaxAge: 3600
         addVaryHeader: true
-    
-    # Middleware de timeout aumentado para uploads (5 minutos)
+
+    # Timeout para uploads (5 min)
     ci-timeout:
       buffering:
-        maxRequestBodyBytes: 52428800  # 50MB
+        maxRequestBodyBytes: 52428800   # 50MB
         maxResponseBodyBytes: 52428800  # 50MB
-        memRequestBodyBytes: 2097152  # 2MB
-        memResponseBodyBytes: 2097152  # 2MB
+        memRequestBodyBytes: 2097152
+        memResponseBodyBytes: 2097152
         retryExpression: "IsNetworkError() && Attempts() < 2"
 
   routers:
-    # Router HTTPS específico para o ambiente CI
-    # O redirecionamento HTTP → HTTPS é feito pelo entrypoint 'web' do Traefik
-    ci-backend:
+    # Router HTTPS para CI - fallback quando Docker provider não descobre
+    ci-https:
       rule: "Host(`ci.z7botsolutions.com.br`)"
       entryPoints:
         - websecure
-      service: ci-backend-service
+      service: ci-service
       middlewares:
         - ci-cors
-        - allow-all-methods
+        - ci-allow-methods
         - ci-timeout
       tls:
         certResolver: letsencryptresolver
-      priority: 1000
+      priority: 1500
 
   services:
-    ci-backend-service:
+    ci-service:
       loadBalancer:
         servers:
           - url: "http://secured-guard-nginx-ci:80"
         passHostHeader: true
-        # Timeouts aumentados para uploads grandes (5 minutos)
         responseForwarding:
           flushInterval: 100ms
-        # Health check removido - causava erro no Traefik 3.0
-        # O health check será feito pelo próprio Traefik via labels do docker-compose

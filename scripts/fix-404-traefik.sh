@@ -24,14 +24,21 @@ fi
 echo ""
 echo "2️⃣ Verificando configuração dinâmica..."
 if [ ! -f "/var/www/secured_guard/traefik/dynamic/ci.yml" ]; then
-  echo "❌ Arquivo de configuração dinâmica não encontrado!"
-  echo "   Criando diretório..."
-  mkdir -p /var/www/secured_guard/traefik/dynamic
+  echo "⚠️ Arquivo de configuração dinâmica não encontrado em /var/www/secured_guard/traefik/dynamic/ci.yml"
   
-  echo "   ⚠️ Arquivo ci.yml não existe. Você precisa transferir o arquivo traefik-dynamic-ci.yml"
-  echo "   💡 Execute no GitHub Actions ou copie manualmente:"
-  echo "      scp traefik-dynamic-ci.yml root@servidor:/var/www/secured_guard/traefik/dynamic/ci.yml"
-  exit 1
+  # Tentar recuperar de um backup se existir (enviado pelo deploy)
+  if [ -f "/var/www/secured_guard/traefik-dynamic-ci.yml" ]; then
+    echo "   📦 Encontrado backup em /var/www/secured_guard/traefik-dynamic-ci.yml. Restaurando..."
+    mkdir -p /var/www/secured_guard/traefik/dynamic
+    cp /var/www/secured_guard/traefik-dynamic-ci.yml /var/www/secured_guard/traefik/dynamic/ci.yml
+    echo "   ✅ Arquivo restaurado!"
+  else
+    echo "   ❌ Nenhum backup encontrado! Você precisa transferir o arquivo traefik-dynamic-ci.yml"
+    echo "   💡 Execute no GitHub Actions ou copie manualmente:"
+    echo "      scp traefik-dynamic-ci.yml root@servidor:/var/www/secured_guard/traefik/dynamic/ci.yml"
+    # Não sair com erro se for apenas aviso, mas aqui é crítico para o roteamento
+    # exit 1 
+  fi
 else
   echo "✅ Arquivo de configuração dinâmica encontrado"
 fi

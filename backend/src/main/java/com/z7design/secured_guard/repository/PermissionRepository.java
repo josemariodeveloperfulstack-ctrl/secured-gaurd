@@ -14,6 +14,9 @@ import java.util.UUID;
 public interface PermissionRepository extends JpaRepository<Permission, UUID> {
     
     Optional<Permission> findByName(String name);
+
+    /** Retorna todas as permissões com o nome dado (evita NonUniqueResultException quando há duplicados). */
+    List<Permission> findAllByName(String name);
     
     boolean existsByName(String name);
     

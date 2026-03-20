@@ -9,7 +9,7 @@ SELECT
     'INSERT INTO employees (' ||
     'id, user_id, position_id, registration_number, name, document, cpf, rg, ' ||
     'birth_date, gender, marital_status, nationality, address, phone, email, ' ||
-    'unit_id, company_id, hire_date, termination_date, status, notes, photo_url, ' ||
+    'unit_id, company_id, work_post_id, hire_date, termination_date, status, notes, photo_url, ' ||
     'cnh_number, cnh_expiration_date, cnh_category, ' ||
     'ctps, ctps_series, ctps_issue_date, ctps_issuing_agency, ctps_rural, ' ||
     'titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao, ' ||
@@ -45,6 +45,7 @@ SELECT
     COALESCE('''' || REPLACE(email, '''', '''''') || '''', 'NULL') || ', ' ||
     COALESCE('''' || unit_id || '''', 'NULL') || ', ' ||
     COALESCE('''' || company_id || '''', 'NULL') || ', ' ||
+    COALESCE('''' || work_post_id || '''', 'NULL') || ', ' ||
     COALESCE('''' || hire_date::text || '''', 'NULL') || ', ' ||
     COALESCE('''' || termination_date::text || '''', 'NULL') || ', ' ||
     COALESCE('''' || REPLACE(status, '''', '''''') || '''', '''ACTIVE''') || ', ' ||

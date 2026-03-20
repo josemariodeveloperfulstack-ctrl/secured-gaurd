@@ -2,6 +2,7 @@ package com.z7design.secured_guard.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Arrays;
@@ -342,7 +343,7 @@ public class EmployeeService {
 
             // Atualizar WorkPost se fornecido - criar remanejamento quando houver alteração
             WorkPost oldWorkPost = existingEmployee.getWorkPost();
-            if (dto.getWorkPostId() != null && !dto.getWorkPostId().trim().isEmpty()) {
+            if (dto.getWorkPostId() != null && !dto.getWorkPostId().trim().isEmpty() && !dto.getWorkPostId().equalsIgnoreCase("null")) {
                 try {
                     UUID workPostId = UUID.fromString(dto.getWorkPostId());
                     WorkPost newWorkPost = workPostRepository.findById(workPostId).orElse(null);
@@ -379,28 +380,34 @@ public class EmployeeService {
                             remanejamentoService.create(remanejamento, changedByUserId != null ? userRepository.findById(changedByUserId).orElse(null) : null, "Alteração de setor/posto via edição de funcionário");
                         }
                     }
-                    existingEmployee.setWorkPost(newWorkPost);
+                    if (newWorkPost != null) {
+                        existingEmployee.setWorkPost(newWorkPost);
+                    }
                 } catch (IllegalArgumentException e) {
                     if (e.getMessage() != null && e.getMessage().contains("Ao alterar o setor")) {
                         throw e; // Re-lançar validações de remanejamento para o cliente
                     }
                     System.err.println("[WARNING] WorkPostId inválido: " + dto.getWorkPostId());
                 }
-            } else {
+            } else if (dto.getWorkPostId() != null && (dto.getWorkPostId().trim().isEmpty() || dto.getWorkPostId().equalsIgnoreCase("null"))) {
+                // Se explicitamente enviado como vazio ou "null", limpar o posto
                 existingEmployee.setWorkPost(null);
             }
+            // Se dto.getWorkPostId() for null, preservamos o valor atual (comportamento de patch)
 
             // Atualizar Department se fornecido
-            if (dto.getDepartmentId() != null && !dto.getDepartmentId().trim().isEmpty()) {
+            if (dto.getDepartmentId() != null && !dto.getDepartmentId().trim().isEmpty() && !dto.getDepartmentId().equalsIgnoreCase("null")) {
                 try {
                     UUID departmentId = UUID.fromString(dto.getDepartmentId());
                     existingEmployee.setDepartment(departmentRepository.findById(departmentId).orElse(null));
                 } catch (IllegalArgumentException e) {
                     System.err.println("[WARNING] DepartmentId inválido: " + dto.getDepartmentId());
                 }
-            } else {
+            } else if (dto.getDepartmentId() != null && (dto.getDepartmentId().trim().isEmpty() || dto.getDepartmentId().equalsIgnoreCase("null"))) {
+                // Se explicitamente enviado como vazio ou "null", limpar o departamento
                 existingEmployee.setDepartment(null);
             }
+            // Se dto.getDepartmentId() for null, preservamos o valor atual (comportamento de patch)
 
             // Atualizar dados do exame médico (ASO)
             if (dto.getExameMedicoData() != null) {
@@ -647,7 +654,7 @@ public class EmployeeService {
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void bulkUpdateStatus(List<UUID> ids, String statusStr) {
         EmploymentStatus status = EmploymentStatus.valueOf(statusStr.toUpperCase());
-        List<Employee> employees = employeeRepository.findAllById(ids);
+        List<Employee> employees = new ArrayList<>(employeeRepository.findAllByIdIn(ids));
         for (Employee employee : employees) {
             employee.setStatus(status);
             employee.setUpdatedAt(LocalDateTime.now());
@@ -658,7 +665,7 @@ public class EmployeeService {
     @Transactional
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void bulkTerminate(List<UUID> ids, java.time.LocalDate terminationDate) {
-        List<Employee> employees = employeeRepository.findAllById(ids);
+        List<Employee> employees = new ArrayList<>(employeeRepository.findAllByIdIn(ids));
         for (Employee employee : employees) {
             employee.setStatus(EmploymentStatus.TERMINATED);
             employee.setTerminationDate(terminationDate);
@@ -673,7 +680,7 @@ public class EmployeeService {
     @Transactional
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
     public void bulkDelete(List<UUID> ids) {
-        List<Employee> employees = employeeRepository.findAllById(ids);
+        List<Employee> employees = new ArrayList<>(employeeRepository.findAllByIdIn(ids));
         for (Employee employee : employees) {
             if (employee.getStatus() != EmploymentStatus.TERMINATED) {
                 throw new RuntimeException(
@@ -855,7 +862,13 @@ public class EmployeeService {
     }
 
     public List<Employee> findAllByIds(List<UUID> ids) {
-        return employeeRepository.findAllById(ids);
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<UUID> distinctIds = ids.stream().distinct().toList();
+        // Usando Set no repositório para evitar erro de duplicidade no Hibernate 6
+        java.util.Set<Employee> employees = employeeRepository.findAllByIdIn(distinctIds);
+        return new java.util.ArrayList<>(employees);
     }
 
     public List<Employee> findByNameContaining(String name) {
@@ -967,22 +980,16 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public List<Employee> findAll() {
         try {
-            System.out.println("🔍 EmployeeService.findAll - Iniciando busca no banco...");
+            System.out.println("🔍 EmployeeService.findAll - Iniciando busca deduplicada...");
 
-            // Primeiro, vamos tentar buscar apenas os IDs
             try {
-                List<Employee> employees = employeeRepository.findAll();
+                // Utiliza Set/DISTINCT para evitar "Duplicate row was found" no Hibernate 6
+                // especialmente em ambientes como CI com dados inconsistentes
+                java.util.Set<Employee> employeeSet = employeeRepository.findAllDistinct();
+                List<Employee> employees = new ArrayList<>(employeeSet);
+                
                 System.out.println(
-                        "✅ EmployeeService.findAll - Encontrados " + employees.size() + " funcionários no banco");
-
-                // Log dos primeiros funcionários para debug
-                if (!employees.isEmpty()) {
-                    for (int i = 0; i < Math.min(3, employees.size()); i++) {
-                        Employee emp = employees.get(i);
-                        System.out.println(
-                                "📋 Funcionário " + (i + 1) + ": " + emp.getName() + " (ID: " + emp.getId() + ")");
-                    }
-                }
+                        "✅ EmployeeService.findAll - Encontrados " + employees.size() + " funcionários únicos");
 
                 return employees;
             } catch (Exception repoError) {
@@ -1702,19 +1709,27 @@ public class EmployeeService {
             } catch (Exception wpEx) {
                 System.err.println("[WARNING] Erro ao mapear workPost: " + wpEx.getMessage());
             }
-            if (e.getDepartment() != null) {
-                dto.setDepartmentId(e.getDepartment().getId().toString());
-                EmployeeDTO.IdOnlyDTO deptDTO = new EmployeeDTO.IdOnlyDTO();
-                deptDTO.setId(e.getDepartment().getId());
-                deptDTO.setName(e.getDepartment().getName());
-                dto.setDepartment(deptDTO);
+            try {
+                if (e.getDepartment() != null) {
+                    dto.setDepartmentId(e.getDepartment().getId().toString());
+                    EmployeeDTO.IdOnlyDTO deptDTO = new EmployeeDTO.IdOnlyDTO();
+                    deptDTO.setId(e.getDepartment().getId());
+                    deptDTO.setName(e.getDepartment().getName());
+                    dto.setDepartment(deptDTO);
+                }
+            } catch (Exception deptEx) {
+                System.err.println("[WARNING] Erro ao mapear department: " + deptEx.getMessage());
             }
 
-            if (e.getExameMedicoDoctor() != null) {
-                EmployeeDTO.IdOnlyDTO doctorDTO = new EmployeeDTO.IdOnlyDTO();
-                doctorDTO.setId(e.getExameMedicoDoctor().getId());
-                doctorDTO.setName(e.getExameMedicoDoctor().getName());
-                dto.setExameMedicoDoctor(doctorDTO);
+            try {
+                if (e.getExameMedicoDoctor() != null) {
+                    EmployeeDTO.IdOnlyDTO doctorDTO = new EmployeeDTO.IdOnlyDTO();
+                    doctorDTO.setId(e.getExameMedicoDoctor().getId());
+                    doctorDTO.setName(e.getExameMedicoDoctor().getName());
+                    dto.setExameMedicoDoctor(doctorDTO);
+                }
+            } catch (Exception docEx) {
+                System.err.println("[WARNING] Erro ao mapear exameMedicoDoctor: " + docEx.getMessage());
             }
 
             // Mapear dados bancários

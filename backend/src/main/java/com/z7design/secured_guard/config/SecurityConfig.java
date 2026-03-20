@@ -481,6 +481,14 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
                                                                 "ROLE_SUPERVISOR")
+                                                // Endpoints de departamentos - requerem permissões de RH ou admin
+                                                .requestMatchers("/api/departments/**")
+                                                .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_DEPARTAMENTO_PESSOAL",
+                                                                "EMPLOYEES_READ", "EMPLOYEES_WRITE",
+                                                                "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                                "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR")
                                                 // Endpoints de funcionários, unidades, empresas e cargos - requerem
                                                 // permissões de RH, admin ou financeiro (empresas usadas em Contas a Pagar)
                                                 .requestMatchers("/api/employees/**", "/api/units/**",
@@ -619,9 +627,20 @@ public class SecurityConfig {
                                                 // (dados por funcionário/CPF no serviço)
                                                 .requestMatchers("/api/time-sheets/**").authenticated()
                                                 // Todo o resto requer autenticação
-                                                .anyRequest().authenticated())
-                                .authenticationProvider(authenticationProvider())
-                                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                                .anyRequest().authenticated())
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                                response.setContentType("application/json");
+                                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                                response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"" + authException.getMessage() + "\"}");
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                                response.setContentType("application/json");
+                                response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                                response.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"Access denied\"}");
+                        }))
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
                 return http.build();
         }

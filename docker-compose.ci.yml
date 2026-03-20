@@ -58,7 +58,7 @@ services:
   # BACKEND API CI
   # ========================================
   backend-ci:
-    image: z7design/secured-guard-backend:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-backend:ci
     container_name: secured-guard-backend-ci
     env_file:
       - .env
@@ -127,7 +127,7 @@ services:
   # WHATSAPP SERVICE (Baileys)
   # ========================================
   whatsapp-service-ci:
-    image: z7design/secured-guard-whatsapp:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci
     container_name: secured-guard-whatsapp-ci
     environment:
       PORT: 3333
@@ -181,7 +181,7 @@ services:
       - secured-guard-ci-network
       - z7network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health || exit 1"]
+      test: [ "CMD", "curl", "-f", "http://localhost/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -189,26 +189,17 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      # Router HTTPS - usando labels diretas
       - "traefik.http.routers.nginx-ci-https.rule=Host(`ci.z7botsolutions.com.br`)"
       - "traefik.http.routers.nginx-ci-https.entrypoints=websecure"
+      - "traefik.http.routers.nginx-ci-https.tls=true"
       - "traefik.http.routers.nginx-ci-https.tls.certresolver=letsencryptresolver"
       - "traefik.http.routers.nginx-ci-https.service=nginx-ci-service"
       - "traefik.http.routers.nginx-ci-https.priority=2000"
-      # Router HTTP (redireciona para HTTPS)
       - "traefik.http.routers.nginx-ci-http.rule=Host(`ci.z7botsolutions.com.br`)"
       - "traefik.http.routers.nginx-ci-http.entrypoints=web"
       - "traefik.http.routers.nginx-ci-http.middlewares=redirect-https@docker"
       - "traefik.http.routers.nginx-ci-http.priority=2000"
-      # Serviço
       - "traefik.http.services.nginx-ci-service.loadbalancer.server.port=80"
-      # Middlewares CORS
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS,HEAD"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolalloworiginlist=*"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowheaders=*"
-      - "traefik.http.middlewares.nginx-ci-cors.headers.accesscontrolallowcredentials=true"
-      - "traefik.http.routers.nginx-ci-https.middlewares=nginx-ci-cors@docker"
-      # Forçar detecção na rede correta
       - "traefik.docker.network=z7network"
 
   # ========================================
@@ -223,7 +214,7 @@ services:
     #     VITE_API_URL: https://ci.z7botsolutions.com.br/api
     #     VITE_WS_URL: wss://ci.z7botsolutions.com.br/ws
     #     VITE_ENVIRONMENT: ci
-    image: z7design/secured-guard-frontend:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
     ports:
       - "3000:80"

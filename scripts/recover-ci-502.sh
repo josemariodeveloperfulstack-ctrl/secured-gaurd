@@ -49,9 +49,10 @@ docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -t 
 
 # 5. Remover migrações falhas e reiniciar
 echo ""
-echo "📋 5. Removendo registros de migrações falhas (V424-V452)..."
+echo "📋 5. Removendo registros de migrações falhas (V424, V452, V457, etc.)..."
 docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "
   DELETE FROM flyway_schema_history WHERE success = false;
+  DELETE FROM flyway_schema_history WHERE version = '457';
   UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';
   UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';
   SELECT version, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;
