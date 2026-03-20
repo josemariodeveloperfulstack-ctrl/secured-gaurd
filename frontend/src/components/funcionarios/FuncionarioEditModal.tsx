@@ -809,8 +809,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         positionService.getPositions().catch(err => { console.warn('⚠️ Erro ao carregar cargos:', err); return []; }),
         unitService.getAllUnits().catch(err => { console.warn('⚠️ Erro ao carregar unidades:', err); return []; }),
         userService.getAllUsers().catch(err => { console.warn('⚠️ Erro ao carregar usuários:', err); return []; }),
-        companyService.getAllCompanies().catch(err => { 
-          console.error('❌ CRITICAL: Erro ao carregar empresas:', err); 
+        companyService.getAllCompanies().then(data => {
+          console.log('✅ DIAGNÓSTICO /api/companies RETORNOU:', data);
+          return data;
+        }).catch(err => { 
+          console.error('❌ CRITICAL: Erro ao carregar empresas:', err.response || err); 
           return []; 
         }),
         workPostService.getAllWorkPosts().catch(err => { console.warn('⚠️ Erro ao carregar postos de trabalho:', err); return []; }),
@@ -886,15 +889,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         
         // Preencher empresa selecionada - comparar IDs como strings
         if (funcionario.company?.id) {
-          const companyId = String(funcionario.company.id);
-          const company = companiesData.find(c => String(c.id) === companyId);
+          const companyId = String(funcionario.company.id).toLowerCase();
+          const company = companiesData.find(c => String(c.id).toLowerCase() === companyId);
           if (company) {
             setSelectedCompany(company);
             console.log('✅ Empresa encontrada e selecionada:', company.name, company.id);
           } else {
-            console.warn('⚠️ Empresa não encontrada na lista');
-            console.warn('   Procurando por:', companyId);
-            console.warn('   IDs disponíveis:', companiesData.map(c => String(c.id)));
+            console.warn('⚠️ Empresa não encontrada na lista detalhada');
+            console.warn('   Procurando por (toLowerCase):', companyId);
+            console.warn('   IDs disponíveis:', companiesData.map(c => String(c.id).toLowerCase()));
           }
         } else {
           console.log('ℹ️ Funcionário não tem empresa associada');
