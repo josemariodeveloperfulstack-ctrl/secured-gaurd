@@ -245,29 +245,44 @@ public class EmployeeController {
                 employee.put("status", row[7]); // status está na posição 7
                 employee.put("createdAt", row[17]); // created_at está na posição 17
 
-                // Adicionar position e unit
-                if (row.length > 19 && row[19] != null) {
+                // Adicionar position, unit, company, workPost e department
+                if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                     java.util.Map<String, Object> position = new java.util.HashMap<>();
-                    position.put("name", row[19]); // position_name
+                    if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19));
+                    if (safeAt(row, 28) != null) position.put("id", safeAt(row, 28));
                     employee.put("position", position);
                 }
 
-                if (row.length > 20 && row[20] != null) {
+                if (safeAt(row, 20) != null || safeAt(row, 25) != null) {
                     java.util.Map<String, Object> unit = new java.util.HashMap<>();
-                    unit.put("name", row[20]); // unit_name
+                    if (safeAt(row, 20) != null) unit.put("name", safeAt(row, 20));
+                    if (safeAt(row, 25) != null) unit.put("id", safeAt(row, 25));
                     employee.put("unit", unit);
                 }
 
-                // Adicionar company (sigla) se existir (index 21)
-                if (row.length > 21 && row[21] != null) {
+                if (safeAt(row, 21) != null || safeAt(row, 26) != null) {
                     java.util.Map<String, Object> company = new java.util.HashMap<>();
-                    company.put("sigla", row[21]); // company_sigla
+                    if (safeAt(row, 21) != null) company.put("sigla", safeAt(row, 21));
+                    if (safeAt(row, 26) != null) company.put("id", safeAt(row, 26));
                     employee.put("company", company);
                 }
 
-                // Adicionar userId se existir (index 22)
-                if (row.length > 22 && row[22] != null) {
-                    employee.put("userId", row[22]);
+                if (safeAt(row, 22) != null) {
+                    employee.put("userId", safeAt(row, 22));
+                }
+
+                if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
+                    java.util.Map<String, Object> workPost = new java.util.HashMap<>();
+                    if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23));
+                    if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27));
+                    employee.put("workPost", workPost);
+                }
+
+                if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
+                    java.util.Map<String, Object> department = new java.util.HashMap<>();
+                    if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24));
+                    if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29));
+                    employee.put("department", department);
                 }
 
                 employees.add(employee);
@@ -338,9 +353,10 @@ public class EmployeeController {
                     employee.put("updatedAt", row[18]);
 
                     // Adicionar position e unit (novas colunas da query)
-                    if (safeAt(row, 19) != null) {
+                    if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                         java.util.Map<String, Object> position = new java.util.HashMap<>();
-                        position.put("name", safeAt(row, 19)); // position_name
+                        if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19)); // position_name
+                        if (safeAt(row, 28) != null) position.put("id", safeAt(row, 28)); // position_id
                         employee.put("position", position);
                     }
 
@@ -364,18 +380,19 @@ public class EmployeeController {
                         employee.put("userId", safeAt(row, 22));
                     }
 
-                    // Adicionar workPost apenas se tiver nome (evita "Posto Inválido" no front)
-                    if (safeAt(row, 23) != null) {
+                    // Adicionar workPost apenas se tiver nome ou ID
+                    if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
                         java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                        workPost.put("name", safeAt(row, 23)); // work_post_name
+                        if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23)); // work_post_name
                         if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27)); // work_post_id
                         employee.put("workPost", workPost);
                     }
 
-                    // Adicionar department se existir (index 24)
-                    if (safeAt(row, 24) != null) {
+                    // Adicionar department se existir (index 24 ou 29)
+                    if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
                         java.util.Map<String, Object> department = new java.util.HashMap<>();
-                        department.put("name", safeAt(row, 24)); // department_name
+                        if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24)); // department_name
+                        if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29)); // department_id
                         employee.put("department", department);
                     }
 
@@ -457,9 +474,10 @@ public class EmployeeController {
                 employee.put("createdAt", safeAt(row, 17));
                 employee.put("updatedAt", safeAt(row, 18));
 
-                if (safeAt(row, 19) != null) {
+                if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                     java.util.Map<String, Object> position = new java.util.HashMap<>();
-                    position.put("name", safeAt(row, 19));
+                    if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19));
+                    if (safeAt(row, 28) != null) position.put("id", safeAt(row, 28));
                     employee.put("position", position);
                 }
                 if (safeAt(row, 20) != null || safeAt(row, 25) != null) {
@@ -475,15 +493,16 @@ public class EmployeeController {
                     employee.put("company", company);
                 }
                 if (safeAt(row, 22) != null) employee.put("userId", safeAt(row, 22));
-                if (safeAt(row, 23) != null) {
+                if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
                     java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                    workPost.put("name", safeAt(row, 23));
+                    if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23));
                     if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27));
                     employee.put("workPost", workPost);
                 }
-                if (safeAt(row, 24) != null) {
+                if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
                     java.util.Map<String, Object> department = new java.util.HashMap<>();
-                    department.put("name", safeAt(row, 24));
+                    if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24));
+                    if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29));
                     employee.put("department", department);
                 }
                 employees.add(employee);
