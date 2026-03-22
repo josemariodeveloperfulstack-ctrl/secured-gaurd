@@ -19,6 +19,7 @@ import com.z7design.secured_guard.model.enums.ReportOrderBy;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.RemanejamentoRepository;
+import com.z7design.secured_guard.util.ReportIssuanceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -120,6 +121,9 @@ public class EmployeeReportPdfService {
                     .reportTitle("RELATÓRIO DE FUNCIONÁRIOS")
                     .landscape(true)
                     .showPageNumbers(true)
+                    .bottomMargin(95f)
+                    .footerUserSummary(ReportIssuanceContext.resolveUserLabelForReportFooter())
+                    .footerReportAt(ReportIssuanceContext.resolveReportTimestampFooter())
                     .build();
 
             StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);

@@ -25,6 +25,7 @@ import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Company.CompanyStatus;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.util.ReportIssuanceContext;
 import com.z7design.secured_guard.service.StandardReportLayoutService;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
@@ -85,9 +86,11 @@ public class ReportService {
                     .companyId(companyId)
                     .reportTitle("RELATÓRIO DE FUNCIONÁRIOS")
                     .topMargin(130f)
-                    .bottomMargin(80f)
+                    .bottomMargin(95f)
                     .leftMargin(20f)
                     .rightMargin(20f)
+                    .footerUserSummary(ReportIssuanceContext.resolveUserLabelForReportFooter())
+                    .footerReportAt(ReportIssuanceContext.resolveReportTimestampFooter())
                     .build();
 
             StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService

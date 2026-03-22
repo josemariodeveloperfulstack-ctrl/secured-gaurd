@@ -114,4 +114,16 @@ public class ReportLayoutConfig {
      */
     @Builder.Default
     private boolean showPageNumbers = true;
+
+    /**
+     * Texto do usuário que gerou o relatório (nome e login), exibido à direita acima da numeração.
+     * Opcional; se null ou vazio, a linha não é desenhada.
+     */
+    private String footerUserSummary;
+
+    /**
+     * Data/hora da geração já formatada (ex.: dd/MM/yyyy HH:mm), à direita entre usuário e numeração.
+     * Opcional; se null ou vazio, a linha não é desenhada.
+     */
+    private String footerReportAt;
 }

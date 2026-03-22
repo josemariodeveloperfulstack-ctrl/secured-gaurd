@@ -61,6 +61,29 @@ public class OperationalOccurrence {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "substitute_id")
+    private Employee substitute;
+    
+    @Column(name = "original_start_time")
+    private String originalStartTime;
+    
+    @Column(name = "original_end_time")
+    private String originalEndTime;
+    
+    @Column(name = "substitute_start_time")
+    private String substituteStartTime;
+    
+    @Column(name = "substitute_end_time")
+    private String substituteEndTime;
+    
+    @Column(name = "total_hours")
+    private Double totalHours;
+    
+    @Column(name = "category")
+    private String category; // e.g., "OPERATIONAL_MAP", "INCIDENT"
+
+    
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -73,8 +96,10 @@ public class OperationalOccurrence {
     }
     
     public enum OccurrenceType {
-        SEGURANCA, DISCIPLINAR, EQUIPAMENTO, INCIDENTE, MANUTENCAO
+        SEGURANCA, DISCIPLINAR, EQUIPAMENTO, INCIDENTE, MANUTENCAO,
+        FALTA, TROCA, HE, FREE_LANCE, PEDIDO_DEMISSAO, FALTA_EFETIVO, SOLICITACAO_CLIENTE, OUTROS
     }
+
     
     public enum OccurrenceStatus {
         PENDENTE, EM_ANDAMENTO, RESOLVIDO, CONCLUIDO

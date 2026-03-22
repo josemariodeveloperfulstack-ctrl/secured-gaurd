@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2 } from 'lucide-react';
+import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2, ChevronsUpDown, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { employeeService, Employee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
@@ -51,6 +54,14 @@ interface FichaEntregaEPIFormProps {
   companyId?: string;
 }
 
+const MIN_EMPLOYEE_SEARCH_CHARS = 3;
+
+function resolveCompanyIdFromEmployee(emp: Employee | undefined): string {
+  if (!emp) return '';
+  const raw = (emp as { companyId?: string }).companyId ?? emp.company?.id;
+  return raw != null && String(raw).trim() !== '' ? String(raw) : '';
+}
+
 const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -69,6 +80,25 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       empresaId: companyId || prev.empresaId
     }));
   }, [employeeId, companyId]);
+
+  // Preenche empresa pelo cadastro do funcionário (prop sem companyId ou lista que carrega depois).
+  // Se o funcionário mudou, sempre atualiza a empresa; se só a lista carregou, só preenche se empresa ainda estiver vazia.
+  useEffect(() => {
+    if (!form.funcionarioId || employees.length === 0) return;
+    if (companyId) return;
+    const emp = employees.find((e) => e.id === form.funcionarioId);
+    const cid = resolveCompanyIdFromEmployee(emp);
+    if (!cid) return;
+
+    const funcionarioMudou = prevFuncionarioIdForCompanySync.current !== form.funcionarioId;
+    prevFuncionarioIdForCompanySync.current = form.funcionarioId;
+
+    setForm((prev) => {
+      if (funcionarioMudou) return { ...prev, empresaId: cid };
+      if (!prev.empresaId) return { ...prev, empresaId: cid };
+      return prev;
+    });
+  }, [form.funcionarioId, employees, companyId]);
 
   const [epis, setEpis] = useState([
     {
@@ -93,8 +123,41 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
   const [loadingData, setLoadingData] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  const prevFuncionarioIdForCompanySync = useRef<string | undefined>(undefined);
 
   const funcionario = employees.find(f => f.id === form.funcionarioId);
+
+  const filteredEmployeesForPicker = useMemo(() => {
+    const q = employeeSearchQuery.trim().toLowerCase();
+    if (q.length < MIN_EMPLOYEE_SEARCH_CHARS) return [];
+    const qDigits = q.replace(/\D/g, '');
+    return employees.filter((f) => {
+      const name = (f.name || '').toLowerCase();
+      const mat = (f.registrationNumber || '').toLowerCase();
+      const cpfDigits = (f.cpf || (f as { document?: string }).document || '').replace(/\D/g, '');
+      if (name.includes(q) || mat.includes(q)) return true;
+      if (qDigits.length >= MIN_EMPLOYEE_SEARCH_CHARS && cpfDigits.includes(qDigits)) return true;
+      return false;
+    });
+  }, [employees, employeeSearchQuery]);
+
+  const handleSelectEmployee = (id: string) => {
+    const emp = employees.find((e) => e.id === id);
+    const cid = resolveCompanyIdFromEmployee(emp);
+    prevFuncionarioIdForCompanySync.current = id;
+    setForm((prev) => ({ ...prev, funcionarioId: id, empresaId: cid }));
+    setEmployeePickerOpen(false);
+    setEmployeeSearchQuery('');
+    if (emp && !cid) {
+      toast({
+        title: 'Atenção',
+        description: 'Este funcionário não possui empresa vinculada no cadastro. Selecione a empresa manualmente.',
+        variant: 'default',
+      });
+    }
+  };
   const empresa = companies.find(e => e.id === form.empresaId);
   const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
 
@@ -565,38 +628,76 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                 <Label className="text-base font-semibold">
                   Funcionário
                   <span className="block text-[11px] font-normal text-muted-foreground/80">
-                    Selecione o colaborador que receberá os EPIs.
+                    Selecione o colaborador que receberá os EPIs. Digite pelo menos 3 caracteres do nome, matrícula ou CPF para buscar.
                   </span>
                 </Label>
-                <Select
-                  value={form.funcionarioId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                  disabled={loadingData}
+                <Popover
+                  open={employeePickerOpen}
+                  onOpenChange={(open) => {
+                    setEmployeePickerOpen(open);
+                    if (!open) setEmployeeSearchQuery('');
+                  }}
                 >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{f.name}</span>
-                            {(f.cpf || (f as any).document) && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={employeePickerOpen}
+                      disabled={loadingData}
+                      className="h-11 w-full justify-between rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 font-normal"
+                    >
+                      <span className={cn('truncate text-left', !funcionario && 'text-muted-foreground')}>
+                        {loadingData ? 'Carregando...' : funcionario ? funcionario.name : 'Selecione o funcionário'}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 border bg-popover" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder={`Mín. ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres (nome, matrícula ou CPF)...`}
+                        value={employeeSearchQuery}
+                        onValueChange={setEmployeeSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {employeeSearchQuery.trim().length < MIN_EMPLOYEE_SEARCH_CHARS
+                            ? `Digite pelo menos ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres para exibir os registros.`
+                            : 'Nenhum funcionário encontrado.'}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {filteredEmployeesForPicker.map((f) => (
+                            <CommandItem
+                              key={f.id}
+                              value={f.id}
+                              onSelect={() => handleSelectEmployee(f.id)}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4 shrink-0',
+                                  form.funcionarioId === f.id ? 'opacity-100' : 'opacity-0'
+                                )}
+                              />
+                              <div className="flex flex-col gap-0.5 text-left min-w-0">
+                                <span className="font-medium text-sm normal-case truncate">{f.name}</span>
+                                {(f.registrationNumber || f.cpf || (f as { document?: string }).document) && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {f.registrationNumber ? `Matr.: ${f.registrationNumber}` : ''}
+                                    {f.registrationNumber && (f.cpf || (f as { document?: string }).document) ? ' · ' : ''}
+                                    {(f.cpf || (f as { document?: string }).document) &&
+                                      `CPF: ${formatCPF(f.cpf || (f as { document?: string }).document || '')}`}
+                                  </span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 {funcionario && (
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
                     <User className="h-3.5 w-3.5 text-primary" />

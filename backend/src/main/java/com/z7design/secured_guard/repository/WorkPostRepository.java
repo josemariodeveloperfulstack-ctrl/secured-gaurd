@@ -30,9 +30,9 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     List<WorkPost> findByType(WorkPostType type);
     Page<WorkPost> findByType(WorkPostType type, Pageable pageable);
     
-    // Buscar por cliente
-    List<WorkPost> findByClientId(UUID clientId);
-    Page<WorkPost> findByClientId(UUID clientId, Pageable pageable);
+    // Buscar por cliente (Client_Id = associação client.id; não usar findByClientId — conflita com getClientId() na entidade)
+    List<WorkPost> findByClient_Id(UUID clientId);
+    Page<WorkPost> findByClient_Id(UUID clientId, Pageable pageable);
     
     // Buscar por contrato
     List<WorkPost> findByContractId(UUID contractId);
@@ -42,8 +42,8 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     long countByContractId(UUID contractId);
     
     // Buscar por cliente e status
-    List<WorkPost> findByClientIdAndStatus(UUID clientId, WorkPostStatus status);
-    Page<WorkPost> findByClientIdAndStatus(UUID clientId, WorkPostStatus status, Pageable pageable);
+    List<WorkPost> findByClient_IdAndStatus(UUID clientId, WorkPostStatus status);
+    Page<WorkPost> findByClient_IdAndStatus(UUID clientId, WorkPostStatus status, Pageable pageable);
     
     // Buscar por responsável
     List<WorkPost> findByResponsibleId(UUID responsibleId);
@@ -90,7 +90,7 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     long countByStatus(WorkPostStatus status);
     
     // Contar postos por cliente
-    long countByClientId(UUID clientId);
+    long countByClient_Id(UUID clientId);
     
     // Contar postos por tipo
     long countByType(WorkPostType type);

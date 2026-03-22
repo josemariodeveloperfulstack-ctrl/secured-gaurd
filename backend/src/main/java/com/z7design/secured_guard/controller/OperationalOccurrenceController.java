@@ -436,4 +436,28 @@ public class OperationalOccurrenceController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    /**
+     * Gerar Mapa de Ocorrências Excel
+     */
+    @GetMapping(value = "/report/map/excel", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    @Operation(summary = "Gerar Mapa de Ocorrências Excel", description = "Gera o mapa de ocorrências operacionais no formato Excel para o período informado")
+    public ResponseEntity<byte[]> generateMapExcelReport(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        log.info("GET /api/operational/occurrences/report/map/excel - Gerando mapa de {} a {}", startDate, endDate);
+        
+        try {
+            byte[] excelBytes = occurrenceService.generateOperationalMapExcel(startDate, endDate);
+            String fileName = "mapa-ocorrencias-" + startDate + "-a-" + endDate + ".xlsx";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .body(excelBytes);
+        } catch (Exception e) {
+            log.error("Erro ao gerar mapa de ocorrências Excel: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
+

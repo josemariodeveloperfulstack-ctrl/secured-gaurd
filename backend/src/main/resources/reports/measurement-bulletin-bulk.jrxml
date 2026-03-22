@@ -15,6 +15,8 @@
     <parameter name="COMPANY_EMAIL_RIGHT" class="java.lang.String"/>
     <parameter name="COMPANY_WEBSITE" class="java.lang.String"/>
     <parameter name="GENERATED_DATE" class="java.lang.String"/>
+    <parameter name="REPORT_USER" class="java.lang.String"/>
+    <parameter name="REPORT_TIMESTAMP" class="java.lang.String"/>
     
     <!-- Campos do datasource -->
     <field name="id" class="java.util.UUID"/>
@@ -327,6 +329,23 @@
                     </textElement>
                     <text><![CDATA[✉️ comercial@promovervigilancia.com.br]]></text>
                 </staticText>
+                
+                <!-- Metadata do rodapé -->
+                <textField>
+                    <reportElement x="0" y="55" width="555" height="15" uuid="footer-metadata"/>
+                    <textElement textAlignment="Center" verticalAlignment="Middle">
+                        <font fontName="Arial" size="8" isBold="true"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA["Gerado por: " + $P{REPORT_USER} + " em: " + $P{REPORT_TIMESTAMP}]]></textFieldExpression>
+                </textField>
+                
+                <textField>
+                    <reportElement x="0" y="70" width="555" height="10" uuid="footer-page-number"/>
+                    <textElement textAlignment="Center" verticalAlignment="Middle">
+                        <font fontName="Arial" size="7"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA["Página " + $V{PAGE_NUMBER} + " de " + $V{PAGE_COUNT}]]></textFieldExpression>
+                </textField>
             </frame>
         </band>
     </pageFooter>

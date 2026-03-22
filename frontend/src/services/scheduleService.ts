@@ -20,6 +20,8 @@ export interface ScheduleWorkPost {
   name: string;
   postCode: string;
   clientId?: string;
+  /** Preenchido pelo backend (JSON) para edição de escala sem objeto client aninhado */
+  clientName?: string;
   shiftStart?: string;
   shiftEnd?: string;
 }
@@ -40,6 +42,13 @@ export interface Schedule {
   workPost?: ScheduleWorkPost;
   status: ScheduleStatus;
   observations?: string;
+  sigla?: string;
+  remanejamentoId?: string;
+  isMonitoria?: boolean;
+  isHoraExtra?: boolean;
+  coverageScheduleId?: string;
+  startTime?: string;
+  endTime?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +62,13 @@ export interface CreateScheduleDTO {
   shift: Shift;
   status: ScheduleStatus;
   observations?: string;
+  sigla?: string;
+  remanejamentoId?: string;
+  isMonitoria?: boolean;
+  isHoraExtra?: boolean;
+  coverageScheduleId?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 // DTO para atualizar uma escala (todos os campos são opcionais)
@@ -250,4 +266,24 @@ export const scheduleService = {
       throw new Error('Falha ao gerar relatório PDF');
     }
   },
-}; 
+
+  /**
+   * Exporta a escala para folha de pagamento (Excel)
+   */
+  async exportPayroll(startDate: string, endDate: string, companyId: string): Promise<Blob> {
+    try {
+      const params = new URLSearchParams();
+      params.append('startDate', startDate);
+      params.append('endDate', endDate);
+      params.append('companyId', companyId);
+
+      const response = await api.get(`/api/operational/schedules/export/payroll?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar escala para payroll:', error);
+      throw new Error('Falha ao exportar escala para folha de pagamento');
+    }
+  },
+};

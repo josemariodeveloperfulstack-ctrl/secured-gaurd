@@ -39,6 +39,23 @@ public class WorkScheduleDTO {
     @Size(max = 1000, message = "Observações não podem ter mais de 1000 caracteres")
     private String observations;
     
+    @Size(max = 5, message = "Sigla não pode ter mais de 5 caracteres")
+    private String sigla;
+    
+    private UUID remanejamentoId;
+    
+    private Boolean isMonitoria;
+    
+    private Boolean isHoraExtra;
+    
+    private UUID coverageScheduleId;
+    
+    @Pattern(regexp = "^([01]?[0-9]|2[0-3]):[0-5][0-9]$", message = "Horário de início deve estar no formato HH:mm")
+    private String startTime;
+    
+    @Pattern(regexp = "^([01]?[0-9]|2[0-3]):[0-5][0-9]$", message = "Horário de término deve estar no formato HH:mm")
+    private String endTime;
+    
     // Campos de resposta (não validados na entrada)
     private String employeeName;
     private String locationName;

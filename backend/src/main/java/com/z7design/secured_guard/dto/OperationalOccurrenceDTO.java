@@ -19,8 +19,9 @@ public class OperationalOccurrenceDTO {
     private UUID id;
     
     @NotNull(message = "Tipo da ocorrência é obrigatório")
-    @Pattern(regexp = "^(SEGURANCA|DISCIPLINAR|EQUIPAMENTO|INCIDENTE|MANUTENCAO)$", 
-             message = "Tipo deve ser SEGURANCA, DISCIPLINAR, EQUIPAMENTO, INCIDENTE ou MANUTENCAO")
+    @Pattern(regexp = "^(SEGURANCA|DISCIPLINAR|EQUIPAMENTO|INCIDENTE|MANUTENCAO|FALTA|TROCA|HE|FREE_LANCE|PEDIDO_DEMISSAO|FALTA_EFETIVO|SOLICITACAO_CLIENTE|OUTROS)$", 
+             message = "Tipo inválido para ocorrência operacional")
+
     private String type;
     
     @NotBlank(message = "Título é obrigatório")
@@ -55,6 +56,16 @@ public class OperationalOccurrenceDTO {
     @Min(value = 1, message = "Número de advertência deve ser maior que 0")
     @Max(value = 999999, message = "Número de advertência deve ser menor que 999999")
     private Integer warningNumber;
+    
+    private UUID substituteId;
+    private String substituteName;
+    private String originalStartTime;
+    private String originalEndTime;
+    private String substituteStartTime;
+    private String substituteEndTime;
+    private Double totalHours;
+    private String category;
+
     
     // Campos de resposta (não validados na entrada)
     private String employeeName;

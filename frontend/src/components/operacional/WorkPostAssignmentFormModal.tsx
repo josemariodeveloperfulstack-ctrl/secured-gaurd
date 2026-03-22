@@ -44,6 +44,7 @@ interface WorkPostAssignmentFormModalProps {
   assignment?: WorkPostAssignment | null;
   onSubmit: (data: CreateWorkPostAssignmentDTO) => Promise<void>;
   employees: Array<{ id: string; name: string }>;
+  fixedEmployeeId?: string;
 }
 
 const shiftTypeLabels: Record<string, string> = {
@@ -58,6 +59,7 @@ export default function WorkPostAssignmentFormModal({
   assignment,
   onSubmit,
   employees,
+  fixedEmployeeId,
 }: WorkPostAssignmentFormModalProps) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
@@ -107,12 +109,16 @@ export default function WorkPostAssignmentFormModal({
       setValue('endTime', assignment.endTime || '');
       setValue('observations', assignment.observations || '');
     } else {
-      reset({
+      const defaultValues: Partial<AssignmentFormData> = {
         shift: 'DAY',
         assignmentDate: new Date().toISOString().split('T')[0],
-      });
+      };
+      if (fixedEmployeeId) {
+        defaultValues.employeeId = fixedEmployeeId;
+      }
+      reset(defaultValues);
     }
-  }, [assignment, setValue, reset]);
+  }, [assignment, setValue, reset, fixedEmployeeId]);
 
   const handleFormSubmit = async (data: AssignmentFormData) => {
     setIsSubmitting(true);

@@ -3,6 +3,8 @@
     
     <!-- Parâmetros -->
     <parameter name="TEST_PARAM" class="java.lang.String"/>
+    <parameter name="REPORT_USER" class="java.lang.String"/>
+    <parameter name="REPORT_TIMESTAMP" class="java.lang.String"/>
     
     <!-- Campos do datasource -->
     <field name="id" class="java.util.UUID"/>

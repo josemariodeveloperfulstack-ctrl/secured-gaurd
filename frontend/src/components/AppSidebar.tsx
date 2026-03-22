@@ -47,6 +47,7 @@ import {
   UserCog,
   GraduationCap,
   FileSignature,
+  Gift,
   CreditCard,
   Banknote,
   Heart,
@@ -184,6 +185,7 @@ const rhMenuItems = [
   { icon: MapPin, text: 'Postos de Trabalho', to: '/rh/postos', id: 'rh-postos' },
   { icon: Briefcase, text: 'Vagas', to: '/rh/vagas', id: 'rh-vagas' },
   { icon: Award, text: 'Benefícios', to: '/rh/beneficios', id: 'rh-beneficios' },
+  { icon: Gift, text: 'Aniversariantes', to: '/rh/aniversariantes', id: 'rh-aniversariantes' },
   { icon: GraduationCap, text: 'Treinamentos', to: '/rh/treinamentos', id: 'rh-treinamentos' },
   { icon: BarChart3Icon, text: 'Relatórios RH', to: '/rh/relatorios', id: 'rh-relatorios' },
 ];
@@ -204,10 +206,9 @@ const sstMenuItems = [
 const departamentoPessoalMenuItems = [
   // Gestão de Funcionários
   { icon: Users, text: 'Funcionários', to: '/rh/funcionarios', id: 'dp-funcionarios' },
-  { icon: FileSpreadsheet, text: 'Importar Funcionários Excel', to: '/rh/funcionarios?importar=excel', id: 'dp-funcionarios-importar-excel' },
-  { icon: Banknote, text: 'Importar Dados Bancários', to: '/rh/funcionarios/importar-dados-bancarios', id: 'dp-funcionarios-importar-bancarios' },
   { icon: Handshake, text: 'Admissão/Demissão', to: '/rh/admissao-demissao', id: 'dp-admissao-demissao' },
   { icon: ArrowUpDown, text: 'Remanejamentos', to: '/rh/remanejamentos', id: 'dp-remanejamentos' },
+  { icon: Gift, text: 'Aniversariantes do mês', to: '/rh/aniversariantes', id: 'dp-aniversariantes' },
 
   // Gestão de Tempo e Frequência
   { icon: Calendar, text: 'Férias', to: '/rh/ferias', id: 'dp-ferias' },
@@ -277,6 +278,7 @@ const estoqueMenuItems = [
   { icon: Package, text: 'Produtos', to: '/estoque/produtos', id: 'estoque-produtos' },
   { icon: Package, text: 'Movimentações', to: '/estoque/movimentacoes', id: 'estoque-movimentacoes' },
   { icon: Package, text: 'Relatórios', to: '/estoque/relatorios', id: 'estoque-relatorios' },
+  { icon: FileSignature, text: 'Entregas & Assinaturas', to: '/estoque/entregas', id: 'estoque-entregas' },
   { icon: Handshake, text: 'Fornecedores', to: '/estoque/fornecedores', id: 'estoque-fornecedores' },
 ];
 

@@ -76,6 +76,17 @@ public class CreateOccurrenceDTO {
     
     private Integer warningNumber;
     
+    // Novos campos para o mapa operacional
+    private UUID substituteId;
+    private String substituteName;
+    private String originalStartTime;
+    private String originalEndTime;
+    private String substituteStartTime;
+    private String substituteEndTime;
+    private Double totalHours;
+    private String category;
+
+    
     /**
      * Converte a string de data para LocalDateTime
      * Se apenas a data for fornecida, usa a hora atual

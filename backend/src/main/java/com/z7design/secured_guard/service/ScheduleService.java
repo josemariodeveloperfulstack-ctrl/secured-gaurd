@@ -382,6 +382,14 @@ public class ScheduleService {
                         if (schedule.getWorkPost() != null) {
                             schedule.getWorkPost().getName();
                             schedule.getWorkPost().getId();
+                            try {
+                                if (schedule.getWorkPost().getClient() != null) {
+                                    schedule.getWorkPost().getClient().getName();
+                                    schedule.getWorkPost().getClient().getId();
+                                }
+                            } catch (Exception ignored) {
+                                // lazy / órfão
+                            }
                         }
                     }
                 }
@@ -400,63 +408,10 @@ public class ScheduleService {
                 log.error("❌ Causa: {}", e.getCause().getMessage());
                 log.error("❌ Tipo da causa: {}", e.getCause().getClass().getName());
             }
-            // Se falhar, usar o método padrão
-            try {
-                log.info("🔄 Tentando buscar escalas com método padrão (fallback)");
-                List<Schedule> allSchedules = scheduleRepository.findAll();
-
-                log.info("✅ Escalas encontradas (método padrão): {} registros", allSchedules.size());
-                if (allSchedules.size() > 0) {
-                    log.info("📋 Primeira escala (método padrão): ID={}, Employee={}, Date={}",
-                            allSchedules.get(0).getId(),
-                            allSchedules.get(0).getEmployee() != null ? allSchedules.get(0).getEmployee().getName()
-                                    : "null",
-                            allSchedules.get(0).getScheduleDate());
-                }
-
-                // Inicializar objetos dentro da transação
-                for (Schedule schedule : allSchedules) {
-                    if (schedule.getEmployee() != null) {
-                        try {
-                            schedule.getEmployee().getName();
-                            schedule.getEmployee().getId();
-                        } catch (Exception ignored) {
-                            // Ignorar erros de lazy initialization
-                        }
-                    }
-                    if (schedule.getLocation() != null) {
-                        try {
-                            schedule.getLocation().getName();
-                            schedule.getLocation().getId();
-                        } catch (Exception ignored) {
-                            // Ignorar erros de lazy initialization
-                        }
-                    }
-                    if (schedule.getWorkPost() != null) {
-                        try {
-                            schedule.getWorkPost().getName();
-                            schedule.getWorkPost().getId();
-                            // Inicializar client dentro da transação para evitar
-                            // LazyInitializationException
-                            if (schedule.getWorkPost().getClient() != null) {
-                                schedule.getWorkPost().getClient().getName();
-                                schedule.getWorkPost().getClient().getId();
-                            }
-                        } catch (Exception ignored) {
-                            // Ignorar erros de lazy initialization
-                        }
-                    }
-                }
-
-                return allSchedules;
-            } catch (Exception e2) {
-                log.error("❌ Erro também no método padrão", e2);
-                log.error("❌ Tipo de exceção: {}", e2.getClass().getName());
-                log.error("❌ Mensagem: {}", e2.getMessage());
-                // Retornar lista vazia ao invés de lançar exceção para evitar erro 500
-                log.warn("⚠️ Retornando lista vazia devido a erro no método padrão");
-                return new java.util.ArrayList<>();
-            }
+            // Não chamar repository.findAll() aqui: após falha JPA/Hibernate a transação pode estar
+            // rollback-only e um segundo acesso causa UnexpectedRollbackException.
+            log.warn("⚠️ Retornando lista vazia. Corrija dados órfãos ou use @NotFound(IGNORE) nas associações.");
+            return new java.util.ArrayList<>();
         }
     }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Textarea } from '@/components/ui/textarea';
 import {
   HardHat,
@@ -30,13 +32,27 @@ import {
   RefreshCw,
   ArrowLeftRight,
   MessageSquare,
-  Info
+  Info,
+  ChevronsUpDown,
+  Check,
+  Building2
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { sstService, PersonalProtectiveEquipment, EPIDelivery, CreateEPIDeliveryDTO } from '@/services/sstService';
 import { employeeService, Employee } from '@/services/employeeService';
+import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
+import { formatCPF } from '@/utils/validation';
+
+const MIN_EMPLOYEE_SEARCH_CHARS = 3;
+
+function resolveCompanyIdFromEmployee(emp: Employee | undefined): string {
+  if (!emp) return '';
+  const raw = (emp as { companyId?: string }).companyId ?? emp.company?.id;
+  return raw != null && String(raw).trim() !== '' ? String(raw) : '';
+}
 
 const EPIs: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +70,11 @@ const EPIs: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [companies, setCompanies] = useState<Array<{ id: string; name?: string; sigla?: string; tradeName?: string; cnpj?: string }>>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [deliveryCompanyId, setDeliveryCompanyId] = useState('');
+  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
 
   // Estados para modal de entrega
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
@@ -173,6 +194,23 @@ const EPIs: React.FC = () => {
     }
   }, [toast]);
 
+  const loadCompanies = useCallback(async () => {
+    try {
+      setLoadingCompanies(true);
+      const data = await companyService.getAllCompanies();
+      setCompanies(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Erro ao carregar empresas:', err);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar as empresas',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }, [toast]);
+
   // Garantir que os EPIs e funcionários sejam carregados quando o modal abrir
   useEffect(() => {
     if (showDeliveryModal) {
@@ -182,8 +220,45 @@ const EPIs: React.FC = () => {
       if (employees.length === 0) {
         loadEmployees();
       }
+      if (companies.length === 0) {
+        loadCompanies();
+      }
     }
-  }, [showDeliveryModal, epis.length, employees.length, loadData, loadEmployees]);
+  }, [showDeliveryModal, epis.length, employees.length, companies.length, loadData, loadEmployees, loadCompanies]);
+
+  const deliveryEmployee = useMemo(
+    () => employees.find((e) => e.id === deliveryForm.employeeId),
+    [employees, deliveryForm.employeeId]
+  );
+
+  const filteredEmployeesForDeliveryPicker = useMemo(() => {
+    const q = employeeSearchQuery.trim().toLowerCase();
+    if (q.length < MIN_EMPLOYEE_SEARCH_CHARS) return [];
+    const qDigits = q.replace(/\D/g, '');
+    return employees.filter((f) => {
+      const name = (f.name || '').toLowerCase();
+      const mat = (f.registrationNumber || '').toLowerCase();
+      const cpfDigits = (f.cpf || (f as { document?: string }).document || '').replace(/\D/g, '');
+      if (name.includes(q) || mat.includes(q)) return true;
+      if (qDigits.length >= MIN_EMPLOYEE_SEARCH_CHARS && cpfDigits.includes(qDigits)) return true;
+      return false;
+    });
+  }, [employees, employeeSearchQuery]);
+
+  const handleSelectDeliveryEmployee = (id: string) => {
+    const emp = employees.find((e) => e.id === id);
+    const cid = resolveCompanyIdFromEmployee(emp);
+    setDeliveryForm((prev) => ({ ...prev, employeeId: id }));
+    setDeliveryCompanyId(cid);
+    setEmployeePickerOpen(false);
+    setEmployeeSearchQuery('');
+    if (emp && !cid) {
+      toast({
+        title: 'Atenção',
+        description: 'Funcionário sem empresa vinculada no cadastro. Selecione a empresa manualmente.',
+      });
+    }
+  };
 
   // Filtrar EPIs
   const filteredEpis = epis.filter(epi => {
@@ -216,6 +291,9 @@ const EPIs: React.FC = () => {
     });
     setUniformType('');
     setUniformItems([]);
+    setDeliveryCompanyId('');
+    setEmployeeSearchQuery('');
+    setEmployeePickerOpen(false);
   };
 
   // Fechar modal e resetar formulário
@@ -674,64 +752,152 @@ const EPIs: React.FC = () => {
               {/* Content */}
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Funcionário */}
-                  <div className="md:col-span-2">
-                    <Label htmlFor="employeeId" className="text-seguranca-lightgray font-medium flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      Funcionário *
-                    </Label>
-                    <div className="mt-2">
-                      {loadingEmployees ? (
-                        <div className="flex items-center gap-2 p-3 bg-seguranca-black border border-gray-600 rounded-md">
-                          <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
-                          <span className="text-sm text-gray-400">Carregando funcionários...</span>
-                        </div>
-                      ) : (
-                        <>
-                          <Select
-                            value={deliveryForm.employeeId}
-                            onValueChange={(value) => setDeliveryForm({ ...deliveryForm, employeeId: value })}
-                            disabled={employees.length === 0}
-                          >
-                            <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-red h-11 [&>span[data-placeholder]]:text-gray-400 [&>span:not([data-placeholder])]:!text-white [&>span:not([data-placeholder])]:!opacity-100">
-                              <SelectValue placeholder="Selecione o funcionário" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-seguranca-graphite border-gray-600">
-                              {employees.length > 0 ? (
-                                employees.map((employee) => (
-                                  <SelectItem 
-                                    key={employee.id} 
-                                    value={employee.id} 
-                                    className="text-seguranca-lightgray focus:bg-seguranca-black focus:text-seguranca-lightgray"
+                  {/* Identificação: Funcionário + Empresa */}
+                  <div className="md:col-span-2 space-y-2 border-b border-gray-600 pb-6 mb-2">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Identificação</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          Funcionário *
+                        </Label>
+                        <p className="text-[11px] text-gray-500">
+                          Digite pelo menos 3 caracteres do nome, matrícula ou CPF para buscar.
+                        </p>
+                        <div className="mt-1">
+                          {loadingEmployees ? (
+                            <div className="flex items-center gap-2 p-3 bg-seguranca-black border border-gray-600 rounded-md">
+                              <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+                              <span className="text-sm text-gray-400">Carregando funcionários...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <Popover
+                                open={employeePickerOpen}
+                                onOpenChange={(open) => {
+                                  setEmployeePickerOpen(open);
+                                  if (!open) setEmployeeSearchQuery('');
+                                }}
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={employeePickerOpen}
+                                    disabled={employees.length === 0}
+                                    className="h-11 w-full justify-between bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black/90 hover:text-seguranca-lightgray focus:border-seguranca-red"
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <User className="w-4 h-4 text-seguranca-red" />
-                                      <div>
-                                        <div className="font-medium">{employee.name}</div>
-                                        {employee.registrationNumber && (
-                                          <div className="text-xs text-gray-400">Matrícula: {employee.registrationNumber}</div>
-                                        )}
-                                        {employee.document && (
-                                          <div className="text-xs text-gray-400">CPF: {employee.document}</div>
-                                        )}
-                                      </div>
+                                    <span className={cn('truncate text-left', !deliveryEmployee && 'text-gray-400')}>
+                                      {deliveryEmployee ? deliveryEmployee.name : 'Selecione o funcionário'}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  className="w-[var(--radix-popover-trigger-width)] p-0 border border-gray-600 bg-seguranca-graphite"
+                                  align="start"
+                                >
+                                  <Command shouldFilter={false}>
+                                    <CommandInput
+                                      placeholder={`Mín. ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres (nome, matrícula ou CPF)...`}
+                                      value={employeeSearchQuery}
+                                      onValueChange={setEmployeeSearchQuery}
+                                      className="border-gray-600"
+                                    />
+                                    <CommandList>
+                                      <CommandEmpty>
+                                        {employeeSearchQuery.trim().length < MIN_EMPLOYEE_SEARCH_CHARS
+                                          ? `Digite pelo menos ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres para exibir os registros.`
+                                          : 'Nenhum funcionário encontrado.'}
+                                      </CommandEmpty>
+                                      <CommandGroup>
+                                        {filteredEmployeesForDeliveryPicker.map((f) => {
+                                          const doc = f.cpf || f.document || '';
+                                          return (
+                                            <CommandItem
+                                              key={f.id}
+                                              value={f.id}
+                                              onSelect={() => handleSelectDeliveryEmployee(f.id)}
+                                              className="text-seguranca-lightgray cursor-pointer aria-selected:bg-seguranca-black"
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  'mr-2 h-4 w-4 shrink-0',
+                                                  deliveryForm.employeeId === f.id ? 'opacity-100' : 'opacity-0'
+                                                )}
+                                              />
+                                              <div className="flex flex-col min-w-0 text-left">
+                                                <span className="font-medium truncate">{f.name}</span>
+                                                {(f.registrationNumber || doc) && (
+                                                  <span className="text-xs text-gray-400">
+                                                    {f.registrationNumber ? `Matr.: ${f.registrationNumber}` : ''}
+                                                    {f.registrationNumber && doc ? ' · ' : ''}
+                                                    {doc ? `CPF: ${formatCPF(doc)}` : ''}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </CommandItem>
+                                          );
+                                        })}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                              {employees.length === 0 && !loadingEmployees && (
+                                <p className="text-xs text-yellow-400 mt-1">
+                                  Nenhum funcionário ativo cadastrado no sistema.
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-seguranca-lightgray font-medium flex items-center gap-2">
+                          <Building2 className="w-4 h-4" />
+                          Empresa
+                        </Label>
+                        <p className="text-[11px] text-gray-500">
+                          Preenchida automaticamente ao escolher o funcionário; você pode alterar se necessário.
+                        </p>
+                        <div className="mt-1">
+                          {loadingCompanies ? (
+                            <div className="flex items-center gap-2 p-3 bg-seguranca-black border border-gray-600 rounded-md">
+                              <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+                              <span className="text-sm text-gray-400">Carregando empresas...</span>
+                            </div>
+                          ) : (
+                            <Select
+                              value={deliveryCompanyId || undefined}
+                              onValueChange={(value) => setDeliveryCompanyId(value)}
+                              disabled={companies.length === 0}
+                            >
+                              <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-red h-11 [&>span[data-placeholder]]:text-gray-400 [&>span:not([data-placeholder])]:!text-white [&>span:not([data-placeholder])]:!opacity-100">
+                                <SelectValue placeholder="Selecione a empresa" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-seguranca-graphite border-gray-600">
+                                {companies.map((c) => (
+                                  <SelectItem
+                                    key={c.id}
+                                    value={c.id}
+                                    className="text-seguranca-lightgray focus:bg-seguranca-black"
+                                  >
+                                    <div className="flex flex-col text-left">
+                                      <span className="font-medium">{c.sigla || c.tradeName || c.name}</span>
+                                      {c.name && (c.sigla || c.tradeName) && (
+                                        <span className="text-xs text-gray-400">{c.name}</span>
+                                      )}
                                     </div>
                                   </SelectItem>
-                                ))
-                              ) : (
-                                <SelectItem value="__NO_EMPLOYEES__" disabled className="text-gray-400">
-                                  Nenhum funcionário ativo encontrado
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                          {employees.length === 0 && !loadingEmployees && (
-                            <p className="text-xs text-yellow-400 mt-1">
-                              Nenhum funcionário ativo cadastrado no sistema.
-                            </p>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           )}
-                        </>
-                      )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 

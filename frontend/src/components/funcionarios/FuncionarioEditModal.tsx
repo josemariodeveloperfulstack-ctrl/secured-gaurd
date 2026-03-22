@@ -41,8 +41,8 @@ import { formatTituloEleitorForInput, validateCPF, formatCpfForInput } from '@/u
 import DocumentosGerarTab from './DocumentosGerarTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
-import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
-import { History, ChevronLeft, ChevronRight } from 'lucide-react';
+import { History, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 
 interface FuncionarioEditModalProps {
   open: boolean;
@@ -208,6 +208,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyPageIndex, setHistoryPageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('cadastro');
+  const [remanejamentos, setRemanejamentos] = useState<Remanejamento[]>([]);
+  const [loadingRemanejamentos, setLoadingRemanejamentos] = useState(false);
 
   // Estados que devem estar antes de qualquer return (Rules of Hooks)
   const [cpfError, setCpfError] = useState<string | null>(null);
@@ -247,6 +249,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       return;
     }
     let cancelled = false;
+    
+    // Buscar histórico de auditoria
     setHistoryLoading(true);
     employeeChangeHistoryService
       .getByEmployeeId(funcionario.id, historyPageIndex, 20)
@@ -259,6 +263,21 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       .finally(() => {
         if (!cancelled) setHistoryLoading(false);
       });
+
+    // Buscar histórico de remanejamentos
+    setLoadingRemanejamentos(true);
+    remanejamentoService
+      .getRemanejamentosByEmployee(funcionario.id)
+      .then((data) => {
+        if (!cancelled) setRemanejamentos(data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setRemanejamentos([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRemanejamentos(false);
+      });
+
     return () => { cancelled = true; };
   }, [canSeeHistory, activeTab, funcionario?.id, historyPageIndex]);
 
@@ -4136,6 +4155,64 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               </div>
                             )}
                           </>
+                        )}
+                      </div>
+                    </Card>
+
+                    {/* Histórico de Remanejamentos */}
+                    <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                      <div className="p-4 sm:p-6 space-y-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
+                            <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
+                          </div>
+                          <h3 className="text-lg sm:text-xl font-semibold text-white">Histórico de Remanejamentos</h3>
+                        </div>
+                        {loadingRemanejamentos ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-seguranca-yellow mx-auto" />
+                            <p className="text-gray-400 text-sm mt-2">Carregando remanejamentos...</p>
+                          </div>
+                        ) : !remanejamentos?.length ? (
+                          <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-6 text-center">
+                            <ArrowRight className="mx-auto mb-2 text-gray-400" size={32} />
+                            <p className="text-gray-400 text-sm">Nenhum remanejamento registrado.</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-lg border border-gray-600">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-800/80 text-gray-300">
+                                <tr>
+                                  <th className="text-left p-3">Data</th>
+                                  <th className="text-left p-3">Tipo</th>
+                                  <th className="text-left p-3">Origem</th>
+                                  <th className="text-left p-3">Destino</th>
+                                  <th className="text-left p-3">Observação</th>
+                                </tr>
+                              </thead>
+                              <tbody className="text-gray-400 divide-y divide-gray-600">
+                                {remanejamentos.map((rem) => (
+                                  <tr key={rem.id} className="hover:bg-gray-800/50">
+                                    <td className="p-3 whitespace-nowrap">
+                                      {rem.dataRemanejamento ? new Date(rem.dataRemanejamento).toLocaleDateString('pt-BR') : '-'}
+                                    </td>
+                                    <td className="p-3">
+                                      <Badge variant="outline" className="text-[10px] uppercase font-bold border-gray-500 text-gray-300">
+                                        {rem.tipo === 'TRANSFERENCIA_UNIDADE' ? 'Unidade' :
+                                         rem.tipo === 'TRANSFERENCIA_POSTO_TRABALHO' ? 'Posto' :
+                                         rem.tipo === 'PLANTAO' ? 'Plantão' :
+                                         rem.tipo === 'COBRIR_FALTA' ? 'Falta' :
+                                         rem.tipo === 'COBRIR_FERIAS' ? 'Férias' : rem.tipo}
+                                      </Badge>
+                                    </td>
+                                    <td className="p-3">{rem.origem || '—'}</td>
+                                    <td className="p-3">{rem.destino || '—'}</td>
+                                    <td className="p-3 max-w-[200px] truncate" title={rem.observacao ?? ''}>{rem.observacao || '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         )}
                       </div>
                     </Card>

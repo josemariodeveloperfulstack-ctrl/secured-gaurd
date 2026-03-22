@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import TransferenciaEstoque from '@/components/estoque/TransferenciaEstoque';
+import DeliveryManagement from '@/components/estoque/DeliveryManagement';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -440,7 +441,8 @@ export default function Estoque() {
         <Tabs defaultValue="produtos" className="mt-4">
           <TabsList>
             <TabsTrigger value="produtos">Produtos</TabsTrigger>
-            <TabsTrigger value="fornecedores">Fornecedores</TabsTrigger>
+            <TabsTrigger value="transferencias">Transferências</TabsTrigger>
+            <TabsTrigger value="entregas">Entregas</TabsTrigger>
           </TabsList>
 
           <TabsContent value="produtos">
@@ -632,7 +634,11 @@ export default function Estoque() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+          <TabsContent value="entregas" className="mt-6">
+          <DeliveryManagement />
+        </TabsContent>
+      </Tabs>
+
 
         {/* Modais */}
         {/* Modal Item de Produto */}

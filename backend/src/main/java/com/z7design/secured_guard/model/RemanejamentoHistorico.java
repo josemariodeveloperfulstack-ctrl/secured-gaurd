@@ -12,7 +12,7 @@ public class RemanejamentoHistorico {
     private UUID id;
 
     @ManyToOne
-    @JoinColumn(name = "remanejamento_id", nullable = false)
+    @JoinColumn(name = "remanejamento_id", nullable = true)
     private Remanejamento remanejamento;
 
     @ManyToOne

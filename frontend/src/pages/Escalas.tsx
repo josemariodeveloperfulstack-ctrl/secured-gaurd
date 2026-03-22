@@ -844,9 +844,11 @@ const Escalas = () => {
                                 (modalState.escala as any).employeeId || 
                                 '';
               
-              // Extrair workPostId - pode vir como objeto ou string
-              const workPostId = modalState.escala.workPost?.id || 
-                                (modalState.escala as any).workPostId || 
+              // Extrair workPostId - pode vir como objeto ou string; fallback: location.id (alguns registros antigos)
+              const workPostId = modalState.escala.workPost?.id ||
+                                (modalState.escala as any).workPostId ||
+                                modalState.escala.location?.id ||
+                                (modalState.escala as any).locationId ||
                                 '';
               
               // Extrair locationId - pode vir como objeto ou string
@@ -911,11 +913,13 @@ const Escalas = () => {
               }
               
               // Extrair clientId do workPost (pode vir como clientId direto ou como objeto client)
-              const clientId = workPost?.clientId || 
-                              workPost?.client?.id || 
-                              (modalState.escala.location as any)?.unit?.clientId || 
-                              (modalState.escala.location as any)?.unit?.client?.id || 
+              const clientId = workPost?.clientId ||
+                              workPost?.client?.id ||
+                              (modalState.escala.location as any)?.unit?.clientId ||
+                              (modalState.escala.location as any)?.unit?.client?.id ||
                               '';
+              const clientNameHint =
+                              String(workPost?.clientName || workPost?.client?.name || '').trim();
               
               // Processar scheduleDate - sempre vem como string da API
               let scheduleDate: Date;
@@ -940,6 +944,7 @@ const Escalas = () => {
                 endTime: String(endTime || ''),
                 observations: String(modalState.escala.observations || ''),
                 clientId: String(clientId || ''), // Adicionar clientId para facilitar o mapeamento no modal
+                ...(clientNameHint ? { clientName: clientNameHint } : {}),
               };
               
               console.log('📋 initialData mapeado (useMemo):', mappedData);

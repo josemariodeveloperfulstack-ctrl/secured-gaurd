@@ -99,9 +99,16 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
       const names = wps.map((x: any) => x?.name).filter(Boolean);
       if (names.length) return names.join(', ');
     }
-    
+
     if (wp) return wp;
-    if (wpId) return `Posto Inválido/Excluído`;
+    // Sem nome mas com id: FK órfã (posto apagado) ou resposta antiga — usar unidade/setor como pista
+    if (wpId) {
+      const unitName = (employee as any).unit?.name;
+      const deptName = (employee as any).department?.name;
+      if (unitName) return `${unitName} (posto indisponível — atualize o cadastro)`;
+      if (deptName) return `${deptName} (posto indisponível — atualize o cadastro)`;
+      return 'Posto removido ou inexistente (atualize o cadastro)';
+    }
     return null;
   };
 

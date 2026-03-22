@@ -1,4 +1,4 @@
--- =====================================================
+﻿-- =====================================================
 -- SEED DE DADOS ESSENCIAIS PARA AMBIENTE CI
 -- Executado automaticamente via Flyway após migrations
 -- =====================================================
@@ -168,11 +168,11 @@ WHERE NOT EXISTS (
 -- =====================================================
 -- 7. EMPRESA DE TESTE
 -- =====================================================
-INSERT INTO companies (id, name, trade_name, cnpj, email, phone, address, city, state, zip_code, status, type, sector, size, created_by, created_at, updated_at)
+INSERT INTO companies (id, name, sigla, cnpj, email, phone, address, city, state, zip_code, status, created_at, updated_at)
 SELECT 
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
     'Empresa Teste CI',
-    'Empresa Teste CI Ltda',
+    'TESTECI',
     '98.765.432/0001-10',
     'empresa@teste.ci',
     '(11) 2222-2222',
@@ -181,10 +181,6 @@ SELECT
     'SP',
     '01234-567',
     'ACTIVE',
-    'LTDA',
-    'Segurança',
-    'Média',
-    '11111111-1111-1111-1111-111111111111'::uuid,
     NOW(),
     NOW()
 WHERE NOT EXISTS (
@@ -192,236 +188,32 @@ WHERE NOT EXISTS (
 );
 
 -- =====================================================
--- 7.1. COPIAR USUÁRIOS DO BANCO secured_guard_test
+-- 7.1. USUÁRIOS DO BANCO secured_guard_test
 -- =====================================================
--- Tenta copiar automaticamente usando dblink, se disponível
--- Se dblink não estiver disponível, usa INSERTs hardcoded (gerados previamente)
-DO $$
-DECLARE
-    dblink_available BOOLEAN := false;
-    test_db_user TEXT := 'postgressg';
-    test_db_password TEXT := '4KaCiJc6an@7sgbdcid2025';  -- Ajuste se necessário
-BEGIN
-    -- Verificar se dblink está disponível
-    SELECT EXISTS (
-        SELECT 1 FROM pg_extension WHERE extname = 'dblink'
-    ) INTO dblink_available;
+-- INSERTs hardcoded de usuários exportados do banco secured_guard_test
+-- Para gerar estes INSERTs, execute o script: generate_inserts_and_update_migration.ps1
+-- no ambiente onde o banco secured_guard_test está disponível
 
-    IF dblink_available THEN
-        RAISE NOTICE '📋 Copiando usuários do banco secured_guard_test via dblink...';
-        
-        -- Criar conexão e copiar usuários (exceto admin@ci)
-        PERFORM dblink_connect(
-            'test_db_conn',
-            format('host=localhost port=5432 dbname=secured_guard_test user=%s password=%s', 
-                   test_db_user, test_db_password)
-        );
-
-        -- Copiar usuários
-        INSERT INTO users (
-            id, username, password, email, name, status, active,
-            two_factor_enabled, two_factor_whatsapp, require_password_change,
-            last_password_change, first_access_completed, whatsapp,
-            whatsapp_consent, whatsapp_consent_date, whatsapp_consent_ip, whatsapp_consent_user_agent,
-            created_at, updated_at
-        )
-        SELECT * FROM dblink(
-            'test_db_conn',
-            'SELECT 
-                id, username, password, email, name, status, 
-                COALESCE(active, true),
-                COALESCE(two_factor_enabled, false), 
-                two_factor_whatsapp, 
-                COALESCE(require_password_change, false),
-                last_password_change, 
-                COALESCE(first_access_completed, false),
-                whatsapp,
-                COALESCE(whatsapp_consent, false),
-                whatsapp_consent_date, whatsapp_consent_ip, whatsapp_consent_user_agent,
-                created_at, updated_at
-             FROM users 
-             WHERE username != ''admin@ci'''
-        ) AS t(
-            id uuid, username text, password text, email text, name text, status text,
-            active boolean, two_factor_enabled boolean, two_factor_whatsapp text,
-            require_password_change boolean, last_password_change timestamp,
-            first_access_completed boolean, whatsapp text,
-            whatsapp_consent boolean, whatsapp_consent_date timestamp,
-            whatsapp_consent_ip text, whatsapp_consent_user_agent text,
-            created_at timestamp, updated_at timestamp
-        )
-        ON CONFLICT (id) DO NOTHING;
-
-        -- Copiar user_roles
-        INSERT INTO user_roles (user_id, role_id, created_at)
-        SELECT 
-            ur.user_id,
-            r.id,
-            NOW()
-        FROM dblink(
-            'test_db_conn',
-            'SELECT ur.user_id, r.name as role_name
-             FROM user_roles ur
-             JOIN roles r ON ur.role_id = r.id
-             JOIN users u ON ur.user_id = u.id
-             WHERE u.username != ''admin@ci'''
-        ) AS t(user_id uuid, role_name text)
-        JOIN roles r ON r.name = t.role_name
-        WHERE NOT EXISTS (
-            SELECT 1 FROM user_roles ur2 
-            WHERE ur2.user_id = t.user_id AND ur2.role_id = r.id
-        );
-
-        PERFORM dblink_disconnect('test_db_conn');
-        RAISE NOTICE '✅ Usuários copiados com sucesso via dblink';
-    ELSE
-        RAISE NOTICE '⚠️ dblink não disponível. Usando INSERTs hardcoded...';
-        -- INSERTs hardcoded serão executados abaixo (seção 7.1.1)
-    END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE NOTICE '⚠️ Erro ao copiar via dblink: %. Usando INSERTs hardcoded...', SQLERRM;
-        -- Em caso de erro, usar INSERTs hardcoded
-END $$;
+-- COLE OS INSERTs DE USUÁRIOS AQUI:
+-- (Execute generate_inserts_and_update_migration.ps1 para gerar automaticamente)
 
 -- =====================================================
--- 7.1.1. INSERTs HARDCODED DE USUÁRIOS (FALLBACK)
+-- 7.2. USER_ROLES DOS USUÁRIOS
 -- =====================================================
--- Se dblink não estiver disponível ou falhar, estes INSERTs serão usados
--- Para gerar estes INSERTs, execute: export_users_from_test_db.sql no banco secured_guard_test
--- e cole os resultados aqui:
+-- INSERTs hardcoded de user_roles exportados do banco secured_guard_test
 
--- COLE OS INSERTs DE USUÁRIOS AQUI (se dblink não funcionar):
-
--- =====================================================
--- 7.2. USER_ROLES DOS USUÁRIOS (FALLBACK)
--- =====================================================
--- INSERTs hardcoded de user_roles (se dblink não funcionar):
-
--- COLE OS INSERTs DE USER_ROLES AQUI (se dblink não funcionar):
+-- COLE OS INSERTs DE USER_ROLES AQUI:
+-- (Execute generate_inserts_and_update_migration.ps1 para gerar automaticamente)
 
 -- =====================================================
--- 8. COPIAR FUNCIONÁRIOS DO BANCO secured_guard_test
+-- 8. FUNCIONÁRIOS DO BANCO secured_guard_test
 -- =====================================================
--- Tenta copiar automaticamente usando dblink, se disponível
-DO $$
-DECLARE
-    dblink_available BOOLEAN := false;
-    test_db_user TEXT := 'postgressg';
-    test_db_password TEXT := '4KaCiJc6an@7sgbdcid2025';  -- Ajuste se necessário
-BEGIN
-    -- Verificar se dblink está disponível
-    SELECT EXISTS (
-        SELECT 1 FROM pg_extension WHERE extname = 'dblink'
-    ) INTO dblink_available;
+-- INSERTs hardcoded de funcionários exportados do banco secured_guard_test
+-- Para gerar estes INSERTs, execute o script: generate_inserts_and_update_migration.ps1
+-- no ambiente onde o banco secured_guard_test está disponível
 
-    IF dblink_available THEN
-        RAISE NOTICE '📋 Copiando funcionários do banco secured_guard_test via dblink...';
-        
-        -- Criar conexão se ainda não existir
-        BEGIN
-            PERFORM dblink_connect(
-                'test_db_conn',
-                format('host=localhost port=5432 dbname=secured_guard_test user=%s password=%s', 
-                       test_db_user, test_db_password)
-            );
-        EXCEPTION
-            WHEN duplicate_object THEN
-                -- Conexão já existe, continuar
-                NULL;
-        END;
-
-        -- Copiar funcionários
-        INSERT INTO employees (
-            id, user_id, position_id, registration_number, name, document, cpf, rg,
-            birth_date, gender, marital_status, nationality, address, phone, email,
-            unit_id, company_id, hire_date, termination_date, status, notes, photo_url,
-            cnh_number, cnh_expiration_date, cnh_category,
-            ctps, ctps_series, ctps_issue_date, ctps_issuing_agency, ctps_rural,
-            titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao,
-            carteira_identidade_orgao_emissor, carteira_identidade_data_emissao, certificado_militar,
-            cbo, pis, salario, salario_por_extenso, periodo_pagamento, horario_trabalho, folga_semanal,
-            fgts_optante, fgts_data_opcao, fgts_banco_depositario, fgts_data_retratacao,
-            pis_data_cadastro, pis_banco_depositario, pis_endereco_banco, pis_codigo_banco, pis_codigo_agencia,
-            visto_fiscalizacao, nome_pai, nome_mae, local_nascimento, grau_instrucao,
-            carteira_modelo_19, registro_geral_estrangeiro,
-            casado_brasileiro, nome_conjuge_estrangeiro,
-            spouse_name, spouse_cpf, spouse_rg, spouse_birth_date, spouse_phone, spouse_email,
-            tem_filhos_brasileiros, quantidade_filhos_brasileiros,
-            data_chegada_brasil, naturalizado, decreto_naturalizacao,
-            assinatura_funcionario, data_rescisao, whatsapp,
-            banco, agencia, conta_corrente,
-            empresa_nome, empresa_endereco, empresa_cnpj,
-            created_at, updated_at
-        )
-        SELECT * FROM dblink(
-            'test_db_conn',
-            'SELECT 
-                id, user_id, position_id, registration_number, name, document, cpf, rg,
-                birth_date, gender, marital_status, nationality, address, phone, email,
-                unit_id, company_id, hire_date, termination_date, status, notes, photo_url,
-                cnh_number, cnh_expiration_date, cnh_category,
-                ctps, ctps_series, ctps_issue_date, ctps_issuing_agency, ctps_rural,
-                titulo_eleitor, titulo_eleitor_zona, titulo_eleitor_secao,
-                carteira_identidade_orgao_emissor, carteira_identidade_data_emissao, certificado_militar,
-                cbo, pis, salario, salario_por_extenso, periodo_pagamento, horario_trabalho, folga_semanal,
-                fgts_optante, fgts_data_opcao, fgts_banco_depositario, fgts_data_retratacao,
-                pis_data_cadastro, pis_banco_depositario, pis_endereco_banco, pis_codigo_banco, pis_codigo_agencia,
-                visto_fiscalizacao, nome_pai, nome_mae, local_nascimento, grau_instrucao,
-                carteira_modelo_19, registro_geral_estrangeiro,
-                casado_brasileiro, nome_conjuge_estrangeiro,
-                spouse_name, spouse_cpf, spouse_rg, spouse_birth_date, spouse_phone, spouse_email,
-                tem_filhos_brasileiros, quantidade_filhos_brasileiros,
-                data_chegada_brasil, naturalizado, decreto_naturalizacao,
-                assinatura_funcionario, data_rescisao, whatsapp,
-                banco, agencia, conta_corrente,
-                empresa_nome, empresa_endereco, empresa_cnpj,
-                created_at, updated_at
-             FROM employees'
-        ) AS t(
-            id uuid, user_id uuid, position_id uuid, registration_number text, name text, document text, cpf text, rg text,
-            birth_date date, gender text, marital_status text, nationality text, address text, phone text, email text,
-            unit_id uuid, company_id uuid, hire_date date, termination_date date, status text, notes text, photo_url text,
-            cnh_number text, cnh_expiration_date date, cnh_category text,
-            ctps text, ctps_series text, ctps_issue_date date, ctps_issuing_agency text, ctps_rural text,
-            titulo_eleitor text, titulo_eleitor_zona text, titulo_eleitor_secao text,
-            carteira_identidade_orgao_emissor text, carteira_identidade_data_emissao date, certificado_militar text,
-            cbo text, pis text, salario numeric, salario_por_extenso text, periodo_pagamento text, horario_trabalho text, folga_semanal text,
-            fgts_optante boolean, fgts_data_opcao date, fgts_banco_depositario text, fgts_data_retratacao date,
-            pis_data_cadastro date, pis_banco_depositario text, pis_endereco_banco text, pis_codigo_banco text, pis_codigo_agencia text,
-            visto_fiscalizacao text, nome_pai text, nome_mae text, local_nascimento text, grau_instrucao text,
-            carteira_modelo_19 text, registro_geral_estrangeiro text,
-            casado_brasileiro boolean, nome_conjuge_estrangeiro text,
-            spouse_name text, spouse_cpf text, spouse_rg text, spouse_birth_date date, spouse_phone text, spouse_email text,
-            tem_filhos_brasileiros boolean, quantidade_filhos_brasileiros integer,
-            data_chegada_brasil date, naturalizado boolean, decreto_naturalizacao text,
-            assinatura_funcionario text, data_rescisao date, whatsapp text,
-            banco text, agencia text, conta_corrente text,
-            empresa_nome text, empresa_endereco text, empresa_cnpj text,
-            created_at timestamp, updated_at timestamp
-        )
-        ON CONFLICT (id) DO NOTHING;
-
-        PERFORM dblink_disconnect('test_db_conn');
-        RAISE NOTICE '✅ Funcionários copiados com sucesso via dblink';
-    ELSE
-        RAISE NOTICE '⚠️ dblink não disponível. Usando INSERTs hardcoded...';
-        -- INSERTs hardcoded serão executados abaixo (seção 8.1)
-    END IF;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE NOTICE '⚠️ Erro ao copiar via dblink: %. Usando INSERTs hardcoded...', SQLERRM;
-        -- Em caso de erro, usar INSERTs hardcoded
-END $$;
-
--- =====================================================
--- 8.1. INSERTs HARDCODED DE FUNCIONÁRIOS (FALLBACK)
--- =====================================================
--- Se dblink não estiver disponível ou falhar, estes INSERTs serão usados
--- Para gerar estes INSERTs, execute: export_employees_from_test_db.sql no banco secured_guard_test
--- e cole os resultados aqui:
-
--- COLE OS INSERTs DE FUNCIONÁRIOS AQUI (se dblink não funcionar):
+-- COLE OS INSERTs DE FUNCIONÁRIOS AQUI:
+-- (Execute generate_inserts_and_update_migration.ps1 para gerar automaticamente)
 
 -- =====================================================
 -- 8.1. DADOS DA TABELA EMPLOYEES (LEGADO - manter para referência)
@@ -491,7 +283,7 @@ END $$;
 -- com os funcionários reais inseridos acima
 INSERT INTO employees (
     id, user_id, position_id, registration_number, name, document, cpf, rg, 
-    birth_date, gender, marital_status, nationality, address, phone, email, 
+    birth_date, sexo, marital_status, nationality, address, phone, email, 
     unit_id, company_id, hire_date, termination_date, status, notes,
     cnh_number, cnh_expiration_date, cnh_category,
     ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
@@ -555,7 +347,7 @@ WHERE NOT EXISTS (SELECT 1 FROM employees WHERE id = 'cccccccc-cccc-cccc-cccc-cc
 
 INSERT INTO employees (
     id, user_id, position_id, registration_number, name, document, cpf, rg, 
-    birth_date, gender, marital_status, nationality, address, phone, email, 
+    birth_date, sexo, marital_status, nationality, address, phone, email, 
     unit_id, company_id, hire_date, termination_date, status, notes,
     cnh_number, cnh_expiration_date, cnh_category,
     ctps, ctps_series, ctps_issue_date, ctps_issuing_agency,
@@ -680,16 +472,66 @@ DO $$
 BEGIN
     RAISE NOTICE '✅ Seed de dados essenciais para CI concluído com sucesso!';
     RAISE NOTICE '   - Usuário admin: admin@ci (senha: Admin123!)';
-    RAISE NOTICE '   - Usuários do banco secured_guard_test: Incluídos (se exportados)';
+    RAISE NOTICE '   - Usuários do banco secured_guard_test: Incluídos via INSERTs hardcoded';
     RAISE NOTICE '   - Unidade: Unidade Matriz CI';
     RAISE NOTICE '   - Turnos: Manhã, Tarde, Noite';
     RAISE NOTICE '   - Cargos: Vigilante, Supervisor, Gerente';
     RAISE NOTICE '   - Departamento: Operacional';
     RAISE NOTICE '   - Cliente: Cliente Teste CI';
     RAISE NOTICE '   - Empresa: Empresa Teste CI';
-    RAISE NOTICE '   - Funcionários do banco secured_guard_test: Incluídos (se exportados)';
+    RAISE NOTICE '   - Funcionários do banco secured_guard_test: Incluídos via INSERTs hardcoded';
     RAISE NOTICE '   - Funcionários de teste (fallback): 2 funcionários completos';
     RAISE NOTICE '   - Frota: 3 veículos de teste';
+END $$;
+
+-- =====================================================
+-- 10. CLIENTES REFERENCIADOS PELOS POSTOS DE TRABALHO
+-- =====================================================
+DO $$
+DECLARE
+    client_ids uuid[] := ARRAY[
+        '07a31427-7e91-4aab-8659-9f08efd933d9', '276c0b0c-bb1f-4107-9aa0-3b93a2e547a2', '7c5e4e3c-4fcb-4111-b0b9-71cb07cfd9e6', 
+        '4e52b832-5226-4647-a23f-60fe0877521f', '1319af0a-218e-417c-9205-3258a9f4dced', '02b04d58-c043-47da-9ef0-2f02c5db1e9a', 
+        '5f1cb241-be50-434c-930c-51cdb59d2e17', 'f170a64a-560e-4d14-863d-85caedd52646', '65e59abc-db76-410f-8194-a85ad4cc22c7', 
+        'ec93e79f-b966-4fb2-9526-78b9cc88eb89', 'eade6ca4-fb2b-4864-8d6e-4c91eea4308e', 'c2a10090-b719-4cf0-8696-a55513a97d7c', 
+        'b37c8f45-ff80-4eee-a74d-3e47bf7b6ebe', '6a3cedeb-09bc-4d59-ab8f-ade6b84956d4', '5b642694-8431-4a39-a74b-3f5fccfcf43d', 
+        '5d19a2f9-316b-4d00-8ebd-6297363d524d', '89c2ff1a-6e1b-4c36-8c2c-e7d21d91ebbf', 'd637b119-a0aa-4297-99a2-fc226846d25d', 
+        '10d89142-fef7-46f7-a366-4a82c3325f50', '63963541-bd1d-415c-af64-c868ff52f033', '63f78ae1-a955-4f61-b719-b6af0fec2a2f', 
+        'ddede840-e36a-4e27-8ead-884a955809ed', '9f3671db-c150-4ceb-a69d-2b04b8af46b8', 'fb94f83c-73e0-4277-893f-507f4be05d5f', 
+        '2a806237-9548-4dc4-b4ea-2ccfde1671c7', '2fa8aa05-54ec-4bcd-b39c-480b47ae4067', '7424e80e-b1c5-47db-b2af-fb4c4efa2215', 
+        '1d9cd74f-00d8-4bd4-b026-d17b12e92eaa', '3b5d0291-aa03-4903-8180-bb093d4fb72d', '5baac85a-9794-427e-81c2-815117d19b2c', 
+        'df3ab2d6-d71d-4257-92d0-a30dfb82b043', 'c64e8e02-46d8-4932-986c-a68203126767', '6716064d-ce6f-4263-82da-f3b838eaef5b', 
+        '62c88888-7d3b-42d9-af18-6de29c173edb'
+    ]::uuid[];
+    cid uuid;
+BEGIN
+    FOREACH cid IN ARRAY client_ids
+    LOOP
+        INSERT INTO clients (id, name, cnpj, status, created_at, updated_at)
+        SELECT cid, 'Cliente Migrado ' || cid, '00.000.000/0001-00', 'ACTIVE', NOW(), NOW()
+        WHERE NOT EXISTS (SELECT 1 FROM clients WHERE id = cid);
+    END LOOP;
+END $$;
+
+-- =====================================================
+-- 11. POSTOS DE TRABALHO (SEED CI)
+-- =====================================================
+
+
+-- =====================================================
+-- 12. LIMPEZA DE REFERÊNCIAS ÓRFÃS DE POSTOS
+-- =====================================================
+UPDATE employees 
+SET work_post_id = NULL 
+WHERE work_post_id IS NOT NULL 
+  AND work_post_id NOT IN (SELECT id FROM work_posts);
+
+-- =====================================================
+-- LOG DE CONCLUSÃO FINAL
+-- =====================================================
+DO $$
+BEGIN
+    RAISE NOTICE '✅ Seed de postos de trabalho e limpeza concluída!';
 END $$;
 
 

@@ -170,34 +170,29 @@ export function getApiUrl(): string {
     return '/api';
   }
 
-  // portal.promovervigilancia.com.br pode estar em CDN/servidor diferente do backend.
-  // Usar URL absoluta do backend para garantir que as chamadas cheguem ao servidor correto.
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  const config = getCurrentEnvironmentConfig();
+  const hn = typeof window !== 'undefined' ? window.location.hostname : '';
 
-  if (hostname.includes('promovervigilancia.com.br')) {
-    const backendUrl = config.apiUrl; // ex: https://app.z7botsolutions.com.br/api
-    if (backendUrl && backendUrl.startsWith('http')) {
-      console.log('🔧 Portal Promover: usando backend absoluto:', backendUrl);
-      return backendUrl;
-    }
+  // 1. Ambientes no mesmo host (Nginx faz proxy de /api para backend)
+  // SEMPRE usar `/api` relativo para evitar loops de redirect e problemas de CORS/SSL.
+  if (
+    hn === 'ci.z7botsolutions.com.br' ||
+    hn === 'dev.z7botsolutions.com.br' ||
+    hn === 'securedguard.z7botsolutions.com.br' ||
+    hn === 'portal.promovervigilancia.com.br' ||
+    ((hn.includes('test.') || hn.includes('testing.')) && hn.includes('z7botsolutions.com.br'))
+  ) {
+    console.log('🔧 Usando API relativa (/api) para host:', hn);
+    return '/api';
   }
 
-  // Primeiro tenta usar variável de ambiente (para builds específicos)
+  // 2. Variável de ambiente (para builds específicos)
   if (import.meta.env.VITE_API_URL) {
     console.log('🔧 Usando VITE_API_URL:', import.meta.env.VITE_API_URL);
     return import.meta.env.VITE_API_URL;
   }
 
-  // PROD: portal.promovervigilancia.com.br e securedguard servem frontend+backend no mesmo host.
-  // Usar /api relativo evita ERR_CERT_AUTHORITY_INVALID e CORS (nginx faz proxy de /api para backend).
-  const hn = typeof window !== 'undefined' ? window.location.hostname : '';
-  if (hn === 'portal.promovervigilancia.com.br' || hn === 'securedguard.z7botsolutions.com.br') {
-    console.log('🔧 Portal/Prod: usando API no mesmo host (/api)');
-    return '/api';
-  }
-
-  // Senão, usa detecção automática
+  // 3. Fallback para detecção automática baseada no mapa de ambientes
+  const config = getCurrentEnvironmentConfig();
   console.log('🔄 Usando detecção automática:', config.apiUrl);
   return config.apiUrl;
 }

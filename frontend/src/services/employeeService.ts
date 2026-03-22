@@ -31,6 +31,20 @@ export interface Employee {
   nomeMae?: string;
   workPost?: EmployeeWorkPost;
   workPostId?: string;
+  /** Preenchido em /api/employees/birthdays */
+  birthDayOfMonth?: number;
+  ageTurning?: number;
+  position?: { id?: string; name?: string };
+  unit?: { id?: string; name?: string };
+  company?: { id?: string; sigla?: string };
+  department?: { id?: string; name?: string };
+}
+
+export interface BirthdaysByMonthResult {
+  month: number;
+  referenceYear: number;
+  count: number;
+  employees: Employee[];
 }
 
 export interface SimpleEmployee {
@@ -122,6 +136,37 @@ export const employeeService = {
       console.error('Erro ao obter contagem de funcionários:', error);
       return 0;
     }
+  },
+
+  /**
+   * Aniversariantes do mês (RH / Departamento Pessoal).
+   */
+  async getBirthdaysByMonth(params: {
+    month: number;
+    onlyActive?: boolean;
+    referenceYear?: number;
+    companyId?: string;
+  }): Promise<BirthdaysByMonthResult> {
+    const query: Record<string, string | number | boolean> = {
+      month: params.month,
+      onlyActive: params.onlyActive !== false,
+    };
+    if (params.referenceYear != null) query.referenceYear = params.referenceYear;
+    if (params.companyId && params.companyId !== 'all') query.companyId = params.companyId;
+
+    const response = await api.get('/api/employees/birthdays', { params: query });
+    const d = response.data ?? {};
+    const raw = Array.isArray(d.employees) ? d.employees : [];
+    const employees = raw
+      .map((e: any) => this.normalizeEmployee(e))
+      .filter((e: Employee | null): e is Employee => e != null);
+
+    return {
+      month: Number(d.month ?? params.month),
+      referenceYear: Number(d.referenceYear ?? new Date().getFullYear()),
+      count: Number(d.count ?? employees.length),
+      employees,
+    };
   },
 
   /**

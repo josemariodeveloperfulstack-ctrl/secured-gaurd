@@ -57,7 +57,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
         // Buscar dados básicos COM relacionamentos de cargo, unidade, empresa, workPost
         // e department
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -68,7 +68,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         List<Object[]> findBasicData();
 
         // Versão paginada SEM filtro de empresa (status opcional)
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -82,7 +82,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         List<Object[]> findBasicDataPaged(@Param("limit") int limit, @Param("offset") int offset, @Param("status") String status);
 
         // Versão paginada COM filtro de empresa (status opcional)
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -97,7 +97,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
         // Buscar dados básicos COM relacionamentos por termo de busca (nome, CPF ou
         // email)
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -112,7 +112,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         List<Object[]> findBasicDataBySearchTerm(@Param("searchTerm") String searchTerm);
 
         // Versão paginada com termo de busca SEM filtro de empresa (status opcional)
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -133,7 +133,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         @Param("status") String status);
 
         // Versão paginada com termo de busca COM filtro de empresa (status opcional)
-        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id "
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id "
                         +
                         "FROM employees e " +
                         "LEFT JOIN positions p ON e.position_id = p.id " +
@@ -194,4 +194,26 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         // Contagens para estatísticas por empresa
         long countByCompanyId(UUID companyId);
         long countByCompanyIdAndStatus(UUID companyId, EmploymentStatus status);
+
+        /**
+         * Aniversariantes do mês (mesma projeção de {@link #findBasicData()}).
+         * {@code onlyActive}: 1 = apenas ACTIVE; 0 = todos os status.
+         * {@code companyFilter}: 0 = todas as empresas; 1 = filtrar por {@code companyId}.
+         * Evita {@code :companyId IS NULL} na SQL nativa — PostgreSQL não infere tipo do parâmetro em {@code IS NULL}.
+         */
+        @Query(value = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id "
+                        +
+                        "FROM employees e " +
+                        "LEFT JOIN positions p ON e.position_id = p.id " +
+                        "LEFT JOIN units u ON e.unit_id = u.id " +
+                        "LEFT JOIN companies c ON e.company_id = c.id " +
+                        "LEFT JOIN work_posts wp ON e.work_post_id = wp.id " +
+                        "LEFT JOIN departments d ON e.department_id = d.id " +
+                        "WHERE e.birth_date IS NOT NULL " +
+                        "AND EXTRACT(MONTH FROM e.birth_date) = :month " +
+                        "AND (:onlyActive = 0 OR CAST(e.status AS text) = 'ACTIVE') " +
+                        "AND (:companyFilter = 0 OR e.company_id = :companyId) " +
+                        "ORDER BY EXTRACT(DAY FROM e.birth_date) ASC, e.name ASC", nativeQuery = true)
+        List<Object[]> findBasicDataByBirthMonth(@Param("month") int month, @Param("onlyActive") int onlyActive,
+                        @Param("companyFilter") int companyFilter, @Param("companyId") UUID companyId);
 }

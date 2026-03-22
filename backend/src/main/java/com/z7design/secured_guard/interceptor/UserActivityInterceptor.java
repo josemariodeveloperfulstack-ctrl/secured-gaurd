@@ -3,6 +3,7 @@ package com.z7design.secured_guard.interceptor;
 import com.z7design.secured_guard.service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -31,7 +32,9 @@ public class UserActivityInterceptor implements HandlerInterceptor {
                 String details = getDetailsFromRequest(request);
                 String ipAddress = getClientIpAddress(request);
                 String userAgent = request.getHeader("User-Agent");
-                String sessionId = request.getSession().getId();
+                // Não criar HttpSession só para log (STATELESS + evita efeitos colaterais em proxies)
+                HttpSession existing = request.getSession(false);
+                String sessionId = existing != null ? existing.getId() : "stateless";
                 
                 // Registra a atividade usando o LogService existente
                 logService.logUserActivity(username, action, details, ipAddress, userAgent, sessionId);

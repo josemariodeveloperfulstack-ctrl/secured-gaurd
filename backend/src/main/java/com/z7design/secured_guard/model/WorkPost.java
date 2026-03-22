@@ -3,6 +3,7 @@ package com.z7design.secured_guard.model;
 import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -59,7 +60,21 @@ public class WorkPost {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = true)
     private Client client;
-    
+
+    /**
+     * Expõe {@code clientId} / {@code clientName} no JSON sem serializar o objeto {@link #client}
+     * (evita ciclos Client ↔ WorkPost e mantém o contrato esperado pelo frontend nas escalas).
+     */
+    @JsonProperty("clientId")
+    public java.util.UUID getClientId() {
+        return client == null ? null : client.getId();
+    }
+
+    @JsonProperty("clientName")
+    public String getClientName() {
+        return client == null ? null : client.getName();
+    }
+
     // Contrato
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contract_id")

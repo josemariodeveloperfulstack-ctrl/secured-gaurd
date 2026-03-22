@@ -47,8 +47,8 @@ public class JasperReportService {
             
             // Preparar parâmetros
             Map<String, Object> parameters = new HashMap<>();
+            injectStandardParameters(parameters);
             parameters.put("PERIOD", formatPeriod(startDate, endDate));
-            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
             parameters.put("TOTAL_RECORDS", records.size());
             
             // Calcular valor total
@@ -109,7 +109,7 @@ public class JasperReportService {
             
             // Preparar parâmetros
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            injectStandardParameters(parameters);
             parameters.put("TOTAL_VEHICLES", vehicles.size());
             
             // Calcular estatísticas por status
@@ -200,7 +200,7 @@ public class JasperReportService {
             
             // Preparar parâmetros
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            injectStandardParameters(parameters);
             parameters.put("TOTAL_TRANSACTIONS", transactions.size());
             
             // Informações do arquivo
@@ -295,7 +295,7 @@ public class JasperReportService {
             
             // Preparar parâmetros
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            injectStandardParameters(parameters);
             parameters.put("PERIOD", formatPeriod(startDate, endDate));
             parameters.put("BANK_FILTER", bankName != null ? bankName : "Todos os bancos");
             parameters.put("TOTAL_TRANSACTIONS", transactions.size());
@@ -359,7 +359,7 @@ public class JasperReportService {
                                        String vehicleFilter, 
                                        String driverFilter,
                                        String statusFilter) throws IOException {
-        return generateFineReportPDF(fines, startDate, endDate, vehicleFilter, driverFilter, statusFilter);
+        return generateFineReportPDFSimple(fines, vehicleFilter, driverFilter, statusFilter);
     }
     
     private byte[] generateFineReportPDFSimple(List<FineReportDTO> fines, String vehicleFilter, String driverFilter, String statusFilter) throws IOException {
@@ -376,7 +376,7 @@ public class JasperReportService {
             
             // Preparar parâmetros mínimos
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            injectStandardParameters(parameters);
             parameters.put("TOTAL_FINES", fines.size());
             
             // Calcular valor total
@@ -574,7 +574,7 @@ public class JasperReportService {
             
             // Preparar parâmetros
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            injectStandardParameters(parameters);
             parameters.put("PERIOD", formatPeriod(startDate, endDate));
             parameters.put("TOTAL_ACCOUNTS", accounts.size());
             
@@ -654,7 +654,7 @@ public class JasperReportService {
             
             // Preparar parâmetros
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("GENERATION_DATE", LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            injectStandardParameters(parameters);
             parameters.put("PERIOD", formatPeriod(startDate, endDate));
             parameters.put("TOTAL_PAYMENTS", payments.size());
             
@@ -702,5 +702,12 @@ public class JasperReportService {
             log.error("Erro ao gerar relatório PDF de pagamentos agendados: " + e.getMessage(), e);
             throw new IOException("Erro ao gerar relatório de pagamentos agendados: " + e.getMessage(), e);
         }
+    }
+
+    private void injectStandardParameters(Map<String, Object> parameters) {
+        parameters.put("REPORT_USER", com.z7design.secured_guard.util.ReportIssuanceContext.resolveUserLabelForReportFooter());
+        parameters.put("REPORT_TIMESTAMP", com.z7design.secured_guard.util.ReportIssuanceContext.resolveReportTimestampFooter());
+        // Compatibilidade com templates antigos que usam GENERATION_DATE
+        parameters.put("GENERATION_DATE", com.z7design.secured_guard.util.ReportIssuanceContext.resolveReportTimestampFooter());
     }
 }

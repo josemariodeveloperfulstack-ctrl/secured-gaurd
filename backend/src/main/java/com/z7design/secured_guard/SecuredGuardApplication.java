@@ -18,7 +18,9 @@ import com.z7design.secured_guard.config.JwtConfig;
 @EnableMethodSecurity
 @EnableScheduling
 @EnableAsync
-@EntityScan("com.z7design.secured_guard.model")
+// Escanear todo o pacote raiz da app (inclui model e subpacotes). Apenas "model" pode falhar com
+// DevTools/class loaders ou deixar de alinhar com o @AutoConfigurationPackage em alguns cenários.
+@EntityScan(basePackages = "com.z7design.secured_guard")
 @EnableJpaRepositories("com.z7design.secured_guard.repository")
 @ComponentScan(basePackages = "com.z7design.secured_guard")
 public class SecuredGuardApplication {

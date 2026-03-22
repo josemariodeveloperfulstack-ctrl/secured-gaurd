@@ -41,5 +41,21 @@ public class OccurrenceResponseDTO {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+    
+    private UUID substituteId;
+    
+    private String substituteName;
+    
+    private String originalStartTime;
+    
+    private String originalEndTime;
+    
+    private String substituteStartTime;
+    
+    private String substituteEndTime;
+    
+    private Double totalHours;
+    
+    private String category;
 }
 

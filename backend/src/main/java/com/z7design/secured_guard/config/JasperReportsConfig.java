@@ -57,6 +57,9 @@ public class JasperReportsConfig {
         JasperReport jasperReport = compileReport(jrxmlPath);
         JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(data);
         
+        // Injetar parâmetros padrão se não estiverem presentes
+        injectStandardParameters(parameters);
+        
         JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
         
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -86,6 +89,9 @@ public class JasperReportsConfig {
         
         JasperReport jasperReport = compileReport(jrxmlPath);
         JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(data);
+        
+        // Injetar parâmetros padrão se não estiverem presentes
+        injectStandardParameters(parameters);
         
         JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
         
@@ -121,4 +127,20 @@ public class JasperReportsConfig {
         parameters.put("COMPANY_EMAIL", "contato@secureguard.com.br");
         return parameters;
     }
-} 
+
+    private void injectStandardParameters(Map<String, Object> parameters) {
+        if (!parameters.containsKey("REPORT_USER")) {
+            parameters.put("REPORT_USER", com.z7design.secured_guard.util.ReportIssuanceContext.resolveUserLabelForReportFooter());
+        }
+        if (!parameters.containsKey("REPORT_TIMESTAMP")) {
+            parameters.put("REPORT_TIMESTAMP", com.z7design.secured_guard.util.ReportIssuanceContext.resolveReportTimestampFooter());
+        }
+        // Compatibilidade com templates que usam GENERATION_DATE ou GENERATED_DATE
+        if (!parameters.containsKey("GENERATION_DATE")) {
+            parameters.put("GENERATION_DATE", com.z7design.secured_guard.util.ReportIssuanceContext.resolveReportTimestampFooter());
+        }
+        if (!parameters.containsKey("GENERATED_DATE")) {
+            parameters.put("GENERATED_DATE", java.time.LocalDateTime.now());
+        }
+    }
+}

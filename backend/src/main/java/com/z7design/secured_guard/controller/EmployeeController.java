@@ -30,6 +30,8 @@ import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 
 import jakarta.validation.Valid;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -245,29 +247,39 @@ public class EmployeeController {
                 employee.put("status", row[7]); // status está na posição 7
                 employee.put("createdAt", row[17]); // created_at está na posição 17
 
-                // Adicionar position e unit
-                if (row.length > 19 && row[19] != null) {
+                // Adicionar position, unit, company, workPost e department
+                if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                     java.util.Map<String, Object> position = new java.util.HashMap<>();
-                    position.put("name", row[19]); // position_name
+                    if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19));
+                    if (safeAt(row, 28) != null) position.put("id", safeAt(row, 28));
                     employee.put("position", position);
                 }
 
-                if (row.length > 20 && row[20] != null) {
+                if (safeAt(row, 20) != null || safeAt(row, 25) != null) {
                     java.util.Map<String, Object> unit = new java.util.HashMap<>();
-                    unit.put("name", row[20]); // unit_name
+                    if (safeAt(row, 20) != null) unit.put("name", safeAt(row, 20));
+                    if (safeAt(row, 25) != null) unit.put("id", safeAt(row, 25));
                     employee.put("unit", unit);
                 }
 
-                // Adicionar company (sigla) se existir (index 21)
-                if (row.length > 21 && row[21] != null) {
+                if (safeAt(row, 21) != null || safeAt(row, 26) != null) {
                     java.util.Map<String, Object> company = new java.util.HashMap<>();
-                    company.put("sigla", row[21]); // company_sigla
+                    if (safeAt(row, 21) != null) company.put("sigla", safeAt(row, 21));
+                    if (safeAt(row, 26) != null) company.put("id", safeAt(row, 26));
                     employee.put("company", company);
                 }
 
-                // Adicionar userId se existir (index 22)
-                if (row.length > 22 && row[22] != null) {
-                    employee.put("userId", row[22]);
+                if (safeAt(row, 22) != null) {
+                    employee.put("userId", safeAt(row, 22));
+                }
+
+                putWorkPostIfPresent(employee, row);
+
+                if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
+                    java.util.Map<String, Object> department = new java.util.HashMap<>();
+                    if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24));
+                    if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29));
+                    employee.put("department", department);
                 }
 
                 employees.add(employee);
@@ -338,9 +350,10 @@ public class EmployeeController {
                     employee.put("updatedAt", row[18]);
 
                     // Adicionar position e unit (novas colunas da query)
-                    if (safeAt(row, 19) != null) {
+                    if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                         java.util.Map<String, Object> position = new java.util.HashMap<>();
-                        position.put("name", safeAt(row, 19)); // position_name
+                        if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19)); // position_name
+                        if (safeAt(row, 28) != null) position.put("id", safeAt(row, 28)); // position_id
                         employee.put("position", position);
                     }
 
@@ -364,18 +377,13 @@ public class EmployeeController {
                         employee.put("userId", safeAt(row, 22));
                     }
 
-                    // Adicionar workPost apenas se tiver nome (evita "Posto Inválido" no front)
-                    if (safeAt(row, 23) != null) {
-                        java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                        workPost.put("name", safeAt(row, 23)); // work_post_name
-                        if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27)); // work_post_id
-                        employee.put("workPost", workPost);
-                    }
+                    putWorkPostIfPresent(employee, row);
 
-                    // Adicionar department se existir (index 24)
-                    if (safeAt(row, 24) != null) {
+                    // Adicionar department se existir (index 24 ou 29)
+                    if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
                         java.util.Map<String, Object> department = new java.util.HashMap<>();
-                        department.put("name", safeAt(row, 24)); // department_name
+                        if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24)); // department_name
+                        if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29)); // department_id
                         employee.put("department", department);
                     }
 
@@ -457,9 +465,10 @@ public class EmployeeController {
                 employee.put("createdAt", safeAt(row, 17));
                 employee.put("updatedAt", safeAt(row, 18));
 
-                if (safeAt(row, 19) != null) {
+                if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                     java.util.Map<String, Object> position = new java.util.HashMap<>();
-                    position.put("name", safeAt(row, 19));
+                    if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19));
+                    if (safeAt(row, 28) != null) position.put("id", safeAt(row, 28));
                     employee.put("position", position);
                 }
                 if (safeAt(row, 20) != null || safeAt(row, 25) != null) {
@@ -475,15 +484,16 @@ public class EmployeeController {
                     employee.put("company", company);
                 }
                 if (safeAt(row, 22) != null) employee.put("userId", safeAt(row, 22));
-                if (safeAt(row, 23) != null) {
+                if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
                     java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                    workPost.put("name", safeAt(row, 23));
+                    if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23));
                     if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27));
                     employee.put("workPost", workPost);
                 }
-                if (safeAt(row, 24) != null) {
+                if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
                     java.util.Map<String, Object> department = new java.util.HashMap<>();
-                    department.put("name", safeAt(row, 24));
+                    if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24));
+                    if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29));
                     employee.put("department", department);
                 }
                 employees.add(employee);
@@ -497,6 +507,127 @@ public class EmployeeController {
             e.printStackTrace();
             return ResponseEntity.status(500).body(java.util.Collections.emptyList());
         }
+    }
+
+    @GetMapping("/birthdays")
+    @Operation(summary = "Aniversariantes do mês", description = "Lista funcionários com data de nascimento no mês informado (ordenado por dia e nome)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Mês inválido")
+    })
+    @Transactional(readOnly = true)
+    public ResponseEntity<Object> getBirthdaysByMonth(
+            @RequestParam int month,
+            @RequestParam(defaultValue = "true") boolean onlyActive,
+            @RequestParam(required = false) Integer referenceYear,
+            @RequestParam(required = false) UUID companyId) {
+        try {
+            if (month < 1 || month > 12) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Parâmetro month deve ser entre 1 e 12"));
+            }
+            int year = referenceYear != null ? referenceYear : java.time.Year.now().getValue();
+            List<Object[]> data = employeeService.findBasicDataByBirthMonth(month, onlyActive, companyId);
+            List<Map<String, Object>> employees = new ArrayList<>();
+            for (Object[] row : data) {
+                Map<String, Object> employee = mapBasicRowToEmployeeMap(row);
+                Object bd = employee.get("birthDate");
+                LocalDate birth = toLocalDate(bd);
+                if (birth != null) {
+                    employee.put("birthDayOfMonth", birth.getDayOfMonth());
+                    employee.put("ageTurning", year - birth.getYear());
+                }
+                employees.add(employee);
+            }
+            Map<String, Object> body = new HashMap<>();
+            body.put("month", month);
+            body.put("referenceYear", year);
+            body.put("count", employees.size());
+            body.put("employees", employees);
+            return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeController.getBirthdaysByMonth - Erro: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Converte uma linha da query nativa {@code findBasicData*} no mesmo formato de {@link #getAll(String)}.
+     */
+    private static Map<String, Object> mapBasicRowToEmployeeMap(Object[] row) {
+        Map<String, Object> employee = new HashMap<>();
+        employee.put("id", row[0]);
+        employee.put("name", row[1]);
+        employee.put("document", row[2]);
+        employee.put("birthDate", row[3]);
+        employee.put("registrationNumber", row[4]);
+        employee.put("hireDate", row[5]);
+        employee.put("terminationDate", row[6]);
+        employee.put("status", row[7]);
+        employee.put("notes", row[8]);
+        employee.put("address", row[9]);
+        employee.put("phone", row[10]);
+        employee.put("email", row[11]);
+        employee.put("cnhNumber", row[12]);
+        employee.put("ctps", row[13]);
+        employee.put("cbo", row[14]);
+        employee.put("pis", row[15]);
+        employee.put("salario", row[16]);
+        employee.put("createdAt", row[17]);
+        employee.put("updatedAt", row[18]);
+        if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
+            Map<String, Object> position = new HashMap<>();
+            if (safeAt(row, 19) != null) position.put("name", safeAt(row, 19));
+            if (safeAt(row, 28) != null) position.put("id", safeAt(row, 28));
+            employee.put("position", position);
+        }
+        if (safeAt(row, 20) != null || safeAt(row, 25) != null) {
+            Map<String, Object> unit = new HashMap<>();
+            if (safeAt(row, 20) != null) unit.put("name", safeAt(row, 20));
+            if (safeAt(row, 25) != null) unit.put("id", safeAt(row, 25));
+            employee.put("unit", unit);
+        }
+        if (safeAt(row, 21) != null || safeAt(row, 26) != null) {
+            Map<String, Object> company = new HashMap<>();
+            if (safeAt(row, 21) != null) company.put("sigla", safeAt(row, 21));
+            if (safeAt(row, 26) != null) company.put("id", safeAt(row, 26));
+            employee.put("company", company);
+        }
+        if (safeAt(row, 22) != null) {
+            employee.put("userId", safeAt(row, 22));
+        }
+        putWorkPostIfPresent(employee, row);
+        if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
+            Map<String, Object> department = new HashMap<>();
+            if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24));
+            if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29));
+            employee.put("department", department);
+        }
+        return employee;
+    }
+
+    private static LocalDate toLocalDate(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof java.sql.Date d) {
+            return d.toLocalDate();
+        }
+        if (value instanceof java.util.Date d) {
+            return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+        if (value instanceof Instant i) {
+            return i.atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+        if (value instanceof LocalDate ld) {
+            return ld;
+        }
+        if (value instanceof java.time.LocalDateTime ldt) {
+            return ldt.toLocalDate();
+        }
+        return null;
     }
 
     @GetMapping("/{id}")
@@ -1013,5 +1144,30 @@ public class EmployeeController {
 
     private static Object safeAt(Object[] row, int i) {
         return (row != null && i >= 0 && i < row.length) ? row[i] : null;
+    }
+
+    /**
+     * Monta {@code workPost} a partir da linha da query nativa (índices 23 = nome do join, 27 = id em employees).
+     * Quando {@code work_post_id} está preenchido mas o registro foi removido de {@code work_posts},
+     * o JOIN não traz nome — enviamos rótulo explícito para o frontend não tratar como "posto inválido" sem contexto.
+     */
+    private static void putWorkPostIfPresent(java.util.Map<String, Object> employee, Object[] row) {
+        Object wpName = safeAt(row, 23);
+        Object wpId = safeAt(row, 27);
+        if (wpName == null && wpId == null) {
+            return;
+        }
+        java.util.Map<String, Object> workPost = new java.util.HashMap<>();
+        if (wpId != null) {
+            workPost.put("id", wpId);
+        }
+        if (wpName != null) {
+            workPost.put("name", wpName);
+        } else {
+            // wpName == null e ainda entramos aqui ⇒ wpId != null (senão teríamos retornado no início)
+            workPost.put("name", "Posto removido ou inexistente (atualize o cadastro)");
+            workPost.put("orphanWorkPost", Boolean.TRUE);
+        }
+        employee.put("workPost", workPost);
     }
 }

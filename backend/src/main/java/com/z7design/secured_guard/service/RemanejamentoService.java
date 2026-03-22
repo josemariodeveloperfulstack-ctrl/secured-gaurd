@@ -14,6 +14,7 @@ import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.RemanejamentoRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
+import com.z7design.secured_guard.repository.WorkScheduleRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -58,6 +59,12 @@ public class RemanejamentoService {
 
     @Autowired
     private EmployeeChangeHistoryService employeeChangeHistoryService;
+
+    @Autowired
+    private com.z7design.secured_guard.repository.RemanejamentoHistoricoRepository historicoRepository;
+
+    @Autowired
+    private WorkScheduleRepository workScheduleRepository;
 
     /**
      * Cria um novo remanejamento e registra no histórico
@@ -126,12 +133,25 @@ public class RemanejamentoService {
 
         Remanejamento existing = existingOpt.get();
 
+        // Escalas podem referenciar este remanejamento (coluna remanejamento_id em work_schedules)
+        int cleared = workScheduleRepository.clearRemanejamentoIdByRemanejamentoId(id);
+        if (cleared > 0) {
+            log.info("Removido vínculo remanejamento_id de {} escala(s) antes de excluir remanejamento {}", cleared, id);
+        }
+
         // Registrar no histórico antes de deletar
         historicoService.registrarAcao(
                 existing,
                 AcaoHistorico.EXCLUSAO,
                 usuarioQueExecutou,
                 motivoAlteracao != null ? motivoAlteracao : "Exclusão de remanejamento");
+
+        // Nullificar referências no histórico para evitar 409 Conflict na exclusão
+        List<RemanejamentoHistorico> historicos = historicoRepository.findByRemanejamentoIdOrderByDataExecucaoDesc(id);
+        for (RemanejamentoHistorico h : historicos) {
+            h.setRemanejamento(null);
+            historicoRepository.save(h);
+        }
 
         remanejamentoRepository.deleteById(id);
     }

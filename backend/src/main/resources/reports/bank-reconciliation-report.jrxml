@@ -13,6 +13,8 @@
     
     <!-- Parâmetros -->
     <parameter name="GENERATION_DATE" class="java.lang.String"/>
+    <parameter name="REPORT_USER" class="java.lang.String"/>
+    <parameter name="REPORT_TIMESTAMP" class="java.lang.String"/>
     <parameter name="TOTAL_TRANSACTIONS" class="java.lang.Integer"/>
     <parameter name="FILE_NAME" class="java.lang.String"/>
     <parameter name="BANK_NAME" class="java.lang.String"/>
@@ -230,8 +232,15 @@
     <pageFooter>
         <band height="30">
             <textField>
-                <reportElement x="0" y="0" width="555" height="15"/>
-                <textElement textAlignment="Center">
+                <reportElement x="0" y="0" width="300" height="15"/>
+                <textElement textAlignment="Left">
+                    <font size="8"/>
+                </textElement>
+                <textFieldExpression><![CDATA["Gerado por: " + $P{REPORT_USER} + " em: " + $P{REPORT_TIMESTAMP}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="355" y="0" width="200" height="15"/>
+                <textElement textAlignment="Right">
                     <font size="8"/>
                 </textElement>
                 <textFieldExpression><![CDATA["Página " + $V{PAGE_NUMBER} + " de " + $V{PAGE_COUNT}]]></textFieldExpression>

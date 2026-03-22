@@ -375,6 +375,12 @@ public class ActivityReportService {
         return ActivityReportDTO.fromEntity(rejectedReport);
     }
 
+    /**
+     * Transação read-only na operação inteira: {@link #getActivityReports} é chamado via {@code this}
+     * (sem proxy), logo o {@code @Transactional} desse método não entra em efeito — o mapeamento em
+     * {@link ActivityReportDTO#fromEntity} precisa da mesma sessão Hibernate para coleções lazy (photos, documents).
+     */
+    @Transactional(readOnly = true)
     public byte[] generatePDFReport(UUID employeeId, UUID clientId, LocalDate startDate, LocalDate endDate) {
         log.info("Gerando relatório PDF de atividades - EmployeeId: {}, ClientId: {}, StartDate: {}, EndDate: {}",
                 employeeId, clientId, startDate, endDate);

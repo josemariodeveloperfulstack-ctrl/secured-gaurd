@@ -1048,6 +1048,30 @@ public class EmployeeService {
     }
 
     /**
+     * Dados básicos de funcionários com aniversário no mês informado (1–12).
+     */
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataByBirthMonth(int month, boolean onlyActive, java.util.UUID companyId) {
+        if (month < 1 || month > 12) {
+            throw new IllegalArgumentException("Mês deve estar entre 1 e 12");
+        }
+        int onlyActiveFlag = onlyActive ? 1 : 0;
+        int companyFilter = companyId != null ? 1 : 0;
+        try {
+            System.out.println("🔍 EmployeeService.findBasicDataByBirthMonth - month=" + month + " onlyActive="
+                    + onlyActive + " companyId=" + companyId);
+            List<Object[]> data = employeeRepository.findBasicDataByBirthMonth(month, onlyActiveFlag, companyFilter,
+                    companyId);
+            System.out.println("✅ EmployeeService.findBasicDataByBirthMonth - " + data.size() + " registros");
+            return data;
+        } catch (Exception e) {
+            System.err.println("❌ EmployeeService.findBasicDataByBirthMonth - Erro: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erro ao buscar aniversariantes: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Versão paginada de findBasicData para ambientes com muitos registros.
      * status: opcional, ex. "ACTIVE" para filtrar apenas ativos
      */

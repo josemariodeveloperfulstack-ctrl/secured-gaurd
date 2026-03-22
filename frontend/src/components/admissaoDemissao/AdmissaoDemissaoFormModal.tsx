@@ -16,6 +16,21 @@ import { Unit } from '@/types/unit';
 import { Position } from '@/services/positionService';
 import { admissionRequestService, AdmissionRequest } from '@/services/admissionRequestService';
 import { useToast } from '@/hooks/use-toast';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import WorkPostAssignmentFormModal from '@/components/operacional/WorkPostAssignmentFormModal';
+import { modeloDocumentoService, ModeloDocumento } from '@/services/modeloDocumentoService';
+import { documentoGeradoService, DocumentoGerado } from '@/services/documentoGeradoService';
+import { operationalService } from '@/services/operationalService';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CheckCircle2, AlertCircle, FileType, Printer, Download, Trash2 as TrashIcon } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AdmissaoDemissaoFormModalProps {
   isOpen: boolean;
@@ -28,6 +43,7 @@ interface AdmissaoDemissaoFormModalProps {
 
 const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ isOpen, onClose, onSuccess, request }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [form, setForm] = useState({
     tipo: 'admissao',
     funcionario: '',
@@ -62,6 +78,12 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
   const [defaultEpis, setDefaultEpis] = useState<Array<{ epiName: string; quantity: string; caNumber: string; validity: string; observations: string }>>([
     { epiName: '', quantity: '1', caNumber: '', validity: '', observations: '' }
   ]);
+  const [showWorkPostModal, setShowWorkPostModal] = useState(false);
+  const [employeeDetailed, setEmployeeDetailed] = useState<any>(null);
+  const [modelos, setModelos] = useState<ModeloDocumento[]>([]);
+  const [documentosFuncionario, setDocumentosFuncionario] = useState<DocumentoGerado[]>([]);
+  const [activeTab, setActiveTab] = useState('dados');
+  const [isGeneratingDoc, setIsGeneratingDoc] = useState<string | null>(null);
 
   // Carregar dados quando o modal abrir
   useEffect(() => {
@@ -73,7 +95,7 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
           tipo: 'admissao', 
           funcionario: '', 
           data: '', 
-          solicitante: '', 
+          solicitante: user?.name || '', 
           empresa: '', 
           unidade: '', 
           cliente: '', 
@@ -87,8 +109,190 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
       loadUnidades();
       loadClientes();
       loadPostos();
+      loadModelos();
     }
   }, [isOpen]);
+
+  // Carregar documentos quando o funcionário mudar
+  useEffect(() => {
+    if (form.funcionario) {
+      loadDocumentosFuncionario(form.funcionario);
+      fetchEmployeeDetails(form.funcionario);
+    } else {
+      setDocumentosFuncionario([]);
+      setEmployeeDetailed(null);
+    }
+  }, [form.funcionario]);
+
+  const loadModelos = async () => {
+    try {
+      const data = await modeloDocumentoService.listarTodos();
+      setModelos(data);
+    } catch (error) {
+      console.error('Erro ao carregar modelos:', error);
+    }
+  };
+
+  const loadDocumentosFuncionario = async (id: string) => {
+    try {
+      const docs = await documentoGeradoService.listarPorFuncionario(id);
+      setDocumentosFuncionario(docs);
+    } catch (error) {
+      console.error('Erro ao carregar documentos do funcionário:', error);
+    }
+  };
+
+  const fetchEmployeeDetails = async (id: string) => {
+    try {
+      const emp = await employeeService.getEmployeeById(id);
+      if (!emp) return;
+      
+      setEmployeeDetailed(emp);
+      
+      setForm(prev => {
+        const next = { ...prev };
+        
+        // Empresa
+        if (emp.company?.id) {
+          next.empresa = String(emp.company.id);
+        } else if ((emp as any).companyId) {
+          next.empresa = String((emp as any).companyId);
+        }
+        
+        // Unidade
+        if (emp.unit?.id) {
+          next.unidade = String(emp.unit.id);
+        } else if ((emp as any).unitId) {
+          next.unidade = String((emp as any).unitId);
+        }
+        
+        // Posto de Trabalho
+        if (emp.workPost?.id) {
+          next.posto = String(emp.workPost.id);
+          
+          // Cliente pelo Posto
+          if (emp.workPost.client?.id) {
+            next.cliente = String(emp.workPost.client.id);
+          } else if ((emp as any).workPost?.clientId) {
+            next.cliente = String((emp as any).workPost.clientId);
+          }
+        } else if (emp.workPostId) {
+          next.posto = String(emp.workPostId);
+        }
+        
+        // Se ainda não achou cliente no posto, tentar no funcionário direto
+        if (!next.cliente) {
+          if (emp.client?.id) {
+            next.cliente = String(emp.client.id);
+          } else if (emp.clientId) {
+            next.cliente = String(emp.clientId);
+          }
+        }
+        
+        return next;
+      });
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do funcionário:', error);
+    }
+  };
+
+  const handleSelectFuncionario = (id: string) => {
+    setForm(f => ({ ...f, funcionario: id }));
+  };
+
+  const handleGerarDocumento = async (modeloId: string) => {
+    if (!form.funcionario) return;
+    
+    setIsGeneratingDoc(modeloId);
+    try {
+      await documentoGeradoService.gerarDocumento({
+        modeloId,
+        funcionarioId: form.funcionario,
+        dadosPreenchidos: {} // O backend preenche automaticamente o que puder
+      });
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Documento gerado com sucesso.',
+      });
+      
+      loadDocumentosFuncionario(form.funcionario);
+    } catch (error) {
+      console.error('Erro ao gerar documento:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar o documento.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingDoc(null);
+    }
+  };
+
+  const handleAssinarDocumento = async (id: string) => {
+    try {
+      await documentoGeradoService.assinarDocumento(id);
+      toast({
+        title: 'Sucesso',
+        description: 'Documento assinado com sucesso.',
+      });
+      if (form.funcionario) loadDocumentosFuncionario(form.funcionario);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao assinar documento.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDownloadDocumento = async (id: string, nome: string) => {
+    try {
+      const blob = await documentoGeradoService.downloadArquivo(id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nome;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao baixar documento.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleExcluirDocumento = async (id: string) => {
+    if (!confirm('Deseja realmente excluir este documento?')) return;
+    try {
+      await documentoGeradoService.excluirDocumento(id);
+      toast({
+        title: 'Sucesso',
+        description: 'Documento excluído.',
+      });
+      if (form.funcionario) loadDocumentosFuncionario(form.funcionario);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao excluir documento.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleWorkPostAssigned = async () => {
+    setShowWorkPostModal(false);
+    if (form.funcionario) {
+      await fetchEmployeeDetails(form.funcionario);
+      toast({
+        title: 'Sucesso',
+        description: 'Posto de trabalho vinculado com sucesso.',
+      });
+    }
+  };
   
   // Preencher formulário quando os dados e o request estiverem disponíveis
   useEffect(() => {
@@ -162,7 +366,7 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
       tipo: req.type === 'ADMISSION' ? 'admissao' : 'demissao',
       funcionario: funcionario?.id || '',
       data: dataFormatada,
-      solicitante: req.requesterName || '',
+      solicitante: req.requesterName || user?.name || '',
       empresa: empresaEncontrada?.id || '',
       unidade: unidade?.id || req.unitId || '',
       cliente: '', // Não temos cliente no request
@@ -428,9 +632,32 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
           </Button>
         </div>
         
-        {/* Formulário */}
-        <div className="overflow-y-auto max-h-[calc(95vh-80px)]">
-          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
+        {/* Tabs Selection */}
+        <div className="px-6 border-b border-gray-600 bg-gray-800/50">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="bg-transparent border-b-0 w-full justify-start h-12 p-0 gap-8">
+              <TabsTrigger 
+                value="dados" 
+                className="data-[state=active]:bg-transparent data-[state=active]:text-seguranca-yellow data-[state=active]:border-b-2 data-[state=active]:border-seguranca-yellow rounded-none h-full px-2 font-semibold transition-all"
+              >
+                Dados da Solicitação
+              </TabsTrigger>
+              <TabsTrigger 
+                value="documentos" 
+                disabled={!form.funcionario}
+                className="data-[state=active]:bg-transparent data-[state=active]:text-seguranca-yellow data-[state=active]:border-b-2 data-[state=active]:border-seguranca-yellow rounded-none h-full px-2 font-semibold transition-all disabled:opacity-50"
+              >
+                Documentos de Admissão
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        
+        {/* Conteúdo */}
+        <div className="overflow-y-auto max-h-[calc(95vh-130px)]">
+          <Tabs value={activeTab} className="w-full">
+            <TabsContent value="dados">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
             {/* Seção Principal */}
             <div className="space-y-6">
               {/* Informações Básicas */}
@@ -475,22 +702,12 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
                         </Button>
                       )}
                     </div>
-                    <select
-                      id="funcionario"
-                      className={`w-full rounded-lg bg-gray-700 text-white border-2 transition-all duration-200 focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow p-3 ${errors.funcionario ? 'border-red-500' : 'border-gray-600'}`}
+                    <EmployeeCombobox
                       value={form.funcionario}
-                      onChange={e => setForm(f => ({ ...f, funcionario: e.target.value }))}
-                      disabled={loadingFuncionarios}
-                    >
-                      <option value="">
-                        {loadingFuncionarios ? 'Carregando funcionários...' : 'Selecione...'}
-                      </option>
-                      {funcionarios.map(f => (
-                        <option key={f.id} value={f.id}>
-                          {f.name} {f.registrationNumber ? `(${f.registrationNumber})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={handleSelectFuncionario}
+                      placeholder={loadingFuncionarios ? 'Carregando...' : 'Selecione o funcionário'}
+                      initialDisplayName={request?.employeeName}
+                    />
                     {errors.funcionario && <span className="text-xs text-red-400 flex items-center mt-1">
                       <span className="w-1 h-1 bg-red-400 rounded-full mr-1"></span>
                       {errors.funcionario}
@@ -637,8 +854,23 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
                 
                 <div className="mt-4">
                   {/* Posto de Trabalho Atual */}
+                  {/* Posto de Trabalho */}
                   <div className="space-y-2">
-                    <Label htmlFor="posto" className="text-sm font-medium text-gray-200">Posto de Trabalho Atual *</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="posto" className="text-sm font-medium text-gray-200">Posto de Trabalho *</Label>
+                      {form.funcionario && !employeeDetailed?.workPost && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowWorkPostModal(true)}
+                          className="text-seguranca-yellow hover:text-yellow-400 text-xs px-2 py-1 h-auto bg-yellow-500/10 hover:bg-yellow-500/20 rounded-md transition-all duration-200"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Alocar Posto
+                        </Button>
+                      )}
+                    </div>
                     <select
                       id="posto"
                       className={`w-full rounded-lg bg-gray-700 text-white border-2 transition-all duration-200 focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow p-3 ${errors.posto ? 'border-red-500' : 'border-gray-600'}`}
@@ -659,6 +891,12 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
                       <span className="w-1 h-1 bg-red-400 rounded-full mr-1"></span>
                       {errors.posto}
                     </span>}
+                    {employeeDetailed?.workPost && (
+                      <p className="text-[10px] text-green-400 flex items-center mt-1">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Posto atual: {employeeDetailed.workPost.name}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -846,15 +1084,164 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
                 </Button>
               </div>
             </div>
-          </form>
+              </form>
+            </TabsContent>
+            
+            <TabsContent value="documentos" className="p-4 sm:p-6 space-y-6">
+              {/* Seção de Geração */}
+              <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-600">
+                <h3 className="text-sm font-semibold text-seguranca-yellow mb-6 flex items-center">
+                  <div className="w-2 h-2 bg-seguranca-yellow rounded-full mr-2"></div>
+                  Modelos Disponíveis para Geração
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {modelos.filter(m => !m.categoria || m.categoria.toUpperCase().includes('ADMISSAO')).map((modelo) => (
+                    <div key={modelo.id} className="bg-seguranca-graphite border border-gray-600 rounded-lg p-4 flex items-center justify-between hover:border-seguranca-yellow transition-all group">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-700 rounded-lg text-gray-400 group-hover:text-seguranca-yellow">
+                          <FileType className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{modelo.nomeModelo}</p>
+                          <p className="text-xs text-gray-400">{modelo.descricao || 'Documento padrão'}</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleGerarDocumento(modelo.id)}
+                        disabled={isGeneratingDoc === modelo.id}
+                        className="bg-seguranca-yellow text-black hover:bg-yellow-500 font-bold px-4"
+                      >
+                        {isGeneratingDoc === modelo.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Gerar'
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  {modelos.length === 0 && (
+                    <div className="col-span-2 py-8 text-center text-gray-400 flex flex-col items-center">
+                      <AlertCircle className="h-10 w-10 mb-2 opacity-20" />
+                      <p>Nenhum modelo de documento encontrado.</p>
+                      <p className="text-xs">
+                        {'Cadastre modelos no menu Configurações > Documentos.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Seção de Documentos já Gerados */}
+              <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-600">
+                <h3 className="text-sm font-semibold text-seguranca-yellow mb-6 flex items-center">
+                  <div className="w-2 h-2 bg-seguranca-yellow rounded-full mr-2"></div>
+                  Documentos Gerados
+                </h3>
+                
+                <div className="space-y-3">
+                  {documentosFuncionario.map((doc) => (
+                    <div key={doc.id} className="bg-seguranca-graphite border border-gray-700/50 rounded-lg p-4 flex items-center justify-between border-l-4 border-l-seguranca-yellow">
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col">
+                          <p className="text-sm font-medium text-white">{doc.nomeArquivoGerado}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-gray-400">
+                              Gerado em: {new Date(doc.dataCriacao).toLocaleDateString()}
+                            </span>
+                            <Badge variant="outline" className={`text-[10px] h-4 py-0 ${
+                              doc.status === 'ASSINADO' ? 'text-green-400 border-green-400' : 'text-yellow-400 border-yellow-400'
+                            }`}>
+                              {doc.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDownloadDocumento(doc.id, doc.nomeArquivoGerado)}
+                                className="h-8 w-8 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-400/10"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Baixar PDF</TooltipContent>
+                          </Tooltip>
+
+                          {doc.status !== 'ASSINADO' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleAssinarDocumento(doc.id)}
+                                  className="h-8 w-8 p-0 text-green-400 hover:text-green-300 hover:bg-green-400/10"
+                                >
+                                  <FileType className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Assinar Documento</TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleExcluirDocumento(doc.id)}
+                                className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Excluir</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {documentosFuncionario.length === 0 && (
+                    <div className="py-12 text-center text-gray-500 border-2 border-dashed border-gray-700 rounded-xl">
+                      <Printer className="h-12 w-12 mx-auto mb-3 opacity-10" />
+                      <p className="text-sm">Nenhum documento gerado para este funcionário.</p>
+                      <p className="text-xs mt-1">Selecione um modelo acima para começar.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
+
 
       {/* Modal de Novo Funcionário */}
       <FuncionarioNovoModal
         open={showFuncionarioModal}
         onClose={() => setShowFuncionarioModal(false)}
         onCreated={handleFuncionarioCreated}
+      />
+
+      {/* Modal de Alocação de Posto */}
+      <WorkPostAssignmentFormModal
+        open={showWorkPostModal}
+        onOpenChange={setShowWorkPostModal}
+        onSubmit={async (data) => {
+          await operationalService.createWorkPostAssignment(data);
+          handleWorkPostAssigned();
+        }}
+        employees={funcionarios}
+        fixedEmployeeId={form.funcionario}
       />
 
       {/* Modal de Visualização */}

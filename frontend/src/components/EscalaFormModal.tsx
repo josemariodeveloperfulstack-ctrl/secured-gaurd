@@ -31,9 +31,15 @@ import {
   AlertCircle,
   CheckCircle2,
   Calendar as CalendarLucide,
-  Users,
-  Eye
+  Eye,
+  Activity
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { ClientSearchCombobox } from '@/components/ui/client-search-combobox';
+import type { ScheduleStatus } from '@/services/scheduleService';
+import { employeeService } from '@/services/employeeService';
+import { clientService } from '@/services/clientService';
 
 interface EscalaFormModalProps {
   open: boolean;
@@ -52,6 +58,10 @@ interface EscalaFormData {
   startTime: string;
   endTime: string;
   observations: string;
+  sigla?: string;
+  isMonitoria?: boolean;
+  isHoraExtra?: boolean;
+  status?: string;
 }
 
 interface ValidationErrors {
@@ -86,62 +96,51 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     startTime: '',
     endTime: '',
     status: 'PENDING',
-    observations: ''
+    observations: '',
+    sigla: '',
+    isMonitoria: false,
+    isHoraExtra: false
   });
 
   const [formData, setFormData] = useState<EscalaFormData>(getDefaultFormData());
   const [selectedClientId, setSelectedClientId] = useState<string>(''); // Cliente selecionado (para exibição)
 
-  const [usuarios, setUsuarios] = useState<{ id: string; name: string }[]>([]);
-  const [clientes, setClientes] = useState<{ id: string; name: string }[]>([]);
+  /** Nomes para modo visualização e rótulos iniciais nos comboboxes */
+  const [displayEmployeeName, setDisplayEmployeeName] = useState('');
+  const [displayClientName, setDisplayClientName] = useState('');
+
   const [postosTrabalho, setPostosTrabalho] = useState<{ id: string; name: string; postCode: string; clientId?: string }[]>([]);
   const [postosFiltrados, setPostosFiltrados] = useState<{ id: string; name: string; postCode: string }[]>([]);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const { toast } = useToast();
+  
+  // Helper para garantir que um posto de trabalho esteja na lista (evita duplicados)
+  const ensureWorkPostInList = (wp: any) => {
+    if (!wp || !wp.id) return;
+    const wpId = String(wp.id);
+    
+    setPostosTrabalho(prev => {
+      if (prev.find(p => String(p.id) === wpId)) return prev;
+      
+      console.log('➕ Adicionando posto ausente à lista local:', wp.name, `(${wpId})`);
+      return [...prev, {
+        id: wpId,
+        name: wp.name,
+        postCode: wp.postCode || '',
+        clientId: wp.clientId,
+        clientName: wp.clientName
+      }];
+    });
+  };
 
   // Carregar dados do backend quando o modal abrir
   useEffect(() => {
     if (!open) return; // Não carregar se o modal estiver fechado
 
     const loadData = async () => {
-      console.log('🔄 Carregando dados para o modal de escala...');
-
-      try {
-        // Carregar funcionários (employees, não users)
-        const { employeeService } = await import('@/services/employeeService');
-        const employees: any = await employeeService.getAllEmployees();
-        // employeeService pode retornar um objeto com 'content' ou um array direto
-        const employeesList = Array.isArray(employees)
-          ? employees
-          : (employees?.content || []);
-        const mappedEmployees = employeesList.map((e: any) => ({
-          id: e.id,
-          name: e.name || e.nome || 'Funcionário sem nome'
-        }));
-        setUsuarios(mappedEmployees);
-        console.log('✅ Funcionários carregados:', mappedEmployees.length);
-      } catch (error) {
-        console.error('❌ Erro ao carregar funcionários:', error);
-        setUsuarios([]);
-      }
-
-      try {
-        // Carregar clientes
-        const { clientService } = await import('@/services/clientService');
-        const clients = await clientService.getAllClients();
-        const mappedClients = clients.map(c => ({ id: c.id, name: c.name }));
-        setClientes(mappedClients);
-        console.log('✅ Clientes carregados:', mappedClients.length, mappedClients);
-      } catch (error) {
-        console.error('❌ Erro ao carregar clientes:', error);
-        console.error('❌ Detalhes do erro:', error);
-        setClientes([]);
-      }
-
-      // Não precisamos mais carregar locations separadas
-      // O Posto de Trabalho será usado como locationId
+      console.log('🔄 Carregando postos para o modal de escala...');
 
       try {
         // Carregar postos de trabalho
@@ -151,7 +150,8 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           id: wp.id,
           name: wp.name,
           postCode: wp.postCode || '',
-          clientId: wp.clientId
+          clientId: wp.clientId,
+          clientName: wp.clientName
         }));
         setPostosTrabalho(mappedWorkPosts);
         setPostosFiltrados(mappedWorkPosts); // Inicializar com todos os postos
@@ -167,19 +167,91 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     loadData();
   }, [open]); // Executar quando o modal abrir
 
-  // Atualizar lista de postos filtrados quando postosTrabalho ou cliente selecionado mudar
+  /** Se a API da escala não trouxe clientId no workPost (JSON antigo), busca o posto e preenche o cliente. */
+  useEffect(() => {
+    if (!open || mode === 'create') return;
+    const wpId = String(formData.workPostId || formData.locationId || '').trim();
+    if (!wpId || wpId === 'none') return;
+    if (selectedClientId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { workPostService } = await import('@/services/workPostService');
+        const wp = await workPostService.getWorkPostById(wpId);
+        if (cancelled || !wp?.clientId) return;
+        ensureWorkPostInList(wp);
+        setSelectedClientId(String(wp.clientId));
+        if (wp.clientName) setDisplayClientName(wp.clientName);
+      } catch {
+        /* silencioso — posto pode não existir ou sem permissão */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, formData.workPostId, formData.locationId, selectedClientId]);
+
+  // Atualizar lista de postos filtrados: somente postos do cliente escolhido (ids normalizados como string)
   useEffect(() => {
     if (selectedClientId) {
-      // Filtrar postos pelo cliente selecionado
-      const filtered = postosTrabalho.filter(posto => posto.clientId === selectedClientId);
-      console.log('🔄 Filtrando postos para o cliente:', selectedClientId, 'Total encontrado:', filtered.length);
+      const sid = String(selectedClientId).toLowerCase().trim();
+      const filtered = postosTrabalho.filter(
+        (posto) => {
+          if (!posto.clientId) return false;
+          return String(posto.clientId).toLowerCase().trim() === sid;
+        }
+      );
+      console.log('🔄 Postos do cliente', sid, ':', filtered.length);
       setPostosFiltrados(filtered);
     } else {
-      // Se não há cliente selecionado, mostrar todos os postos
-      console.log('🔄 Mostrando todos os postos (nenhum cliente selecionado). Total:', postosTrabalho.length);
-      setPostosFiltrados(postosTrabalho);
+      setPostosFiltrados([]);
     }
   }, [postosTrabalho, selectedClientId]);
+
+  // Nomes para visualização / rótulo inicial nos comboboxes
+  useEffect(() => {
+    if (!open) {
+      setDisplayEmployeeName('');
+      setDisplayClientName('');
+      return;
+    }
+    if (!formData.employeeId) {
+      setDisplayEmployeeName('');
+      return;
+    }
+    let cancelled = false;
+    employeeService
+      .getEmployeeById(formData.employeeId)
+      .then((e) => {
+        if (!cancelled && e?.name) setDisplayEmployeeName(e.name);
+      })
+      .catch(() => {
+        if (!cancelled) setDisplayEmployeeName('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, formData.employeeId]);
+
+  useEffect(() => {
+    if (!open || !selectedClientId) {
+      setDisplayClientName('');
+      return;
+    }
+    let cancelled = false;
+    clientService
+      .getClientById(selectedClientId)
+      .then((c) => {
+        if (!cancelled && c?.name) setDisplayClientName(c.name);
+      })
+      .catch(() => {
+        if (!cancelled) setDisplayClientName('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedClientId]);
 
   // Labels para turno
   const shiftLabels: Record<string, { label: string; badgeClass: string }> = {
@@ -207,8 +279,8 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     return `${diffHours}h${diffMinutes > 0 ? ` ${diffMinutes}min` : ''}`;
   };
 
-  const employeeName = usuarios.find(u => String(u.id) === String(formData.employeeId))?.name || '—';
-  const clientName = clientes.find(c => String(c.id) === String(selectedClientId))?.name || '—';
+  const employeeName = displayEmployeeName || '—';
+  const clientName = displayClientName || '—';
   const workPost = postosTrabalho.find(p => String(p.id) === String(formData.workPostId));
   const workPostName = workPost?.name || '—';
   const workPostCode = workPost?.postCode;
@@ -397,8 +469,6 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     console.log('🔄 EscalaFormModal useEffect - open:', open, 'initialData:', initialData, 'mode:', mode);
     console.log('🔄 initialData completo:', JSON.stringify(initialData, null, 2));
     console.log('🔄 postosTrabalho.length:', postosTrabalho.length);
-    console.log('🔄 usuarios.length:', usuarios.length);
-    console.log('🔄 clientes.length:', clientes.length);
 
     if (open) {
       // Check if we have data to populate (checking employeeId is a good proxy for existing record)
@@ -465,7 +535,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           : 'PENDING';
 
         // Garantir que todos os valores sejam sempre strings válidas
-        const newFormData = {
+        const newFormData: EscalaFormData = {
           employeeId,
           locationId,
           workPostId,
@@ -474,12 +544,68 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           startTime,
           endTime,
           status: validStatus,
-          observations: String(initialData.observations || '')
+          observations: String(initialData.observations || ''),
+          sigla: String((initialData as any).sigla || getProperty(initialData, 'sigla') || ''),
+          isMonitoria: !!((initialData as any).isMonitoria || getProperty(initialData, 'isMonitoria')),
+          isHoraExtra: !!((initialData as any).isHoraExtra || getProperty(initialData, 'isHoraExtra')),
         };
         console.log('📝 Atualizando formData com dados processados:', newFormData);
 
+        const empNameFromData =
+          String(getProperty(initialData, 'employee.name') || '').trim() ||
+          String((initialData as any).employeeName || '').trim();
+        if (empNameFromData) setDisplayEmployeeName(empNameFromData);
+
+        const clientNameFromData =
+          String(getProperty(initialData, 'client.name') || '').trim() ||
+          String(getProperty(initialData, 'workPost.clientName') || '').trim() ||
+          String((initialData as any).clientName || '').trim();
+        if (clientNameFromData) setDisplayClientName(clientNameFromData);
+
         // Atualizar formData imediatamente
         setFormData(newFormData);
+
+        // Se temos employeeId mas não temos workPostId/clientId, buscar do funcionário
+        if (employeeId && !workPostId) {
+          console.log('🔍 Buscando posto de trabalho para funcionário pré-selecionado:', employeeId);
+          employeeService.getEmployeeById(employeeId).then(async (emp) => {
+            if (emp) {
+              const wpId = emp.workPostId || emp.workPost?.id;
+              if (wpId) {
+                const wpIdStr = String(wpId);
+                // Buscar o posto para achar o cliente
+                const wpItem = postosTrabalho.find(p => String(p.id) === wpIdStr);
+                if (wpItem && wpItem.clientId) {
+                  const cIdStr = String(wpItem.clientId);
+                  setSelectedClientId(cIdStr);
+                  setFormData(prev => ({
+                    ...prev,
+                    workPostId: wpIdStr,
+                    locationId: wpIdStr
+                  }));
+                } else {
+                  // Tentar carregar do service se não estiver no cache
+                  try {
+                    const { workPostService } = await import('@/services/workPostService');
+                    const wpInfo = await workPostService.getWorkPostById(wpIdStr);
+                    if (wpInfo && wpInfo.clientId) {
+                      const cIdStr = String(wpInfo.clientId);
+                      ensureWorkPostInList(wpInfo);
+                      setSelectedClientId(cIdStr);
+                      setFormData(prev => ({
+                        ...prev,
+                        workPostId: wpIdStr,
+                        locationId: wpIdStr
+                      }));
+                    }
+                  } catch (e) {
+                    console.error('Erro ao buscar posto por ID no useEffect:', e);
+                  }
+                }
+              }
+            }
+          });
+        }
 
         // Mapear workPostId para clientId
         // Primeiro tentar usar clientId diretamente do initialData
@@ -490,7 +616,9 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           console.log('✅ Cliente mapeado diretamente do initialData:', clientIdStr);
           // Forçar atualização dos postos filtrados imediatamente se possível
           if (postosTrabalho.length > 0) {
-            const filtered = postosTrabalho.filter(posto => posto.clientId === clientIdStr);
+            const filtered = postosTrabalho.filter(
+              (posto) => posto.clientId != null && String(posto.clientId) === clientIdStr
+            );
             setPostosFiltrados(filtered);
             console.log('✅ Postos filtrados forçados:', filtered.length);
           }
@@ -526,7 +654,10 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
           startTime: '',
           endTime: '',
           status: 'PENDING',
-          observations: ''
+          observations: '',
+          sigla: '',
+          isMonitoria: false,
+          isHoraExtra: false
         });
         setSelectedClientId('');
       }
@@ -542,9 +673,12 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         shift: '',
         startTime: '',
         endTime: '',
+        sigla: '',
+        isMonitoria: false,
+        isHoraExtra: false
       });
     }
-  }, [initialData, open, mode, postosTrabalho, usuarios, clientes]);
+  }, [initialData, open, mode, postosTrabalho]);
 
   // Efeito adicional removido - a lógica foi consolidada no primeiro useEffect
   // para evitar conflitos de reescrita de dados.
@@ -575,8 +709,6 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   console.log('🎭 Título do modal será:', mode === 'view' ? 'Visualizar Escala' : mode === 'edit' ? 'Edição de Escala' : 'Nova Escala');
   console.log('🎭 formData atual:', formData);
   console.log('🎭 selectedClientId atual:', selectedClientId);
-  console.log('🎭 usuarios.length:', usuarios.length);
-  console.log('🎭 clientes.length:', clientes.length);
   console.log('🎭 postosTrabalho.length:', postosTrabalho.length);
   console.log('🎭 postosFiltrados.length:', postosFiltrados.length);
 
@@ -690,24 +822,53 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
               </div>
             </div>
 
-            {/* Status */}
-            <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 className="w-4 h-4 text-seguranca-yellow" />
-                <h3 className="text-base font-semibold text-seguranca-lightgray">Status</h3>
+            {/* Status e Inteligência Operacional */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-4 h-4 text-seguranca-yellow" />
+                  <h3 className="text-base font-semibold text-seguranca-lightgray">Status</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={
+                    formData.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
+                    formData.status === 'CONFIRMED' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                    formData.status === 'COMPLETED' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                    'bg-red-500/20 text-red-300 border-red-500/30'
+                  }>
+                    {formData.status === 'PENDING' && 'Pendente'}
+                    {formData.status === 'CONFIRMED' && 'Confirmada'}
+                    {formData.status === 'COMPLETED' && 'Concluída'}
+                    {formData.status === 'CANCELLED' && 'Cancelada'}
+                  </Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge className={
-                  formData.status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' :
-                  formData.status === 'CONFIRMED' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
-                  formData.status === 'COMPLETED' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
-                  'bg-red-500/20 text-red-300 border-red-500/30'
-                }>
-                  {formData.status === 'PENDING' && 'Pendente'}
-                  {formData.status === 'CONFIRMED' && 'Confirmada'}
-                  {formData.status === 'COMPLETED' && 'Concluída'}
-                  {formData.status === 'CANCELLED' && 'Cancelada'}
-                </Badge>
+
+              <div className="rounded-lg border border-gray-700 bg-seguranca-black/70 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Activity className="w-4 h-4 text-seguranca-yellow" />
+                  <h3 className="text-base font-semibold text-seguranca-lightgray">Inteligência</h3>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400">Sigla:</span>
+                    <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/30">
+                      {formData.sigla || 'Automática'}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400">Monitoria:</span>
+                    <span className={formData.isMonitoria ? "text-green-400 text-xs font-bold" : "text-gray-600 text-xs"}>
+                      {formData.isMonitoria ? "SIM" : "NÃO"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400">Hora Extra:</span>
+                    <span className={formData.isHoraExtra ? "text-orange-400 text-xs font-bold" : "text-gray-600 text-xs"}>
+                      {formData.isHoraExtra ? "SIM" : "NÃO"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -754,7 +915,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Funcionário */}
+          {/* Funcionário — busca após 3 caracteres */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-seguranca-yellow" />
@@ -762,41 +923,79 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 Funcionário <span className="text-red-400">*</span>
               </Label>
             </div>
-            <Select
+            <EmployeeCombobox
               value={String(formData.employeeId || '')}
-              onValueChange={(value) => {
-                console.log('👤 Funcionário selecionado:', value);
-                handleInputChange('employeeId', value);
+              onChange={async (id) => {
+                handleInputChange('employeeId', id);
+                if (id) {
+                  setDisplayEmployeeName('');
+                  
+                  try {
+                    // Buscar detalhes do funcionário para auto-preencher Cliente e Posto
+                    const emp = await employeeService.getEmployeeById(id);
+                    if (emp) {
+                      if (emp.name) setDisplayEmployeeName(emp.name);
+                      
+                      // Buscar o posto sugerido
+                      const wpId = emp.workPostId || emp.workPost?.id;
+                      if (wpId) {
+                        const wpIdStr = String(wpId);
+                        
+                        // Tentar pegar do cache local ou buscar api
+                        let workPost = postosTrabalho.find(wp => String(wp.id) === wpIdStr);
+                        if (!workPost) {
+                          try {
+                            const { workPostService } = await import('@/services/workPostService');
+                            workPost = await workPostService.getWorkPostById(wpIdStr);
+                            if (workPost) ensureWorkPostInList(workPost);
+                          } catch (e) { console.error(e); }
+                        }
+
+                        if (workPost) {
+                          const clientIdStr = String(workPost.clientId);
+                          console.log('🚀 Auto-populando Escala:', { client: clientIdStr, post: wpIdStr });
+                          
+                          setSelectedClientId(clientIdStr);
+                          
+                          // Atualizar múltiplos campos de uma vez
+                          setFormData(prev => ({
+                            ...prev,
+                            employeeId: id,
+                            locationId: wpIdStr,
+                            workPostId: wpIdStr,
+                            // Se for novo, sugerir horários do posto
+                            shift: prev.shift || (workPost?.type === '12H_NOTURNO' ? 'NIGHT' : 'DAY'),
+                            startTime: prev.startTime || workPost?.shiftStart || '',
+                            endTime: prev.endTime || workPost?.shiftEnd || '',
+                            sigla: prev.sigla || 'PL'
+                          }));
+
+                          if (workPost.clientName) setDisplayClientName(workPost.clientName);
+                          
+                          // Limpar erros
+                          setErrors(prev => ({ 
+                            ...prev, 
+                            employeeId: undefined,
+                            locationId: undefined, 
+                            workPostId: undefined 
+                          }));
+                          return; // Interromper para não sobrescrever o setFormData abaixo
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Erro ao buscar detalhes do funcionário:', error);
+                  }
+                }
+                if (errors.employeeId) setErrors((prev) => ({ ...prev, employeeId: undefined }));
               }}
               disabled={mode === 'view'}
-            >
-              <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.employeeId
-                ? 'border-red-500 focus:border-red-500'
-                : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <SelectValue placeholder="Selecione um funcionário">
-                  {formData.employeeId && usuarios.length > 0 ? (
-                    usuarios.find(u => String(u.id) === String(formData.employeeId))?.name || 'Selecione um funcionário'
-                  ) : 'Selecione um funcionário'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
-                {usuarios.length > 0 ? (
-                  usuarios.map(user => (
-                    <SelectItem key={String(user.id)} value={String(user.id)} className="hover:bg-seguranca-black/50 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        {user.name}
-                      </div>
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="loading" disabled>
-                    Carregando funcionários...
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+              minChars={3}
+              initialDisplayName={displayEmployeeName || undefined}
+              placeholder="Selecione um funcionário"
+              searchPlaceholder="Digite pelo menos 3 letras do nome..."
+              emptyPlaceholder="Nenhum funcionário encontrado."
+            />
             {errors.employeeId && (
               <div className="flex items-center gap-2 text-red-400 text-sm">
                 <AlertCircle className="w-4 h-4" />
@@ -805,7 +1004,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             )}
           </div>
 
-          {/* Cliente */}
+          {/* Cliente — busca após 3 caracteres; postos dependem do cliente */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-seguranca-yellow" />
@@ -813,51 +1012,28 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 Cliente <span className="text-red-400">*</span>
               </Label>
             </div>
-            <Select
-              value={String(selectedClientId || '')}
-              onValueChange={(value) => {
-                console.log('🔍 Cliente selecionado:', value);
-                setSelectedClientId(value);
-                // Limpar locationId e workPostId quando mudar o cliente
-                handleInputChange('locationId', '');
-                handleInputChange('workPostId', '');
-                // Limpar erros
-                if (errors.locationId) {
-                  setErrors(prev => ({ ...prev, locationId: undefined }));
-                }
-                if (errors.workPostId) {
-                  setErrors(prev => ({ ...prev, workPostId: undefined }));
-                }
-              }}
-              disabled={mode === 'view'}
+            <div
+              className={
+                errors.locationId ? 'rounded-md ring-2 ring-red-500 ring-offset-0 ring-offset-transparent' : ''
+              }
             >
-              <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.locationId
-                ? 'border-red-500 focus:border-red-500'
-                : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <SelectValue placeholder="Selecione um cliente">
-                  {selectedClientId && clientes.length > 0 ? (
-                    clientes.find(c => String(c.id) === String(selectedClientId))?.name || 'Selecione um cliente'
-                  ) : 'Selecione um cliente'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
-                {clientes.length > 0 ? (
-                  clientes.map(client => (
-                    <SelectItem key={String(client.id)} value={String(client.id)} className="hover:bg-seguranca-black/50 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-3 h-3 text-gray-400" />
-                        {client.name}
-                      </div>
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="loading" disabled>
-                    Carregando clientes...
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+              <ClientSearchCombobox
+                value={String(selectedClientId || '')}
+                onChange={(clientId) => {
+                  setSelectedClientId(clientId);
+                  setDisplayClientName('');
+                  handleInputChange('locationId', '');
+                  handleInputChange('workPostId', '');
+                  if (errors.locationId) setErrors((prev) => ({ ...prev, locationId: undefined }));
+                  if (errors.workPostId) setErrors((prev) => ({ ...prev, workPostId: undefined }));
+                }}
+                disabled={mode === 'view'}
+                minChars={3}
+                initialDisplayName={displayClientName || undefined}
+                placeholder="Selecione um cliente"
+                searchPlaceholder="Digite pelo menos 3 letras do nome ou CNPJ..."
+              />
+            </div>
             {errors.locationId && (
               <div className="flex items-center gap-2 text-red-400 text-sm">
                 <AlertCircle className="w-4 h-4" />
@@ -881,7 +1057,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 console.log('🏢 Posto de Trabalho selecionado:', value);
                 handleInputChange('workPostId', value);
                 handleInputChange('locationId', value); // Posto de Trabalho = Localização
-                console.log('✅ Posto de Trabalho selecionado:', value, 'usado como locationId');
+                
                 // Limpar erro se houver
                 if (errors.workPostId) {
                   setErrors(prev => ({ ...prev, workPostId: undefined }));
@@ -897,8 +1073,10 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
                 } ${mode === 'view' || !selectedClientId ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <SelectValue placeholder={selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"}>
-                  {formData.workPostId && postosFiltrados.length > 0 ? (
-                    postosFiltrados.find(p => String(p.id) === String(formData.workPostId))?.name || 'Selecione um posto de trabalho'
+                  {formData.workPostId ? (
+                    postosFiltrados.find(p => String(p.id) === String(formData.workPostId))?.name || 
+                    postosTrabalho.find(p => String(p.id) === String(formData.workPostId))?.name || 
+                    'Selecione um posto de trabalho'
                   ) : selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"}
                 </SelectValue>
               </SelectTrigger>
@@ -1124,6 +1302,71 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Novos Campos Operacionais (Sigla, Monitoria, Hora Extra) */}
+          <div className="p-4 bg-seguranca-black/30 rounded-xl border border-gray-700/50 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="w-4 h-4 text-seguranca-yellow" />
+              <h3 className="text-sm font-semibold text-gray-200">Inteligência Operacional</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Sigla */}
+              <div className="space-y-3">
+                <Label htmlFor="sigla" className="text-sm font-medium flex items-center gap-2">
+                  Sigla da Escala
+                  <Badge variant="outline" className="text-[10px] py-0 h-4 border-gray-600">Exporta p/ DP</Badge>
+                </Label>
+                <Select
+                  value={formData.sigla || ''}
+                  onValueChange={(value) => handleInputChange('sigla', value)}
+                  disabled={mode === 'view'}
+                >
+                  <SelectTrigger className="bg-seguranca-black border-2 border-gray-600 hover:border-gray-500 transition-colors h-11">
+                    <SelectValue placeholder="Sugerida pelo sistema" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-graphite border-gray-600 z-[10002]">
+                    <SelectItem value="PL">PL - Plantão</SelectItem>
+                    <SelectItem value="MT">MT - Monitoria</SelectItem>
+                    <SelectItem value="HE">HE - Hora Extra</SelectItem>
+                    <SelectItem value="FT">FT - Falta</SelectItem>
+                    <SelectItem value="AT">AT - Atestado</SelectItem>
+                    <SelectItem value="FE">FE - Férias</SelectItem>
+                    <SelectItem value="CF">CF - Cobertura Férias</SelectItem>
+                    <SelectItem value="RM">RM - Remanejamento</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-gray-500 italic">* Se vazio, o sistema aplicará a regra automática.</p>
+              </div>
+
+              {/* Toggles */}
+              <div className="flex flex-col gap-4 justify-center">
+                <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Monitoria (MT)</Label>
+                    <p className="text-[10px] text-gray-500">Escala de treinamento/acompanhamento</p>
+                  </div>
+                  <Switch 
+                    checked={formData.isMonitoria}
+                    onCheckedChange={(checked: boolean) => handleInputChange('isMonitoria', checked)}
+                    disabled={mode === 'view'}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium text-orange-400">Hora Extra (HE)</Label>
+                    <p className="text-[10px] text-gray-500">Adicional fora da jornada padrão</p>
+                  </div>
+                  <Switch 
+                    checked={formData.isHoraExtra}
+                    onCheckedChange={(checked: boolean) => handleInputChange('isHoraExtra', checked)}
+                    disabled={mode === 'view'}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Status */}

@@ -29,12 +29,16 @@ import {
   PlayCircle,
   ArrowRightLeft,
   FileText,
-  Truck
+  Truck,
+  FileSpreadsheet
 } from 'lucide-react';
+import OccurrenceMap from './OccurrenceMap';
+
 import { useToast } from '@/hooks/use-toast';
 import { operationalService, VacationCoverage, Absence, WorkPostAssignment, SpecificActivity, CreateAbsenceDTO, CreateWorkPostAssignmentDTO, CreateSpecificActivityDTO, CreateVacationCoverageDTO } from '@/services/operationalService';
 import { remanejamentoService, Remanejamento, CreateRemanejamentoDTO } from '@/services/remanejamentoService';
 import api from '@/lib/axios';
+import axios from 'axios';
 import operationalReportGenerator from '@/utils/operationalReportGenerator';
 import OperationalStatsCards from './OperationalStatsCards';
 import AbsenceFormModal from './AbsenceFormModal';
@@ -49,10 +53,16 @@ import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { OperationalEmployeesTab } from './OperationalEmployeesTab';
 import LancamentoManualFolhaPonto from '@/pages/RH/LancamentoManualFolhaPonto';
 import { formatWorkPostDisplayName } from '@/utils/formatters';
+import MapaCalor from './MapaCalor';
+import { Schedule } from '@/services/scheduleService';
+
+interface OperationalDashboardProps {
+  onEditEscala?: (escala: Schedule) => void;
+}
 
 const Frota = lazy(() => import('@/pages/Frota'));
 
-const OperationalDashboard: React.FC = () => {
+const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscala }) => {
   const [vacationCoverages, setVacationCoverages] = useState<VacationCoverage[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [workPostAssignments, setWorkPostAssignments] = useState<WorkPostAssignment[]>([]);
@@ -443,9 +453,21 @@ const OperationalDashboard: React.FC = () => {
         description: 'Remanejamento excluído com sucesso.',
       });
     } catch (error) {
+      const apiMessage =
+        axios.isAxiosError(error) &&
+        error.response?.data &&
+        typeof error.response.data === 'object' &&
+        'message' in error.response.data &&
+        typeof (error.response.data as { message?: string }).message === 'string'
+          ? (error.response.data as { message: string }).message
+          : null;
       toast({
-        title: 'Erro',
-        description: 'Erro ao excluir remanejamento.',
+        title: 'Erro ao excluir',
+        description:
+          apiMessage ??
+          (axios.isAxiosError(error) && error.response?.status === 409
+            ? 'Conflito ao excluir: verifique vínculos (escalas/histórico) ou atualize o banco de dados.'
+            : 'Não foi possível excluir o remanejamento.'),
         variant: 'destructive',
       });
     }
@@ -804,13 +826,47 @@ const OperationalDashboard: React.FC = () => {
               w-full
               flex md:grid
               overflow-x-auto md:overflow-x-visible
-              md:grid-cols-8
+              md:grid-cols-10
               glass-card border-0
+
               p-2
               gap-2
               min-h-[100px] md:min-h-[80px]
               scrollbar-hide
             ">
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger
+                    value="heatmap"
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-orange-500 data-[state='active']:to-orange-600 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-orange-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <Activity className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Matriz</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-orange-500">
+                  <p className="font-semibold">Matriz de Escala</p>
+                  <p className="text-xs text-gray-400">Visão geral em heatmap (26 a 25)</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <TabsTrigger
+                    value="mapa-ocorrencias"
+                    className="modern-tab flex flex-col items-center justify-center gap-2 px-4 md:px-3 py-4 text-slate-300 data-[state='active']:bg-gradient-to-br data-[state='active']:from-red-600 data-[state='active']:to-red-700 data-[state='active']:text-white data-[state='active']:shadow-lg data-[state='active']:shadow-red-500/50 hover:bg-slate-800/50 hover:text-white transition-all duration-300 rounded-md min-w-[85px] md:min-w-0 min-h-[85px] md:min-h-[72px] flex-shrink-0"
+                  >
+                    <FileSpreadsheet className="h-6 w-6 md:h-5 md:w-5 flex-shrink-0" />
+                    <span className="text-[11px] md:text-xs leading-tight text-center whitespace-nowrap">Mapa Ocorr.</span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-seguranca-graphite text-white border-seguranca-red">
+                  <p className="font-semibold">Mapa de Ocorrências</p>
+                  <p className="text-xs text-gray-400">Controle 26-25 e Relatório Excel</p>
+                </TooltipContent>
+              </Tooltip>
+
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1409,7 +1465,16 @@ const OperationalDashboard: React.FC = () => {
             <Frota embedded />
           </Suspense>
         </TabsContent>
+
+        <TabsContent value="mapa-ocorrencias" className="mt-6">
+          <OccurrenceMap />
+        </TabsContent>
+
+        <TabsContent value="heatmap" className="space-y-4">
+          <MapaCalor onEditEscala={onEditEscala} />
+        </TabsContent>
       </Tabs>
+
 
       {/* Modal de Cobertura de Férias */}
       <VacationCoverageFormModal

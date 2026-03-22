@@ -10,12 +10,15 @@ import com.z7design.secured_guard.service.WorkScheduleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -57,6 +60,15 @@ public class WorkScheduleController {
             WorkPost location = new WorkPost();
             location.setId(workScheduleDTO.getLocationId());
             workSchedule.setLocation(location);
+            
+            // Novos campos operacionais
+            workSchedule.setSigla(workScheduleDTO.getSigla());
+            workSchedule.setRemanejamentoId(workScheduleDTO.getRemanejamentoId());
+            workSchedule.setIsMonitoria(workScheduleDTO.getIsMonitoria() != null ? workScheduleDTO.getIsMonitoria() : false);
+            workSchedule.setIsHoraExtra(workScheduleDTO.getIsHoraExtra() != null ? workScheduleDTO.getIsHoraExtra() : false);
+            workSchedule.setCoverageScheduleId(workScheduleDTO.getCoverageScheduleId());
+            workSchedule.setStartTime(workScheduleDTO.getStartTime());
+            workSchedule.setEndTime(workScheduleDTO.getEndTime());
             
             WorkSchedule createdSchedule = workScheduleService.createWorkSchedule(workSchedule);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdSchedule);
@@ -317,6 +329,30 @@ public class WorkScheduleController {
         } catch (Exception e) {
             log.error("Erro ao verificar disponibilidade: {}", e.getMessage(), e);
             throw e;
+        }
+    }
+
+    /**
+     * Exportar escala para folha de pagamento (Excel)
+     */
+    @GetMapping("/export/payroll")
+    public ResponseEntity<byte[]> exportPayroll(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam UUID companyId) {
+        log.info("GET /api/operational/schedules/export/payroll - Exportando escala: {} a {}", startDate, endDate);
+        
+        try {
+            byte[] excelContent = workScheduleService.exportPayroll(startDate, endDate, companyId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment", "faturamento_operacional_" + startDate + "_a_" + endDate + ".xlsx");
+            
+            return new ResponseEntity<>(excelContent, headers, HttpStatus.OK);
+        } catch (IOException e) {
+            log.error("Erro ao gerar Excel de exportação: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

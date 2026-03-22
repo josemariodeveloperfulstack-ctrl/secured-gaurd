@@ -7,18 +7,27 @@ export interface Occurrence {
   description: string;
   employeeId: string;
   employeeName: string;
+  substituteId?: string;
+  substituteName?: string;
   location: string;
   status: string;
   priority: string;
   date: string;
   startTime?: string;
   endTime?: string;
+  originalStartTime?: string;
+  originalEndTime?: string;
+  substituteStartTime?: string;
+  substituteEndTime?: string;
+  totalHours?: number;
+  category?: string;
   responsible: string;
   startDate?: string;
   endDate?: string;
   reason?: string;
   warningNumber?: number;
 }
+
 
 export interface OccurrenceFilters {
   employeeId?: string;
@@ -36,18 +45,26 @@ export interface CreateOccurrenceRequest {
   title: string;
   description: string;
   employeeId: string;
+  substituteId?: string;
   location: string;
   status: string;
   priority: string;
   date: string;
   startTime?: string;
   endTime?: string;
+  originalStartTime?: string;
+  originalEndTime?: string;
+  substituteStartTime?: string;
+  substituteEndTime?: string;
+  totalHours?: number;
+  category?: string;
   responsible: string;
   startDate?: string;
   endDate?: string;
   reason?: string;
   warningNumber?: number;
 }
+
 
 export interface UpdateOccurrenceRequest extends Partial<CreateOccurrenceRequest> {
   id: string;
@@ -142,5 +159,20 @@ export const occurrenceService = {
       console.error('Erro ao gerar relatório PDF:', error);
       throw new Error('Falha ao gerar relatório PDF');
     }
+  },
+
+  // Gerar relatório Excel do mapa de ocorrências
+  async generateMapExcelReport(startDate: string, endDate: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/operational/occurrences/report/map/excel`, {
+        params: { startDate, endDate },
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao gerar relatório Excel:', error);
+      throw new Error('Falha ao gerar relatório Excel');
+    }
   }
-}; 
+};
+ 

@@ -15,6 +15,8 @@
     
     <!-- Parâmetros -->
     <parameter name="GENERATION_DATE" class="java.lang.String"/>
+    <parameter name="REPORT_USER" class="java.lang.String"/>
+    <parameter name="REPORT_TIMESTAMP" class="java.lang.String"/>
     <parameter name="TOTAL_VEHICLES" class="java.lang.Integer"/>
     <parameter name="ACTIVE_VEHICLES" class="java.lang.Integer"/>
     <parameter name="MAINTENANCE_VEHICLES" class="java.lang.Integer"/>
@@ -439,7 +441,7 @@
                 <textElement>
                     <font fontName="DejaVu Sans" size="8" pdfFontName="Helvetica"/>
                 </textElement>
-                <textFieldExpression><![CDATA["Relatório gerado pelo Sistema Secured Guard"]]></textFieldExpression>
+                <textFieldExpression><![CDATA["Gerado por: " + $P{REPORT_USER} + " em: " + $P{REPORT_TIMESTAMP}]]></textFieldExpression>
             </textField>
             
             <textField>
