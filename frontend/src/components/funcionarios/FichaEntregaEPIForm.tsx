@@ -64,6 +64,8 @@ function resolveCompanyIdFromEmployee(emp: Employee | undefined): string {
 
 const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
+  
+  // 1. All State and Ref declarations first
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
@@ -72,6 +74,54 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     observacoes: '',
   });
 
+  const [epis, setEpis] = useState([
+    {
+      nome: '',
+      quantidade: '1',
+      ca: '', // Número do Certificado de Aprovação
+      caName: '', // Nome/Descrição do CA
+      validade: '',
+      observacoes: '',
+      uniformeTipo: '', // 'COMPLETO' ou 'INDIVIDUAL'
+      uniformePeca: '' // Peça específica se for individual
+    }
+  ]);
+
+  const [caSuggestions, setCaSuggestions] = useState<{ [key: number]: CAEPIResponse[] }>({});
+  const [caLoading, setCaLoading] = useState<{ [key: number]: boolean }>({});
+  const [caSearchTimeouts, setCaSearchTimeouts] = useState<{ [key: number]: NodeJS.Timeout }>({});
+  const [showCaSuggestions, setShowCaSuggestions] = useState<{ [key: number]: boolean }>({});
+
+  const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  
+  const prevFuncionarioIdForCompanySync = useRef<string | undefined>(undefined);
+
+  // 2. Memoized values
+  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const empresa = companies.find(e => e.id === form.empresaId);
+  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
+
+  const filteredEmployeesForPicker = useMemo(() => {
+    const q = employeeSearchQuery.trim().toLowerCase();
+    if (q.length < MIN_EMPLOYEE_SEARCH_CHARS) return [];
+    const qDigits = q.replace(/\D/g, '');
+    return employees.filter((f) => {
+      const name = (f.name || '').toLowerCase();
+      const mat = (f.registrationNumber || '').toLowerCase();
+      const cpfDigits = (f.cpf || (f as { document?: string }).document || '').replace(/\D/g, '');
+      if (name.includes(q) || mat.includes(q)) return true;
+      if (qDigits.length >= MIN_EMPLOYEE_SEARCH_CHARS && cpfDigits.includes(qDigits)) return true;
+      return false;
+    });
+  }, [employees, employeeSearchQuery]);
+
+  // 3. All Effects
+  
   // Atualizar funcionarioId e empresaId quando props mudarem
   useEffect(() => {
     setForm(prev => ({
@@ -82,7 +132,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
   }, [employeeId, companyId]);
 
   // Preenche empresa pelo cadastro do funcionário (prop sem companyId ou lista que carrega depois).
-  // Se o funcionário mudou, sempre atualiza a empresa; se só a lista carregou, só preenche se empresa ainda estiver vazia.
   useEffect(() => {
     if (!form.funcionarioId || employees.length === 0) return;
     if (companyId) return;
@@ -100,68 +149,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     });
   }, [form.funcionarioId, employees, companyId]);
 
-  const [epis, setEpis] = useState([
-    {
-      nome: '',
-      quantidade: '1',
-      ca: '', // Número do Certificado de Aprovação
-      caName: '', // Nome/Descrição do CA
-      validade: '',
-      observacoes: '',
-      uniformeTipo: '', // 'COMPLETO' ou 'INDIVIDUAL'
-      uniformePeca: '' // Peça específica se for individual
-    }
-  ]);
-
-  // Estados para autocomplete do CA
-  const [caSuggestions, setCaSuggestions] = useState<{ [key: number]: CAEPIResponse[] }>({});
-  const [caLoading, setCaLoading] = useState<{ [key: number]: boolean }>({});
-  const [caSearchTimeouts, setCaSearchTimeouts] = useState<{ [key: number]: NodeJS.Timeout }>({});
-  const [showCaSuggestions, setShowCaSuggestions] = useState<{ [key: number]: boolean }>({});
-
-  const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
-  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
-  const prevFuncionarioIdForCompanySync = useRef<string | undefined>(undefined);
-
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
-
-  const filteredEmployeesForPicker = useMemo(() => {
-    const q = employeeSearchQuery.trim().toLowerCase();
-    if (q.length < MIN_EMPLOYEE_SEARCH_CHARS) return [];
-    const qDigits = q.replace(/\D/g, '');
-    return employees.filter((f) => {
-      const name = (f.name || '').toLowerCase();
-      const mat = (f.registrationNumber || '').toLowerCase();
-      const cpfDigits = (f.cpf || (f as { document?: string }).document || '').replace(/\D/g, '');
-      if (name.includes(q) || mat.includes(q)) return true;
-      if (qDigits.length >= MIN_EMPLOYEE_SEARCH_CHARS && cpfDigits.includes(qDigits)) return true;
-      return false;
-    });
-  }, [employees, employeeSearchQuery]);
-
-  const handleSelectEmployee = (id: string) => {
-    const emp = employees.find((e) => e.id === id);
-    const cid = resolveCompanyIdFromEmployee(emp);
-    prevFuncionarioIdForCompanySync.current = id;
-    setForm((prev) => ({ ...prev, funcionarioId: id, empresaId: cid }));
-    setEmployeePickerOpen(false);
-    setEmployeeSearchQuery('');
-    if (emp && !cid) {
-      toast({
-        title: 'Atenção',
-        description: 'Este funcionário não possui empresa vinculada no cadastro. Selecione a empresa manualmente.',
-        variant: 'default',
-      });
-    }
-  };
-  const empresa = companies.find(e => e.id === form.empresaId);
-  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
-
-  // Carregar dados do backend
+  // Carregar dados iniciais
   useEffect(() => {
     loadData();
   }, []);
@@ -173,7 +161,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       if (selectedCompany) {
         const companyDefaultEpis = (selectedCompany as any).defaultEpis;
         if (companyDefaultEpis && companyDefaultEpis.length > 0) {
-          // Verificar se já não foram carregados (evitar loop)
           const firstEpiName = epis.length > 0 ? epis[0].nome : '';
           const shouldLoad = firstEpiName === '' || firstEpiName !== companyDefaultEpis[0]?.epiName;
 
@@ -195,7 +182,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
             });
           }
         } else {
-          // Se a empresa não tem EPIs padrão e não há EPIs preenchidos, manter apenas um campo vazio
           if (epis.length === 0 || (epis.length === 1 && epis[0].nome === '')) {
             setEpis([{ nome: '', quantidade: '1', ca: '', validade: '', observacoes: '', uniformeTipo: '', uniformePeca: '' }]);
           }
@@ -204,6 +190,21 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.empresaId]);
+  const handleSelectEmployee = (id: string) => {
+    const emp = employees.find((e) => e.id === id);
+    const cid = resolveCompanyIdFromEmployee(emp);
+    prevFuncionarioIdForCompanySync.current = id;
+    setForm((prev) => ({ ...prev, funcionarioId: id, empresaId: cid }));
+    setEmployeePickerOpen(false);
+    setEmployeeSearchQuery('');
+    if (emp && !cid) {
+      toast({
+        title: 'Atenção',
+        description: 'Este funcionário não possui empresa vinculada no cadastro. Selecione a empresa manualmente.',
+        variant: 'default',
+      });
+    }
+  };
 
   const loadData = async () => {
     setLoadingData(true);

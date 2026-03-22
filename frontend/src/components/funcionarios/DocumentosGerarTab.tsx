@@ -12,7 +12,7 @@ import DeclaracaoForm from './DeclaracaoForm';
 import TermoCienciaPrestadorForm from './TermoCienciaPrestadorForm';
 import OrdemServicoForm from './OrdemServicoForm';
 import ModelosDocumentosForm from './ModelosDocumentosForm';
-import TermoResponsabilidadeEspecíficoForm from './TermoResponsabilidadeEspecíficoForm';
+import TermoResponsabilidadeEspecificoForm from './TermoResponsabilidadeEspecificoForm';
 import NppsForm from './NppsForm';
 import FichaEntregaEPIManualForm from './FichaEntregaEPIManualForm';
 import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard } from 'lucide-react';
@@ -116,7 +116,7 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({ employeeId: pro
         {tipo === 'epi' && <FichaEntregaEPIForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'epi-manual' && <FichaEntregaEPIManualForm companyId={finalCompanyId} employeeId={finalEmployeeId} />}
         {tipo === 'npps' && <NppsForm />}
-        {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecíficoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecificoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'lgpd' && <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'contratos' && <ContratosTrabalhoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}

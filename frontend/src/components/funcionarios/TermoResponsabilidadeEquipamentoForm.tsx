@@ -10,6 +10,8 @@ import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Calendar, MapPin, Phone, Mail, Shield, Settings, Monitor, Smartphone, Radio, Car, Motorcycle, Loader2, CheckCircle2 } from 'lucide-react';
 import { employeeService } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/axios';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
@@ -40,6 +42,9 @@ interface TermoResponsabilidadeEquipamentoFormProps {
 }
 
 const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipamentoFormProps> = ({ employeeId, companyId }) => {
+  const { toast } = useToast();
+
+  // 1. All State and Ref declarations first
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
@@ -50,7 +55,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     patrimonio: '',
     dataEntrega: '',
     dataDevolucao: '',
-    responsavelEntrega: '',
+    responsavelEntregaId: '', // ID do funcionário responsável
     condicoes: '',
     observacoes: '',
     estadoEquipamento: '',
@@ -61,6 +66,21 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
+  // 2. Memoized values (computed from state)
+  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const empresa = companies.find(e => e.id === form.empresaId);
+  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
+
+  const estadosEquipamento = [
+    'Novo',
+    'Excelente',
+    'Bom',
+    'Regular',
+    'Precisa Manutenção',
+    'Defeituoso',
+  ];
+
+  // 3. Effects
   useEffect(() => {
     setForm(prev => ({
       ...prev,
@@ -89,22 +109,14 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     fetchData();
   }, []);
 
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
-  const empresa = companies.find(e => e.id === form.empresaId);
-  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
-
-  const estadosEquipamento = [
-    'Novo',
-    'Excelente',
-    'Bom',
-    'Regular',
-    'Precisa Manutenção',
-    'Defeituoso',
-  ];
-
+  // 4. Handlers
   const handlePreview = async () => {
     if (!funcionario || !empresa || !form.equipamento) {
-      alert('Selecione funcionário, empresa e pelo menos um equipamento!');
+      toast({
+        title: 'Atenção',
+        description: 'Selecione funcionário, empresa e pelo menos um equipamento!',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -128,25 +140,21 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
         documentDate: form.dataEntrega
       };
 
-      // No preview endpoint exists for this one yet in the grep results, using generate-pdf with window.open
-      const response = await fetch('/api/equipment-responsibility/generate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(payload)
+      const response = await api.post('/api/equipment-responsibility/generate-pdf', payload, {
+        responseType: 'blob'
       });
 
-      if (!response.ok) throw new Error('Erro ao gerar preview');
-
-      const blob = await response.blob();
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
-      alert('Erro ao gerar preview. Tente novamente.');
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.message || 'Erro ao gerar preview. Tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -156,7 +164,11 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     e.preventDefault();
 
     if (!funcionario || !empresa || !form.equipamento || !form.numeroSerie || !form.dataEntrega) {
-      alert('Preencha todos os campos obrigatórios!');
+      toast({
+        title: 'Atenção',
+        description: 'Preencha todos os campos obrigatórios!',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -180,18 +192,11 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
         documentDate: form.dataEntrega
       };
 
-      const response = await fetch('/api/equipment-responsibility/generate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(payload)
+      const response = await api.post('/api/equipment-responsibility/generate-pdf', payload, {
+        responseType: 'blob'
       });
 
-      if (!response.ok) throw new Error('Erro ao gerar PDF');
-
-      const blob = await response.blob();
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -200,9 +205,18 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Termo de responsabilidade gerado com sucesso!',
+      });
+    } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
-      alert('Erro ao gerar PDF. Tente novamente.');
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.message || 'Erro ao gerar PDF. Tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

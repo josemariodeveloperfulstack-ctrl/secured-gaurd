@@ -24,7 +24,7 @@ interface TermoResponsabilidadeEspecificoFormProps {
     companyId?: string;
 }
 
-const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({ employeeId, companyId }) => {
+const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({ employeeId, companyId }) => {
     const [form, setForm] = useState({
         funcionarioId: employeeId || '',
         empresaId: companyId || '',
@@ -268,4 +268,4 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
     );
 };
 
-export default TermoResponsabilidadeEspecíficoForm;
+export default TermoResponsabilidadeEspecificoForm;

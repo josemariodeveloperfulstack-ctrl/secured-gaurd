@@ -24,16 +24,7 @@ interface FichaRegistroFuncionarioFormProps {
 const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
 
-  // Função auxiliar para formatar data ISO para BR
-  const formatDateToBR = (isoDate: string | null | undefined): string => {
-    if (!isoDate) return '';
-    try {
-      const date = new Date(isoDate);
-      return date.toLocaleDateString('pt-BR');
-    } catch {
-      return isoDate;
-    }
-  };
+  // 1. All State and Ref declarations first
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
@@ -43,15 +34,6 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
     documentosEntregues: [] as string[],
   });
 
-  // Atualizar funcionarioId e empresaId quando props mudarem
-  useEffect(() => {
-    setForm(prev => ({
-      ...prev,
-      funcionarioId: employeeId || prev.funcionarioId,
-      empresaId: companyId || prev.empresaId
-    }));
-  }, [employeeId, companyId]);
-
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [loadingEmployee, setLoadingEmployee] = useState(false);
@@ -59,19 +41,12 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
   const [companies, setCompanies] = useState<any[]>([]);
   const [fullEmployee, setFullEmployee] = useState<Employee | null>(null);
 
+  // 2. Memoized values
   const funcionario = employees.find(f => f.id === form.funcionarioId);
   const empresa = companies.find(e => e.id === form.empresaId);
   const responsavel = employees.find(f => f.id === form.responsavelRegistroId);
 
-  // Carregar dados completos do funcionário quando selecionado
-  useEffect(() => {
-    if (form.funcionarioId) {
-      loadFullEmployee(form.funcionarioId);
-    } else {
-      setFullEmployee(null);
-    }
-  }, [form.funcionarioId]);
-
+  // 3. Helper functions
   const loadFullEmployee = async (employeeId: string) => {
     setLoadingEmployee(true);
     try {
@@ -84,11 +59,6 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       setLoadingEmployee(false);
     }
   };
-
-  // Carregar dados do backend
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const loadData = async () => {
     setLoadingData(true);
@@ -110,6 +80,41 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
       setLoadingData(false);
     }
   };
+
+  const formatDateToBR = (isoDate: string | null | undefined): string => {
+    if (!isoDate) return '';
+    try {
+      const date = new Date(isoDate);
+      return date.toLocaleDateString('pt-BR');
+    } catch {
+      return isoDate;
+    }
+  };
+
+  // 4. All Effects
+  
+  // Atualizar funcionarioId e empresaId quando props mudarem
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      funcionarioId: employeeId || prev.funcionarioId,
+      empresaId: companyId || prev.empresaId
+    }));
+  }, [employeeId, companyId]);
+
+  // Carregar dados completos do funcionário quando selecionado
+  useEffect(() => {
+    if (form.funcionarioId) {
+      loadFullEmployee(form.funcionarioId);
+    } else {
+      setFullEmployee(null);
+    }
+  }, [form.funcionarioId]);
+
+  // Carregar dados do backend (uma única vez ao montar)
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const documentosOptions = [
     'Carteira de Identidade (RG)',
