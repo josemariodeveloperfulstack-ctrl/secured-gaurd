@@ -172,32 +172,26 @@ export function getApiUrl(): string {
 
   const hn = typeof window !== 'undefined' ? window.location.hostname : '';
 
-  // CI / Dev / Test no mesmo host (nginx → /api → backend): SEMPRE usar `/api` relativo.
-  // Evita: (1) VITE_API_URL de build apontando para localhost/errado; (2) loops de redirect
-  // (ERR_TOO_MANY_REDIRECTS) quando URL absoluta + proxies/SSL terminam divergindo.
+  // 1. Ambientes no mesmo host (Nginx faz proxy de /api para backend)
+  // SEMPRE usar `/api` relativo para evitar loops de redirect e problemas de CORS/SSL.
   if (
     hn === 'ci.z7botsolutions.com.br' ||
     hn === 'dev.z7botsolutions.com.br' ||
+    hn === 'securedguard.z7botsolutions.com.br' ||
+    hn === 'portal.promovervigilancia.com.br' ||
     ((hn.includes('test.') || hn.includes('testing.')) && hn.includes('z7botsolutions.com.br'))
   ) {
-    console.log('🔧 Mesmo host (CI/Dev/Test): usando /api relativo —', hn);
+    console.log('🔧 Usando API relativa (/api) para host:', hn);
     return '/api';
   }
 
-  // Primeiro tenta usar variável de ambiente (para builds específicos)
+  // 2. Variável de ambiente (para builds específicos)
   if (import.meta.env.VITE_API_URL) {
     console.log('🔧 Usando VITE_API_URL:', import.meta.env.VITE_API_URL);
     return import.meta.env.VITE_API_URL;
   }
 
-  // PROD: portal.promovervigilancia.com.br e securedguard servem frontend+backend no mesmo host.
-  // Usar /api relativo evita ERR_CERT_AUTHORITY_INVALID e CORS (nginx faz proxy de /api para backend).
-  if (hn === 'portal.promovervigilancia.com.br' || hn === 'securedguard.z7botsolutions.com.br') {
-    console.log('🔧 Portal/Prod: usando API no mesmo host (/api)');
-    return '/api';
-  }
-
-  // Senão, usa detecção automática
+  // 3. Fallback para detecção automática baseada no mapa de ambientes
   const config = getCurrentEnvironmentConfig();
   console.log('🔄 Usando detecção automática:', config.apiUrl);
   return config.apiUrl;
@@ -216,20 +210,27 @@ export function getWsUrl(): string {
     return url;
   }
 
-  // Primeiro tenta usar variável de ambiente
-  let url = import.meta.env.VITE_WS_URL;
+  const hn = typeof window !== 'undefined' ? window.location.hostname : '';
 
-  // PROD: portal/securedguard - WebSocket no mesmo host
-  if (!url && typeof window !== 'undefined') {
-    const hn = window.location.hostname;
-    if (hn === 'portal.promovervigilancia.com.br' || hn === 'securedguard.z7botsolutions.com.br') {
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      url = `${protocol}://${window.location.host}/ws`;
-      console.log('🔧 Portal/Prod: WebSocket no mesmo host:', url);
-    }
+  // 1. WebSocket no mesmo host para conhecidos do mesmo proxy
+  if (
+    hn === 'ci.z7botsolutions.com.br' ||
+    hn === 'dev.z7botsolutions.com.br' ||
+    hn === 'securedguard.z7botsolutions.com.br' ||
+    hn === 'portal.promovervigilancia.com.br' ||
+    ((hn.includes('test.') || hn.includes('testing.')) && hn.includes('z7botsolutions.com.br'))
+  ) {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.host;
+    const url = `${protocol}://${host}/ws`;
+    console.log('🔧 WebSocket no mesmo host:', url);
+    return url;
   }
 
-  // Se não houver variável, usa detecção automática
+  // 2. Tenta usar variável de ambiente
+  let url = import.meta.env.VITE_WS_URL;
+
+  // 3. Se não houver variável, usa detecção automática
   if (!url) {
     const config = getCurrentEnvironmentConfig();
     url = config.wsUrl;
