@@ -189,7 +189,11 @@ jobs:
             done
             
             echo "🚀 Subindo containers..."
-            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            if ! docker-compose -f \$DEPLOY_DIR/docker-compose.prod.yml up -d --remove-orphans; then
+              echo "❌ Erro ao subir containers. Capturando logs do backend..."
+              docker logs secured-guard-backend-prod --tail 200
+              exit 1
+            fi
             
             echo "⏳ Aguardando 15s para Postgres ficar healthy..."
             sleep 15
