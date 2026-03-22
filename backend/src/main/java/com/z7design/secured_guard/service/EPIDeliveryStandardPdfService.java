@@ -24,6 +24,7 @@ import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
@@ -149,6 +150,7 @@ public class EPIDeliveryStandardPdfService {
                 return baos.toByteArray();
         }
 
+        @Transactional(readOnly = true)
         public byte[] generateEPIDeliveryPdfFromForm(EPIDeliveryForm form) throws Exception {
                 log.info("📄 Gerando ficha de entrega de EPI a partir do formulário ID: {}", form.getId());
 
@@ -283,6 +285,7 @@ public class EPIDeliveryStandardPdfService {
                 return baos.toByteArray();
         }
 
+        @Transactional(readOnly = true)
         public byte[] generateEPIDeliveryExcelFromForm(EPIDeliveryForm form) throws Exception {
                 log.info("📊 Gerando ficha de entrega de EPI (Excel) a partir do formulário ID: {}", form.getId());
 
@@ -390,6 +393,7 @@ public class EPIDeliveryStandardPdfService {
 
         private static final DateTimeFormatter DATE_FORMAT_DDMMYYYY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+        @Transactional(readOnly = true)
         public byte[] generateBlankEPIDeliveryPdf(UUID companyId, UUID employeeId) throws Exception {
                 log.info("📄 Gerando ficha de entrega de EPI EM BRANCO (Manual) para empresa ID: {}, funcionário: {}", companyId, employeeId);
 

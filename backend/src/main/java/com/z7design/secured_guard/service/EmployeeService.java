@@ -1728,6 +1728,13 @@ public class EmployeeService {
                     EmployeeDTO.IdOnlyDTO workPostDTO = new EmployeeDTO.IdOnlyDTO();
                     workPostDTO.setId(e.getWorkPost().getId());
                     workPostDTO.setName(e.getWorkPost().getName());
+                    if (e.getWorkPost().getClient() != null) {
+                        workPostDTO.setClientId(e.getWorkPost().getClient().getId());
+                        workPostDTO.setClientName(e.getWorkPost().getClient().getName());
+                    }
+                    if (e.getWorkPost().getEpis() != null) {
+                        workPostDTO.setEpis(new java.util.ArrayList<>(e.getWorkPost().getEpis()));
+                    }
                     dto.setWorkPost(workPostDTO);
                 }
             } catch (Exception wpEx) {
