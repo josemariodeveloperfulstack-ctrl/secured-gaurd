@@ -13,6 +13,8 @@ import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import api from '@/lib/axios';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { CompanyCombobox } from '@/components/ui/company-combobox';
 
 interface TermoValeTransporteFormProps {
   employeeId?: string;
@@ -47,6 +49,28 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       empresaId: companyId || prev.empresaId
     }));
   }, [employeeId, companyId]);
+
+  // Auto-preencher empresa quando o funcionário mudar
+  useEffect(() => {
+    if (form.funcionarioId) {
+      const selected = employees.find(f => f.id === form.funcionarioId);
+      if (selected && selected.company?.id) {
+        setForm(prev => ({ ...prev, empresaId: selected.company.id || '' }));
+      } else if (form.funcionarioId && !selected) {
+        // Se não achou na lista local (ex: veio de busca remota), buscar detalhes
+        employeeService.getEmployeeById(form.funcionarioId).then(emp => {
+          if (emp && emp.company?.id) {
+            setForm(prev => ({ ...prev, empresaId: emp.company.id || '' }));
+            // Adicionar à lista local para evitar buscas repetidas
+            setEmployees(prev => {
+              if (prev.find(p => p.id === emp.id)) return prev;
+              return [...prev, emp];
+            });
+          }
+        }).catch(err => console.error('Erro ao buscar detalhes para auto-preenchimento:', err));
+      }
+    }
+  }, [form.funcionarioId, employees.length > 0]);
 
   // Carregar dados do backend
   useEffect(() => {
@@ -282,48 +306,12 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                     Selecione o colaborador para quem será gerado o termo.
                   </span>
                 </Label>
-                <Select
+                <EmployeeCombobox
                   value={form.funcionarioId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                  onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{f.name}</span>
-                            {(f.cpf || (f as any).document) && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
-                {funcionario && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
-                    <User className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-xs font-semibold text-foreground">
-                      {funcionario.name}
-                    </span>
-                    {(funcionario.cpf || (funcionario as any).document) && (
-                      <span className="text-[11px] text-muted-foreground">
-                        · CPF: {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
-                      </span>
-                    )}
-                  </div>
-                )}
+                  placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"}
+                />
               </div>
 
               <div className="space-y-2">
@@ -333,58 +321,13 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                     Escolha a empresa empregadora que constará no documento.
                   </span>
                 </Label>
-                <Select
+                <CompanyCombobox
                   value={form.empresaId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
+                  onChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
+                  companies={companies}
                   disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando empresas...</div>
-                    ) : companies.length > 0 ? (
-                      companies.map(e => (
-                        <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                            )}
-                            {e.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(e.cnpj)}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhuma empresa encontrada</div>
-                    )}
-                  </SelectContent>
-                </Select>
-                {empresa && (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
-                    <Building className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-xs font-semibold text-foreground">
-                      {empresa.sigla || empresa.tradeName || empresa.name}
-                    </span>
-                    {empresa.name && (
-                      <span className="text-[11px] text-muted-foreground">
-                        · Razão Social: {empresa.name}
-                      </span>
-                    )}
-                    {empresa.cnpj && (
-                      <span className="text-[11px] text-muted-foreground">
-                        · CNPJ: {formatCNPJ(empresa.cnpj)}
-                      </span>
-                    )}
-                  </div>
-                )}
+                  placeholder={loadingData ? "Carregando..." : "Selecione a empresa"}
+                />
               </div>
             </div>
           </div>
@@ -426,6 +369,21 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
                         {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {funcionario.workPost?.name || '-'}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Matrícula</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.registrationNumber || '-'}
                       </div>
                     </div>
                   </div>

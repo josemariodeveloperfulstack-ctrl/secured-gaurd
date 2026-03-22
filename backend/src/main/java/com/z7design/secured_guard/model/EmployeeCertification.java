@@ -7,6 +7,9 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -33,9 +36,15 @@ public class EmployeeCertification {
     @JsonBackReference
     private Employee employee;
     
-    @NotNull(message = "Training is required")
+    /**
+     * Treinamento referenciado. {@link NotFoundAction#IGNORE}: se o registro em {@code trainings}
+     * foi removido mas {@code employee_certifications.training_id} ainda aponta para ele, o Hibernate
+     * define {@code null} em vez de lançar {@code FetchNotFoundException} no listagem (FETCH JOIN).
+     * Novas certificações continuam exigindo treino válido no serviço ({@code create}).
+     */
     @ManyToOne
     @JoinColumn(name = "training_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Training training;
     
     @ManyToOne

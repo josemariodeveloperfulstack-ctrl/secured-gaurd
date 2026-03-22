@@ -7,6 +7,8 @@
               rightMargin="20" 
               topMargin="20" 
               bottomMargin="20">
+    <parameter name="REPORT_USER" class="java.lang.String"/>
+    <parameter name="REPORT_TIMESTAMP" class="java.lang.String"/>
     
     <!-- Campos -->
     <field name="id" class="java.util.UUID"/>
@@ -142,7 +144,7 @@
                 <textElement textAlignment="Center">
                     <font size="10"/>
                 </textElement>
-                <textFieldExpression><![CDATA["Relatório gerado em: " + new java.util.Date()]]></textFieldExpression>
+                <textFieldExpression><![CDATA["Gerado por: " + $P{REPORT_USER} + " em: " + $P{REPORT_TIMESTAMP}]]></textFieldExpression>
             </textField>
         </band>
     </summary>

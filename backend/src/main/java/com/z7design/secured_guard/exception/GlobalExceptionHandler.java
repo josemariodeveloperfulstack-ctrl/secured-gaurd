@@ -154,6 +154,8 @@ public class GlobalExceptionHandler {
             message = "Número do contrato já está em uso por outro contrato.";
         } else if (path.contains("employee-certifications")) {
             message = "Erro ao salvar treinamento/certificação. Verifique se o número da certificação ou os dados já existem.";
+        } else if (path.contains("remanejamentos") && (fullMsg.contains("remanejamento_id") || fullMsg.contains("remanejamentos_historico") || fullMsg.contains("not-null"))) {
+            message = "Não foi possível concluir a exclusão do remanejamento (integridade dos dados). Execute as migrações do banco (Flyway) ou contate o suporte.";
         }
 
         ErrorResponse errorResponse = ErrorResponse.builder()

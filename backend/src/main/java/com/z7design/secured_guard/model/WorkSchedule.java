@@ -50,6 +50,29 @@ public class WorkSchedule {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
     
+    @Column(name = "sigla", length = 5)
+    private String sigla; // PL, MT, HE, FT, AT, FE, CF, RM
+    
+    @Column(name = "remanejamento_id")
+    private UUID remanejamentoId;
+    
+    @Column(name = "is_monitoria")
+    @Builder.Default
+    private Boolean isMonitoria = false;
+    
+    @Column(name = "is_hora_extra")
+    @Builder.Default
+    private Boolean isHoraExtra = false;
+    
+    @Column(name = "coverage_schedule_id")
+    private UUID coverageScheduleId;
+    
+    @Column(name = "start_time", length = 5)
+    private String startTime; // HH:mm
+    
+    @Column(name = "end_time", length = 5)
+    private String endTime; // HH:mm
+    
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

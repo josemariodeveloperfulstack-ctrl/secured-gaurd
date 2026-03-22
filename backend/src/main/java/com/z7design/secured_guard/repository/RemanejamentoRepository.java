@@ -12,6 +12,8 @@ import java.util.UUID;
 public interface RemanejamentoRepository extends JpaRepository<Remanejamento, UUID> {
     List<Remanejamento> findByEmployeeId(UUID employeeId);
     
+    List<Remanejamento> findByEmployeeIdAndDataRemanejamento(UUID employeeId, java.time.LocalDate dataRemanejamento);
+    
     @Query("SELECT DISTINCT r FROM Remanejamento r " +
            "LEFT JOIN FETCH r.employee " +
            "LEFT JOIN FETCH r.originWorkstation " +

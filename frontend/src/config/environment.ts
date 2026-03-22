@@ -170,6 +170,20 @@ export function getApiUrl(): string {
     return '/api';
   }
 
+  const hn = typeof window !== 'undefined' ? window.location.hostname : '';
+
+  // CI / Dev / Test no mesmo host (nginx → /api → backend): SEMPRE usar `/api` relativo.
+  // Evita: (1) VITE_API_URL de build apontando para localhost/errado; (2) loops de redirect
+  // (ERR_TOO_MANY_REDIRECTS) quando URL absoluta + proxies/SSL terminam divergindo.
+  if (
+    hn === 'ci.z7botsolutions.com.br' ||
+    hn === 'dev.z7botsolutions.com.br' ||
+    ((hn.includes('test.') || hn.includes('testing.')) && hn.includes('z7botsolutions.com.br'))
+  ) {
+    console.log('🔧 Mesmo host (CI/Dev/Test): usando /api relativo —', hn);
+    return '/api';
+  }
+
   // Primeiro tenta usar variável de ambiente (para builds específicos)
   if (import.meta.env.VITE_API_URL) {
     console.log('🔧 Usando VITE_API_URL:', import.meta.env.VITE_API_URL);
@@ -178,7 +192,6 @@ export function getApiUrl(): string {
 
   // PROD: portal.promovervigilancia.com.br e securedguard servem frontend+backend no mesmo host.
   // Usar /api relativo evita ERR_CERT_AUTHORITY_INVALID e CORS (nginx faz proxy de /api para backend).
-  const hn = typeof window !== 'undefined' ? window.location.hostname : '';
   if (hn === 'portal.promovervigilancia.com.br' || hn === 'securedguard.z7botsolutions.com.br') {
     console.log('🔧 Portal/Prod: usando API no mesmo host (/api)');
     return '/api';

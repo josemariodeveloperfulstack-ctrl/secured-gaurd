@@ -5,14 +5,23 @@ import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.model.WorkSchedule;
+import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.repository.WorkScheduleRepository;
+import com.z7design.secured_guard.repository.RemanejamentoRepository;
 import com.z7design.secured_guard.validation.WorkScheduleValidator;
+import com.z7design.secured_guard.model.Remanejamento;
+import com.z7design.secured_guard.model.RemanejamentoTipo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +38,10 @@ public class WorkScheduleService {
     private final EmployeeRepository employeeRepository;
     private final WorkPostRepository workPostRepository;
     private final WorkScheduleValidator workScheduleValidator;
+    private final WorkScheduleIntelligenceService intelligenceService;
+    private final ExcelReportLayoutService excelService;
+    private final CompanyRepository companyRepository;
+    private final RemanejamentoRepository remanejamentoRepository;
     
     /**
      * Criar nova escala de trabalho
@@ -47,13 +60,37 @@ public class WorkScheduleService {
         // Validar regras de negócio
         workScheduleValidator.validateCreateSchedule(workSchedule);
         
+        // Inteligência de Siglas
+        if (workSchedule.getSigla() == null || workSchedule.getSigla().isEmpty()) {
+            String suggestedSigla = intelligenceService.suggestSigla(
+                    employee.getId(), 
+                    workSchedule.getScheduleDate(), 
+                    workSchedule.getIsMonitoria() != null ? workSchedule.getIsMonitoria() : false,
+                    workSchedule.getIsHoraExtra() != null ? workSchedule.getIsHoraExtra() : false
+            );
+            workSchedule.setSigla(suggestedSigla);
+            log.info("Sigla sugerida/aplicada: {}", suggestedSigla);
+        }
+        
+        // Bloqueio de Reciclagem (se for PL e não tiver reciclagem em dia)
+        if ("PL".equals(workSchedule.getSigla()) && !intelligenceService.isReciclagemValid(employee.getId(), workSchedule.getScheduleDate())) {
+            throw new BusinessException("Não é possível alocar PL: Reciclagem vencida para esta data.");
+        }
+        
         // Definir status inicial
-        workSchedule.setStatus(WorkSchedule.ScheduleStatus.PENDING);
+        if (workSchedule.getStatus() == null) {
+            workSchedule.setStatus(WorkSchedule.ScheduleStatus.PENDING);
+        }
         workSchedule.setEmployee(employee);
         workSchedule.setLocation(location);
         
         WorkSchedule savedSchedule = workScheduleRepository.save(workSchedule);
         log.info("Escala criada com sucesso: {}", savedSchedule.getId());
+        
+        // Se a sigla for RM (Remanejamento), criar registro automático na tabela de remanejamentos
+        if ("RM".equals(savedSchedule.getSigla())) {
+            handleRemanejamentoCreation(savedSchedule, employee, location);
+        }
         
         return savedSchedule;
     }
@@ -100,12 +137,90 @@ public class WorkScheduleService {
             existingSchedule.setObservations(workScheduleDetails.getObservations());
         }
         
+        // Novos campos operacionais
+        if (workScheduleDetails.getSigla() != null) {
+            existingSchedule.setSigla(workScheduleDetails.getSigla());
+        }
+        if (workScheduleDetails.getRemanejamentoId() != null) {
+            existingSchedule.setRemanejamentoId(workScheduleDetails.getRemanejamentoId());
+        }
+        if (workScheduleDetails.getIsMonitoria() != null) {
+            existingSchedule.setIsMonitoria(workScheduleDetails.getIsMonitoria());
+        }
+        if (workScheduleDetails.getIsHoraExtra() != null) {
+            existingSchedule.setIsHoraExtra(workScheduleDetails.getIsHoraExtra());
+        }
+        if (workScheduleDetails.getCoverageScheduleId() != null) {
+            existingSchedule.setCoverageScheduleId(workScheduleDetails.getCoverageScheduleId());
+        }
+        if (workScheduleDetails.getStartTime() != null) {
+            existingSchedule.setStartTime(workScheduleDetails.getStartTime());
+        }
+        if (workScheduleDetails.getEndTime() != null) {
+            existingSchedule.setEndTime(workScheduleDetails.getEndTime());
+        }
+
+        // Inteligência de Siglas na atualização
+        if (existingSchedule.getSigla() == null || existingSchedule.getSigla().isEmpty()) {
+            String suggestedSigla = intelligenceService.suggestSigla(
+                    existingSchedule.getEmployee().getId(), 
+                    existingSchedule.getScheduleDate(), 
+                    existingSchedule.getIsMonitoria() != null ? existingSchedule.getIsMonitoria() : false,
+                    existingSchedule.getIsHoraExtra() != null ? existingSchedule.getIsHoraExtra() : false
+            );
+            existingSchedule.setSigla(suggestedSigla);
+        }
+
+        // Bloqueio de Reciclagem na atualização
+        if ("PL".equals(existingSchedule.getSigla()) && !intelligenceService.isReciclagemValid(existingSchedule.getEmployee().getId(), existingSchedule.getScheduleDate())) {
+            throw new BusinessException("Não é possível alocar PL: Reciclagem vencida para esta data.");
+        }
+        
         existingSchedule.setUpdatedAt(LocalDateTime.now());
         
         WorkSchedule updatedSchedule = workScheduleRepository.save(existingSchedule);
         log.info("Escala atualizada com sucesso: {}", updatedSchedule.getId());
         
+        // Se a sigla passou a ser RM (Remanejamento), garantir que existe o registro
+        if ("RM".equals(updatedSchedule.getSigla()) && updatedSchedule.getRemanejamentoId() == null) {
+            handleRemanejamentoCreation(updatedSchedule, updatedSchedule.getEmployee(), updatedSchedule.getLocation());
+        }
+        
         return updatedSchedule;
+    }
+
+    /**
+     * Cria registro de remanejamento vinculado à escala
+     */
+    private void handleRemanejamentoCreation(WorkSchedule schedule, Employee employee, WorkPost destination) {
+        try {
+            log.info("Iniciando criação automática de remanejamento para funcionário: {}", employee.getId());
+            
+            // Buscar posto de origem (atual do funcionário)
+            WorkPost origin = employee.getWorkPost();
+            
+            Remanejamento rem = new Remanejamento();
+            rem.setEmployee(employee);
+            rem.setDataRemanejamento(schedule.getScheduleDate());
+            rem.setDestinationWorkstation(destination);
+            rem.setOriginWorkstation(origin);
+            rem.setTipo(RemanejamentoTipo.TRANSFERENCIA_POSTO_TRABALHO);
+            rem.setObservacao("Gerado automaticamente via Escala de Trabalho (RM) em " + schedule.getScheduleDate());
+            
+            if (origin != null) rem.setOrigem(origin.getName());
+            rem.setDestino(destination.getName());
+            
+            Remanejamento savedRem = remanejamentoRepository.save(rem);
+            
+            // Vincular ID do remanejamento à escala
+            schedule.setRemanejamentoId(savedRem.getId());
+            workScheduleRepository.save(schedule);
+            
+            log.info("Remanejamento automático criado com sucesso. ID: {}", savedRem.getId());
+        } catch (Exception e) {
+            log.error("Erro ao criar remanejamento automático: {}", e.getMessage(), e);
+            // Não falhar a criação da escala por erro no log de remanejamento, mas logar o erro
+        }
     }
     
     /**
@@ -266,5 +381,71 @@ public class WorkScheduleService {
     @Transactional(readOnly = true)
     public boolean isEmployeeAvailable(UUID employeeId, LocalDate date) {
         return !workScheduleRepository.existsByEmployeeIdAndScheduleDate(employeeId, date);
+    }
+
+    /**
+     * Exportar escala para folha de pagamento (Excel)
+     */
+    public byte[] exportPayroll(LocalDate startDate, LocalDate endDate, UUID companyId) throws IOException {
+        log.info("Exportando escala para folha de pagamento: {} a {}", startDate, endDate);
+        
+        List<WorkSchedule> schedules = getWorkSchedulesByPeriod(startDate, endDate);
+        
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Fechamento Operacional");
+            
+            // Adicionar cabeçalho padrão
+            int currentRow = excelService.addHeader(sheet, workbook, companyId, "FECHAMENTO OPERACIONAL (DP/RH)", 6);
+            
+            // Estilo do cabeçalho da tabela
+            CellStyle headerStyle = workbook.createCellStyle();
+            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+            
+            // Criar linha de cabeçalho
+            Row headerRow = sheet.createRow(currentRow++);
+            String[] columns = {"DATA", "MATRÍCULA", "NOME DO FUNCIONÁRIO", "POSTO", "TURNO", "SIGLA", "OBSERVAÇÕES"};
+            for (int i = 0; i < columns.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+            }
+            
+            // Preencher dados
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat(workbook.getCreationHelper().createDataFormat().getFormat("dd/MM/yyyy"));
+            
+            for (WorkSchedule schedule : schedules) {
+                Row row = sheet.createRow(currentRow++);
+                
+                Cell dateCell = row.createCell(0);
+                dateCell.setCellValue(java.sql.Date.valueOf(schedule.getScheduleDate()));
+                dateCell.setCellStyle(dateStyle);
+                
+                String matricula = schedule.getEmployee().getRegistrationNumber();
+                if (matricula == null || matricula.isBlank()) {
+                    matricula = schedule.getEmployee().getMatriculaEsocial();
+                }
+                row.createCell(1).setCellValue(matricula != null && !matricula.isBlank() ? matricula : "N/A");
+                row.createCell(2).setCellValue(schedule.getEmployee().getName());
+                row.createCell(3).setCellValue(schedule.getLocation().getName());
+                row.createCell(4).setCellValue(schedule.getShift().toString());
+                row.createCell(5).setCellValue(schedule.getSigla());
+                row.createCell(6).setCellValue(schedule.getObservations() != null ? schedule.getObservations() : "");
+            }
+            
+            // Ajustar largura das colunas
+            for (int i = 0; i < columns.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            
+            workbook.write(out);
+            return out.toByteArray();
+        }
     }
 }

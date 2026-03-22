@@ -16,6 +16,8 @@ export function isConnectionError(error: any): boolean {
   return (
     error?.code === 'ECONNREFUSED' ||
     error?.code === 'ERR_CONNECTION_REFUSED' ||
+    error?.code === 'ERR_TOO_MANY_REDIRECTS' ||
+    error?.message?.includes('too many redirects') ||
     error?.message?.includes('Network Error') ||
     error?.message?.includes('connection refused') ||
     error?.message?.includes('Failed to fetch') ||

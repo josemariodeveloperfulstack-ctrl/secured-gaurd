@@ -94,10 +94,13 @@ api.interceptors.response.use(
     // Tratamento especial para erros de conexão (backend não disponível)
     if (!error.response && isConnectionError(error)) {
       const apiUrl = error.config?.baseURL || getApiUrl();
-      console.warn('⚠️ Backend não está disponível:', apiUrl);
-      console.warn('⚠️ Verifique se o backend está rodando na porta correta');
-      
-      // Retornar erro customizado para que os componentes possam tratar
+      if (error?.code === 'ERR_TOO_MANY_REDIRECTS' || error?.message?.includes('too many redirects')) {
+        console.warn('⚠️ Loop de redirecionamento na API (proxy/nginx ou URL base incorreta):', apiUrl);
+        console.warn('⚠️ Em CI use getApiUrl() = /api (mesmo host). Verifique nginx: proxy_redirect off; e X-Forwarded-*');
+      } else {
+        console.warn('⚠️ Backend não está disponível:', apiUrl);
+        console.warn('⚠️ Verifique se o backend está rodando na porta correta');
+      }
       return Promise.reject(createConnectionError(apiUrl));
     }
     

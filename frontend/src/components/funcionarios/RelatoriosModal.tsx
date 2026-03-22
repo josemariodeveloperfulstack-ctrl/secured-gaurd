@@ -25,7 +25,9 @@ import {
     ChevronDown,
     ChevronUp,
     RefreshCcw,
-    Calendar
+    Calendar,
+    Shield,
+    AlertCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { employeeService } from '@/services/employeeService';
@@ -45,9 +47,13 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/contexts/AuthContext";
 
 /** Colunas disponíveis para o relatório PDF (chave usada no backend, label exibido) */
 const REPORT_COLUMNS: { key: string; label: string }[] = [
@@ -102,11 +108,12 @@ export function RelatoriosModal({
     filterWorkPosts,
     filterPositions
 }: RelatoriosModalProps) {
+    const { user } = useAuth();
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [asoFilter, setAsoFilter] = useState<string>('all');
-    const [companyFilter, setCompanyFilter] = useState<string>('all');
-    const [workPostFilter, setWorkPostFilter] = useState<string>('all');
-    const [positionFilter, setPositionFilter] = useState<string>('all');
+    const [companyFilters, setCompanyFilters] = useState<string[]>([]);
+    const [workPostFilters, setWorkPostFilters] = useState<string[]>([]);
+    const [positionFilters, setPositionFilters] = useState<string[]>([]);
     const [genderFilter, setGenderFilter] = useState<string>('all');
     const [terminationReasonFilter, setTerminationReasonFilter] = useState<string>('all');
     const [feriasFilter, setFeriasFilter] = useState<string>('all');
@@ -222,9 +229,9 @@ export function RelatoriosModal({
     const deferredFilters = useDeferredValue({
         status: statusFilter,
         aso: asoFilter,
-        company: companyFilter,
-        workPost: workPostFilter,
-        position: positionFilter,
+        company: companyFilters,
+        workPost: workPostFilters,
+        position: positionFilters,
         gender: genderFilter,
         terminationReason: terminationReasonFilter,
         hireDateStart,
@@ -262,24 +269,24 @@ export function RelatoriosModal({
             }
 
             // Company Filter
-            if (deferredFilters.company !== 'all') {
+            if (deferredFilters.company.length > 0) {
                 const cName = emp.company?.sigla || emp.company?.name || String(emp.company?.id);
-                if (cName !== deferredFilters.company) return false;
+                if (!cName || !deferredFilters.company.includes(cName)) return false;
             }
 
             // WorkPost Filter
-            if (deferredFilters.workPost !== 'all') {
+            if (deferredFilters.workPost.length > 0) {
                 let wpName = typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name;
                 if (!wpName && emp.department?.name) {
                     wpName = emp.department.name;
                 }
-                if (wpName !== deferredFilters.workPost) return false;
+                if (!wpName || !deferredFilters.workPost.includes(wpName)) return false;
             }
 
             // Position Filter
-            if (deferredFilters.position !== 'all') {
+            if (deferredFilters.position.length > 0) {
                 const posName = typeof emp.position === 'string' ? emp.position : emp.position?.name || '';
-                if (posName !== deferredFilters.position) return false;
+                if (!posName || !deferredFilters.position.includes(posName)) return false;
             }
 
             // Gender Filter
@@ -395,112 +402,126 @@ export function RelatoriosModal({
                 return;
             }
 
-            const dataToExport = await processDataInChunks(fullEmployeesData, (emp) => {
-                let age = '';
-                if (emp.birthDate) {
-                    const birthDate = new Date(emp.birthDate);
-                    const diff = Date.now() - birthDate.getTime();
-                    age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25)).toString();
+            const columnsToUse = selectedColumns.size > 0 ? Array.from(selectedColumns) : DEFAULT_PDF_COLUMNS;
+
+            // Ordenar dados antes de mapear
+            fullEmployeesData.sort((a, b) => {
+                let aPost = typeof a.workPost === 'string' ? a.workPost : (a.workPost?.name || a.department?.name || '');
+                let bPost = typeof b.workPost === 'string' ? b.workPost : (b.workPost?.name || b.department?.name || '');
+                aPost = String(aPost).trim() || 'Z_NÃO ALOCADO';
+                bPost = String(bPost).trim() || 'Z_NÃO ALOCADO';
+
+                const aName = (a.name || '').toLowerCase();
+                const bName = (b.name || '').toLowerCase();
+
+                if (orderBy === 'POSTO_TRABALHO') {
+                    const postCompare = aPost.localeCompare(bPost);
+                    if (postCompare !== 0) return postCompare;
                 }
+                
+                return aName.localeCompare(bName);
+            });
 
+            let dataToExport = await processDataInChunks(fullEmployeesData, (emp) => {
                 const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString() : '';
-                const hireDateStr = formatDate(emp.hireDate);
-                const asoDateStr = formatDate(emp.exameMedicoVencimento);
-                const termDateStr = formatDate(emp.dataRescisao || emp.terminationDate);
-
                 const getAddress = (addr: any) => {
                     if (!addr) return '';
                     if (typeof addr === 'string') return addr;
                     return `${addr.street || ''}, ${addr.number || ''} ${addr.complement ? `- ${addr.complement}` : ''} - ${addr.neighborhood || ''}, ${addr.city || ''}/${addr.state || ''} CEP: ${addr.zipCode || ''}`;
                 };
 
-                let dependentes = '';
-                if (emp.dependents && emp.dependents.length > 0) {
-                    dependentes = emp.dependents.map((d: any) => `${d.name} (${d.relationship}) - Nasc: ${formatDate(d.birthDate)}${d.cpf ? ` CPF: ${d.cpf}` : ''}`).join(' | ');
+                const row: any = {};
+                
+                if (columnsToUse.includes('name')) row['Nome'] = emp.name;
+                if (columnsToUse.includes('registrationNumber')) row['Matrícula'] = emp.matricula || emp.registrationNumber || '';
+                if (columnsToUse.includes('position')) row['Cargo'] = typeof emp.position === 'string' ? emp.position : emp.position?.name || '';
+                if (columnsToUse.includes('workPost')) {
+                    const wp = typeof emp.workPost === 'string' ? emp.workPost : (emp.workPost?.name || emp.department?.name || '');
+                    row['Posto de Trabalho'] = wp && String(wp).trim() ? wp : 'Não alocado';
                 }
+                if (columnsToUse.includes('company')) row['Empresa'] = emp.company?.sigla || emp.company?.name || emp.empresaNome || '';
+                if (columnsToUse.includes('status')) row['Status'] = getStatusLabel(emp.status);
+                if (columnsToUse.includes('cpf')) row['CPF'] = emp.cpf || (emp as any).document || '';
+                if (columnsToUse.includes('rg')) row['RG'] = emp.rg || '';
+                if (columnsToUse.includes('birthDate')) row['Data Nasc.'] = formatDate(emp.birthDate);
+                if (columnsToUse.includes('hireDate')) row['Admissão'] = formatDate(emp.hireDate);
+                if (columnsToUse.includes('terminationDate')) row['Data Rescisão'] = formatDate(emp.dataRescisao || emp.terminationDate);
+                if (columnsToUse.includes('terminationReason')) row['Motivo Demissão'] = emp.terminationReason || '';
+                if (columnsToUse.includes('email')) row['E-mail'] = emp.email || '';
+                if (columnsToUse.includes('phone')) row['Telefone'] = emp.phone || emp.telefoneContato || '';
+                if (columnsToUse.includes('sexo')) row['Gênero'] = emp.sexo || emp.gender || '';
+                if (columnsToUse.includes('maritalStatus')) row['Estado Civil'] = emp.maritalStatus || '';
+                if (columnsToUse.includes('salario')) row['Salário'] = emp.salario ? `R$ ${emp.salario}` : '';
+                if (columnsToUse.includes('ctps')) row['CTPS'] = emp.ctps || '';
+                if (columnsToUse.includes('pis')) row['PIS'] = emp.pis || '';
+                if (columnsToUse.includes('cbo')) row['CBO'] = emp.cbo || '';
+                if (columnsToUse.includes('matriculaEsocial')) row['Matr. eSocial'] = emp.matriculaEsocial || '';
+                if (columnsToUse.includes('cnhNumber')) row['CNH'] = emp.cnh || emp.cnhNumber || '';
+                if (columnsToUse.includes('cnhCategory')) row['Categ. CNH'] = emp.cnhCategory || '';
+                if (columnsToUse.includes('cnhExpirationDate')) row['Validade CNH'] = formatDate(emp.cnhExpirationDate);
+                if (columnsToUse.includes('exameMedicoVencimento')) row['Próx. ASO'] = formatDate(emp.exameMedicoVencimento);
+                if (columnsToUse.includes('proximasFeriasVencimento')) row['Venc. Férias'] = formatDate(emp.proximasFeriasVencimento);
+                if (columnsToUse.includes('address')) row['Endereço'] = getAddress(emp.address);
+                if (columnsToUse.includes('nationality')) row['Nacionalidade'] = emp.nationality || '';
+                if (columnsToUse.includes('motherName')) row['Nome Mãe'] = emp.motherName || emp.nomeMae || '';
+                if (columnsToUse.includes('fatherName')) row['Nome Pai'] = emp.fatherName || emp.nomePai || '';
 
-                return {
-                    'Matrícula': emp.matricula || emp.registrationNumber || '',
-                    'Matrícula eSocial': emp.matriculaEsocial || '',
-                    'Status': getStatusLabel(emp.status),
-                    'Nome Completo': emp.name,
-                    'Empresa': emp.company?.sigla || emp.company?.name || emp.empresaNome || '',
-                    'CNPJ Empresa': emp.company?.cnpj || emp.empresaCnpj || '',
-                    'Posto de Trabalho': (() => {
-                const wp = typeof emp.workPost === 'string' ? emp.workPost : (emp.workPost?.name || emp.department?.name || '');
-                return wp && String(wp).trim() ? wp : 'Não alocado';
-              })(),
-                    'Cargo': typeof emp.position === 'string' ? emp.position : emp.position?.name || '',
-                    'CBO': emp.cbo || '',
-                    'Admissão': hireDateStr,
-                    'Data Rescisão': termDateStr,
-                    'Motivo Demissão': emp.terminationReason || '',
-                    'CPF': emp.cpf || (emp as any).document || '',
-                    'RG': emp.rg || '',
-                    'Data Nascimento': formatDate(emp.birthDate),
-                    'Gênero/Sexo': emp.sexo || emp.gender || '',
-                    'Estado Civil': emp.maritalStatus || '',
-                    'Grau de Instrução': emp.grauInstrucao || '',
-                    'Nacionalidade': emp.nationality || '',
-                    'Naturalidade': emp.naturalidade || '',
-                    'Nome da Mãe': emp.motherName || emp.nomeMae || '',
-                    'Nome do Pai': emp.fatherName || emp.nomePai || '',
-                    'Telefone': emp.phone || emp.telefoneContato || '',
-                    'Email': emp.email || '',
-                    'CEP': emp.address?.zipCode || '',
-                    'Endereço': getAddress(emp.address),
-                    'Número': emp.address?.number || '',
-                    'Complemento': emp.address?.complement || '',
-                    'Bairro': emp.address?.neighborhood || '',
-                    'Cidade': emp.address?.city || '',
-                    'Estado': emp.address?.state || '',
-                    'CTPS': emp.ctps || '',
-                    'Série CTPS': emp.ctpsSerie || emp.ctpsSeries || '',
-                    'UF CTPS': emp.ctpsUf || '',
-                    'Data Emissão CTPS': formatDate(emp.ctpsIssueDate),
-                    'Órgão Emissor CTPS': emp.ctpsIssuingAgency || '',
-                    'PIS/PASEP': emp.pis || '',
-                    'Data Cadastro PIS': formatDate(emp.pisDataCadastro),
-                    'Título de Eleitor': emp.tituloEleitor || '',
-                    'Zona Eleitoral': emp.tituloEleitorZona || '',
-                    'Seção Eleitoral': emp.tituloEleitorSecao || '',
-                    'Certificado Militar': emp.certificadoMilitar || '',
-                    'CNH': emp.cnh || emp.cnhNumber || '',
-                    'Categoria CNH': emp.cnhCategory || '',
-                    'Validade CNH': formatDate(emp.cnhExpirationDate),
-                    'Salário': emp.salario ? `R$ ${emp.salario}` : '',
-                    'Período de Pagamento': emp.periodoPagamento || '',
-                    'Horário de Trabalho': emp.horarioTrabalho || '',
-                    'Intervalo Trabalho': emp.horarioTrabalhoIntervalo || '',
-                    'Escala de Trabalho': emp.escalaTrabalho || emp.currentScale || '',
-                    'Dias de Trabalho': emp.diasTrabalho || '',
-                    'Folga Semanal': emp.folgaSemanal || '',
-                    'Banco': emp.bankData?.bank || emp.bankInfo?.bank || '',
-                    'Agência': emp.bankData?.agency || emp.bankInfo?.agency || '',
-                    'Conta': emp.bankData?.account || emp.bankInfo?.account || '',
-                    'Tipo Conta': emp.bankData?.type || emp.bankInfo?.accountType || '',
-                    'Chave PIX': emp.bankData?.chavePix || emp.bankInfo?.pixKey || '',
-                    'Optante FGTS': emp.fgtsOptante ? 'Sim' : 'Não',
-                    'Data Opção FGTS': formatDate(emp.fgtsDataOpcao),
-                    'Banco Depositário FGTS': emp.fgtsBancoDepositario || '',
-                    'Data Referência Exame': formatDate(emp.exameMedicoData),
-                    'Tipo do ASO': emp.exameMedicoTipo || '',
-                    'Próximo ASO': asoDateStr,
-                    'Vencimento Próx. Férias': formatDate(emp.proximasFeriasVencimento),
-                    'Dependentes': dependentes,
-                    'Cônjuge': emp.spouseName || '',
-                    'Cônjuge CPF': emp.spouseCpf || '',
-                    'Filhos Brasileiros?': emp.temFilhosBrasileiros ? 'Sim' : 'Não',
-                    'Qtd Filhos Brasileiros': emp.quantidadeFilhosBrasileiros || '',
-                    'Idade': age,
-                };
+                return row;
             }, 100);
 
-            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            // Agrupamento para o Excel
+            if (groupBy === 'POSTO_TRABALHO') {
+                const groupedData: any[] = [];
+                let currentGroup = '';
+                
+                dataToExport.forEach((row, index) => {
+                    const emp = fullEmployeesData[index];
+                    const wp = typeof emp.workPost === 'string' ? emp.workPost : (emp.workPost?.name || emp.department?.name || '');
+                    const wpLabel = wp && String(wp).trim() ? String(wp).trim() : 'Não alocado';
+                    
+                    if (wpLabel !== currentGroup) {
+                        currentGroup = wpLabel;
+                        if (groupedData.length > 0) groupedData.push({});
+                        // Inserir header da seção no Excel (usando a primeira chave do objeto row para aparecer na primeira coluna)
+                        const firstKey = Object.keys(row)[0] || 'Agrupamento';
+                        groupedData.push({ [firstKey]: `== POSTO DE TRABALHO: ${wpLabel} ==` });
+                    }
+                    groupedData.push(row);
+                });
+                dataToExport = groupedData;
+            }
+
+            const firstDataRow = dataToExport.find((r) => Object.keys(r).length > 0);
+            const firstColKey = firstDataRow ? Object.keys(firstDataRow)[0] : 'Nome';
+            const userName = (user?.name || '').trim();
+            const userLogin = (user?.username || user?.email || '').trim();
+            const userLabel =
+                userName && userLogin && userName.toLowerCase() !== userLogin.toLowerCase()
+                    ? `${userName} (${userLogin})`
+                    : userName || userLogin || '—';
+            const reportAtStr = new Date().toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+            const excelMetaPrefix = [
+                { [firstColKey]: `Usuário: ${userLabel}` },
+                { [firstColKey]: `Data do relatório: ${reportAtStr}` },
+                { [firstColKey]: '' },
+            ];
+
+            const worksheet = XLSX.utils.json_to_sheet([...excelMetaPrefix, ...dataToExport]);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Funcionários");
 
-            const companyTag = companyFilter !== 'all' ? `-${companyFilter}` : '';
+            const companyTag =
+                companyFilters.length === 1
+                    ? `-${companyFilters[0].replace(/[/\\?%*:|"<>]/g, '_').slice(0, 40)}`
+                    : companyFilters.length > 1
+                        ? `-${companyFilters.length}-empresas`
+                        : '';
             XLSX.writeFile(workbook, `relatorio-funcionarios${companyTag}-${new Date().toISOString().split('T')[0]}.xlsx`);
         } catch (error: any) {
             console.error('Erro ao gerar Excel:', error);
@@ -521,9 +542,7 @@ export function RelatoriosModal({
             return;
         }
 
-        const companyId = companyFilter !== 'all'
-            ? allEmployees.find(emp => (emp.company?.sigla || emp.company?.name || String(emp.company?.id)) === companyFilter)?.company?.id
-            : null;
+        const companyId = resolvePdfCompanyId();
 
         setIsProcessing(true);
         setProgress(0);
@@ -557,9 +576,9 @@ export function RelatoriosModal({
     const resetFilters = () => {
         setStatusFilter('all');
         setAsoFilter('all');
-        setCompanyFilter('all');
-        setWorkPostFilter('all');
-        setPositionFilter('all');
+        setCompanyFilters([]);
+        setWorkPostFilters([]);
+        setPositionFilters([]);
         setGenderFilter('all');
         setTerminationReasonFilter('all');
         setFeriasFilter('all');
@@ -584,25 +603,76 @@ export function RelatoriosModal({
     const selectAllColumns = () => setSelectedColumns(new Set(REPORT_COLUMNS.map(c => c.key)));
     const selectDefaultColumns = () => setSelectedColumns(new Set(DEFAULT_PDF_COLUMNS));
 
+    const toggleArrayFilter = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
+        setter(prev => {
+            if (prev.includes(value)) {
+                return prev.filter(v => v !== value);
+            }
+            return [...prev, value];
+        });
+    };
+
+    /** Evita que o Popover feche ao marcar/desmarcar (seleção múltipla) */
+    const keepPopoverOpen = (e: React.PointerEvent) => {
+        e.preventDefault();
+    };
+
+    /** Rótulo compacto nos botões: mostra nomes quando poucos itens */
+    const multiSelectButtonLabel = (selected: string[], allLabel: string) => {
+        if (selected.length === 0) return allLabel;
+        if (selected.length === 1) {
+            const t = selected[0];
+            return t.length > 36 ? `${t.slice(0, 34)}…` : t;
+        }
+        return `${selected.length} selecionado(s)`;
+    };
+
+    /** Cabeçalho do PDF: uma empresa → logo dessa empresa; várias ou nenhuma filtro → padrão do backend (ex.: VIG) */
+    const resolvePdfCompanyId = (): string | undefined => {
+        if (companyFilters.length !== 1) return undefined;
+        const label = companyFilters[0];
+        const emp = allEmployees.find(
+            e => (e.company?.sigla || e.company?.name || String(e.company?.id)) === label
+        );
+        const id = emp?.company?.id;
+        return id ? String(id) : undefined;
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-5xl bg-seguranca-graphite border-gray-600 p-0 overflow-hidden w-full h-[90vh] flex flex-col mx-4 sm:mx-0">
-                <DialogHeader className="bg-gradient-to-r shrink-0 from-seguranca-red to-seguranca-yellow p-4 sm:p-6 text-white z-10 border-b-0 shadow-lg">
-                    <div className="flex flex-col gap-1">
-                        <DialogTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl md:text-2xl font-bold text-white">
-                            <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg shrink-0">
-                                <FileSpreadsheet className="text-white h-4 w-4 sm:h-6 sm:w-6" />
+                <DialogHeader className="bg-seguranca-black/80 backdrop-blur-md shrink-0 p-6 text-white z-10 border-b border-white/5 shadow-2xl relative">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-seguranca-red via-seguranca-yellow to-seguranca-red/50 opacity-80" />
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-seguranca-yellow/10 rounded-xl border border-seguranca-yellow/20 shadow-inner group transition-all duration-300 hover:scale-105">
+                                    <FileSpreadsheet className="text-seguranca-yellow h-6 w-6 group-hover:rotate-3" />
+                                </div>
+                                <div>
+                                    <DialogTitle className="text-2xl font-black tracking-tight text-white flex items-center gap-3">
+                                        Relatórios de Funcionários
+                                        <Badge variant="outline" className="bg-seguranca-yellow/20 text-seguranca-yellow border-seguranca-yellow/30 text-xs font-bold py-0.5 px-2 uppercase tracking-widest">
+                                            {filteredEmployees.length} {filteredEmployees.length === 1 ? 'resultado' : 'resultados'}
+                                        </Badge>
+                                    </DialogTitle>
+                                    <p className="text-gray-400 text-sm mt-1 flex items-center gap-1.5 font-medium">
+                                        <Shield className="h-3.5 w-3.5 text-seguranca-yellow/70" />
+                                        Gere e exporte dados dos colaboradores com filtros avançados
+                                    </p>
+                                </div>
                             </div>
-                            <div className="flex flex-col flex-1 sm:flex-row sm:items-center sm:justify-between w-full">
-                                <span>Relatórios de Funcionários</span>
-                                <Badge variant="outline" className="bg-white/20 text-white border-white/50 text-xs sm:text-sm py-1 px-3 mt-2 sm:mt-0 w-fit">
-                                    {filteredEmployees.length} {filteredEmployees.length === 1 ? 'resultado' : 'resultados'}
-                                </Badge>
+                        </div>
+                        
+                        <div className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-start gap-3">
+                            <div className="bg-seguranca-yellow/20 p-1.5 rounded-md mt-0.5">
+                                <AlertCircle className="h-4 w-4 text-seguranca-yellow" />
                             </div>
-                        </DialogTitle>
-                        <p className="text-white/90 text-xs sm:text-sm mt-1 flex items-center gap-2">
-                            Selecione os filtros abaixo para gerar seu relatório personalizado.
-                        </p>
+                            <p className="text-gray-300 text-xs leading-relaxed">
+                                <span className="font-bold text-white uppercase text-[10px] tracking-widest mr-2 bg-white/10 px-1.5 py-0.5 rounded">Dica</span>
+                                Empresa, posto e cargo permitem <span className="text-seguranca-yellow font-bold italic px-1">múltipla seleção</span> com busca rápida. Os resultados aplicam <span className="text-white font-bold underline underline-offset-4 decoration-seguranca-yellow/40">todos</span> os filtros selecionados simultaneamente.
+                            </p>
+                        </div>
                     </div>
                 </DialogHeader>
 
@@ -699,15 +769,42 @@ export function RelatoriosModal({
                                     <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
                                         <Building2 className="h-3 w-3" /> Empresa
                                     </Label>
-                                    <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                                        <SelectTrigger className="w-full bg-seguranca-black border-gray-600 text-gray-200">
-                                            <SelectValue placeholder="Filtrar por empresa" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
-                                            <SelectItem value="all">Todas as Empresas</SelectItem>
-                                            {companies.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
+                                    <Popover modal={false}>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-gray-200">
+                                                <span className="truncate">{multiSelectButtonLabel(companyFilters, 'Todas as Empresas')}</span>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0 bg-seguranca-graphite border-gray-600" align="start">
+                                            <Command>
+                                                <CommandInput placeholder="Buscar empresa..." className="border-gray-600 text-gray-200" />
+                                                <CommandList className="max-h-64 scrollbar-thin scrollbar-thumb-gray-600">
+                                                    <CommandEmpty className="text-gray-400 py-3 text-center text-sm">Nenhuma empresa encontrada.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        <CommandItem
+                                                            onSelect={() => setCompanyFilters([])}
+                                                            onPointerDown={keepPopoverOpen}
+                                                            className="text-gray-200 aria-selected:bg-white/10 cursor-pointer"
+                                                        >
+                                                            <Check className={cn("mr-2 h-4 w-4 shrink-0 text-seguranca-yellow", companyFilters.length === 0 ? "opacity-100" : "opacity-0")} />
+                                                            Todas as Empresas
+                                                        </CommandItem>
+                                                        {companies.map(c => (
+                                                            <CommandItem
+                                                                key={c}
+                                                                onSelect={() => toggleArrayFilter(setCompanyFilters, c)}
+                                                                onPointerDown={keepPopoverOpen}
+                                                                className="text-gray-200 aria-selected:bg-white/10 cursor-pointer"
+                                                            >
+                                                                <Check className={cn("mr-2 h-4 w-4 shrink-0 text-seguranca-yellow", companyFilters.includes(c) ? "opacity-100" : "opacity-0")} />
+                                                                <span className="truncate">{c}</span>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
 
                                 {/* Work Post */}
@@ -715,15 +812,42 @@ export function RelatoriosModal({
                                     <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
                                         <Briefcase className="h-3 w-3" /> Posto de Trabalho
                                     </Label>
-                                    <Select value={workPostFilter} onValueChange={setWorkPostFilter}>
-                                        <SelectTrigger className="w-full bg-seguranca-black border-gray-600 text-gray-200">
-                                            <SelectValue placeholder="Filtrar por posto" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
-                                            <SelectItem value="all">Todos os Postos</SelectItem>
-                                            {workPosts.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
+                                    <Popover modal={false}>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-gray-200">
+                                                <span className="truncate">{multiSelectButtonLabel(workPostFilters, 'Todos os Postos')}</span>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0 bg-seguranca-graphite border-gray-600" align="start">
+                                            <Command>
+                                                <CommandInput placeholder="Buscar posto..." className="border-gray-600 text-gray-200" />
+                                                <CommandList className="max-h-64 scrollbar-thin scrollbar-thumb-gray-600">
+                                                    <CommandEmpty className="text-gray-400 py-3 text-center text-sm">Nenhum posto encontrado.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        <CommandItem
+                                                            onSelect={() => setWorkPostFilters([])}
+                                                            onPointerDown={keepPopoverOpen}
+                                                            className="text-gray-200 aria-selected:bg-white/10 cursor-pointer"
+                                                        >
+                                                            <Check className={cn("mr-2 h-4 w-4 shrink-0 text-seguranca-yellow", workPostFilters.length === 0 ? "opacity-100" : "opacity-0")} />
+                                                            Todos os Postos
+                                                        </CommandItem>
+                                                        {workPosts.map(p => (
+                                                            <CommandItem
+                                                                key={p}
+                                                                onSelect={() => toggleArrayFilter(setWorkPostFilters, p)}
+                                                                onPointerDown={keepPopoverOpen}
+                                                                className="text-gray-200 aria-selected:bg-white/10 cursor-pointer"
+                                                            >
+                                                                <Check className={cn("mr-2 h-4 w-4 shrink-0 text-seguranca-yellow", workPostFilters.includes(p) ? "opacity-100" : "opacity-0")} />
+                                                                <span className="truncate">{p}</span>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
 
                                 {/* Position */}
@@ -731,15 +855,42 @@ export function RelatoriosModal({
                                     <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
                                         <UserCheck className="h-3 w-3" /> Cargo
                                     </Label>
-                                    <Select value={positionFilter} onValueChange={setPositionFilter}>
-                                        <SelectTrigger className="w-full bg-seguranca-black border-gray-600 text-gray-200">
-                                            <SelectValue placeholder="Filtrar por cargo" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-seguranca-graphite border-gray-600 text-gray-200">
-                                            <SelectItem value="all">Todos os Cargos</SelectItem>
-                                            {positions.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
+                                    <Popover modal={false}>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-gray-200">
+                                                <span className="truncate">{multiSelectButtonLabel(positionFilters, 'Todos os Cargos')}</span>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0 bg-seguranca-graphite border-gray-600" align="start">
+                                            <Command>
+                                                <CommandInput placeholder="Buscar cargo..." className="border-gray-600 text-gray-200" />
+                                                <CommandList className="max-h-64 scrollbar-thin scrollbar-thumb-gray-600">
+                                                    <CommandEmpty className="text-gray-400 py-3 text-center text-sm">Nenhum cargo encontrado.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        <CommandItem
+                                                            onSelect={() => setPositionFilters([])}
+                                                            onPointerDown={keepPopoverOpen}
+                                                            className="text-gray-200 aria-selected:bg-white/10 cursor-pointer"
+                                                        >
+                                                            <Check className={cn("mr-2 h-4 w-4 shrink-0 text-seguranca-yellow", positionFilters.length === 0 ? "opacity-100" : "opacity-0")} />
+                                                            Todos os Cargos
+                                                        </CommandItem>
+                                                        {positions.map(p => (
+                                                            <CommandItem
+                                                                key={p}
+                                                                onSelect={() => toggleArrayFilter(setPositionFilters, p)}
+                                                                onPointerDown={keepPopoverOpen}
+                                                                className="text-gray-200 aria-selected:bg-white/10 cursor-pointer"
+                                                            >
+                                                                <Check className={cn("mr-2 h-4 w-4 shrink-0 text-seguranca-yellow", positionFilters.includes(p) ? "opacity-100" : "opacity-0")} />
+                                                                <span className="truncate">{p}</span>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
 
                                 {/* Gender */}
@@ -953,8 +1104,21 @@ export function RelatoriosModal({
                         <div className="bg-seguranca-black/30 rounded-xl p-4 border border-gray-600 flex flex-wrap gap-2">
                             {statusFilter !== 'all' && <Badge className="bg-seguranca-yellow text-seguranca-graphite border-0 font-bold uppercase">Status: {getStatusLabel(statusFilter)}</Badge>}
                             {feriasFilter !== 'all' && <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold">FÉRIAS: {feriasFilter === 'vencidas' ? 'Vencidas' : 'A Vencer'}</Badge>}
-                            {companyFilter !== 'all' && <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold">EMPRESA: {companyFilter}</Badge>}
-                            {workPostFilter !== 'all' && <Badge variant="outline" className="text-white border-white/20">POSTO: {workPostFilter}</Badge>}
+                            {companyFilters.length > 0 && (
+                                <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold max-w-full truncate" title={companyFilters.join(', ')}>
+                                    EMPRESA: {companyFilters.join(', ')}
+                                </Badge>
+                            )}
+                            {workPostFilters.length > 0 && (
+                                <Badge variant="outline" className="text-white border-white/20 max-w-full truncate" title={workPostFilters.join(', ')}>
+                                    POSTO: {workPostFilters.join(', ')}
+                                </Badge>
+                            )}
+                            {positionFilters.length > 0 && (
+                                <Badge variant="outline" className="text-white border-white/20 max-w-full truncate" title={positionFilters.join(', ')}>
+                                    CARGO: {positionFilters.join(', ')}
+                                </Badge>
+                            )}
                             {isLoadingAll ? (
                                 <span className="text-seguranca-yellow text-sm font-bold animate-pulse flex items-center gap-2">
                                     <Loader2 className="h-4 w-4 animate-spin" /> Carregando base completa...

@@ -10,6 +10,8 @@
     <parameter name="ELABORATED_BY" class="java.lang.String"/>
     <parameter name="MEASURED_BY" class="java.lang.String"/>
     <parameter name="GENERATED_DATE" class="java.lang.String"/>
+    <parameter name="REPORT_USER" class="java.lang.String"/>
+    <parameter name="REPORT_TIMESTAMP" class="java.lang.String"/>
     
     <!-- Campos do datasource -->
     <field name="id" class="java.util.UUID"/>
@@ -168,7 +170,7 @@
                 <textElement textAlignment="Left">
                     <font fontName="Arial" size="8" pdfFontName="Helvetica"/>
                 </textElement>
-                <textFieldExpression><![CDATA[$P{GENERATED_DATE}]]></textFieldExpression>
+                <textFieldExpression><![CDATA["Gerado por: " + $P{REPORT_USER} + " em: " + $P{REPORT_TIMESTAMP} + " | Página " + $V{PAGE_NUMBER} + " de " + $V{PAGE_COUNT}]]></textFieldExpression>
             </textField>
         </band>
     </pageFooter>

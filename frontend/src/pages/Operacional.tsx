@@ -31,10 +31,13 @@ import {
   LayoutDashboard,
   Truck,
   UserCheck,
-  PackageCheck
+  PackageCheck,
+  FileSpreadsheet
 } from 'lucide-react';
 import { StandardLayout } from '@/components/StandardLayout';
 import Equipamentos from './Equipamentos';
+import OccurrenceMap from '@/components/operacional/OccurrenceMap';
+
 
 import EscalaTrabalhoTable from '@/components/operacional/EscalaTrabalhoTable';
 import NotificacoesList from '@/components/operacional/NotificacoesList';
@@ -59,6 +62,9 @@ interface EscalaFormData {
   endTime: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
   observations: string;
+  sigla?: string;
+  isMonitoria?: boolean;
+  isHoraExtra?: boolean;
 }
 import { notificationService, NotificationData } from '@/services/notificationService';
 import { occurrenceService, Occurrence } from '@/services/occurrenceService';
@@ -486,6 +492,7 @@ const Operacional: React.FC = () => {
   const confirmDeleteEscala = async () => {
     if (!escalaToDelete) return;
 
+    const employeeName = escalaToDelete.employee?.name ?? 'a escala';
     try {
       await scheduleService.delete(escalaToDelete.id);
       setEscalas(prev => prev.filter(e => e.id !== escalaToDelete.id));
@@ -493,7 +500,7 @@ const Operacional: React.FC = () => {
       setEscalaToDelete(null);
       toast({
         title: 'Escala excluída',
-        description: `A escala de ${escalaToDelete.employee.name} foi excluída com sucesso.`,
+        description: `A escala de ${employeeName} foi excluída com sucesso.`,
         variant: 'default',
       });
     } catch (error) {
@@ -509,7 +516,7 @@ const Operacional: React.FC = () => {
   const handleViewEscala = (escala: Schedule) => {
     toast({
       title: 'Visualizar Escala',
-      description: `Visualizando escala de ${escala.employee.name}`,
+      description: `Visualizando escala de ${escala.employee?.name ?? 'funcionário'}`,
     });
     // TODO: Implementar modal de visualização
   };
@@ -632,7 +639,10 @@ const Operacional: React.FC = () => {
         scheduleDate: escalaData.scheduleDate.toISOString().split('T')[0], // Converter Date para string YYYY-MM-DD
         shift: escalaData.shift as 'DAY' | 'NIGHT' | 'MIXED', // Converter string para Shift
         status: (escalaData.status || 'PENDING') as ScheduleStatus, // Usar status do formulário ou padrão
-        observations: escalaData.observations
+        observations: escalaData.observations,
+        sigla: escalaData.sigla,
+        isMonitoria: escalaData.isMonitoria,
+        isHoraExtra: escalaData.isHoraExtra
       };
 
       if (selectedEscala) {
@@ -1129,7 +1139,12 @@ const Operacional: React.FC = () => {
               onOpenChange={setShowNotificationSettings}
             />
 
+            <TabsContent value="mapa-ocorrencias" className="mt-6">
+              <OccurrenceMap />
+            </TabsContent>
+
             <TabsContent value="ocorrencias" className="mt-6">
+
               <OcorrenciasTable
                 ocorrencias={ocorrencias}
                 onRefresh={handleRefreshOcorrencias}
@@ -1172,7 +1187,7 @@ const Operacional: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="gestao-operacional" className="mt-6">
-              <OperationalDashboard />
+              <OperationalDashboard onEditEscala={handleEditEscala} />
             </TabsContent>
 
             <TabsContent value="troca-plantao" className="mt-6">

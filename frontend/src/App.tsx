@@ -170,6 +170,7 @@ const SSTTreinamentos = lazy(() => import('@/pages/RH/SST/Treinamentos'));
 const Treinamentos = lazy(() => import('@/pages/RH/Treinamentos'));
 const PontoEletronico = lazy(() => import('@/pages/RH/PontoEletronico'));
 const FechamentoHoras = lazy(() => import('@/pages/RH/FechamentoHoras'));
+const Aniversariantes = lazy(() => import('@/pages/RH/Aniversariantes'));
 const FechamentoHorasDetalhes = lazy(() => import('@/pages/RH/FechamentoHorasDetalhes'));
 const ImportarBatidas = lazy(() => import('@/pages/RH/ImportarBatidas'));
 const AvaliacaoDesempenho = lazy(() => import('@/pages/RH/AvaliacaoDesempenho'));
@@ -249,6 +250,9 @@ const GestaoFerias = lazy(() => import('@/pages/GestaoFerias'));
 const GestaoTarefas = lazy(() => import('@/pages/GestaoTarefas'));
 const RelatoriosOperacionais = lazy(() => import('@/pages/RelatoriosOperacionais'));
 const ApuracaoHoras = lazy(() => import('@/pages/operacional/ApuracaoHoras'));
+const RemoteSignaturePage = lazy(() => import('@/pages/RemoteSignaturePage'));
+const DeliveryManagement = lazy(() => import('@/components/estoque/DeliveryManagement'));
+
 
 function App() {
   useEffect(() => {
@@ -310,6 +314,12 @@ function App() {
                     <Route path="/contato" element={<Contato />} />
                     <Route path="/politicas-privacidade" element={<PoliticasPrivacidade />} />
                     <Route path="/termos-condicoes" element={<TermosCondicoes />} />
+                    <Route path="/remote-sign/:token" element={
+                      <Suspense fallback={<LoadingSpinner />}>
+                        <RemoteSignaturePage />
+                      </Suspense>
+                    } />
+
 
                     {/* Sistema Administrativo */}
                     <Route path="/admin" element={<Navigate to="/login" replace />} />
@@ -680,6 +690,11 @@ function App() {
                         <EstoqueRelatorios />
                       </ProtectedRoute>
                     } />
+                    <Route path="/estoque/entregas" element={
+                      <ProtectedRoute requiredPermissions={['STOCK_READ']}>
+                        <DeliveryManagement />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/comercial/empresas" element={
                       <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
                         <Empresas />
@@ -949,6 +964,13 @@ function App() {
                     <Route path="/rh/ferias" element={
                       <ProtectedRoute>
                         <FeriasPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/rh/aniversariantes" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <Aniversariantes />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/beneficios" element={

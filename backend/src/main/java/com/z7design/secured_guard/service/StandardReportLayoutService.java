@@ -57,8 +57,20 @@ public class StandardReportLayoutService {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    /** URL pública do front (e-mails, links). Não usar para /api/uploads no servidor — ver {@link #resolveBackendInternalBaseUrl()}. */
     @Value("${app.url:http://localhost:3000}")
     private String appUrl;
+
+    @Value("${server.port:8080}")
+    private int serverPort;
+
+    /**
+     * Base HTTP do próprio backend para carregar logos em PDF (loopback).
+     * Em Docker, {@code app.url} costuma ser o front (ex.: localhost:3000), que não existe dentro do container;
+     * {@code /api/uploads/**} é servido pelo Spring nesta JVM — usar 127.0.0.1:{port}.
+     */
+    @Value("${app.backend-internal-url:}")
+    private String backendInternalUrl;
 
     // Cores padrão do gradiente (amarelo → laranja → vermelho) conforme modelo
     private static final DeviceRgb COLOR_YELLOW_DEFAULT = new DeviceRgb(255, 204, 0); // #FFCC00 - Amarelo brilhante
@@ -397,7 +409,42 @@ public class StandardReportLayoutService {
             canvas.add(cnpjFooter.setFixedPosition(0, yPosition + 10f, pageWidth));
         }
 
-        // Numeração de páginas (canto inferior direito) — destaque visual
+        // Bloco direito: usuário e data da geração (acima da numeração), alinhado à direita
+        float rightFooterWidth = 240f;
+        float rightFooterX = pageWidth - rightFooterWidth - 12f;
+        DeviceRgb metaColor = new DeviceRgb(55, 55, 55);
+
+        // Resolver usuário (prioriza config, fallback para contexto de emissão)
+        String userSummary = config.getFooterUserSummary();
+        if (userSummary == null || userSummary.isBlank()) {
+            userSummary = com.z7design.secured_guard.util.ReportIssuanceContext.resolveUserLabelForReportFooter();
+        }
+        
+        if (userSummary != null && !userSummary.isBlank() && !userSummary.equals("—")) {
+            Paragraph userFooter = new Paragraph("Usuário: " + userSummary.trim())
+                    .setFontSize(8)
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontColor(metaColor)
+                    .setMarginBottom(0f);
+            canvas.add(userFooter.setFixedPosition(rightFooterX, yPosition + 40f, rightFooterWidth));
+        }
+
+        // Resolver data/hora (prioriza config, fallback para contexto de emissão)
+        String reportAt = config.getFooterReportAt();
+        if (reportAt == null || reportAt.isBlank()) {
+            reportAt = com.z7design.secured_guard.util.ReportIssuanceContext.resolveReportTimestampFooter();
+        }
+
+        if (reportAt != null && !reportAt.isBlank()) {
+            Paragraph dateFooter = new Paragraph("Data do relatório: " + reportAt.trim())
+                    .setFontSize(8)
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontColor(metaColor)
+                    .setMarginBottom(0f);
+            canvas.add(dateFooter.setFixedPosition(rightFooterX, yPosition + 28f, rightFooterWidth));
+        }
+
+        // Numeração de páginas (canto inferior direito) — abaixo de usuário/data
         if (config.isShowPageNumbers()) {
             String pageText = totalPages > 1 ? "Página " + pageNum + " de " + totalPages : "Página " + pageNum;
             DeviceRgb pageNumColor = new DeviceRgb(45, 45, 45); // cinza escuro para boa leitura
@@ -407,7 +454,7 @@ public class StandardReportLayoutService {
                     .setTextAlignment(TextAlignment.RIGHT)
                     .setFontColor(pageNumColor)
                     .setMarginBottom(0f);
-            canvas.add(pageNumFooter.setFixedPosition(pageWidth - 110f, yPosition + 8f, 100f));
+            canvas.add(pageNumFooter.setFixedPosition(rightFooterX, yPosition + 10f, rightFooterWidth));
         }
     }
 
@@ -600,7 +647,7 @@ public class StandardReportLayoutService {
                         log.warn("Logo não encontrado no caminho: {}. Tentando URL pública...", logoPath);
                         String publicLogoUrl = buildPublicLogoUrl(logoUrl);
                         if (publicLogoUrl != null) {
-                            log.info("🔗 Carregando logo via URL pública: {}", publicLogoUrl);
+                            log.debug("Carregando logo via URL HTTP (fallback): {}", publicLogoUrl);
                             try {
                                 imageData = ImageDataFactory.create(publicLogoUrl);
                             } catch (OutOfMemoryError e) {
@@ -650,9 +697,24 @@ public class StandardReportLayoutService {
             log.error("❌ Erro de memória ao processar logo da empresa {}: imagem muito grande", company.getName());
             return null;
         } catch (Exception e) {
-            log.error("Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage(), e);
+            if (isCausedByConnectException(e)) {
+                log.warn("Logo da empresa {} indisponível via HTTP (conexão recusada ou host inalcançável): {}",
+                        company.getName(), e.getMessage());
+                return null;
+            }
+            log.warn("Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage());
+            log.debug("Detalhe", e);
             return null;
         }
+    }
+
+    private static boolean isCausedByConnectException(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.net.ConnectException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -752,6 +814,26 @@ public class StandardReportLayoutService {
         return null;
     }
 
+    private String normalizeLogoPathForUrl(String logoUrl) {
+        if (logoUrl == null) {
+            return "";
+        }
+        return logoUrl.startsWith("/") ? logoUrl : "/" + logoUrl;
+    }
+
+    private String resolveBackendInternalBaseUrl() {
+        if (backendInternalUrl != null && !backendInternalUrl.isBlank()) {
+            String b = backendInternalUrl.trim();
+            return b.endsWith("/") ? b.substring(0, b.length() - 1) : b;
+        }
+        return "http://127.0.0.1:" + serverPort;
+    }
+
+    /**
+     * Monta URL HTTP para fallback quando o ficheiro não existe no disco.
+     * Rotas {@code /api/...} (uploads servidos pelo Spring) usam base interna do backend;
+     * outros caminhos continuam com {@code app.url} (front).
+     */
     private String buildPublicLogoUrl(String logoUrl) {
         if (logoUrl == null || logoUrl.isEmpty()) {
             return null;
@@ -759,14 +841,15 @@ public class StandardReportLayoutService {
         if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
             return logoUrl;
         }
+        String path = normalizeLogoPathForUrl(logoUrl);
+        if (path.startsWith("/api/")) {
+            return resolveBackendInternalBaseUrl() + path;
+        }
         String base = appUrl == null ? "" : appUrl.trim();
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
-        if (logoUrl.startsWith("/")) {
-            return base + logoUrl;
-        }
-        return base + "/" + logoUrl;
+        return base + path;
     }
 
     /**

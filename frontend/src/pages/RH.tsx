@@ -27,7 +27,8 @@ import {
   Handshake,
   Settings,
   BarChart3,
-  UserX
+  UserX,
+  Gift
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import hrService from '@/services/hrService';
@@ -349,7 +350,7 @@ const RH: React.FC = () => {
                 <CardTitle className="text-seguranca-lightgray">Ações Rápidas</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   <Button 
                     variant="outline" 
                     onClick={() => navigate('/rh/funcionarios')}
@@ -375,6 +376,15 @@ const RH: React.FC = () => {
                   >
                     <Calendar size={20} />
                     <span className="text-sm mt-1">Férias</span>
+                  </Button>
+
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/rh/aniversariantes')}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-20 flex-col"
+                  >
+                    <Gift size={20} />
+                    <span className="text-sm mt-1">Aniversariantes</span>
                   </Button>
                   
                   <Button 
@@ -440,6 +450,20 @@ const RH: React.FC = () => {
                 <CardContent>
                   <p className="text-gray-400 text-sm">
                     Controle de período aquisitivo, concessivo e afastamentos
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-seguranca-graphite border-gray-600 hover:border-gray-500 transition-colors cursor-pointer" onClick={() => navigate('/rh/aniversariantes')}>
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray flex items-center gap-2">
+                    <Gift className="h-5 w-5 text-amber-400" />
+                    Aniversariantes do mês
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-400 text-sm">
+                    Lista por mês com exportação CSV para RH e Departamento Pessoal
                   </p>
                 </CardContent>
               </Card>

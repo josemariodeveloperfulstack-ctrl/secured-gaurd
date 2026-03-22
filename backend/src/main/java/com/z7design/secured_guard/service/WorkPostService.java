@@ -175,11 +175,11 @@ public class WorkPostService {
     }
     
     public List<WorkPost> findByClient(UUID clientId) {
-        return workPostRepository.findByClientId(clientId);
+        return workPostRepository.findByClient_Id(clientId);
     }
     
     public Page<WorkPost> findByClient(UUID clientId, Pageable pageable) {
-        return workPostRepository.findByClientId(clientId, pageable);
+        return workPostRepository.findByClient_Id(clientId, pageable);
     }
     
     public List<WorkPost> findByContract(UUID contractId) {
@@ -396,7 +396,7 @@ public class WorkPostService {
     }
     
     public long countByClient(UUID clientId) {
-        return workPostRepository.countByClientId(clientId);
+        return workPostRepository.countByClient_Id(clientId);
     }
     
     public long countByType(WorkPostType type) {

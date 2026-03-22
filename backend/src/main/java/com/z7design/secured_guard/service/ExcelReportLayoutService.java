@@ -164,18 +164,23 @@ public class ExcelReportLayoutService {
         infoCell.setCellStyle(footerStyle);
         sheet.addMergedRegion(new CellRangeAddress(footerStartRow - 1, footerStartRow - 1, 0, safeLastColumn));
 
-        // Última linha: Data de geração + linha gradiente
-        Row dateRow = sheet.createRow(footerStartRow);
-        dateRow.setHeightInPoints(20);
-        Cell dateCell = dateRow.createCell(0);
-        String generatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-        dateCell.setCellValue("Gerado em: " + generatedAt);
+        // Última linha: Dados de auditoria (Usuário + Data/Hora) + linha gradiente
+        Row auditoriaRow = sheet.createRow(footerStartRow);
+        auditoriaRow.setHeightInPoints(20);
+        Cell cell = auditoriaRow.createCell(0);
+        
+        String userLabel = com.z7design.secured_guard.util.ReportIssuanceContext.resolveUserLabelForReportFooter();
+        String reportAt = com.z7design.secured_guard.util.ReportIssuanceContext.resolveReportTimestampFooter();
+        
+        String auditoriaText = "Gerado por: " + userLabel + " em: " + reportAt;
+        cell.setCellValue(auditoriaText);
+        
         CellStyle dateStyle = createDateStyle(workbook);
-        dateCell.setCellStyle(dateStyle);
+        cell.setCellStyle(dateStyle);
         sheet.addMergedRegion(new CellRangeAddress(footerStartRow, footerStartRow, 0, safeLastColumn));
 
         // Adicionar linha gradiente na parte inferior (3px)
-        addGradientBarAtBottom(workbook, dateRow, safeLastColumn);
+        addGradientBarAtBottom(workbook, auditoriaRow, safeLastColumn);
 
         log.info("Rodapé Excel adicionado");
     }

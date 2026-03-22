@@ -19,7 +19,11 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import lombok.RequiredArgsConstructor;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,8 +48,10 @@ public class OperationalOccurrenceService {
     private final OperationalOccurrenceRepository occurrenceRepository;
     private final EmployeeRepository employeeRepository;
     private final StandardReportLayoutService standardReportLayoutService;
+    private final ExcelReportLayoutService excelReportLayoutService;
     private final CompanyRepository companyRepository;
     private final EmployeeChangeHistoryService employeeChangeHistoryService;
+
     
     /**
      * Criar nova ocorrência operacional a partir de DTO
@@ -106,7 +112,15 @@ public class OperationalOccurrenceService {
             .date(date)
             .responsible(dto.getResponsible())
             .warningNumber(dto.getWarningNumber())
+            .substitute(dto.getSubstituteId() != null ? employeeRepository.findById(dto.getSubstituteId()).orElse(null) : null)
+            .originalStartTime(dto.getOriginalStartTime())
+            .originalEndTime(dto.getOriginalEndTime())
+            .substituteStartTime(dto.getSubstituteStartTime())
+            .substituteEndTime(dto.getSubstituteEndTime())
+            .totalHours(dto.getTotalHours())
+            .category(dto.getCategory() != null ? dto.getCategory() : "INCIDENT")
             .build();
+
         
         OperationalOccurrence savedOccurrence = occurrenceRepository.save(occurrence);
         log.info("Ocorrência criada com sucesso: {}", savedOccurrence.getId());
@@ -448,8 +462,18 @@ public class OperationalOccurrenceService {
                 .responsible(occurrence.getResponsible())
                 .warningNumber(occurrence.getWarningNumber())
                 .createdAt(occurrence.getCreatedAt())
+                .createdAt(occurrence.getCreatedAt())
                 .updatedAt(occurrence.getUpdatedAt())
+                .substituteId(occurrence.getSubstitute() != null ? occurrence.getSubstitute().getId() : null)
+                .substituteName(occurrence.getSubstitute() != null ? occurrence.getSubstitute().getName() : null)
+                .originalStartTime(occurrence.getOriginalStartTime())
+                .originalEndTime(occurrence.getOriginalEndTime())
+                .substituteStartTime(occurrence.getSubstituteStartTime())
+                .substituteEndTime(occurrence.getSubstituteEndTime())
+                .totalHours(occurrence.getTotalHours())
+                .category(occurrence.getCategory())
                 .build();
+
         } catch (Exception e) {
             log.error("❌ Erro ao converter OperationalOccurrence para DTO - ID: {}", occurrence != null ? occurrence.getId() : "null", e);
             throw new RuntimeException("Erro ao converter OperationalOccurrence para DTO: " + e.getMessage(), e);
@@ -648,7 +672,16 @@ public class OperationalOccurrenceService {
             case EQUIPAMENTO: return "Equipamento";
             case INCIDENTE: return "Incidente";
             case MANUTENCAO: return "Manutenção";
+            case FALTA: return "Falta";
+            case TROCA: return "Troca de Plantão";
+            case HE: return "Hora Extra";
+            case FREE_LANCE: return "Free Lance";
+            case PEDIDO_DEMISSAO: return "Pedido de Demissão";
+            case FALTA_EFETIVO: return "Falta de Efetivo";
+            case SOLICITACAO_CLIENTE: return "Solicitação do Cliente";
+            case OUTROS: return "Outros";
             default: return type.name();
+
         }
     }
 
@@ -685,4 +718,134 @@ public class OperationalOccurrenceService {
                 .add(new Paragraph(text != null ? text : "").setFontSize(9))
                 .setPadding(5);
     }
+
+    /**
+     * Gerar Mapa de Ocorrências em Excel (Período 26-25)
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateOperationalMapExcel(LocalDate startDate, LocalDate endDate) throws IOException {
+        log.info("Gerando Mapa de Ocorrências Excel - Período: {} a {}", startDate, endDate);
+
+        // Buscar ocorrências no período (usando LocalDateTime start/end)
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
+        
+        List<OperationalOccurrence> occurrences = occurrenceRepository.findByDateBetweenOrderByDateDesc(startDateTime, endDateTime);
+        
+        // Determinar empresa
+        UUID companyId = resolveCompanyId(occurrences);
+        Company company = companyRepository.findById(companyId).orElse(null);
+
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Mapa de Ocorrências");
+            
+            // Adicionar cabeçalho
+            int currentRow = excelReportLayoutService.addHeader(sheet, workbook, companyId, "MAPA DE OCORRÊNCIAS OPERACIONAIS", 9);
+            
+            // Estilo do cabeçalho da tabela
+            CellStyle headerStyle = excelReportLayoutService.createHeaderStyle(workbook);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            
+            // Criar linha de cabeçalho
+            Row headerRow = sheet.createRow(currentRow++);
+            String[] columns = {"DATA", "POSTO", "CLIENTE", "HORÁRIO ORIGINAL", "EFETIVO", "OCORRÊNCIA", "SUBSTITUTO", "HORÁRIO SUBSTITUTO", "TOTAL", "OBSERVAÇÃO"};
+            for (int i = 0; i < columns.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+            }
+            
+            // Estilos de dados
+            CellStyle dataStyle = excelReportLayoutService.createValueStyle(workbook);
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.cloneStyleFrom(dataStyle);
+            CreationHelper createHelper = workbook.getCreationHelper();
+            dateStyle.setDataFormat(createHelper.createDataFormat().getFormat("dd/MM/yyyy"));
+            
+            // Preencher dados
+            for (OperationalOccurrence occ : occurrences) {
+                Row row = sheet.createRow(currentRow++);
+                
+                // DATA
+                Cell dateCell = row.createCell(0);
+                if (occ.getDate() != null) {
+                    dateCell.setCellValue(java.sql.Timestamp.valueOf(occ.getDate()));
+                }
+                dateCell.setCellStyle(dateStyle);
+                
+                // POSTO
+                Cell postCell = row.createCell(1);
+                postCell.setCellValue(occ.getLocation() != null ? occ.getLocation() : "");
+                postCell.setCellStyle(dataStyle);
+                
+                // CLIENTE
+                String cliente = "";
+                if (occ.getEmployee() != null && occ.getEmployee().getWorkPost() != null && occ.getEmployee().getWorkPost().getClient() != null) {
+                    cliente = occ.getEmployee().getWorkPost().getClient().getName();
+                }
+                Cell clientCell = row.createCell(2);
+                clientCell.setCellValue(cliente);
+                clientCell.setCellStyle(dataStyle);
+                
+                // HORÁRIO ORIGINAL
+                String originalTime = "";
+                if (occ.getOriginalStartTime() != null || occ.getOriginalEndTime() != null) {
+                    originalTime = (occ.getOriginalStartTime() != null ? occ.getOriginalStartTime() : "??") + " - " + 
+                                   (occ.getOriginalEndTime() != null ? occ.getOriginalEndTime() : "??");
+                }
+                Cell origTimeCell = row.createCell(3);
+                origTimeCell.setCellValue(originalTime);
+                origTimeCell.setCellStyle(dataStyle);
+                
+                // EFETIVO
+                Cell empCell = row.createCell(4);
+                empCell.setCellValue(occ.getEmployee() != null ? occ.getEmployee().getName() : "");
+                empCell.setCellStyle(dataStyle);
+                
+                // OCORRÊNCIA
+                Cell typeCell = row.createCell(5);
+                typeCell.setCellValue(getTypeLabel(occ.getType()));
+                typeCell.setCellStyle(dataStyle);
+                
+                // SUBSTITUTO
+                Cell subCell = row.createCell(6);
+                subCell.setCellValue(occ.getSubstitute() != null ? occ.getSubstitute().getName() : "");
+                subCell.setCellStyle(dataStyle);
+                
+                // HORÁRIO SUBSTITUTO
+                String substituteTime = "";
+                if (occ.getSubstituteStartTime() != null || occ.getSubstituteEndTime() != null) {
+                    substituteTime = (occ.getSubstituteStartTime() != null ? occ.getSubstituteStartTime() : "??") + " - " + 
+                                     (occ.getSubstituteEndTime() != null ? occ.getSubstituteEndTime() : "??");
+                }
+                Cell subTimeCell = row.createCell(7);
+                subTimeCell.setCellValue(substituteTime);
+                subTimeCell.setCellStyle(dataStyle);
+                
+                // TOTAL
+                Cell totalCell = row.createCell(8);
+                if (occ.getTotalHours() != null) {
+                    totalCell.setCellValue(occ.getTotalHours());
+                }
+                totalCell.setCellStyle(dataStyle);
+                
+                // OBSERVAÇÃO
+                Cell descCell = row.createCell(9);
+                descCell.setCellValue(occ.getDescription() != null ? occ.getDescription() : "");
+                descCell.setCellStyle(dataStyle);
+            }
+            
+            // Auto-ajustar colunas
+            for (int i = 0; i < columns.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            
+            // Adicionar rodapé
+            excelReportLayoutService.addFooter(sheet, workbook, company, 9);
+            
+            workbook.write(baos);
+            return baos.toByteArray();
+        }
+    }
 }
+

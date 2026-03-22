@@ -188,6 +188,23 @@ export const OperationalEmployeesTab: React.FC = () => {
     return acc;
   }, {} as Record<string, EmployeeWithDetails[]>);
 
+  const employeesByStatus = filteredEmployees.reduce((acc, emp) => {
+    const status = emp.status || 'ACTIVE';
+    if (!acc[status]) acc[status] = [];
+    acc[status].push(emp);
+    return acc;
+  }, {} as Record<string, EmployeeWithDetails[]>);
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      ACTIVE: 'Ativo',
+      TERMINATED: 'Demitido',
+      INACTIVE: 'Inativo',
+      VACATION: 'Férias',
+    };
+    return labels[status] || status;
+  };
+
   const generatePdfReport = async (title: string, data: EmployeeWithDetails[]) => {
     try {
       const employeeIds = data.map(e => e.id);
@@ -265,6 +282,7 @@ export const OperationalEmployeesTab: React.FC = () => {
             <TabsTrigger value="todos">Todos</TabsTrigger>
             <TabsTrigger value="empresa">Por Empresa</TabsTrigger>
             <TabsTrigger value="posto">Por Posto de Trabalho</TabsTrigger>
+            <TabsTrigger value="status">Por Status</TabsTrigger>
           </TabsList>
 
           <TabsContent value="todos" className="space-y-4">
@@ -381,6 +399,58 @@ export const OperationalEmployeesTab: React.FC = () => {
                   </div>
                   <div className="space-y-2 pl-4 border-l-2 border-slate-800">
                     {employeesByWorkPost[wp].map((emp) => (
+                      <EmployeeRow
+                        key={emp.id}
+                        employee={emp}
+                        currentWorkPost={getCurrentWorkPost(emp)}
+                        expanded={expandedId === emp.id}
+                        onToggle={() => setExpandedId(expandedId === emp.id ? null : emp.id)}
+                        historyLoading={historyLoading === emp.id}
+                        setHistoryLoading={(v) => setHistoryLoading(v ? emp.id : null)}
+                        onEmployeeUpdated={loadEmployees}
+                        onEditClick={setEmployeeToEdit}
+                      />
+                    ))}
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+            )}
+          </TabsContent>
+
+          <TabsContent value="status" className="space-y-6">
+            {Object.keys(employeesByStatus).length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                {searchTerm.trim() ? 'Nenhum funcionário encontrado para esta pesquisa.' : 'Nenhum funcionário encontrado.'}
+              </p>
+            ) : (
+            <Tabs defaultValue={Object.keys(employeesByStatus).sort((a, b) => a.localeCompare(b))[0]} className="w-full">
+              <TabsList className="mb-4 bg-slate-800/50 flex-wrap h-auto p-1">
+                {Object.keys(employeesByStatus).sort((a, b) => a.localeCompare(b)).map(status => (
+                  <TabsTrigger key={status} value={status} className="flex-1 min-w-[120px] whitespace-nowrap">
+                    {getStatusLabel(status)} ({employeesByStatus[status].length})
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {Object.keys(employeesByStatus).sort((a, b) => a.localeCompare(b)).map(status => (
+                <TabsContent key={status} value={status} className="space-y-3">
+                  <div className="flex items-center justify-between bg-slate-800/50 p-3 rounded-md">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-seguranca-red" />
+                      {getStatusLabel(status)} ({employeesByStatus[status].length})
+                    </h3>
+                    <Button 
+                      onClick={() => generatePdfReport(`Relatório de Funcionários - Status: ${getStatusLabel(status)}`, employeesByStatus[status])} 
+                      variant="ghost" 
+                      size="sm"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      PDF
+                    </Button>
+                  </div>
+                  <div className="space-y-2 pl-4 border-l-2 border-slate-800">
+                    {employeesByStatus[status].map((emp) => (
                       <EmployeeRow
                         key={emp.id}
                         employee={emp}

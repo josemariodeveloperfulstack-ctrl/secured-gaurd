@@ -2,6 +2,7 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.WorkSchedule;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -53,4 +54,9 @@ public interface WorkScheduleRepository extends JpaRepository<WorkSchedule, UUID
     
     // Verificar se existe escala para funcionário em determinada data
     boolean existsByEmployeeIdAndScheduleDate(UUID employeeId, LocalDate scheduleDate);
+
+    /** Remove vínculo da escala com o remanejamento (antes de excluir o remanejamento). */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE WorkSchedule w SET w.remanejamentoId = null WHERE w.remanejamentoId = :remanejamentoId")
+    int clearRemanejamentoIdByRemanejamentoId(@Param("remanejamentoId") UUID remanejamentoId);
 }

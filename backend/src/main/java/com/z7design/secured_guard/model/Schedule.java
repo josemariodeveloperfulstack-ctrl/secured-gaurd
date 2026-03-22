@@ -37,9 +37,14 @@ public class Schedule {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @NotNull(message = "Employee is required")
+    /**
+     * Funcionário da escala. {@link NotFoundAction#IGNORE}: se o funcionário foi excluído
+     * mas a linha em {@code schedules} permaneceu (órfã), o campo fica null em vez de
+     * falhar o {@code JOIN FETCH} / {@code findAll}.
+     */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "employee_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JsonIgnoreProperties({
             "schedules", "hibernateLazyInitializer", "handler",
             "documents", "benefits", "dependents", "timeRecords",
@@ -68,6 +73,7 @@ public class Schedule {
 
     @ManyToOne
     @JoinColumn(name = "work_post_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     @JsonIgnoreProperties({ "schedules", "hibernateLazyInitializer", "handler" })
     private WorkPost workPost;
 

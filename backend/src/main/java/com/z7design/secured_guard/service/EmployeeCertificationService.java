@@ -70,6 +70,9 @@ public class EmployeeCertificationService {
 
     @Transactional
     public EmployeeCertification create(EmployeeCertification certification) {
+        if (certification.getTraining() == null) {
+            throw new IllegalArgumentException("Treinamento é obrigatório para nova certificação");
+        }
         validateCertification(certification);
         certification.setStatus(CertificationStatus.ACTIVE);
         return certificationRepository.save(certification);
