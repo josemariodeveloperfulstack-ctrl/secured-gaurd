@@ -2,23 +2,22 @@ services:
   # ========================================
   # DATABASE (CI/Test)
   # ========================================
-  postgres:
+  postgres-ci:
     image: postgres:15-alpine
     container_name: secured-guard-db-ci
     environment:
-      POSTGRES_DB: secured_guard_test
-      POSTGRES_USER: postgres
+      POSTGRES_DB: secured_guard_ci
+      POSTGRES_USER: secured_guard_ci
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_CI}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "55432:5432"
     volumes:
       - postgres_data_ci:/var/lib/postgresql/data
-      - ../backend/src/main/resources/db/migration:/docker-entrypoint-initdb.d
     networks:
       - secured-guard-ci
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U secured_guard_ci -d secured_guard_ci"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,7 +26,7 @@ services:
   # ========================================
   # REDIS CACHE (CI/Test)
   # ========================================
-  redis:
+  redis-ci:
     image: redis:7-alpine
     container_name: secured-guard-redis-ci
     ports:
@@ -47,36 +46,34 @@ services:
   # ========================================
   # BACKEND API (CI/Test)
   # ========================================
-  backend:
+  backend-ci:
     image: ghcr.io/z7devplenojava-afk/secured-guard-backend:ci
     container_name: secured-guard-backend-ci
     environment:
       SERVER_PORT: 8080
-      SPRING_PROFILES_ACTIVE: test
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard_test
-      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_PROFILES_ACTIVE: ci
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-ci:5432/secured_guard_ci
+      SPRING_DATASOURCE_USERNAME: secured_guard_ci
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_CI}
-      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_HOST: redis-ci
       SPRING_REDIS_PORT: 6379
       SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD_CI}
       JWT_SECRET: ${JWT_SECRET_CI}
       # WhatsApp/Baileys REST API
       BAILEYS_REST_URL: http://whatsapp-service-ci:3333
-      BAILEYS_INSTANCE_KEY: securedguard
-      # Configurações para testes
-      TEST_SHOW_SQL: "false"
-      TEST_HIBERNATE_DDL_AUTO: "create-drop"
-      LOG_LEVEL_ROOT: "WARN"
-      LOG_LEVEL_APP: "INFO"
+      BAILEYS_INSTANCE_KEY: securedguard_ci
+      # Configurações para CI
+      LOG_LEVEL_ROOT: "INFO"
+      LOG_LEVEL_APP: "DEBUG"
     ports:
       - "8081:8080"
     volumes:
       - backend_logs_ci:/app/logs
       - backend_uploads_ci:/app/uploads
     depends_on:
-      postgres:
+      postgres-ci:
         condition: service_healthy
-      redis:
+      redis-ci:
         condition: service_healthy
     networks:
       - secured-guard-ci
@@ -91,17 +88,18 @@ services:
   # ========================================
   # FRONTEND (CI/Test)
   # ========================================
-  frontend:
+  frontend-ci:
     image: ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
     environment:
-      VITE_API_URL: http://localhost:8081/api
-      VITE_WS_URL: ws://localhost:8081/ws
-      NODE_ENV: test
+      VITE_API_URL: https://ci.z7botsolutions.com.br/api
+      VITE_WS_URL: wss://ci.z7botsolutions.com.br/ws
+      NODE_ENV: production
+      VITE_ENVIRONMENT: ci
     ports:
       - "5174:80"
     depends_on:
-      - backend
+      - backend-ci
     networks:
       - secured-guard-ci
     healthcheck:
@@ -114,16 +112,15 @@ services:
   # ========================================
   # WHATSAPP SERVICE (Baileys REST API)
   # ========================================
-  whatsapp-service:
+  whatsapp-service-ci:
     image: z7design/secured-guard-whatsapp:ci
     container_name: whatsapp-service-ci
     environment:
       PORT: 3333
-      INSTANCE_KEY: securedguard
+      INSTANCE_KEY: securedguard_ci
       SESSION_DIR: /app/sessions
     volumes:
       - whatsapp_sessions_ci:/app/sessions
-      - ../backend/holerites:/app/holerites:ro
     ports:
       - "3333:3333"
     networks:
@@ -136,16 +133,16 @@ services:
   # ========================================
   # NGINX (CI/Test)
   # ========================================
-  nginx:
+  nginx-ci:
     image: nginx:alpine
     container_name: secured-guard-nginx-ci
     ports:
-      - "8080:80"
+      - "8082:80"
     volumes:
-      - ./nginx/nginx-ci.conf:/etc/nginx/nginx.conf
+      - ../nginx/ci.conf:/etc/nginx/conf.d/default.conf
     depends_on:
-      - frontend
-      - backend
+      - frontend-ci
+      - backend-ci
     networks:
       - secured-guard-ci
     restart: unless-stopped
@@ -170,5 +167,4 @@ volumes:
 # ========================================
 networks:
   secured-guard-ci:
-    external: true
-    name: secured-guard
+    name: secured-guard-ci
