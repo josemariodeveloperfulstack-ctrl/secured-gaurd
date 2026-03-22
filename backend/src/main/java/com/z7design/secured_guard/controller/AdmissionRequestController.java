@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.AdmissionRequestDTO;
+import com.z7design.secured_guard.dto.AdmissionRequestReportFilterDTO;
 import com.z7design.secured_guard.dto.CreateAdmissionRequestDTO;
 import com.z7design.secured_guard.model.enums.AdmissionRequestStatus;
 import com.z7design.secured_guard.model.enums.AdmissionRequestType;
@@ -238,36 +239,40 @@ public class AdmissionRequestController {
         }
     }
     
-    @GetMapping("/report/pdf")
+    @PostMapping("/report/pdf")
     @Operation(summary = "Gerar relatório PDF com filtros", description = "Gera relatório PDF de solicitações com filtros opcionais")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
-    public ResponseEntity<byte[]> generatePDFReport(
-            @RequestParam(required = false) String employeeName,
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String status) {
+    public ResponseEntity<byte[]> generatePDFReport(@RequestBody(required = false) AdmissionRequestReportFilterDTO filters) {
         try {
+            if (filters == null) {
+                filters = new AdmissionRequestReportFilterDTO();
+            }
+
             AdmissionRequestType requestType = null;
-            if (type != null && !type.isEmpty()) {
+            if (filters.getType() != null && !filters.getType().isEmpty()) {
                 try {
-                    requestType = AdmissionRequestType.valueOf(type.toUpperCase());
+                    requestType = AdmissionRequestType.valueOf(filters.getType().toUpperCase());
                 } catch (IllegalArgumentException e) {
                     // Tipo inválido, ignorar
                 }
             }
             
             AdmissionRequestStatus requestStatus = null;
-            if (status != null && !status.isEmpty()) {
+            if (filters.getStatus() != null && !filters.getStatus().isEmpty()) {
                 try {
-                    requestStatus = AdmissionRequestStatus.valueOf(status.toUpperCase());
+                    requestStatus = AdmissionRequestStatus.valueOf(filters.getStatus().toUpperCase());
                 } catch (IllegalArgumentException e) {
                     // Status inválido, ignorar
                 }
             }
             
             byte[] pdfBytes = admissionRequestService.generatePDFReport(
-                    employeeName, requestType, startDate, endDate, requestStatus);
+                    filters.getEmployeeName(), 
+                    requestType, 
+                    filters.getStartDate(), 
+                    filters.getEndDate(), 
+                    requestStatus
+            );
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);

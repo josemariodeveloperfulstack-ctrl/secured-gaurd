@@ -225,6 +225,11 @@ public class SecurityConfig {
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_RH")
+                                                // Endpoints de solicitações de admissão/demissão
+                                                .requestMatchers("/api/admission-requests/**")
+                                                .hasAnyAuthority("RH", "DEPARTAMENTO_PESSOAL", "SUPER_ADMIN", "ADMIN",
+                                                                "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
                                                 // Endpoints de guias de transporte - requerem autenticação
                                                 .requestMatchers("/api/transport-guides/**").authenticated()
                                                 // Endpoints de reconhecimento facial - requerem apenas autenticação

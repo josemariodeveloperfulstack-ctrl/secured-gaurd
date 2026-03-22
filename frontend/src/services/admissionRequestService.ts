@@ -253,22 +253,10 @@ class AdmissionRequestService {
     startDate?: string;
     endDate?: string;
   }): Promise<Blob> {
-    try {
-      const response = await api.post('/api/admission-requests/report/pdf', filters || {}, {
-        responseType: 'blob',
-      });
-      return response.data;
-    } catch (error) {
-      console.warn('Erro ao gerar relatório PDF de admissões/demissões. Retornando PDF de exemplo.', error);
-      const placeholder = `
-        Relatório de Admissões/Demissões
-        --------------------------------
-        O serviço de geração de relatórios ainda não está disponível.
-        Filtros utilizados:
-        ${JSON.stringify(filters || {}, null, 2)}
-      `;
-      return new Blob([placeholder], { type: 'application/pdf' });
-    }
+    const response = await api.post('/api/admission-requests/report/pdf', filters || {}, {
+      responseType: 'blob',
+    });
+    return response.data;
   }
 
   // Método para dados de exemplo durante desenvolvimento
