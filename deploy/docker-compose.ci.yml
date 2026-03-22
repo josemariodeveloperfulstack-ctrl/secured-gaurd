@@ -48,11 +48,10 @@ services:
   # BACKEND API (CI/Test)
   # ========================================
   backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile.prod
+    image: ghcr.io/z7devplenojava-afk/secured-guard-backend:ci
     container_name: secured-guard-backend-ci
     environment:
+      SERVER_PORT: 8080
       SPRING_PROFILES_ACTIVE: test
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/secured_guard_test
       SPRING_DATASOURCE_USERNAME: postgres
@@ -93,9 +92,7 @@ services:
   # FRONTEND (CI/Test)
   # ========================================
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile.prod
+    image: ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
     environment:
       VITE_API_URL: http://localhost:8081/api
