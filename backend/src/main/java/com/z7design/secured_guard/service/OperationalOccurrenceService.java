@@ -462,7 +462,6 @@ public class OperationalOccurrenceService {
                 .responsible(occurrence.getResponsible())
                 .warningNumber(occurrence.getWarningNumber())
                 .createdAt(occurrence.getCreatedAt())
-                .createdAt(occurrence.getCreatedAt())
                 .updatedAt(occurrence.getUpdatedAt())
                 .substituteId(occurrence.getSubstitute() != null ? occurrence.getSubstitute().getId() : null)
                 .substituteName(occurrence.getSubstitute() != null ? occurrence.getSubstitute().getName() : null)

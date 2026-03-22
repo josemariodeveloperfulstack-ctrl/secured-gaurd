@@ -98,7 +98,7 @@ public class DeliveryService {
         return deliveryRepository.save(delivery);
     }
 
-    public Delivery getDelivery(UUID id) {
+    public Delivery getDeliveryById(UUID id) {
         return deliveryRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Entrega não encontrada"));
     }
