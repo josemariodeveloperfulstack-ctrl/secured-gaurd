@@ -210,20 +210,27 @@ export function getWsUrl(): string {
     return url;
   }
 
-  // Primeiro tenta usar variável de ambiente
-  let url = import.meta.env.VITE_WS_URL;
+  const hn = typeof window !== 'undefined' ? window.location.hostname : '';
 
-  // PROD: portal/securedguard - WebSocket no mesmo host
-  if (!url && typeof window !== 'undefined') {
-    const hn = window.location.hostname;
-    if (hn === 'portal.promovervigilancia.com.br' || hn === 'securedguard.z7botsolutions.com.br') {
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      url = `${protocol}://${window.location.host}/ws`;
-      console.log('🔧 Portal/Prod: WebSocket no mesmo host:', url);
-    }
+  // 1. WebSocket no mesmo host para conhecidos do mesmo proxy
+  if (
+    hn === 'ci.z7botsolutions.com.br' ||
+    hn === 'dev.z7botsolutions.com.br' ||
+    hn === 'securedguard.z7botsolutions.com.br' ||
+    hn === 'portal.promovervigilancia.com.br' ||
+    ((hn.includes('test.') || hn.includes('testing.')) && hn.includes('z7botsolutions.com.br'))
+  ) {
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const host = window.location.host;
+    const url = `${protocol}://${host}/ws`;
+    console.log('🔧 WebSocket no mesmo host:', url);
+    return url;
   }
 
-  // Se não houver variável, usa detecção automática
+  // 2. Tenta usar variável de ambiente
+  let url = import.meta.env.VITE_WS_URL;
+
+  // 3. Se não houver variável, usa detecção automática
   if (!url) {
     const config = getCurrentEnvironmentConfig();
     url = config.wsUrl;

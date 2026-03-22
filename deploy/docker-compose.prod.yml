@@ -48,7 +48,7 @@ services:
   # BACKEND API (PROD)
   # ========================================
   backend:
-    image: z7design/secured-guard-backend:prod
+    image: ghcr.io/z7devplenojava-afk/secured-guard-backend:prod
     container_name: secured-guard-backend-prod
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -103,7 +103,7 @@ services:
   # FRONTEND (PROD)
   # ========================================
   frontend:
-    image: z7design/secured-guard-frontend:prod
+    image: ghcr.io/z7devplenojava-afk/secured-guard-frontend:prod
     container_name: secured-guard-frontend-prod
     environment:
       VITE_API_URL: /api
@@ -126,7 +126,7 @@ services:
   # WHATSAPP SERVICE (Baileys REST API - PROD)
   # ========================================
   whatsapp-service:
-    image: z7design/secured-guard-whatsapp:prod
+    image: ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:prod
     container_name: whatsapp-service-prod
     environment:
       PORT: 3333

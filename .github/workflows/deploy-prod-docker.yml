@@ -139,16 +139,21 @@ jobs:
             export SCRIPT_DIR="/var/www/secured_guard/prod/scripts"
             
             echo "🔎 Verificando acesso ao GHCR (forçar IPv4)..."
+            GHCR_OK=0
             for j in 1 2 3 4 5; do
               if curl -4 --connect-timeout 30 -fsSL https://ghcr.io/v2/ >/dev/null 2>&1; then
                 echo "✅ GHCR acessível"
+                GHCR_OK=1
                 break
               fi
               WAIT=\$((j * 10))
               echo "⚠️ Tentativa \$j de acesso ao GHCR falhou, aguardando \${WAIT}s..."
               sleep \$WAIT
-              [ \$j -eq 5 ] && { echo "❌ GHCR inacessível após 5 tentativas"; exit 1; }
             done
+            
+            if [ \$GHCR_OK -eq 0 ]; then
+              echo "⚠️ GHCR inacessível via curl da VPS (Contabo). Tentaremos o pull mesmo assim..."
+            fi
             
             echo "📦 Extracting deployment files..."
             mkdir -p \$DEPLOY_DIR/nginx \$TRAEFIK_DIR \$SCRIPT_DIR
@@ -168,7 +173,7 @@ jobs:
             cd \$DEPLOY_DIR
             
             echo "🔐 Login GitHub Container Registry..."
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin 2>/dev/null || echo "⚠️ Login no GHCR falhou (pode ser problema de rede)"
             
             # Ensure networks exist
             if ! docker network ls | grep -q "secured-guard"; then docker network create secured-guard; fi
