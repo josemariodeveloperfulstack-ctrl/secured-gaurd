@@ -319,6 +319,9 @@ public class EmployeeDTO {
         private String email;
         private String sigla;
         private String cnpj;
+        private java.util.UUID clientId;
+        private String clientName;
+        private List<String> epis;
     }
 
     @Data

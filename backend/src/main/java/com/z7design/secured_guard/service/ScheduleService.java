@@ -74,7 +74,7 @@ public class ScheduleService {
     }
 
     @Transactional
-    public Schedule createFromDTO(CreateScheduleDTO dto) {
+    public ScheduleDTO createFromDTO(CreateScheduleDTO dto) {
         try {
             // Validar que pelo menos locationId ou workPostId foi fornecido
             if (dto.getLocationId() == null && dto.getWorkPostId() == null) {
@@ -242,12 +242,19 @@ public class ScheduleService {
                     .observations(dto.getObservations())
                     .build();
 
-            return scheduleRepository.save(schedule);
+            Schedule saved = scheduleRepository.save(schedule);
+            return toDTO(saved);
         } catch (Exception e) {
             System.err.println("Erro ao criar Schedule: " + e.getMessage());
             e.printStackTrace();
             throw e;
         }
+    }
+
+    @Transactional
+    public ScheduleDTO updateToDTO(UUID id, Schedule schedule) {
+        Schedule updated = update(id, schedule);
+        return toDTO(updated);
     }
 
     @Transactional
@@ -311,9 +318,75 @@ public class ScheduleService {
         }
     }
 
-    public Schedule findById(UUID id) {
-        return scheduleRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Schedule not found"));
+    public ScheduleDTO findById(UUID id) {
+        Schedule schedule = scheduleRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Schedule not found with id: " + id));
+        return toDTO(schedule);
+    }
+
+    public List<ScheduleDTO> findByEmployeeIdDTO(UUID employeeId) {
+        return scheduleRepository.findByEmployeeId(employeeId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<ScheduleDTO> findByDateDTO(LocalDate date) {
+        return scheduleRepository.findByScheduleDate(date).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ScheduleDTO> findAllDTO() {
+        return findAll().stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    private ScheduleDTO toDTO(Schedule s) {
+        if (s == null) return null;
+        
+        ScheduleDTO dto = ScheduleDTO.builder()
+                .id(s.getId())
+                .scheduleDate(s.getScheduleDate())
+                .shift(s.getShift())
+                .status(s.getStatus())
+                .observations(s.getObservations())
+                .createdAt(s.getCreatedAt())
+                .updatedAt(s.getUpdatedAt())
+                .build();
+                
+        if (s.getEmployee() != null) {
+            dto.setEmployeeId(s.getEmployee().getId());
+            dto.setEmployeeName(s.getEmployee().getName());
+            dto.setEmployeeDocument(s.getEmployee().getDocument());
+        }
+        
+        if (s.getLocation() != null) {
+            dto.setLocationId(s.getLocation().getId());
+            dto.setLocationName(s.getLocation().getName());
+        }
+        
+        if (s.getWorkPost() != null) {
+            dto.setWorkPostId(s.getWorkPost().getId());
+            dto.setWorkPostName(s.getWorkPost().getName());
+            dto.setWorkPostCode(s.getWorkPost().getPostCode());
+            
+            if (s.getWorkPost().getClient() != null) {
+                dto.setClientId(s.getWorkPost().getClient().getId());
+                dto.setClientName(s.getWorkPost().getClient().getName());
+            }
+        }
+        
+        if (s.getRoute() != null) {
+            dto.setRouteId(s.getRoute().getId());
+        }
+        
+        if (s.getPatrol() != null) {
+            dto.setPatrolId(s.getPatrol().getId());
+        }
+        
+        return dto;
     }
 
     public List<Schedule> findByEmployeeId(UUID employeeId) {
