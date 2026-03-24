@@ -922,7 +922,15 @@ public class EmployeeService {
                     .println("[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Funcionários encontrados: "
                             + employees.size());
 
-            return employees.stream()
+            // Deduplicar por ID para evitar duplicatas causadas por dados inconsistentes ou joins
+            Map<UUID, Employee> uniqueEmployees = new LinkedHashMap<>();
+            for (Employee emp : employees) {
+                if (emp != null && emp.getId() != null) {
+                    uniqueEmployees.putIfAbsent(emp.getId(), emp);
+                }
+            }
+
+            return uniqueEmployees.values().stream()
                     .map(emp -> SimpleEmployeeDTO.builder()
                             .id(emp.getId())
                             .name(emp.getName())
@@ -937,6 +945,7 @@ public class EmployeeService {
                             .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
                             .companyId(emp.getCompany() != null ? emp.getCompany().getId() : null)
                             .companySigla(emp.getCompany() != null ? emp.getCompany().getSigla() : null)
+                            .salario(emp.getSalario())
                             .build())
                     .collect(java.util.stream.Collectors.toList());
         } catch (Exception e) {
@@ -1908,6 +1917,7 @@ public class EmployeeService {
                         .name(emp.getName())
                         .email(emp.getEmail())
                         .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
+                        .salario(emp.getSalario())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
     }

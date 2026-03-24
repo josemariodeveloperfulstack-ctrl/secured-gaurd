@@ -96,12 +96,16 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
         ? costCenters.find(cc => cc.name.toLowerCase() === unitName.toLowerCase())
         : null;
 
-      setForm(prev => ({
-        ...prev,
-        position: (funcionario as any).position?.name || prev.position,
-        department: matchingCostCenter?.id || prev.department,
-        startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
-      }));
+      setForm(prev => {
+        const salaryValue = (funcionario as any).salario;
+        return {
+          ...prev,
+          position: (funcionario as any).positionName || (funcionario as any).position?.name || prev.position,
+          department: matchingCostCenter?.id || prev.department,
+          startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
+          salary: salaryValue != null ? String(salaryValue).replace('.', ',') : prev.salary,
+        };
+      });
     }
   }, [funcionario, costCenters]);
 

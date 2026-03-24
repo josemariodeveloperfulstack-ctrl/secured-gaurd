@@ -56,6 +56,17 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
             try {
                 const companiesData = await companyService.getAllCompanies();
                 setCompanies(companiesData);
+
+                // Se tivermos employeeId, buscar dados completos do funcionário
+                if (employeeId) {
+                    const fullEmployee = await employeeService.getEmployeeById(employeeId);
+                    if (fullEmployee) {
+                        setSelectedEmployeeData(fullEmployee as any);
+                        if (fullEmployee.company?.id) {
+                            setForm(prev => ({ ...prev, empresaId: fullEmployee.company.id }));
+                        }
+                    }
+                }
             } catch (error) {
                 console.error('Erro ao buscar dados:', error);
             } finally {
@@ -63,7 +74,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
             }
         };
         fetchData();
-    }, []);
+    }, [employeeId]);
 
 
     const selectedFunc = selectedEmployeeData;

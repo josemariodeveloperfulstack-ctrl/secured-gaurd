@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
@@ -46,6 +47,7 @@ public class EmployeeHistoryPdfService {
     private final CompanyRepository companyRepository;
     private final StandardReportLayoutService standardReportLayoutService;
 
+    @Transactional(readOnly = true)
     public byte[] generateEmployeeHistoryPdf(UUID employeeId) throws Exception {
         log.info("📄 Gerando PDF do histórico completo do funcionário ID: {}", employeeId);
 

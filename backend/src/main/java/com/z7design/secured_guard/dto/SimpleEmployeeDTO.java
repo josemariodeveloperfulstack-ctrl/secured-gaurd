@@ -25,4 +25,5 @@ public class SimpleEmployeeDTO {
     private String unitName;
     private UUID companyId;
     private String companySigla;
+    private java.math.BigDecimal salario;
 }
