@@ -31,6 +31,8 @@ interface EmployeeComboboxProps {
   minChars?: number;
   /** Nome do funcionário para exibir quando value está preenchido (ex.: ao editar) e o combobox ainda não carregou o item */
   initialDisplayName?: string;
+  /** Callback disparado quando um funcionário é selecionado, retornando o objeto completo */
+  onEmployeeSelect?: (employee: SimpleEmployee) => void;
 }
 
 export function EmployeeCombobox({ 
@@ -41,7 +43,8 @@ export function EmployeeCombobox({
   emptyPlaceholder = "Nenhum funcionário encontrado.",
   disabled = false,
   minChars = 3,
-  initialDisplayName
+  initialDisplayName,
+  onEmployeeSelect
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -87,7 +90,15 @@ export function EmployeeCombobox({
             email: emp.email,
             phone: emp.phone,
             document: emp.document,
-          } as SimpleEmployee
+            cpf: emp.cpf,
+            address: emp.address,
+            registrationNumber: emp.registrationNumber,
+            hireDate: emp.hireDate,
+            companyId: emp.company?.id,
+            companySigla: emp.company?.sigla,
+            positionName: emp.position?.name,
+            unitName: emp.unit?.name,
+          };
           setEmployees(prev => [...prev, simple])
           setSelectedEmployee(simple)
         }
@@ -137,7 +148,7 @@ export function EmployeeCombobox({
         className="w-full p-0 bg-seguranca-graphite border-gray-600 z-[10100] shadow-lg"
       >
         <Command
-          filter={() => true}
+          filter={() => 1}
           className="bg-seguranca-graphite text-seguranca-lightgray"
         >
           <CommandInput 
@@ -165,7 +176,11 @@ export function EmployeeCombobox({
                       key={option.value}
                       value={option.value}
                       onSelect={(currentValue) => {
-                        onChange(currentValue === value ? "" : currentValue)
+                        const isSelected = currentValue === value;
+                        onChange(isSelected ? "" : currentValue)
+                        if (!isSelected && onEmployeeSelect) {
+                          onEmployeeSelect(option.employee);
+                        }
                         setOpen(false)
                         setSearchTerm("")
                       }}
@@ -181,6 +196,7 @@ export function EmployeeCombobox({
                         <span className="font-medium">{option.employee.name}</span>
                         <span className="text-sm text-gray-400">
                           {option.employee.positionName && `${option.employee.positionName}`}
+                          {option.employee.companySigla && ` • ${option.employee.companySigla}`}
                           {option.employee.unitName && ` • ${option.employee.unitName}`}
                           {option.employee.registrationNumber && ` • ${option.employee.registrationNumber}`}
                         </span>

@@ -19,14 +19,15 @@ import {
   Users,
   Briefcase,
   MapPin,
-  Calendar,
-  Save,
   X
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { ordemServicoPDFGenerator } from '@/utils/ordemServicoPDFGenerator';
 import { mockAPIData } from '@/utils/mockAPIData';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import { SimpleEmployee } from '@/services/employeeService';
+
 
 // Interfaces
 interface Position {
@@ -142,10 +143,11 @@ const OrdemServicoForm = () => {
 
   // Estados para busca dinâmica
   const [positions, setPositions] = useState<Position[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+
 
   // Estados de loading
   const [loading, setLoading] = useState(false);
@@ -178,22 +180,7 @@ const OrdemServicoForm = () => {
         setPositions(mockAPIData.positions);
       }
 
-      // Carregar funcionários
-      try {
-        const employeesResponse = await fetch('/api/employees', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (employeesResponse.ok) {
-          const employeesData = await employeesResponse.json();
-          setEmployees(employeesData);
-        } else {
-          console.warn('Erro ao carregar funcionários, usando dados mock');
-          setEmployees(mockAPIData.employees);
-        }
-      } catch (error) {
-        console.warn('Erro ao carregar funcionários, usando dados mock:', error);
-        setEmployees(mockAPIData.employees);
-      }
+
 
       // Carregar clientes
       try {
@@ -525,25 +512,19 @@ const OrdemServicoForm = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="funcionario">Funcionário</Label>
-                          <Select
+                          <EmployeeCombobox
                             value={form.funcionarioId}
-                            onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecione o funcionário" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.isArray(employees) && employees.length > 0 ? employees.map(emp => (
-                                <SelectItem key={emp.id} value={emp.id}>
-                                  {emp.name} - {emp.position?.name || 'Sem cargo'}
-                                </SelectItem>
-                              )) : (
-                                <SelectItem value="no-data" disabled>
-                                  Nenhum funcionário encontrado
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
+                            onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                            onEmployeeSelect={(emp) => {
+                              setSelectedEmployeeData(emp);
+                              setForm(prev => ({
+                                ...prev,
+                                funcionarioId: emp.id,
+                                empresaId: emp.companyId || prev.empresaId,
+                                cargoId: (positions.find(p => p.name === emp.positionName)?.id) || prev.cargoId
+                              }));
+                            }}
+                          />
                         </div>
 
                         <div className="space-y-2">

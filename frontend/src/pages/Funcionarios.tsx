@@ -68,6 +68,7 @@ import { FuncionariosTable } from '@/components/funcionarios/FuncionariosTable';
 import ExcelImportModal from '@/components/funcionarios/ExcelImportModal';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 import { EmployeeViewDetailsModal } from '@/components/funcionarios/EmployeeViewDetailsModal';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import FuncionarioEditModal from '@/components/funcionarios/FuncionarioEditModal';
 
 const Funcionarios: React.FC = () => {
@@ -256,9 +257,16 @@ const Funcionarios: React.FC = () => {
 
   // Carregar funcionários ao mudar filtros (searchTerm, companyId e status vão para a API; resto filtra no frontend)
   useEffect(() => {
+    const term = searchTerm.trim();
+    
+    // Só dispara a busca se o termo for vazio (limpar) ou tiver pelo menos 3 caracteres
+    if (term.length > 0 && term.length < 3) {
+      return;
+    }
+
     setCurrentPage(0);
     const filters: EmployeeFilters = {
-      searchTerm: searchTerm.trim() || undefined,
+      searchTerm: term || undefined,
       companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
       status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
     };
@@ -449,10 +457,12 @@ const Funcionarios: React.FC = () => {
       String((employee.company as any)?.id) === String(companyFilter);
 
     const matchesPosition = isAll(positionFilter) ||
-      same((employee.position as any)?.name, positionFilter);
+      same((employee.position as any)?.name, positionFilter) ||
+      String((employee.position as any)?.id) === String(positionFilter);
 
     const matchesWorkPost = isAll(workPostFilter) ||
-      same((employee.workPost as any)?.name, workPostFilter);
+      same((employee.workPost as any)?.name, workPostFilter) ||
+      String((employee.workPost as any)?.id) === String(workPostFilter);
 
     const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
     const matchesHireDateFrom = !hireDateFrom || (hireDate && hireDate >= new Date(hireDateFrom));
@@ -465,20 +475,19 @@ const Funcionarios: React.FC = () => {
     const matchesSearch = !normalizedSearch || (() => {
       const nameMatch = (employee.name || '').toLowerCase().includes(normalizedSearch);
       const emailMatch = (employee.email || '').toLowerCase().includes(normalizedSearch);
-      const registrationMatch = (employee.registrationNumber || '').toLowerCase().includes(normalizedSearch);
-      const documentDigits = (employee.document || employee.cpf || '').replace(/\D/g, '');
-      const cpfMatch = searchDigits
-        ? documentDigits.includes(searchDigits)
-        : (employee.document || employee.cpf || '').toLowerCase().includes(normalizedSearch);
+      const registrationMatch = (employee.registration || '').toLowerCase().includes(normalizedSearch);
+      const cpfMatch = searchDigits ? (employee.cpf || '').replace(/\D/g, '').includes(searchDigits) : false;
+      const positionMatch = (employee.position?.name || '').toLowerCase().includes(normalizedSearch);
+      const workPostMatch = ((employee.workPost as any)?.name || '').toLowerCase().includes(normalizedSearch);
 
-      return nameMatch || emailMatch || registrationMatch || cpfMatch;
+      return nameMatch || emailMatch || registrationMatch || cpfMatch || positionMatch || workPostMatch;
     })();
 
     return matchesStatus && matchesSearch && matchesCompany && matchesPosition && matchesWorkPost
       && matchesHireDateFrom && matchesHireDateTo && matchesTerminationDateFrom && matchesTerminationDateTo;
   });
 
-  type SortKey = 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status';
+  type SortKey = 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho';
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -502,6 +511,8 @@ const Funcionarios: React.FC = () => {
         case 'company': return (e.company as any)?.sigla || (e.company as any)?.name || '';
         case 'workPost': return (e.workPost as any)?.name || '';
         case 'status': return e.status || '';
+        case 'escalaTrabalho': return e.escalaTrabalho || '';
+        case 'horarioTrabalho': return e.horarioTrabalho || '';
         default: return '';
       }
     };
@@ -1222,38 +1233,47 @@ Para excluir este funcionário:
                   <option value="SUSPENDED">⏸️ Suspenso</option>
                 </select>
 
-                <select
+                <SearchableSelect
                   value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
-                >
-                  <option value="all">🏢 Todas as Empresas</option>
-                  {filterCompanies.map(c => (
-                    <option key={c.id} value={c.id}>{c.sigla ? `${c.sigla} - ${c.name}` : c.name}</option>
-                  ))}
-                </select>
+                  onChange={setCompanyFilter}
+                  options={[
+                    { value: "all", label: "🏢 Todas as Empresas" },
+                    ...filterCompanies.map(c => ({
+                      value: c.id,
+                      label: c.sigla ? `${c.sigla} - ${c.name}` : (c.name || 'Sem nome')
+                    }))
+                  ]}
+                  placeholder="🏢 Todas as Empresas"
+                  searchPlaceholder="Buscar empresa..."
+                />
 
-                <select
+                <SearchableSelect
                   value={positionFilter}
-                  onChange={(e) => setPositionFilter(e.target.value)}
-                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
-                >
-                  <option value="all">💼 Todos os cargos</option>
-                  {filterPositions.map(p => (
-                    <option key={p.id} value={p.name}>{p.name}</option>
-                  ))}
-                </select>
+                  onChange={setPositionFilter}
+                  options={[
+                    { value: "all", label: "💼 Todos os cargos" },
+                    ...filterPositions.map(p => ({
+                      value: p.name,
+                      label: p.name
+                    }))
+                  ]}
+                  placeholder="💼 Todos os cargos"
+                  searchPlaceholder="Buscar cargo..."
+                />
 
-                <select
+                <SearchableSelect
                   value={workPostFilter}
-                  onChange={(e) => setWorkPostFilter(e.target.value)}
-                  className="h-11 bg-seguranca-black/70 border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow/20 outline-none"
-                >
-                  <option value="all">📍 Todos os postos</option>
-                  {filterWorkPosts.map(wp => (
-                    <option key={wp.id} value={wp.name}>{wp.name}</option>
-                  ))}
-                </select>
+                  onChange={setWorkPostFilter}
+                  options={[
+                    { value: "all", label: "📍 Todos os postos" },
+                    ...filterWorkPosts.map(wp => ({
+                      value: wp.name,
+                      label: wp.name
+                    }))
+                  ]}
+                  placeholder="📍 Todos os postos"
+                  searchPlaceholder="Buscar posto..."
+                />
 
                 <div className="flex flex-col gap-1">
                   <label htmlFor="hire-date-from" className="text-xs text-gray-400">Admissão (de)</label>

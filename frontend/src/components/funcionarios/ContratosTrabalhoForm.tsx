@@ -8,7 +8,10 @@ import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { Calendar, User, Building, FileText, Download, Eye, Loader2, CheckCircle2, Clock, Briefcase } from 'lucide-react';
-import { employeeService, Employee } from '@/services/employeeService';
+import { employeeService, Employee, SimpleEmployee } from '@/services/employeeService';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import { SearchableSelect } from '../ui/searchable-select';
+
 import { companyService } from '@/services/companyService';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
@@ -40,11 +43,12 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
+
   const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
 
-  const funcionario = employees.find(f => f.id === form.employeeId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
   const costCenter = costCenters.find(cc => cc.id === form.department || cc.name === form.department);
 
@@ -63,14 +67,13 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [employeesData, companiesData, costCentersData] = await Promise.all([
-        employeeService.getAllEmployees(),
+      const [companiesData, costCentersData] = await Promise.all([
         companyService.getAllCompanies(),
         costCenterService.listActive()
       ]);
-      setEmployees(employeesData);
       setCompanies(companiesData);
       setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
+
       console.log('📊 Centros de Custo carregados:', costCentersData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -323,35 +326,17 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                       Selecione o colaborador que terá o contrato gerado.
                     </span>
                   </Label>
-                  <Select
+                  <EmployeeCombobox
                     value={form.employeeId}
-                    onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
+                    onChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                     disabled={loadingData}
-                  >
-                    <SelectTrigger className="h-12 rounded-lg border border-input bg-muted/40 text-foreground font-medium shadow-sm transition-colors hover:bg-muted/60 focus:ring-2 focus:ring-primary/20 focus:border-primary/50 [&>span]:line-clamp-2 [&>span]:text-left [&>span]:normal-case">
-                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                      {loadingData ? (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Carregando funcionários...</div>
-                      ) : employees.length > 0 ? (
-                        employees.map(f => (
-                          <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium normal-case">{f.name}</span>
-                              {(f.cpf || (f as any).document) && (
-                                <span className="text-xs text-muted-foreground">
-                                  CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Nenhum funcionário encontrado</div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    onEmployeeSelect={(emp) => {
+                      setSelectedEmployeeData(emp);
+                      if (emp.companyId) {
+                        setForm(prev => ({ ...prev, companyId: emp.companyId! }));
+                      }
+                    }}
+                  />
                   {funcionario && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
                       <User className="h-3.5 w-3.5 text-primary" />
@@ -379,40 +364,18 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                       Escolha a empresa empregadora que assinará o contrato.
                     </span>
                   </Label>
-                  <Select
+                  <SearchableSelect
+                    options={companies.map(e => ({
+                      value: e.id,
+                      label: e.sigla || e.tradeName || e.name,
+                      description: e.cnpj ? `CNPJ: ${formatCNPJ(e.cnpj)}` : e.name
+                    }))}
                     value={form.companyId}
-                    onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
+                    onChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
                     disabled={loadingData}
-                  >
-                    <SelectTrigger className="h-12 rounded-lg border border-input bg-muted/40 text-foreground font-medium shadow-sm transition-colors hover:bg-muted/60 focus:ring-2 focus:ring-primary/20 focus:border-primary/50 [&>span]:line-clamp-2 [&>span]:text-left [&>span]:normal-case">
-                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                      {loadingData ? (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Carregando empresas...</div>
-                      ) : companies.length > 0 ? (
-                        companies.map(e => (
-                          <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium normal-case">
-                                {e.sigla || e.tradeName || e.name}
-                              </span>
-                              {(e.sigla || e.tradeName) && e.name && (
-                                <span className="text-xs text-muted-foreground">{e.name}</span>
-                              )}
-                              {e.cnpj && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  CNPJ: {formatCNPJ(e.cnpj)}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Nenhuma empresa encontrada</div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Selecione a empresa"
+                    searchPlaceholder="Buscar empresa..."
+                  />
                   {empresa && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
                       <Building className="h-3.5 w-3.5 text-primary" />
@@ -676,33 +639,18 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
               <div className="space-y-2">
                 <Label>Departamento (Centro de Custo)</Label>
-                <Select
+                <SearchableSelect
+                  options={costCenters.map(cc => ({
+                    value: cc.id || cc.name,
+                    label: cc.name,
+                    description: cc.code ? `Código: ${cc.code}` : undefined
+                  }))}
                   value={form.department}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, department: value }))}
+                  onChange={(value) => setForm(prev => ({ ...prev, department: value }))}
                   disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o departamento"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando centros de custo...</div>
-                    ) : costCenters.length > 0 ? (
-                      costCenters.map(cc => (
-                        <SelectItem key={cc.id} value={cc.id || cc.name}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{cc.name}</span>
-                            {cc.code && (
-                              <span className="text-xs text-muted-foreground">Código: {cc.code}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum centro de custo encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione o departamento"
+                  searchPlaceholder="Buscar departamento..."
+                />
               </div>
             </div>
           </div>

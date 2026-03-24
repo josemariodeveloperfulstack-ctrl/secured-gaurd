@@ -142,36 +142,51 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Se o erro for 401 (não autorizado - token inválido/expirado)
-    // 403 (Forbidden) é diferente - significa que o usuário está autenticado mas não tem permissão
-    // Não devemos redirecionar para login em caso de 403, apenas em 401
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Verificar se o problema é falta de token
       const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
+      const refreshTokenKey = import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken';
+      const userKey = import.meta.env.VITE_USER_KEY || 'user';
+      
       const token = localStorage.getItem(tokenKey) || localStorage.getItem('token') || localStorage.getItem('authToken');
       
+      console.group('🔐 Axios 401 Unauthorized');
+      console.log('🔗 URL:', originalRequest.url);
+      console.log('📦 Token Key:', tokenKey);
+      console.log('🎫 Possui Token:', !!token);
+      
       if (!token || token.trim() === '' || token === 'fake-token') {
-        console.error('❌ Token inválido ou não encontrado. Redirecionando para login...');
-        localStorage.removeItem(import.meta.env.VITE_TOKEN_KEY || 'token');
-        localStorage.removeItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
-        localStorage.removeItem(import.meta.env.VITE_USER_KEY || 'user');
-        window.location.href = '/login';
+        console.error('❌ Token inválido ou não encontrado. Limpando armazenamento e redirecionando...');
+        
+        // Limpa TODOS os possíveis nomes de chaves para evitar loops
+        const keysToRemove = [tokenKey, refreshTokenKey, userKey, 'token', 'refreshToken', 'user', 'authToken', 'secured_guard_token'];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        console.log('🧹 Armazenamento limpo. Redirecionando para /login...');
+        console.groupEnd();
+        
+        // Pequeno atraso para garantir que o localStorage.removeItem persistiu
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 50);
+        
         return Promise.reject(error);
       }
+      
       originalRequest._retry = true;
 
       try {
+        const refreshToken = localStorage.getItem(refreshTokenKey) || localStorage.getItem('refreshToken');
         
-        const refreshToken = localStorage.getItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
         if (!refreshToken) {
-          // Se não há refresh token, redirecionar para login
-          console.error('❌ Refresh token não encontrado. Redirecionando para login...');
-          localStorage.removeItem(import.meta.env.VITE_TOKEN_KEY || 'token');
-          localStorage.removeItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
-          localStorage.removeItem(import.meta.env.VITE_USER_KEY || 'user');
+          console.error('❌ Refresh token não encontrado. Fazendo logout...');
+          const keysToRemove = [tokenKey, refreshTokenKey, userKey, 'token', 'refreshToken', 'user', 'authToken'];
+          keysToRemove.forEach(key => localStorage.removeItem(key));
+          console.groupEnd();
           window.location.href = '/login';
           return Promise.reject(error);
         }
 
+        console.log('🔄 Tentando renovar token...');
         // Tenta renovar o token
         const response = await axios.post(`${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`, {
           refreshToken
@@ -180,8 +195,11 @@ api.interceptors.response.use(
         const { token: newToken, refreshToken: newRefreshToken } = response.data;
 
         // Atualiza os tokens
-        localStorage.setItem(import.meta.env.VITE_TOKEN_KEY || 'token', newToken);
-        localStorage.setItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken', newRefreshToken);
+        localStorage.setItem(tokenKey, newToken);
+        localStorage.setItem(refreshTokenKey, newRefreshToken);
+
+        console.log('✅ Token renovado com sucesso!');
+        console.groupEnd();
 
         // Atualiza o header da requisição original
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
@@ -189,12 +207,15 @@ api.interceptors.response.use(
         // Repete a requisição original
         return api(originalRequest);
       } catch (refreshError) {
-        // Se falhar ao renovar o token, faz logout
-        console.error('❌ Erro ao renovar token. Fazendo logout...', refreshError);
-        localStorage.removeItem(import.meta.env.VITE_TOKEN_KEY || 'token');
-        localStorage.removeItem(import.meta.env.VITE_REFRESH_TOKEN_KEY || 'refreshToken');
-        localStorage.removeItem(import.meta.env.VITE_USER_KEY || 'user');
-        window.location.href = '/login';
+        console.error('❌ Erro ao renovar token. Fazendo logout compulsório...', refreshError);
+        const keysToRemove = [tokenKey, refreshTokenKey, userKey, 'token', 'refreshToken', 'user', 'authToken'];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        console.groupEnd();
+        
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 50);
+        
         return Promise.reject(refreshError);
       }
     }

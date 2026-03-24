@@ -916,11 +916,16 @@ public class EmployeeService {
                             .id(emp.getId())
                             .name(emp.getName())
                             .document(emp.getDocument())
+                            .cpf(emp.getCpf())
                             .email(emp.getEmail())
                             .phone(emp.getPhone())
+                            .address(emp.getAddress())
                             .registrationNumber(emp.getRegistrationNumber())
+                            .hireDate(emp.getHireDate())
                             .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
                             .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
+                            .companyId(emp.getCompany() != null ? emp.getCompany().getId() : null)
+                            .companySigla(emp.getCompany() != null ? emp.getCompany().getSigla() : null)
                             .build())
                     .collect(java.util.stream.Collectors.toList());
         } catch (Exception e) {

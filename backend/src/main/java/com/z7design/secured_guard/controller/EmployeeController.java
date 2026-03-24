@@ -348,6 +348,8 @@ public class EmployeeController {
                     employee.put("salario", row[16]);
                     employee.put("createdAt", row[17]);
                     employee.put("updatedAt", row[18]);
+                    employee.put("escalaTrabalho", safeAt(row, 30));
+                    employee.put("horarioTrabalho", safeAt(row, 31));
 
                     // Adicionar position e unit (novas colunas da query)
                     if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
@@ -464,6 +466,8 @@ public class EmployeeController {
                 employee.put("salario", safeAt(row, 16));
                 employee.put("createdAt", safeAt(row, 17));
                 employee.put("updatedAt", safeAt(row, 18));
+                employee.put("escalaTrabalho", safeAt(row, 30));
+                employee.put("horarioTrabalho", safeAt(row, 31));
 
                 if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                     java.util.Map<String, Object> position = new java.util.HashMap<>();

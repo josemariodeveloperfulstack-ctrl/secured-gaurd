@@ -1,0 +1,126 @@
+﻿curl.exe :   % Total    % Received % 
+Xferd  Average Speed  Time    Time    
+Time   Current
+No linha:1 caractere:1
++ curl.exe -v https://ci.z7botsolutions.c
+om.br/api/users/me/current-rol ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecifi 
+   ed: (  % Total    % ... Time   Curre  
+  nt:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeComm 
+   andError
+ 
+                                 Dload  
+Upload  Total   Spent   Left   Speed
+
+  0      0   0      0   0      0      0  
+    0                              0* 
+Host ci.z7botsolutions.com.br:443 was 
+resolved.
+* IPv6: 2606:4700:3031::6815:e96, 
+2606:4700:3034::ac43:9fb5
+* IPv4: 172.67.159.181, 104.21.14.150
+*   Trying 
+[2606:4700:3031::6815:e96]:443...
+* schannel: disabled automatic use of 
+client certificate
+* ALPN: curl offers http/1.1
+* ALPN: server accepted http/1.1
+* Established connection to 
+ci.z7botsolutions.com.br 
+(2606:4700:3031::6815:e96 port 443) from 
+2803:9810:437c:910:30bb:fc01:ae39:d770 
+port 63273 
+* using HTTP/1.x
+> GET /api/users/me/current-role HTTP/1.1
+
+> Host: ci.z7botsolutions.com.br
+
+> User-Agent: curl/8.18.0
+
+> Accept: */*
+
+> 
+
+* Request completely sent off
+* schannel: remote party requests 
+renegotiation
+* schannel: renegotiating SSL/TLS 
+connection
+* schannel: SSL/TLS connection 
+renegotiated
+< HTTP/1.1 401 Unauthorized
+
+< Date: Tue, 24 Mar 2026 00:43:40 GMT
+
+< Content-Type: 
+application/json;charset=UTF-8
+
+< Content-Length: 95
+
+< Connection: keep-alive
+
+< access-control-allow-credentials: true
+
+< access-control-allow-headers: DNT,User-
+Agent,X-Requested-With,If-Modified-Since,
+Cache-Control,Content-Type,Range,Authoriz
+ation
+
+< access-control-allow-methods: GET, 
+POST, PUT, DELETE, PATCH, OPTIONS, HEAD
+
+< Cache-Control: no-cache, no-store, 
+max-age=0, must-revalidate
+
+< expires: 0
+
+< pragma: no-cache
+
+< Server: cloudflare
+
+< strict-transport-security: 
+max-age=31536000 ; includeSubDomains
+
+< vary: Origin
+
+< vary: Access-Control-Request-Method
+
+< vary: Access-Control-Request-Headers
+
+< x-content-type-options: nosniff
+
+< x-xss-protection: 0
+
+< cf-cache-status: DYNAMIC
+
+< Nel: {"report_to":"cf-nel","success_fra
+ction":0.0,"max_age":604800}
+
+< Report-To: {"group":"cf-nel","max_age":
+604800,"endpoints":[{"url":"https://a.nel
+.cloudflare.com/report/v4?s=KcId%2FMzUJwS
+Fs3hIOb%2FbontDC1UydwystMGSMPpcJPQl1S8Sei
+BzwG%2BC1b8rg0wQrhYaEwsvS4TX2XCV281JsrN1C
+6fdJB0%2BQbc8xe7q1JFZhbU473r5XDP8%2BC8MKM
+SK97vTWQ%3D%3D"}]}
+
+< CF-RAY: 9e11a49afab588b4-GRU
+
+< alt-svc: h3=":443"; ma=86400
+
+< 
+
+{ [95 bytes data]
+
+100     95 100     95   0      0    203  
+    0                              0
+100     95 100     95   0      0    203  
+    0                              0
+100     95 100     95   0      0    203  
+    0                              0
+* Connection #0 to host 
+ci.z7botsolutions.com.br:443 left intact
+{"error": "Unauthorized", "message": "Full authentication is required to access this resource"}

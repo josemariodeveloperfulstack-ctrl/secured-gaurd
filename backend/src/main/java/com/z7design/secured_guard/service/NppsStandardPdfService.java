@@ -35,7 +35,8 @@ public class NppsStandardPdfService {
 
     private static final String REPORT_TITLE = "NPPS – Norma e Procedimento do Posto de Serviço";
 
-    public byte[] generatePdf(UUID companyId) {
+    public byte[] generatePdf(UUID companyId, String employeeName, String employeeCpf) {
+
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(outputStream);
 
@@ -53,7 +54,8 @@ public class NppsStandardPdfService {
             Document document = docWithPdf.getDocument();
             Company company = docWithPdf.getCompany();
 
-            addContent(document, company);
+            addContent(document, company, employeeName, employeeCpf);
+
 
             document.close();
             return outputStream.toByteArray();
@@ -81,7 +83,8 @@ public class NppsStandardPdfService {
         throw new RuntimeException("Não foi possível determinar a empresa para o relatório NPPS.");
     }
 
-    private void addContent(Document document, Company company) {
+    private void addContent(Document document, Company company, String employeeName, String employeeCpf) {
+
         // Prefácio
         document.add(createSectionHeader("Prefácio"));
         document.add(createParagraph(
@@ -225,13 +228,17 @@ public class NppsStandardPdfService {
                 .setMarginTop(20);
 
         for (int i = 0; i < 4; i++) {
+            String nameVal = (i == 0 && employeeName != null && !employeeName.isEmpty()) ? employeeName : "___________________________";
+            String cpfVal = (i == 0 && employeeCpf != null && !employeeCpf.isEmpty()) ? employeeCpf : "________________________";
+
             Paragraph p = new Paragraph()
                     .add(new Paragraph("_________________________________").setTextAlignment(TextAlignment.CENTER))
-                    .add(new Paragraph("Nome: ___________________________").setTextAlignment(TextAlignment.CENTER).setFontSize(8))
-                    .add(new Paragraph("CPF n.º: ________________________").setTextAlignment(TextAlignment.CENTER).setFontSize(8))
+                    .add(new Paragraph("Nome: " + nameVal).setTextAlignment(TextAlignment.CENTER).setFontSize(8))
+                    .add(new Paragraph("CPF n.º: " + cpfVal).setTextAlignment(TextAlignment.CENTER).setFontSize(8))
                     .add(new Paragraph("Data: ____/____/______").setTextAlignment(TextAlignment.CENTER).setFontSize(8));
             signatures.addCell(p.setMarginTop(5).setMarginBottom(10));
         }
+
 
         document.add(signatures);
     }

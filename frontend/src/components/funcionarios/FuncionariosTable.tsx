@@ -24,9 +24,9 @@ interface FuncionariosTableProps {
   onViewDetails: (employee: Employee) => void;
   isLoading?: boolean;
   isMobileSelectionMode?: boolean;
-  sortKey?: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status';
+  sortKey?: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho';
   sortDir?: 'asc' | 'desc';
-  onSort?: (key: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status') => void;
+  onSort?: (key: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho') => void;
 }
 
 export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
@@ -180,6 +180,12 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 <SortHead k="workPost">Posto de Trabalho</SortHead>
               </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="escalaTrabalho">Escala</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="horarioTrabalho">Horário</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
                 <SortHead k="hireDate">Admissão</SortHead>
               </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">
@@ -296,6 +302,24 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                         </div>
                       );
                     })()}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                    {employee.escalaTrabalho ? (
+                      <span className="truncate max-w-[150px]">{employee.escalaTrabalho}</span>
+                    ) : (
+                      <span className="text-gray-500 italic text-xs">Não definida</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                    {employee.horarioTrabalho ? (
+                      <span className="truncate max-w-[150px]">{employee.horarioTrabalho}</span>
+                    ) : (
+                      <span className="text-gray-500 italic text-xs">Não definido</span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -479,6 +503,18 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                     </div>
                   );
                 })()}
+                {employee.escalaTrabalho && (
+                  <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Escala de Trabalho">
+                    <Calendar className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                    <span className="truncate text-[10px]">{employee.escalaTrabalho}</span>
+                  </div>
+                )}
+                {employee.horarioTrabalho && (
+                  <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Horário de Trabalho">
+                    <Calendar className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                    <span className="truncate text-[10px]">{employee.horarioTrabalho}</span>
+                  </div>
+                )}
                 {employee.hireDate && (
                   <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
                     <Calendar className="h-3 w-3 flex-shrink-0 text-green-400/70" />

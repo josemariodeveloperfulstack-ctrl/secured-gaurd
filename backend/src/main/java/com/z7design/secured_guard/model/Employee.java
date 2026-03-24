@@ -192,8 +192,6 @@ public class Employee {
     private String photoUrl;
 
     // Dados Profissionais
-    // @Column(name = "current_scale")
-    // private String currentScale;
 
     // Documentos
     @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

@@ -71,16 +71,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const savedUser = localStorage.getItem('user');
+        const tokenKey = import.meta.env.VITE_TOKEN_KEY || 'token';
+        const userKey = import.meta.env.VITE_USER_KEY || 'user';
+        
+        const token = localStorage.getItem(tokenKey) || localStorage.getItem('token');
+        const savedUser = localStorage.getItem(userKey) || localStorage.getItem('user');
 
-        console.log('🔍 AuthContext: Carregando usuário...');
-        console.log('🔍 Token encontrado:', !!token);
-        console.log('🔍 Usuário salvo:', !!savedUser);
+        console.group('🔍 AuthContext: Bootstrapping Session');
+        console.log('🔗 Token found:', !!token);
+        console.log('👤 Saved user found:', !!savedUser);
 
         if (token && savedUser) {
           const userData = JSON.parse(savedUser);
-          console.log('🔍 Usuário carregado:', userData.name, userData.role);
+          console.log('👤 User data valid:', !!userData.id, userData.name, userData.role);
 
           // Gerar permissões a partir do role principal
           const rolePermissions = generatePermissions(userData.role);
@@ -90,20 +93,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             firstAccessCompleted: userData.firstAccessCompleted ?? false
           };
 
-          console.log('🔍 AuthContext - Usuário carregado:', {
-            name: userData.name,
-            role: userData.role,
-            permissions: rolePermissions,
-            firstAccessCompleted: userWithPermissions.firstAccessCompleted,
-            isSuperAdmin: userData.role === 'SUPER_ADMIN',
-            allPermissions: rolePermissions.ALL_PERMISSIONS
-          });
-
           setUser(userWithPermissions);
-          console.log('🔍 Usuário definido no estado');
-          localStorage.setItem('user', JSON.stringify(userWithPermissions));
-
+          localStorage.setItem(userKey, JSON.stringify(userWithPermissions));
           setRefreshToken(token);
+
+          console.log('✅ Session restored successfully');
 
           const roleKey = (userWithPermissions.role ?? '').toUpperCase();
           if (!['COLABORADOR', 'ROLE_COLABORADOR'].includes(roleKey) && userWithPermissions.id) {
@@ -115,20 +109,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const currentPath = window.location.pathname;
             const firstAccessPaths = ['/first-access/change-password', '/first-access/activate-2fa'];
             if (!firstAccessPaths.includes(currentPath)) {
-              console.log('🔒 Usuário precisa completar primeiro acesso, redirecionando...');
-              setTimeout(() => {
-                navigate('/first-access/change-password', { replace: true });
-              }, 100);
+              console.log('🔒 User needs first-access completion, redirecting...');
+              setTimeout(() => navigate('/first-access/change-password', { replace: true }), 100);
             }
           }
         } else {
-          console.log('🔍 Nenhum token ou usuário encontrado');
+          console.log('ℹ️ No active session found in localStorage');
         }
+        console.groupEnd();
       } catch (error) {
-        console.error('❌ [AuthContext] Erro fatal ao carregar dados do usuário:', error);
-        // Só remover se for erro de parsing (corrupção), erro de rede não deve limpar a sessão
+        console.error('❌ [AuthContext] Fatal bootstrap error:', error);
+        console.groupEnd();
         if (error instanceof SyntaxError) {
-          console.warn('⚠️ [AuthContext] Dados corrompidos detectados, limpando localStorage...');
+          console.warn('⚠️ [AuthContext] Corrupted data detected, clearing localStorage...');
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
@@ -150,6 +143,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       try {
         const response = await api.get('/api/users/me/current-role');
+        if (!response.data) return;
+        
         const { role: dbRole, token: newToken } = response.data as { role: string; token: string };
 
         const savedUser = JSON.parse(savedUserStr);
@@ -157,7 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const normalizedDbRole = dbRole.replace(/^ROLE_/, '');
 
         if (storedRole !== normalizedDbRole) {
-          console.log(`🔄 Role alterado: ${storedRole} → ${normalizedDbRole}. Atualizando sessão...`);
+          console.log(`🔄 Role changed: ${storedRole} → ${normalizedDbRole}. Syncing session...`);
 
           // Atualiza token
           localStorage.setItem('token', newToken);
@@ -170,8 +165,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Atualiza estado React
           setUser(updatedUser);
         }
-      } catch {
-        // Silencioso — não interromper a sessão por falha no poll
+      } catch (err: any) {
+        // Silenciar erros de polling, mas logar se for 401 para debug
+        if (err?.response?.status === 401) {
+          console.warn('⚠️ [AuthContext] Polling 401 - Session likely expired');
+        }
       }
     };
 

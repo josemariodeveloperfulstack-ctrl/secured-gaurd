@@ -8,9 +8,11 @@ import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Calendar, MapPin, Phone, Mail, IdCard, FileSignature, Loader2, CheckCircle2 } from 'lucide-react';
-import { employeeService, Employee } from '@/services/employeeService';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { EmployeeCombobox } from '../ui/employee-combobox';
 import { useToast } from '@/hooks/use-toast';
+
 import api from '@/lib/axios';
 import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
 import { formatCNPJ } from '@/utils/validation';
@@ -37,14 +39,17 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [loadingEmployee, setLoadingEmployee] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
+  const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [fullEmployee, setFullEmployee] = useState<Employee | null>(null);
+  const [fullEmployee, setFullEmployee] = useState<any | null>(null);
+
 
   // 2. Memoized values
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
-  const responsavel = employees.find(f => f.id === form.responsavelRegistroId);
+  const responsavel = selectedResponsibleData;
+
 
   // 3. Helper functions
   const loadFullEmployee = async (employeeId: string) => {
@@ -63,11 +68,7 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [employeesData, companiesData] = await Promise.all([
-        employeeService.getAllEmployees(),
-        companyService.getAllCompanies()
-      ]);
-      setEmployees(employeesData);
+      const companiesData = await companyService.getAllCompanies();
       setCompanies(companiesData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -241,33 +242,18 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Funcionário</Label>
-                <Select
+                <EmployeeCombobox
                   value={form.funcionarioId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{f.name}</span>
-                            {f.document && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    setForm(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
+                      empresaId: emp.companyId || prev.empresaId
+                    }));
+                  }}
+                />
               </div>
 
               <div className="space-y-2">
@@ -481,33 +467,11 @@ const FichaRegistroFuncionarioForm: React.FC<FichaRegistroFuncionarioFormProps> 
 
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pelo Registro</Label>
-                <Select
+                <EmployeeCombobox
                   value={form.responsavelRegistroId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, responsavelRegistroId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o responsável"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{f.name}</span>
-                            {f.document && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setForm(prev => ({ ...prev, responsavelRegistroId: value }))}
+                  onEmployeeSelect={(emp) => setSelectedResponsibleData(emp)}
+                />
               </div>
             </div>
 

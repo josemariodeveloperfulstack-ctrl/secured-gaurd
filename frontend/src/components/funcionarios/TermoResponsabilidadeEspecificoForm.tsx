@@ -7,10 +7,12 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Shield, Loader2, CheckCircle2 } from 'lucide-react';
-import { employeeService } from '@/services/employeeService';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+
 
 const documentTypes = [
     { id: 'BH_BUS', label: 'TERMO DE RESPONSABILIDADE CARTÃO BH BUS VALE-TRANSPORTE' },
@@ -35,9 +37,10 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
     });
 
     const [loading, setLoading] = useState(false);
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loadingData, setLoadingData] = useState(false);
+
 
     useEffect(() => {
         setForm(prev => ({
@@ -51,11 +54,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
         const fetchData = async () => {
             setLoadingData(true);
             try {
-                const [employeesData, companiesData] = await Promise.all([
-                    employeeService.getAllEmployees(),
-                    companyService.getAllCompanies(),
-                ]);
-                setEmployees(employeesData as unknown as Employee[]);
+                const companiesData = await companyService.getAllCompanies();
                 setCompanies(companiesData);
             } catch (error) {
                 console.error('Erro ao buscar dados:', error);
@@ -66,9 +65,11 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
         fetchData();
     }, []);
 
-    const selectedFunc = employees.find(f => f.id === form.funcionarioId);
+
+    const selectedFunc = selectedEmployeeData;
     const selectedEmp = companies.find(e => e.id === form.empresaId);
     const selectedDocType = documentTypes.find(t => t.id === form.documentTypeId);
+
 
     const handleGenerate = async (preview = false) => {
         if (!selectedFunc || !selectedEmp) {
@@ -82,8 +83,9 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                 companyId: selectedEmp.id,
                 reportTitle: selectedDocType?.label,
                 employeeName: selectedFunc.name,
-                employeeCpf: selectedFunc.cpf || selectedFunc.document || '',
-                employeePosition: (selectedFunc as any).position?.name || '',
+                employeeCpf: selectedFunc.document || '',
+                employeePosition: selectedFunc.positionName || '',
+
                 equipments: [
                     {
                         name: form.documentTypeId === 'CELULAR' ? 'Aparelho Celular' : 'Cartão Vale-Transporte',
@@ -190,17 +192,18 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
                             <Label className="text-seguranca-lightgray">Funcionário</Label>
-                            <Select value={form.funcionarioId} onValueChange={(val) => setForm(prev => ({ ...prev, funcionarioId: val }))}>
-                                <SelectTrigger className="bg-seguranca-black border-gray-700 text-white h-11">
-                                    <SelectValue placeholder="Selecione..." />
-                                </SelectTrigger>
-                                <SelectContent className="bg-seguranca-black border-gray-700 text-white">
-                                    {employees.map(f => (
-                                        <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <EmployeeCombobox
+                                value={form.funcionarioId}
+                                onChange={(val) => setForm(prev => ({ ...prev, funcionarioId: val }))}
+                                onEmployeeSelect={(emp) => {
+                                    setSelectedEmployeeData(emp);
+                                    if (emp.companyId) {
+                                        setForm(prev => ({ ...prev, empresaId: emp.companyId! }));
+                                    }
+                                }}
+                            />
                         </div>
+
 
                         <div className="space-y-2">
                             <Label className="text-seguranca-lightgray">Empresa</Label>

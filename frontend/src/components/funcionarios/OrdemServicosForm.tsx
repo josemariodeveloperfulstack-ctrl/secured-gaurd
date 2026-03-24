@@ -8,7 +8,9 @@ import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Calendar, Clock, MapPin, AlertTriangle, CheckCircle2, Loader2, Briefcase } from 'lucide-react';
-import { employeeService, Employee } from '@/services/employeeService';
+import { employeeService, Employee, SimpleEmployee } from '@/services/employeeService';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+
 import { companyService } from '@/services/companyService';
 import { clientService, Client } from '@/services/clientService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
@@ -41,11 +43,12 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
+
   const [clients, setClients] = useState<Client[]>([]);
 
-  const funcionario = employees.find(f => f.id === form.employeeId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
   const cliente = clients.find(c => c.id === form.clientId);
 
@@ -64,14 +67,13 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [employeesData, companiesData, clientsData] = await Promise.all([
-        employeeService.getAllEmployees(),
+      const [companiesData, clientsData] = await Promise.all([
         companyService.getAllCompanies(),
         clientService.getAllClients()
       ]);
-      setEmployees(employeesData);
       setCompanies(companiesData);
       setClients(clientsData);
+
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -310,19 +312,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                     ) : companies.length > 0 ? (
                       companies.map(e => (
                         <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                            )}
-                            {e.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(e.cnpj)}
-                              </span>
-                            )}
-                          </div>
+                          {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                         </SelectItem>
                       ))
                     ) : (
@@ -358,35 +348,17 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                     Executante principal desta ordem de serviço.
                   </span>
                 </Label>
-                <Select
+                <EmployeeCombobox
                   value={form.employeeId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
+                  onChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                   disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{f.name}</span>
-                            {(f.cpf || (f as any).document) && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    if (emp.companyId) {
+                      setForm(prev => ({ ...prev, companyId: emp.companyId! }));
+                    }
+                  }}
+                />
               </div>
 
               {funcionario && (
@@ -424,14 +396,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                     ) : clients.length > 0 ? (
                       clients.map(c => (
                         <SelectItem key={c.id} value={c.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{c.name}</span>
-                            {c.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(c.cnpj)}
-                              </span>
-                            )}
-                          </div>
+                          {c.name}
                         </SelectItem>
                       ))
                     ) : (

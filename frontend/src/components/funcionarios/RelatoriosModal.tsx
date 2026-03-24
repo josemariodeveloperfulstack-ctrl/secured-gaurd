@@ -87,6 +87,8 @@ const REPORT_COLUMNS: { key: string; label: string }[] = [
     { key: 'nationality', label: 'Nacionalidade' },
     { key: 'motherName', label: 'Nome Mãe' },
     { key: 'fatherName', label: 'Nome Pai' },
+    { key: 'escalaTrabalho', label: 'Escala' },
+    { key: 'horarioTrabalho', label: 'Horário' },
 ];
 
 const DEFAULT_PDF_COLUMNS = ['name', 'registrationNumber', 'position', 'workPost', 'company', 'status'];
@@ -465,6 +467,8 @@ export function RelatoriosModal({
                 if (columnsToUse.includes('nationality')) row['Nacionalidade'] = emp.nationality || '';
                 if (columnsToUse.includes('motherName')) row['Nome Mãe'] = emp.motherName || emp.nomeMae || '';
                 if (columnsToUse.includes('fatherName')) row['Nome Pai'] = emp.fatherName || emp.nomePai || '';
+                if (columnsToUse.includes('escalaTrabalho')) row['Escala'] = emp.escalaTrabalho || '';
+                if (columnsToUse.includes('horarioTrabalho')) row['Horário'] = emp.horarioTrabalho || '';
 
                 return row;
             }, 100);

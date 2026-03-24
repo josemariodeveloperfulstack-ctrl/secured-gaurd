@@ -60,12 +60,24 @@ const Login = () => {
   // Usar um pequeno delay para evitar conflito com o login em andamento
   useEffect(() => {
     const timer = setTimeout(() => {
-      console.log('🔍 Login useEffect - user check:', { user: !!user, loading, userRole: user?.role });
-      if (user && !loading) {
-        console.log('🔍 User already logged in, redirecting to dashboard');
+      // Verificar se o usuário está realmente "completo" antes de redirecionar
+      const isUserValid = user && user.id && user.role && user.role !== 'COLABORADOR' || (user?.role === 'COLABORADOR');
+      
+      console.log('🔍 Login useEffect - user check:', { 
+        user: !!user, 
+        loading, 
+        userRole: user?.role,
+        hasId: !!user?.id,
+        isUserValid 
+      });
+
+      if (user && !loading && isUserValid) {
+        console.log('🔍 Valid user found, redirecting to dashboard');
         navigate('/dashboard');
+      } else if (user && !isUserValid) {
+        console.warn('⚠️ User state exists but is incomplete/invalid. Staying on login.');
       }
-    }, 200);
+    }, 300); // Aumentado para 300ms para garantir que AuthContext estabilizou
 
     return () => clearTimeout(timer);
   }, [user, navigate, loading]);

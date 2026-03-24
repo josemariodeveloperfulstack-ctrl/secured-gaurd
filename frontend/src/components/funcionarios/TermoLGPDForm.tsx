@@ -9,9 +9,12 @@ import { Checkbox } from '../ui/checkbox';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { useToast } from '../../hooks/use-toast';
-import { FileText, Download, Printer, Eye, User, Building, Calendar, FileCheck, CheckCircle2, Loader2, Shield } from 'lucide-react';
-import { employeeService } from '@/services/employeeService';
+import { Download, Eye, User, Building, FileCheck, CheckCircle2, Loader2, Shield } from 'lucide-react';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+
+
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 import api from '@/lib/axios';
@@ -36,8 +39,9 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
+
 
   useEffect(() => {
     setFormData(prev => ({
@@ -51,11 +55,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [employeesData, companiesData] = await Promise.all([
-          employeeService.getAllEmployees(),
-          companyService.getAllCompanies(),
-        ]);
-        setEmployees(employeesData as unknown as Employee[]);
+        const companiesData = await companyService.getAllCompanies();
         setCompanies(companiesData);
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
@@ -72,8 +72,9 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
     fetchData();
   }, []);
 
-  const funcionario = employees.find(f => f.id === formData.funcionarioId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === formData.empresaId);
+
 
   const consentOptions = [
     { id: 'data_processing', label: 'Processamento de Dados Pessoais' },
@@ -104,20 +105,17 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
     setLoading(true);
     try {
-      const addressValue = typeof funcionario.address === 'string'
-        ? funcionario.address
-        : funcionario.address
-          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
-          : '';
+      const addressValue = funcionario.address || '';
 
       const payload = {
         companyId: empresa.id,
         employeeId: funcionario.id,
         employeeName: funcionario.name,
-        employeeCpf: funcionario.cpf || funcionario.document || '',
-        employeePosition: funcionario.position?.name,
-        employeeDepartment: funcionario.unit?.name || funcionario.position?.name,
+        employeeCpf: funcionario.cpf || (funcionario as any).document || '',
+        employeePosition: (funcionario as any).positionName || (funcionario as any).position?.name || '',
+        employeeDepartment: (funcionario as any).unitName || (funcionario as any).unit?.name || (funcionario as any).positionName || '',
         employeeAddress: addressValue,
+
         consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
         dataUsagePurpose: formData.dataUsage,
         retentionPeriod: formData.dataRetention,
@@ -169,20 +167,17 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
     setLoading(true);
     try {
-      const addressValue = typeof funcionario.address === 'string'
-        ? funcionario.address
-        : funcionario.address
-          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
-          : '';
+      const addressValue = funcionario.address || '';
 
       const payload = {
         companyId: empresa.id,
         employeeId: funcionario.id,
         employeeName: funcionario.name,
-        employeeCpf: funcionario.cpf || funcionario.document || '',
-        employeePosition: funcionario.position?.name,
-        employeeDepartment: funcionario.unit?.name || funcionario.position?.name,
+        employeeCpf: funcionario.cpf || (funcionario as any).document || '',
+        employeePosition: (funcionario as any).positionName || (funcionario as any).position?.name || '',
+        employeeDepartment: (funcionario as any).unitName || (funcionario as any).unit?.name || (funcionario as any).positionName || '',
         employeeAddress: addressValue,
+
         consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
         dataUsagePurpose: formData.dataUsage,
         retentionPeriod: formData.dataRetention,
@@ -252,35 +247,18 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                     Selecione o titular dos dados pessoais.
                   </span>
                 </Label>
-                <Select
+                <EmployeeCombobox
                   value={formData.funcionarioId}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, funcionarioId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{f.name}</span>
-                            {(f.cpf || f.document) && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setFormData(prev => ({ ...prev, funcionarioId: value }))}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    setFormData(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
+                      empresaId: emp.companyId || prev.empresaId
+                    }));
+                  }}
+                />
               </div>
 
               {funcionario && (
@@ -318,19 +296,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                     ) : companies.length > 0 ? (
                       companies.map(e => (
                         <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                            )}
-                            {e.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(e.cnpj)}
-                              </span>
-                            )}
-                          </div>
+                          {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                         </SelectItem>
                       ))
                     ) : (
@@ -391,15 +357,16 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.position?.name || '-'}
+                        {(funcionario as any).positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Departamento</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.unit?.name || funcionario.position?.name || '-'}
+                        {(funcionario as any).unitName || (funcionario as any).unit?.name || (funcionario as any).positionName || '-'}
                       </div>
                     </div>
+
                   </div>
                 </div>
               </div>

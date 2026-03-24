@@ -15,7 +15,8 @@ import ModelosDocumentosForm from './ModelosDocumentosForm';
 import TermoResponsabilidadeEspecificoForm from './TermoResponsabilidadeEspecificoForm';
 import NppsForm from './NppsForm';
 import FichaEntregaEPIManualForm from './FichaEntregaEPIManualForm';
-import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard } from 'lucide-react';
+import RelatorioMovimentacaoForm from './RelatorioMovimentacaoForm';
+import { FileText, Shield, FileSignature, FileCheck, UserX, File, CreditCard, ArrowRightLeft } from 'lucide-react';
 
 const tipos = [
   { key: 'modelos', label: 'Modelos de Documentos', icon: FileText, shortLabel: 'Modelos' },
@@ -31,6 +32,7 @@ const tipos = [
   { key: 'advertencia', label: 'Advertência Disciplinar', icon: UserX, shortLabel: 'Advertência' },
   { key: 'declaracao', label: 'Declaração', icon: FileCheck, shortLabel: 'Declaração' },
   { key: 'termo-ciencia', label: 'Termo de Ciência do Prestador de Serviços', icon: File, shortLabel: 'Termo Ciência' },
+  { key: 'movimentacao', label: 'Relatório de Movimentação do Funcionário', icon: ArrowRightLeft, shortLabel: 'Movimentação' },
 ];
 
 interface DocumentosGerarTabProps {
@@ -124,6 +126,7 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({ employeeId: pro
         {tipo === 'advertencia' && <AdvertenciaDisciplinarForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'declaracao' && <DeclaracaoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'termo-ciencia' && <TermoCienciaPrestadorForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'movimentacao' && <RelatorioMovimentacaoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
       </div>
     </div>
   );

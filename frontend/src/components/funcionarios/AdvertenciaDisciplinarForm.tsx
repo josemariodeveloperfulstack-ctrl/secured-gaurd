@@ -13,8 +13,10 @@ import { companyService } from '@/services/companyService';
 import { documentService } from '@/services/documentService';
 import api from '@/lib/axios';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
-import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import { SimpleEmployee } from '@/services/employeeService';
+
 import {
   Dialog,
   DialogContent,
@@ -40,8 +42,9 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     dataEmissao: new Date().toISOString().split('T')[0],
   });
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
+
   const [loadingData, setLoadingData] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -59,13 +62,10 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [employeesData, companiesData] = await Promise.all([
-          employeeService.getAllEmployees(),
-          companyService.getAllCompanies(),
-        ]);
-        setEmployees(employeesData as unknown as Employee[]);
+        const companiesData = await companyService.getAllCompanies();
         setCompanies(companiesData);
       } catch (error) {
+
         console.error('Erro ao buscar dados:', error);
       } finally {
         setLoadingData(false);
@@ -75,8 +75,9 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     fetchData();
   }, []);
 
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
+
 
   const motivosAdvertencia = [
     'Falta sem justificativa',
@@ -242,35 +243,18 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                       Colaborador que receberá a advertência.
                     </span>
                   </Label>
-                  <Select
+                  <EmployeeCombobox
                     value={form.funcionarioId}
-                    onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                    disabled={loadingData}
-                  >
-                    <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-red-500/30 focus:border-red-500/70 [&>span]:text-left [&>span]:truncate">
-                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                      {loadingData ? (
-                        <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                      ) : employees.length > 0 ? (
-                        employees.map(f => (
-                          <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium text-sm normal-case">{f.name}</span>
-                              {(f.cpf || (f as any).document) && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                    onEmployeeSelect={(emp) => {
+                      setSelectedEmployeeData(emp);
+                      setForm(prev => ({
+                        ...prev,
+                        funcionarioId: emp.id,
+                        empresaId: emp.companyId || prev.empresaId
+                      }));
+                    }}
+                  />
                 </div>
 
                 {funcionario && (
@@ -308,19 +292,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                       ) : companies.length > 0 ? (
                         companies.map(e => (
                           <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium text-sm normal-case">
-                                {e.sigla || e.tradeName || e.name}
-                              </span>
-                              {(e.sigla || e.tradeName) && e.name && (
-                                <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                              )}
-                              {e.cnpj && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  CNPJ: {formatCNPJ(e.cnpj)}
-                                </span>
-                              )}
-                            </div>
+                            {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                           </SelectItem>
                         ))
                       ) : (

@@ -11,10 +11,10 @@ import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Calendar, MapPin, Shield, CheckCircle2, Loader2, Building, Info } from 'lucide-react';
 import { termoCienciaPrestadorGenerator } from '@/utils/termoCienciaPrestadorGenerator';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
-import { employeeService } from '@/services/employeeService';
-import { companyService } from '@/services/companyService';
-import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import { SimpleEmployee } from '@/services/employeeService';
+
 
 interface TermoCienciaPrestadorFormProps {
   employeeId?: string;
@@ -32,8 +32,9 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
     observacoes: '',
   });
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
+
   const [loadingData, setLoadingData] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -49,13 +50,10 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [employeesData, companiesData] = await Promise.all([
-          employeeService.getAllEmployees(),
-          companyService.getAllCompanies(),
-        ]);
-        setEmployees(employeesData as unknown as Employee[]);
+        const companiesData = await companyService.getAllCompanies();
         setCompanies(companiesData);
       } catch (error) {
+
         console.error('Erro ao buscar dados:', error);
       } finally {
         setLoadingData(false);
@@ -65,8 +63,9 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
     fetchData();
   }, []);
 
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
+
 
   const formatDateToBrazilian = (dateString?: string) => {
     if (!dateString) return '';
@@ -198,35 +197,18 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
                     Pessoa física responsável pela prestação de serviços.
                   </span>
                 </Label>
-                <Select
+                <EmployeeCombobox
                   value={form.funcionarioId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o prestador"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando prestadores...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{f.name}</span>
-                            {(f.cpf || (f as any).document) && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum prestador encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    setForm(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
+                      empresaId: emp.companyId || prev.empresaId
+                    }));
+                  }}
+                />
               </div>
 
               {funcionario && (
@@ -264,19 +246,7 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
                     ) : companies.length > 0 ? (
                       companies.map(e => (
                         <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                            )}
-                            {e.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(e.cnpj)}
-                              </span>
-                            )}
-                          </div>
+                          {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                         </SelectItem>
                       ))
                     ) : (

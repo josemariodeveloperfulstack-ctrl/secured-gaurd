@@ -7,11 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, User, Building, Calendar, MapPin, Phone, Mail, Shield, Settings, Monitor, Smartphone, Radio, Car, Motorcycle, Loader2, CheckCircle2 } from 'lucide-react';
-import { employeeService } from '@/services/employeeService';
+import { FileText, Download, Eye, User, Building, Calendar, MapPin, Phone, Mail, Shield, Settings, Monitor, Smartphone, Radio, Car, Loader2, CheckCircle2 } from 'lucide-react';
+
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
+import { EmployeeCombobox } from '../ui/employee-combobox';
 import api from '@/lib/axios';
+
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
@@ -62,14 +65,17 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
   });
 
   const [loading, setLoading] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
+  const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
+
   // 2. Memoized values (computed from state)
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
-  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
+  const responsavel = selectedResponsibleData;
+
 
   const estadosEquipamento = [
     'Novo',
@@ -93,11 +99,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [employeesData, companiesData] = await Promise.all([
-          employeeService.getAllEmployees(),
-          companyService.getAllCompanies(),
-        ]);
-        setEmployees(employeesData as unknown as Employee[]);
+        const companiesData = await companyService.getAllCompanies();
         setCompanies(companiesData);
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
@@ -261,35 +263,18 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                     Colaborador responsável pelo equipamento.
                   </span>
                 </Label>
-                <Select
+                <EmployeeCombobox
                   value={form.funcionarioId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{f.name}</span>
-                            {(f.cpf || f.document) && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CPF: {formatCPF(f.cpf || f.document || '')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    setForm(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
+                      empresaId: emp.companyId || prev.empresaId
+                    }));
+                  }}
+                />
               </div>
 
               {funcionario && (
@@ -327,19 +312,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                     ) : companies.length > 0 ? (
                       companies.map(e => (
                         <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                            )}
-                            {e.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(e.cnpj)}
-                              </span>
-                            )}
-                          </div>
+                          {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                         </SelectItem>
                       ))
                     ) : (
@@ -400,25 +373,22 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.position?.name || '-'}
+                        {(funcionario as any).positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor (Posto de Trabalho)</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.unit?.name || '-'}
+                        {(funcionario as any).unitName || (funcionario as any).unit?.name || '-'}
                       </div>
                     </div>
                   </div>
 
+
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {typeof funcionario.address === 'string'
-                        ? funcionario.address
-                        : funcionario.address
-                          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
-                          : '-'}
+                      {funcionario.address || '-'}
                     </div>
                   </div>
                 </div>
@@ -460,13 +430,14 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {empresa.address && empresa.address.street
-                        ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
+                      {empresa.address && typeof empresa.address !== 'string' && (empresa.address as any).street
+                        ? [(empresa.address as any).street, (empresa.address as any).number, (empresa.address as any).neighborhood, (empresa.address as any).city]
                           .filter(Boolean)
                           .join(', ')
-                        : '-'}
+                        : typeof empresa.address === 'string' ? empresa.address : '-'}
                     </div>
                   </div>
+
                 </div>
               </div>
             )}
@@ -584,33 +555,12 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
 
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pela Entrega</Label>
-                <Select
+                <EmployeeCombobox
                   value={form.responsavelEntregaId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o responsável"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{f.name}</span>
-                            {(f.cpf || f.document) && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.cpf || f.document}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
+                  onEmployeeSelect={(emp) => setSelectedResponsibleData(emp)}
+                  placeholder="Selecione o responsável"
+                />
               </div>
             </div>
 

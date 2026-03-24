@@ -43,6 +43,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
 import { History, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface FuncionarioEditModalProps {
   open: boolean;
@@ -1853,28 +1854,17 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Empresa</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Select
-                              value={(form as any).company?.id || selectedCompany?.id || 'none'}
-                              onValueChange={handleCompanySelect}
-                            >
-                              <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                                <SelectValue placeholder="Selecione uma empresa" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                                <SelectItem value="none" className="hover:bg-gray-700">
-                                  <span className="text-gray-400">Nenhuma empresa</span>
-                                </SelectItem>
-                                {companies.map((company) => (
-                                  <SelectItem
-                                    key={company.id}
-                                    value={company.id}
-                                    className="hover:bg-gray-700"
-                                  >
-                                    {company.sigla ? `${company.sigla.toUpperCase()} - ${company.name}` : company.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                              options={companies.map(c => ({
+                                value: String(c.id),
+                                label: c.sigla ? `${c.sigla.toUpperCase()} - ${c.name}` : c.name,
+                                description: c.cnpj || ''
+                              }))}
+                              value={(form as any).company?.id || selectedCompany?.id || ''}
+                              onChange={handleCompanySelect}
+                              placeholder="Selecione uma empresa"
+                              emptyMessage="Nenhuma empresa encontrada"
+                            />
           </div>
                           <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
@@ -3220,45 +3210,20 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                           <div className="relative">
                             <div className="flex gap-2">
                               <div className="relative flex-1">
-                                <Input
-                                  type="text"
-                                  value={positionSearchTerm}
-                                  onChange={(e) => setPositionSearchTerm(e.target.value)}
-                                  onFocus={handlePositionInputFocus}
-                                  onBlur={handlePositionInputBlur}
-                                  placeholder="Digite para buscar cargo..."
-                                  className="pr-10 bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                                <SearchableSelect
+                                  options={positions.map(p => ({
+                                    value: String(p.id),
+                                    label: p.name,
+                                    description: p.description || ''
+                                  }))}
+                                  value={form.position?.id ? String(form.position.id) : ''}
+                                  onChange={(val) => {
+                                    const cargo = positions.find(p => String(p.id) === val);
+                                    if (cargo) handlePositionSelect(cargo);
+                                  }}
+                                  placeholder="Selecione o cargo"
+                                  emptyPlaceholder="Nenhum cargo encontrado"
                                 />
-                                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-
-                                {/* Dropdown de cargos */}
-                                {showPositionDropdown && (
-                                  <div className="absolute z-50 w-full mt-1 bg-seguranca-graphite border border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                                    {filteredPositions.length > 0 ? (
-                                      filteredPositions.map((position) => (
-                                        <div
-                                          key={position.id}
-                                          className="px-3 py-2 hover:bg-gray-700 cursor-pointer flex items-center text-seguranca-lightgray"
-                                          onClick={() => handlePositionSelect(position)}
-                                        >
-                                          <Briefcase className="mr-2 text-seguranca-yellow" size={16} />
-                                          <div className="flex-1">
-                                            <div className="font-medium text-sm sm:text-base text-gray-200">{position.name}</div>
-                                            {position.description && (
-                                              <div className="text-xs text-gray-400">
-                                                {position.description}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="px-3 py-2 text-gray-400 text-sm">
-                                        Nenhum cargo encontrado
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                               <Button
                                 type="button"
@@ -3597,45 +3562,34 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">Departamento</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                <Select 
-                  value={(form as any).departmentId || ''}
-                  onValueChange={(value) => setForm(prev => ({ ...(prev as any), departmentId: value }))}
-                >
-                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                    <SelectValue placeholder="Selecione um departamento" />
-                  </SelectTrigger>
-                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                              {departments.map((d) => (
-                                <SelectItem key={d.id} value={d.id} className="hover:bg-gray-700">
-                                  {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                            <SearchableSelect
+                              options={departments.map(d => ({
+                                value: String(d.id),
+                                label: d.name,
+                                description: d.code ? `Código: ${d.code}` : ''
+                              }))}
+                              value={(form as any).departmentId || ''}
+                              onChange={(val) => setForm(prev => ({ ...(prev as any), departmentId: val }))}
+                              placeholder="Selecione o departamento"
+                              emptyMessage="Nenhum departamento encontrado"
+                            />
               </div>
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                             <span className="truncate">Unidade</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                <Select 
-                  value={form.unit?.id || ''} 
-                  onValueChange={(value) => handleSelectChange('unit', value)}
-                >
-                            <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                    <SelectValue placeholder="Selecione uma unidade" />
-                  </SelectTrigger>
-                            <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                    {units.map((unit) => (
-                                <SelectItem key={unit.id} value={unit.id} className="hover:bg-gray-700">
-                        <div className="flex items-center">
-                                    <Building className="mr-2 text-seguranca-yellow" size={16} />
-                          {unit.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                            <SearchableSelect
+                              options={units.map(u => ({
+                                value: String(u.id),
+                                label: u.name,
+                                description: u.sigla || u.code || ''
+                              }))}
+                              value={form.unit?.id || ''}
+                              onChange={(val) => handleSelectChange('unit', val)}
+                              placeholder="Selecione a unidade"
+                              emptyMessage="Nenhuma unidade encontrada"
+                            />
               </div>
                       </div>
                     </div>
