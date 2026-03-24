@@ -861,12 +861,23 @@ public class EmployeeService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<EmployeeDTO> findAllByIdsAsDTOs(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<UUID> distinctIds = ids.stream().distinct().toList();
+        // O repositório agora usa JOIN FETCH para carregar relacionamentos em uma única consulta
+        java.util.Set<Employee> employees = employeeRepository.findAllByIdIn(distinctIds);
+        return employees.stream().map(this::toDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<Employee> findAllByIds(List<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             return java.util.Collections.emptyList();
         }
         List<UUID> distinctIds = ids.stream().distinct().toList();
-        // Usando Set no repositório para evitar erro de duplicidade no Hibernate 6
         java.util.Set<Employee> employees = employeeRepository.findAllByIdIn(distinctIds);
         return new java.util.ArrayList<>(employees);
     }

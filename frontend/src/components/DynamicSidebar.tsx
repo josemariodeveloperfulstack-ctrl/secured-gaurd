@@ -82,6 +82,18 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'mensagens',
     'chat-interno',
   ]),
+  ALMOXARIFADO: new Set([
+    'dashboard',
+    'compras',
+    'compras-solicitacoes',
+    'compras-aprovacoes',
+    'compras-cotacoes',
+    'compras-relatorios',
+    'estoque',
+    'estoque-simplificado',
+    'mensagens',
+    'chat-interno',
+  ]),
 };
 
 export function DynamicSidebar() {

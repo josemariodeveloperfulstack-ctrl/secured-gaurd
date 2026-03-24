@@ -23,6 +23,7 @@ export const USER_ROLE_LIST: UserRole[] = [
   'ESTOQUE',
   'SUPRIMENTOS',
   'COMPRAS',
+  'ALMOXARIFADO',
 ];
 
 // Função para gerar permissões baseadas no role principal
@@ -1087,6 +1088,14 @@ export const PERMISSION_TRANSLATIONS: Record<keyof UserPermissions, string> = {
   PAYROLL_CREATE: 'Gerar Folha',
   PAYROLL_MANAGE: 'Gerenciar Folha',
 
+  // Gestão Patrimonial
+  PATRIMONIAL_READ: 'Visualizar Gestão Patrimonial',
+  PATRIMONIAL_WRITE: 'Editar Gestão Patrimonial',
+
+  // Módulo Fiscal
+  FISCAL_READ: 'Visualizar Módulo Fiscal',
+  FISCAL_WRITE: 'Editar Módulo Fiscal',
+
   // Outros
   ALL_PERMISSIONS: 'Acesso Total (Admin)',
   ASSISTENTE_ADMINISTRATIVO: 'Assistente Administrativo (Permissão)'
@@ -1252,6 +1261,14 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     PAYROLL_CREATE: false,
     PAYROLL_MANAGE: false,
 
+    // Gestão Patrimonial
+    PATRIMONIAL_READ: false,
+    PATRIMONIAL_WRITE: false,
+
+    // Módulo Fiscal
+    FISCAL_READ: false,
+    FISCAL_WRITE: false,
+
     // Permissão de Acesso Total
     ALL_PERMISSIONS: false,
   };
@@ -1330,6 +1347,10 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     'PAYROLL_READ': 'PAYROLL_READ',
     'PAYROLL_CREATE': 'PAYROLL_CREATE',
     'PAYROLL_MANAGE': 'PAYROLL_MANAGE',
+    'PATRIMONIAL_READ': 'PATRIMONIAL_READ',
+    'PATRIMONIAL_WRITE': 'PATRIMONIAL_WRITE',
+    'FISCAL_READ': 'FISCAL_READ',
+    'FISCAL_WRITE': 'FISCAL_WRITE',
     'DASHBOARD_READ': 'DASHBOARD_READ',
     'DASHBOARD_WRITE': 'DASHBOARD_WRITE',
     'COMMERCIAL_DASHBOARD_READ': 'COMMERCIAL_DASHBOARD_READ',
@@ -1474,6 +1495,7 @@ export const getRoleDisplayName = (role: UserRole): string => {
     COMPRAS: 'Compras',
     GESTOR_COMERCIAL: 'Gestor Comercial',
     ASSISTENTE_COMERCIAL: 'Assistente Comercial',
+    ALMOXARIFADO: 'Almoxarifado',
   };
   return roleNames[role] || role;
 };
@@ -1505,6 +1527,7 @@ export const getRoleColor = (role: UserRole): string => {
     COMPRAS: 'bg-violet-100 text-violet-800',
     GESTOR_COMERCIAL: 'bg-teal-100 text-teal-800',
     ASSISTENTE_COMERCIAL: 'bg-indigo-50 text-indigo-700',
+    ALMOXARIFADO: 'bg-indigo-100 text-indigo-800',
   };
   return roleColors[role] || 'bg-gray-100 text-gray-800';
 };

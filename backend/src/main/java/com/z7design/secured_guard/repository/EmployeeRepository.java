@@ -47,9 +47,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         @Query("SELECT e.id FROM Employee e")
         List<UUID> findAllIds();
 
-        // Busca customizada com DISTINCT para evitar erro de duplicidade no Hibernate 6
-        // Usamos Set para garantir que o Hibernate deduplique os resultados em memória se necessário
-        @Query("SELECT DISTINCT e FROM Employee e WHERE e.id IN :ids")
+        // Busca customizada com FETCH JOIN para carregar relacionamentos essenciais em uma única consulta
+        // Evita N+1 e garante que LazyInitializationException não ocorra durante a exportação
+        @Query("SELECT DISTINCT e FROM Employee e " +
+                        "LEFT JOIN FETCH e.position " +
+                        "LEFT JOIN FETCH e.unit " +
+                        "LEFT JOIN FETCH e.company " +
+                        "LEFT JOIN FETCH e.workPost " +
+                        "LEFT JOIN FETCH e.department " +
+                        "WHERE e.id IN :ids")
         java.util.Set<Employee> findAllByIdIn(@Param("ids") List<UUID> ids);
 
         @Query("SELECT DISTINCT e FROM Employee e")

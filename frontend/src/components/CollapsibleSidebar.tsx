@@ -499,6 +499,20 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'chat-interno',
     'mensagens',
   ]),
+  ALMOXARIFADO: new Set([
+    'dashboard',
+    'estoque-simplificado',
+    'estoque-relatorios',
+    'estoque-alertas',
+    'estoque-fornecedores',
+    'compras',
+    'compras-solicitacoes',
+    'compras-aprovacoes',
+    'compras-cotacoes',
+    'compras-relatorios',
+    'chat-interno',
+    'mensagens',
+  ]),
 };
 
 // Roles que NÃO devem ver módulos Financeiro ou Fiscal

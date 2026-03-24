@@ -814,8 +814,7 @@ public class EmployeeController {
                 return ResponseEntity.ok(java.util.Collections.emptyList());
             }
             List<UUID> uuids = ids.stream().map(UUID::fromString).toList();
-            List<Employee> employees = employeeService.findAllByIds(uuids);
-            List<EmployeeDTO> dtos = employees.stream().map(employeeService::toDTO).toList();
+            List<EmployeeDTO> dtos = employeeService.findAllByIdsAsDTOs(uuids);
             return ResponseEntity.ok(dtos);
         } catch (Exception e) {
             System.err.println("❌ EmployeeController.getFullDataForExport - Erro: " + e.getMessage());
