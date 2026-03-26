@@ -105,11 +105,17 @@ public class PermissionService {
             Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
         )));
 
-        // ESTOQUE - Consulta e relatórios de estoque
+        // ESTOQUE - Consulta e relatórios de estoque e suprimentos
         rolePermissions.put(UserRole.ESTOQUE, new HashSet<>(Arrays.asList(
             Permission.STOCK_READ,
             Permission.INVENTORY_READ, Permission.INVENTORY_MOVEMENTS_READ,
             Permission.PRODUCTS_READ,
+            Permission.PURCHASE_REQUESTS_READ,
+            Permission.EQUIPMENTS_READ,
+            Permission.COMPANIES_READ,
+            Permission.DEPARTMENTS_READ,
+            Permission.GROUPS_READ,
+            Permission.TIME_RECORDS_READ,
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE
         )));
