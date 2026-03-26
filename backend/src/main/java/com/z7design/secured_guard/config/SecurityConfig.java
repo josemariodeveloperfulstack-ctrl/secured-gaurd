@@ -298,7 +298,8 @@ public class SecurityConfig {
                                                                 "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ASSISTENTE_ADMINISTRATIVO")
+                                                                "ASSISTENTE_ADMINISTRATIVO", "ROLE_ANALISTA_SUPRIMENTOS",
+                                                                "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de compras - requerem permissões financeiras ou de estoque
                                                 .requestMatchers("/api/purchases/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
@@ -306,7 +307,8 @@ public class SecurityConfig {
                                                                 "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ASSISTENTE_ADMINISTRATIVO")
+                                                                "ASSISTENTE_ADMINISTRATIVO", "ROLE_ANALISTA_SUPRIMENTOS",
+                                                                "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de propostas e leads - requerem permissões comerciais
                                                 .requestMatchers("/api/leads/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
