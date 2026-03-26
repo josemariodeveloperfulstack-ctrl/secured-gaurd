@@ -6,6 +6,7 @@ import com.z7design.secured_guard.model.PurchaseRequest;
 import com.z7design.secured_guard.model.PurchaseRequestItem;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.Unit;
+import com.z7design.secured_guard.repository.PurchaseQuotationRepository;
 import com.z7design.secured_guard.repository.PurchaseRequestRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 public class PurchaseRequestService {
     
     private final PurchaseRequestRepository purchaseRequestRepository;
+    private final PurchaseQuotationRepository purchaseQuotationRepository;
     private final UserRepository userRepository;
     private final UnitRepository unitRepository;
     
@@ -74,6 +76,8 @@ public class PurchaseRequestService {
     
     @Transactional
     public void deletePurchaseRequest(UUID id) {
+        // Excluir as cotações associadas antes de excluir a solicitação para evitar o erro 409 (Foreign Key Constraint)
+        purchaseQuotationRepository.deleteByPurchaseRequestId(id);
         purchaseRequestRepository.deleteById(id);
     }
     

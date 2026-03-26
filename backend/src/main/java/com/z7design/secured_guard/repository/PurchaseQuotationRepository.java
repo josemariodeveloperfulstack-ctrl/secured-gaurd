@@ -47,6 +47,8 @@ public interface PurchaseQuotationRepository extends JpaRepository<PurchaseQuota
     List<PurchaseQuotation> searchQuotations(@Param("term") String term);
     
     long countByStatus(PurchaseQuotationStatus status);
+    
+    void deleteByPurchaseRequestId(UUID purchaseRequestId);
 }
 
 
