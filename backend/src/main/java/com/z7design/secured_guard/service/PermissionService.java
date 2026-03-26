@@ -133,6 +133,16 @@ public class PermissionService {
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE
         )));
+
+        // ALMOXARIFADO - Gestão completa de armazém e materiais
+        rolePermissions.put(UserRole.ALMOXARIFADO, new HashSet<>(Arrays.asList(
+            Permission.STOCK_READ, Permission.STOCK_WRITE, Permission.STOCK_CREATE,
+            Permission.INVENTORY_READ, Permission.INVENTORY_WRITE, Permission.INVENTORY_MOVEMENTS_READ, Permission.INVENTORY_MOVEMENTS_CREATE,
+            Permission.PRODUCTS_READ, Permission.PRODUCTS_WRITE,
+            Permission.EQUIPMENTS_READ, Permission.EQUIPMENTS_WRITE, Permission.EQUIPMENTS_CREATE, Permission.EQUIPMENTS_ASSIGN,
+            Permission.DASHBOARD_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE
+        )));
     }
 
     public Set<Permission> getPermissionsForRole(UserRole role) {
