@@ -278,7 +278,7 @@ public class SecurityConfig {
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_OPERATIONAL_SUPERVISOR",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS",
-                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS")
+                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de requisições de compras - requerem permissões financeiras
                                                 // ou administrativas
                                                 .requestMatchers("/api/purchase-requests", "/api/purchase-requests/**")
@@ -289,7 +289,7 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ASSISTENTE_ADMINISTRATIVO",
                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS",
-                                                                "ROLE_SUPRIMENTOS", "ROLE_COMPRAS")
+                                                                "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de cotações de compras - requerem permissões financeiras ou
                                                 // administrativas
                                                 .requestMatchers("/api/purchase-quotations/**")
@@ -347,7 +347,7 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO", "FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE",
                                                                 "FINANCIAL_DELETE", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 .requestMatchers("/api/patrimonial/**")
                                                 .hasAnyAuthority("PATRIMONIAL_READ", "PATRIMONIAL_WRITE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
@@ -436,7 +436,7 @@ public class SecurityConfig {
                                                                 "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de chat - permitir para todos os roles principais,
                                                 // incluindo
                                                 // Departamento Pessoal
@@ -505,7 +505,7 @@ public class SecurityConfig {
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
-                                                                "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR")
+                                                                "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de funcionários, unidades, empresas e cargos - requerem
                                                 // permissões de RH, admin ou financeiro (empresas usadas em Contas a Pagar)
                                                 .requestMatchers("/api/employees/**", "/api/units/**",
@@ -519,7 +519,7 @@ public class SecurityConfig {
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR",
                                                                 "COMERCIAL", "ROLE_COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de clientes - temporariamente públicos para debug
                                                 .requestMatchers("/api/clients/**").permitAll()
                                                 // Endpoints de documentos - temporariamente públicos para debug
@@ -595,7 +595,7 @@ public class SecurityConfig {
                                                                 "STOCK_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "SUPER_ADMIN", "ADMIN",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
-                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS")
+                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de modelos de documentos - temporariamente público para
                                                 // teste
                                                 .requestMatchers("/api/modelos-documentos/**").permitAll()

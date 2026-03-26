@@ -113,7 +113,6 @@ public class PermissionService {
             Permission.PURCHASE_REQUESTS_READ,
             Permission.EQUIPMENTS_READ,
             Permission.COMPANIES_READ,
-            Permission.DEPARTMENTS_READ,
             Permission.GROUPS_READ,
             Permission.TIME_RECORDS_READ,
             Permission.DASHBOARD_READ,

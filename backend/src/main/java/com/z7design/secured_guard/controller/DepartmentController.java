@@ -37,14 +37,14 @@ public class DepartmentController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
     @Operation(summary = "Criar departamento")
     public ResponseEntity<Department> create(@RequestBody Department department) {
         return ResponseEntity.ok(departmentService.create(department));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
     @Operation(summary = "Atualizar departamento")
     public ResponseEntity<Department> update(@PathVariable UUID id, @RequestBody Department department) {
         return ResponseEntity.ok(departmentService.update(id, department));

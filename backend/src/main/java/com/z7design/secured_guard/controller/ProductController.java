@@ -21,6 +21,7 @@ public class ProductController {
     private final ProductService productService;
     
     @GetMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS', 'ANALISTA_SUPRIMENTOS', 'GESTOR', 'SUPERVISOR')")
     public ResponseEntity<List<ProductDTO>> getAllProducts() {
         log.info("Buscando todos os produtos");
         List<ProductDTO> products = productService.getAllProducts();
@@ -28,6 +29,7 @@ public class ProductController {
     }
     
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS', 'ANALISTA_SUPRIMENTOS', 'GESTOR', 'SUPERVISOR')")
     public ResponseEntity<ProductDTO> getProductById(@PathVariable UUID id) {
         log.info("Buscando produto com ID: {}", id);
         return productService.getProductById(id)
@@ -36,6 +38,7 @@ public class ProductController {
     }
     
     @PostMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS', 'ANALISTA_SUPRIMENTOS')")
     public ResponseEntity<ProductDTO> createProduct(@RequestBody ProductDTO productDTO) {
         log.info("Criando novo produto: {}", productDTO.getName());
         ProductDTO createdProduct = productService.createProduct(productDTO);
@@ -43,6 +46,7 @@ public class ProductController {
     }
     
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS', 'ANALISTA_SUPRIMENTOS')")
     public ResponseEntity<ProductDTO> updateProduct(@PathVariable UUID id, @RequestBody ProductDTO productDTO) {
         log.info("Atualizando produto com ID: {}", id);
         try {
@@ -54,6 +58,7 @@ public class ProductController {
     }
     
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<Void> deleteProduct(@PathVariable UUID id) {
         log.info("Deletando produto com ID: {}", id);
         productService.deleteProduct(id);
@@ -82,6 +87,7 @@ public class ProductController {
     }
     
     @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS', 'ANALISTA_SUPRIMENTOS', 'GESTOR', 'SUPERVISOR')")
     public ResponseEntity<List<ProductDTO>> searchProducts(@RequestParam String searchTerm) {
         log.info("Buscando produtos com termo: {}", searchTerm);
         List<ProductDTO> products = productService.searchProducts(searchTerm);

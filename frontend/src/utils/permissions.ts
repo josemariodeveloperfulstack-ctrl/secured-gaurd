@@ -805,6 +805,8 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         STOCK_WRITE: true,
         STOCK_CREATE: true,
         STOCK_MANAGE: true,
+        COMPANIES_READ: true,
+        REPORTS_READ: true,
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
