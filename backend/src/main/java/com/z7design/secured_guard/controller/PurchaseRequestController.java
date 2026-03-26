@@ -26,7 +26,7 @@ public class PurchaseRequestController {
     private final PurchaseRequestReportService purchaseRequestReportService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getAllPurchaseRequests() {
         log.info("Buscando todas as requisições de compra");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getAllPurchaseRequests();
@@ -34,7 +34,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<PurchaseRequestDTO> getPurchaseRequestById(@PathVariable UUID id) {
         log.info("Buscando requisição de compra com ID: {}", id);
         return purchaseRequestService.getPurchaseRequestById(id)
@@ -43,7 +43,7 @@ public class PurchaseRequestController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_WRITE', 'PURCHASE_REQUESTS_CREATE')")
     public ResponseEntity<PurchaseRequestDTO> createPurchaseRequest(@RequestBody PurchaseRequestDTO requestDTO) {
         log.info("Criando nova requisição de compra: {}", requestDTO.getTitle());
         PurchaseRequestDTO createdRequest = purchaseRequestService.createPurchaseRequest(requestDTO);
@@ -51,7 +51,7 @@ public class PurchaseRequestController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_WRITE')")
     public ResponseEntity<PurchaseRequestDTO> updatePurchaseRequest(@PathVariable UUID id,
             @RequestBody PurchaseRequestDTO requestDTO) {
         log.info("Atualizando requisição de compra com ID: {}", id);
@@ -202,7 +202,7 @@ public class PurchaseRequestController {
      * utilizando os mesmos filtros de data, status e valor do frontend.
      */
     @GetMapping("/reports/pdf")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<byte[]> generatePurchaseRequestsReportPdf(
             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
