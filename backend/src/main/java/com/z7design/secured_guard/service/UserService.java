@@ -297,28 +297,22 @@ public class UserService {
             }
         }
 
-        // Atualizar roles se fornecidas
-        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+        // Atualizar roles se fornecidas (ou se lista vazia para remover todas)
+        if (request.getRoles() != null) {
             var roleNames = request.getRoles(); // Já é uma lista de strings
             var rolesFromDb = roleRepository.findByNames(roleNames);
 
-            // Validar se pelo menos um role foi encontrado
-            if (rolesFromDb.isEmpty()) {
+            // Deduplicar rpor nome caso existam entradas repetidas no banco com IDs diferentes
+            var uniqueRoles = new java.util.HashSet<>(rolesFromDb);
+            
+            // Se roles foram solicitados mas nenhum foi encontrado, lançar erro preventivo
+            if (!roleNames.isEmpty() && uniqueRoles.isEmpty()) {
                 throw new IllegalArgumentException("Nenhum role válido encontrado. Roles fornecidos: " + roleNames);
             }
 
-            // Verificar se todos os roles solicitados foram encontrados
-            if (rolesFromDb.size() < roleNames.size()) {
-                var foundRoleNames = rolesFromDb.stream().map(role -> role.getName())
-                        .collect(java.util.stream.Collectors.toSet());
-                var missingRoles = roleNames.stream().filter(name -> !foundRoleNames.contains(name))
-                        .collect(java.util.stream.Collectors.toList());
-                log.warn("Alguns roles não foram encontrados: {}", missingRoles);
-            }
-
-            existingUser.setRoles(new java.util.HashSet<>(rolesFromDb));
+            existingUser.setRoles(uniqueRoles);
             log.info("Roles atualizadas para usuário {}: {}", id,
-                    rolesFromDb.stream().map(r -> r.getName()).collect(java.util.stream.Collectors.toList()));
+                    uniqueRoles.stream().map(r -> r.getName()).collect(java.util.stream.Collectors.toList()));
         } else {
             log.info("Roles não fornecidas no request, mantendo roles existentes para usuário {}", id);
         }

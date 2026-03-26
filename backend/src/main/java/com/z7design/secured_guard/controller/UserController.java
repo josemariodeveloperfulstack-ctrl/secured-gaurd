@@ -348,6 +348,7 @@ public class UserController {
                             }
                         })
                         .filter(name -> name != null)
+                        .distinct()
                         .collect(java.util.stream.Collectors.toList());
                 dto.setRoles(roleNames);
             } else {

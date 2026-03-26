@@ -214,12 +214,9 @@ collect_diagnostics() {
 }
 
 # Aguardar inicialização
-log "⏳ Aguardando 300 segundos (5 min) para aplicação inicializar completamente..."
-log "💡 Backend precisa de tempo para:"
-log "   - Conectar ao banco de dados"
-log "   - Executar migrations do Flyway"
-log "   - Inicializar Spring Boot completamente"
-sleep 300
+log "⏳ Aguardando 30 segundos para aplicação inicializar (o deploy principal já verificou o básico)..."
+log "💡 Backend precisa de tempo para conectar ao banco e Flyway."
+sleep 30
 
 # Loop principal de tentativas
 while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
