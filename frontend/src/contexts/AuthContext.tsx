@@ -145,21 +145,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const response = await api.get('/api/users/me/current-role');
         if (!response.data) return;
         
-        const { role: dbRole, token: newToken } = response.data as { role: string; token: string };
+        const { role: dbRole, roles: dbRoles, token: newToken } = response.data as { role: string; roles?: string[]; token: string };
 
         const savedUser = JSON.parse(savedUserStr);
         const storedRole = (savedUser.role ?? '').replace(/^ROLE_/, '');
         const normalizedDbRole = dbRole.replace(/^ROLE_/, '');
 
-        if (storedRole !== normalizedDbRole) {
-          console.log(`🔄 Role changed: ${storedRole} → ${normalizedDbRole}. Syncing session...`);
+        // Verificar se houve mudança em qualquer um dos roles ou no role principal
+        const storedRoles = Array.isArray(savedUser.roles) ? savedUser.roles.map((r: string) => r.replace(/^ROLE_/, '').toUpperCase()) : [storedRole];
+        const normalizedDbRoles = Array.isArray(dbRoles) ? dbRoles.map((r: string) => r.replace(/^ROLE_/, '').toUpperCase()) : [normalizedDbRole];
+        
+        const rolesChanged = JSON.stringify(storedRoles.sort()) !== JSON.stringify(normalizedDbRoles.sort()) || storedRole !== normalizedDbRole;
+
+        if (rolesChanged) {
+          console.log(`🔄 Roles changed. Syncing session...`);
 
           // Atualiza token
           localStorage.setItem('token', newToken);
 
+          // Gerar permissões combinadas de todos os novos roles
+          const allRolePermissions = normalizedDbRoles.map(r => generatePermissions(r as UserRole));
+          const combinedPermissions = combinePermissions(...allRolePermissions);
+
           // Atualiza user em localStorage
-          const rolePermissions = generatePermissions(normalizedDbRole as UserRole);
-          const updatedUser = { ...savedUser, role: normalizedDbRole, permissions: rolePermissions };
+          const updatedUser = { 
+            ...savedUser, 
+            role: normalizedDbRole, 
+            roles: dbRoles || [dbRole],
+            permissions: combinedPermissions 
+          };
           localStorage.setItem('user', JSON.stringify(updatedUser));
 
           // Atualiza estado React
@@ -311,7 +325,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const validRole = role as UserRole;
         return generatePermissions(validRole);
       });
-      const combinedPermissions = combinePermissions(allRolePermissions);
+      const combinedPermissions = combinePermissions(...allRolePermissions);
 
       // Log para debug do SUPER_ADMIN e outros roles
       console.log(`🔍 Role final definido: ${userRole}`);

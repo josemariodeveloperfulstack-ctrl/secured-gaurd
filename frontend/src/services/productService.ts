@@ -113,7 +113,7 @@ export interface UpdateProductRequest extends CreateProductRequest {
 
 class ProductService {
   async getAllProducts(): Promise<Product[]> {
-    const response = await api.get('/products');
+    const response = await api.get('/api/products');
     return response.data;
   }
 
@@ -123,7 +123,7 @@ class ProductService {
   }
 
   async createProduct(product: CreateProductRequest): Promise<Product> {
-    const response = await api.post('/products', product);
+    const response = await api.post('/api/products', product);
     return response.data;
   }
 
@@ -137,17 +137,17 @@ class ProductService {
   }
 
   async getLowStockProducts(): Promise<Product[]> {
-    const response = await api.get('/products/low-stock');
+    const response = await api.get('/api/products/low-stock');
     return response.data;
   }
 
   async getOverStockProducts(): Promise<Product[]> {
-    const response = await api.get('/products/over-stock');
+    const response = await api.get('/api/products/over-stock');
     return response.data;
   }
 
   async getProductsNeedingReorder(): Promise<Product[]> {
-    const response = await api.get('/products/needing-reorder');
+    const response = await api.get('/api/products/needing-reorder');
     return response.data;
   }
 
@@ -177,22 +177,22 @@ class ProductService {
   }
 
   async getActiveProductsCount(): Promise<number> {
-    const response = await api.get('/products/stats/active-count');
+    const response = await api.get('/api/products/stats/active-count');
     return response.data;
   }
 
   async getLowStockProductsCount(): Promise<number> {
-    const response = await api.get('/products/stats/low-stock-count');
+    const response = await api.get('/api/products/stats/low-stock-count');
     return response.data;
   }
 
   async getOutOfStockProductsCount(): Promise<number> {
-    const response = await api.get('/products/stats/out-of-stock-count');
+    const response = await api.get('/api/products/stats/out-of-stock-count');
     return response.data;
   }
 
   async getTotalInventoryValue(): Promise<number> {
-    const response = await api.get('/products/stats/total-inventory-value');
+    const response = await api.get('/api/products/stats/total-inventory-value');
     return response.data;
   }
 }

@@ -51,6 +51,35 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
     }));
   }, [employeeId, companyId]);
 
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (formData.funcionarioId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(formData.funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [formData.funcionarioId, selectedEmployeeData]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
@@ -357,16 +386,21 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {(funcionario as any).positionName || (funcionario as any).position?.name || '-'}
+                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Departamento</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {(funcionario as any).unitName || (funcionario as any).unit?.name || (funcionario as any).positionName || '-'}
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
                       </div>
                     </div>
-
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
+                    </div>
                   </div>
                 </div>
               </div>

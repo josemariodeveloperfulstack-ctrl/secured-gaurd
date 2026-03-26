@@ -30,6 +30,9 @@ public class StockItemDTO {
     private String notes;
     private Boolean isLowStock;
     private String fullName;
+    private java.util.List<StockItemLocationDTO> locations;
+    private UUID initialShelfId;
+    private String initialFloor;
 
     public static StockItemDTO fromEntity(StockItem entity) {
         StockItemDTO dto = new StockItemDTO();
@@ -56,7 +59,9 @@ public class StockItemDTO {
             dto.setUnitId(entity.getUnit().getId());
             dto.setUnitName(entity.getUnit().getName());
         }
-
+        
+        // As localizações serão preenchidas no service se necessário
+        
         return dto;
     }
 

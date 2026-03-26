@@ -60,6 +60,35 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     }));
   }, [employeeId, companyId]);
 
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.employeeId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.employeeId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.employeeId, selectedEmployeeData]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -451,14 +480,20 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {form.position || (funcionario as any).position?.name || '-'}
+                        {form.position || funcionario.positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {(funcionario as any).unit?.name || '-'}
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
                       </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
                     </div>
                   </div>
                 </div>

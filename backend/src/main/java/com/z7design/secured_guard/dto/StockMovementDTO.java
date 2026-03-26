@@ -34,6 +34,13 @@ public class StockMovementDTO {
     private String qrCodeUsed;
     private UUID unitId;
     private String unitName;
+    private UUID itemLocationId;
+    private String itemLocationDisplay;
+    private String digitalSignature;
+    private LocalDateTime signatureDate;
+    private StockMovement.SignatureType signatureType;
+    private String requisitionUrl;
+    private StockMovement.RequisitionSentType requisitionSentType;
 
     public static StockMovementDTO fromEntity(StockMovement entity) {
         StockMovementDTO dto = new StockMovementDTO();
@@ -52,6 +59,11 @@ public class StockMovementDTO {
         dto.setMovementDate(entity.getMovementDate());
         dto.setNotes(entity.getNotes());
         dto.setQrCodeUsed(entity.getQrCodeUsed());
+        dto.setDigitalSignature(entity.getDigitalSignature());
+        dto.setSignatureDate(entity.getSignatureDate());
+        dto.setSignatureType(entity.getSignatureType());
+        dto.setRequisitionUrl(entity.getRequisitionUrl());
+        dto.setRequisitionSentType(entity.getRequisitionSentType());
 
         if (entity.getStockItem() != null) {
             dto.setStockItemId(entity.getStockItem().getId());
@@ -73,6 +85,17 @@ public class StockMovementDTO {
             dto.setUnitName(entity.getUnit().getName());
         }
 
+        if (entity.getItemLocation() != null) {
+            dto.setItemLocationId(entity.getItemLocation().getId());
+            if (entity.getItemLocation().getShelf() != null) {
+                dto.setItemLocationDisplay(entity.getItemLocation().getShelf().getIdentification() + 
+                    (entity.getItemLocation().getFloor() != null ? " - " + entity.getItemLocation().getFloor() : ""));
+            } else {
+                dto.setItemLocationDisplay("Prateleira não identificada" + 
+                    (entity.getItemLocation().getFloor() != null ? " - " + entity.getItemLocation().getFloor() : ""));
+            }
+        }
+
         return dto;
     }
 
@@ -92,6 +115,11 @@ public class StockMovementDTO {
         entity.setTotalCost(dto.getTotalCost());
         entity.setNotes(dto.getNotes());
         entity.setQrCodeUsed(dto.getQrCodeUsed());
+        entity.setDigitalSignature(dto.getDigitalSignature());
+        entity.setSignatureDate(dto.getSignatureDate());
+        entity.setSignatureType(dto.getSignatureType());
+        entity.setRequisitionUrl(dto.getRequisitionUrl());
+        entity.setRequisitionSentType(dto.getRequisitionSentType());
         return entity;
     }
 }

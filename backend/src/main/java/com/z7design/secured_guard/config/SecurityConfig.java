@@ -59,13 +59,17 @@ public class SecurityConfig {
                                                 .contentTypeOptions(contentType -> {
                                                 }))
                                 .authorizeHttpRequests(auth -> auth
-                                                // Endpoints públicos (sem autenticação)
-                                                .requestMatchers("/api/auth/**").permitAll()
+                                                 // Permitir todos os pre-flights OPTIONS para evitar loops e erros de CORS
+                                                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                                                 // Endpoints públicos
+                                                 .requestMatchers("/api/auth/**").permitAll()
                                                 .requestMatchers("/api/files/**").permitAll()
                                                 .requestMatchers("/api/test/**").permitAll()
                                                 .requestMatchers("/api/health").permitAll()
-                                                .requestMatchers("/api/diagnostic/**").permitAll()
-                                                .requestMatchers("/api/debug/**").permitAll()
+                                                 .requestMatchers("/api/public/**").permitAll()
+                                                 .requestMatchers("/api/diagnostic/**").permitAll()
+                                                 .requestMatchers("/api/debug/**").permitAll()
+                                                 .requestMatchers("/api/users/public/**").permitAll()
                                                 // WebSocket endpoints - permitir todos os transportes do SockJS (info,
                                                 // websocket, xhr, eventsource, htmlfile, jsonp, iframe)
                                                 // O SockJS faz requisições HTTP iniciais que não incluem o token JWT
@@ -450,7 +454,10 @@ public class SecurityConfig {
                                                                 "GESTOR_COMERCIAL",
                                                                 "ASSISTENTE_COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO",
-                                                                "ANALISTA_SUPRIMENTOS")
+                                                                "ANALISTA_SUPRIMENTOS",
+                                                                "ESTOQUE",
+                                                                "COMPRAS",
+                                                                "SUPRIMENTOS", "ALMOXARIFADO")
                                                 // Endpoints de mensagens - qualquer usuário autenticado pode
                                                 // enviar/receber
                                                 .requestMatchers("/api/v1/messages/**").authenticated()
@@ -463,7 +470,10 @@ public class SecurityConfig {
                                                                 "FINANCEIRO",
                                                                 "OPERACIONAL",
                                                                 "COMERCIAL",
-                                                                "GESTOR_COMERCIAL")
+                                                                "GESTOR_COMERCIAL",
+                                                                "ESTOQUE",
+                                                                "COMPRAS",
+                                                                "SUPRIMENTOS", "ALMOXARIFADO")
                                                 // Endpoints de suporte e atendimento - requerem permissões específicas
                                                 .requestMatchers("/api/v1/support/**")
                                                 .hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE",
@@ -474,7 +484,8 @@ public class SecurityConfig {
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
-                                                                "ROLE_SUPERVISOR")
+                                                                "ROLE_SUPERVISOR",
+                                                                "ROLE_ESTOQUE", "ROLE_COMPRAS", "ROLE_SUPRIMENTOS", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de chatbot - mesmas permissões de suporte
                                                 .requestMatchers("/api/v1/support/chatbot/**")
                                                 .hasAnyAuthority("SUPPORT_READ", "SUPPORT_WRITE", "SUPPORT_CREATE",
@@ -485,7 +496,8 @@ public class SecurityConfig {
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
-                                                                "ROLE_SUPERVISOR")
+                                                                "ROLE_SUPERVISOR",
+                                                                "ROLE_ESTOQUE", "ROLE_COMPRAS", "ROLE_SUPRIMENTOS", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de departamentos - requerem permissões de RH ou admin
                                                 .requestMatchers("/api/departments/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
@@ -575,12 +587,13 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO")
                                                 // Endpoints de estoque - requerem permissões específicas ou
                                                 // autenticação
-                                                .requestMatchers("/api/stock/**")
+                                                .requestMatchers("/api/stock/**", "/api/products/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "STOCK_READ",
                                                                 "STOCK_WRITE", "STOCK_CREATE",
                                                                 "STOCK_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "SUPER_ADMIN", "ADMIN",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS")
                                                 // Endpoints de modelos de documentos - temporariamente público para

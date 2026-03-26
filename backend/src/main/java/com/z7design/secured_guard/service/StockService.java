@@ -23,6 +23,13 @@ import com.z7design.secured_guard.repository.StockAlertRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
+import com.z7design.secured_guard.repository.StockItemLocationRepository;
+import com.z7design.secured_guard.repository.StorageShelfRepository;
+import com.z7design.secured_guard.repository.EmployeeChangeHistoryRepository;
+import com.z7design.secured_guard.repository.PersonalProtectiveEquipmentRepository;
+import com.z7design.secured_guard.model.StockItemLocation;
+import com.z7design.secured_guard.model.EmployeeChangeHistory;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +40,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.z7design.secured_guard.model.StorageShelf;
 import jakarta.persistence.criteria.Predicate;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -52,6 +60,13 @@ public class StockService {
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final UnitRepository unitRepository;
+    private final StockItemLocationRepository stockItemLocationRepository;
+    private final StorageShelfRepository storageShelfRepository;
+    private final EmployeeChangeHistoryRepository employeeChangeHistoryRepository;
+    private final StockRequisitionPdfService stockRequisitionPdfService;
+    private final EmailService emailService;
+    private final PersonalProtectiveEquipmentRepository epiRepository;
+    private final EPIDeliveryFormService epiDeliveryFormService;
 
     // ===== GESTÃO DE ITENS =====
 
@@ -81,7 +96,15 @@ public class StockService {
         log.info("Buscando item por ID: {}", id);
         StockItem item = stockItemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item de estoque não encontrado: " + id));
-        return StockItemDTO.fromEntity(item);
+        StockItemDTO dto = StockItemDTO.fromEntity(item);
+        
+        // Buscar localizações
+        List<StockItemLocation> locations = stockItemLocationRepository.findByStockItem(item);
+        dto.setLocations(locations.stream()
+                .map(com.z7design.secured_guard.dto.StockItemLocationDTO::fromEntity)
+                .collect(Collectors.toList()));
+        
+        return dto;
     }
 
     public StockItemDTO getItemByCode(String code) {
@@ -116,6 +139,19 @@ public class StockService {
         }
 
         item = stockItemRepository.save(item);
+
+        // Associar localização inicial se especificada
+        if (dto.getInitialShelfId() != null) {
+            StorageShelf shelf = storageShelfRepository.findById(dto.getInitialShelfId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Prateleira não encontrada: " + dto.getInitialShelfId()));
+            
+            StockItemLocation location = new StockItemLocation();
+            location.setStockItem(item);
+            location.setShelf(shelf);
+            location.setFloor(dto.getInitialFloor());
+            location.setQuantity(item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0);
+            stockItemLocationRepository.save(location);
+        }
 
         // Criar alerta se quantidade inicial for baixa
         checkAndCreateLowStockAlert(item);
@@ -200,9 +236,10 @@ public class StockService {
         StockMovement movement = StockMovementDTO.toEntity(dto);
         movement.setStockItem(item);
         movement.setUser(user);
+        movement.setMovementDate(LocalDateTime.now());
         movement.setPreviousQuantity(item.getCurrentQuantity());
 
-        // Calcular nova quantidade
+        // Calcular nova quantidade total do item
         int newQuantity;
         if (dto.getMovementType() == MovementType.ENTRADA) {
             newQuantity = item.getCurrentQuantity() + dto.getQuantity();
@@ -217,10 +254,10 @@ public class StockService {
         movement.setNewQuantity(newQuantity);
 
         // Associar funcionário se for saída
+        Employee employee = null;
         if (dto.getEmployeeId() != null) {
-            Employee employee = employeeRepository.findById(dto.getEmployeeId())
-                    .orElseThrow(
-                            () -> new ResourceNotFoundException("Funcionário não encontrado: " + dto.getEmployeeId()));
+            employee = employeeRepository.findById(dto.getEmployeeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado: " + dto.getEmployeeId()));
             movement.setEmployee(employee);
         }
 
@@ -231,18 +268,132 @@ public class StockService {
             movement.setUnit(unit);
         }
 
+        // Lidar com Localização (Prateleira)
+        if (dto.getItemLocationId() != null) {
+            com.z7design.secured_guard.model.StockItemLocation location = stockItemLocationRepository.findById(dto.getItemLocationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Localização não encontrada: " + dto.getItemLocationId()));
+            
+            if (dto.getMovementType() == MovementType.SAIDA && location.getQuantity() < dto.getQuantity()) {
+                throw new IllegalArgumentException("Quantidade insuficiente nesta localização específica. Disponível: " + location.getQuantity());
+            }
+
+            location.updateQuantity(dto.getMovementType() == MovementType.ENTRADA ? dto.getQuantity() : -dto.getQuantity());
+            stockItemLocationRepository.save(location);
+            movement.setItemLocation(location);
+        }
+
         // Salvar movimentação
         movement = stockMovementRepository.save(movement);
 
-        // Atualizar quantidade do item
+        // Atualizar quantidade total do item
         item.setCurrentQuantity(newQuantity);
         stockItemRepository.save(item);
+
+        // Registrar no histórico do funcionário se for saída
+        if (dto.getMovementType() == MovementType.SAIDA && employee != null) {
+            recordEmployeeStockHistory(movement, employee, user);
+            
+            // Se for EPI, registrar entrega de EPI também
+            if (item.getCategory() == StockCategory.EPI) {
+                try {
+                    recordEPIDelivery(movement, employee, user);
+                } catch (Exception e) {
+                    log.error("Erro ao registrar entrega de EPI: {}", e.getMessage());
+                }
+            }
+        }
 
         // Verificar alertas
         checkAndCreateLowStockAlert(item);
 
         log.info("Movimentação criada com sucesso - ID: {}, Nova quantidade: {}", movement.getId(), newQuantity);
         return StockMovementDTO.fromEntity(movement);
+    }
+
+    private void recordEmployeeStockHistory(StockMovement movement, Employee employee, User user) {
+        log.info("Registrando movimentação no histórico do funcionário: {}", employee.getId());
+        
+        EmployeeChangeHistory history = EmployeeChangeHistory.builder()
+                .employeeId(employee.getId())
+                .changedAt(java.time.Instant.now())
+                .changedByUser(user)
+                .category(EmployeeChangeCategory.OUTROS)
+                .fieldName("ESTOQUE_MOVIMENTACAO")
+                .fieldLabel("Retirada de Material")
+                .newValue(String.format("Retirou %d %s de %s (Ref: %s)", 
+                        movement.getQuantity(), 
+                        movement.getStockItem().getUnit() != null ? movement.getStockItem().getUnit().getAbbreviation() : "UN",
+                        movement.getStockItem().getFullName(),
+                        movement.getId().toString().substring(0, 8).toUpperCase()))
+                .reason(movement.getNotes())
+                .build();
+        
+        employeeChangeHistoryRepository.save(history);
+    }
+
+    private void recordEPIDelivery(StockMovement movement, Employee employee, User user) {
+        log.info("Registrando entrega de EPI para funcionário: {}", employee.getId());
+        
+        // Criar ficha de entrega de EPI simplificada
+        com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO epiDto = new com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO();
+        epiDto.setEmployeeId(employee.getId());
+        epiDto.setDeliveryDate(java.time.LocalDate.now());
+        epiDto.setCompanyId(employee.getCompany() != null ? employee.getCompany().getId() : null);
+        epiDto.setObservations("Gerado via movimentação de estoque: " + movement.getId());
+        
+        com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO itemDto = new com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO();
+        itemDto.setEpiName(movement.getStockItem().getFullName());
+        itemDto.setQuantity(movement.getQuantity());
+        
+        epiDto.setItems(List.of(itemDto));
+        
+        // Nota: O service de EPI delivery já dá baixa no estoque de PersonalProtectiveEquipment.
+        // Como estamos usando StockItem, pode haver duplicidade se ambos sistemas forem usados.
+        // Por enquanto, apenas registramos a ficha sem afetar o estoque 'legado' de EPIs se possível,
+        // mas o service atual faz isso. Para evitar conflito, idealmente unificaríamos os modelos futuramente.
+        epiDeliveryFormService.create(epiDto, user.getId());
+    }
+
+    public StockMovementDTO signMovement(UUID movementId, String signatureBase64) {
+        log.info("Registrando assinatura digital para movimentação: {}", movementId);
+        StockMovement movement = stockMovementRepository.findById(movementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada: " + movementId));
+        
+        movement.setDigitalSignature(signatureBase64);
+        movement.setSignatureDate(LocalDateTime.now());
+        movement.setSignatureType(StockMovement.SignatureType.DIGITAL);
+        
+        movement = stockMovementRepository.save(movement);
+        return StockMovementDTO.fromEntity(movement);
+    }
+
+    public byte[] getRequisitionPdf(UUID movementId) {
+        return stockRequisitionPdfService.generateRequisitionPdf(movementId);
+    }
+
+    public void sendRequisition(UUID movementId, StockMovement.RequisitionSentType type, String destination) {
+        log.info("Enviando requisição {} via {}", movementId, type);
+        StockMovement movement = stockMovementRepository.findById(movementId)
+                .orElseThrow(() -> new ResourceNotFoundException("Movimentação não encontrada: " + movementId));
+        
+        byte[] pdfContent = getRequisitionPdf(movementId);
+        String fileName = "Requisicao_" + movement.getId().toString().substring(0, 8) + ".pdf";
+
+        if (type == StockMovement.RequisitionSentType.EMAIL) {
+            if (destination == null || destination.isEmpty()) {
+                destination = movement.getEmployee() != null ? movement.getEmployee().getEmail() : null;
+            }
+            if (destination != null) {
+                emailService.sendEmailWithAttachment(destination, "Requisição de Estoque", 
+                    "Segue em anexo a sua requisição de estoque.", pdfContent, fileName);
+            }
+        } else if (type == StockMovement.RequisitionSentType.WHATSAPP) {
+            // Placeholder para WhatsApp integration (usando BaileysRestService se disponível)
+            log.info("WhatsApp integration placeholder for destination: {}", destination);
+        }
+
+        movement.setRequisitionSentType(type);
+        stockMovementRepository.save(movement);
     }
 
     public Page<StockMovementDTO> getMovementsWithFilters(
@@ -1065,7 +1216,8 @@ public class StockService {
     public List<StockMovementDTO> getRecentMovements(int limit) {
         try {
             log.info("Buscando as {} movimentações mais recentes...", limit);
-            List<StockMovement> recentMovements = stockMovementRepository.findTop10ByOrderByMovementDateDesc();
+            List<StockMovement> recentMovements = stockMovementRepository.findRecentMovements(
+                org.springframework.data.domain.PageRequest.of(0, limit));
             log.info("Encontrados {} movimentações recentes", recentMovements.size());
 
             return recentMovements.stream()

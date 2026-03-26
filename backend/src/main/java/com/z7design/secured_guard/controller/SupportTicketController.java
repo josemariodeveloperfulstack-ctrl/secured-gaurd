@@ -42,7 +42,7 @@ public class SupportTicketController {
      * Listar todos os tickets (paginado)
      */
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<SupportTicketDTO>> getAllTickets(
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
@@ -61,7 +61,7 @@ public class SupportTicketController {
      * Buscar ticket por ID
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<SupportTicketDTO> getTicketById(@PathVariable UUID id) {
         log.info("GET /api/v1/support/tickets/{} - Buscando ticket por ID", id);
         SupportTicketDTO ticket = ticketService.getTicketById(id);
@@ -72,7 +72,7 @@ public class SupportTicketController {
      * Buscar tickets por status
      */
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<SupportTicketDTO>> getTicketsByStatus(
             @PathVariable TicketStatus status,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -90,7 +90,7 @@ public class SupportTicketController {
      * Buscar tickets por agente
      */
     @GetMapping("/agent/{agentId}")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<SupportTicketDTO>> getTicketsByAgent(
             @PathVariable UUID agentId,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -108,7 +108,7 @@ public class SupportTicketController {
      * Buscar tickets com filtros
      */
     @GetMapping("/filter")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<SupportTicketDTO>> getTicketsWithFilters(
             @RequestParam(value = "status", required = false) TicketStatus status,
             @RequestParam(value = "priority", required = false) TicketPriority priority,
@@ -130,7 +130,7 @@ public class SupportTicketController {
      * Buscar tickets por texto
      */
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<SupportTicketDTO>> searchTickets(
             @RequestParam("q") String q,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -148,7 +148,7 @@ public class SupportTicketController {
      * Criar novo ticket
      */
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPPORT_CREATE', 'SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_CREATE', 'SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<SupportTicketDTO> createTicket(@Valid @RequestBody CreateTicketRequest request) {
         log.info("POST /api/v1/support/tickets - Criando novo ticket: {}", request.getTitle());
         SupportTicketDTO ticket = ticketService.createTicket(request);
@@ -159,7 +159,7 @@ public class SupportTicketController {
      * Atualizar ticket
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<SupportTicketDTO> updateTicket(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateTicketRequest request) {
@@ -172,7 +172,7 @@ public class SupportTicketController {
      * Atribuir ticket a um agente
      */
     @PutMapping("/{id}/assign/{agentId}")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<SupportTicketDTO> assignTicketToAgent(
             @PathVariable UUID id,
             @PathVariable UUID agentId) {
@@ -185,7 +185,7 @@ public class SupportTicketController {
      * Adicionar mensagem ao ticket
      */
     @PostMapping("/{id}/messages")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<TicketMessageDTO> addMessageToTicket(
             @PathVariable UUID id,
             @Valid @RequestBody AddTicketMessageRequest request,
@@ -204,7 +204,7 @@ public class SupportTicketController {
      * Buscar mensagens de um ticket
      */
     @GetMapping("/{id}/messages")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<TicketMessageDTO>> getTicketMessages(@PathVariable UUID id) {
         log.info("GET /api/v1/support/tickets/{}/messages - Buscando mensagens do ticket", id);
         List<TicketMessageDTO> messages = ticketService.getTicketMessages(id);
@@ -215,7 +215,7 @@ public class SupportTicketController {
      * Deletar ticket
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_DELETE', 'SUPPORT_MANAGE', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_DELETE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Void> deleteTicket(@PathVariable UUID id) {
         log.info("DELETE /api/v1/support/tickets/{} - Deletando ticket", id);
         ticketService.deleteTicket(id);
@@ -226,7 +226,7 @@ public class SupportTicketController {
      * Obter métricas de atendimento
      */
     @GetMapping("/metrics")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<TicketMetrics> getTicketMetrics() {
         log.info("GET /api/v1/support/tickets/metrics - Obtendo métricas de atendimento");
         TicketMetrics metrics = ticketService.getTicketMetrics();

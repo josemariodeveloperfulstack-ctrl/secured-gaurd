@@ -54,8 +54,14 @@ import {
   ChevronsUpDown,
   ArrowRight,
   ArrowLeft,
-  Box
+  Box,
+  MapPin,
+  ClipboardCheck,
+  Smartphone,
+  Mail,
+  Download
 } from 'lucide-react';
+import SignaturePad from '@/components/SignaturePad';
 
 interface StockMovementModalProps {
   open: boolean;
@@ -74,6 +80,10 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [employeeLoading, setEmployeeLoading] = useState(false);
   const [employees, setEmployees] = useState<Array<{ id: string; name: string; document?: string }>>([]);
+  const [shelves, setShelves] = useState<any[]>([]);
+  const [loadingShelves, setLoadingShelves] = useState(false);
+  const [showSignature, setShowSignature] = useState(false);
+  const [createdMovementId, setCreatedMovementId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(item);
   const [itemCodeSearch, setItemCodeSearch] = useState('');
   const [allItems, setAllItems] = useState<StockItem[]>([]);
@@ -94,7 +104,9 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
     documentNumber: '',
     supplier: '',
     unitCost: 0,
-    notes: ''
+    notes: '',
+    shelfId: '',
+    floor: ''
   });
 
   const formatCurrency = (value: string): string => {
@@ -125,8 +137,21 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
       loadEmployees();
       loadSuppliers();
       loadAllItems();
+      loadShelves();
     }
   }, [open]);
+
+  const loadShelves = async () => {
+    try {
+      setLoadingShelves(true);
+      const data = await stockService.getAllShelves();
+      setShelves(data.filter(s => s.active));
+    } catch (error) {
+      console.error('Erro ao carregar prateleiras:', error);
+    } finally {
+      setLoadingShelves(false);
+    }
+  };
 
   // Filtrar itens baseado no termo de busca
   const filteredItems = React.useMemo(() => {
@@ -339,12 +364,26 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
 
       console.log('📦 Dados da movimentação sendo enviados:', JSON.stringify(dataToSend, null, 2));
 
-      await stockService.createMovement(dataToSend);
+      const response = await stockService.createMovement({
+        ...dataToSend,
+        shelfId: formData.shelfId || undefined,
+        floor: formData.floor || undefined
+      } as any);
+      
+      const movementId = response.id;
+      setCreatedMovementId(movementId);
+
       toast({
         title: 'Sucesso!',
         description: 'Movimentação registrada com sucesso.',
       });
       
+      // Se for saída e tiver funcionário, oferecer assinatura
+      if (formData.movementType === MovementType.SAIDA && formData.employeeId) {
+        setShowSignature(true);
+        return; // Não fecha o modal ainda
+      }
+
       onSave();
       onOpenChange(false);
       
@@ -406,40 +445,79 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
     }
   };
 
+  const handleSignatureSave = async (signatureBase64: string) => {
+    if (!createdMovementId) return;
+    
+    setLoading(true);
+    try {
+      await stockService.signMovement(createdMovementId, signatureBase64);
+      toast({
+        title: 'Sucesso!',
+        description: 'Assinatura registrada e comprovante gerado.',
+      });
+      
+      // Oferecer opções de envio/download
+      onSave();
+      onOpenChange(false);
+      
+      // Reset
+      setShowSignature(false);
+      setCreatedMovementId(null);
+    } catch (error: any) {
+      console.error('Erro ao salvar assinatura:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao salvar assinatura digital.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkipSignature = () => {
+    onSave();
+    onOpenChange(false);
+    setShowSignature(false);
+    setCreatedMovementId(null);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[95vw] max-w-[800px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-seguranca-graphite/95 to-seguranca-black/95 border-gray-600/50 shadow-2xl backdrop-blur-sm">
-          <DialogHeader className="space-y-3 sm:space-y-4">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-seguranca-red/20 to-seguranca-red/10 border border-seguranca-red/30 shadow-lg shadow-seguranca-red/10">
-                <ArrowUpDown className="h-5 w-5 sm:h-6 sm:w-6 text-seguranca-red" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-white truncate">
-                  Nova Movimentação de Estoque
-                </DialogTitle>
-                <DialogDescription className="text-gray-400 text-sm sm:text-base mt-1">
-                  Registre uma nova entrada ou saída de item do estoque
-                </DialogDescription>
-              </div>
-            </div>
-            
-            <Card className="bg-gradient-to-r from-seguranca-red/10 to-seguranca-darkred/10 border-seguranca-red/20 p-3 sm:p-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-seguranca-red">
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                <span className="font-medium">Campos obrigatórios:</span>
-                <div className="flex flex-wrap gap-1">
-                  <Badge variant="destructive" className="text-xs px-2 py-1">Item</Badge>
-                  <Badge variant="destructive" className="text-xs px-2 py-1">Tipo</Badge>
-                  <Badge variant="destructive" className="text-xs px-2 py-1">Motivo</Badge>
-                  <Badge variant="destructive" className="text-xs px-2 py-1">Quantidade</Badge>
+          {!showSignature ? (
+            <>
+              <DialogHeader className="space-y-3 sm:space-y-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="p-2 sm:p-3 rounded-xl bg-gradient-to-br from-seguranca-red/20 to-seguranca-red/10 border border-seguranca-red/30 shadow-lg shadow-seguranca-red/10">
+                    <ArrowUpDown className="h-5 w-5 sm:h-6 sm:w-6 text-seguranca-red" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-white truncate">
+                      Nova Movimentação de Estoque
+                    </DialogTitle>
+                    <DialogDescription className="text-gray-400 text-sm sm:text-base mt-1">
+                      Registre uma nova entrada ou saída de item do estoque
+                    </DialogDescription>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          </DialogHeader>
+                
+                <Card className="bg-gradient-to-r from-seguranca-red/10 to-seguranca-darkred/10 border-seguranca-red/20 p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-seguranca-red">
+                    <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="font-medium">Campos obrigatórios:</span>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="destructive" className="text-xs px-2 py-1">Item</Badge>
+                      <Badge variant="destructive" className="text-xs px-2 py-1">Tipo</Badge>
+                      <Badge variant="destructive" className="text-xs px-2 py-1">Motivo</Badge>
+                      <Badge variant="destructive" className="text-xs px-2 py-1">Quantidade</Badge>
+                    </div>
+                  </div>
+                </Card>
+              </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 mt-4">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 mt-4">
             {/* Seleção do Item */}
             {!item && (
               <div className="space-y-3 sm:space-y-4">
@@ -874,26 +952,52 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
               />
             </div>
 
-            {/* Botões */}
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sm:pt-6 border-t border-gray-600/30">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-2 sm:order-1"
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={loading || !selectedItem}
-                className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-1 sm:order-2"
-              >
-                {loading ? 'Registrando...' : 'Registrar Movimentação'}
-              </Button>
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sm:pt-6 border-t border-gray-600/30">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  disabled={loading}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-2 sm:order-1"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={loading || !selectedItem}
+                  className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-1 sm:order-2"
+                >
+                  {loading ? 'Registrando...' : 'Registrar Movimentação'}
+                </Button>
+              </div>
+            </form>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <DialogHeader className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 border border-blue-500/30 shadow-lg shadow-blue-500/10">
+                    <FileSignature className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <DialogTitle className="text-xl font-bold text-white">
+                      Assinatura Digital
+                    </DialogTitle>
+                    <DialogDescription className="text-gray-400 text-sm mt-1">
+                      Assinatura de recebimento (EPI/Materiais)
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              
+              <div className="bg-seguranca-black/30 border border-gray-600/30 rounded-lg p-4">
+                <SignaturePad 
+                  onSave={handleSignatureSave} 
+                  onCancel={handleSkipSignature} 
+                />
+              </div>
             </div>
-          </form>
+          )}
         </DialogContent>
       </Dialog>
 

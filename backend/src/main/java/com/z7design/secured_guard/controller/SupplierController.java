@@ -117,7 +117,7 @@ public class SupplierController {
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','FINANCEIRO','ASSISTENTE_ADMINISTRATIVO','ANALISTA_SUPRIMENTOS','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Supplier> create(@Valid @RequestBody SupplierDTO supplierDTO) {
         return ResponseEntity.ok(supplierService.create(supplierDTO));
     }
@@ -130,7 +130,7 @@ public class SupplierController {
             @ApiResponse(responseCode = "404", description = "Fornecedor não encontrado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','FINANCEIRO','ASSISTENTE_ADMINISTRATIVO','ANALISTA_SUPRIMENTOS','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Supplier> update(@PathVariable String id, @Valid @RequestBody SupplierDTO supplierDTO) {
         return ResponseEntity.ok(supplierService.update(UUID.fromString(id), supplierDTO));
     }

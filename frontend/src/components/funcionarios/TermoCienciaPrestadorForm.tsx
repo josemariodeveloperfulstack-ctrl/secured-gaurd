@@ -13,7 +13,8 @@ import { termoCienciaPrestadorGenerator } from '@/utils/termoCienciaPrestadorGen
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { Company } from '@/types/company';
 import { EmployeeCombobox } from '../ui/employee-combobox';
-import { SimpleEmployee } from '@/services/employeeService';
+import { SimpleEmployee, employeeService } from '@/services/employeeService';
+import { companyService } from '@/services/companyService';
 
 
 interface TermoCienciaPrestadorFormProps {
@@ -45,6 +46,35 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
       empresaId: companyId || prev.empresaId
     }));
   }, [employeeId, companyId]);
+
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.funcionarioId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.funcionarioId, selectedEmployeeData]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -317,16 +347,16 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
                       </div>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {typeof funcionario.address === 'string'
-                        ? funcionario.address
-                        : funcionario.address
-                          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
-                          : '-'}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {typeof (funcionario.address as any) === 'string'
+                          ? (funcionario.address as any)
+                          : (funcionario.address as any)?.street
+                            ? `${(funcionario.address as any).street}, ${(funcionario.address as any).number || ''}`
+                            : '-'}
+                      </div>
                     </div>
-                  </div>
                 </div>
               </div>
             )}

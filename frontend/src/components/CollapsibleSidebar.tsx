@@ -306,6 +306,7 @@ const comprasMenuItems = [
   { icon: FileText, text: 'Solicitações', to: '/compras/solicitacoes', id: 'compras-solicitacoes' },
   { icon: CheckCircle, text: 'Aprovações', to: '/compras/aprovacoes', id: 'compras-aprovacoes' },
   { icon: Calculator, text: 'Cotações', to: '/compras/cotacoes', id: 'compras-cotacoes' },
+  { icon: FileSignature, text: 'Acordo de Recolhimento', to: '/compras/acordo-recolhimento', id: 'compras-acordo-recolhimento' },
   { icon: BarChart3, text: 'Relatórios', to: '/compras/relatorios', id: 'compras-relatorios' },
 ];
 
@@ -476,6 +477,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-solicitacoes',
     'compras-aprovacoes',
     'compras-cotacoes',
+    'compras-acordo-recolhimento',
     'compras-relatorios',
     'chat-interno',
     'mensagens',
@@ -495,6 +497,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-solicitacoes',
     'compras-aprovacoes',
     'compras-cotacoes',
+    'compras-acordo-recolhimento',
     'compras-relatorios',
     'chat-interno',
     'mensagens',
@@ -509,9 +512,62 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-solicitacoes',
     'compras-aprovacoes',
     'compras-cotacoes',
+    'compras-acordo-recolhimento',
     'compras-relatorios',
     'chat-interno',
     'mensagens',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    'gestao-atendimento-tickets',
+  ]),
+  ESTOQUE: new Set([
+    'dashboard',
+    'estoque-simplificado',
+    'estoque-relatorios',
+    'estoque-alertas',
+    'estoque-fornecedores',
+    'chat-interno',
+    'mensagens',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    'gestao-atendimento-tickets',
+  ]),
+  COMPRAS: new Set([
+    'dashboard',
+    'compras',
+    'compras-solicitacoes',
+    'compras-aprovacoes',
+    'compras-cotacoes',
+    'compras-acordo-recolhimento',
+    'compras-relatorios',
+    'chat-interno',
+    'mensagens',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    'gestao-atendimento-tickets',
+  ]),
+  SUPRIMENTOS: new Set([
+    'dashboard',
+    'holerites',
+    'financeiro',
+    'financeiro-contas-pagar',
+    'financeiro-relatorios',
+    'financeiro-centro-custos',
+    'estoque-simplificado',
+    'estoque-relatorios',
+    'estoque-alertas',
+    'estoque-fornecedores',
+    'compras',
+    'compras-solicitacoes',
+    'compras-aprovacoes',
+    'compras-cotacoes',
+    'compras-acordo-recolhimento',
+    'compras-relatorios',
+    'chat-interno',
+    'mensagens',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    'gestao-atendimento-tickets',
   ]),
 };
 
@@ -780,7 +836,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       openIf('sst', filteredSstItems);
       openIf('dp', filteredDepartamentoPessoalItems);
       openIf('comercial', filteredComercialItems);
-      openIf('suprimentos', [...filteredEstoqueItems, ...filteredComprasItems]);
+      openIf('estoque', filteredEstoqueItems);
+      openIf('compras', filteredComprasItems);
       openIf('comunicacao', filteredComunicacaoInternaItems);
       openIf('atendimento', filteredAtendimentoItems);
       openIf('sistema', filteredSistemaItems);
@@ -1133,83 +1190,77 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             </SidebarNavSection>
           )}
 
-          {/* Grupo Suprimentos e Estoque (cabeçalho) + Estoque + Compras */}
-          {(shouldShowModule('STOCK_READ') || shouldShowModule('STOCK_MANAGE')) && (
+          {/* Grupo Gestão de Estoque */}
+          {shouldShowModule('STOCK_READ') && (
             <SidebarNavSection
-              title="Suprimentos e Estoque"
+              title="Gestão de Estoque"
               sidebarCollapsed={collapsed}
-              isEmpty={filteredEstoqueItems.length === 0 && filteredComprasItems.length === 0}
-              open={isSectionOpen('suprimentos')}
-              onOpenChange={(v) => setSectionKey('suprimentos', v)}
+              isEmpty={filteredEstoqueItems.length === 0}
+              open={isSectionOpen('estoque')}
+              onOpenChange={(v) => setSectionKey('estoque', v)}
             >
-              {shouldShowModule('STOCK_READ') && filteredEstoqueItems.length > 0 && (
-                <>
-                  {!collapsed && (
-                    <div className="px-1 pt-0 pb-1 text-xs font-medium text-seguranca-lightgray/90 uppercase tracking-wider">
-                      Estoque
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    {filteredEstoqueItems.map((item) => (
-                      <ScrollPreservingLink
-                        key={item.id}
-                        to={item.to}
-                        preserveScroll={true}
-                        ref={isActive(item.id) ? activeItemRef : undefined}
-                        className={`
-                          flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                          ${isActive(item.id)
-                            ? 'bg-seguranca-black text-seguranca-yellow'
-                            : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                          }
-                        `}
-                      >
-                        <item.icon
-                          size={18}
-                          className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                        />
-                        {!collapsed && (
-                          <span className="truncate">{item.text}</span>
-                        )}
-                      </ScrollPreservingLink>
-                    ))}
-                  </div>
-                </>
-              )}
-              {shouldShowModule('STOCK_MANAGE') && filteredComprasItems.length > 0 && (
-                <>
-                  {!collapsed && (
-                    <div className="px-1 pt-2 pb-1 text-xs font-medium text-seguranca-lightgray/90 uppercase tracking-wider">
-                      Compras
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    {filteredComprasItems.map((item) => (
-                      <ScrollPreservingLink
-                        key={item.id}
-                        to={item.to}
-                        preserveScroll={true}
-                        ref={isActive(item.id) ? activeItemRef : undefined}
-                        className={`
-                          flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                          ${isActive(item.id)
-                            ? 'bg-seguranca-black text-seguranca-yellow'
-                            : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                          }
-                        `}
-                      >
-                        <item.icon
-                          size={18}
-                          className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
-                        />
-                        {!collapsed && (
-                          <span className="truncate">{item.text}</span>
-                        )}
-                      </ScrollPreservingLink>
-                    ))}
-                  </div>
-                </>
-              )}
+              <div className="space-y-1">
+                {filteredEstoqueItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </div>
+            </SidebarNavSection>
+          )}
+
+          {/* Grupo Gestão de Compras */}
+          {shouldShowModule('STOCK_MANAGE') && (
+            <SidebarNavSection
+              title="Gestão de Compras"
+              sidebarCollapsed={collapsed}
+              isEmpty={filteredComprasItems.length === 0}
+              open={isSectionOpen('compras')}
+              onOpenChange={(v) => setSectionKey('compras', v)}
+            >
+              <div className="space-y-1">
+                {filteredComprasItems.map((item) => (
+                  <ScrollPreservingLink
+                    key={item.id}
+                    to={item.to}
+                    preserveScroll={true}
+                    ref={isActive(item.id) ? activeItemRef : undefined}
+                    className={`
+                      flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                      ${isActive(item.id)
+                        ? 'bg-seguranca-black text-seguranca-yellow'
+                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
+                      }
+                    `}
+                  >
+                    <item.icon
+                      size={18}
+                      className={`flex-shrink-0 ${collapsed ? 'mx-auto' : 'mr-3'}`}
+                    />
+                    {!collapsed && (
+                      <span className="truncate">{item.text}</span>
+                    )}
+                  </ScrollPreservingLink>
+                ))}
+              </div>
             </SidebarNavSection>
           )}
 

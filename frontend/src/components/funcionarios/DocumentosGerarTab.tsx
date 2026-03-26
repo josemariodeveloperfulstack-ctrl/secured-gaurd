@@ -117,7 +117,7 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({ employeeId: pro
         {tipo === 'vt' && <TermoValeTransporteForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'epi' && <FichaEntregaEPIForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'epi-manual' && <FichaEntregaEPIManualForm companyId={finalCompanyId} employeeId={finalEmployeeId} />}
-        {tipo === 'npps' && <NppsForm />}
+        {tipo === 'npps' && <NppsForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecificoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'lgpd' && <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}

@@ -96,6 +96,8 @@ api.interceptors.response.use(
       const apiUrl = error.config?.baseURL || getApiUrl();
       if (error?.code === 'ERR_TOO_MANY_REDIRECTS' || error?.message?.includes('too many redirects')) {
         console.warn('⚠️ Loop de redirecionamento na API (proxy/nginx ou URL base incorreta):', apiUrl);
+        console.warn('⚠️ URL da requisição:', error.config?.url);
+        console.warn('⚠️ Método:', error.config?.method);
         console.warn('⚠️ Em CI use getApiUrl() = /api (mesmo host). Verifique nginx: proxy_redirect off; e X-Forwarded-*');
       } else {
         console.warn('⚠️ Backend não está disponível:', apiUrl);

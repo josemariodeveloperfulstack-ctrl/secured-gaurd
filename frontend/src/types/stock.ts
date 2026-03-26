@@ -19,6 +19,26 @@ export interface StockItem {
   notes?: string;
   isLowStock: boolean;
   fullName: string;
+  locations?: StockItemLocation[];
+}
+
+export interface StockItemLocation {
+  id: string;
+  shelfId: string;
+  shelfIdentification: string;
+  floor: string;
+  quantity: number;
+}
+
+export interface StorageShelf {
+  id: string;
+  identification: string;
+  block?: string;
+  section?: string;
+  aisle?: string;
+  room?: string;
+  compartmentInfo?: string;
+  active: boolean;
 }
 
 export interface StockMovement {
@@ -45,6 +65,24 @@ export interface StockMovement {
   qrCodeUsed?: string;
   unitId?: string;
   unitName?: string;
+  // Novos campos
+  digitalSignature?: string;
+  signatureDate?: string;
+  signatureType?: SignatureType;
+  requisitionUrl?: string;
+  requisitionSentType?: RequisitionSentType;
+  itemLocationId?: string;
+}
+
+export enum SignatureType {
+  PHYSICAL = 'PHYSICAL',
+  DIGITAL = 'DIGITAL'
+}
+
+export enum RequisitionSentType {
+  EMAIL = 'EMAIL',
+  WHATSAPP = 'WHATSAPP',
+  NONE = 'NONE'
 }
 
 export interface StockAlert {
@@ -108,6 +146,8 @@ export interface CreateStockItemDTO {
   barcode?: string;
   unitId?: string;
   notes?: string;
+  initialShelfId?: string;
+  initialFloor?: string;
 }
 
 export interface CreateStockMovementDTO {
@@ -122,6 +162,8 @@ export interface CreateStockMovementDTO {
   notes?: string;
   qrCodeUsed?: string;
   unitId?: string;
+  shelfId?: string;
+  floor?: string;
 }
 
 export interface StockFilters {

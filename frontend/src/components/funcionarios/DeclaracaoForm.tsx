@@ -50,6 +50,37 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
     }));
   }, [employeeId, companyId]);
 
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.funcionarioId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              rg: emp.rg,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              terminationDate: emp.terminationDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.funcionarioId, selectedEmployeeData]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
@@ -355,11 +386,18 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
                         {funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : '-'}
                       </div>
                     </div>
-                    {funcionario.terminationDate && (
+                    {funcionario.terminationDate ? (
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Demissão</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                           {formatDateToBrazilian(funcionario.terminationDate)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
+                        <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                          {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
                         </div>
                       </div>
                     )}

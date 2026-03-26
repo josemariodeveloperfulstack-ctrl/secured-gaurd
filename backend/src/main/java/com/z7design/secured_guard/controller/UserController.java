@@ -38,12 +38,24 @@ import com.z7design.secured_guard.model.Permission;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Usuários", description = "Endpoints para gestão de usuários")
+@CrossOrigin(origins = "*")
 public class UserController {
 
     private final UserService userService;
     private final UserOnlineStatusService userOnlineStatusService;
     private final LgpdConsentService lgpdConsentService;
     private final JwtService jwtService;
+    
+    @GetMapping("/public/diagnostic")
+    @Operation(summary = "Diagnóstico público", description = "Verifica se o controller responde sem autenticação")
+    public ResponseEntity<Object> publicDiagnostic() {
+        return ResponseEntity.ok(Map.of(
+            "status", "UP",
+            "controller", "UserController",
+            "access", "public",
+            "timestamp", java.time.LocalDateTime.now().toString()
+        ));
+    }
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -543,21 +555,27 @@ public class UserController {
                 return ResponseEntity.status(404).body(Map.of("error", "Usuário não encontrado"));
             }
 
-            // Role atual direto do banco (evitar NPE se roles for null)
-            String currentRole = "COLABORADOR";
+            // Role primário (para compatibilidade legada) e lista completa de roles
+            String primaryRole = "COLABORADOR";
+            List<String> allRoles = new java.util.ArrayList<>();
+            
             if (currentUser.getRoles() != null && !currentUser.getRoles().isEmpty()) {
-                currentRole = currentUser.getRoles().stream()
-                        .findFirst()
-                        .map(role -> role != null ? role.getName() : null)
-                        .filter(n -> n != null && !n.isEmpty())
-                        .orElse("COLABORADOR");
+                allRoles = currentUser.getRoles().stream()
+                        .filter(role -> role != null)
+                        .map(role -> role.getName())
+                        .collect(Collectors.toList());
+                
+                primaryRole = allRoles.get(0);
+            } else {
+                allRoles.add("COLABORADOR");
             }
 
             // Gera um novo token com o role atualizado
             String newToken = jwtService.generateToken(currentUser);
 
             return ResponseEntity.ok(Map.of(
-                    "role", currentRole,
+                    "role", primaryRole,
+                    "roles", allRoles,
                     "token", newToken,
                     "userId", currentUser.getId().toString()));
         } catch (Exception e) {

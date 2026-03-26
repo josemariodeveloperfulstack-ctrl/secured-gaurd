@@ -798,12 +798,21 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       };
 
     case 'ESTOQUE':
+    case 'ALMOXARIFADO':
       return {
         ...basePermissions,
         STOCK_READ: true,
+        STOCK_WRITE: true,
+        STOCK_CREATE: true,
+        STOCK_MANAGE: true,
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        SUPPORT_READ: true,
+        SUPPORT_CREATE: true,
       };
 
     case 'SUPRIMENTOS':
@@ -836,6 +845,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         REPORTS_READ: true,
         CONTRACTS_READ: true,
         EMPLOYEES_READ: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        SUPPORT_READ: true,
+        SUPPORT_CREATE: true,
       };
     case 'COMPRAS':
       return {
@@ -847,6 +861,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        SUPPORT_READ: true,
+        SUPPORT_CREATE: true,
       };
 
     case 'AUXI_ADMINISTRATIVO':
@@ -1416,17 +1435,63 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
   return basePermissions;
 };
 
-// Função para combinar permissões de role e grupos
-export const combinePermissions = (rolePermissions: UserPermissions, groupPermissions: UserPermissions): UserPermissions => {
-  const combined: UserPermissions = { ...rolePermissions };
+// Função para combinar múltiplas permissões (roles e grupos)
+export const combinePermissions = (...permissionSets: (UserPermissions | undefined)[]): UserPermissions => {
+  // Criar um objeto de permissões base com tudo em false
+  const combined: any = {};
+  
+  // Lista de todas as chaves de permissão
+  const allPermissionKeys: (keyof UserPermissions)[] = [
+    'USERS_READ', 'USERS_WRITE', 'USERS_DELETE', 'USERS_CREATE',
+    'GROUPS_READ', 'GROUPS_WRITE', 'GROUPS_DELETE', 'GROUPS_CREATE',
+    'CLIENTS_READ', 'CLIENTS_WRITE', 'CLIENTS_DELETE', 'CLIENTS_CREATE',
+    'EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_DELETE', 'EMPLOYEES_CREATE', 'EMPLOYEE_HISTORY_READ',
+    'CONTRACTS_READ', 'CONTRACTS_WRITE', 'CONTRACTS_DELETE', 'CONTRACTS_CREATE',
+    'FINANCIAL_READ', 'FINANCIAL_WRITE', 'FINANCIAL_DELETE', 'FINANCIAL_CREATE',
+    'FINANCIAL_PAYABLE_READ', 'FINANCIAL_PAYABLE_WRITE', 'FINANCIAL_RECEIVABLE_READ', 'FINANCIAL_RECEIVABLE_WRITE',
+    'FINANCIAL_CASHFLOW_READ', 'FINANCIAL_INVOICE_READ', 'FINANCIAL_MEASUREMENT_READ',
+    'PAYSLIPS_READ', 'PAYSLIPS_WRITE', 'PAYSLIPS_DELETE', 'PAYSLIPS_CREATE', 'PAYSLIPS_PUBLISH',
+    'STOCK_READ', 'STOCK_WRITE', 'STOCK_DELETE', 'STOCK_CREATE', 'STOCK_MANAGE',
+    'EQUIPMENTS_READ', 'EQUIPMENTS_WRITE', 'EQUIPMENTS_DELETE', 'EQUIPMENTS_CREATE', 'EQUIPMENTS_ASSIGN',
+    'COMPANIES_READ', 'COMPANIES_WRITE', 'COMPANIES_DELETE', 'COMPANIES_CREATE', 'COMPANIES_MANAGE',
+    'REPORTS_READ', 'REPORTS_GENERATE', 'REPORTS_EXPORT',
+    'LEADS_READ', 'LEADS_WRITE', 'LEADS_DELETE', 'LEADS_CREATE',
+    'PROPOSALS_READ', 'PROPOSALS_WRITE', 'PROPOSALS_DELETE', 'PROPOSALS_CREATE',
+    'QUOTES_READ', 'QUOTES_WRITE', 'QUOTES_DELETE', 'QUOTES_CREATE',
+    'SYSTEM_CONFIG', 'SYSTEM_LOGS', 'SYSTEM_BACKUP', 'SYSTEM_INTEGRATION',
+    'AUDIT_READ', 'AUDIT_WRITE',
+    'DASHBOARD_READ', 'DASHBOARD_WRITE',
+    'COMMERCIAL_DASHBOARD_READ', 'SALES_GOALS_READ', 'SALES_GOALS_WRITE',
+    'PROFILE_READ', 'PROFILE_WRITE',
+    'SUPPORT_READ', 'SUPPORT_WRITE', 'SUPPORT_DELETE', 'SUPPORT_CREATE', 'SUPPORT_MANAGE',
+    'MESSAGES_READ', 'MESSAGES_WRITE', 'MESSAGES_DELETE', 'MESSAGES_CREATE', 'MESSAGES_MANAGE',
+    'ATTENDANCE_READ', 'ATTENDANCE_WRITE', 'ATTENDANCE_MANAGE',
+    'VISITS_READ', 'VISITS_WRITE', 'VISITS_CREATE', 'VISITS_UPDATE', 'VISITS_DELETE', 'VISITS_MANAGE',
+    'TIME_RECORD_READ', 'TIME_RECORD_CREATE', 'TIME_RECORD_UPDATE', 'TIME_RECORD_DELETE', 'TIME_RECORD_MANAGE',
+    'PAYROLL_READ', 'PAYROLL_CREATE', 'PAYROLL_MANAGE',
+    'PATRIMONIAL_READ', 'PATRIMONIAL_WRITE',
+    'FISCAL_READ', 'FISCAL_WRITE',
+    'ALL_PERMISSIONS'
+  ];
 
-  // Se qualquer uma das permissões (role ou grupo) for true, a permissão final será true
-  Object.keys(rolePermissions).forEach(key => {
-    const permissionKey = key as keyof UserPermissions;
-    combined[permissionKey] = rolePermissions[permissionKey] || groupPermissions[permissionKey];
+  // Inicializar tudo como false
+  allPermissionKeys.forEach(key => (combined[key] = false));
+
+  // Combinar (OR lógico) todos os conjuntos válidos
+  permissionSets.forEach(set => {
+    if (!set) return;
+    
+    // Se algum set tem ALL_PERMISSIONS, o resultado final terá
+    if (set.ALL_PERMISSIONS) combined.ALL_PERMISSIONS = true;
+    
+    Object.keys(set).forEach(key => {
+      if (set[key as keyof UserPermissions]) {
+        combined[key] = true;
+      }
+    });
   });
 
-  return combined;
+  return combined as UserPermissions;
 };
 
 // Função para verificar se usuário tem permissão específica

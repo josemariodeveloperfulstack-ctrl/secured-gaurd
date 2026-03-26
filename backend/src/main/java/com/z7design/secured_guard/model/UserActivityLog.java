@@ -15,11 +15,11 @@ public class UserActivityLog {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", nullable = true)
     @JsonIgnore
     private User user;
 
-    @Column(name = "username", nullable = false)
+    @Column(name = "username", nullable = true)
     private String username;
 
     @Column(name = "action", nullable = false, length = 100)

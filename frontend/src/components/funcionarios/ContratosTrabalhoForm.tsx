@@ -60,6 +60,35 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     }));
   }, [employeeId, companyId]);
 
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.employeeId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.employeeId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.employeeId, selectedEmployeeData]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -420,23 +449,41 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     <span className="text-sm font-semibold text-foreground">Dados do Empregado</span>
                   </div>
                 </div>
-                <div className="p-4 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</Label>
-                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
-                      {funcionario.name}
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
+                        {funcionario.name}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPF</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPF</Label>
-                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
-                      {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cargo</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
+                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                         {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
+                      </div>
                     </div>
                   </div>
+
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
-                      {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
+                      {typeof funcionario.address === 'string' ? funcionario.address : (funcionario.address as any)?.street || '-'}
                     </div>
                   </div>
                 </div>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
+import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { Download, Loader2, ArrowRightLeft, User, Eye, FileText } from 'lucide-react';
 import { remanejamentoService } from '@/services/remanejamentoService';
 import { EmployeeCombobox } from '../ui/employee-combobox';
-import { SimpleEmployee } from '@/services/employeeService';
+import employeeService, { SimpleEmployee } from '@/services/employeeService';
 import { useToast } from '@/hooks/use-toast';
 
 interface RelatorioMovimentacaoFormProps {
@@ -151,9 +152,39 @@ const RelatorioMovimentacaoForm: React.FC<RelatorioMovimentacaoFormProps> = ({ e
                   <span className="text-xs font-semibold text-foreground truncate">
                     {selectedEmployeeData.name}
                   </span>
+                  {(selectedEmployeeData.cpf || (selectedEmployeeData as any).document) && (
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                      · CPF: {selectedEmployeeData.cpf || (selectedEmployeeData as any).document}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
+
+            {selectedEmployeeData && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-300">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Cargo</Label>
+                    <div className="p-2.5 bg-muted/60 rounded-md text-sm font-medium border border-border/40 truncate">
+                      {selectedEmployeeData.positionName || (selectedEmployeeData as any).position?.name || '-'}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Admissão</Label>
+                    <div className="p-2.5 bg-muted/60 rounded-md text-sm font-medium border border-border/40">
+                      {selectedEmployeeData.hireDate ? new Date(selectedEmployeeData.hireDate).toLocaleDateString('pt-BR') : '-'}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Posto de Trabalho / Setor</Label>
+                  <div className="p-2.5 bg-muted/60 rounded-md text-sm font-medium border border-border/40 truncate">
+                    {selectedEmployeeData.unitName || (selectedEmployeeData as any).unit?.name || (selectedEmployeeData as any).workPost?.name || '-'}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <Separator />

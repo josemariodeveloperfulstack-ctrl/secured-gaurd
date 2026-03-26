@@ -228,7 +228,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshAuthToken: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
   setFirstAccessCompleted: (completed: boolean) => void;
 }
 
@@ -396,9 +396,22 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
   ],
   GESTOR: [],
   GESTOR_OPERACIONAL: [],
-  ESTOQUE: [],
-  SUPRIMENTOS: [],
-  COMPRAS: [],
+  ESTOQUE: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
+  ],
+  SUPRIMENTOS: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
+    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
+  ],
+  COMPRAS: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
+    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
+  ],
 };
 
 export interface UserWithGroups extends User {

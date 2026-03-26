@@ -26,7 +26,7 @@ public class DeliveryController {
     private final DeliveryService deliveryService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_SUPRIMENTOS', 'ROLE_ESTOQUE', 'SUPER_ADMIN', 'ADMIN', 'SUPRIMENTOS', 'ESTOQUE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     @Operation(summary = "Criar nova entrega", description = "Cria uma entrega e gera o token de assinatura")
     public ResponseEntity<Delivery> createDelivery(@RequestBody DeliveryRequestDTO request, Authentication authentication) {
         User user = (User) authentication.getPrincipal();
@@ -40,7 +40,7 @@ public class DeliveryController {
     }
 
     @PostMapping("/{id}/sign")
-    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_SUPRIMENTOS', 'ROLE_ESTOQUE', 'SUPER_ADMIN', 'ADMIN', 'SUPRIMENTOS', 'ESTOQUE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     @Operation(summary = "Assinar entrega via Tablet", description = "Registra a assinatura capturada localmente no tablet")
     public ResponseEntity<Delivery> signTablet(@PathVariable UUID id, @RequestBody DeliverySignatureRequestDTO request, @RequestHeader(value = "X-Forwarded-For", required = false) String ip, @RequestHeader(value = "User-Agent") String userAgent) {
         Delivery delivery = deliveryService.signDelivery(id, request.getSignatureBase64(), request.getOrigin(), ip, userAgent);
@@ -49,14 +49,14 @@ public class DeliveryController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Obter detalhes da entrega")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR', 'ALMOXARIFE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_ALMOXARIFADO', 'ROLE_ESTOQUE', 'ROLE_COMPRAS')")
     public ResponseEntity<Delivery> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(deliveryService.getDeliveryById(id));
     }
 
     @GetMapping
     @Operation(summary = "Listar todas as entregas")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GESTOR', 'ALMOXARIFE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_ALMOXARIFADO', 'ROLE_ESTOQUE', 'ROLE_COMPRAS')")
     public ResponseEntity<List<Delivery>> listAll() {
         return ResponseEntity.ok(deliveryService.getAllDeliveries());
     }

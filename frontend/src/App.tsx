@@ -207,6 +207,7 @@ const EstoqueRelatorios = lazy(() => import('@/pages/EstoqueRelatorios'));
 const Empresas = lazy(() => import('@/pages/Empresas'));
 const Compras = lazy(() => import('@/pages/Compras'));
 const CotacoesCompras = lazy(() => import('@/pages/CotacoesCompras'));
+const AcordoRecolhimento = lazy(() => import('@/pages/AcordoRecolhimento'));
 // const Suporte = lazy(() => import('@/pages/Suporte')); // REMOVIDO - substituído por Gestão de Atendimento
 const Postos = lazy(() => import('@/pages/Postos'));
 const RemanejamentoPage = lazy(() => import('@/pages/Remanejamento'));
@@ -742,6 +743,13 @@ function App() {
                     <Route path="/compras/cotacoes" element={
                       <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
                         <CotacoesCompras />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/compras/acordo-recolhimento" element={
+                      <ProtectedRoute requiredPermissions={['PURCHASE_AGREEMENT_READ', 'STOCK_MANAGE']}>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <AcordoRecolhimento />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/purchase" element={

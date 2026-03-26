@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -128,7 +129,7 @@ public class Inventory {
     
     public void calculateAccuracy() {
         if (totalItems != null && totalItems.compareTo(BigDecimal.ZERO) > 0 && countedItems != null) {
-            BigDecimal accuracy = countedItems.divide(totalItems, 4, BigDecimal.ROUND_HALF_UP)
+            BigDecimal accuracy = countedItems.divide(totalItems, 4, RoundingMode.HALF_UP)
                                            .multiply(BigDecimal.valueOf(100));
             this.accuracyPercentage = accuracy;
         }
@@ -150,7 +151,7 @@ public class Inventory {
         if (totalItems == null || totalItems.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
-        return countedItems.divide(totalItems, 2, BigDecimal.ROUND_HALF_UP)
+        return countedItems.divide(totalItems, 2, RoundingMode.HALF_UP)
                           .multiply(BigDecimal.valueOf(100));
     }
     

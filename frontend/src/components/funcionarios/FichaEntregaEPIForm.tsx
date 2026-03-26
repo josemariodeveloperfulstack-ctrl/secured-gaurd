@@ -757,6 +757,15 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                       </div>
                     </div>
                     <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
                         {funcionario.unitName || '-'}
