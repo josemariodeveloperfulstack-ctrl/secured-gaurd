@@ -66,12 +66,12 @@ jobs:
         run: |
           # Build Backend
           docker build --no-cache \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-backend:prod \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-backend:prod \
             -f backend/Dockerfile.prod ./backend
           
           # Build Frontend
           docker build --no-cache \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-frontend:prod \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:prod \
             --build-arg VITE_API_URL=/api \
             --build-arg VITE_WS_URL=/ws \
             --build-arg VITE_ENVIRONMENT=prod \
@@ -79,13 +79,13 @@ jobs:
           
           # Build WhatsApp Service
           docker build --no-cache \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:prod \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:prod \
             -f whatsapp-service/Dockerfile ./whatsapp-service
 
           # Push Images
-          docker push ghcr.io/z7devplenojava-afk/secured-guard-backend:prod
-          docker push ghcr.io/z7devplenojava-afk/secured-guard-frontend:prod
-          docker push ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:prod
+          docker push ghcr.io/${{ github.repository_owner }}/secured-guard-backend:prod
+          docker push ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:prod
+          docker push ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:prod
 
       - name: 🔑 Install sshpass and configure SSH
         run: |

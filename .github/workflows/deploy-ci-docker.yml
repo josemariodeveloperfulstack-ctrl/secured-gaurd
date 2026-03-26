@@ -167,8 +167,8 @@ jobs:
           echo "🔨 Construindo imagem do backend..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/z7devplenojava-afk/secured-guard \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-backend:ci \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci \
             -f backend/Dockerfile.prod ./backend || {
             echo "❌ Build do backend Docker falhou!"
             exit 1
@@ -179,8 +179,8 @@ jobs:
           echo "🎨 Construindo imagem do frontend..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/z7devplenojava-afk/secured-guard \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
@@ -194,8 +194,8 @@ jobs:
           echo "📱 Construindo imagem do WhatsApp service..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/z7devplenojava-afk/secured-guard \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci \
             -f whatsapp-service/Dockerfile ./whatsapp-service || {
             echo "❌ Build do WhatsApp service Docker falhou!"
             exit 1
@@ -204,7 +204,7 @@ jobs:
           
           # Verificar imagens construídas
           echo "📋 Verificando imagens construídas..."
-          docker images | grep ghcr.io/z7devplenojava-afk/secured-guard || echo "⚠️ Nenhuma imagem encontrada"
+          docker images | grep ghcr.io/${{ github.repository_owner }}/secured-guard || echo "⚠️ Nenhuma imagem encontrada"
 
       # ============================================
       # 5️⃣ LOGIN TO GHCR
@@ -231,9 +231,9 @@ jobs:
             done
             return 1
           }
-          push_with_retry ghcr.io/z7devplenojava-afk/secured-guard-backend:ci
-          push_with_retry ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci
-          push_with_retry ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci
+          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci
+          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci
+          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci
 
       # ============================================
       # 7️⃣ INSTALL SSHPASS AND CONFIGURE SSH
@@ -405,19 +405,19 @@ jobs:
               echo "❌ $name não disponível e sem cache"; return 1
             }
             echo "📥 Pull backend..."
-            pull_or_use_cache ghcr.io/z7devplenojava-afk/secured-guard-backend:ci "backend" || exit 1
+            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci "backend" || exit 1
             echo "📥 Pull frontend..."
-            pull_or_use_cache ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci "frontend" || exit 1
+            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci "frontend" || exit 1
             echo "📥 Pull whatsapp..."
-            pull_or_use_cache ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci "whatsapp" || exit 1
+            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci "whatsapp" || exit 1
 
             echo "🧹 Removendo imagens antigas (após pull bem-sucedido)..."
             docker image prune -f --filter "dangling=true" 2>/dev/null || true
 
             echo "🔎 Labels das imagens:"
-            docker image inspect ghcr.io/z7devplenojava-afk/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
-            docker image inspect ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
-            docker image inspect ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
+            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
+            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
+            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
 
             echo "🧹 Limpando redes..."
             docker network rm secured-guard-ci 2>/dev/null || true
