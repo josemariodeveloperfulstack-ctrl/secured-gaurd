@@ -392,14 +392,12 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
     { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
     { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
-    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
   ],
   GESTOR: [],
   GESTOR_OPERACIONAL: [],
   ESTOQUE: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
     { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
-    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
   ],
   SUPRIMENTOS: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },

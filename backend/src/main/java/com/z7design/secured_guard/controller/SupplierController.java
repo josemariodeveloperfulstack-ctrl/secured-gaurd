@@ -35,6 +35,7 @@ public class SupplierController {
             @ApiResponse(responseCode = "200", description = "Lista de fornecedores retornada com sucesso"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<Supplier>> getAll(
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
         return ResponseEntity.ok(supplierService.findAll(pageable));
@@ -42,12 +43,14 @@ public class SupplierController {
 
     @GetMapping("/all")
     @Operation(summary = "Listar todos os fornecedores (sem paginação)", description = "Retorna uma lista completa de todos os fornecedores")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<Supplier>> getAllWithoutPagination() {
         return ResponseEntity.ok(supplierService.findAll());
     }
 
     @GetMapping("/active")
     @Operation(summary = "Listar fornecedores ativos", description = "Retorna apenas fornecedores ativos")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<Supplier>> getActiveSuppliers() {
         return ResponseEntity.ok(supplierService.findActiveSuppliers());
     }
@@ -59,6 +62,7 @@ public class SupplierController {
             @ApiResponse(responseCode = "404", description = "Fornecedor não encontrado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Supplier> getById(@PathVariable String id) {
         return ResponseEntity.ok(supplierService.findById(UUID.fromString(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado")));
@@ -66,6 +70,7 @@ public class SupplierController {
 
     @GetMapping("/cnpj/{cnpj}")
     @Operation(summary = "Buscar fornecedor por CNPJ", description = "Retorna um fornecedor específico pelo seu CNPJ")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Supplier> getByCnpj(@PathVariable String cnpj) {
         Optional<Supplier> supplier = supplierService.findByCnpj(cnpj);
         return supplier.map(ResponseEntity::ok)
@@ -74,6 +79,7 @@ public class SupplierController {
 
     @GetMapping("/email/{email}")
     @Operation(summary = "Buscar fornecedor por email", description = "Retorna um fornecedor específico pelo seu email")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Supplier> getByEmail(@PathVariable String email) {
         Optional<Supplier> supplier = supplierService.findByEmail(email);
         return supplier.map(ResponseEntity::ok)
@@ -82,24 +88,28 @@ public class SupplierController {
 
     @GetMapping("/search")
     @Operation(summary = "Buscar fornecedores por nome", description = "Busca fornecedores pelo nome (parcial)")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<Supplier>> searchByName(@RequestParam("name") String name) {
         return ResponseEntity.ok(supplierService.findByNameContaining(name));
     }
 
     @GetMapping("/city/{city}")
     @Operation(summary = "Buscar fornecedores por cidade", description = "Retorna fornecedores de uma cidade específica")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<Supplier>> getByCity(@PathVariable String city) {
         return ResponseEntity.ok(supplierService.findByCity(city));
     }
 
     @GetMapping("/state/{state}")
     @Operation(summary = "Buscar fornecedores por estado", description = "Retorna fornecedores de um estado específico")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<Supplier>> getByState(@PathVariable String state) {
         return ResponseEntity.ok(supplierService.findByState(state));
     }
 
     @GetMapping("/filters")
     @Operation(summary = "Buscar fornecedores com filtros", description = "Busca fornecedores aplicando múltiplos filtros")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<Supplier>> getByFilters(
             @RequestParam(value = "name", required = false) String name,
             @RequestParam(value = "cnpj", required = false) String cnpj,
@@ -142,6 +152,7 @@ public class SupplierController {
             @ApiResponse(responseCode = "404", description = "Fornecedor não encontrado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         supplierService.deleteById(UUID.fromString(id));
         return ResponseEntity.noContent().build();
@@ -149,6 +160,7 @@ public class SupplierController {
 
     @PatchMapping("/{id}/toggle-status")
     @Operation(summary = "Alternar status do fornecedor", description = "Ativa ou desativa um fornecedor")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Supplier> toggleStatus(@PathVariable String id) {
         UUID uuid = UUID.fromString(id);
         Supplier supplier = supplierService.findById(uuid)
@@ -164,6 +176,7 @@ public class SupplierController {
 
     @GetMapping("/categories")
     @Operation(summary = "Listar categorias de fornecedores", description = "Retorna todas as categorias de fornecedores disponíveis")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<String>> getCategories() {
         // Por enquanto retorna uma lista vazia, pode ser implementado no repository se
         // necessário
@@ -172,6 +185,7 @@ public class SupplierController {
 
     @GetMapping("/stats/count")
     @Operation(summary = "Estatísticas de fornecedores", description = "Retorna contadores de fornecedores ativos e inativos")
+    @PreAuthorize("hasAnyAuthority('ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO','ROLE_ASSISTENTE_ADMINISTRATIVO','ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Object> getStats() {
         long activeCount = supplierService.countActiveSuppliers();
         long inactiveCount = supplierService.countInactiveSuppliers();

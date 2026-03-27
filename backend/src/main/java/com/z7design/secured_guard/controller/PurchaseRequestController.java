@@ -64,7 +64,7 @@ public class PurchaseRequestController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_DELETE')")
     public ResponseEntity<Void> deletePurchaseRequest(@PathVariable UUID id) {
         log.info("Deletando requisição de compra com ID: {}", id);
         purchaseRequestService.deletePurchaseRequest(id);
@@ -72,7 +72,7 @@ public class PurchaseRequestController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO', 'ROLE_COMPRAS')")
     public ResponseEntity<PurchaseRequestDTO> approveRequest(
             @PathVariable UUID id,
             @RequestParam("approverName") String approverName,
@@ -87,7 +87,7 @@ public class PurchaseRequestController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_FINANCEIRO', 'ROLE_COMPRAS')")
     public ResponseEntity<PurchaseRequestDTO> rejectRequest(
             @PathVariable UUID id,
             @RequestParam("rejectorName") String rejectorName,
@@ -103,6 +103,7 @@ public class PurchaseRequestController {
     }
 
     @PostMapping("/{id}/complete")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_WRITE')")
     public ResponseEntity<PurchaseRequestDTO> completeRequest(@PathVariable UUID id) {
         log.info("Completando requisição de compra com ID: {}", id);
         try {
@@ -114,6 +115,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByStatus(@PathVariable String status) {
         log.info("Buscando requisições de compra com status: {}", status);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByStatus(status);
@@ -121,6 +123,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/priority/{priority}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByPriority(@PathVariable String priority) {
         log.info("Buscando requisições de compra com prioridade: {}", priority);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByPriority(priority);
@@ -128,6 +131,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/requester/{requesterId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByRequester(@PathVariable UUID requesterId) {
         log.info("Buscando requisições de compra do solicitante: {}", requesterId);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByRequester(requesterId);
@@ -135,6 +139,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/approver/{approverId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByApprover(@PathVariable UUID approverId) {
         log.info("Buscando requisições de compra do aprovador: {}", approverId);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByApprover(approverId);
@@ -142,6 +147,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/unit/{unitId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getRequestsByUnit(@PathVariable UUID unitId) {
         log.info("Buscando requisições de compra da unidade: {}", unitId);
         List<PurchaseRequestDTO> requests = purchaseRequestService.getRequestsByUnit(unitId);
@@ -149,6 +155,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/overdue")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getOverdueRequests() {
         log.info("Buscando requisições de compra em atraso");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getOverdueRequests();
@@ -156,6 +163,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/urgent")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getUrgentRequests() {
         log.info("Buscando requisições de compra urgentes");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getUrgentRequests();
@@ -163,6 +171,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/pending-approval")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> getPendingApprovalRequests() {
         log.info("Buscando requisições de compra pendentes de aprovação");
         List<PurchaseRequestDTO> requests = purchaseRequestService.getPendingApprovalRequests();
@@ -170,6 +179,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseRequestDTO>> searchRequests(@RequestParam("searchTerm") String searchTerm) {
         log.info("Buscando requisições de compra com termo: {}", searchTerm);
         List<PurchaseRequestDTO> requests = purchaseRequestService.searchRequests(searchTerm);
@@ -177,6 +187,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/stats/count/{status}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<Long> getRequestsCountByStatus(@PathVariable String status) {
         log.info("Buscando contagem de requisições com status: {}", status);
         long count = purchaseRequestService.getRequestsCountByStatus(status);
@@ -184,6 +195,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/stats/urgent-count")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<Long> getUrgentRequestsCount() {
         log.info("Buscando contagem de requisições urgentes");
         long count = purchaseRequestService.getUrgentRequestsCount();
@@ -191,6 +203,7 @@ public class PurchaseRequestController {
     }
 
     @GetMapping("/stats/overdue-count")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<Long> getOverdueRequestsCount() {
         log.info("Buscando contagem de requisições em atraso");
         long count = purchaseRequestService.getOverdueRequestsCount();

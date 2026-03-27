@@ -574,6 +574,8 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
 const ROLES_WITHOUT_FINANCIAL_MODULES = new Set<UserRole>([
   'RH',
   'DEPARTAMENTO_PESSOAL',
+  'ALMOXARIFADO',
+  'ESTOQUE',
 ]);
 
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({

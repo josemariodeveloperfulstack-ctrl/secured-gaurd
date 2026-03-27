@@ -95,7 +95,7 @@ public class PurchaseQuotationController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir cotação", description = "Exclui uma cotação do sistema")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_DELETE')")
     public ResponseEntity<Void> deleteQuotation(@PathVariable UUID id) {
         log.info("Deletando cotação com ID: {}", id);
         try {
@@ -184,7 +184,7 @@ public class PurchaseQuotationController {
 
     @GetMapping("/search")
     @Operation(summary = "Buscar cotações", description = "Busca cotações por termo de pesquisa")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'PURCHASE_REQUESTS_READ')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<List<PurchaseQuotationDTO>> searchQuotations(@RequestParam("term") String term) {
         log.info("Buscando cotações com termo: {}", term);
         List<PurchaseQuotationDTO> quotations = purchaseQuotationService.searchQuotations(term);
@@ -207,7 +207,7 @@ public class PurchaseQuotationController {
 
     @GetMapping("/reports/pdf")
     @Operation(summary = "Gerar relatório PDF de cotações", description = "Gera relatório com layout corporativo em formato retrato")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'PURCHASE_REQUESTS_READ')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_COMPRAS', 'ROLE_FINANCEIRO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO', 'PURCHASE_REQUESTS_READ')")
     public ResponseEntity<byte[]> generateQuotationsReportPdf(
             @RequestParam(value = "quoteNumber", required = false) String quoteNumber,
             @RequestParam(value = "title", required = false) String title,
