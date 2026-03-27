@@ -391,6 +391,7 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
   ALMOXARIFADO: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
     { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Fornecedores', path: '/estoque/fornecedores', icon: 'Building2', color: '🟨' },
     { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
   ],
   GESTOR: [],
@@ -398,6 +399,7 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
   ESTOQUE: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
     { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Fornecedores', path: '/estoque/fornecedores', icon: 'Building2', color: '🟨' },
   ],
   SUPRIMENTOS: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
@@ -408,6 +410,7 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
   COMPRAS: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
     { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
+    { label: 'Fornecedores', path: '/estoque/fornecedores', icon: 'Building2', color: '🟨' },
     { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
   ],
 };

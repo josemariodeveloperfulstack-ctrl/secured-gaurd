@@ -540,6 +540,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-aprovacoes',
     'compras-cotacoes',
     'compras-relatorios',
+    'estoque-fornecedores',
     'chat-interno',
     'mensagens',
     'gestao-mensagens-grupos',

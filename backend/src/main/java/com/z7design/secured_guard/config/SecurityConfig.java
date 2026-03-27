@@ -410,7 +410,7 @@ public class SecurityConfig {
                                                                 "ROLE_RH", "ROLE_FINANCEIRO",
                                                                 "ROLE_COLABORADOR", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
-                                                                "ROLE_COMPRAS")
+                                                                "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de recibos - requerem permissões específicas
                                                 .requestMatchers("/api/receipts/**")
                                                 .hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE",
@@ -419,7 +419,7 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO", "ROLE_COLABORADOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
-                                                                "ROLE_COMPRAS")
+                                                                "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de documentos unificados - arquivos públicos para
                                                 // download/visualização
                                                 .requestMatchers("/api/unified-documents/public/**").permitAll()
@@ -432,7 +432,7 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO", "ROLE_COLABORADOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
-                                                                "ROLE_COMPRAS")
+                                                                "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de organização por setor - temporariamente público para
                                                 // debug
                                                 .requestMatchers("/api/sector-organization/**").permitAll()

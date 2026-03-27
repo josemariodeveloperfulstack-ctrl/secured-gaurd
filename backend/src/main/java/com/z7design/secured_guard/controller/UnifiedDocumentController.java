@@ -583,7 +583,11 @@ public class UnifiedDocumentController {
     public ResponseEntity<Resource> viewUnifiedDocument(@PathVariable String fileName) {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            boolean isColaborador = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
+                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                                  a.getAuthority().equals("ROLE_COMPRAS"));
 
             if (isColaborador) {
                 Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
@@ -1564,7 +1568,11 @@ public class UnifiedDocumentController {
         try {
             log.info("📋 Listando documentos unificados...");
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            boolean isColaborador = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
+                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                                  a.getAuthority().equals("ROLE_COMPRAS"));
             
             List<Map<String, Object>> documents;
             if (isColaborador) {

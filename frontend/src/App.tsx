@@ -528,7 +528,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/fornecedores" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ', 'STOCK_READ']} requireAllPermissions={false}>
                         <Fornecedores />
                       </ProtectedRoute>
                     } />
@@ -702,7 +702,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/estoque/fornecedores" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ', 'STOCK_READ']} requireAllPermissions={false}>
                         <Fornecedores />
                       </ProtectedRoute>
                     } />
@@ -736,7 +736,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/fornecedores" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />

@@ -423,7 +423,11 @@ public class PayslipController {
     public ResponseEntity<List<Payslip>> getAllPayslips() {
         log.info("🔍 Iniciando busca de todos os payslips...");
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+        boolean isColaborador = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                              a.getAuthority().equals("ROLE_ESTOQUE") || 
+                              a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                              a.getAuthority().equals("ROLE_COMPRAS"));
         Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
         List<Payslip> payslips;
         if (isColaborador) {
@@ -464,7 +468,11 @@ public class PayslipController {
                 return ResponseEntity.ok(emptyResponse);
             }
             
-            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            boolean isColaborador = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
+                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                                  a.getAuthority().equals("ROLE_COMPRAS"));
             Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
 
             List<Payslip> payslips;
@@ -571,7 +579,11 @@ public class PayslipController {
                 return ResponseEntity.ok(emptyResponse);
             }
             
-            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+            boolean isColaborador = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
+                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                                  a.getAuthority().equals("ROLE_COMPRAS"));
             Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
 
             List<Payslip> payslips;
@@ -757,6 +769,12 @@ public class PayslipController {
             log.info("✅ Payslip encontrado: ID={}, CPF={}, Nome={}, Arquivo={}", 
                 payslip.getId(), payslip.getCpf(), payslip.getEmployeeName(), payslip.getFileName());
             
+            boolean isColaborador = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
+                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                                  a.getAuthority().equals("ROLE_COMPRAS"));
+            
             if (isColaborador) {
                 Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip.getCpf());
                 if (resolvedCpf.isEmpty() || payslipCpf.isEmpty() || !resolvedCpf.get().equals(payslipCpf.get())) {
@@ -816,6 +834,12 @@ public class PayslipController {
             
             log.info("✅ Payslip encontrado: ID={}, CPF={}, Nome={}, Arquivo={}", 
                 payslip.getId(), payslip.getCpf(), payslip.getEmployeeName(), payslip.getFileName());
+            
+            boolean isColaborador = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
+                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                                  a.getAuthority().equals("ROLE_COMPRAS"));
             
             if (isColaborador) {
                 Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip.getCpf());
