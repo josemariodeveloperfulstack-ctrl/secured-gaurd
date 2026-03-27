@@ -716,22 +716,22 @@ function App() {
 
                     {/* Compras */}
                     <Route path="/compras" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/solicitacoes" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/aprovacoes" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/relatorios" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
@@ -741,7 +741,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/cotacoes" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <CotacoesCompras />
                       </ProtectedRoute>
                     } />

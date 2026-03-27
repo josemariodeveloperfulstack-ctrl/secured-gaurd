@@ -755,7 +755,6 @@ public class PayslipController {
     public ResponseEntity<Resource> downloadPayslip(@PathVariable String fileName) {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
             Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
             
             log.info("📥 Tentando baixar arquivo: {}", fileName);
@@ -812,7 +811,6 @@ public class PayslipController {
     public ResponseEntity<Resource> downloadPayslipById(@PathVariable String id) {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isColaborador = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
             Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
             
             log.info("📥 Tentando baixar payslip pelo ID: {}", id);
