@@ -148,6 +148,21 @@ public class PermissionService {
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE
         )));
+
+        // Módulo Comercial + contratos (alinhado ao front e às authorities do JWT vindas do BD)
+        Set<Permission> commercialFull = new HashSet<>(Arrays.asList(
+            Permission.CLIENTS_READ, Permission.CLIENTS_WRITE, Permission.CLIENTS_CREATE, Permission.CLIENTS_DELETE,
+            Permission.LEADS_READ, Permission.LEADS_WRITE, Permission.LEADS_CREATE, Permission.LEADS_DELETE,
+            Permission.PROPOSALS_READ, Permission.PROPOSALS_WRITE, Permission.PROPOSALS_CREATE, Permission.PROPOSALS_DELETE,
+            Permission.QUOTES_READ, Permission.QUOTES_WRITE, Permission.QUOTES_CREATE, Permission.QUOTES_DELETE,
+            Permission.CONTRACTS_READ, Permission.CONTRACTS_WRITE, Permission.CONTRACTS_CREATE, Permission.CONTRACTS_DELETE,
+            Permission.DASHBOARD_READ, Permission.REPORTS_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE,
+            Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
+        ));
+        rolePermissions.put(UserRole.COMERCIAL, new HashSet<>(commercialFull));
+        rolePermissions.put(UserRole.GESTOR_COMERCIAL, new HashSet<>(commercialFull));
+        rolePermissions.put(UserRole.ASSISTENTE_COMERCIAL, new HashSet<>(commercialFull));
     }
 
     public Set<Permission> getPermissionsForRole(UserRole role) {

@@ -5,6 +5,8 @@ export const USER_ROLE_LIST: UserRole[] = [
   'ADMIN',
   'GESTOR',
   'COMERCIAL',
+  'GESTOR_COMERCIAL',
+  'ASSISTENTE_COMERCIAL',
   'SUPERVISOR',
   'RH',
   'ASSISTENCIA_RH',
@@ -300,6 +302,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         QUOTES_READ: true,
         QUOTES_WRITE: true,
         QUOTES_CREATE: true,
+        QUOTES_DELETE: true,
 
         // Permissões de Suporte
         SUPPORT_READ: true,
@@ -540,6 +543,12 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     case 'GESTOR':
       return {
         ...basePermissions,
+        // Clientes / empresas (módulo Comercial no menu)
+        CLIENTS_READ: true,
+        CLIENTS_WRITE: true,
+        CLIENTS_CREATE: true,
+        CLIENTS_DELETE: true,
+
         // Permissões de Equipamentos/Frota
         EQUIPMENTS_READ: true,
         EQUIPMENTS_WRITE: true,
@@ -550,9 +559,11 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         EMPLOYEES_READ: true,
         EMPLOYEES_WRITE: true,
 
-        // Permissões de Contratos
+        // Permissões de Contratos (CRUD alinhado ao módulo Comercial)
         CONTRACTS_READ: true,
         CONTRACTS_WRITE: true,
+        CONTRACTS_CREATE: true,
+        CONTRACTS_DELETE: true,
 
         // Permissões de Relatórios
         REPORTS_READ: true,
@@ -567,12 +578,15 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         LEADS_READ: true,
         LEADS_WRITE: true,
         LEADS_CREATE: true,
+        LEADS_DELETE: true,
         PROPOSALS_READ: true,
         PROPOSALS_WRITE: true,
         PROPOSALS_CREATE: true,
+        PROPOSALS_DELETE: true,
         QUOTES_READ: true,
         QUOTES_WRITE: true,
         QUOTES_CREATE: true,
+        QUOTES_DELETE: true,
 
         // Dashboard Comercial e Metas
         COMMERCIAL_DASHBOARD_READ: true,
@@ -929,6 +943,8 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         CONTRACTS_READ: true,
         CONTRACTS_WRITE: true,
         CONTRACTS_CREATE: true,
+        CONTRACTS_DELETE: true,
+        CLIENTS_DELETE: true,
         REPORTS_READ: true,
         DASHBOARD_READ: true,
         PROFILE_READ: true,
@@ -940,6 +956,42 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         // Dashboard Comercial (somente leitura, sem metas)
         COMMERCIAL_DASHBOARD_READ: true,
         SALES_GOALS_READ: true,
+      };
+
+    case 'GESTOR_COMERCIAL':
+    case 'ASSISTENTE_COMERCIAL':
+      return {
+        ...basePermissions,
+        CLIENTS_READ: true,
+        CLIENTS_WRITE: true,
+        CLIENTS_CREATE: true,
+        CLIENTS_DELETE: true,
+        LEADS_READ: true,
+        LEADS_WRITE: true,
+        LEADS_CREATE: true,
+        LEADS_DELETE: true,
+        PROPOSALS_READ: true,
+        PROPOSALS_WRITE: true,
+        PROPOSALS_CREATE: true,
+        PROPOSALS_DELETE: true,
+        QUOTES_READ: true,
+        QUOTES_WRITE: true,
+        QUOTES_CREATE: true,
+        QUOTES_DELETE: true,
+        CONTRACTS_READ: true,
+        CONTRACTS_WRITE: true,
+        CONTRACTS_CREATE: true,
+        CONTRACTS_DELETE: true,
+        REPORTS_READ: true,
+        DASHBOARD_READ: true,
+        PROFILE_READ: true,
+        PROFILE_WRITE: true,
+        MESSAGES_READ: true,
+        MESSAGES_WRITE: true,
+        MESSAGES_CREATE: true,
+        COMMERCIAL_DASHBOARD_READ: true,
+        SALES_GOALS_READ: true,
+        SALES_GOALS_WRITE: normalizedRole === 'GESTOR_COMERCIAL',
       };
 
     default:

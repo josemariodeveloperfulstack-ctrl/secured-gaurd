@@ -445,6 +445,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         errorMessage = 'Acesso negado. Verifique suas permissões.';
       } else if (error?.response?.status === 500) {
         errorMessage = 'Erro interno do servidor. Tente novamente mais tarde.';
+      } else if (
+        error?.response?.status === 502 ||
+        error?.response?.status === 503 ||
+        error?.response?.status === 504
+      ) {
+        errorMessage =
+          error?.response?.data?.message ||
+          'O backend está temporariamente indisponível. Tente novamente em alguns instantes.';
       } else if (error?.response?.status === 522 || (error as any)?.is522Error) {
         errorMessage = 'O servidor está temporariamente indisponível. O servidor de origem não está respondendo. Por favor, tente novamente em alguns instantes. Se o problema persistir, entre em contato com o suporte.';
       } else if (error?.isConnectionError) {

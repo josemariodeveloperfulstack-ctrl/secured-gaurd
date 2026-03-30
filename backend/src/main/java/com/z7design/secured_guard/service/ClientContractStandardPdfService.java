@@ -3,7 +3,6 @@ package com.z7design.secured_guard.service;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
-import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Cell;
@@ -48,11 +47,12 @@ public class ClientContractStandardPdfService {
                         // Buscar configuração: por ID se informado, senão a ativa
                         CompanyConfig companyConfig;
                         if (request.getCompanyConfigId() != null) {
-                                companyConfig = companyConfigRepository.findById(request.getCompanyConfigId())
+                                companyConfig = companyConfigRepository
+                                                .findFirstByIdOrderByCreatedAtDesc(request.getCompanyConfigId())
                                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                                 "Configuração da empresa não encontrada"));
                         } else {
-                                companyConfig = companyConfigRepository.findActiveConfig()
+                                companyConfig = companyConfigRepository.findFirstByActiveTrueOrderByCreatedAtDesc()
                                                 .orElseThrow(() -> new ResourceNotFoundException(
                                                                 "Configuração da empresa não encontrada"));
                         }
@@ -75,6 +75,10 @@ public class ClientContractStandardPdfService {
                                                 .map(Company::getId)
                                                 .orElse(null);
                         }
+                        if (companyId == null) {
+                                throw new ResourceNotFoundException(
+                                                "Nenhuma empresa cadastrada. Cadastre uma empresa e ative uma configuração antes de gerar o contrato em PDF.");
+                        }
 
                         ReportLayoutConfig config = ReportLayoutConfig.builder()
                                         .companyId(companyId)
@@ -92,6 +96,10 @@ public class ClientContractStandardPdfService {
 
                         document.close();
                         return outputStream.toByteArray();
+                } catch (ResourceNotFoundException e) {
+                        throw e;
+                } catch (IllegalArgumentException e) {
+                        throw e;
                 } catch (Exception e) {
                         log.error("Erro ao gerar PDF do Contrato de Cliente", e);
                         throw new RuntimeException("Erro ao gerar PDF do Contrato de Cliente", e);
@@ -150,6 +158,10 @@ public class ClientContractStandardPdfService {
 
                         document.close();
                         return outputStream.toByteArray();
+                } catch (ResourceNotFoundException e) {
+                        throw e;
+                } catch (IllegalArgumentException e) {
+                        throw e;
                 } catch (Exception e) {
                         log.error("Erro ao gerar PDF de preview do template", e);
                         throw new RuntimeException("Erro ao gerar PDF de preview do template", e);
@@ -158,8 +170,9 @@ public class ClientContractStandardPdfService {
 
         private CompanyConfig resolveCompanyConfig(ContractTemplatePreviewRequest req, Company company) {
                 if (req.getCompanyConfigId() != null) {
-                        return companyConfigRepository.findById(req.getCompanyConfigId())
-                                        .orElseThrow(() -> new ResourceNotFoundException(
+                        return companyConfigRepository
+                                                .findFirstByIdOrderByCreatedAtDesc(req.getCompanyConfigId())
+                                                .orElseThrow(() -> new ResourceNotFoundException(
                                                         "Configuração da empresa não encontrada"));
                 }
                 // Config virtual com overrides (alterações não salvas)
@@ -324,10 +337,13 @@ public class ClientContractStandardPdfService {
                 Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 45, 10, 45 }))
                                 .useAllAvailableWidth();
 
+                String contractorName = company.getName() != null ? company.getName() : "";
+                String clientSignName = request.getClientName() != null ? request.getClientName() : "";
+
                 Cell cell1 = new Cell()
                                 .add(new Paragraph("_________________________________")
                                                 .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(company.getName().toUpperCase())
+                                .add(new Paragraph(contractorName.toUpperCase())
                                                 .setTextAlignment(TextAlignment.CENTER)
                                                 .setFontSize(8f).setBold())
                                 .add(new Paragraph("CONTRATADA").setTextAlignment(TextAlignment.CENTER).setFontSize(8f))
@@ -338,7 +354,7 @@ public class ClientContractStandardPdfService {
                 Cell cell2 = new Cell()
                                 .add(new Paragraph("_________________________________")
                                                 .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(request.getClientName().toUpperCase())
+                                .add(new Paragraph(clientSignName.toUpperCase())
                                                 .setTextAlignment(TextAlignment.CENTER)
                                                 .setFontSize(8f).setBold())
                                 .add(new Paragraph("CONTRATANTE").setTextAlignment(TextAlignment.CENTER)
