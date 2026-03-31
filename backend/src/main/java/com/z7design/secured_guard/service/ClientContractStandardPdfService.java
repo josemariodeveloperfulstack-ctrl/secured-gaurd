@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 import java.text.NumberFormat;
 import java.time.LocalDate;
@@ -44,18 +45,7 @@ public class ClientContractStandardPdfService {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                         PdfWriter writer = new PdfWriter(outputStream);
 
-                        // Buscar configuração: por ID se informado, senão a ativa
-                        CompanyConfig companyConfig;
-                        if (request.getCompanyConfigId() != null) {
-                                companyConfig = companyConfigRepository
-                                                .findFirstByIdOrderByCreatedAtDesc(request.getCompanyConfigId())
-                                                .orElseThrow(() -> new ResourceNotFoundException(
-                                                                "Configuração da empresa não encontrada"));
-                        } else {
-                                companyConfig = companyConfigRepository.findFirstByActiveTrueOrderByCreatedAtDesc()
-                                                .orElseThrow(() -> new ResourceNotFoundException(
-                                                                "Configuração da empresa não encontrada"));
-                        }
+                        CompanyConfig companyConfig = resolveCompanyConfigForPdf(request);
 
                         String reportTitle = companyConfig.getHeaderText() != null
                                         && !companyConfig.getHeaderText().isEmpty()
@@ -104,6 +94,79 @@ public class ClientContractStandardPdfService {
                         log.error("Erro ao gerar PDF do Contrato de Cliente", e);
                         throw new RuntimeException("Erro ao gerar PDF do Contrato de Cliente", e);
                 }
+        }
+
+        /**
+         * Resolve {@link CompanyConfig} para PDF: ID explícito, config ativa no banco, ou
+         * fallback sintético a partir da empresa (evita falha em ambientes sem config ativa).
+         */
+        private CompanyConfig resolveCompanyConfigForPdf(ClientContractRequest request) {
+                if (request.getCompanyConfigId() != null) {
+                        return companyConfigRepository
+                                        .findFirstByIdOrderByCreatedAtDesc(request.getCompanyConfigId())
+                                        .orElseThrow(() -> new ResourceNotFoundException(
+                                                        "Configuração da empresa não encontrada"));
+                }
+                Optional<CompanyConfig> active = companyConfigRepository
+                                .findFirstByActiveTrueOrderByCreatedAtDesc();
+                if (active.isPresent()) {
+                        return active.get();
+                }
+                UUID resolvedCompanyId = request.getCompanyId();
+                if (resolvedCompanyId == null) {
+                        resolvedCompanyId = companyRepository.findAll().stream()
+                                        .findFirst()
+                                        .map(Company::getId)
+                                        .orElse(null);
+                }
+                if (resolvedCompanyId == null) {
+                        throw new ResourceNotFoundException(
+                                        "Nenhuma configuração de empresa ativa e nenhuma empresa cadastrada. "
+                                                        + "Cadastre uma empresa e ative uma configuração, ou informe companyId no contrato.");
+                }
+                final UUID companyId = resolvedCompanyId;
+                Company company = companyRepository.findById(companyId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Empresa não encontrada com ID: " + companyId));
+                log.warn("PDF contrato: sem CompanyConfig ativa — usando dados sintéticos da empresa {} ({})",
+                                companyId, company.getName());
+                return buildSyntheticCompanyConfig(company);
+        }
+
+        private CompanyConfig buildSyntheticCompanyConfig(Company company) {
+                String cnpjDigits = company.getCnpj() != null ? company.getCnpj().replaceAll("[^0-9]", "") : "";
+                if (cnpjDigits.length() != 14) {
+                        cnpjDigits = "00000000000000";
+                }
+                String cepDigits = company.getZipCode() != null ? company.getZipCode().replaceAll("[^0-9]", "") : "";
+                if (cepDigits.length() < 8) {
+                        cepDigits = "00000000";
+                } else if (cepDigits.length() > 8) {
+                        cepDigits = cepDigits.substring(0, 8);
+                }
+                String uf = "MG";
+                if (company.getState() != null && company.getState().length() >= 2) {
+                        uf = company.getState().substring(0, 2).toUpperCase();
+                }
+                return CompanyConfig.builder()
+                                .companyId(company.getId())
+                                .name(company.getName() != null && !company.getName().isBlank()
+                                                ? company.getName()
+                                                : "Empresa")
+                                .cnpj(cnpjDigits)
+                                .address(company.getAddress() != null ? company.getAddress() : "-")
+                                .city(company.getCity() != null ? company.getCity() : "-")
+                                .state(uf)
+                                .zipCode(cepDigits)
+                                .phone(company.getPhone() != null ? company.getPhone() : "-")
+                                .email(company.getEmail() != null ? company.getEmail() : "contato@empresa.com")
+                                .website(company.getWebsite())
+                                .logoUrl(company.getLogoUrl())
+                                .headerText(null)
+                                .footerText("")
+                                .contractTerms("")
+                                .active(false)
+                                .build();
         }
 
         /**
@@ -218,8 +281,12 @@ public class ClientContractStandardPdfService {
                 // Contratante (Cliente)
                 Cell clientCell = new Cell().setPadding(5f);
                 clientCell.add(new Paragraph("CONTRATANTE:").setBold().setFontSize(9f));
-                clientCell.add(new Paragraph(request.getClientName()).setBold().setFontSize(10f));
-                clientCell.add(new Paragraph("Doc: " + request.getClientDocument()).setFontSize(9f));
+                clientCell.add(new Paragraph(
+                                request.getClientName() != null ? request.getClientName() : "-")
+                                                .setBold().setFontSize(10f));
+                clientCell.add(new Paragraph(
+                                "Doc: " + (request.getClientDocument() != null ? request.getClientDocument() : "-"))
+                                                .setFontSize(9f));
                 clientCell.add(
                                 new Paragraph("Endereço: "
                                                 + (request.getClientAddress() != null ? request.getClientAddress()
@@ -236,7 +303,8 @@ public class ClientContractStandardPdfService {
                                 .useAllAvailableWidth();
 
                 detailsTable.addCell(createLabelCell("Número do Contrato:"));
-                detailsTable.addCell(createValueCell(request.getContractNumber()));
+                detailsTable.addCell(createValueCell(
+                                request.getContractNumber() != null ? request.getContractNumber() : "-"));
 
                 detailsTable.addCell(createLabelCell("Valor Total:"));
                 detailsTable.addCell(createValueCell("R$ " + formatMoney(request.getValue())));
@@ -250,7 +318,8 @@ public class ClientContractStandardPdfService {
                                                 : "Prazo Indeterminado"));
 
                 detailsTable.addCell(createLabelCell("Descrição:"));
-                detailsTable.addCell(createValueCell(request.getDescription()));
+                detailsTable.addCell(createValueCell(
+                                request.getDescription() != null ? request.getDescription() : "-"));
 
                 document.add(detailsTable);
 
