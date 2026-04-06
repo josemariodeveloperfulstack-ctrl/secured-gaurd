@@ -70,12 +70,14 @@ public class ClientContractStandardPdfService {
                                                 "Nenhuma empresa cadastrada. Cadastre uma empresa e ative uma configuração antes de gerar o contrato em PDF.");
                         }
 
+                        // Mesmo padrão visual dos contratos de trabalho e relatórios: template PNG + margens.
                         ReportLayoutConfig config = ReportLayoutConfig.builder()
                                         .companyId(companyId)
                                         .reportTitle(reportTitle)
+                                        .topMargin(100f)
+                                        .bottomMargin(50f)
                                         .includeEmailInFooter(true)
                                         .landscape(false)
-                                        .useProgrammaticLayout(true) // Layout correto: gradiente, forma escura (ORIENTACAO_LAYOUT)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -209,9 +211,10 @@ public class ClientContractStandardPdfService {
                         ReportLayoutConfig config = ReportLayoutConfig.builder()
                                         .companyId(companyId)
                                         .reportTitle(reportTitle)
+                                        .topMargin(100f)
+                                        .bottomMargin(50f)
                                         .includeEmailInFooter(true)
                                         .landscape(false)
-                                        .useProgrammaticLayout(true) // Layout correto: gradiente, forma escura (ORIENTACAO_LAYOUT)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -260,8 +263,9 @@ public class ClientContractStandardPdfService {
 
         private void addContent(Document document, ClientContractRequest request, Company company,
                         CompanyConfig config) {
+                document.add(new Paragraph("").setMarginBottom(14f));
                 // Seção: Partes Contratantes
-                document.add(createSectionHeader("1. PARTES CONTRATANTES"));
+                document.add(createSectionHeader("1. PARTES CONTRATANTES").setMarginTop(6f));
 
                 Table partiesTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
                                 .useAllAvailableWidth();
