@@ -670,6 +670,7 @@ public class EmployeeService {
         for (Employee employee : employees) {
             employee.setStatus(EmploymentStatus.TERMINATED);
             employee.setTerminationDate(terminationDate);
+            employee.setDataRescisao(terminationDate);
             employee.setUpdatedAt(LocalDateTime.now());
 
             // Apply termination rules (deactivate user etc.)
@@ -707,11 +708,13 @@ public class EmployeeService {
         }
 
         if (dto != null) {
-            if (employee.getTerminationDate() == null && dto.getDataRescisao() != null) {
-                employee.setTerminationDate(dto.getDataRescisao());
-            }
+            // data_rescisao é o campo usado na ficha/edição; manter termination_date alinhado para listagens e relatórios
             if (dto.getDataRescisao() != null) {
                 employee.setDataRescisao(dto.getDataRescisao());
+                employee.setTerminationDate(dto.getDataRescisao());
+            } else if (dto.getTerminationDate() != null) {
+                employee.setTerminationDate(dto.getTerminationDate());
+                employee.setDataRescisao(dto.getTerminationDate());
             }
             if (dto.getTerminationReason() != null) {
                 employee.setTerminationReason(dto.getTerminationReason());

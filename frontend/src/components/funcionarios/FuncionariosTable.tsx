@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import { Checkbox } from '@/components/ui/checkbox';
+import { formatDate as formatDatePtBr } from '@/utils/formatters';
 
 interface FuncionariosTableProps {
   employees: Employee[];
@@ -86,13 +87,8 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
     );
   };
 
-  const formatDate = (date?: string) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('pt-BR');
-  };
-
-  /** Data de desligamento exibida (API pode preencher só terminationDate ou só dataRescisao). */
-  const terminationDateForDisplay = (e: Employee) => e.terminationDate || e.dataRescisao;
+  /** Data de desligamento: mesma prioridade da edição (data de rescisão na ficha). */
+  const terminationDateForDisplay = (e: Employee) => e.dataRescisao || e.terminationDate;
 
   /** Status efetivo para UI: com data de demissão → Demitido. */
   const effectiveEmploymentStatus = (e: Employee) =>
@@ -339,13 +335,13 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 <TableCell>
                   <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
                     <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                    {formatDate(employee.hireDate)}
+                    {formatDatePtBr(employee.hireDate)}
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
                     <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                    {formatDate(terminationDateForDisplay(employee))}
+                    {formatDatePtBr(terminationDateForDisplay(employee))}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -532,7 +528,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 {employee.hireDate && (
                   <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
                     <Calendar className="h-3 w-3 flex-shrink-0 text-green-400/70" />
-                    <span>{formatDate(employee.hireDate)}</span>
+                    <span>{formatDatePtBr(employee.hireDate)}</span>
                   </div>
                 )}
               </div>

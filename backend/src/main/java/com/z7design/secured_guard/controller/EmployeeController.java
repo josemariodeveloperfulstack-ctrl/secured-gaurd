@@ -350,6 +350,9 @@ public class EmployeeController {
                     employee.put("updatedAt", row[18]);
                     employee.put("escalaTrabalho", safeAt(row, 30));
                     employee.put("horarioTrabalho", safeAt(row, 31));
+                    if (safeAt(row, 32) != null) {
+                        employee.put("dataRescisao", safeAt(row, 32));
+                    }
 
                     // Adicionar position e unit (novas colunas da query)
                     if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
@@ -468,6 +471,9 @@ public class EmployeeController {
                 employee.put("updatedAt", safeAt(row, 18));
                 employee.put("escalaTrabalho", safeAt(row, 30));
                 employee.put("horarioTrabalho", safeAt(row, 31));
+                if (safeAt(row, 32) != null) {
+                    employee.put("dataRescisao", safeAt(row, 32));
+                }
 
                 if (safeAt(row, 19) != null || safeAt(row, 28) != null) {
                     java.util.Map<String, Object> position = new java.util.HashMap<>();
@@ -488,12 +494,7 @@ public class EmployeeController {
                     employee.put("company", company);
                 }
                 if (safeAt(row, 22) != null) employee.put("userId", safeAt(row, 22));
-                if (safeAt(row, 23) != null || safeAt(row, 27) != null) {
-                    java.util.Map<String, Object> workPost = new java.util.HashMap<>();
-                    if (safeAt(row, 23) != null) workPost.put("name", safeAt(row, 23));
-                    if (safeAt(row, 27) != null) workPost.put("id", safeAt(row, 27));
-                    employee.put("workPost", workPost);
-                }
+                putWorkPostIfPresent(employee, row);
                 if (safeAt(row, 24) != null || safeAt(row, 29) != null) {
                     java.util.Map<String, Object> department = new java.util.HashMap<>();
                     if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24));
@@ -608,6 +609,15 @@ public class EmployeeController {
             if (safeAt(row, 24) != null) department.put("name", safeAt(row, 24));
             if (safeAt(row, 29) != null) department.put("id", safeAt(row, 29));
             employee.put("department", department);
+        }
+        if (safeAt(row, 30) != null) {
+            employee.put("escalaTrabalho", safeAt(row, 30));
+        }
+        if (safeAt(row, 31) != null) {
+            employee.put("horarioTrabalho", safeAt(row, 31));
+        }
+        if (safeAt(row, 32) != null) {
+            employee.put("dataRescisao", safeAt(row, 32));
         }
         return employee;
     }

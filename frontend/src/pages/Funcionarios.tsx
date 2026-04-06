@@ -464,11 +464,13 @@ const Funcionarios: React.FC = () => {
       same((employee.workPost as any)?.name, workPostFilter) ||
       String((employee.workPost as any)?.id) === String(workPostFilter);
 
-    const hireDate = employee.hireDate ? new Date(employee.hireDate) : null;
-    const matchesHireDateFrom = !hireDateFrom || (hireDate && hireDate >= new Date(hireDateFrom));
+    const hireStr = employee.hireDate;
+    const hireDate = hireStr ? new Date(`${String(hireStr).split('T')[0]}T12:00:00`) : null;
+    const matchesHireDateFrom = !hireDateFrom || (hireDate && hireDate >= new Date(hireDateFrom + 'T12:00:00'));
     const matchesHireDateTo = !hireDateTo || (hireDate && hireDate <= new Date(hireDateTo + 'T23:59:59'));
 
-    const termDate = employee.terminationDate ? new Date(employee.terminationDate) : null;
+    const termStr = employee.dataRescisao || employee.terminationDate;
+    const termDate = termStr ? new Date(`${String(termStr).split('T')[0]}T12:00:00`) : null;
     const matchesTerminationDateFrom = !terminationDateFrom || (termDate && termDate >= new Date(terminationDateFrom));
     const matchesTerminationDateTo = !terminationDateTo || (termDate && termDate <= new Date(terminationDateTo + 'T23:59:59'));
 
@@ -520,11 +522,12 @@ const Funcionarios: React.FC = () => {
     };
     const getDate = (e: Employee, k: SortKey) => {
       if (k === 'hireDate') {
-        return e.hireDate ? new Date(e.hireDate).getTime() : null;
+        const h = e.hireDate;
+        return h ? new Date(`${String(h).split('T')[0]}T12:00:00`).getTime() : null;
       }
       if (k === 'terminationDate') {
-        const v = e.terminationDate || e.dataRescisao;
-        return v ? new Date(v).getTime() : null;
+        const v = e.dataRescisao || e.terminationDate;
+        return v ? new Date(`${String(v).split('T')[0]}T12:00:00`).getTime() : null;
       }
       return null;
     };

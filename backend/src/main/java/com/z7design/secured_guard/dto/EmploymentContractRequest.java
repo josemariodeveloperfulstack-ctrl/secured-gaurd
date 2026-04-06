@@ -34,4 +34,17 @@ public class EmploymentContractRequest {
 
     private String city; // Cidade para data
     private LocalDate contractDate; // Data do contrato
+
+    /**
+     * Tipo de contrato no PDF: {@code STANDARD} (cláusulas resumidas CLT), {@code EXPERIENCE}
+     * (texto integral + LGPD + termo de prorrogação) ou {@code INDEFINITE} (texto integral por prazo
+     * indeterminado, sem termo de experiência/prorrogação — várias páginas).
+     */
+    private String contractKind;
+
+    /** Dias do período de experiência: 45, 60 ou 90 (usado quando contractKind = EXPERIENCE). */
+    private Integer experienceDurationDays;
+
+    /** Salário por extenso (ex.: cadastro do funcionário). Opcional; se vazio, usa texto orientativo no PDF. */
+    private String salaryInWords;
 }

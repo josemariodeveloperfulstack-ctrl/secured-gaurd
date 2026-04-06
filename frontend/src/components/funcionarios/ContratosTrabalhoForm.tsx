@@ -23,6 +23,33 @@ interface ContratosTrabalhoFormProps {
   companyId?: string;
 }
 
+function resolvePdfContractKind(
+  contractType: string
+): 'EXPERIENCE' | 'INDEFINITE' | 'STANDARD' {
+  if (contractType === 'Contrato de Experiência') return 'EXPERIENCE';
+  if (contractType === 'CLT - Prazo indeterminado (integral)') return 'INDEFINITE';
+  return 'STANDARD';
+}
+
+/** Valor enviado em `department` para o PDF como "SETOR DE TRABALHO" (setor + unidade + posto — não centro de custo). */
+function buildSetorLocalTrabalhoContrato(emp: Employee): string {
+  const raw = [
+    emp.department?.name?.trim(),
+    emp.unit?.name?.trim(),
+    emp.workPost?.name?.trim(),
+  ].filter((s): s is string => Boolean(s));
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const p of raw) {
+    const key = p.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(p);
+  }
+  return unique.join(' — ');
+}
+
 const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -160,6 +187,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     'CLT - Efetivo',
     'CLT - Temporário',
     'Contrato de Experiência',
+    'CLT - Prazo indeterminado (integral)',
     'PJ - Prestador de Serviços',
     'Estagiário',
     'Aprendiz',
@@ -231,6 +259,13 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       ? fullEmployee.address
       : fullEmployee.address?.street || '';
 
+    const pdfKind = resolvePdfContractKind(form.contractType);
+    const isExperiencia = pdfKind === 'EXPERIENCE';
+    const cidadeContrato =
+      (empresa as any)?.city ||
+      (typeof empresa?.address === 'string' ? empresa.address.split(',')[0]?.trim() : '') ||
+      '';
+
     return {
       companyId: empresa!.id,
       employeeName: fullEmployee.name,
@@ -240,13 +275,18 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       employeeCtps: (fullEmployee as any).ctps || '',
       employeeCtpsSeries: (fullEmployee as any).ctpsSeries || '',
       position: form.position,
-      department: costCenter?.name || form.department || '',
+      department: buildSetorLocalTrabalhoContrato(fullEmployee),
       salary: form.salary ? parseFloat(form.salary.replace(/\./g, '').replace(',', '.')) : 0,
       admissionDate: form.startDate || null,
       workHoursDescription: '44 horas semanais', // Placeholder or add form field if exists
       workSchedule: form.workSchedule || 'a definir',
-      city: empresa!.address && typeof empresa!.address === 'string' ? empresa!.address.split(',')[0] : '',
-      contractDate: new Date().toISOString().split('T')[0]
+      city: cidadeContrato,
+      contractDate: new Date().toISOString().split('T')[0],
+      contractKind: pdfKind,
+      experienceDurationDays: isExperiencia && form.experienceDuration
+        ? parseInt(form.experienceDuration, 10)
+        : undefined,
+      salaryInWords: (fullEmployee as any).salarioPorExtenso || (fullEmployee as any).salario_por_extenso || ''
     };
   };
 
@@ -641,6 +681,17 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               </div>
             )}
 
+            {form.contractType === 'CLT - Prazo indeterminado (integral)' && (
+              <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                <p>
+                  Este tipo gera o <span className="font-medium text-foreground">contrato CLT por prazo indeterminado</span>{' '}
+                  (texto integral em várias páginas, com LGPD), indicado após o fim da experiência. A{' '}
+                  <span className="font-medium text-foreground">data de início</span> abaixo entra na cláusula de início da
+                  prestação; ajuste se for a data de assinatura do contrato definitivo.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <Label>Data de Início</Label>
@@ -702,6 +753,10 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                   placeholder="Selecione o departamento"
                   searchPlaceholder="Buscar departamento..."
                 />
+                <p className="text-xs text-muted-foreground">
+                  No PDF do contrato, o campo <span className="font-medium text-foreground">Setor de trabalho</span> usa o
+                  setor, a unidade e o posto de trabalho cadastrados no funcionário — não este centro de custo.
+                </p>
               </div>
             </div>
           </div>
