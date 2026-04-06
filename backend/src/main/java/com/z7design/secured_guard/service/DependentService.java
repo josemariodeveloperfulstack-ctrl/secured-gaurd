@@ -13,6 +13,7 @@ import com.z7design.secured_guard.model.Dependent;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.DependentRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.validation.CpfValidationUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,22 +34,20 @@ public class DependentService {
         Employee employee = employeeRepository.findById(request.getEmployeeId())
             .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado"));
         
-        // Verificar se CPF já existe para outro dependente
-        if (dependentRepository.findByCpf(request.getCpf()).stream()
-            .anyMatch(d -> !d.getEmployee().getId().equals(request.getEmployeeId()))) {
-            throw new IllegalArgumentException("CPF já está cadastrado para outro dependente");
-        }
+        String cpfNormalizado = normalizeAndAssertValidCpf(request.getCpf());
+
+        assertCpfNotAlreadyRegistered(request.getEmployeeId(), cpfNormalizado, null);
         
         Dependent dependent = Dependent.builder()
             .employee(employee)
             .name(request.getName())
             .relationship(request.getRelationship())
             .birthDate(request.getBirthDate())
-            .cpf(request.getCpf())
+            .cpf(cpfNormalizado)
             .rg(request.getRg())
             .gender(request.getGender())
-            .phone(request.getPhone())
-            .email(request.getEmail())
+            .phone(blankToNull(request.getPhone()))
+            .email(blankToNull(request.getEmail()))
             .address(request.getAddress())
             .city(request.getCity())
             .state(request.getState())
@@ -72,23 +71,23 @@ public class DependentService {
         
         Dependent existingDependent = findByIdEntity(id);
         
-        // Verificar se CPF já existe para outro dependente
-        if (request.getCpf() != null && !request.getCpf().equals(existingDependent.getCpf())) {
-            if (dependentRepository.findByCpf(request.getCpf()).stream()
-                .anyMatch(d -> !d.getId().equals(id))) {
-                throw new IllegalArgumentException("CPF já está cadastrado para outro dependente");
+        if (request.getCpf() != null) {
+            String cpfNormalizado = normalizeAndAssertValidCpf(request.getCpf());
+            String cpfAtual = CpfValidationUtils.digitsOnly(existingDependent.getCpf());
+            if (!cpfNormalizado.equals(cpfAtual)) {
+                assertCpfNotAlreadyRegistered(existingDependent.getEmployee().getId(), cpfNormalizado, id);
             }
+            existingDependent.setCpf(cpfNormalizado);
         }
         
         // Atualizar campos
         if (request.getName() != null) existingDependent.setName(request.getName());
         if (request.getRelationship() != null) existingDependent.setRelationship(request.getRelationship());
         if (request.getBirthDate() != null) existingDependent.setBirthDate(request.getBirthDate());
-        if (request.getCpf() != null) existingDependent.setCpf(request.getCpf());
         if (request.getRg() != null) existingDependent.setRg(request.getRg());
         if (request.getGender() != null) existingDependent.setGender(request.getGender());
-        if (request.getPhone() != null) existingDependent.setPhone(request.getPhone());
-        if (request.getEmail() != null) existingDependent.setEmail(request.getEmail());
+        if (request.getPhone() != null) existingDependent.setPhone(blankToNull(request.getPhone()));
+        if (request.getEmail() != null) existingDependent.setEmail(blankToNull(request.getEmail()));
         if (request.getAddress() != null) existingDependent.setAddress(request.getAddress());
         if (request.getCity() != null) existingDependent.setCity(request.getCity());
         if (request.getState() != null) existingDependent.setState(request.getState());
@@ -200,5 +199,46 @@ public class DependentService {
         if (dependent.getEmployee() == null) {
             throw new IllegalArgumentException("Funcionário é obrigatório");
         }
+    }
+
+    /**
+     * Impede CPF duplicado na base (mesmo ou outro funcionário). {@code excludeDependentId} ignora
+     * o registo em atualização.
+     */
+    private void assertCpfNotAlreadyRegistered(UUID employeeId, String cpfDigits, UUID excludeDependentId) {
+        for (UUID depId : dependentRepository.findIdsByCpfDigitsNormalized(cpfDigits)) {
+            if (excludeDependentId != null && depId.equals(excludeDependentId)) {
+                continue;
+            }
+            Dependent d = dependentRepository.findById(depId)
+                    .orElseThrow(() -> new IllegalStateException("Dependente inconsistente na verificação de CPF"));
+            if (!d.getEmployee().getId().equals(employeeId)) {
+                throw new IllegalArgumentException("CPF já está cadastrado para outro dependente");
+            }
+            throw new IllegalArgumentException("Este CPF já está cadastrado como dependente deste funcionário");
+        }
+    }
+
+    private static String blankToNull(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    /** CPF apenas com dígitos, 11 posições e DV válidos — antes do persist para evitar rollback por Bean Validation. */
+    private String normalizeAndAssertValidCpf(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            throw new IllegalArgumentException("CPF é obrigatório");
+        }
+        String digits = CpfValidationUtils.digitsOnly(raw);
+        if (digits.length() != 11) {
+            throw new IllegalArgumentException("CPF deve conter 11 dígitos");
+        }
+        if (!CpfValidationUtils.isValid(digits)) {
+            throw new IllegalArgumentException("CPF inválido. Verifique os dígitos verificadores.");
+        }
+        return digits;
     }
 } 

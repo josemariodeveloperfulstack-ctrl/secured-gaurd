@@ -492,12 +492,14 @@ const Funcionarios: React.FC = () => {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const toggleSort = (key: SortKey) => {
-    setSortKey(prev => {
+    setSortKey((prev) => {
       if (prev === key) {
-        setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
         return prev;
       }
-      setSortDir('asc');
+      // Admissão e Demissão: primeiro clique = mais recente primeiro (desc)
+      const newestFirstKeys: SortKey[] = ['hireDate', 'terminationDate'];
+      setSortDir(newestFirstKeys.includes(key) ? 'desc' : 'asc');
       return key;
     });
   };
@@ -517,8 +519,14 @@ const Funcionarios: React.FC = () => {
       }
     };
     const getDate = (e: Employee, k: SortKey) => {
-      const v = k === 'hireDate' ? e.hireDate : e.terminationDate;
-      return v ? new Date(v).getTime() : null;
+      if (k === 'hireDate') {
+        return e.hireDate ? new Date(e.hireDate).getTime() : null;
+      }
+      if (k === 'terminationDate') {
+        const v = e.terminationDate || e.dataRescisao;
+        return v ? new Date(v).getTime() : null;
+      }
+      return null;
     };
 
     return [...filteredEmployees].sort((a, b) => {
@@ -836,11 +844,29 @@ Para excluir este funcionário:
     setDetailsModalOpen(true);
   };
 
-  const handleEditFromDetails = (employee: Employee) => {
-    setEmployeeToEdit(employee);
-    setEditModalOpen(true);
-    // Não fechamos o de detalhes, ou fechamos? UX decision: fechar detalhes para focar na edição
+  const handleEditFromDetails = async (employee: Employee) => {
     setDetailsModalOpen(false);
+    try {
+      const full = await employeeService.getEmployeeById(employee.id);
+      if (!full?.id) {
+        toast({
+          title: 'Erro ao carregar dados do funcionário',
+          description: 'Não foi possível carregar os dados completos. Tente novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setModalOpen(false);
+      setEmployeeToEdit(full);
+      setEditModalOpen(true);
+    } catch (e) {
+      console.error('Erro ao abrir edição a partir dos detalhes:', e);
+      toast({
+        title: 'Erro ao carregar dados do funcionário',
+        description: 'Não foi possível carregar os dados completos. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Loading state

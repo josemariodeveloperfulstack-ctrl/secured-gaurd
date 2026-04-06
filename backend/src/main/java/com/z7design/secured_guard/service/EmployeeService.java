@@ -702,29 +702,37 @@ public class EmployeeService {
     }
 
     private void applyTerminationRules(Employee employee, EmployeeDTO dto) {
-        if (employee == null || dto == null) {
+        if (employee == null) {
             return;
         }
 
-        if (employee.getTerminationDate() == null && dto.getDataRescisao() != null) {
-            employee.setTerminationDate(dto.getDataRescisao());
+        if (dto != null) {
+            if (employee.getTerminationDate() == null && dto.getDataRescisao() != null) {
+                employee.setTerminationDate(dto.getDataRescisao());
+            }
+            if (dto.getDataRescisao() != null) {
+                employee.setDataRescisao(dto.getDataRescisao());
+            }
+            if (dto.getTerminationReason() != null) {
+                employee.setTerminationReason(dto.getTerminationReason());
+            }
+
+            if (employee.getTerminationDate() == null && dto.getTerminationDate() == null
+                    && dto.getDataRescisao() == null) {
+                employee.setTerminationReason(null);
+                return;
+            }
         }
 
-        // Always sync termination reason from DTO if provided, otherwise clear if no
-        // termination date
-        if (dto.getTerminationReason() != null) {
-            employee.setTerminationReason(dto.getTerminationReason());
-        }
-
-        if (employee.getTerminationDate() == null && dto.getTerminationDate() == null
-                && dto.getDataRescisao() == null) {
-            employee.setTerminationReason(null);
+        if (employee.getTerminationDate() == null) {
             return;
         }
 
-        employee.setStatus(EmploymentStatus.INACTIVE);
+        employee.setStatus(EmploymentStatus.TERMINATED);
 
-        String cpf = dto.getCpf() != null ? dto.getCpf() : employee.getDocument();
+        String cpf = dto != null && dto.getCpf() != null && !dto.getCpf().trim().isEmpty()
+                ? dto.getCpf()
+                : employee.getDocument();
         if (cpf == null || cpf.trim().isEmpty()) {
             return;
         }
@@ -1728,7 +1736,7 @@ public class EmployeeService {
             dto.setDecretoNaturalizacao(e.getDecretoNaturalizacao());
             dto.setVistoFiscalizacao(e.getVistoFiscalizacao());
             dto.setAssinaturaFuncionario(e.getAssinaturaFuncionario());
-            dto.setDataRescisao(e.getDataRescisao());
+            dto.setDataRescisao(e.getDataRescisao() != null ? e.getDataRescisao() : e.getTerminationDate());
 
             // Mapear dados do Exame Médico (ASO)
             dto.setExameMedicoData(e.getExameMedicoData());

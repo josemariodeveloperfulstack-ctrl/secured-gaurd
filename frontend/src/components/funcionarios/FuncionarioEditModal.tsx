@@ -44,6 +44,7 @@ import { hasPermission } from '@/utils/permissions';
 import { History, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { remanejamentoService, Remanejamento } from '@/services/remanejamentoService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
 
 interface FuncionarioEditModalProps {
   open: boolean;
@@ -235,6 +236,40 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [remanejamentoModalOpen, setRemanejamentoModalOpen] = useState(false);
   const [pendingWorkPostId, setPendingWorkPostId] = useState<string>('');
   const [remanejamentoForm, setRemanejamentoForm] = useState({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
+
+  const loadEmployeeDependents = async (employeeId: string | undefined) => {
+    const raw = String(employeeId ?? '').trim();
+    if (!raw) {
+      setEmployeeDependents([]);
+      return;
+    }
+    if (
+      raw === '00000000-0000-0000-0000-000000000001' ||
+      raw === '00000000-0000-0000-0000-000000000000' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)
+    ) {
+      setEmployeeDependents([]);
+      return;
+    }
+    setLoadingDependents(true);
+    try {
+      const list = await dependentService.getDependentsByEmployee(raw);
+      setEmployeeDependents(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error('Erro ao carregar dependentes:', err);
+      setEmployeeDependents([]);
+    } finally {
+      setLoadingDependents(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open || !funcionario?.id) {
+      setEmployeeDependents([]);
+      return;
+    }
+    loadEmployeeDependents(String(funcionario.id).trim());
+  }, [open, funcionario?.id]);
 
   // Carregar dados para os selects quando o modal abrir
   useEffect(() => {
@@ -1261,8 +1296,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setNovoMedicoModalOpen(false);
   };
 
-  const handleDependentSaved = () => {
+  const handleDependentSaved = async () => {
     setDependentModalOpen(false);
+    setDependentToEdit(null);
+    if (funcionario?.id) {
+      await loadEmployeeDependents(String(funcionario.id).trim());
+    }
   };
 
   const handleEditDependent = (dependent: Dependent) => {
@@ -3167,38 +3206,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Motivo da Demissão</span>
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                             </Label>
-                            <Select
+                            <DismissalReasonSelect
                               value={form.terminationReason || ''}
-                              onValueChange={(val) => setForm(prev => ({ ...prev, terminationReason: val }))}
-                            >
-                              <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                                <SelectValue placeholder="Selecione o motivo" />
-                              </SelectTrigger>
-                              <SelectContent position="popper" sideOffset={4} className="bg-seguranca-dark border-gray-600 z-[9999] max-h-60 overflow-auto w-[--radix-select-trigger-width]">
-                                {[
-                                  "Dispensa sem Justa Causa",
-                                  "Dispensa por Justa Causa",
-                                  "Pedido de Demissão",
-                                  "Rescisão por Comum Acordo (Reforma Trabalhista)",
-                                  "Término de Contrato de Experiência (Prazo Determinado)",
-                                  "Rescisão Antecipada do Contrato de Experiência",
-                                  "Rescisão Indireta",
-                                  "Falecimento",
-                                  "Aposentadoria",
-                                  "Performance Insuficiente",
-                                  "Corte de Custo",
-                                  "Saúde / Motivos Médicos",
-                                  "Mudança de Cidade/País",
-                                  "Conflitos Internos / Liderança",
-                                  "Falta de Fit Cultural",
-                                  "Transição de Carreira"
-                                ].map((reason) => (
-                                  <SelectItem key={reason} value={reason} className="text-gray-200 hover:bg-gray-700 hover:text-seguranca-yellow focus:bg-gray-700 focus:text-seguranca-yellow">
-                                    {reason}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onValueChange={(val) => setForm((prev) => ({ ...prev, terminationReason: val }))}
+                            />
             </div>
                         )}
                         {/* Cargo */}
@@ -3292,8 +3303,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             decimalScale={2}
                             decimalSeparator=","
                             groupSeparator="."
-                            preserveValue={true}
-                            turnOffAbbreviations={true}
+                            disableAbbreviations
                             prefix="R$ "
                             allowDecimals={true}
                             value={form.salario}

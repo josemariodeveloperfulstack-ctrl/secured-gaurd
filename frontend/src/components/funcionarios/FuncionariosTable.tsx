@@ -91,6 +91,16 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
     return new Date(date).toLocaleDateString('pt-BR');
   };
 
+  /** Data de desligamento exibida (API pode preencher só terminationDate ou só dataRescisao). */
+  const terminationDateForDisplay = (e: Employee) => e.terminationDate || e.dataRescisao;
+
+  /** Status efetivo para UI: com data de demissão → Demitido. */
+  const effectiveEmploymentStatus = (e: Employee) =>
+    terminationDateForDisplay(e) ? 'TERMINATED' : (e.status || 'INACTIVE');
+
+  const isTerminatedEmployee = (e: Employee) =>
+    e.status === 'TERMINATED' || !!terminationDateForDisplay(e);
+
   const getWorkPostsLabel = (employee: Employee) => {
     const wp = (employee.workPost as any)?.name;
     const wpId = (employee.workPost as any)?.id;
@@ -120,7 +130,11 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
         type="button"
         onClick={() => onSort?.(k)}
         className={`inline-flex items-center gap-2 ${onSort ? 'hover:text-white' : ''} ${active ? 'text-white' : ''}`}
-        title="Ordenar"
+        title={
+          k === 'hireDate' || k === 'terminationDate'
+            ? 'Ordenar por data (primeiro clique: mais recente primeiro)'
+            : 'Ordenar'
+        }
       >
         <span>{children}</span>
         <span className="text-xs text-gray-400">{arrow}</span>
@@ -331,11 +345,11 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 <TableCell>
                   <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
                     <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                    {formatDate(employee.terminationDate)}
+                    {formatDate(terminationDateForDisplay(employee))}
                   </div>
                 </TableCell>
                 <TableCell>
-                  {getStatusBadge(employee.status || 'INACTIVE')}
+                  {getStatusBadge(effectiveEmploymentStatus(employee))}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -390,7 +404,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                           <UserPlus className="mr-2 h-4 w-4" />
                           Ver Dependentes
                         </DropdownMenuItem>
-                        {employee.status !== 'TERMINATED' && (
+                        {!isTerminatedEmployee(employee) && (
                           <DropdownMenuItem
                             onClick={() => onTerminate(employee)}
                             className="text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 cursor-pointer"
@@ -399,7 +413,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                             Demitir Funcionário
                           </DropdownMenuItem>
                         )}
-                        {employee.status === 'TERMINATED' && (
+                        {isTerminatedEmployee(employee) && (
                           <DropdownMenuItem
                             onClick={() => onDelete(employee)}
                             className="text-red-400 hover:bg-red-500/20 hover:text-red-300 cursor-pointer"
@@ -464,7 +478,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   </div>
                 </div>
                 <div className="flex-shrink-0 scale-75 origin-right">
-                  {getStatusBadge(employee.status || 'INACTIVE')}
+                  {getStatusBadge(effectiveEmploymentStatus(employee))}
                 </div>
               </div>
 
@@ -527,7 +541,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
               {!isMobileSelectionMode && (
                 <div className="pt-2 border-t border-gray-600/20 flex items-center justify-between">
                   <div className="flex-1">
-                    {employee.status !== 'TERMINATED' ? (
+                    {!isTerminatedEmployee(employee) ? (
                       <span className="text-[10px] text-orange-400/80 flex items-center">
                         <AlertCircle className="h-2.5 w-2.5 mr-1" />
                         Demitir para excluir
@@ -573,12 +587,12 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                         <DropdownMenuItem onClick={() => onViewDependents(employee)} className="text-green-400 text-xs">
                           <UserPlus className="mr-2 h-3.5 w-3.5" /> Dependentes
                         </DropdownMenuItem>
-                        {employee.status !== 'TERMINATED' && (
+                        {!isTerminatedEmployee(employee) && (
                           <DropdownMenuItem onClick={() => onTerminate(employee)} className="text-orange-400 text-xs">
                             <UserMinus className="mr-2 h-3.5 w-3.5" /> Demitir
                           </DropdownMenuItem>
                         )}
-                        {employee.status === 'TERMINATED' && (
+                        {isTerminatedEmployee(employee) && (
                           <DropdownMenuItem onClick={() => onDelete(employee)} className="text-red-400 text-xs">
                             <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
                           </DropdownMenuItem>

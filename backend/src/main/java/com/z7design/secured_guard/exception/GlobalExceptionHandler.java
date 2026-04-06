@@ -156,6 +156,10 @@ public class GlobalExceptionHandler {
             message = "Erro ao salvar treinamento/certificação. Verifique se o número da certificação ou os dados já existem.";
         } else if (path.contains("remanejamentos") && (fullMsg.contains("remanejamento_id") || fullMsg.contains("remanejamentos_historico") || fullMsg.contains("not-null"))) {
             message = "Não foi possível concluir a exclusão do remanejamento (integridade dos dados). Execute as migrações do banco (Flyway) ou contate o suporte.";
+        } else if (path.contains("/dependents") || path.contains("dependents")) {
+            if (fullMsg.toLowerCase().contains("cpf") || fullMsg.contains("dependents")) {
+                message = "Este CPF já está cadastrado como dependente (restrição no banco de dados). Use outro CPF ou edite o registo existente.";
+            }
         }
 
         ErrorResponse errorResponse = ErrorResponse.builder()

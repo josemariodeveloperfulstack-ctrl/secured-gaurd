@@ -17,8 +17,16 @@ const dependentService = {
 
   // Buscar dependentes por funcionário
   async getDependentsByEmployee(employeeId: string): Promise<Dependent[]> {
-    const response = await api.get(`/dependents/employee/${employeeId}`);
-    return response.data;
+    const response = await api.get(`/dependents/employee/${encodeURIComponent(employeeId)}`);
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray((data as { content?: unknown }).content)) {
+      return (data as { content: Dependent[] }).content;
+    }
+    if (data && Array.isArray((data as { data?: unknown }).data)) {
+      return (data as { data: Dependent[] }).data;
+    }
+    return [];
   },
 
   // Buscar dependentes por CPF
