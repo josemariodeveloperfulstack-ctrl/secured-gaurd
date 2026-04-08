@@ -7,9 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, User, Building, Calendar, MapPin, Phone, Mail, Shield, Settings, Monitor, Smartphone, Radio, Car, Motorcycle, Loader2, CheckCircle2 } from 'lucide-react';
-import { employeeService } from '@/services/employeeService';
+import { FileText, Download, Eye, User, Building, Calendar, MapPin, Phone, Mail, Shield, Settings, Monitor, Smartphone, Radio, Car, Loader2, CheckCircle2 } from 'lucide-react';
+
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { useToast } from '@/hooks/use-toast';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import api from '@/lib/axios';
+
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
@@ -40,6 +45,9 @@ interface TermoResponsabilidadeEquipamentoFormProps {
 }
 
 const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipamentoFormProps> = ({ employeeId, companyId }) => {
+  const { toast } = useToast();
+
+  // 1. All State and Ref declarations first
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
@@ -50,17 +58,35 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     patrimonio: '',
     dataEntrega: '',
     dataDevolucao: '',
-    responsavelEntrega: '',
+    responsavelEntregaId: '', // ID do funcionário responsável
     condicoes: '',
     observacoes: '',
     estadoEquipamento: '',
   });
 
   const [loading, setLoading] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
+  const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingData, setLoadingData] = useState(false);
 
+
+  // 2. Memoized values (computed from state)
+  const funcionario = selectedEmployeeData;
+  const empresa = companies.find(e => e.id === form.empresaId);
+  const responsavel = selectedResponsibleData;
+
+
+  const estadosEquipamento = [
+    'Novo',
+    'Excelente',
+    'Bom',
+    'Regular',
+    'Precisa Manutenção',
+    'Defeituoso',
+  ];
+
+  // 3. Effects
   useEffect(() => {
     setForm(prev => ({
       ...prev,
@@ -69,15 +95,47 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     }));
   }, [employeeId, companyId]);
 
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.funcionarioId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address,
+              companyId: emp.company?.id,
+              companySigla: emp.company?.sigla
+            } as SimpleEmployee);
+            
+            // Auto-selecionar empresa se o funcionário tiver uma
+            if (emp.company?.id && !form.empresaId) {
+              setForm(prev => ({ ...prev, empresaId: emp.company.id }));
+            }
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.funcionarioId, selectedEmployeeData, form.empresaId]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [employeesData, companiesData] = await Promise.all([
-          employeeService.getAllEmployees(),
-          companyService.getAllCompanies(),
-        ]);
-        setEmployees(employeesData as unknown as Employee[]);
+        const companiesData = await companyService.getAllCompanies();
         setCompanies(companiesData);
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
@@ -89,22 +147,14 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     fetchData();
   }, []);
 
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
-  const empresa = companies.find(e => e.id === form.empresaId);
-  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
-
-  const estadosEquipamento = [
-    'Novo',
-    'Excelente',
-    'Bom',
-    'Regular',
-    'Precisa Manutenção',
-    'Defeituoso',
-  ];
-
+  // 4. Handlers
   const handlePreview = async () => {
     if (!funcionario || !empresa || !form.equipamento) {
-      alert('Selecione funcionário, empresa e pelo menos um equipamento!');
+      toast({
+        title: 'Atenção',
+        description: 'Selecione funcionário, empresa e pelo menos um equipamento!',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -128,25 +178,21 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
         documentDate: form.dataEntrega
       };
 
-      // No preview endpoint exists for this one yet in the grep results, using generate-pdf with window.open
-      const response = await fetch('/api/equipment-responsibility/generate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(payload)
+      const response = await api.post('/api/equipment-responsibility/generate-pdf', payload, {
+        responseType: 'blob'
       });
 
-      if (!response.ok) throw new Error('Erro ao gerar preview');
-
-      const blob = await response.blob();
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao gerar preview:', err);
-      alert('Erro ao gerar preview. Tente novamente.');
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.message || 'Erro ao gerar preview. Tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -156,7 +202,11 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     e.preventDefault();
 
     if (!funcionario || !empresa || !form.equipamento || !form.numeroSerie || !form.dataEntrega) {
-      alert('Preencha todos os campos obrigatórios!');
+      toast({
+        title: 'Atenção',
+        description: 'Preencha todos os campos obrigatórios!',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -180,18 +230,11 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
         documentDate: form.dataEntrega
       };
 
-      const response = await fetch('/api/equipment-responsibility/generate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(payload)
+      const response = await api.post('/api/equipment-responsibility/generate-pdf', payload, {
+        responseType: 'blob'
       });
 
-      if (!response.ok) throw new Error('Erro ao gerar PDF');
-
-      const blob = await response.blob();
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -200,9 +243,18 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Termo de responsabilidade gerado com sucesso!',
+      });
+    } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
-      alert('Erro ao gerar PDF. Tente novamente.');
+      toast({
+        title: 'Erro',
+        description: err.response?.data?.message || 'Erro ao gerar PDF. Tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -247,35 +299,18 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                     Colaborador responsável pelo equipamento.
                   </span>
                 </Label>
-                <Select
+                <EmployeeCombobox
                   value={form.funcionarioId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">{f.name}</span>
-                            {(f.cpf || f.document) && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CPF: {formatCPF(f.cpf || f.document || '')}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    setForm(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
+                      empresaId: emp.companyId || prev.empresaId
+                    }));
+                  }}
+                />
               </div>
 
               {funcionario && (
@@ -313,19 +348,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                     ) : companies.length > 0 ? (
                       companies.map(e => (
                         <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                            )}
-                            {e.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(e.cnpj)}
-                              </span>
-                            )}
-                          </div>
+                          {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                         </SelectItem>
                       ))
                     ) : (
@@ -386,25 +409,31 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.position?.name || '-'}
+                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor (Posto de Trabalho)</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.unit?.name || '-'}
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
                       </div>
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor (Posto de Trabalho)</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {funcionario.unitName || (funcionario as any).unit?.name || '-'}
+                      </div>
+                    </div>
+                  </div>
+
+
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {typeof funcionario.address === 'string'
-                        ? funcionario.address
-                        : funcionario.address
-                          ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
-                          : '-'}
+                      {funcionario.address || '-'}
                     </div>
                   </div>
                 </div>
@@ -446,13 +475,14 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {empresa.address && empresa.address.street
-                        ? [empresa.address.street, empresa.address.number, empresa.address.neighborhood, empresa.address.city]
+                      {empresa.address && typeof empresa.address !== 'string' && (empresa.address as any).street
+                        ? [(empresa.address as any).street, (empresa.address as any).number, (empresa.address as any).neighborhood, (empresa.address as any).city]
                           .filter(Boolean)
                           .join(', ')
-                        : '-'}
+                        : typeof empresa.address === 'string' ? empresa.address : '-'}
                     </div>
                   </div>
+
                 </div>
               </div>
             )}
@@ -570,33 +600,12 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
 
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pela Entrega</Label>
-                <Select
+                <EmployeeCombobox
                   value={form.responsavelEntregaId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o responsável"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{f.name}</span>
-                            {(f.cpf || f.document) && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.cpf || f.document}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  onChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
+                  onEmployeeSelect={(emp) => setSelectedResponsibleData(emp)}
+                  placeholder="Selecione o responsável"
+                />
               </div>
             </div>
 

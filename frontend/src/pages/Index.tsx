@@ -43,7 +43,8 @@ import {
   CreditCard,
   Banknote,
   MessageSquare,
-  Calendar
+  Calendar,
+  ShoppingCart
 } from 'lucide-react';
 import { getRoleDisplayName, getRoleColor } from '@/utils/permissions';
 import { dashboardService, DashboardStats } from '@/services/dashboardService';
@@ -1127,6 +1128,88 @@ const Index: React.FC = () => {
                     action={{
                       label: "Acessar",
                       onClick: () => navigate('/orcamentos'), // Fixed path from earlier log
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
+
+              {/* Módulo Estoque */}
+              {(user.role === 'ADMIN' || 
+                user.role === 'SUPER_ADMIN' ||
+                user.role === 'ESTOQUE' || 
+                user.role === 'ALMOXARIFADO' || 
+                user.role === 'ANALISTA_SUPRIMENTOS' || 
+                user.role === 'SUPRIMENTOS' ||
+                user.role === 'ASSISTENTE_ADMINISTRATIVO') && (
+                <>
+                  <DashboardCard
+                    title="Estoque"
+                    value="Gerenciar"
+                    description="Controle de estoque e inventário"
+                    icon={Package}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/estoque-simplificado'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
+
+              {/* Módulo Compras */}
+              {(user.role === 'ADMIN' || 
+                user.role === 'SUPER_ADMIN' ||
+                user.role === 'COMPRAS' || 
+                user.role === 'ALMOXARIFADO' || 
+                user.role === 'ANALISTA_SUPRIMENTOS' || 
+                user.role === 'SUPRIMENTOS' ||
+                user.role === 'ASSISTENTE_ADMINISTRATIVO') && (
+                <>
+                  <DashboardCard
+                    title="Compras"
+                    value="Gerenciar"
+                    description="Gestão de compras e cotações"
+                    icon={ShoppingCart}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/compras'),
+                      variant: 'default'
+                    }}
+                  />
+                </>
+              )}
+
+              {/* Módulo Comunicação e Suporte */}
+              {(user.role === 'ESTOQUE' || 
+                user.role === 'COMPRAS' || 
+                user.role === 'SUPRIMENTOS' ||
+                user.role === 'ALMOXARIFADO') && (
+                <>
+                  <DashboardCard
+                    title="Mensagens"
+                    value="Acessar"
+                    description="Sistema de mensagens internas"
+                    icon={MessageSquare}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/gestao-mensagens/inbox'),
+                      variant: 'default'
+                    }}
+                  />
+
+                  <DashboardCard
+                    title="Suporte"
+                    value="Acessar"
+                    description="Central de suporte e atendimento"
+                    icon={Bell}
+                    iconColor="text-seguranca-yellow"
+                    action={{
+                      label: "Acessar",
+                      onClick: () => navigate('/suporte'),
                       variant: 'default'
                     }}
                   />

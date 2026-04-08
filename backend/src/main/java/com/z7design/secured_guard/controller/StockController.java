@@ -22,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -467,5 +468,46 @@ public class StockController {
                 .header("Content-Type", "application/pdf")
                 .header("Content-Disposition", "attachment; filename=movimentacoes-estoque.pdf")
                 .body(pdf);
+    }
+
+    // ===== ASSINATURAS E REQUISIÇÕES =====
+
+    @PostMapping("/movements/{id}/sign")
+    @Operation(summary = "Registrar assinatura digital", description = "Armazena a assinatura digital de uma movimentação")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    public ResponseEntity<StockMovementDTO> signMovement(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> payload) {
+        
+        String signature = payload.get("signature");
+        if (signature == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        return ResponseEntity.ok(stockService.signMovement(id, signature));
+    }
+
+    @GetMapping("/movements/{id}/requisition")
+    @Operation(summary = "Gerar PDF da requisição", description = "Retorna o PDF da requisição de estoque")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESTOQUE', 'COMPRAS', 'ALMOXARIFADO')")
+    public ResponseEntity<byte[]> getRequisitionPdf(@PathVariable UUID id) {
+        byte[] pdf = stockService.getRequisitionPdf(id);
+        
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=\"requisicao_" + id.toString().substring(0, 8) + ".pdf\"")
+                .body(pdf);
+    }
+
+    @PostMapping("/movements/{id}/send")
+    @Operation(summary = "Enviar requisição", description = "Envia a requisição por e-mail ou WhatsApp")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    public ResponseEntity<Void> sendRequisition(
+            @PathVariable UUID id,
+            @RequestParam com.z7design.secured_guard.model.StockMovement.RequisitionSentType type,
+            @RequestParam(required = false) String destination) {
+        
+        stockService.sendRequisition(id, type, destination);
+        return ResponseEntity.ok().build();
     }
 }

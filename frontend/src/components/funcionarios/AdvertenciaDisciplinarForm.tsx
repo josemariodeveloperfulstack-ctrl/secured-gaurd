@@ -13,8 +13,10 @@ import { companyService } from '@/services/companyService';
 import { documentService } from '@/services/documentService';
 import api from '@/lib/axios';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
-import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import { SimpleEmployee } from '@/services/employeeService';
+
 import {
   Dialog,
   DialogContent,
@@ -40,8 +42,9 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     dataEmissao: new Date().toISOString().split('T')[0],
   });
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
+
   const [loadingData, setLoadingData] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -55,17 +58,43 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     }));
   }, [employeeId, companyId]);
 
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.funcionarioId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.funcionarioId, selectedEmployeeData]);
+
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [employeesData, companiesData] = await Promise.all([
-          employeeService.getAllEmployees(),
-          companyService.getAllCompanies(),
-        ]);
-        setEmployees(employeesData as unknown as Employee[]);
+        const companiesData = await companyService.getAllCompanies();
         setCompanies(companiesData);
       } catch (error) {
+
         console.error('Erro ao buscar dados:', error);
       } finally {
         setLoadingData(false);
@@ -75,8 +104,9 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     fetchData();
   }, []);
 
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
+
 
   const motivosAdvertencia = [
     'Falta sem justificativa',
@@ -242,35 +272,18 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                       Colaborador que receberá a advertência.
                     </span>
                   </Label>
-                  <Select
+                  <EmployeeCombobox
                     value={form.funcionarioId}
-                    onValueChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
-                    disabled={loadingData}
-                  >
-                    <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-red-500/30 focus:border-red-500/70 [&>span]:text-left [&>span]:truncate">
-                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                      {loadingData ? (
-                        <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                      ) : employees.length > 0 ? (
-                        employees.map(f => (
-                          <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium text-sm normal-case">{f.name}</span>
-                              {(f.cpf || (f as any).document) && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                    onEmployeeSelect={(emp) => {
+                      setSelectedEmployeeData(emp);
+                      setForm(prev => ({
+                        ...prev,
+                        funcionarioId: emp.id,
+                        empresaId: emp.companyId || prev.empresaId
+                      }));
+                    }}
+                  />
                 </div>
 
                 {funcionario && (
@@ -308,19 +321,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                       ) : companies.length > 0 ? (
                         companies.map(e => (
                           <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium text-sm normal-case">
-                                {e.sigla || e.tradeName || e.name}
-                              </span>
-                              {(e.sigla || e.tradeName) && e.name && (
-                                <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                              )}
-                              {e.cnpj && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  CNPJ: {formatCNPJ(e.cnpj)}
-                                </span>
-                              )}
-                            </div>
+                            {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                           </SelectItem>
                         ))
                       ) : (
@@ -376,30 +377,36 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
-                        <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                          {(funcionario as any).position?.name || '-'}
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
-                        <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                          {funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : '-'}
-                        </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {typeof funcionario.address === 'string'
-                          ? funcionario.address
-                          : funcionario.address
-                            ? `${funcionario.address.street}, ${funcionario.address.number || ''}`
-                            : '-'}
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.hireDate ? formatDateToBrazilian(funcionario.hireDate) : '-'}
                       </div>
                     </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
+                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                      {typeof funcionario.address === 'string'
+                        ? funcionario.address
+                        : (funcionario.address as any)?.street
+                          ? `${(funcionario.address as any).street}, ${(funcionario.address as any).number || ''}`
+                          : '-'}
+                    </div>
+                  </div>
                   </div>
                 </div>
               )}

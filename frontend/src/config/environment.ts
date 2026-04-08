@@ -103,8 +103,8 @@ const environments: Record<string, EnvironmentConfig> = {
   },
   ci: {
     name: 'CI - Integração Contínua',
-    apiUrl: 'https://ci.z7botsolutions.com.br/api',
-    wsUrl: 'wss://ci.z7botsolutions.com.br/ws',
+    apiUrl: '/api',
+    wsUrl: '/ws',
     debug: true,
     features: {
       notifications: true,
@@ -114,8 +114,8 @@ const environments: Record<string, EnvironmentConfig> = {
   },
   dev: {
     name: 'Desenvolvimento',
-    apiUrl: 'https://dev.z7botsolutions.com.br/api',
-    wsUrl: 'wss://dev.z7botsolutions.com.br/ws',
+    apiUrl: '/api',
+    wsUrl: '/ws',
     debug: true,
     features: {
       notifications: true,

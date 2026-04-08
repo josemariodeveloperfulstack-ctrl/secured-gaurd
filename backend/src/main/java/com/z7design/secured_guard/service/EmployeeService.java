@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Objects;
@@ -669,6 +670,7 @@ public class EmployeeService {
         for (Employee employee : employees) {
             employee.setStatus(EmploymentStatus.TERMINATED);
             employee.setTerminationDate(terminationDate);
+            employee.setDataRescisao(terminationDate);
             employee.setUpdatedAt(LocalDateTime.now());
 
             // Apply termination rules (deactivate user etc.)
@@ -701,29 +703,39 @@ public class EmployeeService {
     }
 
     private void applyTerminationRules(Employee employee, EmployeeDTO dto) {
-        if (employee == null || dto == null) {
+        if (employee == null) {
             return;
         }
 
-        if (employee.getTerminationDate() == null && dto.getDataRescisao() != null) {
-            employee.setTerminationDate(dto.getDataRescisao());
+        if (dto != null) {
+            // data_rescisao é o campo usado na ficha/edição; manter termination_date alinhado para listagens e relatórios
+            if (dto.getDataRescisao() != null) {
+                employee.setDataRescisao(dto.getDataRescisao());
+                employee.setTerminationDate(dto.getDataRescisao());
+            } else if (dto.getTerminationDate() != null) {
+                employee.setTerminationDate(dto.getTerminationDate());
+                employee.setDataRescisao(dto.getTerminationDate());
+            }
+            if (dto.getTerminationReason() != null) {
+                employee.setTerminationReason(dto.getTerminationReason());
+            }
+
+            if (employee.getTerminationDate() == null && dto.getTerminationDate() == null
+                    && dto.getDataRescisao() == null) {
+                employee.setTerminationReason(null);
+                return;
+            }
         }
 
-        // Always sync termination reason from DTO if provided, otherwise clear if no
-        // termination date
-        if (dto.getTerminationReason() != null) {
-            employee.setTerminationReason(dto.getTerminationReason());
-        }
-
-        if (employee.getTerminationDate() == null && dto.getTerminationDate() == null
-                && dto.getDataRescisao() == null) {
-            employee.setTerminationReason(null);
+        if (employee.getTerminationDate() == null) {
             return;
         }
 
-        employee.setStatus(EmploymentStatus.INACTIVE);
+        employee.setStatus(EmploymentStatus.TERMINATED);
 
-        String cpf = dto.getCpf() != null ? dto.getCpf() : employee.getDocument();
+        String cpf = dto != null && dto.getCpf() != null && !dto.getCpf().trim().isEmpty()
+                ? dto.getCpf()
+                : employee.getDocument();
         if (cpf == null || cpf.trim().isEmpty()) {
             return;
         }
@@ -861,12 +873,23 @@ public class EmployeeService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<EmployeeDTO> findAllByIdsAsDTOs(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<UUID> distinctIds = ids.stream().distinct().toList();
+        // O repositório agora usa JOIN FETCH para carregar relacionamentos em uma única consulta
+        java.util.Set<Employee> employees = employeeRepository.findAllByIdIn(distinctIds);
+        return employees.stream().map(this::toDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<Employee> findAllByIds(List<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
             return java.util.Collections.emptyList();
         }
         List<UUID> distinctIds = ids.stream().distinct().toList();
-        // Usando Set no repositório para evitar erro de duplicidade no Hibernate 6
         java.util.Set<Employee> employees = employeeRepository.findAllByIdIn(distinctIds);
         return new java.util.ArrayList<>(employees);
     }
@@ -911,16 +934,30 @@ public class EmployeeService {
                     .println("[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Funcionários encontrados: "
                             + employees.size());
 
-            return employees.stream()
+            // Deduplicar por ID para evitar duplicatas causadas por dados inconsistentes ou joins
+            Map<UUID, Employee> uniqueEmployees = new LinkedHashMap<>();
+            for (Employee emp : employees) {
+                if (emp != null && emp.getId() != null) {
+                    uniqueEmployees.putIfAbsent(emp.getId(), emp);
+                }
+            }
+
+            return uniqueEmployees.values().stream()
                     .map(emp -> SimpleEmployeeDTO.builder()
                             .id(emp.getId())
                             .name(emp.getName())
                             .document(emp.getDocument())
+                            .cpf(emp.getCpf())
                             .email(emp.getEmail())
                             .phone(emp.getPhone())
+                            .address(emp.getAddress())
                             .registrationNumber(emp.getRegistrationNumber())
+                            .hireDate(emp.getHireDate())
                             .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
                             .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
+                            .companyId(emp.getCompany() != null ? emp.getCompany().getId() : null)
+                            .companySigla(emp.getCompany() != null ? emp.getCompany().getSigla() : null)
+                            .salario(emp.getSalario())
                             .build())
                     .collect(java.util.stream.Collectors.toList());
         } catch (Exception e) {
@@ -1702,7 +1739,7 @@ public class EmployeeService {
             dto.setDecretoNaturalizacao(e.getDecretoNaturalizacao());
             dto.setVistoFiscalizacao(e.getVistoFiscalizacao());
             dto.setAssinaturaFuncionario(e.getAssinaturaFuncionario());
-            dto.setDataRescisao(e.getDataRescisao());
+            dto.setDataRescisao(e.getDataRescisao() != null ? e.getDataRescisao() : e.getTerminationDate());
 
             // Mapear dados do Exame Médico (ASO)
             dto.setExameMedicoData(e.getExameMedicoData());
@@ -1892,6 +1929,7 @@ public class EmployeeService {
                         .name(emp.getName())
                         .email(emp.getEmail())
                         .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
+                        .salario(emp.getSalario())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
     }

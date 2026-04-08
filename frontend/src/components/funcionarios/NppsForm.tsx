@@ -1,20 +1,69 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, Loader2, Shield } from 'lucide-react';
+import { Label } from '../ui/label';
+import { FileText, Download, Eye, Loader2, Shield, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 
-const NppsForm: React.FC = () => {
+interface NppsFormProps {
+  employeeId?: string;
+  companyId?: string;
+}
+
+const NppsForm: React.FC<NppsFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingDownload, setLoadingDownload] = useState(false);
+  
+  const [funcionarioId, setFuncionarioId] = useState(employeeId || '');
+  const [employeeName, setEmployeeName] = useState('');
+  const [employeeCpf, setEmployeeCpf] = useState('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(companyId || '');
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
+
+  useEffect(() => {
+    if (employeeId) setFuncionarioId(employeeId);
+    if (companyId) setSelectedCompanyId(companyId);
+  }, [employeeId, companyId]);
+
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    const fetchEmployee = async () => {
+      if (funcionarioId && !selectedEmployeeData) {
+        try {
+          const emp = await employeeService.getEmployeeById(funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData(emp as any);
+            setEmployeeName(emp.name);
+            setEmployeeCpf(emp.cpf || (emp as any).document || '');
+            
+            const empCompanyId = (emp as any).companyId || emp.company?.id;
+            if (!selectedCompanyId && empCompanyId) {
+              setSelectedCompanyId(empCompanyId);
+            }
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário no NPPS:", error);
+        }
+      }
+    };
+    fetchEmployee();
+  }, [funcionarioId, selectedEmployeeData, selectedCompanyId]);
 
   const handlePreview = async () => {
     setLoadingPreview(true);
     try {
-      const response = await api.post('/api/npps/preview-pdf', {}, { responseType: 'blob' });
+      const payload = {
+        companyId: selectedCompanyId || null,
+        employeeName: employeeName || null,
+        employeeCpf: employeeCpf || null
+      };
+      
+      const response = await api.post('/api/npps/preview-pdf', payload, { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = globalThis.URL.createObjectURL(blob);
       globalThis.open(url, '_blank');
@@ -35,12 +84,18 @@ const NppsForm: React.FC = () => {
   const handleDownload = async () => {
     setLoadingDownload(true);
     try {
-      const response = await api.post('/api/npps/generate-pdf', {}, { responseType: 'blob' });
+      const payload = {
+        companyId: selectedCompanyId || null,
+        employeeName: employeeName || null,
+        employeeCpf: employeeCpf || null
+      };
+
+      const response = await api.post('/api/npps/generate-pdf', payload, { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = globalThis.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'NPPS-Norma-e-Procedimento-do-Posto-de-Servico.pdf';
+      a.download = `NPPS-Norma-e-Procedimento-${employeeName ? employeeName.replace(/\s+/g, '-').toLowerCase() : 'Geral'}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -82,6 +137,41 @@ const NppsForm: React.FC = () => {
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Seleção de Funcionário */}
+        <div className="bg-slate-950/20 p-4 rounded-xl border border-slate-800/60 space-y-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-1">
+            <User className="h-4 w-4 text-seguranca-red" />
+            <span>Identificação do Colaborador (Opcional)</span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-gray-400">Funcionário</Label>
+              <EmployeeCombobox
+                value={funcionarioId}
+                onChange={(val) => setFuncionarioId(val)}
+                onEmployeeSelect={(emp) => {
+                  setFuncionarioId(emp.id);
+                  setEmployeeName(emp.name);
+                  setEmployeeCpf(emp.cpf || (emp as any).document || '');
+                  setSelectedCompanyId(emp.companyId || (emp as any).company?.id || '');
+                  setSelectedEmployeeData(emp);
+                }}
+                placeholder="Selecione para preencher o nome no documento..."
+              />
+            </div>
+            
+            {employeeName && (
+              <div className="flex items-end pb-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                <div className="bg-seguranca-red/10 border border-seguranca-red/30 rounded-lg px-3 py-2 w-full">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Preenchimento automático:</p>
+                  <p className="text-sm text-seguranca-lightgray font-medium truncate">{employeeName}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 space-y-3 text-sm text-gray-300">
             <p>
@@ -122,7 +212,7 @@ const NppsForm: React.FC = () => {
             variant="outline"
             className="flex items-center gap-2 h-11 w-full sm:w-auto"
             onClick={handlePreview}
-            disabled={loadingPreview || loadingDownload}
+            disabled={loadingPreview || loadingDownload || !funcionarioId}
           >
             {loadingPreview ? (
               <>
@@ -140,7 +230,7 @@ const NppsForm: React.FC = () => {
           <Button
             className="flex items-center gap-2 h-11 w-full sm:w-auto bg-seguranca-red hover:bg-seguranca-red/90 shadow-lg shadow-seguranca-red/40"
             onClick={handleDownload}
-            disabled={loadingDownload || loadingPreview}
+            disabled={loadingDownload || loadingPreview || !funcionarioId}
           >
             {loadingDownload ? (
               <>
@@ -161,4 +251,5 @@ const NppsForm: React.FC = () => {
 };
 
 export default NppsForm;
+
 

@@ -105,11 +105,16 @@ public class PermissionService {
             Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
         )));
 
-        // ESTOQUE - Consulta e relatórios de estoque
+        // ESTOQUE - Consulta e relatórios de estoque e suprimentos
         rolePermissions.put(UserRole.ESTOQUE, new HashSet<>(Arrays.asList(
             Permission.STOCK_READ,
             Permission.INVENTORY_READ, Permission.INVENTORY_MOVEMENTS_READ,
             Permission.PRODUCTS_READ,
+            Permission.PURCHASE_REQUESTS_READ,
+            Permission.EQUIPMENTS_READ,
+            Permission.COMPANIES_READ,
+            Permission.GROUPS_READ,
+            Permission.TIME_RECORDS_READ,
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE
         )));
@@ -133,6 +138,31 @@ public class PermissionService {
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE
         )));
+
+        // ALMOXARIFADO - Gestão completa de armazém e materiais
+        rolePermissions.put(UserRole.ALMOXARIFADO, new HashSet<>(Arrays.asList(
+            Permission.STOCK_READ, Permission.STOCK_WRITE, Permission.STOCK_CREATE,
+            Permission.INVENTORY_READ, Permission.INVENTORY_WRITE, Permission.INVENTORY_MOVEMENTS_READ, Permission.INVENTORY_MOVEMENTS_CREATE,
+            Permission.PRODUCTS_READ, Permission.PRODUCTS_WRITE,
+            Permission.EQUIPMENTS_READ, Permission.EQUIPMENTS_WRITE, Permission.EQUIPMENTS_CREATE, Permission.EQUIPMENTS_ASSIGN,
+            Permission.DASHBOARD_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE
+        )));
+
+        // Módulo Comercial + contratos (alinhado ao front e às authorities do JWT vindas do BD)
+        Set<Permission> commercialFull = new HashSet<>(Arrays.asList(
+            Permission.CLIENTS_READ, Permission.CLIENTS_WRITE, Permission.CLIENTS_CREATE, Permission.CLIENTS_DELETE,
+            Permission.LEADS_READ, Permission.LEADS_WRITE, Permission.LEADS_CREATE, Permission.LEADS_DELETE,
+            Permission.PROPOSALS_READ, Permission.PROPOSALS_WRITE, Permission.PROPOSALS_CREATE, Permission.PROPOSALS_DELETE,
+            Permission.QUOTES_READ, Permission.QUOTES_WRITE, Permission.QUOTES_CREATE, Permission.QUOTES_DELETE,
+            Permission.CONTRACTS_READ, Permission.CONTRACTS_WRITE, Permission.CONTRACTS_CREATE, Permission.CONTRACTS_DELETE,
+            Permission.DASHBOARD_READ, Permission.REPORTS_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE,
+            Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
+        ));
+        rolePermissions.put(UserRole.COMERCIAL, new HashSet<>(commercialFull));
+        rolePermissions.put(UserRole.GESTOR_COMERCIAL, new HashSet<>(commercialFull));
+        rolePermissions.put(UserRole.ASSISTENTE_COMERCIAL, new HashSet<>(commercialFull));
     }
 
     public Set<Permission> getPermissionsForRole(UserRole role) {

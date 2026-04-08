@@ -71,6 +71,7 @@ public class ParserWorker {
         }
     }
     
+    @SuppressWarnings("unchecked")
     @Scheduled(fixedDelay = 500)
     public void processParsedPages() {
         try {

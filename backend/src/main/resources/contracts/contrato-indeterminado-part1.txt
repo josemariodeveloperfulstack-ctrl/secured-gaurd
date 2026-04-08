@@ -1,0 +1,43 @@
+{{EMPREGADOR_NOME}}, com sede na {{EMPREGADOR_ENDERECO}}, inscrita no CNPJ sob número {{EMPREGADOR_CNPJ}}, doravante denominado EMPREGADOR e {{EMPREGADO_NOME}}, portador(a) do RG {{EMPREGADO_RG}} e CPF {{EMPREGADO_CPF}}, residente e domiciliado(a) na {{EMPREGADO_ENDERECO}}, a seguir chamado apenas EMPREGADO(A), celebram o presente CONTRATO DE TRABALHO POR PRAZO INDETERMINADO, nos termos da Consolidação das Leis do Trabalho (CLT), de acordo com as condições a seguir especificadas:
+
+1 – Fica o EMPREGADO(A) admitido(a) para exercer a função de {{FUNCAO}}, mediante o salário mensal de {{SALARIO_VALOR}} ({{SALARIO_EXTENSO}}), por mês podendo ser o EMPREGADO remanejado para outra atividade em que demonstre melhor capacidade de adaptação, e ainda cumular outros afazeres, desde que compatíveis com sua condição pessoal.
+
+2 – O horário de trabalho será registrado por aplicativo através do telefone funcional do posto e a eventual redução/alteração da jornada por determinação do EMPREGADOR não inovará este ajuste, permanecendo sempre integra a obrigação do EMPREGADO de cumprir o horário que lhe for determinado, de modo que a mudança de horário de trabalho não se trata de alteração lesiva do contrato.
+
+3 – Sujeita-se o EMPREGADO(A) aos regimes de prorrogação e de compensação da jornada, obrigando-se a prestar serviços em horas extraordinárias, ainda que em horário noturno, sempre que lhe for determinado pelo EMPREGADOR, ocasião em que receberá horas extras devidas, ou as terá compensadas com a redução da jornada de trabalho em outro dia.
+
+4 – Aceita o EMPREGADO(A), expressamente, a condição de prestar serviços em quaisquer dos turnos de trabalho, isto é, tanto durante o dia quanto durante a noite, desde que sem simultaneidade, não incorrendo em alteração lesiva do contrato a alternância dos turnos.
+
+4.1 – Compromete-se o EMPREGADO(A) a registrar no cartão de ponto (se aplicável ao contrato) os efetivos e reais horários de entrada e saída da empresa, ficando proibida a omissão de registro, ou a assinalação com horários invariáveis ou irreais.
+
+4.2 – Exclusivamente em caso de laborar na jornada especial 12x36, declara o EMPREGADO(A) que, nessa circunstância, abster-se-á de contrair qualquer ocupação a ser desempenhada nos períodos destinados ao repouso, o que, não sendo observado pelo EMPREGADO, implicará a rescisão do contrato por justa causa do obreiro.
+
+5 – Fica ajustado, nos termos do § 1º, art. 469, da CLT, que o EMPREGADO concorda com a possibilidade de transferência, transitória ou definitiva, do local de trabalho, não incorrendo em alteração lesiva do contrato a alternância da localidade de prestação dos serviços.
+
+6 – Declara o EMPREGADO(A) que, no ato da contratação, recebeu orientação sobre o Regulamento Interno da Empresa, cujas cláusulas fazem parte do contrato, e a violação de quaisquer delas implicará em sanção.
+
+6.1 – Em caso de acometimento de problemas de saúde, o EMPREGADO(A) se compromete a comunicar de forma prévia e diretamente ao EMPREGADOR de sua impossibilidade de comparecimento ao posto de trabalho, bem como se compromete a apresentar ao EMPREGADOR, no prazo máximo de 48 (quarenta e oito) horas, se outro não for convencionado, o atestado médico, em via original, capaz de justificar a sua ausência, sob pena de ser considerada como falta injustificada, podendo, em qualquer hipótese, vir o EMPREGADO(A) a ser examinado pelo serviço médico conveniado do EMPREGADOR.
+
+6.2 – O EMPREGADOR, livre de quaisquer ônus para com o EMPREGADO(A), poderá utilizar-se de imagens deste, gravadas durante a vigência do presente contrato, para fins exclusivos de divulgação do EMPREGADOR e de suas atividades, podendo, para tanto, reproduzi-la ou divulgá-la junto à "Internet", jornais e todos os demais meios de comunicação, público ou privado.
+
+7 – Em caso de dano causado pelo EMPREGADO(A), seja por culpa ou dolo, fica o EMPREGADOR autorizado a efetivar o desconto da importância correspondente ao prejuízo, nos termos do art. 462, da CLT.
+
+8 – Em atendimento às alterações instituídas pela Lei 13.467/2017, manifesta o EMPREGADO(A) ter ciência e expressa concordância em relação aos seguintes temas:
+
+8.1 – Não é obrigatória a troca de uniforme perante o estabelecimento empresarial, devendo o EMPREGADO(A) comparecer ao posto de trabalho já uniformizado, ou, quando assim não autorizado, ao menos parcialmente uniformizado, ocasião em que terminará a uniformização no local de trabalho, utilizando-se dos 05 (cinco) minutos anteriores à jornada, previstos no art. 58, §1º, da CLT.
+
+8.2 – Ajustam as partes, a depender da conveniência empresarial, a possibilidade de instituição dos sistemas de: trabalho em regime parcial (art. 58-A, CLT); banco de horas (art. 59, §5º, CLT); prorrogação e compensação de jornada (art. 59, §6º, CLT); jornada em regime especial 12X36, observado ou indenizado o intervalo intrajornada (art. 59-A, CLT); labor em regime de tele trabalho, a ser oportunamente disciplinado entre as partes (art. 62, III, CLT).
+
+8.3 – Fica ajustada a responsabilidade do(a) EMPREGADO(A) no tocante a higienização do uniforme que lhe for confiado pelo EMPREGADOR, reconhecendo as partes que tal limpeza não demanda o uso de procedimentos ou produtos especiais (art. 456-A, § único, CLT).
+
+8.4 – Concorda o EMPREGADO(A), a depender da conveniência do EMPREGADOR, com a possiblidade de fracionamento do período de férias, nos termos do art. 75, da CLT.
+
+8.5 – Concorda o EMPREGADO(A), a depender da conveniência do EMPREGADOR, com a possiblidade de adoção do regime de trabalho intermitente, nos termos do art. 452-A, da CLT, não incorrendo em alteração lesiva do contrato a alternância entre os regimes intermitente e tradicional, e vice-versa.
+
+8.6 – Fica o EMPREGADO(A) ciente de que a perda da habilitação técnica para exercício da profissão, aqui também compreendida a carteira nacional de habilitação (CNH) caso indispensável ao desempenho da função, implicará a extinção motivada do contrato de trabalho, nos termos do art. 482, "m", da CLT.
+
+9 – O presente contrato é celebrado por prazo indeterminado, nos termos do art. 443 da CLT, com início da prestação de serviços em {{DATA_INICIO}}, produzindo efeitos enquanto perdurar a relação de emprego, salvo nas hipóteses de extinção previstas em lei.
+
+10 – A rescisão do contrato de trabalho observará o disposto na legislação trabalhista vigente, inclusive quanto a aviso-prévio, verbas rescisórias, estabilidades e demais garantias legais ou convencionadas.
+
+11 – Permanecem em plena vigência as cláusulas deste instrumento enquanto durarem as relações entre EMPREGADO(A) e EMPREGADOR, podendo ser alterado mediante acordo entre as partes ou nos casos previstos em lei.

@@ -61,22 +61,6 @@ export const fiscalService = {
     return data;
   },
 
-  /**
-   * Importa PDF e XML em conjunto. O backend valida se o CNPJ é o mesmo nos dois arquivos.
-   * O nome do cliente é obtido do XML (dest/xNome).
-   */
-  async uploadPdfAndXml(filePdf: File, fileXml: File, periodMonth: number, periodYear: number): Promise<FiscalInvoice[]> {
-    const formData = new FormData();
-    formData.append('filePdf', filePdf);
-    formData.append('fileXml', fileXml);
-    formData.append('periodMonth', String(periodMonth));
-    formData.append('periodYear', String(periodYear));
-    const { data } = await api.post<FiscalInvoice[]>(`${BASE}/upload-pair`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return data;
-  },
-
   async getById(id: string): Promise<FiscalInvoice> {
     const { data } = await api.get<FiscalInvoice>(`${BASE}/${id}`);
     return data;

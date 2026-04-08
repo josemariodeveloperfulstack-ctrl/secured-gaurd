@@ -53,6 +53,16 @@ export interface SimpleEmployee {
   email?: string;
   phone?: string;
   document?: string;
+  cpf?: string;
+  address?: string;
+  registrationNumber?: string;
+  hireDate?: string;
+  terminationDate?: string;
+  rg?: string;
+  companyId?: string;
+  companySigla?: string;
+  positionName?: string;
+  unitName?: string;
 }
 
 export interface EmployeeFilters {

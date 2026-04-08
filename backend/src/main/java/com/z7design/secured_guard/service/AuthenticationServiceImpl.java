@@ -211,6 +211,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             boolean firstAccessCompleted = user.getFirstAccessCompleted() != null && user.getFirstAccessCompleted();
 
             log.info("✅ Autenticação concluída com sucesso para usuário: {}", user.getUsername());
+            log.info("🔍 User ID: {}", user.getId());
+            log.info("🔍 Roles: {}", roles);
+            log.info("🔍 Authorities (from User.getAuthorities()): {}", user.getAuthorities());
+            log.info("🔍 Custom Permissions: {}", customPermissions);
 
             return AuthenticationResponse.builder()
                     .token(jwtToken)

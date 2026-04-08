@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -31,7 +32,7 @@ public class LogService {
         this.userRepository = userRepository;
     }
 
-    @Transactional(noRollbackFor = Exception.class)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Exception.class)
     public void logUserActivity(String username, String action, String details, String ipAddress, String userAgent, String sessionId) {
         try {
             // Validar parâmetros básicos
@@ -89,7 +90,7 @@ public class LogService {
         }
     }
 
-    @Transactional(noRollbackFor = Exception.class)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = Exception.class)
     public void logUserActivity(String username, String action, String details) {
         // Método de compatibilidade - chama o novo método com valores padrão
         // Usar noRollbackFor para garantir que erros não afetem transações principais
@@ -101,7 +102,7 @@ public class LogService {
         }
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logCurrentUserActivity(String action, String details) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -122,7 +123,7 @@ public class LogService {
         }
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logError(String message, String stackTrace, String endpoint) {
         ErrorLog log = new ErrorLog();
         log.setMessage(message);

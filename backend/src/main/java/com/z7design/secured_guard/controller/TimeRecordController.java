@@ -32,7 +32,7 @@ public class TimeRecordController {
         private final TimeRecordReportService timeRecordReportService;
 
         @GetMapping("/report/{employeeId}")
-        @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR', 'CLIENT_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
+        @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'SUPERVISOR', 'CLIENT_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS')")
         public ResponseEntity<byte[]> generateMonthlyReport(
                         @PathVariable UUID employeeId,
                         @RequestParam int month,
@@ -56,8 +56,8 @@ public class TimeRecordController {
         @PostMapping("/register")
         @PreAuthorize("""
                         hasAnyAuthority('TIME_RECORD_CREATE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
-                                        'ASSISTENTE_ADMINISTRATIVO', 'ANALISTA_SUPRIMENTOS', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS')
-                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO','ANALISTA_SUPRIMENTOS')
+                                        'ASSISTENTE_ADMINISTRATIVO', 'ANALISTA_SUPRIMENTOS', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_COMPRAS')
+                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO','ANALISTA_SUPRIMENTOS', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS')
                         """)
         public ResponseEntity<?> registerTimeRecord(@RequestBody Map<String, Object> request) {
                 try {
@@ -95,8 +95,8 @@ public class TimeRecordController {
         @GetMapping("/today/{employeeId}")
         @PreAuthorize("""
                         hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
-                                        'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
-                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+                                        'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_COMPRAS')
+                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS')
                         """)
         public ResponseEntity<?> getTodayRecords(@PathVariable UUID employeeId) {
                 try {
@@ -138,8 +138,8 @@ public class TimeRecordController {
         @GetMapping("/period/{employeeId}")
         @PreAuthorize("""
                         hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
-                                        'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
-                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+                                        'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_COMPRAS')
+                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS')
                         """)
         public ResponseEntity<?> getRecordsByPeriod(
                         @PathVariable UUID employeeId,
@@ -162,8 +162,8 @@ public class TimeRecordController {
         @GetMapping("/next-record-type/{employeeId}")
         @PreAuthorize("""
                         hasAnyAuthority('TIME_RECORD_READ', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN',
-                                        'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO')
-                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO')
+                                        'ASSISTENTE_ADMINISTRATIVO', 'ROLE_ASSISTENTE_ADMINISTRATIVO', 'ROLE_COMPRAS')
+                        or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'COLABORADOR','VIGILANTE','SUPERVISOR','GESTOR','RH','DEPARTAMENTO_PESSOAL','ASSISTENTE_ADMINISTRATIVO', 'ESTOQUE', 'ALMOXARIFADO', 'COMPRAS')
                         """)
         public ResponseEntity<?> getNextRecordType(@PathVariable UUID employeeId) {
                 try {
@@ -245,7 +245,7 @@ public class TimeRecordController {
         @PostMapping("/manual/day")
         @PreAuthorize("""
                         hasAnyAuthority('TIME_RECORD_READ', 'TIME_RECORD_CREATE', 'TIME_RECORD_MANAGE', 'SUPER_ADMIN', 'ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL',
-                        'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL')
+                        'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_DEPARTAMENTO_PESSOAL', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')
                         """)
         public ResponseEntity<?> saveManualDay(@RequestBody Map<String, Object> request) {
                 try {

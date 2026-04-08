@@ -1,4 +1,4 @@
-FROM node:20-bullseye
+FROM public.ecr.aws/docker/library/node:20-bullseye
 
 # Instalar Chromium e dependências necessárias com retry e tratamento de erros
 RUN set -eux; \

@@ -8,7 +8,8 @@ import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
 import { Badge } from '../ui/badge';
 import { FileText, Download, Eye, User, Building, Calendar, MapPin, CreditCard, Loader2, CheckCircle2 } from 'lucide-react';
-import { employeeService, Employee } from '@/services/employeeService';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
+
 import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
@@ -35,11 +36,12 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
 
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
+
 
   // Sincronizar props com state
   useEffect(() => {
@@ -50,29 +52,38 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     }));
   }, [employeeId, companyId]);
 
-  // Auto-preencher empresa quando o funcionário mudar
-  useEffect(() => {
-    if (form.funcionarioId) {
-      const selected = employees.find(f => f.id === form.funcionarioId);
-      if (selected && selected.company?.id) {
-        setForm(prev => ({ ...prev, empresaId: selected.company.id || '' }));
-      } else if (form.funcionarioId && !selected) {
-        // Se não achou na lista local (ex: veio de busca remota), buscar detalhes
-        employeeService.getEmployeeById(form.funcionarioId).then(emp => {
-          if (emp && emp.company?.id) {
-            setForm(prev => ({ ...prev, empresaId: emp.company.id || '' }));
-            // Adicionar à lista local para evitar buscas repetidas
-            setEmployees(prev => {
-              if (prev.find(p => p.id === emp.id)) return prev;
-              return [...prev, emp];
-            });
-          }
-        }).catch(err => console.error('Erro ao buscar detalhes para auto-preenchimento:', err));
-      }
-    }
-  }, [form.funcionarioId, employees.length > 0]);
 
-  // Carregar dados do backend
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.funcionarioId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.funcionarioId, selectedEmployeeData]);
+
+
+  // Carregar dados do backend (empresas)
   useEffect(() => {
     loadData();
   }, []);
@@ -80,11 +91,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [employeesData, companiesData] = await Promise.all([
-        employeeService.getAllEmployees(),
-        companyService.getAllCompanies()
-      ]);
-      setEmployees(employeesData);
+      const companiesData = await companyService.getAllCompanies();
       setCompanies(companiesData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -144,8 +151,8 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       const payload = {
         companyId: empresa.id,
         employeeName: fullEmployee.name,
-        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
-        employeePosition: (fullEmployee as any).position?.name || '',
+        employeeCpf: fullEmployee.cpf || (fullEmployee as any).document || '',
+        employeePosition: (fullEmployee as any).positionName || (fullEmployee as any).position?.name || '',
         hireDate: fullEmployee.hireDate || '',
         employeeAddress: addressValue,
         voucherType: form.tipoVale,
@@ -156,6 +163,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
         documentDate: new Date().toISOString().split('T')[0],
         observations: form.observacoes || ''
       };
+
 
       // Gerar PDF para visualização
       const response = await api.post('/api/transport-voucher/preview-pdf', payload, {
@@ -218,9 +226,10 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       const payload = {
         companyId: empresa.id,
         employeeName: fullEmployee.name,
-        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
-        employeePosition: (fullEmployee as any).position?.name || '',
+        employeeCpf: fullEmployee.cpf || (fullEmployee as any).document || '',
+        employeePosition: (fullEmployee as any).positionName || (fullEmployee as any).position?.name || '',
         hireDate: fullEmployee.hireDate || '',
+
         employeeAddress: addressValue,
         voucherType: form.tipoVale,
         voucherValue: form.valorVale,
@@ -309,6 +318,14 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                 <EmployeeCombobox
                   value={form.funcionarioId}
                   onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    setForm(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
+                      empresaId: emp.companyId || prev.empresaId
+                    }));
+                  }}
                   disabled={loadingData}
                   placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"}
                 />
@@ -362,7 +379,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {(funcionario as any).position?.name || '-'}
+                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -377,9 +394,10 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.workPost?.name || '-'}
+                        {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
                       </div>
                     </div>
+
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Matrícula</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
@@ -391,7 +409,11 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {typeof funcionario.address === 'string' ? funcionario.address : (funcionario.address as any)?.street || '-'}
+                      {typeof funcionario.address === 'string'
+                        ? funcionario.address
+                        : (funcionario.address as any)?.street
+                          ? `${(funcionario.address as any).street}, ${(funcionario.address as any).number || ''}`
+                          : '-'}
                     </div>
                   </div>
                 </div>

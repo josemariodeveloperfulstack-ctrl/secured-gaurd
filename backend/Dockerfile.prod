@@ -6,7 +6,7 @@
 # ============================================
 # STAGE 1: Build
 # ============================================
-FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+FROM public.ecr.aws/docker/library/maven:3.9-eclipse-temurin-17-alpine AS builder
 
 WORKDIR /build
 
@@ -79,7 +79,7 @@ RUN for i in 1 2 3; do \
 # ============================================
 # STAGE 2: Runtime
 # ============================================
-FROM eclipse-temurin:17-jre-alpine AS production
+FROM public.ecr.aws/docker/library/eclipse-temurin:17-jre-alpine AS production
 
 # Metadados
 LABEL maintainer="Secured Guard Team"

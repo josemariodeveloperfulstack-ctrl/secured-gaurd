@@ -8,7 +8,10 @@ import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { Calendar, User, Building, FileText, Download, Eye, Loader2, CheckCircle2, Clock, Briefcase } from 'lucide-react';
-import { employeeService, Employee } from '@/services/employeeService';
+import { employeeService, Employee, SimpleEmployee } from '@/services/employeeService';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+import { SearchableSelect } from '../ui/searchable-select';
+
 import { companyService } from '@/services/companyService';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
@@ -18,6 +21,33 @@ import api from '@/lib/axios';
 interface ContratosTrabalhoFormProps {
   employeeId?: string;
   companyId?: string;
+}
+
+function resolvePdfContractKind(
+  contractType: string
+): 'EXPERIENCE' | 'INDEFINITE' | 'STANDARD' {
+  if (contractType === 'Contrato de Experiência') return 'EXPERIENCE';
+  if (contractType === 'CLT - Prazo indeterminado (integral)') return 'INDEFINITE';
+  return 'STANDARD';
+}
+
+/** Valor enviado em `department` para o PDF como "SETOR DE TRABALHO" (setor + unidade + posto — não centro de custo). */
+function buildSetorLocalTrabalhoContrato(emp: Employee): string {
+  const raw = [
+    emp.department?.name?.trim(),
+    emp.unit?.name?.trim(),
+    emp.workPost?.name?.trim(),
+  ].filter((s): s is string => Boolean(s));
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const p of raw) {
+    const key = p.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(p);
+  }
+  return unique.join(' — ');
 }
 
 const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeId, companyId }) => {
@@ -40,11 +70,12 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
+
   const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
 
-  const funcionario = employees.find(f => f.id === form.employeeId);
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
   const costCenter = costCenters.find(cc => cc.id === form.department || cc.name === form.department);
 
@@ -56,6 +87,35 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     }));
   }, [employeeId, companyId]);
 
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.employeeId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.employeeId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.employeeId, selectedEmployeeData]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -63,14 +123,13 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [employeesData, companiesData, costCentersData] = await Promise.all([
-        employeeService.getAllEmployees(),
+      const [companiesData, costCentersData] = await Promise.all([
         companyService.getAllCompanies(),
         costCenterService.listActive()
       ]);
-      setEmployees(employeesData);
       setCompanies(companiesData);
       setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
+
       console.log('📊 Centros de Custo carregados:', costCentersData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -93,12 +152,16 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
         ? costCenters.find(cc => cc.name.toLowerCase() === unitName.toLowerCase())
         : null;
 
-      setForm(prev => ({
-        ...prev,
-        position: (funcionario as any).position?.name || prev.position,
-        department: matchingCostCenter?.id || prev.department,
-        startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
-      }));
+      setForm(prev => {
+        const salaryValue = (funcionario as any).salario;
+        return {
+          ...prev,
+          position: (funcionario as any).positionName || (funcionario as any).position?.name || prev.position,
+          department: matchingCostCenter?.id || prev.department,
+          startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
+          salary: salaryValue != null ? String(salaryValue).replace('.', ',') : prev.salary,
+        };
+      });
     }
   }, [funcionario, costCenters]);
 
@@ -124,6 +187,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     'CLT - Efetivo',
     'CLT - Temporário',
     'Contrato de Experiência',
+    'CLT - Prazo indeterminado (integral)',
     'PJ - Prestador de Serviços',
     'Estagiário',
     'Aprendiz',
@@ -195,6 +259,13 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       ? fullEmployee.address
       : fullEmployee.address?.street || '';
 
+    const pdfKind = resolvePdfContractKind(form.contractType);
+    const isExperiencia = pdfKind === 'EXPERIENCE';
+    const cidadeContrato =
+      (empresa as any)?.city ||
+      (typeof empresa?.address === 'string' ? empresa.address.split(',')[0]?.trim() : '') ||
+      '';
+
     return {
       companyId: empresa!.id,
       employeeName: fullEmployee.name,
@@ -204,13 +275,18 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       employeeCtps: (fullEmployee as any).ctps || '',
       employeeCtpsSeries: (fullEmployee as any).ctpsSeries || '',
       position: form.position,
-      department: costCenter?.name || form.department || '',
+      department: buildSetorLocalTrabalhoContrato(fullEmployee),
       salary: form.salary ? parseFloat(form.salary.replace(/\./g, '').replace(',', '.')) : 0,
       admissionDate: form.startDate || null,
       workHoursDescription: '44 horas semanais', // Placeholder or add form field if exists
       workSchedule: form.workSchedule || 'a definir',
-      city: empresa!.address && typeof empresa!.address === 'string' ? empresa!.address.split(',')[0] : '',
-      contractDate: new Date().toISOString().split('T')[0]
+      city: cidadeContrato,
+      contractDate: new Date().toISOString().split('T')[0],
+      contractKind: pdfKind,
+      experienceDurationDays: isExperiencia && form.experienceDuration
+        ? parseInt(form.experienceDuration, 10)
+        : undefined,
+      salaryInWords: (fullEmployee as any).salarioPorExtenso || (fullEmployee as any).salario_por_extenso || ''
     };
   };
 
@@ -323,35 +399,17 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                       Selecione o colaborador que terá o contrato gerado.
                     </span>
                   </Label>
-                  <Select
+                  <EmployeeCombobox
                     value={form.employeeId}
-                    onValueChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
+                    onChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                     disabled={loadingData}
-                  >
-                    <SelectTrigger className="h-12 rounded-lg border border-input bg-muted/40 text-foreground font-medium shadow-sm transition-colors hover:bg-muted/60 focus:ring-2 focus:ring-primary/20 focus:border-primary/50 [&>span]:line-clamp-2 [&>span]:text-left [&>span]:normal-case">
-                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                      {loadingData ? (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Carregando funcionários...</div>
-                      ) : employees.length > 0 ? (
-                        employees.map(f => (
-                          <SelectItem key={f.id} value={f.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium normal-case">{f.name}</span>
-                              {(f.cpf || (f as any).document) && (
-                                <span className="text-xs text-muted-foreground">
-                                  CPF: {formatCPF(f.cpf || (f as any).document || '')}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Nenhum funcionário encontrado</div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    onEmployeeSelect={(emp) => {
+                      setSelectedEmployeeData(emp);
+                      if (emp.companyId) {
+                        setForm(prev => ({ ...prev, companyId: emp.companyId! }));
+                      }
+                    }}
+                  />
                   {funcionario && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
                       <User className="h-3.5 w-3.5 text-primary" />
@@ -379,40 +437,18 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                       Escolha a empresa empregadora que assinará o contrato.
                     </span>
                   </Label>
-                  <Select
+                  <SearchableSelect
+                    options={companies.map(e => ({
+                      value: e.id,
+                      label: e.sigla || e.tradeName || e.name,
+                      description: e.cnpj ? `CNPJ: ${formatCNPJ(e.cnpj)}` : e.name
+                    }))}
                     value={form.companyId}
-                    onValueChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
+                    onChange={(value) => setForm(prev => ({ ...prev, companyId: value }))}
                     disabled={loadingData}
-                  >
-                    <SelectTrigger className="h-12 rounded-lg border border-input bg-muted/40 text-foreground font-medium shadow-sm transition-colors hover:bg-muted/60 focus:ring-2 focus:ring-primary/20 focus:border-primary/50 [&>span]:line-clamp-2 [&>span]:text-left [&>span]:normal-case">
-                      <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione a empresa"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                      {loadingData ? (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Carregando empresas...</div>
-                      ) : companies.length > 0 ? (
-                        companies.map(e => (
-                          <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                            <div className="flex flex-col gap-0.5 text-left">
-                              <span className="font-medium normal-case">
-                                {e.sigla || e.tradeName || e.name}
-                              </span>
-                              {(e.sigla || e.tradeName) && e.name && (
-                                <span className="text-xs text-muted-foreground">{e.name}</span>
-                              )}
-                              {e.cnpj && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  CNPJ: {formatCNPJ(e.cnpj)}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <div className="p-3 text-center text-sm text-muted-foreground">Nenhuma empresa encontrada</div>
-                      )}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Selecione a empresa"
+                    searchPlaceholder="Buscar empresa..."
+                  />
                   {empresa && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
                       <Building className="h-3.5 w-3.5 text-primary" />
@@ -453,23 +489,41 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     <span className="text-sm font-semibold text-foreground">Dados do Empregado</span>
                   </div>
                 </div>
-                <div className="p-4 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</Label>
-                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
-                      {funcionario.name}
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nome</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
+                        {funcionario.name}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPF</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">CPF</Label>
-                    <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
-                      {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cargo</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
+                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
+                         {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
+                      </div>
                     </div>
                   </div>
+
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40 truncate">
-                      {typeof funcionario.address === 'string' ? funcionario.address : funcionario.address?.street || '-'}
+                      {typeof funcionario.address === 'string' ? funcionario.address : (funcionario.address as any)?.street || '-'}
                     </div>
                   </div>
                 </div>
@@ -627,6 +681,17 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               </div>
             )}
 
+            {form.contractType === 'CLT - Prazo indeterminado (integral)' && (
+              <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                <p>
+                  Este tipo gera o <span className="font-medium text-foreground">contrato CLT por prazo indeterminado</span>{' '}
+                  (texto integral em várias páginas, com LGPD), indicado após o fim da experiência. A{' '}
+                  <span className="font-medium text-foreground">data de início</span> abaixo entra na cláusula de início da
+                  prestação; ajuste se for a data de assinatura do contrato definitivo.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <Label>Data de Início</Label>
@@ -676,33 +741,22 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
               <div className="space-y-2">
                 <Label>Departamento (Centro de Custo)</Label>
-                <Select
+                <SearchableSelect
+                  options={costCenters.map(cc => ({
+                    value: cc.id || cc.name,
+                    label: cc.name,
+                    description: cc.code ? `Código: ${cc.code}` : undefined
+                  }))}
                   value={form.department}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, department: value }))}
+                  onChange={(value) => setForm(prev => ({ ...prev, department: value }))}
                   disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o departamento"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando centros de custo...</div>
-                    ) : costCenters.length > 0 ? (
-                      costCenters.map(cc => (
-                        <SelectItem key={cc.id} value={cc.id || cc.name}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{cc.name}</span>
-                            {cc.code && (
-                              <span className="text-xs text-muted-foreground">Código: {cc.code}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum centro de custo encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione o departamento"
+                  searchPlaceholder="Buscar departamento..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  No PDF do contrato, o campo <span className="font-medium text-foreground">Setor de trabalho</span> usa o
+                  setor, a unidade e o posto de trabalho cadastrados no funcionário — não este centro de custo.
+                </p>
               </div>
             </div>
           </div>

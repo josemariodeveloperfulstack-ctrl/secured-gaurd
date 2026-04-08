@@ -8,13 +8,19 @@ export interface FinancialTransaction {
   amount: number;
   date: string;
   dueDate?: string;
-  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'PAGA' | 'PENDENTE' | 'PENDENTE_ERRO' | 'CANCELADA';
   reference?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  unit?: { id: string, name: string };
-  supplierName?: string; // Adicionado campo para o nome do fornecedor
+  unit?: { id: string; name: string };
+  unitId?: string;
+  supplierName?: string;
+  /** Centro de custo (relatórios / filtros) */
+  costCenter?: string;
+  /** FIXA | VARIAVEL para despesas */
+  expenseType?: string;
+  supplier?: { id: string; name?: string };
 }
 
 export type InvoiceStatus = 'PENDENTE' | 'PAGA' | 'CANCELADA' | 'PENDENTE_ERRO';
@@ -35,6 +41,14 @@ export interface Invoice {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  /** API retorna centro de custo neste campo */
+  centroCusto?: string;
+  unitId?: string;
+  supplierId?: string;
+  supplierName?: string;
+  companySigla?: string;
+  /** FIXA | VARIAVEL */
+  type?: string;
 }
 
 export interface FinancialReport {
@@ -90,9 +104,43 @@ export interface FinancialFilters {
   sortDir?: 'ASC' | 'DESC';
 }
 
+function normalizeFinancialTransaction(raw: Record<string, unknown>): FinancialTransaction {
+  const amount = raw.amount != null ? Number(raw.amount) : 0;
+  const unitId = raw.unitId as string | undefined;
+  const unitName = (raw.unitName as string) || '';
+  const unit =
+    (raw.unit as FinancialTransaction['unit']) ||
+    (unitId ? { id: String(unitId), name: unitName } : undefined);
+  const dateRaw = raw.date as string | undefined;
+  const dueRaw = raw.dueDate as string | undefined;
+  return {
+    id: String(raw.id),
+    type: (raw.type as FinancialTransaction['type']) || 'EXPENSE',
+    category: String(raw.category ?? ''),
+    description: String(raw.description ?? ''),
+    amount,
+    date: dateRaw || new Date().toISOString(),
+    dueDate: dueRaw,
+    status: (raw.status as FinancialTransaction['status']) || 'PENDING',
+    reference: raw.reference as string | undefined,
+    notes: raw.notes as string | undefined,
+    createdAt: String(raw.createdAt ?? ''),
+    updatedAt: String(raw.updatedAt ?? ''),
+    unit,
+    unitId: unitId ? String(unitId) : unit?.id,
+    supplierName: raw.supplierName as string | undefined,
+    costCenter: (raw.costCenter as string) || (raw.centroCusto as string) || undefined,
+    expenseType: raw.expenseType as string | undefined,
+    supplier:
+      raw.supplierId != null
+        ? { id: String(raw.supplierId), name: raw.supplierName as string | undefined }
+        : undefined,
+  };
+}
+
 export const financialService = {
   // ===== TRANSAÇÕES =====
-  
+
   // Buscar todas as transações
   async getTransactions(filters: FinancialFilters = {}): Promise<FinancialTransaction[]> {
     const params = new URLSearchParams();
@@ -108,10 +156,11 @@ export const financialService = {
 
     const queryString = params.toString();
     const url = queryString
-      ? `/financial/transactions?${queryString}`
-      : `/financial/transactions`;
+      ? `/api/financial/transactions?${queryString}`
+      : `/api/financial/transactions`;
     const response = await api.get(url);
-    return response.data;
+    const list = Array.isArray(response.data) ? response.data : [];
+    return list.map((row) => normalizeFinancialTransaction(row as Record<string, unknown>));
   },
 
   // Criar nova transação
@@ -153,6 +202,12 @@ export const financialService = {
       return response.data.content;
     }
     return [];
+  },
+
+  /** Lista completa de faturas/despesas (sem paginação) — uso em relatórios */
+  async getAllInvoices(): Promise<Invoice[]> {
+    const response = await api.get<Invoice[]>('/api/invoices/all');
+    return Array.isArray(response.data) ? response.data : [];
   },
 
   // Criar nova fatura

@@ -584,9 +584,11 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       setStep('generated');
     } catch (error) {
       console.error('Erro ao gerar contrato:', error);
+      const msg =
+        error instanceof Error ? error.message : 'Não foi possível gerar o contrato. Tente novamente.';
       toast({
         title: "Erro",
-        description: "Não foi possível gerar o contrato. Tente novamente.",
+        description: msg,
         variant: "destructive"
       });
     } finally {

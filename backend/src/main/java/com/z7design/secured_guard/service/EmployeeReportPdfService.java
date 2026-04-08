@@ -374,6 +374,8 @@ public class EmployeeReportPdfService {
             case "nationality" -> "Nacionalidade";
             case "motherName" -> "Nome Mãe";
             case "fatherName" -> "Nome Pai";
+            case "escalaTrabalho" -> "Escala";
+            case "horarioTrabalho" -> "Horário";
             default -> key;
         };
     }
@@ -411,6 +413,8 @@ public class EmployeeReportPdfService {
             case "nationality" -> emp.getNationality();
             case "motherName" -> emp.getNomeMae();
             case "fatherName" -> emp.getNomePai();
+            case "escalaTrabalho" -> emp.getEscalaTrabalho();
+            case "horarioTrabalho" -> emp.getHorarioTrabalho();
             default -> null;
         };
         if (val == null || Objects.toString(val).isBlank()) {

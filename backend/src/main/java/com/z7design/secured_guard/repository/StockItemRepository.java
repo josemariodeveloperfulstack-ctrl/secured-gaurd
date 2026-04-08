@@ -26,17 +26,19 @@ public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
     List<StockItem> findByCategory(StockCategory category);
 
     // Buscar ativos
+    @Query("SELECT si FROM StockItem si LEFT JOIN FETCH si.unit WHERE si.active = true")
     List<StockItem> findByActiveTrue();
 
     // Buscar por categoria e ativos
-    List<StockItem> findByCategoryAndActiveTrue(StockCategory category);
+    @Query("SELECT si FROM StockItem si LEFT JOIN FETCH si.unit WHERE si.category = :category AND si.active = true")
+    List<StockItem> findByCategoryAndActiveTrue(@Param("category") StockCategory category);
 
     // Buscar itens com baixo estoque
-    @Query("SELECT si FROM StockItem si WHERE si.active = true AND si.currentQuantity <= si.minimumQuantity")
+    @Query("SELECT si FROM StockItem si LEFT JOIN FETCH si.unit WHERE si.active = true AND si.currentQuantity <= si.minimumQuantity")
     List<StockItem> findLowStockItems();
 
     // Buscar itens sem estoque
-    @Query("SELECT si FROM StockItem si WHERE si.active = true AND si.currentQuantity = 0")
+    @Query("SELECT si FROM StockItem si LEFT JOIN FETCH si.unit WHERE si.active = true AND si.currentQuantity = 0")
     List<StockItem> findOutOfStockItems();
 
     // Buscar por unidade

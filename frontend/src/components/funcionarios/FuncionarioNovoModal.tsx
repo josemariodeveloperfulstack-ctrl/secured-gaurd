@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,7 @@ import DocumentosGerarTab from './DocumentosGerarTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
 import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
+import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -268,6 +269,46 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [dependentModalOpen, setDependentModalOpen] = useState(false);
   const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
   const [loadingDependents, setLoadingDependents] = useState(false);
+
+  const loadEmployeeDependents = useCallback(async (employeeId: string | undefined) => {
+    const raw = String(employeeId ?? '').trim();
+    if (!raw) {
+      setEmployeeDependents([]);
+      return;
+    }
+    if (
+      raw === '00000000-0000-0000-0000-000000000001' ||
+      raw === '00000000-0000-0000-0000-000000000000' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)
+    ) {
+      console.warn('UUID inválido para carregar dependentes:', raw);
+      setEmployeeDependents([]);
+      return;
+    }
+
+    setLoadingDependents(true);
+    try {
+      const dependents = await dependentService.getDependentsByEmployee(raw);
+      setEmployeeDependents(Array.isArray(dependents) ? dependents : []);
+    } catch (error: unknown) {
+      const err = error as { response?: { status?: number } };
+      console.error('Erro ao carregar dependentes:', error);
+      if (err?.response?.status === 403) {
+        console.warn('Acesso negado ao carregar dependentes. Verifique as permissões do usuário.');
+      }
+      setEmployeeDependents([]);
+    } finally {
+      setLoadingDependents(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !employeeToEdit?.id) {
+      setEmployeeDependents([]);
+      return;
+    }
+    loadEmployeeDependents(employeeToEdit.id);
+  }, [open, employeeToEdit?.id, loadEmployeeDependents]);
 
   // Estados para modal de remanejamento ao alterar setor/posto
   const [remanejamentoModalOpen, setRemanejamentoModalOpen] = useState(false);
@@ -508,10 +549,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         }
       }
 
-      // Carregar dependentes do funcionário
-      if (employeeToEdit.id) {
-        loadEmployeeDependents(employeeToEdit.id);
-      }
+      // Dependentes: carregados pelo useEffect dedicado (open + employeeToEdit.id)
 
       // Carregar médico se houver (uso de optional chaining para segurança)
       if (employeeToEdit.exameMedicoDoctor?.id) {
@@ -596,35 +634,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       }
     }
   }, [companies, employeeToEdit?.company?.id]);
-
-  // Função para carregar dependentes do funcionário
-  const loadEmployeeDependents = async (employeeId: string) => {
-    if (!employeeId) return;
-
-    // Validar UUID - não fazer chamada se for UUID inválido/padrão
-    if (employeeId === '00000000-0000-0000-0000-000000000001' ||
-      employeeId === '00000000-0000-0000-0000-000000000000' ||
-      !employeeId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-      console.warn('UUID inválido para carregar dependentes:', employeeId);
-      setEmployeeDependents([]);
-      return;
-    }
-
-    setLoadingDependents(true);
-    try {
-      const dependents = await dependentService.getDependentsByEmployee(employeeId);
-      setEmployeeDependents(dependents);
-    } catch (error: any) {
-      console.error('Erro ao carregar dependentes:', error);
-      // Se for erro 403, apenas logar e não mostrar erro ao usuário
-      if (error?.response?.status === 403) {
-        console.warn('Acesso negado ao carregar dependentes. Verifique as permissões do usuário.');
-      }
-      setEmployeeDependents([]);
-    } finally {
-      setLoadingDependents(false);
-    }
-  };
 
   // Abrir modal para adicionar dependente
   const handleAddDependent = () => {
@@ -3430,38 +3439,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <span className="truncate">Motivo da Demissão</span>
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                             </Label>
-                            <Select
+                            <DismissalReasonSelect
                               value={form.terminationReason || ''}
-                              onValueChange={(val) => setForm(prev => ({ ...prev, terminationReason: val }))}
-                            >
-                              <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
-                                <SelectValue placeholder="Selecione o motivo" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-seguranca-dark border-gray-600 z-[9999]">
-                                {[
-                                  "Dispensa sem Justa Causa",
-                                  "Dispensa por Justa Causa",
-                                  "Pedido de Demissão",
-                                  "Rescisão por Comum Acordo (Reforma Trabalhista)",
-                                  "Término de Contrato de Experiência (Prazo Determinado)",
-                                  "Rescisão Antecipada do Contrato de Experiência",
-                                  "Rescisão Indireta",
-                                  "Falecimento",
-                                  "Aposentadoria",
-                                  "Performance Insuficiente",
-                                  "Corte de Custo",
-                                  "Saúde / Motivos Médicos",
-                                  "Mudança de Cidade/País",
-                                  "Conflitos Internos / Liderança",
-                                  "Falta de Fit Cultural",
-                                  "Transição de Carreira"
-                                ].map((reason) => (
-                                  <SelectItem key={reason} value={reason} className="text-gray-200 hover:bg-gray-700 hover:text-seguranca-yellow focus:bg-gray-700 focus:text-seguranca-yellow">
-                                    {reason}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              onValueChange={(val) => setForm((prev) => ({ ...prev, terminationReason: val }))}
+                            />
                           </div>
                         )}
                         {/* Cargo */}
@@ -3580,8 +3561,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             decimalScale={2}
                             decimalSeparator=","
                             groupSeparator="."
-                            preserveValue={true}
-                            turnOffAbbreviations={true}
+                            disableAbbreviations
                             prefix="R$ "
                             allowDecimals={true}
                             value={form.salario}

@@ -23,7 +23,28 @@ import {
   Loader2
 } from 'lucide-react';
 import { Dependent, DependentFormData, RELATIONSHIP_OPTIONS, GENDER_OPTIONS, STATE_OPTIONS } from '@/types/dependent';
+import type { DependentCreateRequest, DependentUpdateRequest } from '@/types/dependent';
+import dependentService from '@/services/dependentService';
 import { useToast } from '@/hooks/use-toast';
+import { validateCPF, validateEmail } from '@/utils/validation';
+
+const digitsOnly = (v: string) => v.replace(/\D/g, '');
+
+/** E-mail opcional: sem `type="email"` (validação HTML5 bloqueava envio). Ignora placeholder/autofill genérico. */
+const optionalEmail = (raw: string | undefined): string | undefined => {
+  const t = raw?.trim() ?? '';
+  if (!t) return undefined;
+  const lower = t.toLowerCase();
+  if (lower === 'email@exemplo.com' || lower === 'usuario@email.com' || lower === 'nome@email.com') {
+    return undefined;
+  }
+  return t;
+};
+/** Backend espera LocalDate como yyyy-MM-dd */
+const toBirthDateIso = (raw: string) => {
+  if (!raw?.trim()) return '';
+  return raw.includes('T') ? raw.slice(0, 10) : raw.trim().slice(0, 10);
+};
 
 interface DependentFormModalProps {
   isOpen: boolean;
@@ -132,58 +153,114 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
 
     try {
       if (dependent) {
-        // Atualizar dependente existente
-        const updateData = {
-          name: formData.name,
+        const cpfDigits = digitsOnly(formData.cpf);
+        if (!validateCPF(cpfDigits)) {
+          toast({
+            title: 'CPF inválido',
+            description: 'Informe um CPF válido (11 dígitos e dígitos verificadores corretos).',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const emailForSave = optionalEmail(formData.email);
+        if (emailForSave && !validateEmail(emailForSave)) {
+          toast({
+            title: 'E-mail inválido',
+            description: 'Corrija o e-mail ou deixe o campo em branco.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const birth = toBirthDateIso(formData.birthDate);
+        const updateData: DependentUpdateRequest = {
+          name: formData.name.trim(),
           relationship: formData.relationship,
-          birthDate: formData.birthDate,
-          cpf: formData.cpf,
-          rg: formData.rg,
-          gender: formData.gender,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
+          birthDate: birth,
+          cpf: cpfDigits,
+          rg: formData.rg?.trim() || undefined,
+          gender: formData.gender || undefined,
+          phone: formData.phone?.trim() || undefined,
+          email: emailForSave,
+          address: formData.address?.trim() || undefined,
+          city: formData.city?.trim() || undefined,
+          state: formData.state || undefined,
+          zipCode: formData.zipCode ? digitsOnly(formData.zipCode) : undefined,
           isStudent: formData.isStudent,
-          schoolName: formData.schoolName,
+          schoolName: formData.schoolName?.trim() || undefined,
           isBeneficiary: formData.isBeneficiary,
-          notes: formData.notes
+          notes: formData.notes?.trim() || undefined,
         };
 
-        // TODO: Implementar chamada para atualizar dependente
-        console.log('Atualizando dependente:', dependent.id, updateData);
-        
+        await dependentService.updateDependent(dependent.id, updateData);
+
         toast({
           title: "Sucesso",
           description: "Dependente atualizado com sucesso!",
         });
       } else {
-        // Criar novo dependente
-        const createData = {
-          employeeId: formData.employeeId,
-          name: formData.name,
+        const empId = String(formData.employeeId ?? '').trim();
+        if (!empId) {
+          toast({
+            title: "Erro",
+            description: "Funcionário não identificado. Feche e abra o formulário novamente.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const birth = toBirthDateIso(formData.birthDate);
+        const cpfDigits = digitsOnly(formData.cpf);
+        if (!formData.name?.trim() || !formData.relationship || !birth) {
+          toast({
+            title: "Dados incompletos",
+            description: "Preencha nome, parentesco e data de nascimento.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (!validateCPF(cpfDigits)) {
+          toast({
+            title: 'CPF inválido',
+            description: 'Informe um CPF válido (11 dígitos e dígitos verificadores corretos).',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const emailForSaveCreate = optionalEmail(formData.email);
+        if (emailForSaveCreate && !validateEmail(emailForSaveCreate)) {
+          toast({
+            title: 'E-mail inválido',
+            description: 'Corrija o e-mail ou deixe o campo em branco.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const createData: DependentCreateRequest = {
+          employeeId: empId,
+          name: formData.name.trim(),
           relationship: formData.relationship,
-          birthDate: formData.birthDate,
-          cpf: formData.cpf,
-          rg: formData.rg,
-          gender: formData.gender,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
+          birthDate: birth,
+          cpf: cpfDigits,
+          rg: formData.rg?.trim() || undefined,
+          gender: formData.gender || undefined,
+          phone: formData.phone?.trim() || undefined,
+          email: emailForSaveCreate,
+          address: formData.address?.trim() || undefined,
+          city: formData.city?.trim() || undefined,
+          state: formData.state || undefined,
+          zipCode: formData.zipCode ? digitsOnly(formData.zipCode) : undefined,
           isStudent: formData.isStudent,
-          schoolName: formData.schoolName,
+          schoolName: formData.schoolName?.trim() || undefined,
           isBeneficiary: formData.isBeneficiary,
-          notes: formData.notes
+          notes: formData.notes?.trim() || undefined,
         };
 
-        // TODO: Implementar chamada para criar dependente
-        console.log('Criando dependente:', createData);
-        
+        await dependentService.createDependent(createData);
+
         toast({
           title: "Sucesso",
           description: "Dependente criado com sucesso!",
@@ -192,11 +269,29 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
 
       onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao salvar dependente:', error);
+      const ax = error as {
+        response?: {
+          status?: number;
+          data?: { message?: string; error?: string; fieldErrors?: Record<string, string> } | string;
+        };
+      };
+      const data = ax.response?.data;
+      let fromBody: string | null = null;
+      if (typeof data === 'object' && data != null && 'message' in data && data.message) {
+        fromBody = String(data.message);
+      } else if (typeof data === 'string') {
+        fromBody = data;
+      }
+      const conflictHint =
+        ax.response?.status === 409
+          ? 'Conflito: CPF ou dados já existentes. Verifique se este CPF já está cadastrado.'
+          : null;
+      const msg = fromBody || conflictHint || 'Erro ao salvar dependente';
       toast({
         title: "Erro",
-        description: error.response?.data?.message || "Erro ao salvar dependente",
+        description: String(msg),
         variant: "destructive",
       });
     } finally {
@@ -368,11 +463,13 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                     </Label>
                     <Input
                       id="email"
-                      type="email"
+                      type="text"
+                      inputMode="email"
+                      autoComplete="off"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
                       className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
-                      placeholder="email@exemplo.com"
+                      placeholder="Opcional"
                     />
                   </div>
 

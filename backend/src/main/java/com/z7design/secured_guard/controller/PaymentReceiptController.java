@@ -86,7 +86,7 @@ public class PaymentReceiptController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_COLABORADOR', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_SUPRIMENTOS', 'ROLE_COMPRAS')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_COLABORADOR', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<PaymentReceiptDTO>> getAllPaymentReceipts(
             @RequestParam(value = "search", required = false) String search) {
         try {
@@ -100,7 +100,10 @@ public class PaymentReceiptController {
             log.info("🔍 Iniciando busca de todos os comprovantes...");
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             boolean isColaborador = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR"));
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
+                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
+                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
+                                  a.getAuthority().equals("ROLE_COMPRAS"));
 
             List<PaymentReceiptDTO> receipts;
             if (isColaborador) {
@@ -284,7 +287,7 @@ public class PaymentReceiptController {
 
     // Processamento automático de comprovantes (NOVO ENDPOINT)
     @PostMapping("/process-automatic")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_SUPRIMENTOS', 'ROLE_COMPRAS')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ADMIN', 'RH', 'FINANCEIRO', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_RH', 'ROLE_FINANCEIRO', 'ROLE_ANALISTA_SUPRIMENTOS', 'ROLE_SUPRIMENTOS', 'ROLE_COMPRAS', 'ROLE_ESTOQUE', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<ReceiptProcessingResponse> processReceiptsAutomatic(
             @RequestParam("file") MultipartFile file) {
         try {

@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { StockItem, CreateStockItemDTO, StockCategory, StockCategoryLabels } from '@/types/stock';
+import { StockItem, CreateStockItemDTO, StockCategory, StockCategoryLabels, StorageShelf } from '@/types/stock';
 import { stockService } from '@/services/stockService';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
 import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
@@ -45,7 +45,8 @@ import {
   Plus,
   Search,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  MapPin
 } from 'lucide-react';
 
 interface StockItemModalProps {
@@ -69,6 +70,8 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [supplierComboboxOpen, setSupplierComboboxOpen] = useState(false);
   const [unitCostDisplay, setUnitCostDisplay] = useState('');
+  const [shelves, setShelves] = useState<StorageShelf[]>([]);
+  const [loadingShelves, setLoadingShelves] = useState(false);
   const [formData, setFormData] = useState<CreateStockItemDTO>({
     code: '',
     name: '',
@@ -115,14 +118,33 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
 
   useEffect(() => {
     if (open) {
-      console.log('📦 StockItemModal: Modal aberto, carregando fornecedores...');
+      console.log('📦 StockItemModal: Modal aberto, carregando dados...');
       loadSuppliers();
+      loadShelves();
     } else {
-      // Reset suppliers quando modal fecha
-      console.log('📦 StockItemModal: Modal fechado, resetando lista de fornecedores');
+      // Reset quando modal fecha
+      console.log('📦 StockItemModal: Modal fechado, resetando dados');
       setSuppliers([]);
+      setShelves([]);
     }
   }, [open]);
+
+  const loadShelves = async () => {
+    try {
+      setLoadingShelves(true);
+      const data = await stockService.getAllShelves();
+      setShelves(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar prateleiras:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar as prateleiras',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingShelves(false);
+    }
+  };
 
   useEffect(() => {
     if (item) {
@@ -157,7 +179,9 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
         unitCost: 0,
         supplier: '',
         barcode: '',
-        notes: ''
+        notes: '',
+        initialShelfId: '',
+        initialFloor: ''
       });
       setUnitCostDisplay('');
     }
@@ -523,6 +547,82 @@ const StockItemModal: React.FC<StockItemModalProps> = ({
                 </div>
               </div>
             </div>
+            {/* Localização Inicial (Para Novos Itens) */}
+            {!item && (
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                  <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow flex-shrink-0" />
+                  <span className="truncate">Localização Inicial</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="initialShelfId" className="text-gray-300 text-sm sm:text-base">
+                      Prateleira
+                    </Label>
+                    <Select
+                      value={formData.initialShelfId || ''}
+                      onValueChange={(value) => handleInputChange('initialShelfId', value)}
+                    >
+                      <SelectTrigger className="bg-seguranca-black/50 border-gray-600/30 text-white h-10 sm:h-11">
+                        <SelectValue placeholder={loadingShelves ? "Carregando..." : "Selecione a prateleira"} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-60">
+                        {shelves.length === 0 && !loadingShelves ? (
+                          <div className="p-2 text-sm text-gray-400">Nenhuma prateleira cadastrada</div>
+                        ) : (
+                          shelves.map((shelf) => (
+                            <SelectItem key={shelf.id} value={shelf.id} className="text-white hover:bg-seguranca-black focus:bg-seguranca-black">
+                              {shelf.identification} {shelf.room ? `(${shelf.room})` : ''}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="initialFloor" className="text-gray-300 text-sm sm:text-base">
+                      Andar/Compartimento
+                    </Label>
+                    <Input
+                      id="initialFloor"
+                      type="text"
+                      value={formData.initialFloor || ''}
+                      onChange={(e) => handleInputChange('initialFloor', e.target.value)}
+                      placeholder="Ex: Andar 2, Gaveta A..."
+                      className="bg-seguranca-black/50 border-gray-600/30 text-white placeholder-gray-400 focus:border-seguranca-red/50 focus:ring-seguranca-red/20 h-10 sm:h-11 text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Localizações no Almoxarifado (Para Itens Existentes) */}
+            {item && item.locations && item.locations.length > 0 && (
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                  <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow flex-shrink-0" />
+                  <span className="truncate">Localizações no Almoxarifado</span>
+                </h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {item.locations.map((loc, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-seguranca-black/30 border border-gray-600/30 rounded-lg">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-seguranca-lightgray">
+                          {loc.shelfIdentification}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {loc.floor ? `Andar/Compartimento: ${loc.floor}` : 'Sem andar especificado'}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="border-seguranca-yellow text-seguranca-yellow bg-seguranca-yellow/5">
+                        {loc.quantity} {loc.quantity === 1 ? 'unidade' : 'unidades'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Informações Comerciais */}
             <div className="space-y-3 sm:space-y-4">

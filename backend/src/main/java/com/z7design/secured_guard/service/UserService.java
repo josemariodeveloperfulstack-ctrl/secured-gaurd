@@ -14,13 +14,19 @@ import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.model.Role;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.model.Permission;
+import com.z7design.secured_guard.security.JwtService;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.CreateUserRequest;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +36,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
+    private final JwtService jwtService;
 
     public Optional<User> findById(UUID id) {
         return userRepository.findById(id);
@@ -297,28 +304,22 @@ public class UserService {
             }
         }
 
-        // Atualizar roles se fornecidas
-        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+        // Atualizar roles se fornecidas (ou se lista vazia para remover todas)
+        if (request.getRoles() != null) {
             var roleNames = request.getRoles(); // Já é uma lista de strings
             var rolesFromDb = roleRepository.findByNames(roleNames);
 
-            // Validar se pelo menos um role foi encontrado
-            if (rolesFromDb.isEmpty()) {
+            // Deduplicar rpor nome caso existam entradas repetidas no banco com IDs diferentes
+            var uniqueRoles = new java.util.HashSet<>(rolesFromDb);
+            
+            // Se roles foram solicitados mas nenhum foi encontrado, lançar erro preventivo
+            if (!roleNames.isEmpty() && uniqueRoles.isEmpty()) {
                 throw new IllegalArgumentException("Nenhum role válido encontrado. Roles fornecidos: " + roleNames);
             }
 
-            // Verificar se todos os roles solicitados foram encontrados
-            if (rolesFromDb.size() < roleNames.size()) {
-                var foundRoleNames = rolesFromDb.stream().map(role -> role.getName())
-                        .collect(java.util.stream.Collectors.toSet());
-                var missingRoles = roleNames.stream().filter(name -> !foundRoleNames.contains(name))
-                        .collect(java.util.stream.Collectors.toList());
-                log.warn("Alguns roles não foram encontrados: {}", missingRoles);
-            }
-
-            existingUser.setRoles(new java.util.HashSet<>(rolesFromDb));
+            existingUser.setRoles(uniqueRoles);
             log.info("Roles atualizadas para usuário {}: {}", id,
-                    rolesFromDb.stream().map(r -> r.getName()).collect(java.util.stream.Collectors.toList()));
+                    uniqueRoles.stream().map(r -> r.getName()).collect(java.util.stream.Collectors.toList()));
         } else {
             log.info("Roles não fornecidas no request, mantendo roles existentes para usuário {}", id);
         }
@@ -367,6 +368,35 @@ public class UserService {
 
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
+    }
+
+    /**
+     * Payload para sincronização de role/token (polling do frontend). Centralizado para
+     * {@code /api/users/me/current-role} e {@code /api/session/current-role}.
+     */
+    public Optional<Map<String, Object>> buildCurrentRoleForUsername(String username) {
+        User currentUser = userRepository.findByUsername(username).orElse(null);
+        if (currentUser == null) {
+            return Optional.empty();
+        }
+        String primaryRole = "COLABORADOR";
+        List<String> allRoles = new ArrayList<>();
+        if (currentUser.getRoles() != null && !currentUser.getRoles().isEmpty()) {
+            allRoles = currentUser.getRoles().stream()
+                    .filter(Objects::nonNull)
+                    .map(Role::getName)
+                    .collect(Collectors.toList());
+            primaryRole = allRoles.get(0);
+        } else {
+            allRoles.add("COLABORADOR");
+        }
+        String newToken = jwtService.generateToken(currentUser);
+        Map<String, Object> body = new HashMap<>();
+        body.put("role", primaryRole);
+        body.put("roles", allRoles);
+        body.put("token", newToken);
+        body.put("userId", currentUser.getId().toString());
+        return Optional.of(body);
     }
 
     public Optional<User> findByEmail(String email) {

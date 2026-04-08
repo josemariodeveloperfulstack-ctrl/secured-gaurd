@@ -34,12 +34,21 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     // Histórico de entregas por funcionário
     @Query("SELECT sm FROM StockMovement sm WHERE " +
            "sm.employee.id = :employeeId AND " +
-           "sm.movementType = 'SAIDA' " +
+           "sm.movementType = com.z7design.secured_guard.model.enums.MovementType.SAIDA " +
            "ORDER BY sm.movementDate DESC")
     List<StockMovement> findDeliveryHistoryByEmployee(@Param("employeeId") UUID employeeId);
 
     // Últimas movimentações
-    List<StockMovement> findTop10ByOrderByMovementDateDesc();
+    @Query("SELECT DISTINCT sm FROM StockMovement sm " +
+           "LEFT JOIN FETCH sm.stockItem si " +
+           "LEFT JOIN FETCH si.unit " +
+           "LEFT JOIN FETCH sm.unit " +
+           "LEFT JOIN FETCH sm.employee e " +
+           "LEFT JOIN FETCH sm.user u " +
+           "LEFT JOIN FETCH sm.itemLocation il " +
+           "LEFT JOIN FETCH il.shelf " +
+           "ORDER BY sm.movementDate DESC")
+    List<StockMovement> findRecentMovements(Pageable pageable);
 
     // Movimentações por QR Code
     List<StockMovement> findByQrCodeUsed(String qrCode);
@@ -63,6 +72,6 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     @Query("SELECT sm.stockItem.id, sm.stockItem.name, COUNT(sm) as movementCount FROM StockMovement sm " +
            "WHERE sm.movementDate >= :startDate " +
            "GROUP BY sm.stockItem.id, sm.stockItem.name " +
-           "ORDER BY movementCount DESC")
+           "ORDER BY COUNT(sm) DESC")
     List<Object[]> getMostMovedItems(@Param("startDate") LocalDateTime startDate, Pageable pageable);
 }

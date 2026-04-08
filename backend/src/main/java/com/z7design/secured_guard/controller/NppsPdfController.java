@@ -27,15 +27,19 @@ public class NppsPdfController {
 
     private final NppsStandardPdfService nppsStandardPdfService;
 
-    public record NppsRequest(UUID companyId) {
+    public record NppsRequest(UUID companyId, String employeeName, String employeeCpf) {
     }
+
 
     @Operation(summary = "Gerar PDF do NPPS para download")
     @PostMapping(value = "/generate-pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     public ResponseEntity<byte[]> generatePdf(@RequestBody(required = false) NppsRequest request) throws IOException {
         try {
             UUID companyId = request != null ? request.companyId() : null;
-            byte[] pdf = nppsStandardPdfService.generatePdf(companyId);
+            String employeeName = request != null ? request.employeeName() : null;
+            String employeeCpf = request != null ? request.employeeCpf() : null;
+            byte[] pdf = nppsStandardPdfService.generatePdf(companyId, employeeName, employeeCpf);
+
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -52,7 +56,10 @@ public class NppsPdfController {
     public ResponseEntity<byte[]> previewPdf(@RequestBody(required = false) NppsRequest request) throws IOException {
         try {
             UUID companyId = request != null ? request.companyId() : null;
-            byte[] pdf = nppsStandardPdfService.generatePdf(companyId);
+            String employeeName = request != null ? request.employeeName() : null;
+            String employeeCpf = request != null ? request.employeeCpf() : null;
+            byte[] pdf = nppsStandardPdfService.generatePdf(companyId, employeeName, employeeCpf);
+
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION,

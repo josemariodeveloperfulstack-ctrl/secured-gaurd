@@ -31,7 +31,7 @@ public class CompanyConfigService {
      */
     public Optional<CompanyConfigDTO> getActiveConfig() {
         log.info("Buscando configuração ativa da empresa");
-        return companyConfigRepository.findActiveConfig()
+        return companyConfigRepository.findFirstByActiveTrueOrderByCreatedAtDesc()
                 .map(this::convertToDTO);
     }
 
@@ -93,7 +93,7 @@ public class CompanyConfigService {
         
         if (configDTO.getId() != null) {
             // Atualizar configuração existente
-            config = companyConfigRepository.findById(configDTO.getId())
+            config = companyConfigRepository.findFirstByIdOrderByCreatedAtDesc(configDTO.getId())
                     .orElseThrow(() -> new RuntimeException("Configuração não encontrada"));
             
             // Desativar todas as outras configurações
@@ -121,7 +121,7 @@ public class CompanyConfigService {
      * Busca configuração por ID
      */
     public Optional<CompanyConfigDTO> getConfigById(UUID id) {
-        return companyConfigRepository.findById(id)
+        return companyConfigRepository.findFirstByIdOrderByCreatedAtDesc(id)
                 .map(this::convertToDTO);
     }
 
@@ -130,7 +130,7 @@ public class CompanyConfigService {
      */
     public void deactivateConfig(UUID id) {
         log.info("Desativando configuração: {}", id);
-        companyConfigRepository.findById(id)
+        companyConfigRepository.findFirstByIdOrderByCreatedAtDesc(id)
                 .ifPresent(config -> {
                     config.setActive(false);
                     companyConfigRepository.save(config);

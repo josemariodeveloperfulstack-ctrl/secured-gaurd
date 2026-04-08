@@ -38,6 +38,7 @@ import {
     Briefcase
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
+import type { Dependent } from '@/types/dependent';
 import { EmployeeDocuments } from './EmployeeDocuments';
 import employeeService from '@/services/employeeService';
 import dependentService from '@/services/dependentService';
@@ -65,10 +66,12 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
 }) => {
     const [activeTab, setActiveTab] = useState('dados');
     const [loading, setLoading] = useState(false);
+    /** Isolado do `loading` das outras abas — evita race onde loadTabData faz setLoading(false) enquanto dependentes ainda carregam. */
+    const [loadingDependents, setLoadingDependents] = useState(false);
     const [fullEmployee, setFullEmployee] = useState<Employee | null>(null);
 
     // Data states
-    const [dependents, setDependents] = useState<any[]>([]);
+    const [dependents, setDependents] = useState<Dependent[]>([]);
     const [exams, setExams] = useState<MedicalExam[]>([]);
     const [vacations, setVacations] = useState<any[]>([]);
     const [absences, setAbsences] = useState<any[]>([]);
@@ -90,8 +93,42 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
         }
     }, [open, employee?.id]);
 
+    const employeeIdForRequests = fullEmployee?.id ?? employee?.id;
+
+    /** Limpa lista ao trocar de funcionário ou fechar — evita mostrar dependentes do registro anterior. */
     useEffect(() => {
-        if (open && employee?.id) {
+        setDependents([]);
+        setLoadingDependents(false);
+    }, [open, employee?.id]);
+
+    /** Dependentes: carrega só na aba correta e usa ID estável (detalhe completo quando existir). */
+    useEffect(() => {
+        if (!open || !employeeIdForRequests || activeTab !== 'dependentes') {
+            return;
+        }
+        let cancelled = false;
+        setLoadingDependents(true);
+        dependentService
+            .getDependentsByEmployee(String(employeeIdForRequests))
+            .then((data) => {
+                if (cancelled) return;
+                const list = Array.isArray(data) ? data : [];
+                setDependents(list);
+            })
+            .catch((err) => {
+                console.error('Erro ao carregar dependentes:', err);
+                if (!cancelled) setDependents([]);
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingDependents(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [open, employeeIdForRequests, activeTab]);
+
+    useEffect(() => {
+        if (open && employee?.id && activeTab !== 'dependentes') {
             loadTabData();
         }
     }, [open, employee, activeTab, selectedMonth, selectedYear]);
@@ -102,10 +139,6 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
         setLoading(true);
         try {
             switch (activeTab) {
-                case 'dependentes':
-                    const deps = await dependentService.getDependentsByEmployee(employee.id);
-                    setDependents(deps);
-                    break;
                 case 'aso':
                     const medExams = await sstService.getMedicalExamsByEmployee(employee.id);
                     setExams(medExams);
@@ -142,6 +175,15 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
     };
 
     if (!employee) return null;
+
+    const relationshipLabel = (rel?: string) => {
+        if (!rel) return '—';
+        const u = rel.trim().toUpperCase();
+        if (u === 'SPOUSE' || u.includes('CÔNJUGE') || u.includes('CONJUGE')) return 'Cônjuge';
+        if (u === 'CHILD' || u.includes('FILHO')) return 'Filho(a)';
+        if (u === 'PARENT' || u.includes('PAI') || u.includes('MÃE') || u.includes('MAE')) return 'Pai/Mãe';
+        return rel;
+    };
 
     const formatDate = (dateString?: string) => {
         if (!dateString) return '-';
@@ -219,23 +261,27 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                 <DialogTitle className="text-xl md:text-2xl font-bold text-white mb-1">
                                     {displayEmployee.name}
                                 </DialogTitle>
-                                <DialogDescription className="text-seguranca-lightgray flex flex-wrap items-center gap-x-4 gap-y-1">
-                                    <span className="flex items-center gap-1 font-mono">
-                                        <Briefcase size={14} className="text-seguranca-yellow" />
-                                        Mat: {displayEmployee.registrationNumber || 'N/A'}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <Building size={14} className="text-seguranca-yellow" />
-                                        {displayEmployee.company?.sigla || 'N/A'}
-                                    </span>
-                                    <Badge className={`
+                                <DialogDescription asChild>
+                                    <div className="text-seguranca-lightgray flex flex-wrap items-center gap-x-4 gap-y-1">
+                                        <span className="flex items-center gap-1 font-mono">
+                                            <Briefcase size={14} className="text-seguranca-yellow" />
+                                            Mat: {displayEmployee.registrationNumber || 'N/A'}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <Building size={14} className="text-seguranca-yellow" />
+                                            {displayEmployee.company?.sigla || 'N/A'}
+                                        </span>
+                                        <Badge
+                                            className={`
                     ${displayEmployee.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' :
                                             displayEmployee.status === 'TERMINATED' ? 'bg-red-500/20 text-red-400' :
                                                 'bg-yellow-500/20 text-yellow-400'}
-                  `}>
-                                        {displayEmployee.status === 'ACTIVE' ? 'Ativo' :
-                                            displayEmployee.status === 'TERMINATED' ? 'Demitido' : 'Outro'}
-                                    </Badge>
+                  `}
+                                        >
+                                            {displayEmployee.status === 'ACTIVE' ? 'Ativo' :
+                                                displayEmployee.status === 'TERMINATED' ? 'Demitido' : 'Outro'}
+                                        </Badge>
+                                    </div>
                                 </DialogDescription>
                             </div>
                         </div>
@@ -586,7 +632,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
 
                         {/* Aba Dependentes */}
                         <TabsContent value="dependentes" className="mt-0">
-                            {loading ? renderLoading() : (
+                            {loadingDependents ? renderLoading() : (
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between mb-2">
                                         <h3 className="text-lg font-semibold text-white">Lista de Dependentes</h3>
@@ -597,7 +643,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
 
                                     {dependents.length === 0 ? renderEmpty('Este funcionário não possui dependentes cadastrados.') : (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {dependents.map((dep: any) => (
+                                            {dependents.map((dep) => (
                                                 <Card key={dep.id} className="bg-seguranca-black/40 border-gray-700/50 overflow-hidden p-4">
                                                     <div className="flex items-start gap-3">
                                                         <div className="p-2 rounded-lg bg-seguranca-yellow/10 text-seguranca-yellow">
@@ -606,9 +652,7 @@ export const EmployeeViewDetailsModal: React.FC<EmployeeViewDetailsModalProps> =
                                                         <div>
                                                             <p className="font-bold text-white text-sm">{dep.name}</p>
                                                             <p className="text-xs text-seguranca-lightgray mt-1">
-                                                                {dep.type === 'SPOUSE' ? 'Cônjuge' :
-                                                                    dep.type === 'CHILD' ? 'Filho(a)' :
-                                                                        dep.type === 'PARENT' ? 'Pai/Mãe' : 'Outro'}
+                                                                {relationshipLabel(dep.relationship)}
                                                             </p>
                                                             <div className="flex items-center gap-3 mt-2 font-mono text-[10px]">
                                                                 <span className="text-gray-500">CPF: {dep.cpf || '-'}</span>

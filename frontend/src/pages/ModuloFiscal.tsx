@@ -60,9 +60,9 @@ export default function ModuloFiscal() {
   const [filterClient, setFilterClient] = useState('');
   const [filterType, setFilterType] = useState<string>('__all__');
 
-  // Upload (PDF + XML em conjunto; nome do cliente vem do XML)
+  // Upload apenas PDF (nome do cliente informado no formulário)
   const [uploadFilePdf, setUploadFilePdf] = useState<File | null>(null);
-  const [uploadFileXml, setUploadFileXml] = useState<File | null>(null);
+  const [uploadClientName, setUploadClientName] = useState('');
   const [uploadMonth, setUploadMonth] = useState(currentYear === new Date().getFullYear() ? new Date().getMonth() + 1 : 1);
   const [uploadYear, setUploadYear] = useState(currentYear);
 
@@ -100,35 +100,38 @@ export default function ModuloFiscal() {
     setTimeout(() => loadList(), 0);
   };
 
-  const handleUploadPair = async (e: React.FormEvent) => {
+  const handleUploadPdf = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadFilePdf || !uploadFileXml) {
+    if (!uploadFilePdf) {
       toast({
         title: 'Atenção',
-        description: 'Selecione o PDF e o XML da mesma nota fiscal. O sistema validará se o CNPJ é o mesmo em ambos.',
+        description: 'Selecione o arquivo PDF da nota fiscal.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!uploadClientName.trim()) {
+      toast({
+        title: 'Atenção',
+        description: 'Informe o nome do cliente para associar à nota.',
         variant: 'destructive',
       });
       return;
     }
     const extPdf = (uploadFilePdf.name || '').split('.').pop()?.toLowerCase();
-    const extXml = (uploadFileXml.name || '').split('.').pop()?.toLowerCase();
     if (extPdf !== 'pdf') {
-      toast({ title: 'Atenção', description: 'O primeiro arquivo deve ser um PDF.', variant: 'destructive' });
-      return;
-    }
-    if (extXml !== 'xml') {
-      toast({ title: 'Atenção', description: 'O segundo arquivo deve ser um XML da NFe.', variant: 'destructive' });
+      toast({ title: 'Atenção', description: 'O arquivo deve ser um PDF.', variant: 'destructive' });
       return;
     }
     setUploading(true);
     try {
-      await fiscalService.uploadPdfAndXml(uploadFilePdf, uploadFileXml, uploadMonth, uploadYear);
-      toast({ title: 'Sucesso', description: 'PDF e XML importados. O nome do cliente foi obtido do XML.' });
+      await fiscalService.upload(uploadFilePdf, uploadClientName.trim(), uploadMonth, uploadYear);
+      toast({ title: 'Sucesso', description: 'PDF importado com sucesso.' });
       setUploadFilePdf(null);
-      setUploadFileXml(null);
+      setUploadClientName('');
       loadList();
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Falha ao importar. Verifique se o PDF e o XML são da mesma nota (mesmo CNPJ).';
+      const msg = err?.response?.data?.message || err?.message || 'Falha ao importar o PDF.';
       toast({ title: 'Erro', description: msg, variant: 'destructive' });
     } finally {
       setUploading(false);
@@ -207,15 +210,15 @@ export default function ModuloFiscal() {
   return (
     <StandardLayout title="Módulo Fiscal">
       <div className="space-y-4">
-        {/* Upload PDF + XML (validação de CNPJ no backend) */}
+        {/* Upload apenas PDF */}
         <Card className="p-4 bg-seguranca-graphite border-gray-700">
           <h3 className="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
-            <Upload className="w-4 h-4" /> Importar nota fiscal (PDF e XML)
+            <Upload className="w-4 h-4" /> Importar nota fiscal (PDF)
           </h3>
           <p className="text-xs text-gray-500 mb-3">
-            Envie o PDF e o XML da mesma nota fiscal. O sistema verifica se o CNPJ é o mesmo nos dois arquivos e usa o nome do cliente do XML.
+            Envie o PDF da nota fiscal e informe o nome do cliente e o período (mês/ano) para organização e filtros.
           </p>
-          <form onSubmit={handleUploadPair} className="flex flex-wrap items-end gap-3">
+          <form onSubmit={handleUploadPdf} className="flex flex-wrap items-end gap-3">
             <div>
               <label htmlFor="fiscal-upload-pdf" className="block text-xs text-gray-400 mb-1">PDF</label>
               <Input
@@ -227,13 +230,14 @@ export default function ModuloFiscal() {
               />
             </div>
             <div>
-              <label htmlFor="fiscal-upload-xml" className="block text-xs text-gray-400 mb-1">XML (NFe)</label>
+              <label htmlFor="fiscal-client-name" className="block text-xs text-gray-400 mb-1">Cliente</label>
               <Input
-                id="fiscal-upload-xml"
-                type="file"
-                accept=".xml,application/xml,text/xml"
-                onChange={(e) => setUploadFileXml(e.target.files?.[0] || null)}
-                className="bg-seguranca-black border-gray-600 max-w-xs"
+                id="fiscal-client-name"
+                type="text"
+                placeholder="Nome do cliente"
+                value={uploadClientName}
+                onChange={(e) => setUploadClientName(e.target.value)}
+                className="bg-seguranca-black border-gray-600 w-56 max-w-full"
               />
             </div>
             <div>
@@ -263,7 +267,7 @@ export default function ModuloFiscal() {
               </Select>
             </div>
             <Button type="submit" disabled={uploading} className="bg-seguranca-red hover:bg-seguranca-red/90">
-              {uploading ? 'Validando e importando...' : 'Importar PDF e XML'}
+              {uploading ? 'Importando...' : 'Importar PDF'}
             </Button>
           </form>
         </Card>
@@ -350,7 +354,7 @@ export default function ModuloFiscal() {
             <FolderArchive className="w-4 h-4" /> Download em ZIP (por pastas)
           </h3>
           <p className="text-xs text-gray-500 mb-3">
-            Agrupe por período (ano/mês), por nome do cliente ou por tipo de arquivo (PDF/XML). Os filtros da listagem acima são usados para limitar o que entra no ZIP.
+            Agrupe por período (ano/mês), por nome do cliente ou por tipo de arquivo. Os filtros da listagem acima são usados para limitar o que entra no ZIP.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Select value={zipGroupBy} onValueChange={(v) => setZipGroupBy(v as ZipGroupBy)}>
@@ -360,7 +364,7 @@ export default function ModuloFiscal() {
               <SelectContent>
                 <SelectItem value="PERIOD">Por período (ano/mês)</SelectItem>
                 <SelectItem value="CLIENT">Por cliente</SelectItem>
-                <SelectItem value="TYPE">Por tipo (PDF/XML)</SelectItem>
+                <SelectItem value="TYPE">Por tipo de arquivo</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={handleDownloadZip} disabled={zipLoading} className="bg-seguranca-red hover:bg-seguranca-red/90">

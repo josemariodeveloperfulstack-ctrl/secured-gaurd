@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import { Checkbox } from '@/components/ui/checkbox';
+import { formatDate as formatDatePtBr } from '@/utils/formatters';
 
 interface FuncionariosTableProps {
   employees: Employee[];
@@ -24,9 +25,9 @@ interface FuncionariosTableProps {
   onViewDetails: (employee: Employee) => void;
   isLoading?: boolean;
   isMobileSelectionMode?: boolean;
-  sortKey?: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status';
+  sortKey?: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho';
   sortDir?: 'asc' | 'desc';
-  onSort?: (key: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status') => void;
+  onSort?: (key: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho') => void;
 }
 
 export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
@@ -86,10 +87,15 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
     );
   };
 
-  const formatDate = (date?: string) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('pt-BR');
-  };
+  /** Data de desligamento: mesma prioridade da edição (data de rescisão na ficha). */
+  const terminationDateForDisplay = (e: Employee) => e.dataRescisao || e.terminationDate;
+
+  /** Status efetivo para UI: com data de demissão → Demitido. */
+  const effectiveEmploymentStatus = (e: Employee) =>
+    terminationDateForDisplay(e) ? 'TERMINATED' : (e.status || 'INACTIVE');
+
+  const isTerminatedEmployee = (e: Employee) =>
+    e.status === 'TERMINATED' || !!terminationDateForDisplay(e);
 
   const getWorkPostsLabel = (employee: Employee) => {
     const wp = (employee.workPost as any)?.name;
@@ -120,7 +126,11 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
         type="button"
         onClick={() => onSort?.(k)}
         className={`inline-flex items-center gap-2 ${onSort ? 'hover:text-white' : ''} ${active ? 'text-white' : ''}`}
-        title="Ordenar"
+        title={
+          k === 'hireDate' || k === 'terminationDate'
+            ? 'Ordenar por data (primeiro clique: mais recente primeiro)'
+            : 'Ordenar'
+        }
       >
         <span>{children}</span>
         <span className="text-xs text-gray-400">{arrow}</span>
@@ -178,6 +188,12 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
               </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">
                 <SortHead k="workPost">Posto de Trabalho</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="escalaTrabalho">Escala</SortHead>
+              </TableHead>
+              <TableHead className="text-seguranca-yellow font-semibold">
+                <SortHead k="horarioTrabalho">Horário</SortHead>
               </TableHead>
               <TableHead className="text-seguranca-yellow font-semibold">
                 <SortHead k="hireDate">Admissão</SortHead>
@@ -300,18 +316,36 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
-                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                    {formatDate(employee.hireDate)}
+                    {employee.escalaTrabalho ? (
+                      <span className="truncate max-w-[150px]">{employee.escalaTrabalho}</span>
+                    ) : (
+                      <span className="text-gray-500 italic text-xs">Não definida</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                    {employee.horarioTrabalho ? (
+                      <span className="truncate max-w-[150px]">{employee.horarioTrabalho}</span>
+                    ) : (
+                      <span className="text-gray-500 italic text-xs">Não definido</span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
                     <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                    {formatDate(employee.terminationDate)}
+                    {formatDatePtBr(employee.hireDate)}
                   </div>
                 </TableCell>
                 <TableCell>
-                  {getStatusBadge(employee.status || 'INACTIVE')}
+                  <div className="flex items-center gap-2 text-xs text-seguranca-lightgray leading-tight">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                    {formatDatePtBr(terminationDateForDisplay(employee))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {getStatusBadge(effectiveEmploymentStatus(employee))}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -366,7 +400,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                           <UserPlus className="mr-2 h-4 w-4" />
                           Ver Dependentes
                         </DropdownMenuItem>
-                        {employee.status !== 'TERMINATED' && (
+                        {!isTerminatedEmployee(employee) && (
                           <DropdownMenuItem
                             onClick={() => onTerminate(employee)}
                             className="text-orange-400 hover:bg-orange-500/20 hover:text-orange-300 cursor-pointer"
@@ -375,7 +409,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                             Demitir Funcionário
                           </DropdownMenuItem>
                         )}
-                        {employee.status === 'TERMINATED' && (
+                        {isTerminatedEmployee(employee) && (
                           <DropdownMenuItem
                             onClick={() => onDelete(employee)}
                             className="text-red-400 hover:bg-red-500/20 hover:text-red-300 cursor-pointer"
@@ -440,7 +474,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   </div>
                 </div>
                 <div className="flex-shrink-0 scale-75 origin-right">
-                  {getStatusBadge(employee.status || 'INACTIVE')}
+                  {getStatusBadge(effectiveEmploymentStatus(employee))}
                 </div>
               </div>
 
@@ -479,10 +513,22 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                     </div>
                   );
                 })()}
+                {employee.escalaTrabalho && (
+                  <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Escala de Trabalho">
+                    <Calendar className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                    <span className="truncate text-[10px]">{employee.escalaTrabalho}</span>
+                  </div>
+                )}
+                {employee.horarioTrabalho && (
+                  <div className="flex items-center gap-1.5 text-gray-400 min-w-0" title="Horário de Trabalho">
+                    <Calendar className="h-3 w-3 flex-shrink-0 text-gray-500" />
+                    <span className="truncate text-[10px]">{employee.horarioTrabalho}</span>
+                  </div>
+                )}
                 {employee.hireDate && (
                   <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
                     <Calendar className="h-3 w-3 flex-shrink-0 text-green-400/70" />
-                    <span>{formatDate(employee.hireDate)}</span>
+                    <span>{formatDatePtBr(employee.hireDate)}</span>
                   </div>
                 )}
               </div>
@@ -491,7 +537,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
               {!isMobileSelectionMode && (
                 <div className="pt-2 border-t border-gray-600/20 flex items-center justify-between">
                   <div className="flex-1">
-                    {employee.status !== 'TERMINATED' ? (
+                    {!isTerminatedEmployee(employee) ? (
                       <span className="text-[10px] text-orange-400/80 flex items-center">
                         <AlertCircle className="h-2.5 w-2.5 mr-1" />
                         Demitir para excluir
@@ -537,12 +583,12 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                         <DropdownMenuItem onClick={() => onViewDependents(employee)} className="text-green-400 text-xs">
                           <UserPlus className="mr-2 h-3.5 w-3.5" /> Dependentes
                         </DropdownMenuItem>
-                        {employee.status !== 'TERMINATED' && (
+                        {!isTerminatedEmployee(employee) && (
                           <DropdownMenuItem onClick={() => onTerminate(employee)} className="text-orange-400 text-xs">
                             <UserMinus className="mr-2 h-3.5 w-3.5" /> Demitir
                           </DropdownMenuItem>
                         )}
-                        {employee.status === 'TERMINATED' && (
+                        {isTerminatedEmployee(employee) && (
                           <DropdownMenuItem onClick={() => onDelete(employee)} className="text-red-400 text-xs">
                             <Trash2 className="mr-2 h-3.5 w-3.5" /> Excluir
                           </DropdownMenuItem>

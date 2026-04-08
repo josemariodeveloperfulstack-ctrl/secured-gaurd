@@ -19,6 +19,8 @@ export const useUserPermissions = () => {
       'ROLE_ADMIN',
       'ROLE_GESTOR',
       'ROLE_SUPERVISOR',
+      'ROLE_ESTOQUE',
+      'ROLE_ALMOXARIFADO',
       'RECURSOS_HUMANOS',
       'RH',
       'DEPARTAMENTO_PESSOAL'

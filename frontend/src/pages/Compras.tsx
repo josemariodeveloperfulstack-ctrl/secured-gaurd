@@ -259,7 +259,12 @@ export default function Compras() {
         description: "Solicitação de compra criada com sucesso!",
       });
       return savedRequest;
-    } catch (error) {
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error?.response?.data?.message || "Erro ao criar solicitação.",
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -276,7 +281,12 @@ export default function Compras() {
         description: "Solicitação de compra atualizada com sucesso!",
       });
       return savedRequest;
-    } catch (error) {
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error?.response?.data?.message || "Erro ao atualizar solicitação.",
+        variant: "destructive",
+      });
       throw error;
     }
   };
@@ -291,10 +301,10 @@ export default function Compras() {
           title: "Sucesso",
           description: "Solicitação excluída com sucesso!",
         });
-      } catch (error) {
+      } catch (error: any) {
         toast({
           title: "Erro",
-          description: "Erro ao excluir solicitação.",
+          description: error?.response?.data?.message || "Erro ao excluir solicitação.",
           variant: "destructive",
         });
       }
@@ -311,10 +321,10 @@ export default function Compras() {
         title: "Sucesso",
         description: "Solicitação aprovada com sucesso!",
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erro",
-        description: "Erro ao aprovar solicitação.",
+        description: error?.response?.data?.message || "Erro ao aprovar solicitação.",
         variant: "destructive",
       });
     }
@@ -331,10 +341,10 @@ export default function Compras() {
           title: "Sucesso",
           description: "Solicitação rejeitada com sucesso!",
         });
-      } catch (error) {
+      } catch (error: any) {
         toast({
           title: "Erro",
-          description: "Erro ao rejeitar solicitação.",
+          description: error?.response?.data?.message || "Erro ao rejeitar solicitação.",
           variant: "destructive",
         });
       }

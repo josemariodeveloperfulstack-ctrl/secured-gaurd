@@ -115,6 +115,9 @@ public class Unit {
     @Column(length = 20, unique = true)
     private String code;
 
+    @Column(length = 10, name = "abbreviation")
+    private String abbreviation;
+
     @Column(length = 100)
     private String manager;
 

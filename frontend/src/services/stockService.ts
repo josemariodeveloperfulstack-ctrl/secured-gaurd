@@ -10,7 +10,11 @@ import {
   StockReport,
   StockCategory,
   MovementType,
-  MovementReason
+  MovementReason,
+  StorageShelf,
+  StockItemLocation,
+  SignatureType,
+  RequisitionSentType
 } from '@/types/stock';
 
 export const stockService = {
@@ -454,6 +458,86 @@ export const stockService = {
     } catch (error) {
       console.error('Erro ao baixar PDF de movimentações:', error);
       throw new Error('Falha ao baixar relatório');
+    }
+  },
+
+  // ===== PRATELEIRAS =====
+
+  async getAllShelves(): Promise<StorageShelf[]> {
+    try {
+      const response = await api.get('/api/stock/shelves');
+      return response.data || [];
+    } catch (error) {
+      console.error('Erro ao buscar prateleiras:', error);
+      return [];
+    }
+  },
+
+  async createShelf(shelfData: Partial<StorageShelf>): Promise<StorageShelf> {
+    try {
+      const response = await api.post('/api/stock/shelves', shelfData);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao criar prateleira:', error);
+      throw new Error('Falha ao criar prateleira');
+    }
+  },
+
+  async updateShelf(id: string, shelfData: Partial<StorageShelf>): Promise<StorageShelf> {
+    try {
+      const response = await api.put(`/api/stock/shelves/${id}`, shelfData);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao atualizar prateleira:', error);
+      throw new Error('Falha ao atualizar prateleira');
+    }
+  },
+
+  async deleteShelf(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/stock/shelves/${id}`);
+    } catch (error) {
+      console.error('Erro ao excluir prateleira:', error);
+      throw new Error('Falha ao excluir prateleira');
+    }
+  },
+
+  // ===== ASSINATURAS E REQUISIÇÕES =====
+
+  async signMovement(movementId: string, signatureBase64: string): Promise<StockMovement> {
+    try {
+      const response = await api.post(`/api/stock/movements/${movementId}/sign`, {
+        signature: signatureBase64
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao assinar movimentação:', error);
+      throw new Error('Falha ao registrar assinatura');
+    }
+  },
+
+  async downloadRequisitionPDF(movementId: string): Promise<void> {
+    try {
+      const response = await api.get(`/api/stock/movements/${movementId}/requisition`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, `requisicao_${movementId.substring(0, 8)}.pdf`);
+    } catch (error) {
+      console.error('Erro ao baixar PDF da requisição:', error);
+      throw new Error('Falha ao baixar PDF');
+    }
+  },
+
+  async sendRequisition(movementId: string, type: RequisitionSentType, destination?: string): Promise<void> {
+    try {
+      const params = new URLSearchParams();
+      params.append('type', type);
+      if (destination) params.append('destination', destination);
+
+      await api.post(`/api/stock/movements/${movementId}/send?${params.toString()}`);
+    } catch (error) {
+      console.error('Erro ao enviar requisição:', error);
+      throw new Error('Falha ao enviar requisição');
     }
   },
 

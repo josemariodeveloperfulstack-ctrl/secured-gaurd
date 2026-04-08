@@ -11,8 +11,10 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { employeeService, Employee } from '@/services/employeeService';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
@@ -56,14 +58,16 @@ interface FichaEntregaEPIFormProps {
 
 const MIN_EMPLOYEE_SEARCH_CHARS = 3;
 
-function resolveCompanyIdFromEmployee(emp: Employee | undefined): string {
+function resolveCompanyIdFromEmployee(emp: SimpleEmployee | undefined): string {
   if (!emp) return '';
-  const raw = (emp as { companyId?: string }).companyId ?? emp.company?.id;
-  return raw != null && String(raw).trim() !== '' ? String(raw) : '';
+  return emp.companyId || '';
 }
+
 
 const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
+  
+  // 1. All State and Ref declarations first
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
@@ -71,34 +75,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     responsavelEntregaId: '',
     observacoes: '',
   });
-
-  // Atualizar funcionarioId e empresaId quando props mudarem
-  useEffect(() => {
-    setForm(prev => ({
-      ...prev,
-      funcionarioId: employeeId || prev.funcionarioId,
-      empresaId: companyId || prev.empresaId
-    }));
-  }, [employeeId, companyId]);
-
-  // Preenche empresa pelo cadastro do funcionário (prop sem companyId ou lista que carrega depois).
-  // Se o funcionário mudou, sempre atualiza a empresa; se só a lista carregou, só preenche se empresa ainda estiver vazia.
-  useEffect(() => {
-    if (!form.funcionarioId || employees.length === 0) return;
-    if (companyId) return;
-    const emp = employees.find((e) => e.id === form.funcionarioId);
-    const cid = resolveCompanyIdFromEmployee(emp);
-    if (!cid) return;
-
-    const funcionarioMudou = prevFuncionarioIdForCompanySync.current !== form.funcionarioId;
-    prevFuncionarioIdForCompanySync.current = form.funcionarioId;
-
-    setForm((prev) => {
-      if (funcionarioMudou) return { ...prev, empresaId: cid };
-      if (!prev.empresaId) return { ...prev, empresaId: cid };
-      return prev;
-    });
-  }, [form.funcionarioId, employees, companyId]);
 
   const [epis, setEpis] = useState([
     {
@@ -113,7 +89,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }
   ]);
 
-  // Estados para autocomplete do CA
   const [caSuggestions, setCaSuggestions] = useState<{ [key: number]: CAEPIResponse[] }>({});
   const [caLoading, setCaLoading] = useState<{ [key: number]: boolean }>({});
   const [caSearchTimeouts, setCaSearchTimeouts] = useState<{ [key: number]: NodeJS.Timeout }>({});
@@ -121,47 +96,80 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
+  const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
-  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
-  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+
+  
   const prevFuncionarioIdForCompanySync = useRef<string | undefined>(undefined);
 
-  const funcionario = employees.find(f => f.id === form.funcionarioId);
 
-  const filteredEmployeesForPicker = useMemo(() => {
-    const q = employeeSearchQuery.trim().toLowerCase();
-    if (q.length < MIN_EMPLOYEE_SEARCH_CHARS) return [];
-    const qDigits = q.replace(/\D/g, '');
-    return employees.filter((f) => {
-      const name = (f.name || '').toLowerCase();
-      const mat = (f.registrationNumber || '').toLowerCase();
-      const cpfDigits = (f.cpf || (f as { document?: string }).document || '').replace(/\D/g, '');
-      if (name.includes(q) || mat.includes(q)) return true;
-      if (qDigits.length >= MIN_EMPLOYEE_SEARCH_CHARS && cpfDigits.includes(qDigits)) return true;
-      return false;
-    });
-  }, [employees, employeeSearchQuery]);
-
-  const handleSelectEmployee = (id: string) => {
-    const emp = employees.find((e) => e.id === id);
-    const cid = resolveCompanyIdFromEmployee(emp);
-    prevFuncionarioIdForCompanySync.current = id;
-    setForm((prev) => ({ ...prev, funcionarioId: id, empresaId: cid }));
-    setEmployeePickerOpen(false);
-    setEmployeeSearchQuery('');
-    if (emp && !cid) {
-      toast({
-        title: 'Atenção',
-        description: 'Este funcionário não possui empresa vinculada no cadastro. Selecione a empresa manualmente.',
-        variant: 'default',
-      });
-    }
-  };
+  // 2. Memoized values
+  const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
-  const responsavel = employees.find(f => f.id === form.responsavelEntregaId);
+  const responsavel = selectedResponsibleData;
 
-  // Carregar dados do backend
+
+  // 3. All Effects
+  
+  // Atualizar funcionarioId e empresaId quando props mudarem
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      funcionarioId: employeeId || prev.funcionarioId,
+      empresaId: companyId || prev.empresaId
+    }));
+  }, [employeeId, companyId]);
+
+  // Preenche empresa pelo cadastro do funcionário
+  useEffect(() => {
+    if (!selectedEmployeeData) return;
+    if (companyId) return;
+    const cid = resolveCompanyIdFromEmployee(selectedEmployeeData);
+    if (!cid) return;
+
+    const funcionarioMudou = prevFuncionarioIdForCompanySync.current !== form.funcionarioId;
+    prevFuncionarioIdForCompanySync.current = form.funcionarioId;
+
+    setForm((prev) => {
+      if (funcionarioMudou) return { ...prev, empresaId: cid };
+      if (!prev.empresaId) return { ...prev, empresaId: cid };
+      return prev;
+    });
+  }, [form.funcionarioId, selectedEmployeeData, companyId]);
+
+  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  useEffect(() => {
+    if (form.funcionarioId && !selectedEmployeeData) {
+      const fetchEmployee = async () => {
+        try {
+          const emp = await employeeService.getEmployeeById(form.funcionarioId);
+          if (emp) {
+            setSelectedEmployeeData({
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              address: emp.address,
+              companyId: emp.company?.id,
+              companySigla: emp.company?.sigla
+            } as SimpleEmployee);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar dados iniciais do funcionário:", error);
+        }
+      };
+      fetchEmployee();
+    }
+  }, [form.funcionarioId, selectedEmployeeData]);
+
+  // Carregar dados iniciais
   useEffect(() => {
     loadData();
   }, []);
@@ -173,7 +181,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       if (selectedCompany) {
         const companyDefaultEpis = (selectedCompany as any).defaultEpis;
         if (companyDefaultEpis && companyDefaultEpis.length > 0) {
-          // Verificar se já não foram carregados (evitar loop)
           const firstEpiName = epis.length > 0 ? epis[0].nome : '';
           const shouldLoad = firstEpiName === '' || firstEpiName !== companyDefaultEpis[0]?.epiName;
 
@@ -182,6 +189,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               nome: epi.epiName || '',
               quantidade: String(epi.quantity || 1),
               ca: epi.caNumber || '',
+              caName: epi.caName || '', // added missing property
               validade: epi.validity || '',
               observacoes: epi.observations || '',
               uniformeTipo: '',
@@ -195,9 +203,17 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
             });
           }
         } else {
-          // Se a empresa não tem EPIs padrão e não há EPIs preenchidos, manter apenas um campo vazio
           if (epis.length === 0 || (epis.length === 1 && epis[0].nome === '')) {
-            setEpis([{ nome: '', quantidade: '1', ca: '', validade: '', observacoes: '', uniformeTipo: '', uniformePeca: '' }]);
+            setEpis([{ 
+              nome: '', 
+              quantidade: '1', 
+              ca: '', 
+              caName: '', // added missing property
+              validade: '', 
+              observacoes: '', 
+              uniformeTipo: '', 
+              uniformePeca: '' 
+            }]);
           }
         }
       }
@@ -205,14 +221,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.empresaId]);
 
+
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [employeesData, companiesData] = await Promise.all([
-        employeeService.getAllEmployees(),
-        companyService.getAllCompanies()
-      ]);
-      setEmployees(employeesData);
+      const companiesData = await companyService.getAllCompanies();
       setCompanies(companiesData);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -631,73 +644,19 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                     Selecione o colaborador que receberá os EPIs. Digite pelo menos 3 caracteres do nome, matrícula ou CPF para buscar.
                   </span>
                 </Label>
-                <Popover
-                  open={employeePickerOpen}
-                  onOpenChange={(open) => {
-                    setEmployeePickerOpen(open);
-                    if (!open) setEmployeeSearchQuery('');
+                <EmployeeCombobox
+                  value={form.funcionarioId}
+                  onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
+                  onEmployeeSelect={(emp) => {
+                    setSelectedEmployeeData(emp);
+                    const cid = resolveCompanyIdFromEmployee(emp);
+                    setForm(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
+                      empresaId: cid || prev.empresaId
+                    }));
                   }}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={employeePickerOpen}
-                      disabled={loadingData}
-                      className="h-11 w-full justify-between rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 font-normal"
-                    >
-                      <span className={cn('truncate text-left', !funcionario && 'text-muted-foreground')}>
-                        {loadingData ? 'Carregando...' : funcionario ? funcionario.name : 'Selecione o funcionário'}
-                      </span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 border bg-popover" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput
-                        placeholder={`Mín. ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres (nome, matrícula ou CPF)...`}
-                        value={employeeSearchQuery}
-                        onValueChange={setEmployeeSearchQuery}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {employeeSearchQuery.trim().length < MIN_EMPLOYEE_SEARCH_CHARS
-                            ? `Digite pelo menos ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres para exibir os registros.`
-                            : 'Nenhum funcionário encontrado.'}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {filteredEmployeesForPicker.map((f) => (
-                            <CommandItem
-                              key={f.id}
-                              value={f.id}
-                              onSelect={() => handleSelectEmployee(f.id)}
-                              className="cursor-pointer"
-                            >
-                              <Check
-                                className={cn(
-                                  'mr-2 h-4 w-4 shrink-0',
-                                  form.funcionarioId === f.id ? 'opacity-100' : 'opacity-0'
-                                )}
-                              />
-                              <div className="flex flex-col gap-0.5 text-left min-w-0">
-                                <span className="font-medium text-sm normal-case truncate">{f.name}</span>
-                                {(f.registrationNumber || f.cpf || (f as { document?: string }).document) && (
-                                  <span className="text-[11px] text-muted-foreground">
-                                    {f.registrationNumber ? `Matr.: ${f.registrationNumber}` : ''}
-                                    {f.registrationNumber && (f.cpf || (f as { document?: string }).document) ? ' · ' : ''}
-                                    {(f.cpf || (f as { document?: string }).document) &&
-                                      `CPF: ${formatCPF(f.cpf || (f as { document?: string }).document || '')}`}
-                                  </span>
-                                )}
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                />
                 {funcionario && (
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
                     <User className="h-3.5 w-3.5 text-primary" />
@@ -734,19 +693,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                     ) : companies.length > 0 ? (
                       companies.map(e => (
                         <SelectItem key={e.id} value={e.id} className="py-2.5 cursor-pointer rounded-md">
-                          <div className="flex flex-col gap-0.5 text-left">
-                            <span className="font-medium text-sm normal-case">
-                              {e.sigla || e.tradeName || e.name}
-                            </span>
-                            {(e.sigla || e.tradeName) && e.name && (
-                              <span className="text-[11px] text-muted-foreground">{e.name}</span>
-                            )}
-                            {e.cnpj && (
-                              <span className="text-[11px] text-muted-foreground">
-                                CNPJ: {formatCNPJ(e.cnpj)}
-                              </span>
-                            )}
-                          </div>
+                          {e.sigla ? `${e.sigla} - ${e.name}` : e.name}
                         </SelectItem>
                       ))
                     ) : (
@@ -806,13 +753,22 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {(funcionario as any).position?.name || '-'}
+                        {funcionario.positionName || '-'}
                       </div>
                     </div>
                     <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
+                        {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {(funcionario as any).unit?.name || '-'}
+                        {funcionario.unitName || '-'}
                       </div>
                     </div>
                   </div>
@@ -893,33 +849,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
 
               <div className="space-y-2">
                 <Label className="text-base font-semibold">Responsável pela Entrega</Label>
-                <Select
-                  value={form.responsavelEntregaId || ''}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 bg-background">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o responsável"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando funcionários...</div>
-                    ) : employees.length > 0 ? (
-                      employees.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          <div className="flex flex-col py-1">
-                            <span className="font-medium text-base">{f.name}</span>
-                            {f.document && (
-                              <span className="text-xs text-muted-foreground">CPF: {f.document}</span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum funcionário encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                <EmployeeCombobox
+                  value={form.responsavelEntregaId}
+                  onChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
+                  onEmployeeSelect={(emp) => setSelectedResponsibleData(emp)}
+                />
               </div>
             </div>
 

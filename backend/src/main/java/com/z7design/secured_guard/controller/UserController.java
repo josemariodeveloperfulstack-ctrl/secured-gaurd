@@ -7,7 +7,6 @@ import com.z7design.secured_guard.dto.ProfileResponse;
 import com.z7design.secured_guard.dto.UpdateUserRequest;
 import com.z7design.secured_guard.dto.CreateUserRequest;
 import com.z7design.secured_guard.model.User;
-import com.z7design.secured_guard.security.JwtService;
 import com.z7design.secured_guard.service.UserService;
 import com.z7design.secured_guard.service.UserOnlineStatusService;
 import com.z7design.secured_guard.service.LgpdConsentService;
@@ -38,12 +37,23 @@ import com.z7design.secured_guard.model.Permission;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Usuários", description = "Endpoints para gestão de usuários")
+@CrossOrigin(origins = "*")
 public class UserController {
 
     private final UserService userService;
     private final UserOnlineStatusService userOnlineStatusService;
     private final LgpdConsentService lgpdConsentService;
-    private final JwtService jwtService;
+
+    @GetMapping("/public/diagnostic")
+    @Operation(summary = "Diagnóstico público", description = "Verifica se o controller responde sem autenticação")
+    public ResponseEntity<Object> publicDiagnostic() {
+        return ResponseEntity.ok(Map.of(
+            "status", "UP",
+            "controller", "UserController",
+            "access", "public",
+            "timestamp", java.time.LocalDateTime.now().toString()
+        ));
+    }
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -336,6 +346,7 @@ public class UserController {
                             }
                         })
                         .filter(name -> name != null)
+                        .distinct()
                         .collect(java.util.stream.Collectors.toList());
                 dto.setRoles(roleNames);
             } else {
@@ -536,30 +547,9 @@ public class UserController {
             if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(401).build();
             }
-
-            String username = authentication.getName();
-            User currentUser = userService.findByUsername(username).orElse(null);
-            if (currentUser == null) {
-                return ResponseEntity.status(404).body(Map.of("error", "Usuário não encontrado"));
-            }
-
-            // Role atual direto do banco (evitar NPE se roles for null)
-            String currentRole = "COLABORADOR";
-            if (currentUser.getRoles() != null && !currentUser.getRoles().isEmpty()) {
-                currentRole = currentUser.getRoles().stream()
-                        .findFirst()
-                        .map(role -> role != null ? role.getName() : null)
-                        .filter(n -> n != null && !n.isEmpty())
-                        .orElse("COLABORADOR");
-            }
-
-            // Gera um novo token com o role atualizado
-            String newToken = jwtService.generateToken(currentUser);
-
-            return ResponseEntity.ok(Map.of(
-                    "role", currentRole,
-                    "token", newToken,
-                    "userId", currentUser.getId().toString()));
+            return userService.buildCurrentRoleForUsername(authentication.getName())
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "Usuário não encontrado")));
         } catch (Exception e) {
             log.error("Erro ao obter role atual: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Erro ao obter role: " + e.getMessage()));

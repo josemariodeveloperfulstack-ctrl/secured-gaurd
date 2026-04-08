@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -93,11 +94,11 @@ public class MileageRecord {
         }
         
         if (distanceTraveled != null && distanceTraveled > 0 && fuelConsumed != null && fuelConsumed.compareTo(BigDecimal.ZERO) > 0) {
-            this.averageConsumption = BigDecimal.valueOf(distanceTraveled).divide(fuelConsumed, 2, BigDecimal.ROUND_HALF_UP);
+            this.averageConsumption = BigDecimal.valueOf(distanceTraveled).divide(fuelConsumed, 2, RoundingMode.HALF_UP);
         }
         
         if (distanceTraveled != null && distanceTraveled > 0 && fuelCost != null) {
-            this.costPerKm = fuelCost.divide(BigDecimal.valueOf(distanceTraveled), 2, BigDecimal.ROUND_HALF_UP);
+            this.costPerKm = fuelCost.divide(BigDecimal.valueOf(distanceTraveled), 2, RoundingMode.HALF_UP);
         }
     }
     

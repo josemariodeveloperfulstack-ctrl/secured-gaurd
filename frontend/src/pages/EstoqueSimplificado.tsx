@@ -18,7 +18,8 @@ import {
   Users,
   FileText,
   Bell,
-  Loader2
+  Loader2,
+  Layers
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { stockService } from '@/services/stockService';
@@ -30,6 +31,7 @@ import StockItemModal from '@/components/stock/StockItemModal';
 import StockMovementModal from '@/components/stock/StockMovementModal';
 import QrCodeScanner from '@/components/stock/QrCodeScanner';
 import StockReportsContent from '@/components/stock/StockReportsContent';
+import ShelfManagement from '@/components/stock/ShelfManagement';
 
 const EstoqueSimplificado: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -360,6 +362,10 @@ const EstoqueSimplificado: React.FC = () => {
               <FileText className="h-4 w-4 mr-2" />
               Relatórios
             </TabsTrigger>
+            <TabsTrigger value="shelves" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
+              <Layers className="h-4 w-4 mr-2" />
+              Organização
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="mt-6">
@@ -391,6 +397,10 @@ const EstoqueSimplificado: React.FC = () => {
 
           <TabsContent value="reports" className="mt-6">
             <StockReportsContent />
+          </TabsContent>
+
+          <TabsContent value="shelves" className="mt-6">
+            <ShelfManagement />
           </TabsContent>
         </Tabs>
 

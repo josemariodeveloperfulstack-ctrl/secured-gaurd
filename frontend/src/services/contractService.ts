@@ -403,10 +403,28 @@ export const contractService = {
 
   // Gerar PDF do contrato (backend - layout corporativo)
   async generateContractPdf(contractData: any): Promise<Blob> {
-    const response = await api.post('/contracts/pdf', contractData, {
-      responseType: 'blob'
-    });
-    return response.data;
+    try {
+      const response = await api.post('/contracts/pdf', contractData, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error: unknown) {
+      const ax = error as { response?: { data?: Blob; status?: number } };
+      const blob = ax.response?.data;
+      if (blob instanceof Blob && ax.response && ax.response.status >= 400) {
+        const text = await blob.text();
+        try {
+          const json = JSON.parse(text) as { message?: string; error?: string };
+          throw new Error(json.message || json.error || 'Erro ao gerar o contrato');
+        } catch (inner) {
+          if (inner instanceof SyntaxError) {
+            throw new Error(text?.slice(0, 300) || 'Erro ao gerar o contrato');
+          }
+          throw inner;
+        }
+      }
+      throw error;
+    }
   },
 
   // Método para retornar dados mockados temporariamente

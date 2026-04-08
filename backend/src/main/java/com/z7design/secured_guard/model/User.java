@@ -54,7 +54,7 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String name;
 
-    @Pattern(regexp = "^\\d{9,20}$")
+    @Pattern(regexp = "^\\d{9,20}$|^$")
     @Column(nullable = true, length = 20)
     private String whatsapp;
 

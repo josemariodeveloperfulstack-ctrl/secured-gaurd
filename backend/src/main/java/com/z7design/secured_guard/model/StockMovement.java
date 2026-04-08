@@ -81,6 +81,35 @@ public class StockMovement {
     @JoinColumn(name = "unit_id")
     private Unit unit;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "item_location_id")
+    private StockItemLocation itemLocation; // Localização específica (prateleira/andar) usada na movimentação
+
+    @Column(name = "digital_signature", columnDefinition = "TEXT")
+    private String digitalSignature; // Assinatura digital (Base64)
+
+    @Column(name = "signature_date")
+    private LocalDateTime signatureDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "signature_type")
+    private SignatureType signatureType;
+
+    @Column(name = "requisition_url")
+    private String requisitionUrl; // URL ou path do PDF da requisição
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "requisition_sent_type")
+    private RequisitionSentType requisitionSentType;
+
+    public enum SignatureType {
+        PHYSICAL, DIGITAL
+    }
+
+    public enum RequisitionSentType {
+        EMAIL, WHATSAPP, NONE
+    }
+
     // Método para calcular custo total e definir nomes como backup
     @PrePersist
     @PreUpdate

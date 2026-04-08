@@ -1,4 +1,4 @@
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'GESTOR_OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'GESTOR_COMERCIAL' | 'ASSISTENTE_COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO' | 'ANALISTA_SUPRIMENTOS' | 'ESTOQUE' | 'SUPRIMENTOS' | 'COMPRAS';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'GESTOR_OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'GESTOR_COMERCIAL' | 'ASSISTENTE_COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO' | 'ANALISTA_SUPRIMENTOS' | 'ESTOQUE' | 'SUPRIMENTOS' | 'COMPRAS' | 'ALMOXARIFADO';
 
 export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_GESTOR' | 'GRUPO_RH' | 'GRUPO_DPE' | 'GRUPO_SUPERVISOR' | 'GRUPO_COLABORADORES' | 'GRUPO_OPERACIONAL' | 'GRUPO_VIGILANTES' | 'GRUPO_VIGIAS' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_AUXILIARES' | 'GRUPO_COMERCIAL' | 'GRUPO_ASSISTENTE_ADMINISTRATIVO' | 'GRUPO_ANALISTA_SUPRIMENTOS' | 'GRUPO_SUPRIMENTOS' | 'GRUPO_COMPRAS' | 'GRUPO_ESTOQUE' | 'GRUPO_ASSISTENTE_COMERCIAL' | 'GRUPO_GESTOR_COMERCIAL' | 'GRUPO_GESTOR_SUPERVISAO' | 'GRUPO_GESTOR_FINANCEIRO' | 'GRUPO_GESTOR_RH' | 'GRUPO_GESTOR_DPE';
 
@@ -228,7 +228,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   refreshAuthToken: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
   setFirstAccessCompleted: (completed: boolean) => void;
 }
 
@@ -388,7 +388,31 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
   VIGILANTE: [],
   AUXI_ADMINISTRATIVO: [],
   AUX_DEP: [],
+  ALMOXARIFADO: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Fornecedores', path: '/estoque/fornecedores', icon: 'Building2', color: '🟨' },
+    { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
+  ],
   GESTOR: [],
+  GESTOR_OPERACIONAL: [],
+  ESTOQUE: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Fornecedores', path: '/estoque/fornecedores', icon: 'Building2', color: '🟨' },
+  ],
+  SUPRIMENTOS: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },
+    { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
+    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
+  ],
+  COMPRAS: [
+    { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
+    { label: 'Gestão de Compras', path: '/compras', icon: 'ShoppingCart', color: '🟨' },
+    { label: 'Fornecedores', path: '/estoque/fornecedores', icon: 'Building2', color: '🟨' },
+    { label: 'Relatórios', path: '/reports', icon: 'PieChart', color: '🟨' },
+  ],
 };
 
 export interface UserWithGroups extends User {

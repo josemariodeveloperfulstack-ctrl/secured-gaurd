@@ -12,10 +12,16 @@ import java.util.UUID;
 public interface CompanyConfigRepository extends JpaRepository<CompanyConfig, UUID> {
 
     /**
-     * Busca a configuração ativa da empresa
+     * Carrega por id com no máximo uma linha (ORDER BY + LIMIT 1).
+     * Evita falha do Hibernate 6 "Duplicate row was found and ASSERT was specified" quando
+     * existem linhas físicas duplicadas com o mesmo id (dados legados sem PK).
      */
-    @Query("SELECT cc FROM CompanyConfig cc WHERE cc.active = true ORDER BY cc.createdAt DESC")
-    Optional<CompanyConfig> findActiveConfig();
+    Optional<CompanyConfig> findFirstByIdOrderByCreatedAtDesc(UUID id);
+
+    /**
+     * Configuração ativa mais recente (uma linha).
+     */
+    Optional<CompanyConfig> findFirstByActiveTrueOrderByCreatedAtDesc();
 
     /**
      * Verifica se existe uma configuração ativa

@@ -33,7 +33,7 @@ public class EquipmentController {
      * Busca todos os equipamentos com paginação
      */
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Page<EquipmentDTO>> getAllEquipments(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -62,7 +62,7 @@ public class EquipmentController {
      * Busca todos os equipamentos sem paginação
      */
     @GetMapping("/all")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<EquipmentDTO>> getAllEquipmentsNoPagination() {
         try {
             log.info("Buscando todos os equipamentos sem paginação");
@@ -79,7 +79,7 @@ public class EquipmentController {
      * Busca equipamento por ID
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<EquipmentDTO> getEquipmentById(@PathVariable UUID id) {
         try {
             log.info("Buscando equipamento por ID: {}", id);
@@ -95,7 +95,7 @@ public class EquipmentController {
      * Busca equipamento por número de série
      */
     @GetMapping("/serial/{serialNumber}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<EquipmentDTO> getEquipmentBySerialNumber(@PathVariable String serialNumber) {
         try {
             log.info("Buscando equipamento por número de série: {}", serialNumber);
@@ -111,7 +111,7 @@ public class EquipmentController {
      * Busca equipamentos por status
      */
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<EquipmentDTO>> getEquipmentsByStatus(@PathVariable EquipmentStatus status) {
         try {
             log.info("Buscando equipamentos por status: {}", status);
@@ -127,7 +127,7 @@ public class EquipmentController {
      * Busca equipamentos por usuário
      */
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<EquipmentDTO>> getEquipmentsByUser(@PathVariable UUID userId) {
         try {
             log.info("Buscando equipamentos do usuário: {}", userId);
@@ -143,7 +143,7 @@ public class EquipmentController {
      * Busca equipamentos expirando em X dias
      */
     @GetMapping("/expiring/{days}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<EquipmentDTO>> getExpiringEquipments(@PathVariable int days) {
         try {
             log.info("Buscando equipamentos expirando em {} dias", days);
@@ -159,7 +159,7 @@ public class EquipmentController {
      * Busca equipamentos expirados
      */
     @GetMapping("/expired")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<EquipmentDTO>> getExpiredEquipments() {
         try {
             log.info("Buscando equipamentos expirados");
@@ -175,7 +175,7 @@ public class EquipmentController {
      * Busca equipamentos perigosos
      */
     @GetMapping("/dangerous")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<List<EquipmentDTO>> getDangerousEquipments() {
         try {
             log.info("Buscando equipamentos perigosos");
@@ -191,7 +191,7 @@ public class EquipmentController {
      * Obtém resumo de equipamentos
      */
     @GetMapping("/summary")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<Map<String, Object>> getEquipmentSummary() {
         try {
             log.info("Buscando resumo de equipamentos");
@@ -207,7 +207,7 @@ public class EquipmentController {
      * Cria novo equipamento
      */
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_CREATE', 'EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_CREATE', 'EQUIPMENTS_WRITE', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<EquipmentDTO> createEquipment(@Valid @RequestBody CreateEquipmentRequest request) {
         try {
             log.info("Criando novo equipamento: {}", request.getSerialNumber());
@@ -223,7 +223,7 @@ public class EquipmentController {
      * Atualiza equipamento
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<EquipmentDTO> updateEquipment(
             @PathVariable UUID id,
             @Valid @RequestBody CreateEquipmentRequest request) {
@@ -241,7 +241,7 @@ public class EquipmentController {
      * Atualiza status do equipamento
      */
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_WRITE', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<EquipmentDTO> updateEquipmentStatus(
             @PathVariable UUID id,
             @RequestParam EquipmentStatus status) {
@@ -259,7 +259,7 @@ public class EquipmentController {
      * Atribui equipamento a um usuário
      */
     @PatchMapping("/{equipmentId}/assign/{userId}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_ASSIGN', 'EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_ASSIGN', 'EQUIPMENTS_WRITE', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<EquipmentDTO> assignEquipmentToUser(
             @PathVariable UUID equipmentId,
             @PathVariable UUID userId) {
@@ -277,7 +277,7 @@ public class EquipmentController {
      * Remove atribuição de equipamento (torna disponível)
      */
     @PatchMapping("/{equipmentId}/unassign")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_ASSIGN', 'EQUIPMENTS_WRITE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_ASSIGN', 'EQUIPMENTS_WRITE', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_ALMOXARIFADO')")
     public ResponseEntity<EquipmentDTO> unassignEquipment(@PathVariable UUID equipmentId) {
         try {
             log.info("Removendo atribuição do equipamento {}", equipmentId);
@@ -293,7 +293,7 @@ public class EquipmentController {
      * Exclui equipamento
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_DELETE', 'SUPER_ADMIN', 'ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_DELETE', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Void> deleteEquipment(@PathVariable UUID id) {
         try {
             log.info("Excluindo equipamento: {}", id);

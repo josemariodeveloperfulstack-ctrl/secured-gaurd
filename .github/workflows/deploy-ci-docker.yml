@@ -143,6 +143,15 @@ jobs:
           npm run build
 
       # ============================================
+      # 3.5️⃣ SETUP DOCKER BUILDX
+      # ============================================
+      - name: 🐳 Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ============================================
       # 4️⃣ BUILD DOCKER IMAGES
       # ============================================
       - name: 🐳 Build Docker images
@@ -167,8 +176,8 @@ jobs:
           echo "🔨 Construindo imagem do backend..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/z7devplenojava-afk/secured-guard \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-backend:ci \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci \
             -f backend/Dockerfile.prod ./backend || {
             echo "❌ Build do backend Docker falhou!"
             exit 1
@@ -179,8 +188,8 @@ jobs:
           echo "🎨 Construindo imagem do frontend..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/z7devplenojava-afk/secured-guard \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
@@ -194,8 +203,8 @@ jobs:
           echo "📱 Construindo imagem do WhatsApp service..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/z7devplenojava-afk/secured-guard \
-            -t ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci \
+            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
+            -t ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci \
             -f whatsapp-service/Dockerfile ./whatsapp-service || {
             echo "❌ Build do WhatsApp service Docker falhou!"
             exit 1
@@ -204,7 +213,7 @@ jobs:
           
           # Verificar imagens construídas
           echo "📋 Verificando imagens construídas..."
-          docker images | grep ghcr.io/z7devplenojava-afk/secured-guard || echo "⚠️ Nenhuma imagem encontrada"
+          docker images | grep ghcr.io/${{ github.repository_owner }}/secured-guard || echo "⚠️ Nenhuma imagem encontrada"
 
       # ============================================
       # 5️⃣ LOGIN TO GHCR
@@ -231,9 +240,9 @@ jobs:
             done
             return 1
           }
-          push_with_retry ghcr.io/z7devplenojava-afk/secured-guard-backend:ci
-          push_with_retry ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci
-          push_with_retry ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci
+          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci
+          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci
+          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci
 
       # ============================================
       # 7️⃣ INSTALL SSHPASS AND CONFIGURE SSH
@@ -347,7 +356,7 @@ jobs:
       # ============================================
       - name: 🚀 Execute Deployment (Single SSH Session)
         run: |
-          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30 -o IPQoS=none -o TCPKeepAlive=yes"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=15 -o ServerAliveCountMax=60 -o ConnectTimeout=60 -o IPQoS=none -o TCPKeepAlive=yes"
           
           SUCCESS=0
           for i in 1 2 3 4 5; do
@@ -405,19 +414,19 @@ jobs:
               echo "❌ $name não disponível e sem cache"; return 1
             }
             echo "📥 Pull backend..."
-            pull_or_use_cache ghcr.io/z7devplenojava-afk/secured-guard-backend:ci "backend" || exit 1
+            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci "backend" || exit 1
             echo "📥 Pull frontend..."
-            pull_or_use_cache ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci "frontend" || exit 1
+            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci "frontend" || exit 1
             echo "📥 Pull whatsapp..."
-            pull_or_use_cache ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci "whatsapp" || exit 1
+            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci "whatsapp" || exit 1
 
             echo "🧹 Removendo imagens antigas (após pull bem-sucedido)..."
             docker image prune -f --filter "dangling=true" 2>/dev/null || true
 
             echo "🔎 Labels das imagens:"
-            docker image inspect ghcr.io/z7devplenojava-afk/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
-            docker image inspect ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
-            docker image inspect ghcr.io/z7devplenojava-afk/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
+            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
+            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
+            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
 
             echo "🧹 Limpando redes..."
             docker network rm secured-guard-ci 2>/dev/null || true
@@ -436,17 +445,21 @@ jobs:
             done
             sleep 3
             
+            echo "🧹 Executando limpeza de duplicatas (Roles & Permissions)..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci < scripts/fix_all_duplicates.sql || echo "⚠️ Erro na limpeza, continuando..."
+            
             echo "🔧 Removendo registros de migrações falhas (V452, V457, etc.)..."
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE success = false;" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '457';" 2>/dev/null || true
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '1008';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
             
             echo "🚀 Iniciando todos os containers (usando imagens já baixadas)..."
             docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
             
-            echo "⏳ Aguardando backend subir (máx. 100s)..."
-            for j in $(seq 1 10); do
+            echo "⏳ Aguardando backend subir (máx. 300s)..."
+            for j in $(seq 1 30); do
               BACKEND_STATE=$(docker inspect secured-guard-backend-ci --format '{{.State.Status}}' 2>/dev/null || echo "missing")
               if [ "$BACKEND_STATE" = "exited" ] || [ "$BACKEND_STATE" = "dead" ]; then
                 echo "❌ Backend crashou (status: $BACKEND_STATE). Logs:"
@@ -459,9 +472,9 @@ jobs:
               fi
               echo "   Aguardando... ${j}0s (backend status: $BACKEND_STATE)"
               sleep 10
-              if [ $j -eq 10 ]; then
-                echo "❌ Timeout 100s - backend não respondeu em /api/health. Logs:"
-                docker logs --tail 100 secured-guard-backend-ci 2>&1 || true
+              if [ $j -eq 30 ]; then
+                echo "❌ Timeout 300s - backend não respondeu em /api/health. Logs:"
+                docker logs --tail 200 secured-guard-backend-ci 2>&1 || true
                 exit 1
               fi
             done

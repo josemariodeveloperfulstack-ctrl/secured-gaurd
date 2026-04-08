@@ -1,4 +1,5 @@
 import React, { useEffect, Suspense, lazy } from 'react';
+import type { UserRole } from '@/types/user';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -22,6 +23,16 @@ import '@/styles/gsap-animations.css';
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+/** Acesso ao módulo Comercial (rotas + CRUD contratos) quando o mapa de permissões do JWT estiver incompleto */
+const COMMERCIAL_FULL_ACCESS_ROLES: UserRole[] = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'GESTOR',
+  'COMERCIAL',
+  'GESTOR_COMERCIAL',
+  'ASSISTENTE_COMERCIAL',
+];
 
 // Portal Público - Carregamento imediato (página inicial)
 import PortalHome from '@/pages/PortalHome';
@@ -207,6 +218,7 @@ const EstoqueRelatorios = lazy(() => import('@/pages/EstoqueRelatorios'));
 const Empresas = lazy(() => import('@/pages/Empresas'));
 const Compras = lazy(() => import('@/pages/Compras'));
 const CotacoesCompras = lazy(() => import('@/pages/CotacoesCompras'));
+const AcordoRecolhimento = lazy(() => import('@/pages/AcordoRecolhimento'));
 // const Suporte = lazy(() => import('@/pages/Suporte')); // REMOVIDO - substituído por Gestão de Atendimento
 const Postos = lazy(() => import('@/pages/Postos'));
 const RemanejamentoPage = lazy(() => import('@/pages/Remanejamento'));
@@ -517,17 +529,17 @@ function App() {
 
                     {/* Clientes e Filiais */}
                     <Route path="/clients" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Clientes />
                       </ProtectedRoute>
                     } />
                     <Route path="/clientes" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Clientes />
                       </ProtectedRoute>
                     } />
                     <Route path="/fornecedores" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ', 'STOCK_READ']} requireAllPermissions={false}>
                         <Fornecedores />
                       </ProtectedRoute>
                     } />
@@ -553,17 +565,17 @@ function App() {
 
                     {/* Contratos e Serviços */}
                     <Route path="/contracts" element={
-                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Contratos />
                       </ProtectedRoute>
                     } />
                     <Route path="/contratos" element={
-                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Contratos />
                       </ProtectedRoute>
                     } />
                     <Route path="/servicos" element={
-                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <GestaoServicos />
                         </Suspense>
@@ -701,7 +713,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/estoque/fornecedores" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ', 'STOCK_READ']} requireAllPermissions={false}>
                         <Fornecedores />
                       </ProtectedRoute>
                     } />
@@ -715,33 +727,40 @@ function App() {
 
                     {/* Compras */}
                     <Route path="/compras" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/solicitacoes" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/aprovacoes" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/relatorios" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/fornecedores" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <Compras />
                       </ProtectedRoute>
                     } />
                     <Route path="/compras/cotacoes" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
                         <CotacoesCompras />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/compras/acordo-recolhimento" element={
+                      <ProtectedRoute requiredPermissions={['PURCHASE_AGREEMENT_READ', 'STOCK_MANAGE']}>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <AcordoRecolhimento />
+                        </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/purchase" element={
@@ -1043,17 +1062,17 @@ function App() {
 
                     {/* Módulo Comercial */}
                     <Route path="/leads" element={
-                      <ProtectedRoute requiredPermissions={['LEADS_READ']}>
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Leads />
                       </ProtectedRoute>
                     } />
                     <Route path="/propostas" element={
-                      <ProtectedRoute requiredPermissions={['PROPOSALS_READ']}>
+                      <ProtectedRoute requiredPermissions={['PROPOSALS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Propostas />
                       </ProtectedRoute>
                     } />
                     <Route path="/orcamentos" element={
-                      <ProtectedRoute requiredPermissions={['QUOTES_READ']}>
+                      <ProtectedRoute requiredPermissions={['QUOTES_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Orcamentos />
                       </ProtectedRoute>
                     } />
@@ -1182,7 +1201,7 @@ function App() {
 
                     {/* CRM Comercial */}
                     <Route path="/crm" element={
-                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={['SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL']}>
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <CrmKanban />
                       </ProtectedRoute>
                     } />
@@ -1267,7 +1286,7 @@ function App() {
 
                     {/* Empresas */}
                     <Route path="/empresas" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
                         <Empresas />
                       </ProtectedRoute>
                     } />

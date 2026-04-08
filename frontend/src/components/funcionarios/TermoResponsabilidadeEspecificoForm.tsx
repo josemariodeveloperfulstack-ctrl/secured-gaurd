@@ -7,10 +7,12 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Shield, Loader2, CheckCircle2 } from 'lucide-react';
-import { employeeService } from '@/services/employeeService';
+import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import { EmployeeCombobox } from '../ui/employee-combobox';
+
 
 const documentTypes = [
     { id: 'BH_BUS', label: 'TERMO DE RESPONSABILIDADE CARTÃO BH BUS VALE-TRANSPORTE' },
@@ -24,7 +26,7 @@ interface TermoResponsabilidadeEspecificoFormProps {
     companyId?: string;
 }
 
-const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({ employeeId, companyId }) => {
+const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({ employeeId, companyId }) => {
     const [form, setForm] = useState({
         funcionarioId: employeeId || '',
         empresaId: companyId || '',
@@ -35,9 +37,10 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
     });
 
     const [loading, setLoading] = useState(false);
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
     const [companies, setCompanies] = useState<Company[]>([]);
     const [loadingData, setLoadingData] = useState(false);
+
 
     useEffect(() => {
         setForm(prev => ({
@@ -47,15 +50,47 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
         }));
     }, [employeeId, companyId]);
 
+    // Carregar dados iniciais do funcionário se vier apenas o ID via props
+    useEffect(() => {
+        if (form.funcionarioId && !selectedEmployeeData) {
+            const fetchEmployee = async () => {
+                try {
+                    const emp = await employeeService.getEmployeeById(form.funcionarioId);
+                    if (emp) {
+                        setSelectedEmployeeData({
+                            id: emp.id,
+                            name: emp.name,
+                            document: emp.document || emp.cpf,
+                            cpf: emp.cpf || emp.document,
+                            email: emp.email,
+                            phone: emp.phone,
+                            registrationNumber: emp.registrationNumber,
+                            hireDate: emp.hireDate,
+                            positionName: emp.position?.name,
+                            unitName: emp.unit?.name,
+                            address: emp.address,
+                            companyId: emp.company?.id,
+                            companySigla: emp.company?.sigla
+                        } as SimpleEmployee);
+
+                        // Auto-selecionar empresa se o funcionário tiver uma
+                        if (emp.company?.id && !form.empresaId) {
+                            setForm(prev => ({ ...prev, empresaId: emp.company.id }));
+                        }
+                    }
+                } catch (error) {
+                    console.error("Erro ao carregar dados iniciais do funcionário:", error);
+                }
+            };
+            fetchEmployee();
+        }
+    }, [form.funcionarioId, selectedEmployeeData, form.empresaId]);
+
     useEffect(() => {
         const fetchData = async () => {
             setLoadingData(true);
             try {
-                const [employeesData, companiesData] = await Promise.all([
-                    employeeService.getAllEmployees(),
-                    companyService.getAllCompanies(),
-                ]);
-                setEmployees(employeesData as unknown as Employee[]);
+                const companiesData = await companyService.getAllCompanies();
                 setCompanies(companiesData);
             } catch (error) {
                 console.error('Erro ao buscar dados:', error);
@@ -66,9 +101,11 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
         fetchData();
     }, []);
 
-    const selectedFunc = employees.find(f => f.id === form.funcionarioId);
+
+    const selectedFunc = selectedEmployeeData;
     const selectedEmp = companies.find(e => e.id === form.empresaId);
     const selectedDocType = documentTypes.find(t => t.id === form.documentTypeId);
+
 
     const handleGenerate = async (preview = false) => {
         if (!selectedFunc || !selectedEmp) {
@@ -82,8 +119,9 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
                 companyId: selectedEmp.id,
                 reportTitle: selectedDocType?.label,
                 employeeName: selectedFunc.name,
-                employeeCpf: selectedFunc.cpf || selectedFunc.document || '',
-                employeePosition: (selectedFunc as any).position?.name || '',
+                employeeCpf: selectedFunc.document || '',
+                employeePosition: selectedFunc.positionName || '',
+
                 equipments: [
                     {
                         name: form.documentTypeId === 'CELULAR' ? 'Aparelho Celular' : 'Cartão Vale-Transporte',
@@ -189,21 +227,34 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <Label className="text-seguranca-lightgray">Funcionário</Label>
-                            <Select value={form.funcionarioId} onValueChange={(val) => setForm(prev => ({ ...prev, funcionarioId: val }))}>
-                                <SelectTrigger className="bg-seguranca-black border-gray-700 text-white h-11">
-                                    <SelectValue placeholder="Selecione..." />
-                                </SelectTrigger>
-                                <SelectContent className="bg-seguranca-black border-gray-700 text-white">
-                                    {employees.map(f => (
-                                        <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Label className="text-seguranca-lightgray font-semibold">Funcionário</Label>
+                            <EmployeeCombobox
+                                value={form.funcionarioId}
+                                onChange={(val) => setForm(prev => ({ ...prev, funcionarioId: val }))}
+                                onEmployeeSelect={(emp) => {
+                                    setSelectedEmployeeData(emp);
+                                    if (emp.companyId) {
+                                        setForm(prev => ({ ...prev, empresaId: emp.companyId! }));
+                                    }
+                                }}
+                            />
+                            {selectedFunc && (
+                                <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-seguranca-black/50 px-3 py-2 border border-gray-800">
+                                    <User className="h-3.5 w-3.5 text-seguranca-red" />
+                                    <span className="text-xs font-semibold text-white">
+                                        {selectedFunc.name}
+                                    </span>
+                                    {(selectedFunc.cpf || (selectedFunc as any).document) && (
+                                        <span className="text-[11px] text-gray-400">
+                                            · CPF: {selectedFunc.cpf || (selectedFunc as any).document || ''}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2">
-                            <Label className="text-seguranca-lightgray">Empresa</Label>
+                            <Label className="text-seguranca-lightgray font-semibold">Empresa</Label>
                             <Select value={form.empresaId} onValueChange={(val) => setForm(prev => ({ ...prev, empresaId: val }))}>
                                 <SelectTrigger className="bg-seguranca-black border-gray-700 text-white h-11">
                                     <SelectValue placeholder="Selecione..." />
@@ -214,7 +265,90 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {selectedEmp && (
+                                <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-seguranca-black/50 px-3 py-2 border border-gray-800">
+                                    <Building className="h-3.5 w-3.5 text-seguranca-red" />
+                                    <span className="text-xs font-semibold text-white">
+                                        {selectedEmp.sigla || selectedEmp.name}
+                                    </span>
+                                    {selectedEmp.cnpj && (
+                                        <span className="text-[11px] text-gray-400">
+                                            · CNPJ: {selectedEmp.cnpj}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Detalhes do Funcionário */}
+                        {selectedFunc && (
+                            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 bg-seguranca-black/40 p-4 rounded-lg border border-gray-800">
+                                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                                    <div className="flex items-center gap-2 font-medium text-seguranca-lightgray">
+                                        <User className="h-4 w-4 text-seguranca-red" />
+                                        Dados do Funcionário
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs text-gray-500 uppercase tracking-wider">Cargo</Label>
+                                            <div className="p-2.5 bg-seguranca-black/60 rounded-md text-sm font-medium border border-gray-800 transition-colors truncate">
+                                                {selectedFunc.positionName || '-'}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs text-gray-500 uppercase tracking-wider">Admissão</Label>
+                                            <div className="p-2.5 bg-seguranca-black/60 rounded-md text-sm font-medium border border-gray-800 transition-colors">
+                                                {selectedFunc.hireDate ? new Date(selectedFunc.hireDate).toLocaleDateString('pt-BR') : '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-gray-500 uppercase tracking-wider">Setor</Label>
+                                        <div className="p-2.5 bg-seguranca-black/60 rounded-md text-sm font-medium border border-gray-800 transition-colors truncate">
+                                            {selectedFunc.unitName || '-'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Detalhes da Empresa */}
+                        {selectedEmp && (
+                            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-100 bg-seguranca-black/40 p-4 rounded-lg border border-gray-800">
+                                <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                                    <div className="flex items-center gap-2 font-medium text-seguranca-lightgray">
+                                        <Building className="h-4 w-4 text-seguranca-red" />
+                                        Dados da Empresa
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-gray-500 uppercase tracking-wider">Razão Social</Label>
+                                        <div className="p-2.5 bg-seguranca-black/60 rounded-md text-sm font-medium border border-gray-800 transition-colors truncate">
+                                            {selectedEmp.name}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs text-gray-500 uppercase tracking-wider">CNPJ</Label>
+                                            <div className="p-2.5 bg-seguranca-black/60 rounded-md text-sm font-medium border border-gray-800 transition-colors">
+                                                {selectedEmp.cnpj || '-'}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs text-gray-500 uppercase tracking-wider">Sigla</Label>
+                                            <div className="p-2.5 bg-seguranca-black/60 rounded-md text-sm font-medium border border-gray-800 transition-colors">
+                                                {selectedEmp.sigla || '-'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -268,4 +402,4 @@ const TermoResponsabilidadeEspecíficoForm: React.FC<TermoResponsabilidadeEspeci
     );
 };
 
-export default TermoResponsabilidadeEspecíficoForm;
+export default TermoResponsabilidadeEspecificoForm;
