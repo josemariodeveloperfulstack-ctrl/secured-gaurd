@@ -14,13 +14,19 @@ import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.model.Role;
 import com.z7design.secured_guard.repository.RoleRepository;
 import com.z7design.secured_guard.model.Permission;
+import com.z7design.secured_guard.security.JwtService;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.CreateUserRequest;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +36,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
+    private final JwtService jwtService;
 
     public Optional<User> findById(UUID id) {
         return userRepository.findById(id);
@@ -361,6 +368,35 @@ public class UserService {
 
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
+    }
+
+    /**
+     * Payload para sincronização de role/token (polling do frontend). Centralizado para
+     * {@code /api/users/me/current-role} e {@code /api/session/current-role}.
+     */
+    public Optional<Map<String, Object>> buildCurrentRoleForUsername(String username) {
+        User currentUser = userRepository.findByUsername(username).orElse(null);
+        if (currentUser == null) {
+            return Optional.empty();
+        }
+        String primaryRole = "COLABORADOR";
+        List<String> allRoles = new ArrayList<>();
+        if (currentUser.getRoles() != null && !currentUser.getRoles().isEmpty()) {
+            allRoles = currentUser.getRoles().stream()
+                    .filter(Objects::nonNull)
+                    .map(Role::getName)
+                    .collect(Collectors.toList());
+            primaryRole = allRoles.get(0);
+        } else {
+            allRoles.add("COLABORADOR");
+        }
+        String newToken = jwtService.generateToken(currentUser);
+        Map<String, Object> body = new HashMap<>();
+        body.put("role", primaryRole);
+        body.put("roles", allRoles);
+        body.put("token", newToken);
+        body.put("userId", currentUser.getId().toString());
+        return Optional.of(body);
     }
 
     public Optional<User> findByEmail(String email) {

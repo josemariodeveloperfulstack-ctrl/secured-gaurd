@@ -61,6 +61,9 @@ public class SecurityConfig {
                                 .authorizeHttpRequests(auth -> auth
                                                  // Permitir todos os pre-flights OPTIONS para evitar loops e erros de CORS
                                                  .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                                                 // Aliases fora de /api/users/** e /api/v1/** (evita ERR_TOO_MANY_REDIRECTS em alguns proxies)
+                                                 .requestMatchers("/api/session/current-role").authenticated()
+                                                 .requestMatchers("/api/messages/unread/count").authenticated()
                                                  // Endpoints públicos
                                                  .requestMatchers("/api/auth/**").permitAll()
                                                 .requestMatchers("/api/files/**").permitAll()

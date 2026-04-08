@@ -186,7 +186,7 @@ export const messageService = {
 
   async getUnreadSystemCount(): Promise<number> {
     try {
-      const response = await api.get('/api/v1/messages/unread/count', {
+      const response = await api.get('/messages/unread/count', {
         headers: getAuthHeaders(),
         validateStatus: (status) => status < 500, // Não lançar erro para 401/403, apenas para 500+
         maxRedirects: 0 // Desabilitar redirecionamentos automáticos para evitar loops

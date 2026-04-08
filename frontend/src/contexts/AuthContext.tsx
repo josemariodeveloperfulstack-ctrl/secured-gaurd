@@ -142,7 +142,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (!token || !savedUserStr) return;
 
       try {
-        const response = await api.get('/api/users/me/current-role');
+        const response = await api.get('/session/current-role');
         if (!response.data) return;
         
         const { role: dbRole, roles: dbRoles, token: newToken } = response.data as { role: string; roles?: string[]; token: string };

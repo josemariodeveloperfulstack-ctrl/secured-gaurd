@@ -53,6 +53,20 @@ interface HistoricoCobranca {
   resultado: 'enviado' | 'lido' | 'respondido' | 'promessa' | 'sem_resposta';
 }
 
+/** Status vindo do serviço (mapBackendStatusToFrontend) ou legado da API */
+function isStatusVencida(s: string | undefined) {
+  return s === 'VENCIDA' || s === 'OVERDUE';
+}
+function isStatusRecebida(s: string | undefined) {
+  return s === 'RECEBIDA' || s === 'PAID' || s === 'PAID_PREVIOUSLY';
+}
+function isStatusAberta(s: string | undefined) {
+  return s === 'ABERTA' || s === 'PENDING' || s === 'PENDING_ERROR' || s === 'SOLICITADA';
+}
+function isStatusCancelada(s: string | undefined) {
+  return s === 'CANCELADA' || s === 'CANCELLED';
+}
+
 export const ContasAReceber: React.FC = () => {
   const [contas, setContas] = useState<ContaAReceber[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -62,10 +76,9 @@ export const ContasAReceber: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterCliente, setFilterCliente] = useState('all');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  });
+  // Sem período por padrão: filtrar só pelo calendário em "Filtros Avançados" evita lista vazia
+  // quando os vencimentos estão fora do mês atual.
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Estados do modal
   const [showFormModal, setShowFormModal] = useState(false);
@@ -386,10 +399,20 @@ export const ContasAReceber: React.FC = () => {
   const filteredContas = contas.filter(conta => {
     if (!conta) return false;
 
-    const matchesSearch = (conta.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (conta.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-      (conta.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
-    const matchesStatus = filterStatus === 'all' || conta.status === filterStatus;
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      (conta.client?.name?.toLowerCase().includes(q) || false) ||
+      (typeof conta.cliente === 'string' && conta.cliente.toLowerCase().includes(q)) ||
+      (conta.invoiceNumber?.toLowerCase().includes(q) || false) ||
+      (conta.numeroFatura?.toLowerCase().includes(q) || false) ||
+      (conta.description?.toLowerCase().includes(q) || false) ||
+      (conta.descricao?.toLowerCase().includes(q) || false);
+    const matchesStatus =
+      filterStatus === 'all' ||
+      (filterStatus === 'ABERTA' && isStatusAberta(conta.status)) ||
+      (filterStatus === 'RECEBIDA' && isStatusRecebida(conta.status)) ||
+      (filterStatus === 'VENCIDA' && isStatusVencida(conta.status)) ||
+      (filterStatus === 'CANCELADA' && isStatusCancelada(conta.status));
     const matchesCategoria = filterCategoria === 'all' || conta.categoria === filterCategoria;
     const matchesCliente = filterCliente === 'all' || conta.client?.id === filterCliente;
 
@@ -464,10 +487,10 @@ export const ContasAReceber: React.FC = () => {
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-black border-gray-600">
                       <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Todos Status</SelectItem>
-                      <SelectItem value="pendente" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pendente</SelectItem>
-                      <SelectItem value="pago" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pago</SelectItem>
-                      <SelectItem value="vencido" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Vencido</SelectItem>
-                      <SelectItem value="cancelado" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cancelado</SelectItem>
+                      <SelectItem value="ABERTA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pendente / Aberta</SelectItem>
+                      <SelectItem value="RECEBIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pago / Recebida</SelectItem>
+                      <SelectItem value="VENCIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Vencido</SelectItem>
+                      <SelectItem value="CANCELADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -603,7 +626,7 @@ export const ContasAReceber: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-seguranca-lightgray">Valor Vencido</p>
                         <p className="text-2xl font-bold text-seguranca-red">
-                          R$ {(contas.filter(c => c?.status === 'OVERDUE').reduce((sum, c) => sum + (c?.amount || 0), 0) || 0).toLocaleString('pt-BR')}
+                          R$ {(contas.filter(c => isStatusVencida(c?.status)).reduce((sum, c) => sum + (c?.amount || 0), 0) || 0).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <div className="h-12 w-12 bg-seguranca-red/20 rounded-lg flex items-center justify-center">
@@ -619,7 +642,7 @@ export const ContasAReceber: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-seguranca-lightgray">Taxa Inadimplência</p>
                         <p className="text-2xl font-bold text-seguranca-red">
-                          {contas.length > 0 ? ((contas.filter(c => c.status === 'OVERDUE').length / contas.length) * 100).toFixed(1) : 0}%
+                          {contas.length > 0 ? ((contas.filter(c => isStatusVencida(c.status)).length / contas.length) * 100).toFixed(1) : 0}%
                         </p>
                       </div>
                       <div className="h-12 w-12 bg-seguranca-red/20 rounded-lg flex items-center justify-center">
@@ -643,10 +666,10 @@ export const ContasAReceber: React.FC = () => {
                   <CardContent>
                     <div className="space-y-4">
                       {[
-                        { status: 'PENDING', label: 'Pendentes', color: 'bg-seguranca-lightgray', count: contas.filter(c => c.status === 'PENDING').length },
-                        { status: 'PAID', label: 'Pagas', color: 'bg-seguranca-yellow', count: contas.filter(c => c.status === 'PAID').length },
-                        { status: 'OVERDUE', label: 'Vencidas', color: 'bg-seguranca-red', count: contas.filter(c => c.status === 'OVERDUE').length },
-                        { status: 'PARTIAL', label: 'Parciais', color: 'bg-seguranca-yellow', count: contas.filter(c => c.status === 'PARTIAL').length }
+                        { status: 'ABERTA', label: 'Abertas / Pendentes', color: 'bg-seguranca-lightgray', count: contas.filter(c => isStatusAberta(c.status)).length },
+                        { status: 'RECEBIDA', label: 'Recebidas', color: 'bg-seguranca-yellow', count: contas.filter(c => isStatusRecebida(c.status)).length },
+                        { status: 'VENCIDA', label: 'Vencidas', color: 'bg-seguranca-red', count: contas.filter(c => isStatusVencida(c.status)).length },
+                        { status: 'CANCELADA', label: 'Canceladas', color: 'bg-gray-500', count: contas.filter(c => isStatusCancelada(c.status)).length }
                       ].map((item) => {
                         const percentage = contas.length > 0 ? (item.count / contas.length) * 100 : 0;
                         return (
@@ -703,7 +726,7 @@ export const ContasAReceber: React.FC = () => {
                         },
                         {
                           label: 'Valor Vencido',
-                          value: contas.filter(c => c.status === 'OVERDUE').reduce((sum, c) => sum + c.amount, 0),
+                          value: contas.filter(c => isStatusVencida(c.status)).reduce((sum, c) => sum + c.amount, 0),
                           color: 'bg-seguranca-red',
                           textColor: 'text-seguranca-red'
                         }
@@ -770,13 +793,13 @@ export const ContasAReceber: React.FC = () => {
                               </p>
                               <Badge
                                 variant="outline"
-                                className={`text-xs ${conta.status === 'OVERDUE' ? 'border-seguranca-red text-seguranca-red' :
-                                    conta.status === 'PAID' ? 'border-seguranca-yellow text-seguranca-yellow' :
-                                      conta.status === 'PENDING' ? 'border-seguranca-lightgray text-seguranca-lightgray' :
-                                        'border-seguranca-yellow text-seguranca-yellow'
+                                className={`text-xs ${isStatusVencida(conta.status) ? 'border-seguranca-red text-seguranca-red' :
+                                    isStatusRecebida(conta.status) ? 'border-seguranca-yellow text-seguranca-yellow' :
+                                      isStatusAberta(conta.status) ? 'border-seguranca-lightgray text-seguranca-lightgray' :
+                                        'border-gray-500 text-gray-400'
                                   }`}
                               >
-                                {conta.status}
+                                {isStatusRecebida(conta.status) ? 'Recebida' : isStatusVencida(conta.status) ? 'Vencida' : isStatusAberta(conta.status) ? 'Aberta' : isStatusCancelada(conta.status) ? 'Cancelada' : conta.status}
                               </Badge>
                             </div>
                           </div>
@@ -796,7 +819,7 @@ export const ContasAReceber: React.FC = () => {
                   <CardContent>
                     <div className="space-y-3">
                       {contas
-                        .filter(c => c.status === 'OVERDUE')
+                        .filter(c => isStatusVencida(c.status))
                         .sort((a, b) => b.overdueDays - a.overdueDays)
                         .slice(0, 5)
                         .map((conta) => (
@@ -815,7 +838,7 @@ export const ContasAReceber: React.FC = () => {
                             </div>
                           </div>
                         ))}
-                      {contas.filter(c => c.status === 'OVERDUE').length === 0 && (
+                      {contas.filter(c => isStatusVencida(c.status)).length === 0 && (
                         <div className="text-center py-8">
                           <CheckCircle className="h-12 w-12 text-seguranca-yellow mx-auto mb-2" />
                           <p className="text-seguranca-lightgray">Nenhuma conta vencida!</p>
@@ -861,11 +884,11 @@ export const ContasAReceber: React.FC = () => {
                         <tr key={conta.id} className="hover:bg-seguranca-graphite/50">
                           <td className="px-4 py-4">
                             <div>
-                              <div className="font-medium text-seguranca-lightgray">{conta.client?.name || '-'}</div>
+                              <div className="font-medium text-seguranca-lightgray">{conta.client?.name || conta.cliente || '-'}</div>
                               <div className="text-sm text-gray-400">
-                                Fatura: {conta.invoiceNumber || '-'}
+                                Fatura: {conta.invoiceNumber || conta.numeroFatura || '-'}
                               </div>
-                              <div className="text-sm text-gray-400">{conta.description || '-'}</div>
+                              <div className="text-sm text-gray-400">{conta.description || conta.descricao || '-'}</div>
                             </div>
                           </td>
                           <td className="px-4 py-4">
@@ -904,13 +927,14 @@ export const ContasAReceber: React.FC = () => {
                           </td>
                           <td className="px-4 py-4">
                             <Badge
-                              variant={conta.status === 'PAID' ? 'default' :
-                                conta.status === 'OVERDUE' ? 'destructive' :
-                                  conta.status === 'PENDING' ? 'secondary' : 'outline'}
+                              variant={isStatusRecebida(conta.status) ? 'default' :
+                                isStatusVencida(conta.status) ? 'destructive' :
+                                  isStatusAberta(conta.status) ? 'secondary' : 'outline'}
                             >
-                              {conta.status === 'PAID' ? 'Pago' :
-                                conta.status === 'OVERDUE' ? 'Vencido' :
-                                  conta.status === 'PENDING' ? 'Pendente' : 'Cancelado'}
+                              {isStatusRecebida(conta.status) ? 'Pago' :
+                                isStatusVencida(conta.status) ? 'Vencido' :
+                                  isStatusAberta(conta.status) ? 'Pendente' :
+                                    isStatusCancelada(conta.status) ? 'Cancelado' : conta.status}
                             </Badge>
                           </td>
                           <td className="px-4 py-4">
@@ -933,7 +957,7 @@ export const ContasAReceber: React.FC = () => {
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
-                              {(conta.status === 'PENDING' || conta.status === 'OVERDUE' || conta.status === 'ABERTA' || conta.status === 'VENCIDA') && (
+                              {(isStatusAberta(conta.status) || isStatusVencida(conta.status)) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -975,7 +999,7 @@ export const ContasAReceber: React.FC = () => {
             <DialogHeader>
               <DialogTitle>Enviar Cobrança</DialogTitle>
               <DialogDescription>
-                Enviar cobrança para {selectedConta?.client.name}
+                Enviar cobrança para {selectedConta?.client?.name || selectedConta?.cliente || 'cliente'}
               </DialogDescription>
             </DialogHeader>
 

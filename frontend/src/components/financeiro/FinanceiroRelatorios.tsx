@@ -18,19 +18,116 @@ import {
   Printer,
   AlertTriangle
 } from 'lucide-react';
-import { financialService, FinancialTransaction, Invoice } from '@/services/financialService';
+import { FinancialTransaction, Invoice } from '@/services/financialService';
 import { unitService, Unit } from '@/services/unitService';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
+import { format, startOfDay, endOfDay, isWithinInterval, isBefore, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { useToast } from '@/hooks/use-toast';
 
+/** Alinha status do backend (PENDENTE, PAGA…) com os valores do filtro da UI */
+function statusMatchesFilter(itemStatus: string, filter: string): boolean {
+  if (filter === 'all') return true;
+  switch (filter) {
+    case 'PENDING':
+      return itemStatus === 'PENDING' || itemStatus === 'PENDENTE';
+    case 'CONFIRMED':
+      return itemStatus === 'CONFIRMED';
+    case 'PAGA':
+      return itemStatus === 'PAGA' || itemStatus === 'CONFIRMED';
+    case 'CANCELLED':
+      return itemStatus === 'CANCELLED' || itemStatus === 'CANCELADA';
+    case 'PENDENTE_ERRO':
+      return itemStatus === 'PENDENTE_ERRO';
+    default:
+      return itemStatus === filter;
+  }
+}
+
+/** Aceita "1234.56", "1.234,56", "R$ 999.999,99" */
+function parseMoneyInput(raw: string): number | null {
+  const s = raw?.trim();
+  if (!s) return null;
+  const cleaned = s
+    .replace(/\u00a0/g, ' ')
+    .replace(/R\$\s*/gi, '')
+    .replace(/\s/g, '');
+  if (!cleaned) return null;
+  const normalized = cleaned.includes(',')
+    ? cleaned.replace(/\./g, '').replace(',', '.')
+    : cleaned;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Centro de custo: contém texto ou tolera 1–2 erros de digitação (ex.: Fianceiro ≈ Financeiro) */
+function costCenterMatches(filterRaw: string, haystack: string | undefined): boolean {
+  const filter = filterRaw.trim().toLowerCase();
+  if (!filter) return true;
+  if (!haystack?.trim()) return false;
+  const cc = haystack.toLowerCase().trim();
+  if (cc.includes(filter) || filter.includes(cc)) return true;
+  if (filter.length >= 4 && cc.length >= 4 && levenshtein(filter, cc) <= 2) return true;
+  return cc.split(/\s+/).some((w) => w.includes(filter) || (w.length >= 4 && levenshtein(w, filter) <= 2));
+}
+
+/**
+ * O filtro "Centro de custo" também procura em unidade/empresa, categoria e fornecedor —
+ * muitas contas a receber vêm sem `centroCusto` na API, só com cliente/unidade.
+ */
+function centerCostFilterHaystack(item: FinancialTransaction): string {
+  return [item.costCenter, item.unit?.name, item.category, item.supplierName]
+    .filter((v) => v != null && String(v).trim() !== '')
+    .map((v) => String(v))
+    .join(' ');
+}
+
+type DateGetter = (item: FinancialTransaction) => string | undefined;
+
+function matchesDateBounds(
+  item: FinancialTransaction,
+  start: Date | null,
+  end: Date | null,
+  getRaw: DateGetter
+): boolean {
+  const raw = getRaw(item);
+  if (!raw) return false;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return false;
+  const day = startOfDay(d);
+  if (start && end) {
+    return isWithinInterval(day, { start: startOfDay(start), end: endOfDay(end) });
+  }
+  if (start && !end) {
+    return !isBefore(day, startOfDay(start));
+  }
+  if (!start && end) {
+    return !isAfter(day, endOfDay(end));
+  }
+  return true;
+}
+
 interface FinanceiroRelatoriosProps {
-  transactions: FinancialTransaction[];
-  invoices: Invoice[];
-  refreshData: () => void;
+  transactions?: FinancialTransaction[];
+  invoices?: Invoice[];
+  refreshData?: () => void;
 }
 
 interface FiltrosRelatorio {
@@ -50,9 +147,9 @@ interface FiltrosRelatorio {
 }
 
 export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
-  transactions,
-  invoices,
-  refreshData
+  transactions = [],
+  invoices = [],
+  refreshData = () => {},
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -96,98 +193,94 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
 
   // Aplicar filtros
   const dadosFiltrados = useMemo(() => {
-    let dados = [...transactions, ...invoices.map(invoice => ({
-      id: invoice.id,
-      type: 'EXPENSE',
-      description: invoice.description,
-      amount: invoice.amount,
-      date: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      status: invoice.status,
-      category: invoice.category,
-      reference: invoice.reference,
-      notes: invoice.notes,
-      unitId: invoice.unitId,
-      unit: invoice.unit,
-      expenseType: invoice.expenseType,
-      costCenter: invoice.costCenter,
-      supplier: invoice.supplier,
-      barcode: invoice.barcode,
-      receiptUrl: invoice.receiptUrl
-    }))];
+    let dados: FinancialTransaction[] = [
+      ...transactions,
+      ...invoices.map((invoice) => ({
+        id: String(invoice.id),
+        type: 'EXPENSE' as const,
+        description: invoice.description,
+        amount: Number(invoice.amount) || 0,
+        date: invoice.issueDate,
+        dueDate: invoice.dueDate,
+        status: invoice.status as FinancialTransaction['status'],
+        category: invoice.category || '',
+        reference: invoice.invoiceNumber,
+        notes: invoice.notes,
+        unitId: invoice.unitId ? String(invoice.unitId) : undefined,
+        unit: invoice.unitId
+          ? { id: String(invoice.unitId), name: invoice.companySigla || '' }
+          : undefined,
+        expenseType: invoice.type,
+        costCenter: invoice.centroCusto,
+        supplier: invoice.supplierId ? { id: String(invoice.supplierId), name: invoice.supplierName } : undefined,
+        supplierName: invoice.supplierName,
+        createdAt: invoice.createdAt,
+        updatedAt: invoice.updatedAt,
+      })),
+    ];
 
     // Filtro por tipo
     if (filtros.tipo !== 'all') {
       dados = dados.filter(item => item.type === filtros.tipo);
     }
 
-    // Filtro por status
+    // Filtro por status (PENDENTE/PAGA do backend vs PENDING/PAGA da UI)
     if (filtros.status !== 'all') {
-      dados = dados.filter(item => item.status === filtros.status);
+      dados = dados.filter((item) => statusMatchesFilter(String(item.status), filtros.status));
     }
 
-    // Filtro por tipo de despesa
-    if (filtros.tipoDespesa !== 'all') {
-      dados = dados.filter(item => item.expenseType === filtros.tipoDespesa);
+    // Filtro por tipo de despesa (só faz sentido para despesas; receitas não têm expenseType)
+    if (filtros.tipoDespesa !== 'all' && filtros.tipo !== 'INCOME') {
+      dados = dados.filter((item) => item.expenseType === filtros.tipoDespesa);
     }
 
-    // Filtro por data de lançamento
-    if (filtros.dataInicio && filtros.dataFim) {
-      dados = dados.filter(item => {
-        const data = new Date(item.date);
-        return isWithinInterval(data, {
-          start: startOfDay(filtros.dataInicio!),
-          end: endOfDay(filtros.dataFim!)
-        });
-      });
+    // Datas: intervalo parcial (só início ou só fim) e, se ambos os grupos estão preenchidos,
+    // usar OU entre “data de lançamento” e “data de vencimento” (evita lista vazia por combinação impossível).
+    const hasLanc = Boolean(filtros.dataInicio || filtros.dataFim);
+    const hasVenc = Boolean(filtros.vencimentoInicio || filtros.vencimentoFim);
+    const predLanc = (item: FinancialTransaction) =>
+      matchesDateBounds(item, filtros.dataInicio, filtros.dataFim, (i) => i.date);
+    const predVenc = (item: FinancialTransaction) =>
+      matchesDateBounds(item, filtros.vencimentoInicio, filtros.vencimentoFim, (i) => i.dueDate);
+
+    if (hasLanc && hasVenc) {
+      dados = dados.filter((item) => predLanc(item) || predVenc(item));
+    } else if (hasLanc) {
+      dados = dados.filter(predLanc);
+    } else if (hasVenc) {
+      dados = dados.filter(predVenc);
     }
 
-    // Filtro por data de vencimento
-    if (filtros.vencimentoInicio && filtros.vencimentoFim) {
-      dados = dados.filter(item => {
-        if (!item.dueDate) return false;
-        const data = new Date(item.dueDate);
-        return isWithinInterval(data, {
-          start: startOfDay(filtros.vencimentoInicio!),
-          end: endOfDay(filtros.vencimentoFim!)
-        });
-      });
-    }
-
-    // Filtro por centro de custo
-    if (filtros.centroCusto) {
-      dados = dados.filter(item =>
-        item.costCenter?.toLowerCase().includes(filtros.centroCusto.toLowerCase())
-      );
+    // Filtro por centro de custo (parcial + pequena tolerância a typo)
+    const cc = filtros.centroCusto?.trim();
+    if (cc) {
+      dados = dados.filter((item) => costCenterMatches(cc, centerCostFilterHaystack(item)));
     }
 
     // Filtro por departamento (unidade)
     if (filtros.departamento !== 'all') {
-      dados = dados.filter(item =>
-        item.unitId === filtros.departamento ||
-        item.unit?.id === filtros.departamento
+      dados = dados.filter(
+        (item) => item.unit?.id === filtros.departamento || item.unitId === filtros.departamento
       );
     }
 
-    // Filtro por fornecedor
-    if (filtros.fornecedor !== 'all') {
-      dados = dados.filter(item =>
-        item.supplier?.id === filtros.fornecedor
-      );
+    // Filtro por fornecedor (receitas normalmente não têm fornecedor)
+    if (filtros.fornecedor !== 'all' && filtros.tipo !== 'INCOME') {
+      dados = dados.filter((item) => item.supplier?.id === filtros.fornecedor);
     }
 
-    // Filtro por valor mínimo
-    if (filtros.valorMin) {
-      dados = dados.filter(item =>
-        Number(item.amount) >= Number(filtros.valorMin)
-      );
+    // Filtro por valor mínimo / máximo (aceita formato brasileiro no campo)
+    const vmin = parseMoneyInput(filtros.valorMin);
+    if (vmin !== null && vmin > 0) {
+      dados = dados.filter((item) => Number(item.amount) >= vmin);
     }
 
-    // Filtro por valor máximo
-    if (filtros.valorMax) {
-      dados = dados.filter(item =>
-        Number(item.amount) <= Number(filtros.valorMax)
-      );
+    const vmax = parseMoneyInput(filtros.valorMax);
+    if (vmax !== null) {
+      dados = dados.filter((item) => {
+        const a = Number(item.amount);
+        return Number.isFinite(a) && a <= vmax;
+      });
     }
 
     // Filtro por termo de busca
@@ -213,15 +306,15 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
     const despesas = dadosFiltrados
       .filter(item => item.type === 'EXPENSE')
       .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    const pendentes = dadosFiltrados
-      .filter(item => item.status === 'PENDING' || item.status === 'PENDENTE')
-      .length;
-    const vencidas = dadosFiltrados
-      .filter(item => {
-        if (!item.dueDate) return false;
-        return new Date(item.dueDate) < new Date();
-      })
-      .length;
+    const pendentes = dadosFiltrados.filter(
+      (item) => item.status === 'PENDING' || item.status === 'PENDENTE'
+    ).length;
+    const vencidas = dadosFiltrados.filter((item) => {
+      if (!item.dueDate) return false;
+      const st = item.status;
+      if (st === 'PAGA' || st === 'CONFIRMED' || st === 'CANCELLED' || st === 'CANCELADA') return false;
+      return new Date(item.dueDate) < new Date();
+    }).length;
 
     return {
       total,
@@ -253,6 +346,7 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       valorMax: '',
       searchTerm: ''
     });
+    refreshData();
   };
 
   const formatarMoeda = (valor: number) => {
@@ -693,9 +787,9 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
                     </TableCell>
                     <TableCell>
                       <Badge className={`${getStatusColor(item.status)} text-white`}>
-                        {item.status === 'PENDING' ? 'Pendente' :
+                        {item.status === 'PENDING' || item.status === 'PENDENTE' ? 'Pendente' :
                           item.status === 'CONFIRMED' ? 'Confirmado' :
-                            item.status === 'CANCELLED' ? 'Cancelado' :
+                            item.status === 'CANCELLED' || item.status === 'CANCELADA' ? 'Cancelado' :
                               item.status === 'PAGA' ? 'Pago' :
                                 item.status === 'PENDENTE_ERRO' ? 'Atrasado' : item.status}
                       </Badge>

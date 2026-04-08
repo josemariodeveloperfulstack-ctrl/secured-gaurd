@@ -23,7 +23,7 @@ import { ContasAPagar } from './ContasAPagar';
 import { ContasAReceber } from './ContasAReceber';
 import { Pagamentos } from './Pagamentos';
 import { FluxoCaixa } from './FluxoCaixa';
-import { FinanceiroRelatorios } from './FinanceiroRelatorios';
+import { FinanceiroRelatoriosComDados } from '@/pages/RelatoriosFinanceiros';
 import { RelatoriosFinanceirosGuard } from './FinanceiroPermissionGuard';
 import ConciliacaoBancaria from './ConciliacaoBancaria';
 
@@ -341,7 +341,7 @@ export const ModuloFinanceiro: React.FC = () => {
           {/* Relatórios */}
           <TabsContent value="relatorios">
             <RelatoriosFinanceirosGuard action="view">
-              <FinanceiroRelatorios />
+              <FinanceiroRelatoriosComDados />
             </RelatoriosFinanceirosGuard>
           </TabsContent>
 
