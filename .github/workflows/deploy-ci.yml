@@ -2,12 +2,15 @@
 # IMPORTANTE: TOKEN_GITHUB deve ser um Personal Access Token (PAT), NÃO a senha da conta.
 # Criar em: GitHub → Settings → Developer settings → Personal access tokens (repo scope).
 # USER_GITHUB = seu usuário GitHub (ex: zemarioramos).
+# Atualiza o código na pasta CI da VPS. Dispara em `ci` ou `prod` e faz pull do mesmo branch
+# que originou o push (push em prod → ambiente CI recebe o commit de prod).
 name: Deploy CI
 
 on:
   push:
     branches:
       - ci
+      - prod
 
 concurrency:
   group: deploy-ci
@@ -27,14 +30,15 @@ jobs:
           script_timeout: 10m
           script: |
             set -e
+            BRANCH="${{ github.ref_name }}"
             APP_PATH="${{ secrets.VPS_APP_PATH_CI }}"
             if [ -z "$APP_PATH" ]; then APP_PATH="/var/www/secured_guard/ci"; fi
             cd "$APP_PATH"
             # Usar PAT (Personal Access Token), não senha da conta
             git remote set-url origin https://${{ secrets.USER_GITHUB }}:${{ secrets.TOKEN_GITHUB }}@github.com/zemarioramos/secured-guard.git 2>/dev/null || true
-            git fetch origin ci
-            git reset --hard origin/ci
-            git checkout ci
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/$BRANCH"
+            git checkout "$BRANCH"
             cd deploy
             docker-compose -f docker-compose.env-ci.yml build --no-cache backend-ci frontend-ci
             docker-compose -f docker-compose.env-ci.yml up -d --force-recreate
