@@ -1,5 +1,27 @@
 -- Requisições de estoque multi-item (aprovação, PDF, entrega com assinatura)
 
+-- PostgreSQL exige PK ou UNIQUE na coluna referenciada por FK. Bases legadas podem ter
+-- stock_items sem PRIMARY KEY em id (erro 42830).
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'stock_items'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint co
+        JOIN pg_class cl ON cl.oid = co.conrelid
+        JOIN pg_namespace n ON n.oid = cl.relnamespace
+        WHERE n.nspname = 'public'
+          AND cl.relname = 'stock_items'
+          AND co.contype = 'p'
+    ) THEN
+        ALTER TABLE stock_items ADD CONSTRAINT stock_items_pkey PRIMARY KEY (id);
+    END IF;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
 CREATE TABLE IF NOT EXISTS stock_requisitions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     requisition_number VARCHAR(64) NOT NULL UNIQUE,
