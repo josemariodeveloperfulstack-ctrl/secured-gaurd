@@ -16,6 +16,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
+
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Remanejamento;
@@ -62,6 +66,73 @@ public class EmployeeService {
     private EmployeeChangeHistoryService employeeChangeHistoryService;
     @Autowired
     private RemanejamentoService remanejamentoService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    private static final String BASIC_DATA_SELECT = "SELECT e.id, e.name, e.document, e.birth_date, e.registration_number, e.hire_date, e.termination_date, e.status, e.notes, e.address, e.phone, e.email, e.cnh_number, e.ctps, e.cbo, e.pis, e.salario, e.created_at, e.updated_at, p.name as position_name, u.name as unit_name, c.sigla as company_sigla, e.user_id, wp.name as work_post_name, d.name as department_name, e.unit_id, e.company_id, e.work_post_id, e.position_id, e.department_id, e.escala_trabalho, e.horario_trabalho, e.data_rescisao ";
+
+    private static final String BASIC_DATA_JOINS = "FROM employees e "
+            + "LEFT JOIN positions p ON e.position_id = p.id "
+            + "LEFT JOIN units u ON e.unit_id = u.id "
+            + "LEFT JOIN companies c ON e.company_id = c.id "
+            + "LEFT JOIN work_posts wp ON e.work_post_id = wp.id "
+            + "LEFT JOIN departments d ON e.department_id = d.id ";
+
+    private static boolean isDateSortField(String sortBy) {
+        if (sortBy == null) {
+            return false;
+        }
+        String s = sortBy.trim();
+        return "hireDate".equalsIgnoreCase(s) || "terminationDate".equalsIgnoreCase(s);
+    }
+
+    private static String orderClauseForBasicData(String sortBy, String sortDir) {
+        String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
+        if (sortBy != null && "hireDate".equalsIgnoreCase(sortBy.trim())) {
+            return "ORDER BY e.hire_date " + dir + " NULLS LAST, e.name ASC ";
+        }
+        if (sortBy != null && "terminationDate".equalsIgnoreCase(sortBy.trim())) {
+            return "ORDER BY COALESCE(e.data_rescisao, e.termination_date) " + dir + " NULLS LAST, e.name ASC ";
+        }
+        return "ORDER BY e.name ASC ";
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Object[]> findBasicDataPagedNative(String searchTerm, java.util.UUID companyId, String status,
+            int limit, int offset, String sortBy, String sortDir) {
+        String order = orderClauseForBasicData(sortBy, sortDir);
+        // Não usar "(? IS NULL OR col = ?)" com :status nulo — o PostgreSQL não infere o tipo do parâmetro (42P18).
+        StringBuilder sql = new StringBuilder(BASIC_DATA_SELECT).append(BASIC_DATA_JOINS).append("WHERE 1=1 ");
+        boolean hasSearch = searchTerm != null && !searchTerm.trim().isEmpty();
+        if (hasSearch) {
+            sql.append("AND (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) ")
+                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) ");
+        }
+        if (companyId != null) {
+            sql.append("AND e.company_id = :companyId ");
+        }
+        boolean filterStatus = status != null && !status.isBlank();
+        if (filterStatus) {
+            sql.append("AND CAST(e.status AS text) = :status ");
+        }
+        sql.append(order);
+        sql.append("LIMIT :limit OFFSET :offset");
+        Query q = entityManager.createNativeQuery(sql.toString());
+        if (hasSearch) {
+            q.setParameter("searchTerm", searchTerm.trim());
+        }
+        if (companyId != null) {
+            q.setParameter("companyId", companyId);
+        }
+        if (filterStatus) {
+            q.setParameter("status", status);
+        }
+        q.setParameter("limit", limit);
+        q.setParameter("offset", offset);
+        return (List<Object[]>) q.getResultList();
+    }
 
     @Transactional
     @CacheEvict(value = { "employees", "employees-by-company", "dashboard-summary" }, allEntries = true)
@@ -928,21 +999,14 @@ public class EmployeeService {
         try {
             System.out.println(
                     "[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Termo recebido: " + searchTerm);
-            List<Employee> employees = employeeRepository
-                    .findByNameContainingIgnoreCaseOrDocumentContainingIgnoreCase(searchTerm, searchTerm);
+            List<Employee> employees = employeeRepository.findForSimpleSearch(searchTerm);
             System.out
                     .println("[DEBUG] EmployeeService.findSimpleEmployeesByNameOrDocument - Funcionários encontrados: "
                             + employees.size());
 
-            // Deduplicar por ID para evitar duplicatas causadas por dados inconsistentes ou joins
-            Map<UUID, Employee> uniqueEmployees = new LinkedHashMap<>();
-            for (Employee emp : employees) {
-                if (emp != null && emp.getId() != null) {
-                    uniqueEmployees.putIfAbsent(emp.getId(), emp);
-                }
-            }
-
-            return uniqueEmployees.values().stream()
+            return employees.stream()
+                    .filter(emp -> emp != null && emp.getId() != null)
+                    .limit(50)
                     .map(emp -> SimpleEmployeeDTO.builder()
                             .id(emp.getId())
                             .name(emp.getName())
@@ -955,6 +1019,8 @@ public class EmployeeService {
                             .hireDate(emp.getHireDate())
                             .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
                             .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
+                            .departmentName(emp.getDepartment() != null ? emp.getDepartment().getName() : null)
+                            .workPostName(emp.getWorkPost() != null ? emp.getWorkPost().getName() : null)
                             .companyId(emp.getCompany() != null ? emp.getCompany().getId() : null)
                             .companySigla(emp.getCompany() != null ? emp.getCompany().getSigla() : null)
                             .salario(emp.getSalario())
@@ -1114,14 +1180,31 @@ public class EmployeeService {
      */
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status) {
+        return findBasicDataPaged(page, size, companyId, status, null, null);
+    }
+
+    /**
+     * Igual a {@link #findBasicDataPaged(int, int, java.util.UUID, String)} com ordenação opcional:
+     * {@code hireDate}, {@code terminationDate} (demais valores → nome).
+     */
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status,
+            String sortBy, String sortDir) {
         try {
-            int pageSize = Math.min(Math.max(size, 1), 500); // evitar pageSize muito grande
+            int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
             System.out.println(
-                    "🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset + " companyId=" + companyId + " status=" + status);
-            List<Object[]> data = companyId == null
-                    ? employeeRepository.findBasicDataPaged(pageSize, offset, status)
-                    : employeeRepository.findBasicDataPagedByCompany(pageSize, offset, companyId, status);
+                    "🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset
+                            + " companyId=" + companyId + " status=" + status + " sortBy=" + sortBy + " sortDir="
+                            + sortDir);
+            List<Object[]> data;
+            if (isDateSortField(sortBy)) {
+                data = findBasicDataPagedNative(null, companyId, status, pageSize, offset, sortBy, sortDir);
+            } else {
+                data = companyId == null
+                        ? employeeRepository.findBasicDataPaged(pageSize, offset, status)
+                        : employeeRepository.findBasicDataPagedByCompany(pageSize, offset, companyId, status);
+            }
             System.out.println("✅ EmployeeService.findBasicDataPaged - Encontrados " + data.size() + " registros");
             return data;
         } catch (Exception e) {
@@ -1137,14 +1220,27 @@ public class EmployeeService {
      */
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId, String status) {
+        return findBasicDataBySearchTermPaged(searchTerm, page, size, companyId, status, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId, String status,
+            String sortBy, String sortDir) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
             System.out.println("🔍 EmployeeService.findBasicDataBySearchTermPaged - termo=" + searchTerm + " page="
-                    + page + " size=" + pageSize + " offset=" + offset + " companyId=" + companyId + " status=" + status);
-            List<Object[]> data = companyId == null
-                    ? employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset, status)
-                    : employeeRepository.findBasicDataBySearchTermPagedByCompany(searchTerm, pageSize, offset, companyId, status);
+                    + page + " size=" + pageSize + " offset=" + offset + " companyId=" + companyId + " status="
+                    + status + " sortBy=" + sortBy + " sortDir=" + sortDir);
+            List<Object[]> data;
+            if (isDateSortField(sortBy)) {
+                data = findBasicDataPagedNative(searchTerm, companyId, status, pageSize, offset, sortBy, sortDir);
+            } else {
+                data = companyId == null
+                        ? employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset, status)
+                        : employeeRepository.findBasicDataBySearchTermPagedByCompany(searchTerm, pageSize, offset,
+                                companyId, status);
+            }
             System.out.println(
                     "✅ EmployeeService.findBasicDataBySearchTermPaged - Encontrados " + data.size() + " registros");
             return data;

@@ -72,6 +72,33 @@ export interface StockMovement {
   requisitionUrl?: string;
   requisitionSentType?: RequisitionSentType;
   itemLocationId?: string;
+  /** Mesmo número em todas as linhas de um import de inventário (REQ-INV-...) */
+  requisitionNumber?: string;
+}
+
+export interface PhysicalInventoryImportLineResult {
+  categoryLabel: string;
+  stockItemCode?: string;
+  previousQuantity?: number;
+  targetQuantity?: number;
+  delta?: number;
+  movementId?: string;
+  skipped: boolean;
+  message?: string;
+}
+
+export interface PhysicalInventoryImportResult {
+  requisitionNumber: string;
+  importedAt: string;
+  fileName: string;
+  lines: PhysicalInventoryImportLineResult[];
+  warnings: string[];
+}
+
+export interface InventoryRequisitionSummary {
+  requisitionNumber: string;
+  firstMovementAt: string;
+  movementCount: number;
 }
 
 export enum SignatureType {
@@ -164,6 +191,76 @@ export interface CreateStockMovementDTO {
   unitId?: string;
   shelfId?: string;
   floor?: string;
+  requisitionNumber?: string;
+}
+
+export enum StockRequisitionStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED'
+}
+
+export interface StockRequisitionLineDTO {
+  id?: string;
+  stockItemId: string;
+  stockItemCode?: string;
+  stockItemName?: string;
+  stockItemFullName?: string;
+  quantity: number;
+}
+
+export interface StockRequisitionDTO {
+  id: string;
+  requisitionNumber: string;
+  employeeId: string;
+  employeeName?: string;
+  employeeDocument?: string;
+  /** Snapshot na criação: setor, posto, cargo */
+  employeeWorkSector?: string;
+  requestedByUserId?: string;
+  requestedByName?: string;
+  movementReason: MovementReason;
+  movementReasonLabel?: string;
+  notes?: string;
+  status: StockRequisitionStatus;
+  approvedByUserId?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  deliveredAt?: string;
+  deliveredByUserId?: string;
+  deliveredByName?: string;
+  signatureType?: SignatureType;
+  signatureAt?: string;
+  physicalSignatureAck?: string;
+  hasDigitalSignature?: boolean;
+  createdAt?: string;
+  lines: StockRequisitionLineDTO[];
+}
+
+export interface CreateStockRequisitionPayload {
+  employeeId: string;
+  movementReason: MovementReason;
+  notes?: string;
+  lines: { stockItemId: string; quantity: number }[];
+}
+
+export interface DeliverStockRequisitionPayload {
+  signatureType: SignatureType;
+  digitalSignature?: string;
+  physicalAcknowledgment?: string;
+}
+
+/** Linha da listagem em Estoque / APIs de consulta */
+export interface StockRequisitionListItem {
+  id: string;
+  requisitionNumber: string;
+  status: StockRequisitionStatus;
+  employeeName?: string;
+  movementReasonLabel?: string;
+  createdAt?: string;
+  requestedByName?: string;
+  linesCount: number;
 }
 
 export interface StockFilters {
@@ -183,6 +280,7 @@ export interface MovementFilters {
   startDate?: string;
   endDate?: string;
   searchTerm?: string;
+  requisitionNumber?: string;
 }
 
 export interface StockReport {

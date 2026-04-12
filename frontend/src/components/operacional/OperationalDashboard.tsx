@@ -55,6 +55,7 @@ import LancamentoManualFolhaPonto from '@/pages/RH/LancamentoManualFolhaPonto';
 import { formatWorkPostDisplayName } from '@/utils/formatters';
 import MapaCalor from './MapaCalor';
 import { Schedule } from '@/services/scheduleService';
+import CreateWarehouseRequisitionButton from '@/components/stock/CreateWarehouseRequisitionButton';
 
 interface OperationalDashboardProps {
   onEditEscala?: (escala: Schedule) => void;
@@ -810,12 +811,20 @@ const OperationalDashboard: React.FC<OperationalDashboardProps> = ({ onEditEscal
       {/* Estatísticas Operacionais */}
       <OperationalStatsCards />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-bold">Gestão Operacional Detalhada</h2>
-        <Button onClick={loadAllData} variant="outline" size="sm">
-          <Clock className="h-4 w-4 mr-2" />
-          Atualizar
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <CreateWarehouseRequisitionButton
+            variant="outline"
+            size="sm"
+            className="border-amber-500/50 text-amber-200 hover:bg-amber-500/10"
+            label="Criar Requisição para o Almoxarifado"
+          />
+          <Button onClick={loadAllData} variant="outline" size="sm">
+            <Clock className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="vacations" className="space-y-4">

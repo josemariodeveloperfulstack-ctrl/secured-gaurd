@@ -14,6 +14,10 @@ import { formatDate as formatDatePtBr } from '@/utils/formatters';
 
 interface FuncionariosTableProps {
   employees: Employee[];
+  /** IDs com solicitação de admissão PENDING/APPROVED vinculada ao cadastro */
+  pendingAdmissionEmployeeIds?: Set<string>;
+  /** IDs com solicitação de demissão PENDING/APPROVED vinculada ao cadastro */
+  pendingDismissalEmployeeIds?: Set<string>;
   selectedIds: string[];
   onSelect: (id: string, selected: boolean) => void;
   onSelectAll: (selected: boolean) => void;
@@ -32,6 +36,8 @@ interface FuncionariosTableProps {
 
 export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
   employees,
+  pendingAdmissionEmployeeIds,
+  pendingDismissalEmployeeIds,
   selectedIds,
   onSelect,
   onSelectAll,
@@ -345,7 +351,19 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                   </div>
                 </TableCell>
                 <TableCell>
-                  {getStatusBadge(effectiveEmploymentStatus(employee))}
+                  <div className="flex flex-col gap-1 items-start">
+                    {getStatusBadge(effectiveEmploymentStatus(employee))}
+                    {pendingAdmissionEmployeeIds?.has(employee.id) && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/70 text-amber-300 whitespace-normal text-left leading-tight">
+                        Admissão em processo
+                      </Badge>
+                    )}
+                    {pendingDismissalEmployeeIds?.has(employee.id) && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-orange-500/70 text-orange-300 whitespace-normal text-left leading-tight">
+                        Demissão em processo
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -473,8 +491,18 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                     )}
                   </div>
                 </div>
-                <div className="flex-shrink-0 scale-75 origin-right">
+                <div className="flex-shrink-0 flex flex-col items-end gap-1 scale-90 origin-right max-w-[140px]">
                   {getStatusBadge(effectiveEmploymentStatus(employee))}
+                  {pendingAdmissionEmployeeIds?.has(employee.id) && (
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-500/70 text-amber-300 whitespace-normal text-right leading-tight">
+                      Admissão em processo
+                    </Badge>
+                  )}
+                  {pendingDismissalEmployeeIds?.has(employee.id) && (
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 border-orange-500/70 text-orange-300 whitespace-normal text-right leading-tight">
+                      Demissão em processo
+                    </Badge>
+                  )}
                 </div>
               </div>
 

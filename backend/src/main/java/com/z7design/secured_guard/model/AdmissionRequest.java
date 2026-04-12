@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.z7design.secured_guard.model.enums.AdmissionRequestType;
 import com.z7design.secured_guard.model.enums.AdmissionRequestStatus;
 import com.z7design.secured_guard.model.enums.AdmissionRequestPriority;
@@ -58,6 +59,12 @@ public class AdmissionRequest {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "unit_id")
     private Unit unit;
+
+    /** Cadastro de funcionário vinculado (integração com CRUD). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "employee_id")
+    @JsonIgnore
+    private Employee employee;
     
     @Column(name = "start_date")
     private LocalDate startDate;

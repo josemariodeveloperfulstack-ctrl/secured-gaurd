@@ -85,33 +85,57 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
   const [activeTab, setActiveTab] = useState('dados');
   const [isGeneratingDoc, setIsGeneratingDoc] = useState<string | null>(null);
 
-  // Carregar dados quando o modal abrir
+  // Carregar dados quando o modal abrir (criar ou editar)
   useEffect(() => {
-    if (isOpen) {
-      setErrors({});
-      // Limpar formulário primeiro
-      if (!request) {
-        setForm({ 
-          tipo: 'admissao', 
-          funcionario: '', 
-          data: '', 
-          solicitante: user?.name || '', 
-          empresa: '', 
-          unidade: '', 
-          cliente: '', 
-          posto: '', 
-          motivo: '' 
-        });
-      }
-      // Carregar dados
-      loadFuncionarios();
-      loadEmpresas();
-      loadUnidades();
-      loadClientes();
-      loadPostos();
-      loadModelos();
+    if (!isOpen) return;
+    setErrors({});
+    if (request) {
+      const dataStr =
+        request.type === 'ADMISSION'
+          ? (request.startDate?.slice(0, 10) ?? '')
+          : (request.endDate?.slice(0, 10) ?? '');
+      setForm({
+        tipo: request.type === 'ADMISSION' ? 'admissao' : 'demissao',
+        funcionario: request.employeeId ?? '',
+        data: dataStr,
+        solicitante: request.requesterName || user?.name || '',
+        empresa: '',
+        unidade: request.unitId ? String(request.unitId) : '',
+        cliente: '',
+        posto: '',
+        motivo: request.reason || request.justification || request.notes || '',
+      });
+    } else {
+      setForm({
+        tipo: 'admissao',
+        funcionario: '',
+        data: '',
+        solicitante: user?.name || '',
+        empresa: '',
+        unidade: '',
+        cliente: '',
+        posto: '',
+        motivo: '',
+      });
     }
-  }, [isOpen]);
+    loadFuncionarios();
+    loadEmpresas();
+    loadUnidades();
+    loadClientes();
+    loadPostos();
+    loadModelos();
+  }, [isOpen, request?.id]);
+
+  // Solicitações antigas sem employeeId: casar pelo CPF após carregar lista
+  useEffect(() => {
+    if (!isOpen || !request || !funcionarios.length || request.employeeId) return;
+    const cpf = request.employeeCpf?.replace(/\D/g, '');
+    if (!cpf || cpf.length < 11) return;
+    const match = funcionarios.find((f) => (f.cpf || '').replace(/\D/g, '') === cpf);
+    if (match) {
+      setForm((prev) => ({ ...prev, funcionario: match.id }));
+    }
+  }, [isOpen, request?.id, request?.employeeId, request?.employeeCpf, funcionarios]);
 
   // Carregar documentos quando o funcionário mudar
   useEffect(() => {
@@ -486,12 +510,14 @@ const AdmissaoDemissaoFormModal: React.FC<AdmissaoDemissaoFormModalProps> = ({ i
     if (!validate()) return;
     setLoading(true);
     try {
+      const sel = funcionarios.find(f => f.id === form.funcionario);
       const payload = {
         type: form.tipo === 'admissao' ? 'ADMISSION' : 'DISMISSAL' as 'ADMISSION' | 'DISMISSAL',
-        employeeName: funcionarios.find(f => f.id === form.funcionario)?.name || form.funcionario,
-        employeeCpf: funcionarios.find(f => f.id === form.funcionario)?.cpf,
-        employeeEmail: funcionarios.find(f => f.id === form.funcionario)?.email,
-        position: funcionarios.find(f => f.id === form.funcionario)?.positionName,
+        employeeId: form.funcionario || undefined,
+        employeeName: sel?.name || form.funcionario,
+        employeeCpf: sel?.cpf,
+        employeeEmail: sel?.email,
+        position: sel?.positionName,
         unitId: form.unidade,
         startDate: form.tipo === 'admissao' ? form.data : undefined,
         endDate: form.tipo === 'demissao' ? form.data : undefined,

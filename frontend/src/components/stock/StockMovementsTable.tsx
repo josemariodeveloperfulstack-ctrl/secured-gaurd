@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,9 +27,11 @@ import {
   Plus,
   User,
   Package,
-  Calendar
+  Calendar,
+  Upload,
+  ClipboardList
 } from 'lucide-react';
-import { StockMovement, MovementType, MovementReason, MovementTypeLabels, MovementReasonLabels } from '@/types/stock';
+import { StockMovement, MovementType, MovementReason, MovementTypeLabels, MovementReasonLabels, InventoryRequisitionSummary, MovementFilters } from '@/types/stock';
 import { stockService } from '@/services/stockService';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -51,22 +53,41 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
   const [reasonFilter, setReasonFilter] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [requisitionFilter, setRequisitionFilter] = useState('');
+  const [reqSummaries, setReqSummaries] = useState<InventoryRequisitionSummary[]>([]);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const loadRequisitionSummaries = async () => {
+    try {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 10);
+      const list = await stockService.listInventoryRequisitions(start.toISOString(), end.toISOString());
+      setReqSummaries(list);
+    } catch {
+      setReqSummaries([]);
+    }
+  };
 
   useEffect(() => {
     loadMovements();
+    loadRequisitionSummaries();
   }, []);
 
-  const loadMovements = async () => {
+  const loadMovements = async (requisitionOverride?: string) => {
     setLoading(true);
     try {
-      const filters: any = {};
+      const filters: MovementFilters = {};
       
       if (searchTerm) filters.searchTerm = searchTerm;
       if (typeFilter !== 'all') filters.movementType = typeFilter as MovementType;
       if (reasonFilter !== 'all') filters.reason = reasonFilter as MovementReason;
       if (startDate) filters.startDate = new Date(startDate).toISOString();
       if (endDate) filters.endDate = new Date(endDate).toISOString();
+      const rn = (requisitionOverride ?? requisitionFilter).trim();
+      if (rn) filters.requisitionNumber = rn;
       
       const result = await stockService.searchMovements(filters);
       setMovements(result.content);
@@ -91,7 +112,31 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
     setReasonFilter('all');
     setStartDate('');
     setEndDate('');
+    setRequisitionFilter('');
     loadMovements();
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImporting(true);
+    try {
+      const result = await stockService.importPhysicalInventory(file);
+      toast({
+        title: 'Inventário importado',
+        description: `Requisição ${result.requisitionNumber} — ${result.lines.filter((l) => !l.skipped).length} ajuste(s).`,
+      });
+      setRequisitionFilter(result.requisitionNumber);
+      await loadRequisitionSummaries();
+      await loadMovements(result.requisitionNumber);
+      onRefresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha no import';
+      toast({ title: 'Erro no import', description: msg, variant: 'destructive' });
+    } finally {
+      setImporting(false);
+    }
   };
 
   const getMovementBadge = (movement: StockMovement) => {
@@ -124,6 +169,69 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
         </Button>
       </div>
 
+      <Card className="bg-seguranca-graphite border-gray-600">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-seguranca-lightgray">
+            <Upload className="h-5 w-5" />
+            Inventário físico (planilha)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-400">
+            Envie o Excel com a aba <strong className="text-seguranca-lightgray">Resumo Estoque</strong> (colunas Categoria e Quantidade).
+            Todas as movimentações do import recebem o mesmo número de requisição <code className="text-seguranca-yellow">REQ-INV-…</code> para relatórios (ex.: a cada 10 dias).
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            disabled={importing}
+            className="border-gray-600 text-seguranca-lightgray"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {importing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            {importing ? 'Importando…' : 'Selecionar planilha'}
+          </Button>
+
+          {reqSummaries.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                <ClipboardList className="h-3 w-3" />
+                Requisições nos últimos 10 dias (clique para filtrar)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {reqSummaries.map((r) => (
+                  <Button
+                    key={r.requisitionNumber}
+                    type="button"
+                    variant={requisitionFilter === r.requisitionNumber ? 'default' : 'secondary'}
+                    size="sm"
+                    className={requisitionFilter === r.requisitionNumber ? 'bg-seguranca-yellow text-black' : 'bg-seguranca-black border border-gray-600 text-seguranca-lightgray'}
+                    onClick={() => {
+                      setRequisitionFilter(r.requisitionNumber);
+                      setLoading(true);
+                      stockService
+                        .searchMovements({ requisitionNumber: r.requisitionNumber })
+                        .then((res) => setMovements(res.content))
+                        .finally(() => setLoading(false));
+                    }}
+                  >
+                    {r.requisitionNumber}
+                    <span className="ml-1 opacity-70">({r.movementCount})</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Filtros */}
       <Card className="bg-seguranca-graphite border-gray-600">
         <CardHeader>
@@ -134,6 +242,15 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Nº requisição</label>
+              <Input
+                placeholder="REQ-INV-…"
+                value={requisitionFilter}
+                onChange={(e) => setRequisitionFilter(e.target.value)}
+                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Buscar</label>
               <div className="relative">
@@ -253,6 +370,7 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
                   <TableHead className="text-seguranca-lightgray">Item</TableHead>
                   <TableHead className="text-seguranca-lightgray">Tipo</TableHead>
                   <TableHead className="text-seguranca-lightgray">Motivo</TableHead>
+                  <TableHead className="text-seguranca-lightgray">Requisição</TableHead>
                   <TableHead className="text-seguranca-lightgray">Quantidade</TableHead>
                   <TableHead className="text-seguranca-lightgray">Funcionário</TableHead>
                   <TableHead className="text-seguranca-lightgray">Usuário</TableHead>
@@ -296,6 +414,30 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
                       <Badge variant="outline" className="border-gray-600 text-gray-300">
                         {MovementReasonLabels[movement.reason]}
                       </Badge>
+                    </TableCell>
+
+                    <TableCell>
+                      {movement.requisitionNumber ? (
+                        <button
+                          type="button"
+                          className="text-xs font-mono text-seguranca-yellow hover:underline"
+                          onClick={async () => {
+                            const rn = movement.requisitionNumber!;
+                            setRequisitionFilter(rn);
+                            setLoading(true);
+                            try {
+                              const res = await stockService.searchMovements({ requisitionNumber: rn });
+                              setMovements(res.content);
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                        >
+                          {movement.requisitionNumber}
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      )}
                     </TableCell>
                     
                     <TableCell>

@@ -63,6 +63,8 @@ export interface SimpleEmployee {
   companySigla?: string;
   positionName?: string;
   unitName?: string;
+  departmentName?: string;
+  workPostName?: string;
 }
 
 export interface EmployeeFilters {
@@ -71,6 +73,9 @@ export interface EmployeeFilters {
   companyId?: string;
   unitId?: string;
   workPostId?: string;
+  /** Ordenação no servidor (lista paginada): admissão ou demissão mais recente primeiro com sortDir desc */
+  sortBy?: 'hireDate' | 'terminationDate';
+  sortDir?: 'asc' | 'desc';
 }
 
 export const employeeService = {
@@ -94,6 +99,10 @@ export const employeeService = {
       }
       if (filters?.workPostId && filters.workPostId !== 'all') {
         params.workPostId = filters.workPostId;
+      }
+      if (filters?.sortBy && filters?.sortDir) {
+        params.sortBy = filters.sortBy;
+        params.sortDir = filters.sortDir;
       }
 
       const response = await api.get('/api/employees/paged', { params });

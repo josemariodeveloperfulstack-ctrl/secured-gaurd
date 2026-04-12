@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -42,6 +43,23 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
         // Busca por nome ou documento (case insensitive)
         List<Employee> findByNameContainingIgnoreCaseOrDocumentContainingIgnoreCase(String name, String document);
+
+        /** Busca para autocomplete com relacionamentos (setor, posto, cargo). */
+        @Query("SELECT DISTINCT e FROM Employee e " +
+                        "LEFT JOIN FETCH e.position " +
+                        "LEFT JOIN FETCH e.unit " +
+                        "LEFT JOIN FETCH e.company " +
+                        "LEFT JOIN FETCH e.workPost " +
+                        "LEFT JOIN FETCH e.department " +
+                        "WHERE LOWER(e.name) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+                        "LOWER(COALESCE(e.document, '')) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+                        "LOWER(COALESCE(e.cpf, '')) LIKE LOWER(CONCAT('%', :q, '%')) " +
+                        "ORDER BY e.name ASC")
+        List<Employee> findForSimpleSearch(@Param("q") String q);
+
+        @EntityGraph(attributePaths = { "position", "department", "workPost", "unit", "company" })
+        @Query("SELECT e FROM Employee e WHERE e.id = :id")
+        Optional<Employee> findWithOrgContextById(@Param("id") UUID id);
 
         // Buscar apenas IDs
         @Query("SELECT e.id FROM Employee e")
@@ -224,4 +242,15 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
                         "ORDER BY EXTRACT(DAY FROM e.birth_date) ASC, e.name ASC", nativeQuery = true)
         List<Object[]> findBasicDataByBirthMonth(@Param("month") int month, @Param("onlyActive") int onlyActive,
                         @Param("companyFilter") int companyFilter, @Param("companyId") UUID companyId);
+
+        /** Última admissão conhecida entre funcionários ativos (maior data de contratação). */
+        Optional<Employee> findTopByStatusAndHireDateIsNotNullOrderByHireDateDesc(EmploymentStatus status);
+
+        /** Último desligamento conhecido entre demitidos (maior data de término). */
+        Optional<Employee> findTopByStatusAndTerminationDateIsNotNullOrderByTerminationDateDesc(EmploymentStatus status);
+
+        @Query(value = "SELECT * FROM employees e WHERE "
+                        + "REGEXP_REPLACE(COALESCE(e.cpf, e.document, ''), '[^0-9]', '', 'g') = :digits "
+                        + "ORDER BY e.updated_at DESC NULLS LAST LIMIT 1", nativeQuery = true)
+        Optional<Employee> findFirstByNormalizedCpfOrDocument(@Param("digits") String digits);
 }

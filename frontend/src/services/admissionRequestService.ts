@@ -13,6 +13,8 @@ export interface AdmissionRequest {
   department?: string;
   unitId?: string;
   unitName?: string;
+  /** ID do funcionário no cadastro (integração CRUD ao concluir solicitação) */
+  employeeId?: string;
   startDate?: string;
   endDate?: string;
   reason?: string;
@@ -68,6 +70,7 @@ export interface CreateAdmissionRequestRequest {
   position?: string;
   department?: string;
   unitId?: string;
+  employeeId?: string;
   startDate?: string;
   endDate?: string;
   reason?: string;
@@ -77,6 +80,13 @@ export interface CreateAdmissionRequestRequest {
   requesterId?: string;
   approverId?: string;
   notes?: string;
+}
+
+export interface AdmissionEmployeeIntegrationContext {
+  lastHire: { employeeId: string; name: string; date: string } | null;
+  lastTermination: { employeeId: string; name: string; date: string } | null;
+  pendingAdmissionEmployeeIds: string[];
+  pendingDismissalEmployeeIds: string[];
 }
 
 export interface UpdateAdmissionRequestRequest extends CreateAdmissionRequestRequest {
@@ -247,6 +257,11 @@ class AdmissionRequestService {
    * Enquanto o backend não estiver implementado, retorna um PDF simples
    * com mensagem de placeholder para evitar erros no frontend.
    */
+  async getIntegrationContextForEmployees(): Promise<AdmissionEmployeeIntegrationContext> {
+    const response = await api.get('/api/admission-requests/integration/context-for-employees');
+    return response.data;
+  }
+
   async generatePDFReport(filters?: {
     status?: string;
     type?: 'ADMISSION' | 'DISMISSAL';
@@ -368,4 +383,5 @@ export const admissionRequestService = {
   getRequestsCountByType: serviceInstance.getRequestsCountByType.bind(serviceInstance),
   generatePDF: serviceInstance.generatePDF.bind(serviceInstance),
   generatePDFReport: serviceInstance.generatePDFReport.bind(serviceInstance),
+  getIntegrationContextForEmployees: serviceInstance.getIntegrationContextForEmployees.bind(serviceInstance),
 };

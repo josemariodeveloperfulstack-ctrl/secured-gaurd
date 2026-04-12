@@ -61,6 +61,12 @@ public interface AdmissionRequestRepository extends JpaRepository<AdmissionReque
     
     @Query("SELECT COUNT(ar) FROM AdmissionRequest ar WHERE ar.type = :type")
     long countByType(@Param("type") AdmissionRequestType type);
+
+    @Query("SELECT DISTINCT ar.employee.id FROM AdmissionRequest ar WHERE ar.employee IS NOT NULL "
+            + "AND ar.status IN :openStatuses AND ar.type = :type")
+    List<UUID> findEmployeeIdsWithInProgressRequests(
+            @Param("openStatuses") List<AdmissionRequestStatus> openStatuses,
+            @Param("type") AdmissionRequestType type);
 }
 
 

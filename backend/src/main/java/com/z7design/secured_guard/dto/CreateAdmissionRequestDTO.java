@@ -37,6 +37,9 @@ public class CreateAdmissionRequestDTO {
     private String department;
     
     private UUID unitId;
+
+    /** ID do funcionário no cadastro (recomendado para sincronizar status ao concluir). */
+    private UUID employeeId;
     
     private LocalDate startDate;
     

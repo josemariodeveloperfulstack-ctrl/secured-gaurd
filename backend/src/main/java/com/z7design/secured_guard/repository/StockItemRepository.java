@@ -19,6 +19,8 @@ public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
     // Buscar por código
     Optional<StockItem> findByCode(String code);
 
+    Optional<StockItem> findByCodeIgnoreCase(String code);
+
     // Buscar por QR Code
     Optional<StockItem> findByQrCode(String qrCode);
 

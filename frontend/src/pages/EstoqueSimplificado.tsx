@@ -19,11 +19,12 @@ import {
   FileText,
   Bell,
   Loader2,
-  Layers
+  Layers,
+  ClipboardList
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { stockService } from '@/services/stockService';
-import { StockItem, StockMovement, StockAlert, StockReport } from '@/types/stock';
+import { StockItem, StockMovement, StockAlert, StockReport, StockRequisitionListItem } from '@/types/stock';
 import StockItemsTable from '@/components/stock/StockItemsTable';
 import StockMovementsTable from '@/components/stock/StockMovementsTable';
 import StockAlertsPanel from '@/components/stock/StockAlertsPanel';
@@ -32,6 +33,7 @@ import StockMovementModal from '@/components/stock/StockMovementModal';
 import QrCodeScanner from '@/components/stock/QrCodeScanner';
 import StockReportsContent from '@/components/stock/StockReportsContent';
 import ShelfManagement from '@/components/stock/ShelfManagement';
+import StockRequisitionsPanel from '@/components/stock/StockRequisitionsPanel';
 
 const EstoqueSimplificado: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -44,6 +46,7 @@ const EstoqueSimplificado: React.FC = () => {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [recentMovements, setRecentMovements] = useState<StockMovement[]>([]);
   const [activeAlerts, setActiveAlerts] = useState<StockAlert[]>([]);
+  const [stockRequisitions, setStockRequisitions] = useState<StockRequisitionListItem[]>([]);
 
   // Estados para modais
   const [showItemModal, setShowItemModal] = useState(false);
@@ -60,17 +63,19 @@ const EstoqueSimplificado: React.FC = () => {
     try {
       setLoading(true);
       
-      const [report, items, movements, alerts] = await Promise.all([
+      const [report, items, movements, alerts, requisitions] = await Promise.all([
         stockService.getStockReport(),
         stockService.getAllItems(),
         stockService.getRecentMovements(10),
-        stockService.getActiveAlerts()
+        stockService.getActiveAlerts(),
+        stockService.listStockRequisitions().catch(() => [] as StockRequisitionListItem[]),
       ]);
       
       setStockReport(report);
       setStockItems(Array.isArray(items) ? items : []);
       setRecentMovements(movements);
       setActiveAlerts(Array.isArray(alerts) ? alerts : []);
+      setStockRequisitions(Array.isArray(requisitions) ? requisitions : []);
       
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -101,6 +106,11 @@ const EstoqueSimplificado: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const loadRequisitionsOnly = async () => {
+    const list = await stockService.listStockRequisitions().catch(() => []);
+    setStockRequisitions(Array.isArray(list) ? list : []);
   };
 
   const handleCreateItem = () => {
@@ -354,6 +364,10 @@ const EstoqueSimplificado: React.FC = () => {
               <TrendingUp className="h-4 w-4 mr-2" />
               Movimentações
             </TabsTrigger>
+            <TabsTrigger value="requisitions" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Requisições ({stockRequisitions.length})
+            </TabsTrigger>
             <TabsTrigger value="alerts" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <Bell className="h-4 w-4 mr-2" />
               Alertas ({Array.isArray(activeAlerts) ? activeAlerts.length : 0})
@@ -385,6 +399,14 @@ const EstoqueSimplificado: React.FC = () => {
             <StockMovementsTable
               onCreateMovement={() => handleCreateMovement()}
               onRefresh={handleRefresh}
+            />
+          </TabsContent>
+
+          <TabsContent value="requisitions" className="mt-6">
+            <StockRequisitionsPanel
+              items={stockRequisitions}
+              loading={loading}
+              onRefresh={loadRequisitionsOnly}
             />
           </TabsContent>
 

@@ -51,6 +51,7 @@ import {
 import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
+import { admissionRequestService, AdmissionEmployeeIntegrationContext } from '@/services/admissionRequestService';
 import { companyService } from '@/services/companyService';
 import { workPostService, WorkPost } from '@/services/workPostService';
 import { positionService, Position } from '@/services/positionService';
@@ -127,6 +128,37 @@ const Funcionarios: React.FC = () => {
     suspended: number;
   } | null>(null);
   const [isMobileSelectionMode, setIsMobileSelectionMode] = useState(false);
+  const [admissionIntegration, setAdmissionIntegration] = useState<AdmissionEmployeeIntegrationContext | null>(null);
+
+  type SortKey = 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho';
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const buildApiFilters = React.useCallback((): EmployeeFilters => {
+    const base: EmployeeFilters = {
+      searchTerm: searchTerm.trim() || undefined,
+      companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
+      status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
+    };
+    if (sortKey === 'hireDate' || sortKey === 'terminationDate') {
+      base.sortBy = sortKey;
+      base.sortDir = sortDir;
+    }
+    return base;
+  }, [searchTerm, companyFilter, statusFilter, sortKey, sortDir]);
+
+  const loadAdmissionIntegration = async () => {
+    try {
+      const ctx = await admissionRequestService.getIntegrationContextForEmployees();
+      setAdmissionIntegration(ctx);
+    } catch {
+      setAdmissionIntegration(null);
+    }
+  };
+
+  useEffect(() => {
+    loadAdmissionIntegration();
+  }, []);
 
   // Barra de ações em massa: posição inicial no centro + drag (mouse/touch)
   useEffect(() => {
@@ -211,7 +243,7 @@ const Funcionarios: React.FC = () => {
     setActiveTab(tab);
   }, [location.search]);
 
-  // Carregar funcionários
+  // Carregar funcionários (filtros da API: busca, empresa, status e ordenação por admissão/demissão)
   const loadEmployees = async (filters?: EmployeeFilters, page = 0) => {
     try {
       setLoading(true);
@@ -242,17 +274,35 @@ const Funcionarios: React.FC = () => {
 
   // Efeito para carregar ao mudar de página
   useEffect(() => {
-    loadEmployeesWithFilters();
+    void loadEmployeesWithFilters();
   }, [currentPage]);
+
+  const prevSortKeyRef = React.useRef<SortKey>('name');
+
+  // Ao ordenar por Admissão ou Demissão, voltar à página 0 e buscar já ordenado no servidor (alinha com o resumo global)
+  useEffect(() => {
+    if (sortKey !== 'hireDate' && sortKey !== 'terminationDate') return;
+    setCurrentPage(0);
+    void loadEmployees(buildApiFilters(), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarrega só ao mudar coluna/direção de ordenação por data
+  }, [sortKey, sortDir]);
+
+  // Ao sair da ordenação por data, recarregar por nome no servidor (a ordenação local só veria a página atual)
+  useEffect(() => {
+    const prev = prevSortKeyRef.current;
+    prevSortKeyRef.current = sortKey;
+    const wasDate = prev === 'hireDate' || prev === 'terminationDate';
+    const isDate = sortKey === 'hireDate' || sortKey === 'terminationDate';
+    if (wasDate && !isDate) {
+      setCurrentPage(0);
+      void loadEmployees(buildApiFilters(), 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortKey]);
 
   // Carregar funcionários com filtros atuais (searchTerm, companyId e status vão para a API; demais filtros no frontend)
   const loadEmployeesWithFilters = async () => {
-    const filters: EmployeeFilters = {
-      searchTerm: searchTerm.trim() || undefined,
-      companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
-      status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
-    };
-    await loadEmployees(filters, currentPage);
+    await loadEmployees(buildApiFilters(), currentPage);
   };
 
   // Carregar funcionários ao mudar filtros (searchTerm, companyId e status vão para a API; resto filtra no frontend)
@@ -265,15 +315,10 @@ const Funcionarios: React.FC = () => {
     }
 
     setCurrentPage(0);
-    const filters: EmployeeFilters = {
-      searchTerm: term || undefined,
-      companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
-      status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
-    };
-    const debounceMs = filters.searchTerm ? 500 : 0;
-    const timeoutId = setTimeout(() => loadEmployees(filters as any, 0), debounceMs);
+    const debounceMs = term ? 500 : 0;
+    const timeoutId = setTimeout(() => loadEmployees(buildApiFilters(), 0), debounceMs);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, statusFilter, companyFilter, positionFilter, workPostFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo]);
+  }, [searchTerm, statusFilter, companyFilter, positionFilter, workPostFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, buildApiFilters]);
 
   // Carregar opções dos filtros (empresas, cargos) da API (uma vez)
   useEffect(() => {
@@ -489,10 +534,6 @@ const Funcionarios: React.FC = () => {
       && matchesHireDateFrom && matchesHireDateTo && matchesTerminationDateFrom && matchesTerminationDateTo;
   });
 
-  type SortKey = 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho';
-  const [sortKey, setSortKey] = useState<SortKey>('name');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-
   const toggleSort = (key: SortKey) => {
     setSortKey((prev) => {
       if (prev === key) {
@@ -507,6 +548,10 @@ const Funcionarios: React.FC = () => {
   };
 
   const sortedEmployees = React.useMemo(() => {
+    // Admissão/Demissão: ordem já vem do servidor na página atual; o filtro local preserva essa ordem
+    if (sortKey === 'hireDate' || sortKey === 'terminationDate') {
+      return filteredEmployees;
+    }
     const dir = sortDir === 'asc' ? 1 : -1;
     const getString = (e: Employee, k: SortKey) => {
       switch (k) {
@@ -520,29 +565,10 @@ const Funcionarios: React.FC = () => {
         default: return '';
       }
     };
-    const getDate = (e: Employee, k: SortKey) => {
-      if (k === 'hireDate') {
-        const h = e.hireDate;
-        return h ? new Date(`${String(h).split('T')[0]}T12:00:00`).getTime() : null;
-      }
-      if (k === 'terminationDate') {
-        const v = e.dataRescisao || e.terminationDate;
-        return v ? new Date(`${String(v).split('T')[0]}T12:00:00`).getTime() : null;
-      }
-      return null;
-    };
 
-    return [...filteredEmployees].sort((a, b) => {
-      if (sortKey === 'hireDate' || sortKey === 'terminationDate') {
-        const da = getDate(a, sortKey);
-        const db = getDate(b, sortKey);
-        if (da == null && db == null) return 0;
-        if (da == null) return 1; // vazios no final
-        if (db == null) return -1;
-        return (da - db) * dir;
-      }
-      return getString(a, sortKey).localeCompare(getString(b, sortKey), 'pt-BR', { sensitivity: 'base' }) * dir;
-    });
+    return [...filteredEmployees].sort((a, b) =>
+      getString(a, sortKey).localeCompare(getString(b, sortKey), 'pt-BR', { sensitivity: 'base' }) * dir
+    );
   }, [filteredEmployees, sortKey, sortDir]);
 
   // Limpar filtros
@@ -556,7 +582,10 @@ const Funcionarios: React.FC = () => {
     setHireDateTo('');
     setTerminationDateFrom('');
     setTerminationDateTo('');
-    loadEmployees();
+    setSortKey('name');
+    setSortDir('asc');
+    setCurrentPage(0);
+    void loadEmployees({}, 0);
   };
 
   // Atualizar status do funcionário
@@ -1148,6 +1177,7 @@ Para excluir este funcionário:
                   onClick={() => {
                     setRefreshing(true);
                     loadEmployees();
+                    loadAdmissionIntegration();
                     setTimeout(() => setRefreshing(false), 1000);
                   }}
                   disabled={refreshing}
@@ -1347,10 +1377,48 @@ Para excluir este funcionário:
               </div>
             </Card>
 
+            {/* Resumo admissão/demissão (cadastro + processos em aberto) */}
+            {admissionIntegration && (
+              <Card className="bg-seguranca-black/40 border-amber-600/30 p-4">
+                <div className="flex flex-col lg:flex-row lg:flex-wrap gap-3 text-sm text-gray-300">
+                  {admissionIntegration.lastHire && (
+                    <div className="flex items-center gap-2">
+                      <UserPlus className="h-4 w-4 text-green-400 shrink-0" />
+                      <span>
+                        <span className="text-gray-500">Última admissão no cadastro:</span>{' '}
+                        <span className="text-seguranca-lightgray font-medium">{admissionIntegration.lastHire.name}</span>
+                        {' · '}
+                        {new Date(admissionIntegration.lastHire.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                  )}
+                  {admissionIntegration.lastTermination && (
+                    <div className="flex items-center gap-2">
+                      <UserMinus className="h-4 w-4 text-red-400 shrink-0" />
+                      <span>
+                        <span className="text-gray-500">Última demissão no cadastro:</span>{' '}
+                        <span className="text-seguranca-lightgray font-medium">{admissionIntegration.lastTermination.name}</span>
+                        {' · '}
+                        {new Date(admissionIntegration.lastTermination.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                  )}
+                  {(admissionIntegration.pendingAdmissionEmployeeIds.length > 0 ||
+                    admissionIntegration.pendingDismissalEmployeeIds.length > 0) && (
+                    <div className="text-xs text-amber-200/90 lg:ml-auto">
+                      Há solicitações de admissão ou demissão em andamento; veja os avisos na coluna Status.
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+
             {/* Lista de Funcionários Moderna */}
             <Card className="bg-gradient-to-br from-seguranca-graphite to-seguranca-black border-gray-600/50 p-6" data-animate="fadeUp">
               <FuncionariosTable
                 employees={sortedEmployees}
+                pendingAdmissionEmployeeIds={new Set(admissionIntegration?.pendingAdmissionEmployeeIds ?? [])}
+                pendingDismissalEmployeeIds={new Set(admissionIntegration?.pendingDismissalEmployeeIds ?? [])}
                 selectedIds={selectedIds}
                 onSelect={handleSelectEmployee}
                 onSelectAll={handleSelectAllEmployees}

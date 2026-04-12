@@ -101,6 +101,34 @@ public class CompanyDataFormatter {
     }
 
     /**
+     * Cidade usada em contratos (local de assinatura): sempre o município da empresa, nunca logradouro.
+     * 1) {@link Company#getCity()} se preenchido;
+     * 2) tentativa de extrair do endereço legado no padrão "... - Cidade - UF" (ex.: "... - Contagem - MG").
+     */
+    public static String resolveContractSigningCity(Company company) {
+        if (company == null) {
+            return "";
+        }
+        if (company.getCity() != null && !company.getCity().isBlank()) {
+            return company.getCity().trim();
+        }
+        String legacy = company.getAddress();
+        if (legacy == null || legacy.isBlank()) {
+            return "";
+        }
+        String[] parts = legacy.split("\\s*-\\s*");
+        if (parts.length < 2) {
+            return "";
+        }
+        String last = parts[parts.length - 1].trim();
+        // UF com 2 letras (ex.: MG)
+        if (last.length() == 2 && last.chars().allMatch(Character::isLetter)) {
+            return parts[parts.length - 2].trim();
+        }
+        return "";
+    }
+
+    /**
      * Formata endereço completo da empresa
      * Formato: Rua, Número - Complemento - Bairro - Cidade/Estado - CEP
      */

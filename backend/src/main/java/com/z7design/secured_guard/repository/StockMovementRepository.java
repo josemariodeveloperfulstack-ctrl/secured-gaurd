@@ -16,6 +16,9 @@ import java.util.UUID;
 @Repository
 public interface StockMovementRepository extends JpaRepository<StockMovement, UUID>, JpaSpecificationExecutor<StockMovement> {
 
+    /** Movimentações vinculadas a uma requisição multi-item (REQ-EST-...). */
+    List<StockMovement> findByRequisitionNumberOrderByMovementDateAsc(String requisitionNumber);
+
     // Buscar movimentações por item
     List<StockMovement> findByStockItemIdOrderByMovementDateDesc(UUID stockItemId);
 
@@ -74,4 +77,12 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
            "GROUP BY sm.stockItem.id, sm.stockItem.name " +
            "ORDER BY COUNT(sm) DESC")
     List<Object[]> getMostMovedItems(@Param("startDate") LocalDateTime startDate, Pageable pageable);
+
+    @Query("SELECT m.requisitionNumber, MIN(m.movementDate), COUNT(m) FROM StockMovement m WHERE " +
+           "m.requisitionNumber IS NOT NULL AND m.requisitionNumber LIKE 'REQ-INV-%' AND " +
+           "m.movementDate >= :start AND m.movementDate <= :end " +
+           "GROUP BY m.requisitionNumber ORDER BY MIN(m.movementDate) DESC")
+    List<Object[]> summarizePhysicalInventoryRequisitions(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }

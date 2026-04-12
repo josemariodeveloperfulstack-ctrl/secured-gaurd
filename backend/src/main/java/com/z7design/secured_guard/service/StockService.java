@@ -313,6 +313,9 @@ public class StockService {
     private void recordEmployeeStockHistory(StockMovement movement, Employee employee, User user) {
         log.info("Registrando movimentação no histórico do funcionário: {}", employee.getId());
         
+        String ref = movement.getRequisitionNumber() != null && !movement.getRequisitionNumber().isBlank()
+                ? movement.getRequisitionNumber()
+                : movement.getId().toString().substring(0, 8).toUpperCase();
         EmployeeChangeHistory history = EmployeeChangeHistory.builder()
                 .employeeId(employee.getId())
                 .changedAt(java.time.Instant.now())
@@ -320,11 +323,11 @@ public class StockService {
                 .category(EmployeeChangeCategory.OUTROS)
                 .fieldName("ESTOQUE_MOVIMENTACAO")
                 .fieldLabel("Retirada de Material")
-                .newValue(String.format("Retirou %d %s de %s (Ref: %s)", 
-                        movement.getQuantity(), 
+                .newValue(String.format("Retirou %d %s de %s (Req: %s)",
+                        movement.getQuantity(),
                         movement.getStockItem().getUnit() != null ? movement.getStockItem().getUnit().getAbbreviation() : "UN",
                         movement.getStockItem().getFullName(),
-                        movement.getId().toString().substring(0, 8).toUpperCase()))
+                        ref))
                 .reason(movement.getNotes())
                 .build();
         
@@ -405,6 +408,7 @@ public class StockService {
             LocalDateTime startDate,
             LocalDateTime endDate,
             String searchTerm,
+            String requisitionNumber,
             Pageable pageable) {
 
         try {
@@ -450,6 +454,10 @@ public class StockService {
                     predicates.add(cb.lessThanOrEqualTo(root.get("movementDate"), endDate));
                 }
 
+                if (requisitionNumber != null && !requisitionNumber.trim().isEmpty()) {
+                    predicates.add(cb.equal(root.get("requisitionNumber"), requisitionNumber.trim()));
+                }
+
                 // Filtro por termo de busca
                 if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                     String searchPattern = "%" + searchTerm.toLowerCase() + "%";
@@ -468,9 +476,12 @@ public class StockService {
                     Predicate documentNumberPred = cb.and(
                             cb.isNotNull(root.get("documentNumber")),
                             cb.like(cb.lower(root.get("documentNumber")), searchPattern));
+                    Predicate reqPred = cb.and(
+                            cb.isNotNull(root.get("requisitionNumber")),
+                            cb.like(cb.lower(root.get("requisitionNumber")), searchPattern));
 
                     predicates
-                            .add(cb.or(itemNamePred, itemCodePred, employeeNamePred, userNamePred, documentNumberPred));
+                            .add(cb.or(itemNamePred, itemCodePred, employeeNamePred, userNamePred, documentNumberPred, reqPred));
                 }
 
                 // Ordenar por data de movimentação (mais recente primeiro)

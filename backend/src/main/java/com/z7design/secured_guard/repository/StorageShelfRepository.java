@@ -14,6 +14,8 @@ public interface StorageShelfRepository extends JpaRepository<StorageShelf, UUID
     List<StorageShelf> findByActiveTrue();
     
     Optional<StorageShelf> findByIdentification(String identification);
+
+    Optional<StorageShelf> findByIdentificationIgnoreCase(String identification);
     
     boolean existsByIdentification(String identification);
     

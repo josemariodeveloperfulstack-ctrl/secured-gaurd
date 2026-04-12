@@ -45,6 +45,9 @@ public class AdmissionRequestDTO {
     private UUID unitId;
     
     private String unitName;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    private UUID employeeId;
     
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate startDate;
@@ -122,6 +125,7 @@ public class AdmissionRequestDTO {
             .department(entity.getDepartment())
             .unitId(entity.getUnit() != null ? entity.getUnit().getId() : null)
             .unitName(entity.getUnit() != null ? entity.getUnit().getName() : null)
+            .employeeId(entity.getEmployee() != null ? entity.getEmployee().getId() : null)
             .startDate(entity.getStartDate())
             .endDate(entity.getEndDate())
             .reason(entity.getReason())

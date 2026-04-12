@@ -34,6 +34,7 @@ import { useQuery } from '@tanstack/react-query';
 import hrService from '@/services/hrService';
 import { useNavigate } from 'react-router-dom';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
+import CreateWarehouseRequisitionButton from '@/components/stock/CreateWarehouseRequisitionButton';
 
 const RH: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -125,7 +126,13 @@ const RH: React.FC = () => {
             <h1 className="text-2xl font-bold text-seguranca-lightgray">Recursos Humanos</h1>
             <p className="text-gray-400 mt-1">Gestão completa do Departamento Pessoal</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <CreateWarehouseRequisitionButton
+              variant="outline"
+              size="sm"
+              className="border-seguranca-yellow/50 text-seguranca-lightgray hover:bg-seguranca-black"
+              label="Criar Requisição para o Almoxarifado"
+            />
             <Button 
               onClick={() => setNovoFuncionarioOpen(true)}
               className="bg-seguranca-red hover:bg-seguranca-darkred"

@@ -232,9 +232,7 @@ public class EmploymentContractStandardPdfService {
                                                 : "(informe o valor por extenso no cadastro do funcionário — campo salário por extenso)";
                 LocalDate dataContrato = request.getContractDate() != null ? request.getContractDate()
                                 : LocalDate.now();
-                String cidade = request.getCity() != null && !request.getCity().isBlank()
-                                ? request.getCity().trim()
-                                : (company.getCity() != null ? company.getCity() : "");
+                String cidade = resolveSigningCity(company, request);
                 String dataAssinatura = formatDate(dataContrato);
                 String cidadeDataExtenso = (cidade.isEmpty() ? "_______________" : cidade.toUpperCase()) + ", "
                                 + dataAssinatura + ".";
@@ -262,9 +260,7 @@ public class EmploymentContractStandardPdfService {
         private String fillExperiencePlaceholders(String template, EmploymentContractRequest request, Company company) {
                 int dias = request.getExperienceDurationDays() != null ? request.getExperienceDurationDays() : 45;
                 String diasExperienciaTexto = experienceDaysPhrase(dias);
-                String cidade = request.getCity() != null && !request.getCity().isBlank()
-                                ? request.getCity().trim()
-                                : (company.getCity() != null ? company.getCity() : "");
+                String cidade = resolveSigningCity(company, request);
                 String cidadeDataTermo = (cidade.isEmpty() ? "_______________" : cidade.toUpperCase())
                                 + ", ___/___/______.";
 
@@ -284,6 +280,20 @@ public class EmploymentContractStandardPdfService {
 
         private static String nullToEmpty(String s) {
                 return s != null ? s : "";
+        }
+
+        /**
+         * Local de assinatura dos contratos: cidade da empresa (cadastro), não rua nem endereço do payload.
+         */
+        private static String resolveSigningCity(Company company, EmploymentContractRequest request) {
+                String fromCompany = CompanyDataFormatter.resolveContractSigningCity(company);
+                if (!fromCompany.isBlank()) {
+                        return fromCompany.trim();
+                }
+                if (request.getCity() != null && !request.getCity().isBlank()) {
+                        return request.getCity().trim();
+                }
+                return "";
         }
 
         /**
@@ -343,8 +353,8 @@ public class EmploymentContractStandardPdfService {
         }
 
         private void addSignatures(Document document, EmploymentContractRequest request, Company company) {
-                String city = request.getCity() != null ? request.getCity()
-                                : (company.getCity() != null ? company.getCity() : "_______________");
+                String resolved = resolveSigningCity(company, request);
+                String city = resolved.isEmpty() ? "_______________" : resolved;
                 String date = formatDateExtended(
                                 request.getContractDate() != null ? request.getContractDate() : LocalDate.now());
 

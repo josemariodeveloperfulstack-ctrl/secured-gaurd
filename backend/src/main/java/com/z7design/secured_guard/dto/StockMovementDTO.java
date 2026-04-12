@@ -41,6 +41,8 @@ public class StockMovementDTO {
     private StockMovement.SignatureType signatureType;
     private String requisitionUrl;
     private StockMovement.RequisitionSentType requisitionSentType;
+    /** Mesmo número em todas as linhas geradas por um import de inventário físico */
+    private String requisitionNumber;
 
     public static StockMovementDTO fromEntity(StockMovement entity) {
         StockMovementDTO dto = new StockMovementDTO();
@@ -64,6 +66,7 @@ public class StockMovementDTO {
         dto.setSignatureType(entity.getSignatureType());
         dto.setRequisitionUrl(entity.getRequisitionUrl());
         dto.setRequisitionSentType(entity.getRequisitionSentType());
+        dto.setRequisitionNumber(entity.getRequisitionNumber());
 
         if (entity.getStockItem() != null) {
             dto.setStockItemId(entity.getStockItem().getId());
@@ -120,6 +123,7 @@ public class StockMovementDTO {
         entity.setSignatureType(dto.getSignatureType());
         entity.setRequisitionUrl(dto.getRequisitionUrl());
         entity.setRequisitionSentType(dto.getRequisitionSentType());
+        entity.setRequisitionNumber(dto.getRequisitionNumber());
         return entity;
     }
 }

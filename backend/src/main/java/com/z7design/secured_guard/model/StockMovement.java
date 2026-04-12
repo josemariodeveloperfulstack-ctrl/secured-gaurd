@@ -102,6 +102,10 @@ public class StockMovement {
     @Column(name = "requisition_sent_type")
     private RequisitionSentType requisitionSentType;
 
+    /** Identificador legível compartilhado por todas as movimentações de um mesmo inventário importado (ex.: REQ-INV-20260412-0001). */
+    @Column(name = "requisition_number", length = 64)
+    private String requisitionNumber;
+
     public enum SignatureType {
         PHYSICAL, DIGITAL
     }

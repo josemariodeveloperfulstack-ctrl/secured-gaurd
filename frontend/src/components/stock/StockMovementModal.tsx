@@ -59,9 +59,11 @@ import {
   ClipboardCheck,
   Smartphone,
   Mail,
-  Download
+  Download,
+  ClipboardList
 } from 'lucide-react';
 import SignaturePad from '@/components/SignaturePad';
+import StockRequisitionModal, { StockRequisitionPrefill } from '@/components/stock/StockRequisitionModal';
 
 interface StockMovementModalProps {
   open: boolean;
@@ -94,6 +96,8 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [supplierComboboxOpen, setSupplierComboboxOpen] = useState(false);
+  const [requisitionModalOpen, setRequisitionModalOpen] = useState(false);
+  const [requisitionPrefill, setRequisitionPrefill] = useState<StockRequisitionPrefill | null>(null);
   const [unitCostDisplay, setUnitCostDisplay] = useState('');
   const [formData, setFormData] = useState<CreateStockMovementDTO>({
     stockItemId: '',
@@ -130,6 +134,16 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  };
+
+  const openStockRequisitionModal = () => {
+    setRequisitionPrefill({
+      employeeId: formData.employeeId || undefined,
+      lines: selectedItem
+        ? [{ stockItemId: selectedItem.id, quantity: Math.max(1, formData.quantity) }]
+        : [{ stockItemId: '', quantity: 1 }],
+    });
+    setRequisitionModalOpen(true);
   };
 
   useEffect(() => {
@@ -952,23 +966,39 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
               />
             </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sm:pt-6 border-t border-gray-600/30">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => onOpenChange(false)}
-                  disabled={loading}
-                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-2 sm:order-1"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={loading || !selectedItem}
-                  className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base order-1 sm:order-2"
-                >
-                  {loading ? 'Registrando...' : 'Registrar Movimentação'}
-                </Button>
+              <div className="flex flex-col gap-3 pt-4 sm:pt-6 border-t border-gray-600/30">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  {formData.movementType === MovementType.SAIDA && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={openStockRequisitionModal}
+                      disabled={loading}
+                      className="border-amber-500/50 text-amber-200 hover:bg-amber-500/10 h-10 sm:h-11 text-sm sm:text-base sm:shrink-0"
+                    >
+                      <ClipboardList className="h-4 w-4 mr-2" />
+                      Gerar Requisição
+                    </Button>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-3 sm:ml-auto w-full sm:w-auto">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                      disabled={loading}
+                      className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:border-seguranca-red/50 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={loading || !selectedItem}
+                      className="bg-gradient-to-r from-seguranca-red to-seguranca-darkred hover:from-seguranca-darkred hover:to-seguranca-red shadow-lg shadow-seguranca-red/20 px-4 sm:px-6 h-10 sm:h-11 text-sm sm:text-base"
+                    >
+                      {loading ? 'Registrando...' : 'Registrar Movimentação'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </form>
             </>
@@ -1007,6 +1037,16 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
         onClose={() => setIsSupplierModalOpen(false)}
         supplier={null}
         onSave={handleSupplierSave}
+      />
+
+      <StockRequisitionModal
+        open={requisitionModalOpen}
+        onOpenChange={(v) => {
+          if (!v) setRequisitionPrefill(null);
+          setRequisitionModalOpen(v);
+        }}
+        prefill={requisitionPrefill}
+        onRecorded={onSave}
       />
     </>
   );

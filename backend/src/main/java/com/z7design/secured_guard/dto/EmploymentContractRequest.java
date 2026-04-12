@@ -32,7 +32,8 @@ public class EmploymentContractRequest {
     private String workHoursDescription; // Ex: "44 horas semanais"
     private String workSchedule; // Ex: "08:00 às 18:00 com 1h de intervalo"
 
-    private String city; // Cidade para data
+    /** Opcional; no PDF o local de assinatura prioriza a cidade cadastrada na empresa (não use rua aqui). */
+    private String city;
     private LocalDate contractDate; // Data do contrato
 
     /**

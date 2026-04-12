@@ -421,19 +421,26 @@ public class EmployeeController {
             @RequestParam(required = false) java.util.UUID companyId,
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "500") int size) {
+            @RequestParam(defaultValue = "500") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir) {
         try {
             int safePage = Math.max(page, 0);
             int safeSize = Math.min(Math.max(size, 1), 500);
             String statusFilter = (status != null && !status.trim().isEmpty() && !"all".equalsIgnoreCase(status.trim())) ? status.trim().toUpperCase() : null;
+            String sortByParam = (sortBy != null && !sortBy.trim().isEmpty()) ? sortBy.trim() : null;
+            String sortDirParam = (sortDir != null && sortDir.trim().equalsIgnoreCase("desc")) ? "desc" : "asc";
             System.out.println("🔍 EmployeeController.getAllPaged - page=" + safePage + " size=" + safeSize
-                    + " searchTerm=" + searchTerm + " companyId=" + companyId + " status=" + statusFilter);
+                    + " searchTerm=" + searchTerm + " companyId=" + companyId + " status=" + statusFilter
+                    + " sortBy=" + sortByParam + " sortDir=" + sortDirParam);
 
             List<Object[]> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
-                data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize, companyId, statusFilter);
+                data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize, companyId,
+                        statusFilter, sortByParam, sortDirParam);
             } else {
-                data = employeeService.findBasicDataPaged(safePage, safeSize, companyId, statusFilter);
+                data = employeeService.findBasicDataPaged(safePage, safeSize, companyId, statusFilter, sortByParam,
+                        sortDirParam);
             }
             System.out.println(
                     "🔍 EmployeeController.getAllPaged - Encontrados " + data.size() + " funcionários no banco");
@@ -934,7 +941,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/search/simple")
-    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ')")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'RH', 'DEPARTAMENTO_PESSOAL', 'ESTOQUE', 'ALMOXARIFADO', 'RECURSOS_HUMANOS', 'GERENTE')")
     @Operation(summary = "Buscar funcionários simplificados", description = "Retorna dados simplificados de funcionários para seleção em formulários")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de funcionários simplificados retornada com sucesso"),

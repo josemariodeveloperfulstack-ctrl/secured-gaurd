@@ -14,7 +14,13 @@ import {
   StorageShelf,
   StockItemLocation,
   SignatureType,
-  RequisitionSentType
+  RequisitionSentType,
+  PhysicalInventoryImportResult,
+  InventoryRequisitionSummary,
+  StockRequisitionDTO,
+  CreateStockRequisitionPayload,
+  DeliverStockRequisitionPayload,
+  StockRequisitionListItem
 } from '@/types/stock';
 
 export const stockService = {
@@ -177,6 +183,7 @@ export const stockService = {
       }
 
       if (filters.searchTerm) params.append('searchTerm', filters.searchTerm);
+      if (filters.requisitionNumber) params.append('requisitionNumber', filters.requisitionNumber.trim());
 
       params.append('page', page.toString());
       params.append('size', size.toString());
@@ -194,6 +201,28 @@ export const stockService = {
         totalElements: 0
       };
     }
+  },
+
+  async importPhysicalInventory(file: File): Promise<PhysicalInventoryImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post<PhysicalInventoryImportResult>(
+      '/api/stock/import/physical-inventory',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
+  async listInventoryRequisitions(start?: string, end?: string): Promise<InventoryRequisitionSummary[]> {
+    const params = new URLSearchParams();
+    if (start) params.append('start', start);
+    if (end) params.append('end', end);
+    const q = params.toString();
+    const response = await api.get<InventoryRequisitionSummary[]>(
+      `/api/stock/inventory-requisitions${q ? `?${q}` : ''}`
+    );
+    return response.data || [];
   },
 
   // Função auxiliar para converter data dd/mm/aaaa para ISO DateTime
@@ -526,6 +555,39 @@ export const stockService = {
       console.error('Erro ao baixar PDF da requisição:', error);
       throw new Error('Falha ao baixar PDF');
     }
+  },
+
+  async listStockRequisitions(): Promise<StockRequisitionListItem[]> {
+    const response = await api.get('/api/stock/requisitions');
+    return Array.isArray(response.data) ? response.data : [];
+  },
+
+  async createStockRequisition(payload: CreateStockRequisitionPayload): Promise<StockRequisitionDTO> {
+    const response = await api.post('/api/stock/requisitions', payload);
+    return response.data;
+  },
+
+  async getStockRequisition(id: string): Promise<StockRequisitionDTO> {
+    const response = await api.get(`/api/stock/requisitions/${id}`);
+    return response.data;
+  },
+
+  async approveStockRequisition(id: string): Promise<StockRequisitionDTO> {
+    const response = await api.post(`/api/stock/requisitions/${id}/approve`);
+    return response.data;
+  },
+
+  async deliverStockRequisition(id: string, payload: DeliverStockRequisitionPayload): Promise<StockRequisitionDTO> {
+    const response = await api.post(`/api/stock/requisitions/${id}/deliver`, payload);
+    return response.data;
+  },
+
+  async downloadStockRequisitionPdf(id: string, requisitionNumber?: string): Promise<void> {
+    const response = await api.get(`/api/stock/requisitions/${id}/pdf`, { responseType: 'blob' });
+    const name = requisitionNumber
+      ? `requisicao_${requisitionNumber.replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`
+      : `requisicao_estoque_${id.substring(0, 8)}.pdf`;
+    this.handleFileDownload(response.data, name);
   },
 
   async sendRequisition(movementId: string, type: RequisitionSentType, destination?: string): Promise<void> {

@@ -1,15 +1,19 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.AdmissionEmployeeIntegrationDTO;
 import com.z7design.secured_guard.dto.AdmissionRequestDTO;
 import com.z7design.secured_guard.dto.CreateAdmissionRequestDTO;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.AdmissionRequest;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.Unit;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.AdmissionRequestStatus;
 import com.z7design.secured_guard.model.enums.AdmissionRequestType;
 import com.z7design.secured_guard.model.enums.AdmissionRequestPriority;
+import com.z7design.secured_guard.model.enums.EmploymentStatus;
 import com.z7design.secured_guard.repository.AdmissionRequestRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +33,9 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -42,6 +48,7 @@ public class AdmissionRequestService {
     private final AdmissionRequestRepository admissionRequestRepository;
     private final UnitRepository unitRepository;
     private final UserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
     
     public List<AdmissionRequestDTO> findAll() {
         List<AdmissionRequest> requests = admissionRequestRepository.findAll();
@@ -80,6 +87,7 @@ public class AdmissionRequestService {
                 .requester(dto.getRequesterId() != null ? userRepository.findById(dto.getRequesterId()).orElse(null) : null)
                 .approver(dto.getApproverId() != null ? userRepository.findById(dto.getApproverId()).orElse(null) : null)
                 .notes(dto.getNotes())
+                .employee(dto.getEmployeeId() != null ? employeeRepository.findById(dto.getEmployeeId()).orElse(null) : null)
                 .build();
         
         AdmissionRequest savedRequest = admissionRequestRepository.save(request);
@@ -114,6 +122,7 @@ public class AdmissionRequestService {
         existingRequest.setRequester(dto.getRequesterId() != null ? userRepository.findById(dto.getRequesterId()).orElse(null) : null);
         existingRequest.setApprover(dto.getApproverId() != null ? userRepository.findById(dto.getApproverId()).orElse(null) : null);
         existingRequest.setNotes(dto.getNotes());
+        existingRequest.setEmployee(dto.getEmployeeId() != null ? employeeRepository.findById(dto.getEmployeeId()).orElse(null) : null);
         
         AdmissionRequest updatedRequest = admissionRequestRepository.save(existingRequest);
         log.info("Solicitação atualizada com sucesso: {}", updatedRequest.getId());
@@ -186,8 +195,88 @@ public class AdmissionRequestService {
         request.setCompletionDate(LocalDate.now());
         
         AdmissionRequest completedRequest = admissionRequestRepository.save(request);
+        syncEmployeeAfterAdmissionRequestCompleted(completedRequest);
         log.info("Solicitação completada com sucesso: {}", completedRequest.getId());
         return AdmissionRequestDTO.fromEntity(completedRequest);
+    }
+
+    /**
+     * Atualiza cadastro do funcionário quando a solicitação é concluída (fluxo aprovado → completo).
+     */
+    private void syncEmployeeAfterAdmissionRequestCompleted(AdmissionRequest request) {
+        Optional<Employee> resolved = resolveEmployeeForRequest(request);
+        if (resolved.isEmpty()) {
+            log.warn("Solicitação {} concluída sem funcionário vinculado (employee_id) e sem CPF resolvível no cadastro.",
+                    request.getId());
+            return;
+        }
+        Employee emp = resolved.get();
+        if (request.getType() == AdmissionRequestType.ADMISSION) {
+            emp.setStatus(EmploymentStatus.ACTIVE);
+            LocalDate hire = request.getStartDate() != null ? request.getStartDate() : request.getCompletionDate();
+            if (hire != null) {
+                emp.setHireDate(hire);
+            }
+            emp.setTerminationDate(null);
+            emp.setDataRescisao(null);
+        } else if (request.getType() == AdmissionRequestType.DISMISSAL) {
+            emp.setStatus(EmploymentStatus.TERMINATED);
+            LocalDate term = request.getEndDate() != null ? request.getEndDate() : request.getCompletionDate();
+            if (term != null) {
+                emp.setTerminationDate(term);
+                emp.setDataRescisao(term);
+            }
+        }
+        employeeRepository.save(emp);
+        log.info("Cadastro do funcionário {} sincronizado após conclusão da solicitação {}", emp.getId(), request.getId());
+    }
+
+    private Optional<Employee> resolveEmployeeForRequest(AdmissionRequest request) {
+        if (request.getEmployee() != null) {
+            return employeeRepository.findById(request.getEmployee().getId());
+        }
+        if (request.getEmployeeCpf() == null || request.getEmployeeCpf().isBlank()) {
+            return Optional.empty();
+        }
+        String digits = request.getEmployeeCpf().replaceAll("\\D", "");
+        if (digits.length() < 11) {
+            return Optional.empty();
+        }
+        return employeeRepository.findFirstByNormalizedCpfOrDocument(digits);
+    }
+
+    @Transactional(readOnly = true)
+    public AdmissionEmployeeIntegrationDTO getIntegrationContextForEmployees() {
+        List<AdmissionRequestStatus> open = Arrays.asList(
+                AdmissionRequestStatus.PENDING,
+                AdmissionRequestStatus.APPROVED);
+
+        AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot lastHire = employeeRepository
+                .findTopByStatusAndHireDateIsNotNullOrderByHireDateDesc(EmploymentStatus.ACTIVE)
+                .map(e -> AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot.builder()
+                        .employeeId(e.getId())
+                        .name(e.getName())
+                        .date(e.getHireDate())
+                        .build())
+                .orElse(null);
+
+        AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot lastTerm = employeeRepository
+                .findTopByStatusAndTerminationDateIsNotNullOrderByTerminationDateDesc(EmploymentStatus.TERMINATED)
+                .map(e -> AdmissionEmployeeIntegrationDTO.EmployeeMovementSnapshot.builder()
+                        .employeeId(e.getId())
+                        .name(e.getName())
+                        .date(e.getTerminationDate())
+                        .build())
+                .orElse(null);
+
+        return AdmissionEmployeeIntegrationDTO.builder()
+                .lastHire(lastHire)
+                .lastTermination(lastTerm)
+                .pendingAdmissionEmployeeIds(
+                        admissionRequestRepository.findEmployeeIdsWithInProgressRequests(open, AdmissionRequestType.ADMISSION))
+                .pendingDismissalEmployeeIds(
+                        admissionRequestRepository.findEmployeeIdsWithInProgressRequests(open, AdmissionRequestType.DISMISSAL))
+                .build();
     }
     
     public List<AdmissionRequestDTO> findByStatus(AdmissionRequestStatus status) {

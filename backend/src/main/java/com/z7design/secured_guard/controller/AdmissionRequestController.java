@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.AdmissionEmployeeIntegrationDTO;
 import com.z7design.secured_guard.dto.AdmissionRequestDTO;
 import com.z7design.secured_guard.dto.AdmissionRequestReportFilterDTO;
 import com.z7design.secured_guard.dto.CreateAdmissionRequestDTO;
@@ -51,6 +52,14 @@ public class AdmissionRequestController {
     public ResponseEntity<List<AdmissionRequestDTO>> list() {
         List<AdmissionRequestDTO> requests = admissionRequestService.findAll();
         return ResponseEntity.ok(requests);
+    }
+
+    @GetMapping("/integration/context-for-employees")
+    @Operation(summary = "Contexto para lista de funcionários",
+            description = "Últimas admissões/demissões no cadastro e IDs com solicitação PENDING/APPROVED (badges na lista)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'RH', 'DEPARTAMENTO_PESSOAL')")
+    public ResponseEntity<AdmissionEmployeeIntegrationDTO> integrationContextForEmployees() {
+        return ResponseEntity.ok(admissionRequestService.getIntegrationContextForEmployees());
     }
     
     @GetMapping("/{id}")

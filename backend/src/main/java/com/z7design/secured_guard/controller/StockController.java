@@ -3,11 +3,14 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.StockItemDTO;
 import com.z7design.secured_guard.dto.StockMovementDTO;
 import com.z7design.secured_guard.dto.StockAlertDTO;
+import com.z7design.secured_guard.dto.PhysicalInventoryImportResultDTO;
+import com.z7design.secured_guard.dto.InventoryRequisitionSummaryDTO;
 import com.z7design.secured_guard.model.enums.StockCategory;
 import com.z7design.secured_guard.model.enums.MovementType;
 import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.service.StockService;
 import com.z7design.secured_guard.service.StockReportService;
+import com.z7design.secured_guard.service.StockPhysicalInventoryImportService;
 import com.z7design.secured_guard.repository.UserRepository;
 import java.io.IOException;
 
@@ -21,10 +24,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
@@ -42,6 +47,7 @@ public class StockController {
 
     private final StockService stockService;
     private final StockReportService stockReportService;
+    private final StockPhysicalInventoryImportService stockPhysicalInventoryImportService;
     private final UserRepository userRepository;
 
     // ===== ITENS DE ESTOQUE =====
@@ -165,26 +171,7 @@ public class StockController {
             log.info("POST /api/stock/movements - Criando movimentação");
             log.info("Dados recebidos: {}", movementDTO);
 
-            // Obter ID do usuário logado
-            UUID userId;
-            if (authentication != null && authentication.getPrincipal() != null) {
-                try {
-                    // Tentar obter o usuário do contexto de autenticação
-                    String username = authentication.getName();
-                    com.z7design.secured_guard.model.User user = userRepository.findByUsername(username)
-                            .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + username));
-                    userId = user.getId();
-                    log.info("Usuário autenticado: {} (ID: {})", username, userId);
-                } catch (Exception e) {
-                    log.warn("Erro ao obter usuário do contexto de autenticação: {}. Usando placeholder.",
-                            e.getMessage());
-                    // Fallback para placeholder se não conseguir obter o usuário
-                    userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-                }
-            } else {
-                log.warn("Autenticação não disponível. Usando placeholder.");
-                userId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-            }
+            UUID userId = resolveStockUserId(authentication);
 
             StockMovementDTO createdMovement = stockService.createMovement(movementDTO, userId);
             log.info("Movimentação criada com sucesso: {}", createdMovement.getId());
@@ -212,18 +199,48 @@ public class StockController {
             @Parameter(description = "Data inicial") @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @Parameter(description = "Data final") @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
             @Parameter(description = "Termo de busca") @RequestParam(value = "searchTerm", required = false) String searchTerm,
+            @Parameter(description = "Número da requisição (ex.: inventário REQ-INV-...)") @RequestParam(value = "requisitionNumber", required = false) String requisitionNumber,
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
 
         try {
             log.info("GET /api/stock/movements/search - Buscando movimentações com filtros");
             Page<StockMovementDTO> movements = stockService.getMovementsWithFilters(
                     stockItemId, employeeId, movementType, reason, unitId,
-                    startDate, endDate, searchTerm, pageable);
+                    startDate, endDate, searchTerm, requisitionNumber, pageable);
             return ResponseEntity.ok(movements);
         } catch (Exception e) {
             log.error("Erro ao buscar movimentações: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    @PostMapping(value = "/import/physical-inventory", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    @Operation(summary = "Importar inventário físico", description = "Lê a aba de resumo (ex.: Resumo Estoque), ajusta quantidades e gera movimentações com o mesmo número de requisição REQ-INV-*.")
+    public ResponseEntity<?> importPhysicalInventory(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        try {
+            UUID userId = resolveStockUserId(authentication);
+            PhysicalInventoryImportResultDTO result = stockPhysicalInventoryImportService.importWorkbook(file, userId);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao importar inventário físico: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Falha ao processar planilha: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/inventory-requisitions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    @Operation(summary = "Listar requisições de inventário físico", description = "Agrupa movimentações REQ-INV-* no período (útil para relatórios a cada 10 dias).")
+    public ResponseEntity<List<InventoryRequisitionSummaryDTO>> listInventoryRequisitions(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        LocalDateTime endDt = end != null ? end : LocalDateTime.now();
+        LocalDateTime startDt = start != null ? start : endDt.minusDays(10);
+        return ResponseEntity.ok(stockPhysicalInventoryImportService.listRequisitions(startDt, endDt));
     }
 
     @GetMapping("/movements/item/{itemId}")
@@ -474,7 +491,7 @@ public class StockController {
 
     @PostMapping("/movements/{id}/sign")
     @Operation(summary = "Registrar assinatura digital", description = "Armazena a assinatura digital de uma movimentação")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
     public ResponseEntity<StockMovementDTO> signMovement(
             @PathVariable UUID id,
             @RequestBody Map<String, String> payload) {
@@ -489,7 +506,7 @@ public class StockController {
 
     @GetMapping("/movements/{id}/requisition")
     @Operation(summary = "Gerar PDF da requisição", description = "Retorna o PDF da requisição de estoque")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESTOQUE', 'COMPRAS', 'ALMOXARIFADO')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'COMPRAS', 'ALMOXARIFADO')")
     public ResponseEntity<byte[]> getRequisitionPdf(@PathVariable UUID id) {
         byte[] pdf = stockService.getRequisitionPdf(id);
         
@@ -501,7 +518,7 @@ public class StockController {
 
     @PostMapping("/movements/{id}/send")
     @Operation(summary = "Enviar requisição", description = "Envia a requisição por e-mail ou WhatsApp")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
     public ResponseEntity<Void> sendRequisition(
             @PathVariable UUID id,
             @RequestParam com.z7design.secured_guard.model.StockMovement.RequisitionSentType type,
@@ -509,5 +526,22 @@ public class StockController {
         
         stockService.sendRequisition(id, type, destination);
         return ResponseEntity.ok().build();
+    }
+
+    private UUID resolveStockUserId(Authentication authentication) {
+        if (authentication != null && authentication.getPrincipal() != null) {
+            try {
+                String username = authentication.getName();
+                com.z7design.secured_guard.model.User user = userRepository.findByUsername(username)
+                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + username));
+                log.info("Usuário autenticado (estoque): {} (ID: {})", username, user.getId());
+                return user.getId();
+            } catch (Exception e) {
+                log.warn("Erro ao obter usuário do contexto de autenticação: {}. Usando placeholder.", e.getMessage());
+            }
+        } else {
+            log.warn("Autenticação não disponível. Usando placeholder.");
+        }
+        return UUID.fromString("11111111-1111-1111-1111-111111111111");
     }
 }

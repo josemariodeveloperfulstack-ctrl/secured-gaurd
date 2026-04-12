@@ -17,6 +17,7 @@ import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { resolveCompanySigningCity } from '@/utils/resolveCompanySigningCity';
 
 interface ContratosTrabalhoFormProps {
   employeeId?: string;
@@ -261,10 +262,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
     const pdfKind = resolvePdfContractKind(form.contractType);
     const isExperiencia = pdfKind === 'EXPERIENCE';
-    const cidadeContrato =
-      (empresa as any)?.city ||
-      (typeof empresa?.address === 'string' ? empresa.address.split(',')[0]?.trim() : '') ||
-      '';
+    const cidadeContrato = resolveCompanySigningCity(empresa as { city?: string; address?: string });
 
     return {
       companyId: empresa!.id,

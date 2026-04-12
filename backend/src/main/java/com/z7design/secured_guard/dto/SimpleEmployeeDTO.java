@@ -23,6 +23,8 @@ public class SimpleEmployeeDTO {
     private java.time.LocalDate hireDate;
     private String positionName;
     private String unitName;
+    private String departmentName;
+    private String workPostName;
     private UUID companyId;
     private String companySigla;
     private java.math.BigDecimal salario;
