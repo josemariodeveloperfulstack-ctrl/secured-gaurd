@@ -9,6 +9,13 @@ set +e
 echo "🔧 Corrigindo problema de 404 no Traefik..."
 echo ""
 
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+# shellcheck disable=SC1091
+[ -f "$_SCRIPT_DIR/free-host-ports-for-traefik.sh" ] && . "$_SCRIPT_DIR/free-host-ports-for-traefik.sh"
+if ! declare -F free_host_ports_for_traefik >/dev/null 2>&1; then
+  free_host_ports_for_traefik() { return 0; }
+fi
+
 # Diagnóstico: Cloudflare 521 + "address already in use" na 80 = outro processo ocupa a porta do host.
 diagnose_port80() {
   echo "   📌 Quem usa a porta 80 no host:"
@@ -20,6 +27,7 @@ diagnose_port80() {
 # Sobe Traefik após limpar container falho (Created/Exited por conflito de porta).
 start_traefik_safe() {
   cd /var/www/secured_guard || return 1
+  free_host_ports_for_traefik
   echo "   🔄 compose down + rm traefik (estado falho / porta presa no nome)..."
   docker-compose -f docker-compose.traefik.yml down 2>/dev/null || true
   docker rm -f traefik 2>/dev/null || true

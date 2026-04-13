@@ -234,6 +234,9 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             log "💡 Tentando Traefik: compose down + rm container falho + up -d..."
             (
               cd /var/www/secured_guard || exit 0
+              if [ -f ci/scripts/free-host-ports-for-traefik.sh ]; then
+                bash ci/scripts/free-host-ports-for-traefik.sh 2>/dev/null || true
+              fi
               docker-compose -f docker-compose.traefik.yml down 2>/dev/null || true
               docker rm -f traefik 2>/dev/null || true
               docker-compose -f docker-compose.traefik.yml up -d 2>&1
