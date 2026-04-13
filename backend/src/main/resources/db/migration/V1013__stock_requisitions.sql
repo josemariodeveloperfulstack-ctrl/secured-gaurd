@@ -16,7 +16,26 @@ BEGIN
           AND cl.relname = 'stock_items'
           AND co.contype = 'p'
     ) THEN
-        ALTER TABLE stock_items ADD CONSTRAINT stock_items_pkey PRIMARY KEY (id);
+        -- Sem PK, inserts podem repetir o mesmo id; a PK falha com 23505 até limpar duplicatas.
+        DELETE FROM stock_items si
+        WHERE EXISTS (
+            SELECT 1
+            FROM stock_items other
+            WHERE other.id = si.id AND other.ctid < si.ctid
+        );
+
+        BEGIN
+            ALTER TABLE stock_items ADD CONSTRAINT stock_items_pkey PRIMARY KEY (id);
+        EXCEPTION
+            WHEN unique_violation THEN
+                DELETE FROM stock_items si
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM stock_items other
+                    WHERE other.id = si.id AND other.ctid < si.ctid
+                );
+                ALTER TABLE stock_items ADD CONSTRAINT stock_items_pkey PRIMARY KEY (id);
+        END;
     END IF;
 EXCEPTION
     WHEN duplicate_object THEN NULL;
