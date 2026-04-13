@@ -379,6 +379,21 @@ jobs:
             docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
             docker ps -a | grep "secured-guard-.*-ci" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
 
+            # Rede nomeada secured-guard-ci: se algum container externo a usar, "docker network rm" falha e o próximo "up" dá "already exists".
+            remove_secured_guard_ci_network() {
+              local net=secured-guard-ci
+              docker network inspect "$net" >/dev/null 2>&1 || return 0
+              local cids
+              cids=$(docker network inspect "$net" -f '{{range $k, $v := .Containers}}{{$k}} {{end}}' 2>/dev/null || true)
+              for cid in $cids; do
+                [ -n "$cid" ] || continue
+                echo "   Desligando endpoint $cid da rede $net..."
+                docker network disconnect -f "$net" "$cid" 2>/dev/null || true
+              done
+              docker network rm "$net" 2>/dev/null && echo "✅ Rede $net removida" || echo "⚠️ Rede $net ainda não removida (tentativa seguinte ou uso manual)"
+            }
+            remove_secured_guard_ci_network
+
             echo "🔎 Verificando acesso ao GHCR (forçar IPv4)..."
             GHCR_OK=0
             for j in 1 2 3 4 5; do
@@ -429,8 +444,9 @@ jobs:
             docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
             docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
 
-            echo "🧹 Limpando redes..."
-            docker network rm secured-guard-ci 2>/dev/null || true
+            echo "🧹 Limpando redes (compose down + desligar endpoints da secured-guard-ci)..."
+            docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            remove_secured_guard_ci_network
             sleep 2
             
             echo "📦 Iniciando banco de dados (Postgres + Redis)..."
