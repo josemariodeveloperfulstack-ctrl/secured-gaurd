@@ -433,30 +433,23 @@ jobs:
             docker network rm secured-guard-ci 2>/dev/null || true
             sleep 2
             
-            echo "📦 Iniciando banco de dados (Postgres + Redis)..."
+            echo "📦 Iniciando bando de dados e Flyway repair..."
             docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
-            echo "⏳ Aguardando Postgres aceitar conexões (até ~200s; VPS lenta pode demorar)..."
-            PG_READY=0
-            for j in $(seq 1 40); do
-              if docker exec secured-guard-db-ci pg_isready -U secured_guard_ci -d secured_guard_ci 2>/dev/null \
-                && docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -tAc "SELECT 1" >/dev/null 2>&1; then
-                echo "✅ Postgres pronto (pg_isready + SELECT 1) após ~$(((j - 1) * 5))s"
-                PG_READY=1
+            echo "⏳ Aguardando postgres ficar pronto..."
+            for j in $(seq 1 18); do
+              if docker exec secured-guard-db-ci pg_isready -U secured_guard_ci -d secured_guard_ci 2>/dev/null; then
+                echo "✅ Postgres pronto!"
                 break
               fi
-              if [ $((j % 5)) -eq 0 ]; then
-                echo "   ...ainda aguardando Postgres (tentativa $j/40, ~$((j * 5))s)..."
-              fi
-              [ $j -eq 40 ] && { echo "⚠️ Timeout aguardando Postgres após 200s"; exit 1; }
+              [ $j -eq 18 ] && { echo "⚠️ Timeout aguardando postgres"; exit 1; }
               sleep 5
             done
-            [ "$PG_READY" -eq 1 ] || { echo "⚠️ Postgres não ficou pronto"; exit 1; }
             sleep 3
             
             echo "🧹 Executando limpeza de duplicatas (Roles & Permissions)..."
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci < scripts/fix_all_duplicates.sql || echo "⚠️ Erro na limpeza, continuando..."
             
-            echo "🔧 Flyway: removendo entradas de migrações falhas em flyway_schema_history (permite reexecutar V1013, etc.)..."
+            echo "🔧 Removendo registros de migrações falhas (V452, V457, etc.)..."
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE success = false;" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '457';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '1008';" 2>/dev/null || true
@@ -466,8 +459,8 @@ jobs:
             echo "🚀 Iniciando todos os containers (usando imagens já baixadas)..."
             docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
             
-            echo "⏳ Aguardando backend + Flyway em /api/health (máx. 540s; compose start_period=420s)..."
-            for j in $(seq 1 54); do
+            echo "⏳ Aguardando backend subir (máx. 300s)..."
+            for j in $(seq 1 30); do
               BACKEND_STATE=$(docker inspect secured-guard-backend-ci --format '{{.State.Status}}' 2>/dev/null || echo "missing")
               if [ "$BACKEND_STATE" = "exited" ] || [ "$BACKEND_STATE" = "dead" ]; then
                 echo "❌ Backend crashou (status: $BACKEND_STATE). Logs:"
@@ -475,13 +468,13 @@ jobs:
                 exit 1
               fi
               if curl -sf http://localhost:8081/api/health >/dev/null 2>&1; then
-                echo "✅ Backend respondendo após ~$(((j - 1) * 10))s"
+                echo "✅ Backend respondendo após ${j}0s!"
                 break
               fi
-              echo "   Aguardando... ~$((j * 10))s (backend status: $BACKEND_STATE)"
+              echo "   Aguardando... ${j}0s (backend status: $BACKEND_STATE)"
               sleep 10
-              if [ $j -eq 54 ]; then
-                echo "❌ Timeout 540s - backend não respondeu em /api/health. Logs:"
+              if [ $j -eq 30 ]; then
+                echo "❌ Timeout 300s - backend não respondeu em /api/health. Logs:"
                 docker logs --tail 200 secured-guard-backend-ci 2>&1 || true
                 exit 1
               fi
