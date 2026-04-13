@@ -26,23 +26,23 @@ MAX_ATTEMPTS=25
 ATTEMPT=1
 HEALTH_CHECK_URL="https://ci.z7botsolutions.com.br/api/health"
 INTERNAL_HEALTH_CHECK="http://localhost:8081/api/health"
+# Por omissão o script só termina com sucesso se o health PÚBLICO (Cloudflare) passar.
+# Apenas para debugging: CI_HEALTH_ALLOW_PARTIAL_SUCCESS=1 permite exit 0 só com interno OK (não use em produção).
 
 # Função para log com timestamp
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
 }
 
-# Função para verificar Traefik
+# Função para verificar Traefik (container exato "traefik", não substring noutro nome)
 check_traefik() {
     log "🔍 Verificando status do Traefik..."
-    local traefik_status=$(docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1 || echo "")
-    if echo "$traefik_status" | grep -q "Up" 2>/dev/null; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^traefik$'; then
         log "✅ Traefik está rodando"
         return 0
-    else
-        log "❌ Traefik NÃO está rodando! Isso causa HTTP 521 do Cloudflare."
-        return 1
     fi
+    log "❌ Traefik NÃO está rodando! Isso causa HTTP 521 do Cloudflare."
+    return 1
 }
 
 # Função para verificar se backend está pronto
@@ -203,6 +203,10 @@ collect_diagnostics() {
     curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
     echo "Nginx (localhost:8082):"
     curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8082/api/health || echo "Nginx não responde"
+    echo ""
+    echo "🔌 Porta 80 no host (Traefik precisa disto livre para Cloudflare deixar de responder 521):"
+    (command -v ss >/dev/null && ss -tlnp 2>/dev/null | grep -E ':80\s' || true) || echo "   (instale iproute2 / use: sudo ss -tlnp | grep ':80')"
+    docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null | grep -E ':80->|:::80->' || echo "   (nenhum container mapeando :80)"
     
     echo ""
     echo "📋 Logs do backend (últimas 30 linhas):"
@@ -251,9 +255,9 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             exit 0
         else
             log "⚠️ Aplicação funciona internamente mas não externamente"
-            log "💡 Pode ser problema de Cloudflare ou Traefik"
-            if [ $ATTEMPT -ge 15 ]; then
-                log "✅ Considerando sucesso parcial - aplicação está operacional internamente"
+            log "💡 HTTP 521 = origem inacessível na 80/443 — em geral Traefik parado (porta 80 ocupada no host)."
+            if [ "${CI_HEALTH_ALLOW_PARTIAL_SUCCESS:-0}" = "1" ] && [ $ATTEMPT -ge 15 ]; then
+                log "⚠️ CI_HEALTH_ALLOW_PARTIAL_SUCCESS=1 — saindo com sucesso apesar do externo falhar."
                 exit 0
             fi
         fi
