@@ -138,11 +138,11 @@ check_external_health() {
             return 1
         fi
     elif [ "$http_code" = "521" ]; then
-        log "❌ HTTP 521: Cloudflare não consegue conectar ao servidor de origem"
-        log "💡 Possíveis causas:"
-        log "   1. Traefik não está rodando"
-        log "   2. Firewall bloqueando conexões do Cloudflare"
-        log "   3. Nginx não está respondendo"
+        log "❌ HTTP 521: Cloudflare não consegue conectar ao servidor de origem (origem offline / recusa TCP)."
+        log "💡 Causas frequentes neste projeto:"
+        log "   1. Traefik parado — ver docker logs traefik; se viu 'address already in use' na 80, outro serviço usa a porta."
+        log "   2. Porta 80 ocupada (nginx do sistema, outro container): sudo ss -tlnp | grep ':80'"
+        log "   3. Firewall bloqueando IPs da Cloudflare na 80/443"
         return 1
     elif [ "$http_code" = "301" ] || [ "$http_code" = "302" ] || [ "$http_code" = "307" ] || [ "$http_code" = "308" ]; then
         log "⚠️ HTTP $http_code: Redirecionamento detectado"
@@ -227,9 +227,17 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     # Verificar Traefik a cada 3 tentativas (script roda na VPS, executar localmente)
     if [ $((ATTEMPT % 3)) -eq 0 ]; then
         if ! check_traefik; then
-            log "💡 Tentando iniciar Traefik..."
-            (cd /var/www/secured_guard && docker-compose -f docker-compose.traefik.yml up -d 2>&1) || true
+            log "💡 Tentando Traefik: compose down + rm container falho + up -d..."
+            (
+              cd /var/www/secured_guard || exit 0
+              docker-compose -f docker-compose.traefik.yml down 2>/dev/null || true
+              docker rm -f traefik 2>/dev/null || true
+              docker-compose -f docker-compose.traefik.yml up -d 2>&1
+            ) || true
             sleep 15
+            if ! check_traefik; then
+                log "⚠️ Traefik ainda não subiu. Verifique conflito na porta 80: sudo ss -tlnp | grep ':80'"
+            fi
         fi
     fi
     

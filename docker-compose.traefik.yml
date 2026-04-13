@@ -1,4 +1,6 @@
 version: "3.8"
+# Exige portas 80 e 443 livres no HOST. Se "address already in use", pare nginx/apache do SO ou outro container :80.
+# Diagnóstico: sudo ss -tlnp | grep -E ':80|:443'  &&  docker ps --format '{{.Names}} {{.Ports}}' | grep ':80->'
 
 services:
   traefik:

@@ -9,12 +9,39 @@ set +e
 echo "🔧 Corrigindo problema de 404 no Traefik..."
 echo ""
 
+# Diagnóstico: Cloudflare 521 + "address already in use" na 80 = outro processo ocupa a porta do host.
+diagnose_port80() {
+  echo "   📌 Quem usa a porta 80 no host:"
+  (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null) | grep -E ':(80)\s' || echo "      (não listado — instale iproute2/ss)"
+  echo "   📌 Containers Docker com bind em :80:"
+  docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null | grep -E ':80->|:::80->|0\.0\.0\.0:80->' || echo "      (nenhum encontrado pelo grep)"
+}
+
+# Sobe Traefik após limpar container falho (Created/Exited por conflito de porta).
+start_traefik_safe() {
+  cd /var/www/secured_guard || return 1
+  echo "   🔄 compose down + rm traefik (estado falho / porta presa no nome)..."
+  docker-compose -f docker-compose.traefik.yml down 2>/dev/null || true
+  docker rm -f traefik 2>/dev/null || true
+  echo "   🚀 docker-compose up -d traefik..."
+  if docker-compose -f docker-compose.traefik.yml up -d; then
+    return 0
+  fi
+  echo "❌ Traefik não subiu (muito provável: porta 80 ou 443 já em uso)."
+  diagnose_port80
+  echo "   💡 Liberte a 80/443 no host. Exemplos:"
+  echo "      • Outro container: docker stop <nome>   (veja lista acima)"
+  echo "      • Nginx no sistema: sudo systemctl stop nginx"
+  echo "      • Apache: sudo systemctl stop apache2"
+  return 1
+}
+
 # 1. Verificar se Traefik está rodando
 echo "1️⃣ Verificando Traefik..."
-if ! docker ps | grep -q "traefik"; then
+if ! docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
   echo "❌ Traefik não está rodando! Iniciando..."
-  cd /var/www/secured_guard
-  docker-compose -f docker-compose.traefik.yml up -d
+  diagnose_port80
+  start_traefik_safe || true
   sleep 10
 else
   echo "✅ Traefik está rodando"
@@ -75,6 +102,9 @@ fi
 # 5. Verificar conectividade Traefik → Nginx
 echo ""
 echo "5️⃣ Testando conectividade Traefik → Nginx..."
+if ! docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
+  echo "⚠️ Traefik não está Up — pulando wget (corrija conflito na porta 80)."
+else
 if docker exec traefik wget -qO- --timeout=5 http://secured-guard-nginx-ci:80/health 2>/dev/null | grep -q "healthy"; then
   echo "✅ Traefik consegue acessar o Nginx"
 else
@@ -99,25 +129,34 @@ else
     sleep 2
   fi
 fi
+fi
 
 # 6. Reiniciar Traefik para carregar configuração dinâmica
 echo ""
 echo "6️⃣ Reiniciando Traefik para carregar configuração dinâmica..."
-docker restart traefik
-echo "   Aguardando Traefik reiniciar (15s)..."
+if docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
+  docker restart traefik
+else
+  echo "   Traefik não estava Up — tentando subir de forma limpa..."
+  start_traefik_safe || true
+fi
+echo "   Aguardando Traefik (15s)..."
 sleep 15
 
 # Verificar se Traefik reiniciou
-if docker ps | grep -q "traefik"; then
-  echo "✅ Traefik reiniciado com sucesso"
+if docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
+  echo "✅ Traefik em execução"
 else
-  echo "❌ Traefik não reiniciou!"
-  exit 1
+  echo "❌ Traefik ainda não está rodando (ver conflito de porta 80/443)."
+  diagnose_port80
 fi
 
 # 7. Verificar se router foi carregado
 echo ""
 echo "7️⃣ Verificando se router foi carregado..."
+if ! docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
+  echo "⚠️ Traefik não está Up — passos 7–9 ignorados até a porta 80/443 estar livre."
+else
 ROUTERS=$(docker exec traefik wget -qO- http://localhost:8080/api/http/routers 2>/dev/null || echo "[]")
 if echo "$ROUTERS" | grep -q "ci-backend"; then
   echo "✅ Router ci-backend encontrado no Traefik"
@@ -174,6 +213,8 @@ elif [ "$HTTP_CODE" = "404" ]; then
   echo "   4. Se ambos estão na mesma rede (z7network)"
 else
   echo "⚠️ Resposta HTTP: $HTTP_CODE"
+fi
+
 fi
 
 echo ""
