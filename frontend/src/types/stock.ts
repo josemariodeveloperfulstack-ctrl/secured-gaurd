@@ -78,6 +78,7 @@ export interface StockMovement {
 
 export interface PhysicalInventoryImportLineResult {
   categoryLabel: string;
+  itemName?: string;
   stockItemCode?: string;
   previousQuantity?: number;
   targetQuantity?: number;
@@ -88,6 +89,8 @@ export interface PhysicalInventoryImportLineResult {
 }
 
 export interface PhysicalInventoryImportResult {
+  /** SUMMARY = aba resumo por categoria; DETAIL = linhas por item (inventário no cadastro). */
+  importMode?: string;
   requisitionNumber: string;
   importedAt: string;
   fileName: string;

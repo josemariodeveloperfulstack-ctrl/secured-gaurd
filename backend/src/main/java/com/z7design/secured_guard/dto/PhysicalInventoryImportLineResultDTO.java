@@ -13,6 +13,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class PhysicalInventoryImportLineResultDTO {
     private String categoryLabel;
+    /** Preenchido na importação por item (DETAIL). */
+    private String itemName;
     private String stockItemCode;
     private Integer previousQuantity;
     private Integer targetQuantity;

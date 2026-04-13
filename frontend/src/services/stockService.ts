@@ -23,18 +23,39 @@ import {
   StockRequisitionListItem
 } from '@/types/stock';
 
+/** Normaliza campos numéricos e nomes alternativos vindos do JSON (evita estoque "0" na UI por campo errado). */
+function normalizeStockItem(raw: Record<string, unknown>): StockItem {
+  const cur = raw.currentQuantity ?? raw.current_quantity;
+  const min = raw.minimumQuantity ?? raw.minimum_quantity;
+  const low = raw.isLowStock ?? raw.is_low_stock;
+  const fn = raw.fullName ?? raw.full_name;
+  const base = raw as unknown as StockItem;
+  const nameStr = typeof raw.name === 'string' ? raw.name : '';
+  const fullNameStr =
+    typeof fn === 'string' && fn.trim() !== ''
+      ? fn
+      : typeof base.fullName === 'string' && base.fullName
+        ? base.fullName
+        : nameStr;
+  return {
+    ...base,
+    currentQuantity: typeof cur === 'number' && !Number.isNaN(cur) ? cur : Number(cur) || 0,
+    minimumQuantity: typeof min === 'number' && !Number.isNaN(min) ? min : Number(min) || 0,
+    isLowStock: Boolean(low),
+    fullName: fullNameStr,
+  };
+}
+
 export const stockService = {
   // ===== ITENS DE ESTOQUE =====
 
   async getAllItems(): Promise<StockItem[]> {
-    try {
-      const response = await api.get('/api/stock/items');
-      return response.data || [];
-    } catch (error) {
-      console.error('Erro ao buscar itens de estoque:', error);
-      // Return empty array instead of throwing error to prevent component crash
+    const response = await api.get<StockItem[]>('/api/stock/items');
+    const data = response.data;
+    if (!Array.isArray(data)) {
       return [];
     }
+    return data.map((row) => normalizeStockItem(row as unknown as Record<string, unknown>));
   },
 
   async searchItems(filters: StockFilters, page = 0, size = 20): Promise<{ content: StockItem[], totalElements: number }> {
@@ -50,8 +71,17 @@ export const stockService = {
       params.append('page', page.toString());
       params.append('size', size.toString());
 
-      const response = await api.get(`/api/stock/items/search?${params.toString()}`);
-      return response.data;
+      const response = await api.get<{ content: StockItem[]; totalElements: number }>(
+        `/api/stock/items/search?${params.toString()}`
+      );
+      const body = response.data;
+      if (!body?.content) {
+        return { content: [], totalElements: 0 };
+      }
+      return {
+        ...body,
+        content: body.content.map((row) => normalizeStockItem(row as unknown as Record<string, unknown>)),
+      };
     } catch (error) {
       console.error('Erro ao buscar itens com filtros:', error);
       throw new Error('Falha ao buscar itens');
@@ -206,10 +236,21 @@ export const stockService = {
   async importPhysicalInventory(file: File): Promise<PhysicalInventoryImportResult> {
     const form = new FormData();
     form.append('file', file);
+    // Não definir Content-Type manualmente: o browser/axios precisa incluir o boundary no multipart.
     const response = await api.post<PhysicalInventoryImportResult>(
       '/api/stock/import/physical-inventory',
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      form
+    );
+    return response.data;
+  },
+
+  /** Inventário por item: zera estoque de todos os itens ativos e aplica cada linha da planilha (código, item, categoria, estoque…). */
+  async importItemInventory(file: File): Promise<PhysicalInventoryImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post<PhysicalInventoryImportResult>(
+      '/api/stock/import/item-inventory',
+      form
     );
     return response.data;
   },

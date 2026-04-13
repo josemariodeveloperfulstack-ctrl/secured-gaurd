@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,6 @@ import {
   User,
   Package,
   Calendar,
-  Upload,
   ClipboardList
 } from 'lucide-react';
 import { StockMovement, MovementType, MovementReason, MovementTypeLabels, MovementReasonLabels, InventoryRequisitionSummary, MovementFilters } from '@/types/stock';
@@ -55,8 +54,6 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
   const [endDate, setEndDate] = useState('');
   const [requisitionFilter, setRequisitionFilter] = useState('');
   const [reqSummaries, setReqSummaries] = useState<InventoryRequisitionSummary[]>([]);
-  const [importing, setImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const loadRequisitionSummaries = async () => {
@@ -116,29 +113,6 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
     loadMovements();
   };
 
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setImporting(true);
-    try {
-      const result = await stockService.importPhysicalInventory(file);
-      toast({
-        title: 'Inventário importado',
-        description: `Requisição ${result.requisitionNumber} — ${result.lines.filter((l) => !l.skipped).length} ajuste(s).`,
-      });
-      setRequisitionFilter(result.requisitionNumber);
-      await loadRequisitionSummaries();
-      await loadMovements(result.requisitionNumber);
-      onRefresh();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Falha no import';
-      toast({ title: 'Erro no import', description: msg, variant: 'destructive' });
-    } finally {
-      setImporting(false);
-    }
-  };
-
   const getMovementBadge = (movement: StockMovement) => {
     if (movement.movementType === MovementType.ENTRADA) {
       return <Badge variant="default" className="bg-green-600">Entrada</Badge>;
@@ -172,39 +146,19 @@ const StockMovementsTable: React.FC<StockMovementsTableProps> = ({
       <Card className="bg-seguranca-graphite border-gray-600">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-seguranca-lightgray">
-            <Upload className="h-5 w-5" />
-            Inventário físico (planilha)
+            <ClipboardList className="h-5 w-5" />
+            Requisições de inventário
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           <p className="text-sm text-gray-400">
-            Envie o Excel com a aba <strong className="text-seguranca-lightgray">Resumo Estoque</strong> (colunas Categoria e Quantidade).
-            Todas as movimentações do import recebem o mesmo número de requisição <code className="text-seguranca-yellow">REQ-INV-…</code> para relatórios (ex.: a cada 10 dias).
+            A <strong className="text-seguranca-lightgray">importação de inventário por item</strong> (planilha com código e quantidade por linha) foi movida para a aba{' '}
+            <strong className="text-seguranca-yellow">Itens</strong>. Aqui você consulta o histórico e filtra por número de requisição{' '}
+            <code className="text-seguranca-yellow">REQ-INV-…</code> / <code className="text-seguranca-yellow">REQ-INV-ITEM-…</code>.
           </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleImportFile}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={importing}
-            className="border-gray-600 text-seguranca-lightgray"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {importing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-            {importing ? 'Importando…' : 'Selecionar planilha'}
-          </Button>
-
           {reqSummaries.length > 0 && (
             <div>
-              <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                <ClipboardList className="h-3 w-3" />
-                Requisições nos últimos 10 dias (clique para filtrar)
-              </p>
+              <p className="text-xs text-gray-500 mb-2">Últimos 10 dias — clique para filtrar</p>
               <div className="flex flex-wrap gap-2">
                 {reqSummaries.map((r) => (
                   <Button

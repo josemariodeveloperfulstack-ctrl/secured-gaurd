@@ -11,6 +11,7 @@ import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.service.StockService;
 import com.z7design.secured_guard.service.StockReportService;
 import com.z7design.secured_guard.service.StockPhysicalInventoryImportService;
+import com.z7design.secured_guard.service.StockItemInventoryImportService;
 import com.z7design.secured_guard.repository.UserRepository;
 import java.io.IOException;
 
@@ -48,6 +49,7 @@ public class StockController {
     private final StockService stockService;
     private final StockReportService stockReportService;
     private final StockPhysicalInventoryImportService stockPhysicalInventoryImportService;
+    private final StockItemInventoryImportService stockItemInventoryImportService;
     private final UserRepository userRepository;
 
     // ===== ITENS DE ESTOQUE =====
@@ -216,7 +218,7 @@ public class StockController {
 
     @PostMapping(value = "/import/physical-inventory", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
-    @Operation(summary = "Importar inventário físico", description = "Lê a aba de resumo (ex.: Resumo Estoque), ajusta quantidades e gera movimentações com o mesmo número de requisição REQ-INV-*.")
+    @Operation(summary = "Importar inventário físico (resumo por categoria)", description = "Lê a aba de resumo (ex.: Resumo Estoque), ajusta quantidades e gera movimentações com o mesmo número de requisição REQ-INV-*.")
     public ResponseEntity<?> importPhysicalInventory(
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
@@ -228,6 +230,27 @@ public class StockController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Erro ao importar inventário físico: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Falha ao processar planilha: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping(value = "/import/item-inventory", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    @Operation(summary = "Importar inventário por item (planilha detalhada)",
+            description = "Zera o estoque de todos os itens ativos, depois importa cada linha. Lê todas as abas detalhadas (ignora aba \"Resumo Estoque\"). "
+                    + "Cabeçalhos: Código ou Tamanho + Estoque/Quantidade; opcional Item, Categoria (ou inferida pelo nome da aba), Mín, Valor unit.; "
+                    + "Prateleira ou Localização (criação automática se não existir). Com Tamanho, o código do item é derivado da aba + tamanho. REQ-INV-ITEM-*.")
+    public ResponseEntity<?> importItemInventory(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        try {
+            UUID userId = resolveStockUserId(authentication);
+            PhysicalInventoryImportResultDTO result = stockItemInventoryImportService.importWorkbook(file, userId);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao importar inventário por item: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Falha ao processar planilha: " + e.getMessage()));
         }
     }

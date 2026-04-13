@@ -56,13 +56,19 @@ const EstoqueSimplificado: React.FC = () => {
 
   // Carregar dados iniciais
   useEffect(() => {
-    loadInitialData();
+    void loadInitialData(true);
   }, []);
 
-  const loadInitialData = async () => {
+  /**
+   * @param fullPageLoad — se true, usa `loading` e ocupa o ecrã inteiro (apenas 1.ª carga).
+   *   Refreshes (import, botão Atualizar) usam false para não desmontar a aba Itens e evitar dados desatualizados na tabela.
+   */
+  const loadInitialData = async (fullPageLoad: boolean): Promise<boolean> => {
     try {
-      setLoading(true);
-      
+      if (fullPageLoad) {
+        setLoading(true);
+      }
+
       const [report, items, movements, alerts, requisitions] = await Promise.all([
         stockService.getStockReport(),
         stockService.getAllItems(),
@@ -70,39 +76,47 @@ const EstoqueSimplificado: React.FC = () => {
         stockService.getActiveAlerts(),
         stockService.listStockRequisitions().catch(() => [] as StockRequisitionListItem[]),
       ]);
-      
+
       setStockReport(report);
       setStockItems(Array.isArray(items) ? items : []);
       setRecentMovements(movements);
       setActiveAlerts(Array.isArray(alerts) ? alerts : []);
       setStockRequisitions(Array.isArray(requisitions) ? requisitions : []);
-      
+
+      return true;
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados do estoque.",
-        variant: "destructive"
-      });
+      if (fullPageLoad) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os dados do estoque.",
+          variant: "destructive"
+        });
+      }
+      return false;
     } finally {
-      setLoading(false);
+      if (fullPageLoad) {
+        setLoading(false);
+      }
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadInitialData();
-      toast({
-        title: "Sucesso",
-        description: "Dados atualizados com sucesso.",
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar dados.",
-        variant: "destructive"
-      });
+      const ok = await loadInitialData(false);
+      if (ok) {
+        toast({
+          title: "Sucesso",
+          description: "Dados atualizados com sucesso.",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Não foi possível atualizar os dados do estoque.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setRefreshing(false);
     }
