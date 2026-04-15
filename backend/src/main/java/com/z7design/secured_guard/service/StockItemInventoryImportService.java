@@ -50,8 +50,9 @@ import java.util.regex.Pattern;
  * em prateleiras diferentes são permitidos. Se a identificação da prateleira ainda não existir no cadastro, ela é
  * criada automaticamente (ativa) com esse código; prateleiras inativas com a mesma identificação são reativadas.
  * Planilhas no formato uniforme (colunas Tamanho, Quantidade, Localização) por aba de categoria são reconhecidas; o código
- * do item é derivado da aba + tamanho quando não há coluna Código. Todas as abas detalhadas são processadas (a aba
- * "Resumo Estoque" é ignorada neste fluxo).
+ * do item é derivado da aba + tamanho quando não há coluna Código. Matriz tamanho × produto (ex.: aba Calçados: coluna
+ * Tamanho e várias colunas de modelos) gera um item por célula (código ABA-MODELO-TAMANHO). Aba Descartes com colunas
+ * Item + Quantidade importa cada linha. Todas as abas detalhadas são processadas (aba Resumo Estoque ignorada).
  */
 @Service
 @RequiredArgsConstructor
@@ -96,22 +97,33 @@ public class StockItemInventoryImportService {
 
         try (InputStream in = file.getInputStream(); Workbook wb = WorkbookFactory.create(in)) {
             FormulaEvaluator evaluator = wb.getCreationHelper().createFormulaEvaluator();
-            List<SheetAndHeader> detailSheets = findAllItemDetailSheets(wb, evaluator);
-            if (detailSheets.isEmpty()) {
+            List<SheetAndHeader> detailSheets = new ArrayList<>();
+            List<SizeMatrixSheetSpec> matrixSheets = new ArrayList<>();
+            List<DescartesSheetSpec> descartesSheets = new ArrayList<>();
+            collectImportSheets(wb, evaluator, detailSheets, matrixSheets, descartesSheets);
+            if (detailSheets.isEmpty() && matrixSheets.isEmpty() && descartesSheets.isEmpty()) {
                 String preview = describeWorkbookHeaderPreview(wb, evaluator);
                 throw new IllegalArgumentException(
-                        "Nenhuma aba detalhada reconhecida. Use cabeçalhos Código (ou Tamanho) e Estoque/Quantidade, "
-                                + "opcional Localização ou Prateleira. A aba \"Resumo Estoque\" não é usada nesta importação. "
-                                + "Leitura da 1.ª aba: " + preview);
+                        "Nenhuma aba detalhada reconhecida. Use Código (ou Tamanho) e Estoque/Quantidade, matriz Tamanho "
+                                + "× produtos (várias colunas de modelos), ou aba Descartes (Item + Quantidade). "
+                                + "A aba \"Resumo Estoque\" não é usada nesta importação. Leitura da 1.ª aba: " + preview);
             }
-            log.info("Import inventário por item: {} aba(s) detalhada(s): {}",
-                    detailSheets.size(),
-                    detailSheets.stream().map(s -> s.sheet().getSheetName()).toList());
+            log.info("Import inventário: abas linha a linha={}, matriz tamanho×produto={}, descartes={}",
+                    detailSheets.stream().map(s -> s.sheet().getSheetName()).toList(),
+                    matrixSheets.stream().map(s -> s.sheet().getSheetName()).toList(),
+                    descartesSheets.stream().map(s -> s.sheet().getSheetName()).toList());
             if (detailSheets.stream().anyMatch(s -> s.header().variantSizedCode())) {
                 warnings.add("Planilha com coluna \"Tamanho\" (sem código de item): o sistema gera códigos como ABA-TAMANHO "
                         + "(ex.: CAMISAS-VIGILANCIA-P). O reset inicial zera todos os itens ativos; só recebem saldo de volta "
                         + "os códigos que existirem neste arquivo. Para atualizar itens já cadastrados, inclua a coluna "
                         + "\"Código\" igual ao cadastro.");
+            }
+            if (!matrixSheets.isEmpty()) {
+                warnings.add("Aba(s) em matriz (ex.: Calçados): cada combinação tamanho × coluna de produto vira um item "
+                        + "(código ABA-PRODUTO-TAMANHO, ex.: CALCADOS-SAPATO-SEGURANCA-34).");
+            }
+            if (!descartesSheets.isEmpty()) {
+                warnings.add("Aba(s) Descartes: cada linha vira um item com prefixo no nome e categoria alinhada a descarte.");
             }
 
             int locReset = stockItemLocationRepository.resetLocationQuantitiesForActiveStockItems();
@@ -119,6 +131,13 @@ public class StockItemInventoryImportService {
             log.info("Reset inventário: {} itens ativos zerados, {} linhas de localização em prateleira zeradas", itemReset, locReset);
 
             Set<String> seenLineKeys = new HashSet<>();
+
+            for (SizeMatrixSheetSpec mx : matrixSheets) {
+                importSizeMatrixSheet(mx, originalName, requisitionNumber, userId, evaluator, lines, warnings, seenLineKeys);
+            }
+            for (DescartesSheetSpec ds : descartesSheets) {
+                importDescartesSheet(ds, originalName, requisitionNumber, userId, evaluator, lines, warnings, seenLineKeys);
+            }
 
             for (SheetAndHeader sh : detailSheets) {
                 Sheet sheet = sh.sheet();
@@ -152,24 +171,8 @@ public class StockItemInventoryImportService {
                     if (code.isEmpty()) {
                         continue;
                     }
-                    String codeKey = code.toUpperCase(Locale.ROOT);
                     String shelfIdent = hdr.shelfCol() >= 0 ? trimCell(row.getCell(hdr.shelfCol()), evaluator) : "";
                     String floorVal = hdr.floorCol() >= 0 ? trimCell(row.getCell(hdr.floorCol()), evaluator) : "";
-                    String lineKey = hdr.shelfCol() >= 0
-                            ? codeKey + "\u0001" + shelfIdent.toUpperCase(Locale.ROOT) + "\u0001" + floorVal.toUpperCase(Locale.ROOT)
-                            : codeKey;
-                    if (seenLineKeys.contains(lineKey)) {
-                        warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + ": duplicada (mesmo código"
-                                + (hdr.shelfCol() >= 0 ? ", local e compartimento" : "")
-                                + ") \"" + code + "\" — ignorada.");
-                        lines.add(PhysicalInventoryImportLineResultDTO.builder()
-                                .stockItemCode(code)
-                                .skipped(true)
-                                .message(hdr.shelfCol() >= 0 ? "Linha duplicada (código + localização)" : "Código duplicado no arquivo")
-                                .build());
-                        continue;
-                    }
-                    seenLineKeys.add(lineKey);
 
                     String name = hdr.nameCol() >= 0 ? trimCell(row.getCell(hdr.nameCol()), evaluator) : "";
                     if (name.isEmpty()) {
@@ -179,18 +182,16 @@ public class StockItemInventoryImportService {
                     }
                     String rawCat = hdr.catCol() >= 0 ? trimCell(row.getCell(hdr.catCol()), evaluator) : "";
                     String categoryLabel = rawCat.isBlank() ? sheet.getSheetName().trim() : rawCat;
-                    StockCategory category = resolveCategory(rawCat.isBlank() ? sheet.getSheetName() : rawCat);
+                    String categorySource = rawCat.isBlank() ? sheet.getSheetName() : rawCat;
+                    StockCategory category = resolveCategory(categorySource);
                     if (category == null) {
-                        warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + " (" + code + "): categoria não reconhecida \""
-                                + categoryLabel + "\".");
-                        lines.add(PhysicalInventoryImportLineResultDTO.builder()
-                                .stockItemCode(code)
-                                .itemName(name)
-                                .categoryLabel(categoryLabel)
-                                .skipped(true)
-                                .message("Categoria não reconhecida")
-                                .build());
-                        continue;
+                        category = resolveCategoryFromItemHints(name, code);
+                    }
+                    if (category == null) {
+                        category = StockCategory.ACESSORIOS;
+                        warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + " (" + code + "): categoria \""
+                                + categoryLabel + "\" não mapeada; usado \""
+                                + StockCategory.ACESSORIOS.getDescription() + "\".");
                     }
 
                     int targetQty;
@@ -238,94 +239,25 @@ public class StockItemInventoryImportService {
                         unitCost = parseMoney(row.getCell(hdr.priceCol()), evaluator);
                     }
 
-                    try {
-                    StockItem item = stockItemRepository.findByCodeIgnoreCase(code).orElse(null);
-                    int previous = 0;
-                    if (item == null) {
-                        StockItemDTO dto = new StockItemDTO();
-                        dto.setCode(code);
-                        dto.setName(name);
-                        dto.setCategory(category);
-                        dto.setCurrentQuantity(0);
-                        dto.setMinimumQuantity(minQty);
-                        dto.setUnitCost(unitCost);
-                        dto.setActive(true);
-                        dto.setDescription("Criado na importação de inventário por planilha.");
-                        stockService.createItem(dto);
-                        item = stockItemRepository.findByCodeIgnoreCase(code)
-                                .orElseThrow(() -> new IllegalStateException("Falha ao criar item " + code));
-                    } else {
-                        previous = item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0;
-                        StockItemDTO upd = new StockItemDTO();
-                        upd.setCode(item.getCode());
-                        upd.setName(name);
-                        upd.setCategory(category);
-                        upd.setMinimumQuantity(minQty);
-                        upd.setUnitCost(unitCost != null ? unitCost : item.getUnitCost());
-                        upd.setActive(true);
-                        stockService.updateItem(item.getId(), upd);
-                        item = stockItemRepository.findById(item.getId()).orElse(item);
-                    }
-
-                    if (targetQty == 0) {
-                        lines.add(PhysicalInventoryImportLineResultDTO.builder()
-                                .categoryLabel(categoryLabel)
-                                .stockItemCode(item.getCode())
-                                .itemName(name)
-                                .previousQuantity(previous)
-                                .targetQuantity(0)
-                                .delta(0)
-                                .skipped(false)
-                                .message("Estoque zerado conforme planilha")
-                                .build());
-                        continue;
-                    }
-
-                    StockMovementDTO mov = new StockMovementDTO();
-                    mov.setStockItemId(item.getId());
-                    mov.setMovementType(MovementType.ENTRADA);
-                    mov.setReason(MovementReason.AJUSTE_ENTRADA);
-                    mov.setQuantity(targetQty);
-                    mov.setRequisitionNumber(requisitionNumber);
-                    StringBuilder notes = new StringBuilder("Inventário por planilha (itens) | ").append(originalName);
-                    if (hdr.shelfCol() >= 0) {
-                        if (!shelfIdent.isBlank()) {
-                            StorageShelf shelf = resolveOrCreateShelfByIdentification(shelfIdent);
-                            StockItemLocation loc = getOrCreateItemLocation(item, shelf, floorVal);
-                            mov.setItemLocationId(loc.getId());
-                            notes.append(" | Prat.: ").append(shelf.getIdentification());
-                            if (loc.getFloor() != null && !loc.getFloor().isBlank()) {
-                                notes.append(" | Comp.: ").append(loc.getFloor());
-                            }
-                        } else {
-                            warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + " (" + code
-                                    + "): localização/prateleira vazia — quantidade só no total do item (sem posição).");
-                        }
-                    }
-                    mov.setNotes(notes.toString());
-
-                    StockMovementDTO saved = stockService.createMovement(mov, userId);
-                    lines.add(PhysicalInventoryImportLineResultDTO.builder()
-                            .categoryLabel(categoryLabel)
-                            .stockItemCode(item.getCode())
-                            .itemName(name)
-                            .previousQuantity(0)
-                            .targetQuantity(targetQty)
-                            .delta(targetQty)
-                            .movementId(saved.getId())
-                            .skipped(false)
-                            .build());
-                } catch (Exception ex) {
-                    log.warn("{} — linha {} item {}: {}", sheet.getSheetName(), r + 1, code, ex.getMessage());
-                    warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + " (" + code + "): " + ex.getMessage());
-                    lines.add(PhysicalInventoryImportLineResultDTO.builder()
-                            .stockItemCode(code)
-                            .itemName(name)
-                            .categoryLabel(categoryLabel)
-                            .skipped(true)
-                            .message(ex.getMessage() != null ? ex.getMessage() : "Erro ao processar")
-                            .build());
-                }
+                    applyInventoryQuantityLine(
+                            originalName,
+                            requisitionNumber,
+                            userId,
+                            sheet.getSheetName(),
+                            r + 1,
+                            code,
+                            name,
+                            categoryLabel,
+                            category,
+                            targetQty,
+                            minQty,
+                            unitCost,
+                            hdr.shelfCol() >= 0,
+                            shelfIdent,
+                            floorVal,
+                            lines,
+                            warnings,
+                            seenLineKeys);
                 }
             }
         }
@@ -340,7 +272,145 @@ public class StockItemInventoryImportService {
                 .build();
     }
 
+    /**
+     * Cria/atualiza item e movimentação de ajuste (uma linha lógica de inventário).
+     * {@code hasShelfColumn} indica se a planilha prevê coluna de prateleira (mesmo que vazia na linha).
+     */
+    private void applyInventoryQuantityLine(
+            String originalName,
+            String requisitionNumber,
+            UUID userId,
+            String sheetName,
+            int excelRow,
+            String code,
+            String name,
+            String categoryLabel,
+            StockCategory category,
+            int targetQty,
+            int minQty,
+            BigDecimal unitCost,
+            boolean hasShelfColumn,
+            String shelfIdent,
+            String floorVal,
+            List<PhysicalInventoryImportLineResultDTO> lines,
+            List<String> warnings,
+            Set<String> seenLineKeys) {
+        String codeKey = code.toUpperCase(Locale.ROOT);
+        String shelfKey = shelfIdent == null ? "" : shelfIdent;
+        String floorKey = floorVal == null ? "" : floorVal;
+        String lineKey = hasShelfColumn
+                ? codeKey + "\u0001" + shelfKey.toUpperCase(Locale.ROOT) + "\u0001" + floorKey.toUpperCase(Locale.ROOT)
+                : codeKey;
+        if (seenLineKeys.contains(lineKey)) {
+            warnings.add(sheetName + " — linha " + excelRow + ": duplicada (mesmo código"
+                    + (hasShelfColumn ? ", local e compartimento" : "")
+                    + ") \"" + code + "\" — ignorada.");
+            lines.add(PhysicalInventoryImportLineResultDTO.builder()
+                    .stockItemCode(code)
+                    .skipped(true)
+                    .message(hasShelfColumn ? "Linha duplicada (código + localização)" : "Código duplicado no arquivo")
+                    .build());
+            return;
+        }
+        seenLineKeys.add(lineKey);
+
+        try {
+            StockItem item = stockItemRepository.findByCodeIgnoreCase(code).orElse(null);
+            int previous = 0;
+            if (item == null) {
+                StockItemDTO dto = new StockItemDTO();
+                dto.setCode(code);
+                dto.setName(name);
+                dto.setCategory(category);
+                dto.setCurrentQuantity(0);
+                dto.setMinimumQuantity(minQty);
+                dto.setUnitCost(unitCost);
+                dto.setActive(true);
+                dto.setDescription("Criado na importação de inventário por planilha.");
+                stockService.createItem(dto);
+                item = stockItemRepository.findByCodeIgnoreCase(code)
+                        .orElseThrow(() -> new IllegalStateException("Falha ao criar item " + code));
+            } else {
+                previous = item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0;
+                StockItemDTO upd = new StockItemDTO();
+                upd.setCode(item.getCode());
+                upd.setName(name);
+                upd.setCategory(category);
+                upd.setMinimumQuantity(minQty);
+                upd.setUnitCost(unitCost != null ? unitCost : item.getUnitCost());
+                upd.setActive(true);
+                stockService.updateItem(item.getId(), upd);
+                item = stockItemRepository.findById(item.getId()).orElse(item);
+            }
+
+            if (targetQty == 0) {
+                lines.add(PhysicalInventoryImportLineResultDTO.builder()
+                        .categoryLabel(categoryLabel)
+                        .stockItemCode(item.getCode())
+                        .itemName(name)
+                        .previousQuantity(previous)
+                        .targetQuantity(0)
+                        .delta(0)
+                        .skipped(false)
+                        .message("Estoque zerado conforme planilha")
+                        .build());
+                return;
+            }
+
+            StockMovementDTO mov = new StockMovementDTO();
+            mov.setStockItemId(item.getId());
+            mov.setMovementType(MovementType.ENTRADA);
+            mov.setReason(MovementReason.AJUSTE_ENTRADA);
+            mov.setQuantity(targetQty);
+            mov.setRequisitionNumber(requisitionNumber);
+            StringBuilder notes = new StringBuilder("Inventário por planilha (itens) | ").append(originalName);
+            if (hasShelfColumn) {
+                if (shelfKey.isBlank()) {
+                    warnings.add(sheetName + " — linha " + excelRow + " (" + code
+                            + "): localização/prateleira vazia — quantidade só no total do item (sem posição).");
+                } else {
+                    StorageShelf shelf = resolveOrCreateShelfByIdentification(shelfKey);
+                    StockItemLocation loc = getOrCreateItemLocation(item, shelf, floorKey);
+                    mov.setItemLocationId(loc.getId());
+                    notes.append(" | Prat.: ").append(shelf.getIdentification());
+                    if (loc.getFloor() != null && !loc.getFloor().isBlank()) {
+                        notes.append(" | Comp.: ").append(loc.getFloor());
+                    }
+                }
+            }
+            mov.setNotes(notes.toString());
+
+            StockMovementDTO saved = stockService.createMovement(mov, userId);
+            lines.add(PhysicalInventoryImportLineResultDTO.builder()
+                    .categoryLabel(categoryLabel)
+                    .stockItemCode(item.getCode())
+                    .itemName(name)
+                    .previousQuantity(0)
+                    .targetQuantity(targetQty)
+                    .delta(targetQty)
+                    .movementId(saved.getId())
+                    .skipped(false)
+                    .build());
+        } catch (Exception ex) {
+            log.warn("{} — linha {} item {}: {}", sheetName, excelRow, code, ex.getMessage());
+            warnings.add(sheetName + " — linha " + excelRow + " (" + code + "): " + ex.getMessage());
+            lines.add(PhysicalInventoryImportLineResultDTO.builder()
+                    .stockItemCode(code)
+                    .itemName(name)
+                    .categoryLabel(categoryLabel)
+                    .skipped(true)
+                    .message(ex.getMessage() != null ? ex.getMessage() : "Erro ao processar")
+                    .build());
+        }
+    }
+
     private record SheetAndHeader(Sheet sheet, ItemSheetHeader header) {}
+
+    /** Aba em matriz: linha de cabeçalho com "Tamanho" e duas ou mais colunas de produto (quantidades por tamanho). */
+    private record SizeMatrixSheetSpec(Sheet sheet, int headerRow, int sizeCol, List<Integer> productCols, List<String> productHeaders) {}
+
+    /** Aba Descartes: colunas Item (ou nome/descrição) + Quantidade. */
+    private record DescartesSheetSpec(Sheet sheet, int headerRow, int itemCol, int qtyCol) {}
 
     /** Código estável para planilhas com coluna Tamanho (uma aba por tipo de peça). */
     private static String deriveInventoryCodeFromSheetNameAndVariant(String sheetName, String sizeRaw) {
@@ -379,29 +449,349 @@ public class StockItemInventoryImportService {
         return n.contains("resumo") && n.contains("estoque");
     }
 
-    private static List<SheetAndHeader> findAllItemDetailSheets(Workbook wb, FormulaEvaluator ev) {
-        List<SheetAndHeader> out = new ArrayList<>();
+    private static void collectImportSheets(
+            Workbook wb,
+            FormulaEvaluator ev,
+            List<SheetAndHeader> detailSheets,
+            List<SizeMatrixSheetSpec> matrixSheets,
+            List<DescartesSheetSpec> descartesSheets) {
         for (int i = 0; i < wb.getNumberOfSheets(); i++) {
             Sheet sheet = wb.getSheetAt(i);
             if (isSummaryStockSheet(sheet)) {
                 continue;
             }
+            SizeMatrixSheetSpec matrix = findSizeMatrixSheet(sheet, ev);
+            if (matrix != null) {
+                log.info("Inventário por item: aba '{}' reconhecida como matriz tamanho × produtos ({} colunas de quantidade).",
+                        sheet.getSheetName(),
+                        matrix.productCols().size());
+                matrixSheets.add(matrix);
+                continue;
+            }
+            DescartesSheetSpec desc = findDescartesSheet(sheet, ev);
+            if (desc != null) {
+                log.info("Inventário por item: aba '{}' reconhecida como Descartes (Item + Quantidade).", sheet.getSheetName());
+                descartesSheets.add(desc);
+                continue;
+            }
             ItemSheetHeader hdr = findItemColumns(sheet, ev);
             if (hdr != null) {
-                out.add(new SheetAndHeader(sheet, hdr));
+                detailSheets.add(new SheetAndHeader(sheet, hdr));
                 continue;
             }
             hdr = findPromoverDefaultGridLayout(sheet, ev);
             if (hdr != null) {
                 log.info("Inventário por item: aba '{}' reconhecida pelo layout fixo de colunas (fallback).", sheet.getSheetName());
-                out.add(new SheetAndHeader(sheet, hdr));
+                detailSheets.add(new SheetAndHeader(sheet, hdr));
             }
         }
-        return out;
+    }
+
+    /**
+     * Matriz: linha de cabeçalho com coluna "Tamanho" e duas ou mais colunas seguintes com rótulos de produto
+     * (não "Quantidade"/"Total"/prateleira). Linhas seguintes: tamanho na coluna de tamanho e números nas colunas de produto.
+     */
+    private static SizeMatrixSheetSpec findSizeMatrixSheet(Sheet sheet, FormulaEvaluator ev) {
+        int lastHeaderScan = Math.min(sheet.getLastRowNum(), 250);
+        for (int r = 0; r <= lastHeaderScan; r++) {
+            Row headerRow = sheet.getRow(r);
+            if (headerRow == null) {
+                continue;
+            }
+            int sizeCol = -1;
+            for (Cell cell : headerRow) {
+                String v = normalizeCellHeader(DATA_FORMATTER.formatCellValue(cell, ev));
+                if (matchesTamanhoHeader(v)) {
+                    sizeCol = cell.getColumnIndex();
+                    break;
+                }
+            }
+            if (sizeCol < 0) {
+                continue;
+            }
+            int lastCol = Math.max((int) headerRow.getLastCellNum(), sizeCol + 2);
+            List<Integer> productCols = new ArrayList<>();
+            List<String> productHeaders = new ArrayList<>();
+            for (int c = 0; c < lastCol; c++) {
+                if (c == sizeCol) {
+                    continue;
+                }
+                String rawTitle = trimCell(headerRow.getCell(c), ev);
+                if (isExcludedMatrixProductHeader(rawTitle)) {
+                    continue;
+                }
+                productCols.add(c);
+                productHeaders.add(rawTitle.trim());
+            }
+            if (productCols.size() < 2) {
+                continue;
+            }
+            boolean dataLooksLikeMatrix = false;
+            int probeEnd = Math.min(r + 8, sheet.getLastRowNum());
+            for (int pr = r + 1; pr <= probeEnd; pr++) {
+                Row dataRow = sheet.getRow(pr);
+                if (dataRow == null) {
+                    continue;
+                }
+                String sizeProbe = trimCell(dataRow.getCell(sizeCol), ev);
+                if (sizeProbe.isEmpty()) {
+                    continue;
+                }
+                int qtyHits = 0;
+                for (int pc : productCols) {
+                    if (looksLikeQuantityCell(dataRow.getCell(pc), ev)) {
+                        qtyHits++;
+                    }
+                }
+                if (qtyHits >= 1) {
+                    dataLooksLikeMatrix = true;
+                    break;
+                }
+            }
+            if (dataLooksLikeMatrix) {
+                return new SizeMatrixSheetSpec(sheet, r, sizeCol, productCols, productHeaders);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isExcludedMatrixProductHeader(String rawHeader) {
+        if (rawHeader == null || rawHeader.isBlank()) {
+            return true;
+        }
+        String v = normalizeCellHeader(rawHeader);
+        if (v.isEmpty()) {
+            return true;
+        }
+        if (matchesTamanhoHeader(v)) {
+            return true;
+        }
+        if (matchesQtyHeaderPrimary(v) || matchesQtyHeaderSecondary(v)) {
+            return true;
+        }
+        if (matchesMinHeader(v) || matchesShelfHeader(v) || matchesFloorHeader(v) || matchesPriceHeader(v)) {
+            return true;
+        }
+        if (matchesCategoryHeader(v)) {
+            return true;
+        }
+        String n = normalizeLabel(v);
+        if (n.equals("total") || n.equals("subtotal") || n.startsWith("total ") || n.endsWith(" total")) {
+            return true;
+        }
+        return false;
+    }
+
+    /** Aba cujo nome sugere descarte e contém colunas de item + quantidade. */
+    private static DescartesSheetSpec findDescartesSheet(Sheet sheet, FormulaEvaluator ev) {
+        String sn = normalizeLabel(sheet.getSheetName());
+        if (!sn.contains("descarte")) {
+            return null;
+        }
+        int last = Math.min(sheet.getLastRowNum(), 120);
+        for (int r = 0; r <= last; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) {
+                continue;
+            }
+            int itemCol = -1;
+            int qtyCol = -1;
+            for (Cell cell : row) {
+                String v = normalizeCellHeader(DATA_FORMATTER.formatCellValue(cell, ev));
+                if (matchesNameHeader(v) && itemCol < 0) {
+                    itemCol = cell.getColumnIndex();
+                } else if (matchesQtyHeaderPrimary(v) && qtyCol < 0) {
+                    qtyCol = cell.getColumnIndex();
+                }
+            }
+            if (qtyCol < 0) {
+                for (Cell cell : row) {
+                    String v = normalizeCellHeader(DATA_FORMATTER.formatCellValue(cell, ev));
+                    if (matchesQtyHeaderSecondary(v)) {
+                        qtyCol = cell.getColumnIndex();
+                        break;
+                    }
+                }
+            }
+            if (itemCol >= 0 && qtyCol >= 0 && itemCol != qtyCol) {
+                return new DescartesSheetSpec(sheet, r, itemCol, qtyCol);
+            }
+        }
+        return null;
+    }
+
+    private static String deriveMatrixItemCode(String sheetName, String productHeader, String sizeRaw) {
+        String a = sheetNameToSlug(sheetName);
+        String b = sheetNameToSlug(productHeader);
+        String s = sheetNameToSlug(sizeRaw);
+        if (b.isEmpty()) {
+            b = "item";
+        }
+        if (s.isEmpty()) {
+            s = "tam";
+        }
+        String code = (a + "-" + b + "-" + s).toUpperCase(Locale.ROOT).replaceAll("-+", "-");
+        if (code.length() > 64) {
+            code = code.substring(0, 64).replaceAll("-+$", "");
+        }
+        return code;
+    }
+
+    private static String deriveDescartesItemCode(String itemName, int excelRow) {
+        String slug = sheetNameToSlug(itemName);
+        if (slug.isEmpty()) {
+            slug = "item";
+        }
+        if (slug.length() > 36) {
+            slug = slug.substring(0, 36).replaceAll("-+$", "");
+        }
+        return ("DESCARTES-" + slug + "-L" + (excelRow + 1)).toUpperCase(Locale.ROOT);
+    }
+
+    private void importSizeMatrixSheet(
+            SizeMatrixSheetSpec spec,
+            String originalName,
+            String requisitionNumber,
+            UUID userId,
+            FormulaEvaluator ev,
+            List<PhysicalInventoryImportLineResultDTO> lines,
+            List<String> warnings,
+            Set<String> seenLineKeys) {
+        Sheet sheet = spec.sheet();
+        StockCategory sheetCategory = resolveCategory(sheet.getSheetName());
+        if (sheetCategory == null) {
+            sheetCategory = resolveCategoryFromItemHints(sheet.getSheetName(), null);
+        }
+        if (sheetCategory == null) {
+            sheetCategory = StockCategory.CALCADOS;
+        }
+        for (int r = spec.headerRow() + 1; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) {
+                continue;
+            }
+            String sizeRaw = trimCell(row.getCell(spec.sizeCol()), ev);
+            if (sizeRaw.isEmpty()) {
+                continue;
+            }
+            for (int i = 0; i < spec.productCols().size(); i++) {
+                int col = spec.productCols().get(i);
+                String productHeader = spec.productHeaders().get(i);
+                int targetQty;
+                try {
+                    targetQty = parseQuantity(row.getCell(col), ev);
+                } catch (Exception ex) {
+                    warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + ", col. " + (col + 1)
+                            + " (" + productHeader + "): quantidade inválida.");
+                    lines.add(PhysicalInventoryImportLineResultDTO.builder()
+                            .stockItemCode("-")
+                            .itemName(productHeader + " / " + sizeRaw)
+                            .categoryLabel(sheet.getSheetName())
+                            .skipped(true)
+                            .message("Quantidade inválida")
+                            .build());
+                    continue;
+                }
+                if (targetQty < 0) {
+                    warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + " (" + productHeader + "): quantidade negativa.");
+                    continue;
+                }
+                String code = deriveMatrixItemCode(sheet.getSheetName(), productHeader, sizeRaw);
+                String name = productHeader + " — Tam. " + sizeRaw.trim();
+                String categoryLabel = sheet.getSheetName().trim() + " / " + productHeader.trim();
+                StockCategory category = resolveCategoryFromItemHints(productHeader + " " + sheet.getSheetName(), code);
+                if (category == null) {
+                    category = sheetCategory;
+                }
+                applyInventoryQuantityLine(
+                        originalName,
+                        requisitionNumber,
+                        userId,
+                        sheet.getSheetName(),
+                        r + 1,
+                        code,
+                        name,
+                        categoryLabel,
+                        category,
+                        targetQty,
+                        0,
+                        null,
+                        false,
+                        "",
+                        "",
+                        lines,
+                        warnings,
+                        seenLineKeys);
+            }
+        }
+    }
+
+    private void importDescartesSheet(
+            DescartesSheetSpec spec,
+            String originalName,
+            String requisitionNumber,
+            UUID userId,
+            FormulaEvaluator ev,
+            List<PhysicalInventoryImportLineResultDTO> lines,
+            List<String> warnings,
+            Set<String> seenLineKeys) {
+        Sheet sheet = spec.sheet();
+        for (int r = spec.headerRow() + 1; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) {
+                continue;
+            }
+            String itemName = trimCell(row.getCell(spec.itemCol()), ev);
+            if (itemName.isEmpty()) {
+                continue;
+            }
+            int targetQty;
+            try {
+                targetQty = parseQuantity(row.getCell(spec.qtyCol()), ev);
+            } catch (Exception ex) {
+                warnings.add(sheet.getSheetName() + " — linha " + (r + 1) + " (\"" + itemName + "\"): quantidade inválida.");
+                lines.add(PhysicalInventoryImportLineResultDTO.builder()
+                        .stockItemCode("-")
+                        .itemName(itemName)
+                        .categoryLabel("Descartes")
+                        .skipped(true)
+                        .message("Quantidade inválida")
+                        .build());
+                continue;
+            }
+            if (targetQty < 0) {
+                continue;
+            }
+            String code = deriveDescartesItemCode(itemName, r);
+            String name = "[Descarte] " + itemName.trim();
+            StockCategory category = resolveCategoryFromItemHints(itemName, code);
+            if (category == null) {
+                category = StockCategory.ACESSORIOS;
+            }
+            applyInventoryQuantityLine(
+                    originalName,
+                    requisitionNumber,
+                    userId,
+                    sheet.getSheetName(),
+                    r + 1,
+                    code,
+                    name,
+                    "Descartes",
+                    category,
+                    targetQty,
+                    0,
+                    null,
+                    false,
+                    "",
+                    "",
+                    lines,
+                    warnings,
+                    seenLineKeys);
+        }
     }
 
     private static ItemSheetHeader findItemColumns(Sheet sheet, FormulaEvaluator ev) {
-        int last = Math.min(sheet.getLastRowNum(), 120);
+        int last = Math.min(sheet.getLastRowNum(), 250);
         for (int r = 0; r <= last; r++) {
             Row row = sheet.getRow(r);
             if (row == null) {
@@ -624,7 +1014,7 @@ public class StockItemInventoryImportService {
             return false;
         }
         s = s.trim();
-        if (s.length() < 1 || s.length() > 56) {
+        if (s.length() < 1 || s.length() > 80) {
             return false;
         }
         String n = normalizeLabel(s);
@@ -632,8 +1022,11 @@ public class StockItemInventoryImportService {
                 || n.equals("total") || n.equals("subtotal") || n.startsWith("total ")) {
             return false;
         }
-        // Códigos com letras acentuadas (PT-BR) e alfanuméricos comuns
-        return s.matches("(?U)[\\p{L}\\p{N}\\-_./]+");
+        // Planilhas exportadas costumam usar espaços em volta de hífens (ex.: "CAMISAS - TERCEIRIZADAS - G")
+        if (!s.matches("(?U).*\\p{L}.*") && !s.matches("(?U).*[\\p{N}].*[\\p{N}].*")) {
+            return false;
+        }
+        return s.matches("(?U)[\\p{L}\\p{N}\\s\\-_./]+");
     }
 
     private static boolean looksLikeQuantityCell(Cell cell, FormulaEvaluator ev) {
@@ -840,34 +1233,94 @@ public class StockItemInventoryImportService {
             return StockCategory.ACESSORIOS;
         }
         String n = normalizeLabel(raw);
-        if (n.contains("vigil")) {
-            return StockCategory.UNIFORME_VIGILANCIA;
-        }
-        if (n.contains("servic") || n.contains("terceiriz")) {
-            return StockCategory.UNIFORME_SERVICOS;
-        }
-        if (n.contains("administrativ") || n.contains("social")) {
-            return StockCategory.UNIFORME_ADMINISTRATIVO;
-        }
-        if (n.contains("cozinha")) {
-            return StockCategory.UNIFORME_COZINHA;
-        }
-        if (n.equals("epi") || n.contains("protecao individual") || n.contains("equipamento de protecao")) {
-            return StockCategory.EPI;
-        }
-        if (n.contains("acessor")) {
-            return StockCategory.ACESSORIOS;
-        }
-        if (n.contains("calcad")) {
-            return StockCategory.CALCADOS;
-        }
-        if (n.contains("descart")) {
-            return StockCategory.ACESSORIOS;
+        StockCategory mapped = mapCategoryKeywords(n);
+        if (mapped != null) {
+            return mapped;
         }
         for (StockCategory c : StockCategory.values()) {
             if (n.equals(normalizeLabel(c.getDescription()))) {
                 return c;
             }
+        }
+        return null;
+    }
+
+    /**
+     * Quando aba/célula de categoria não casa com o cadastro (ex.: "Material", "Operacional"),
+     * tenta deduzir a partir do nome ou código do item.
+     */
+    private static StockCategory resolveCategoryFromItemHints(String itemName, String code) {
+        if (itemName == null && code == null) {
+            return null;
+        }
+        return mapCategoryKeywords(normalizeLabel(
+                (itemName != null ? itemName : "") + " " + (code != null ? code : "")));
+    }
+
+    private static StockCategory mapCategoryKeywords(String n) {
+        if (n == null || n.isBlank()) {
+            return null;
+        }
+        if (n.contains("vigil") || n.contains("operacional") || n.contains("seguranca patrimonial")) {
+            return StockCategory.UNIFORME_VIGILANCIA;
+        }
+        if (n.contains("servic") || n.contains("terceiriz") || n.contains("limpeza") || n.contains("zelador")) {
+            return StockCategory.UNIFORME_SERVICOS;
+        }
+        if (n.contains("administrativ") || n.contains("social") || n.contains("recepcao")) {
+            return StockCategory.UNIFORME_ADMINISTRATIVO;
+        }
+        if (n.contains("cozinha")) {
+            return StockCategory.UNIFORME_COZINHA;
+        }
+        if (n.equals("epi")
+                || n.contains("protecao individual")
+                || n.contains("equipamento de protecao")
+                || n.contains("luva")
+                || n.contains("mascara")
+                || n.contains("oculos")
+                || n.contains("capacete")) {
+            return StockCategory.EPI;
+        }
+        if (n.contains("acessor")
+                || n.contains("material")
+                || n.contains("consumo")
+                || n.contains("escritorio")
+                || n.contains("higiene")
+                || n.contains("descart")
+                || n.contains("cinto")
+                || n.contains("bone")
+                || n.contains("chapeu")
+                || n.contains("gorro")) {
+            return StockCategory.ACESSORIOS;
+        }
+        if (n.contains("calcad")
+                || n.contains("sapato")
+                || n.contains("tenis")
+                || n.contains("bota")
+                || n.contains("botina")) {
+            return StockCategory.CALCADOS;
+        }
+        if (n.contains("camisa") || n.contains("camiseta") || n.contains("polo")) {
+            if (n.contains("vigil") || n.contains("patrulh")) {
+                return StockCategory.UNIFORME_VIGILANCIA;
+            }
+            if (n.contains("terceiriz") || n.contains("servic")) {
+                return StockCategory.UNIFORME_SERVICOS;
+            }
+            return StockCategory.UNIFORME_SERVICOS;
+        }
+        if (n.contains("calca") || n.contains("bermuda") || n.contains("jaqueta") || n.contains("blusa")) {
+            if (n.contains("vigil") || n.contains("patrulh")) {
+                return StockCategory.UNIFORME_VIGILANCIA;
+            }
+            if (n.contains("terceiriz") || n.contains("servic")) {
+                return StockCategory.UNIFORME_SERVICOS;
+            }
+            return StockCategory.UNIFORME_VIGILANCIA;
+        }
+        if (n.contains("uniforme")) {
+            return StockCategory.UNIFORME_SERVICOS;
         }
         return null;
     }

@@ -238,8 +238,9 @@ public class StockController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
     @Operation(summary = "Importar inventário por item (planilha detalhada)",
             description = "Zera o estoque de todos os itens ativos, depois importa cada linha. Lê todas as abas detalhadas (ignora aba \"Resumo Estoque\"). "
-                    + "Cabeçalhos: Código ou Tamanho + Estoque/Quantidade; opcional Item, Categoria (ou inferida pelo nome da aba), Mín, Valor unit.; "
-                    + "Prateleira ou Localização (criação automática se não existir). Com Tamanho, o código do item é derivado da aba + tamanho. REQ-INV-ITEM-*.")
+                    + "Formatos: (1) linha a linha — Código ou Tamanho + Estoque/Quantidade; opcional Item, Categoria, Mín, Valor unit., Prateleira/Localização; "
+                    + "(2) matriz Calçados — coluna Tamanho e várias colunas de modelos (código ABA-MODELO-TAMANHO por célula); "
+                    + "(3) aba Descartes — colunas Item + Quantidade (nome com prefixo [Descarte]). REQ-INV-ITEM-*.")
     public ResponseEntity<?> importItemInventory(
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
