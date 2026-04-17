@@ -20,15 +20,26 @@ import {
   StockRequisitionDTO,
   CreateStockRequisitionPayload,
   DeliverStockRequisitionPayload,
-  StockRequisitionListItem
+  StockRequisitionListItem,
+  LocationStockSummaryRow
 } from '@/types/stock';
 
+function parseNumberField(v: unknown): number {
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  if (typeof v === 'string') {
+    const n = Number(v.replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
 /** Normaliza campos numéricos e nomes alternativos vindos do JSON (evita estoque "0" na UI por campo errado). */
-function normalizeStockItem(raw: Record<string, unknown>): StockItem {
+export function normalizeStockItem(raw: Record<string, unknown>): StockItem {
   const cur = raw.currentQuantity ?? raw.current_quantity;
   const min = raw.minimumQuantity ?? raw.minimum_quantity;
   const low = raw.isLowStock ?? raw.is_low_stock;
   const fn = raw.fullName ?? raw.full_name;
+  const uc = raw.unitCost ?? raw.unit_cost;
   const base = raw as unknown as StockItem;
   const nameStr = typeof raw.name === 'string' ? raw.name : '';
   const fullNameStr =
@@ -37,12 +48,47 @@ function normalizeStockItem(raw: Record<string, unknown>): StockItem {
       : typeof base.fullName === 'string' && base.fullName
         ? base.fullName
         : nameStr;
+  let locations = base.locations;
+  const locRaw = raw.locations;
+  if (Array.isArray(locRaw) && locRaw.length > 0) {
+    locations = locRaw.map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        id: String(r.id ?? ''),
+        shelfId: String(r.shelfId ?? r.shelf_id ?? ''),
+        shelfIdentification: String(r.shelfIdentification ?? r.shelf_identification ?? ''),
+        floor: String(r.floor ?? ''),
+        quantity: parseNumberField(r.quantity)
+      };
+    });
+  }
   return {
     ...base,
     currentQuantity: typeof cur === 'number' && !Number.isNaN(cur) ? cur : Number(cur) || 0,
     minimumQuantity: typeof min === 'number' && !Number.isNaN(min) ? min : Number(min) || 0,
     isLowStock: Boolean(low),
     fullName: fullNameStr,
+    unitCost: parseNumberField(uc),
+    locations
+  };
+}
+
+function normalizeStockReportPayload(raw: Record<string, unknown>): StockReport {
+  const low = raw.lowStockItems ?? raw.low_stock_items;
+  const out = raw.outOfStockItems ?? raw.out_of_stock_items;
+  const ibc = raw.itemsByCategory ?? raw.items_by_category;
+  return {
+    totalItems: parseNumberField(raw.totalItems ?? raw.total_items),
+    lowStockCount: parseNumberField(raw.lowStockCount ?? raw.low_stock_count),
+    outOfStockCount: parseNumberField(raw.outOfStockCount ?? raw.out_of_stock_count),
+    totalValue: parseNumberField(raw.totalValue ?? raw.total_value),
+    totalQuantity: parseNumberField(raw.totalQuantity ?? raw.total_quantity),
+    itemsByCategory:
+      ibc && typeof ibc === 'object' && !Array.isArray(ibc) ? (ibc as Record<string, number>) : {},
+    activeAlerts: parseNumberField(raw.activeAlerts ?? raw.active_alerts),
+    criticalAlerts: parseNumberField(raw.criticalAlerts ?? raw.critical_alerts),
+    lowStockItems: Array.isArray(low) ? low.map((row) => normalizeStockItem(row as Record<string, unknown>)) : [],
+    outOfStockItems: Array.isArray(out) ? out.map((row) => normalizeStockItem(row as Record<string, unknown>)) : []
   };
 }
 
@@ -395,7 +441,7 @@ export const stockService = {
   async getStockReport(): Promise<StockReport> {
     try {
       const response = await api.get('/api/stock/report');
-      return response.data;
+      return normalizeStockReportPayload(response.data as Record<string, unknown>);
     } catch (error) {
       console.error('Erro ao gerar relatório de estoque:', error);
       throw new Error('Falha ao gerar relatório');
@@ -528,6 +574,38 @@ export const stockService = {
     } catch (error) {
       console.error('Erro ao baixar PDF de movimentações:', error);
       throw new Error('Falha ao baixar relatório');
+    }
+  },
+
+  async downloadConsolidatedStockPDF(companyId: string, startDate: string, endDate: string): Promise<void> {
+    try {
+      const isoStart = this.convertDateToISO(startDate, true);
+      const isoEnd = this.convertDateToISO(endDate, false);
+      if (!isoStart || !isoEnd) {
+        throw new Error('Período inválido');
+      }
+      const params = new URLSearchParams({
+        companyId,
+        start: isoStart,
+        end: isoEnd
+      });
+      const response = await api.get(`/api/stock/reports/consolidated/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'relatorio-estoque-consolidado.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF consolidado de estoque:', error);
+      throw new Error('Falha ao baixar relatório consolidado');
+    }
+  },
+
+  async getLocationStockSummary(): Promise<LocationStockSummaryRow[]> {
+    try {
+      const response = await api.get<LocationStockSummaryRow[]>('/api/stock/reports/location-summary');
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error('Erro ao buscar resumo por localização:', error);
+      return [];
     }
   },
 

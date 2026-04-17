@@ -470,6 +470,14 @@ export const contasAReceberService = {
     await api.delete(`/api/accounts-receivable/${id}`);
   },
 
+  /** Marca a conta como totalmente paga (usa data de pagamento no backend). Formato: YYYY-MM-DD */
+  async markContaAReceberAsPaid(id: string, paymentDate: string): Promise<ContaAReceber> {
+    const response = await api.put(`/api/accounts-receivable/${id}/mark-paid`, null, {
+      params: { paymentDate }
+    });
+    return this.getContaAReceberById(response.data.id);
+  },
+
   async getCategories(): Promise<string[]> {
     try {
       // Usar endpoint de busca com termo vazio para obter todas as categorias

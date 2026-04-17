@@ -613,7 +613,21 @@ public class StockService {
         Long totalItems = (long) allItems.size();
         Long lowStockCount = (long) lowStockItems.size();
         Long outOfStockCount = (long) outOfStockItems.size();
-        Double totalValue = stockItemRepository.getTotalStockValue();
+        Double totalValueFromQuery = stockItemRepository.getTotalStockValue();
+        java.math.BigDecimal totalValueComputed = allItems.stream()
+                .map(i -> {
+                    int q = i.getCurrentQuantity() != null ? i.getCurrentQuantity() : 0;
+                    java.math.BigDecimal u = i.getUnitCost();
+                    return u != null ? u.multiply(java.math.BigDecimal.valueOf(q)) : java.math.BigDecimal.ZERO;
+                })
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        double totalValue = totalValueFromQuery != null && totalValueFromQuery > 0
+                ? totalValueFromQuery
+                : totalValueComputed.doubleValue();
+
+        long totalQuantity = allItems.stream()
+                .mapToInt(i -> i.getCurrentQuantity() != null ? i.getCurrentQuantity() : 0)
+                .sum();
 
         Map<StockCategory, Long> itemsByCategory = allItems.stream()
                 .collect(Collectors.groupingBy(StockItem::getCategory, Collectors.counting()));
@@ -625,7 +639,8 @@ public class StockService {
                 "totalItems", totalItems,
                 "lowStockCount", lowStockCount,
                 "outOfStockCount", outOfStockCount,
-                "totalValue", totalValue != null ? totalValue : 0.0,
+                "totalValue", totalValue,
+                "totalQuantity", totalQuantity,
                 "itemsByCategory", itemsByCategory,
                 "activeAlerts", activeAlerts,
                 "criticalAlerts", criticalAlerts,
@@ -1256,5 +1271,22 @@ public class StockService {
                 .stream()
                 .map(StockMovementDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Quantidade agregada por prateleira e andar (itens ativos).
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getLocationStockSummary() {
+        List<Object[]> rows = stockItemLocationRepository.aggregateQuantityByShelfAndFloor();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object[] row : rows) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("shelfIdentification", row[0] != null ? row[0].toString() : "");
+            m.put("floor", row[1] != null ? row[1].toString() : "");
+            m.put("totalQuantity", row[2] instanceof Number ? ((Number) row[2]).longValue() : 0L);
+            out.add(m);
+        }
+        return out;
     }
 }

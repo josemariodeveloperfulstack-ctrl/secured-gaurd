@@ -19,7 +19,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.text.Normalizer;
 import java.time.LocalDate;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -475,23 +477,47 @@ public class ReportController {
     }
 
     @GetMapping("/accounts-receivable/pdf")
-    @Operation(summary = "Relatório de Contas a Receber em PDF", description = "Gera relatório PDF de contas a receber com filtros")
+    @Operation(summary = "Relatório de Contas a Receber em PDF", description = "Gera relatório PDF de contas a receber com filtros. Use segment=RECEBIDOS|A_VENCER|VENCIDOS|INADIMPLENCIA ou status legado (ex.: OVERDUE).")
     public ResponseEntity<byte[]> generateAccountsReceivableReportPdf(
             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(value = "client", required = false) String client,
-            @RequestParam(value = "status", required = false) String status) {
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "segment", required = false) String segment) {
         try {
+            String effectiveSegment = (segment != null && !segment.isBlank()) ? segment : null;
+            if (effectiveSegment == null && status != null && !status.isBlank()
+                    && "OVERDUE".equalsIgnoreCase(status.trim())) {
+                effectiveSegment = "INADIMPLENCIA";
+            }
             byte[] pdf = paymentReportService.generateAccountsReceivableReportPDF(
-                    startDate, endDate, client, status, null, null, null, null, null);
+                    startDate, endDate, client, status, null, null, null, null, null, effectiveSegment);
+            String filename = accountsReceivablePdfFilename(effectiveSegment);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-contas-a-receber.pdf")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
                     .body(pdf);
         } catch (Exception e) {
             log.error("Erro ao gerar relatório de contas a receber: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
+    }
+
+    private static String accountsReceivablePdfFilename(String segmentRaw) {
+        if (segmentRaw == null || segmentRaw.isBlank()) {
+            return "relatorio-contas-a-receber.pdf";
+        }
+        String s = Normalizer.normalize(segmentRaw.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toUpperCase(Locale.ROOT)
+                .replace('-', '_');
+        return switch (s) {
+            case "INADIMPLENCIA" -> "relatorio-inadimplencia.pdf";
+            case "RECEBIDOS" -> "relatorio-contas-recebidas.pdf";
+            case "A_VENCER", "AVENCER" -> "relatorio-contas-a-vencer.pdf";
+            case "VENCIDOS" -> "relatorio-contas-vencidas.pdf";
+            default -> "relatorio-contas-a-receber.pdf";
+        };
     }
 
     @GetMapping("/cash-flow/pdf")

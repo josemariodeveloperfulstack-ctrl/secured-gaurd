@@ -204,6 +204,20 @@ export enum StockRequisitionStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export const StockRequisitionStatusLabels: Record<StockRequisitionStatus, string> = {
+  [StockRequisitionStatus.PENDING]: 'Pendente',
+  [StockRequisitionStatus.APPROVED]: 'Aprovada',
+  [StockRequisitionStatus.DELIVERED]: 'Entregue',
+  [StockRequisitionStatus.CANCELLED]: 'Cancelada'
+};
+
+/** Resumo agregado por prateleira/andar (GET /api/stock/reports/location-summary) */
+export interface LocationStockSummaryRow {
+  shelfIdentification?: string;
+  floor?: string | null;
+  totalQuantity?: number;
+}
+
 export interface StockRequisitionLineDTO {
   id?: string;
   stockItemId: string;
@@ -291,6 +305,8 @@ export interface StockReport {
   lowStockCount: number;
   outOfStockCount: number;
   totalValue: number;
+  /** Soma de quantidades atuais (unidades físicas em estoque) */
+  totalQuantity?: number;
   itemsByCategory: Record<string, number>;
   activeAlerts: number;
   criticalAlerts: number;

@@ -511,6 +511,28 @@ public class StockController {
                 .body(pdf);
     }
 
+    @GetMapping("/reports/consolidated/pdf")
+    @Operation(summary = "PDF consolidado de estoque",
+            description = "Baixo estoque (atual), movimentações no período, requisições criadas no período e quantidade por localização")
+    public ResponseEntity<byte[]> getConsolidatedStockReportPDF(
+            @RequestParam("companyId") UUID companyId,
+            @RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam("end") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end)
+            throws IOException {
+        log.info("GET /api/stock/reports/consolidated/pdf - Gerando relatório consolidado");
+        byte[] pdf = stockReportService.generateConsolidatedStockPDFReport(companyId, start, end);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=relatorio-estoque-consolidado.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/location-summary")
+    @Operation(summary = "Resumo de quantidade por localização (prateleira/andar)")
+    public ResponseEntity<List<Map<String, Object>>> getLocationStockSummary() {
+        return ResponseEntity.ok(stockService.getLocationStockSummary());
+    }
+
     // ===== ASSINATURAS E REQUISIÇÕES =====
 
     @PostMapping("/movements/{id}/sign")

@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +32,7 @@ import {
   Mail,
   Phone,
   FileText,
+  ChevronDown,
   Download,
   Send,
   Eye,
@@ -38,8 +44,19 @@ import {
 } from 'lucide-react';
 import { ContasAReceberGuard } from './FinanceiroPermissionGuard';
 import { ContasAReceberFormModal } from './ContasAReceberFormModal';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth } from 'date-fns';
+import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth, startOfDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { DateRange } from 'react-day-picker';
 import { contasAReceberService, Cliente, ContaAReceber } from '@/services/contasAReceberService';
@@ -67,7 +84,67 @@ function isStatusCancelada(s: string | undefined) {
   return s === 'CANCELADA' || s === 'CANCELLED';
 }
 
+/** Dias até o vencimento (0 = hoje) para considerar "vencendo" em amarelo */
+const DIAS_ALERTA_VENCIMENTO = 7;
+
+const statusPillClass =
+  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ring-offset-background';
+
+/**
+ * Cores: pago → verde; vencendo (até N dias) → amarelo; vencida → vermelho.
+ * Pendente distante e cancelado usam tons neutros.
+ */
+function getContaReceberStatusVisual(conta: ContaAReceber): { label: string; className: string } {
+  if (isStatusCancelada(conta.status)) {
+    return {
+      label: 'Cancelado',
+      className: 'border-gray-600 bg-gray-800/90 text-gray-300'
+    };
+  }
+  if (isStatusRecebida(conta.status)) {
+    return {
+      label: 'Pago',
+      className: 'border-transparent bg-green-600 text-white shadow-sm hover:bg-green-600/90'
+    };
+  }
+
+  let due: Date;
+  try {
+    due = startOfDay(new Date(conta.dueDate || conta.vencimento));
+    if (Number.isNaN(due.getTime())) {
+      due = startOfDay(new Date());
+    }
+  } catch {
+    due = startOfDay(new Date());
+  }
+  const today = startOfDay(new Date());
+  const daysUntil = differenceInCalendarDays(due, today);
+
+  const emAtraso =
+    isStatusVencida(conta.status) || (conta.overdueDays ?? 0) > 0 || daysUntil < 0;
+
+  if (emAtraso) {
+    return {
+      label: 'Vencido',
+      className: 'border-transparent bg-red-600 text-white shadow-sm hover:bg-red-600/90'
+    };
+  }
+
+  if (daysUntil >= 0 && daysUntil <= DIAS_ALERTA_VENCIMENTO) {
+    return {
+      label: daysUntil === 0 ? 'Vence hoje' : 'Vencendo',
+      className: 'border-transparent bg-amber-500 text-black shadow-sm hover:bg-amber-500/90'
+    };
+  }
+
+  return {
+    label: 'Pendente',
+    className: 'border-gray-600 bg-gray-700/90 text-seguranca-lightgray hover:bg-gray-700'
+  };
+}
+
 export const ContasAReceber: React.FC = () => {
+  const { user } = useAuth();
   const [contas, setContas] = useState<ContaAReceber[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +171,11 @@ export const ContasAReceber: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contaToDelete, setContaToDelete] = useState<ContaAReceber | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [contaParaMarcarPaga, setContaParaMarcarPaga] = useState<ContaAReceber | null>(null);
   const { toast } = useToast();
+
+  const canEditReceivable = Boolean(user?.permissions?.FINANCIAL_RECEIVABLE_WRITE);
 
   // Funções de cobrança e gestão
 
@@ -191,29 +272,35 @@ export const ContasAReceber: React.FC = () => {
     }
   };
 
-  const handleExportPDF = async () => {
-    if (filteredContas.length === 0) {
-      toast({
-        title: 'Aviso',
-        description: 'Não há contas para exportar com os filtros aplicados.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
+  const downloadContasReceberPdf = async (opts: {
+    segment?: string | null;
+    includePeriod?: boolean;
+    filePrefix: string;
+    successDescription: string;
+  }) => {
     setExportLoading(true);
     try {
-      // Formatar datas para o backend
-      const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : format(startOfMonth(new Date()), 'yyyy-MM-dd');
-      const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : format(endOfMonth(new Date()), 'yyyy-MM-dd');
+      const params = new URLSearchParams();
+      if (opts.includePeriod) {
+        const startDate = dateRange?.from
+          ? format(dateRange.from, 'yyyy-MM-dd')
+          : format(startOfMonth(new Date()), 'yyyy-MM-dd');
+        const endDate = dateRange?.to
+          ? format(dateRange.to, 'yyyy-MM-dd')
+          : format(endOfMonth(new Date()), 'yyyy-MM-dd');
+        params.set('startDate', startDate);
+        params.set('endDate', endDate);
+      }
+      if (opts.segment) {
+        params.set('segment', opts.segment);
+      }
 
-      // Endpoint para Contas a Receber
-      const url = `/api/reports/accounts-receivable/pdf?startDate=${startDate}&endDate=${endDate}`;
+      const qs = params.toString();
+      const url = `/api/reports/accounts-receivable/pdf${qs ? `?${qs}` : ''}`;
 
-      // Chamar endpoint do backend
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
 
@@ -223,7 +310,7 @@ export const ContasAReceber: React.FC = () => {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `relatorio-contas-a-receber-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      link.setAttribute('download', `${opts.filePrefix}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -231,52 +318,13 @@ export const ContasAReceber: React.FC = () => {
 
       toast({
         title: 'Sucesso',
-        description: 'Relatório PDF gerado pelo servidor com sucesso'
+        description: opts.successDescription
       });
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
+      console.error('Erro ao exportar PDF de contas a receber:', error);
       toast({
         title: 'Erro',
         description: 'Erro ao gerar relatório no servidor. Tente novamente.',
-        variant: 'destructive'
-      });
-    } finally {
-      setExportLoading(false);
-    }
-  };
-
-  const handleExportInadimplencia = async () => {
-    setExportLoading(true);
-    try {
-      const url = `/api/reports/accounts-receivable/pdf?status=OVERDUE`;
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Falha ao gerar relatório de inadimplência');
-
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.setAttribute('download', `relatorio-inadimplencia-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
-
-      toast({
-        title: 'Sucesso',
-        description: 'Relatório de inadimplência gerado com layout padrão'
-      });
-    } catch (error) {
-      console.error('Erro ao exportar inadimplência:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao gerar relatório de inadimplência no servidor.',
         variant: 'destructive'
       });
     } finally {
@@ -291,6 +339,30 @@ export const ContasAReceber: React.FC = () => {
 
   const handleEditConta = (conta: ContaAReceber) => {
     handleOpenFormModal(conta);
+  };
+
+  const handleMarkPaidFromStatus = async (conta: ContaAReceber) => {
+    if (!conta.id) return;
+    setMarkingPaidId(conta.id);
+    try {
+      const hoje = format(new Date(), 'yyyy-MM-dd');
+      await contasAReceberService.markContaAReceberAsPaid(conta.id, hoje);
+      toast({
+        title: 'Conta atualizada',
+        description: 'Marcada como paga com a data de hoje.'
+      });
+      await loadContas();
+      setContaParaMarcarPaga(null);
+    } catch (error) {
+      console.error('Erro ao marcar como pago:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível marcar como pago. Verifique sua permissão ou tente pelo formulário de edição.',
+        variant: 'destructive'
+      });
+    } finally {
+      setMarkingPaidId(null);
+    }
   };
 
   const handleDeleteClick = (conta: ContaAReceber) => {
@@ -441,15 +513,84 @@ export const ContasAReceber: React.FC = () => {
             <p className="text-gray-400">Gerencie suas contas a receber e controle de inadimplência</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-            <Button
-              variant="outline"
-              onClick={handleExportInadimplencia}
-              disabled={exportLoading}
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Relatório Inadimplência
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={exportLoading}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Relatórios PDF
+                  <ChevronDown className="w-4 h-4 ml-2 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="min-w-[14rem] border-gray-600 bg-seguranca-black text-seguranca-lightgray"
+              >
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() =>
+                    downloadContasReceberPdf({
+                      includePeriod: true,
+                      filePrefix: 'relatorio-contas-a-receber',
+                      successDescription: 'Relatório por período (data de emissão) gerado com sucesso.'
+                    })
+                  }
+                >
+                  Por período (emissão)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() =>
+                    downloadContasReceberPdf({
+                      segment: 'RECEBIDOS',
+                      filePrefix: 'relatorio-contas-recebidas',
+                      successDescription: 'Relatório de contas recebidas (pagas) gerado com sucesso.'
+                    })
+                  }
+                >
+                  Recebidos
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() =>
+                    downloadContasReceberPdf({
+                      segment: 'A_VENCER',
+                      filePrefix: 'relatorio-contas-a-vencer',
+                      successDescription: 'Relatório de contas a vencer gerado com sucesso.'
+                    })
+                  }
+                >
+                  A vencer
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() =>
+                    downloadContasReceberPdf({
+                      segment: 'VENCIDOS',
+                      filePrefix: 'relatorio-contas-vencidas',
+                      successDescription: 'Relatório de contas vencidas (não pagas) gerado com sucesso.'
+                    })
+                  }
+                >
+                  Vencidos
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() =>
+                    downloadContasReceberPdf({
+                      segment: 'INADIMPLENCIA',
+                      filePrefix: 'relatorio-inadimplencia',
+                      successDescription: 'Relatório de inadimplência (status vencido) gerado com sucesso.'
+                    })
+                  }
+                >
+                  Inadimplência
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               onClick={() => handleOpenFormModal()}
               className="flex items-center gap-2 bg-seguranca-red text-white hover:bg-seguranca-red/90"
@@ -776,7 +917,9 @@ export const ContasAReceber: React.FC = () => {
                       {contas
                         .sort((a, b) => (b?.amount || b?.valor || 0) - (a?.amount || a?.valor || 0))
                         .slice(0, 5)
-                        .map((conta, index) => (
+                        .map((conta, index) => {
+                          const statusVisual = getContaReceberStatusVisual(conta);
+                          return (
                           <div key={conta.id} className="flex items-center justify-between p-3 bg-seguranca-black/50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-seguranca-yellow/20 rounded-full flex items-center justify-center">
@@ -791,19 +934,19 @@ export const ContasAReceber: React.FC = () => {
                               <p className="font-semibold text-seguranca-yellow">
                                 R$ {((conta?.amount || conta?.valor || 0) as number).toLocaleString('pt-BR')}
                               </p>
-                              <Badge
-                                variant="outline"
-                                className={`text-xs ${isStatusVencida(conta.status) ? 'border-seguranca-red text-seguranca-red' :
-                                    isStatusRecebida(conta.status) ? 'border-seguranca-yellow text-seguranca-yellow' :
-                                      isStatusAberta(conta.status) ? 'border-seguranca-lightgray text-seguranca-lightgray' :
-                                        'border-gray-500 text-gray-400'
-                                  }`}
+                              <span
+                                className={cn(
+                                  statusPillClass,
+                                  'text-xs',
+                                  statusVisual.className
+                                )}
                               >
-                                {isStatusRecebida(conta.status) ? 'Recebida' : isStatusVencida(conta.status) ? 'Vencida' : isStatusAberta(conta.status) ? 'Aberta' : isStatusCancelada(conta.status) ? 'Cancelada' : conta.status}
-                              </Badge>
+                                {statusVisual.label}
+                              </span>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   </CardContent>
                 </Card>
@@ -926,16 +1069,35 @@ export const ContasAReceber: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <Badge
-                              variant={isStatusRecebida(conta.status) ? 'default' :
-                                isStatusVencida(conta.status) ? 'destructive' :
-                                  isStatusAberta(conta.status) ? 'secondary' : 'outline'}
-                            >
-                              {isStatusRecebida(conta.status) ? 'Pago' :
-                                isStatusVencida(conta.status) ? 'Vencido' :
-                                  isStatusAberta(conta.status) ? 'Pendente' :
-                                    isStatusCancelada(conta.status) ? 'Cancelado' : conta.status}
-                            </Badge>
+                            {(() => {
+                              const visual = getContaReceberStatusVisual(conta);
+                              const podeAtalhoStatus =
+                                canEditReceivable &&
+                                !isStatusRecebida(conta.status) &&
+                                !isStatusCancelada(conta.status);
+                              if (podeAtalhoStatus) {
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={markingPaidId === conta.id}
+                                    title="Clique para marcar como pago (com confirmação)"
+                                    onClick={() => setContaParaMarcarPaga(conta)}
+                                    className={cn(
+                                      statusPillClass,
+                                      visual.className,
+                                      'cursor-pointer disabled:opacity-60'
+                                    )}
+                                  >
+                                    {markingPaidId === conta.id ? 'Salvando…' : visual.label}
+                                  </button>
+                                );
+                              }
+                              return (
+                                <span className={cn(statusPillClass, visual.className)}>
+                                  {visual.label}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center space-x-2">
@@ -1106,15 +1268,15 @@ export const ContasAReceber: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-seguranca-lightgray">Status</Label>
-                    <Badge
-                      variant={selectedConta.status === 'PAID' || selectedConta.status === 'RECEBIDA' ? 'default' :
-                        selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'destructive' :
-                          selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'secondary' : 'outline'}
+                    <span
+                      className={cn(
+                        statusPillClass,
+                        'mt-1',
+                        getContaReceberStatusVisual(selectedConta).className
+                      )}
                     >
-                      {selectedConta.status === 'PAID' || selectedConta.status === 'RECEBIDA' ? 'Pago' :
-                        selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'Vencido' :
-                          selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'Pendente' : 'Cancelado'}
-                    </Badge>
+                      {getContaReceberStatusVisual(selectedConta).label}
+                    </span>
                   </div>
                   <div>
                     <Label className="text-seguranca-lightgray">Forma de Pagamento</Label>
@@ -1158,6 +1320,74 @@ export const ContasAReceber: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog
+          open={!!contaParaMarcarPaga}
+          onOpenChange={(open) => {
+            if (!open && !markingPaidId) {
+              setContaParaMarcarPaga(null);
+            }
+          }}
+        >
+          <AlertDialogContent className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[440px]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-seguranca-yellow">
+                Marcar como pago?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-300">
+                A conta será registrada como <strong>totalmente paga</strong>, com data de pagamento{' '}
+                <strong>hoje</strong> ({format(new Date(), 'dd/MM/yyyy', { locale: ptBR })}).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {contaParaMarcarPaga && (
+              <div className="space-y-1 text-sm text-seguranca-lightgray border border-gray-600/50 rounded-md p-3 bg-seguranca-black/40">
+                <p>
+                  <span className="text-gray-400">Cliente:</span>{' '}
+                  {contaParaMarcarPaga.client?.name || contaParaMarcarPaga.cliente || '—'}
+                </p>
+                <p>
+                  <span className="text-gray-400">Valor:</span>{' '}
+                  R${' '}
+                  {((contaParaMarcarPaga.amount || contaParaMarcarPaga.valor || 0) as number).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
+                </p>
+                {(contaParaMarcarPaga.invoiceNumber || contaParaMarcarPaga.numeroFatura) && (
+                  <p>
+                    <span className="text-gray-400">Fatura:</span>{' '}
+                    {contaParaMarcarPaga.invoiceNumber || contaParaMarcarPaga.numeroFatura}
+                  </p>
+                )}
+              </div>
+            )}
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel
+                disabled={!!markingPaidId}
+                className="border-gray-600 bg-transparent text-white hover:bg-seguranca-black hover:text-white"
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <Button
+                disabled={!!markingPaidId}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  if (contaParaMarcarPaga) {
+                    void handleMarkPaidFromStatus(contaParaMarcarPaga);
+                  }
+                }}
+              >
+                {markingPaidId ? (
+                  <>
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Salvando…
+                  </>
+                ) : (
+                  'Confirmar pagamento'
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Modal de Confirmação de Exclusão */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>

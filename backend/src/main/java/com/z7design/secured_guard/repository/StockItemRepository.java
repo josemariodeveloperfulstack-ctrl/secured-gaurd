@@ -79,8 +79,8 @@ public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
     @Query("SELECT si.category, COUNT(si), SUM(si.currentQuantity) FROM StockItem si WHERE si.active = true GROUP BY si.category")
     List<Object[]> getStatisticsByCategory();
 
-    // Valor total do estoque
-    @Query("SELECT SUM(si.currentQuantity * si.unitCost) FROM StockItem si WHERE si.active = true AND si.unitCost IS NOT NULL")
+    // Valor total do estoque (custos nulos tratados como zero para não anular o somatório)
+    @Query("SELECT COALESCE(SUM(COALESCE(si.currentQuantity, 0) * COALESCE(si.unitCost, 0)), 0) FROM StockItem si WHERE si.active = true")
     Double getTotalStockValue();
 
     // Contar itens por categoria

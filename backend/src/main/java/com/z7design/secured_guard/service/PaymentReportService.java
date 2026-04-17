@@ -32,6 +32,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,24 +58,26 @@ public class PaymentReportService {
             String paymentMethodFilter,
             BigDecimal amountMin,
             BigDecimal amountMax,
-            List<String> selectedIds) throws IOException {
+            List<String> selectedIds,
+            String reportSegment) throws IOException {
+        String normalizedSegment = normalizeReceivableReportSegment(reportSegment);
         log.info(
-                "Gerando relatório PDF de contas a receber com layout padrão - Período: {} a {}, Cliente: {}, Status: {}, Categoria: {}, Método: {}, Valor: {} a {}, IDs: {}",
-                startDate, endDate, clientFilter, statusFilter, categoryFilter, paymentMethodFilter, amountMin,
-                amountMax, selectedIds);
+                "Gerando relatório PDF de contas a receber com layout padrão - Período: {} a {}, Cliente: {}, Status: {}, Segmento: {}, Categoria: {}, Método: {}, Valor: {} a {}, IDs: {}",
+                startDate, endDate, clientFilter, statusFilter, normalizedSegment, categoryFilter, paymentMethodFilter,
+                amountMin, amountMax, selectedIds);
 
         try {
             // Buscar dados com filtros
             List<AccountsReceivable> accounts = getAccountsReceivableFiltered(
                     startDate, endDate, clientFilter, statusFilter, categoryFilter,
-                    paymentMethodFilter, amountMin, amountMax, selectedIds);
+                    paymentMethodFilter, amountMin, amountMax, selectedIds, normalizedSegment);
 
             log.info("Dados obtidos: {} contas a receber", accounts.size());
 
             // Usar iText com layout padrão
             return generateAccountsReceivableReportPDFWithIText(
                     accounts, startDate, endDate, clientFilter, statusFilter,
-                    categoryFilter, paymentMethodFilter, amountMin, amountMax);
+                    categoryFilter, paymentMethodFilter, amountMin, amountMax, normalizedSegment);
 
         } catch (Exception e) {
             log.error("Erro ao gerar relatório PDF de contas a receber", e);
@@ -93,7 +96,8 @@ public class PaymentReportService {
             String categoryFilter,
             String paymentMethodFilter,
             BigDecimal amountMin,
-            BigDecimal amountMax) throws IOException {
+            BigDecimal amountMax,
+            String reportSegment) throws IOException {
         log.info("Gerando relatório PDF de contas a receber com iText - {} contas", accounts.size());
 
         // Determinar companyId - usar primeira empresa ativa como fallback
@@ -123,7 +127,7 @@ public class PaymentReportService {
 
             ReportLayoutConfig layoutConfig = ReportLayoutConfig.builder()
                     .companyId(companyId)
-                    .reportTitle("RELATÓRIO DE CONTAS A RECEBER")
+                    .reportTitle(receivableReportTitleForSegment(reportSegment))
                     .topMargin(120f)
                     .bottomMargin(80f)
                     .leftMargin(50f)
@@ -143,7 +147,13 @@ public class PaymentReportService {
 
             // Filtros aplicados
             if (startDate != null || endDate != null || clientFilter != null || statusFilter != null ||
-                    categoryFilter != null || paymentMethodFilter != null || amountMin != null || amountMax != null) {
+                    categoryFilter != null || paymentMethodFilter != null || amountMin != null || amountMax != null
+                    || reportSegment != null) {
+                if (reportSegment != null) {
+                    document.add(new Paragraph("Tipo de relatório: " + receivableReportSegmentLabel(reportSegment))
+                            .setFontSize(10)
+                            .setMarginBottom(2));
+                }
                 if (startDate != null && endDate != null) {
                     document.add(
                             new Paragraph("Período: " + startDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) +
@@ -153,7 +163,8 @@ public class PaymentReportService {
                 if (clientFilter != null && !clientFilter.isEmpty()) {
                     document.add(new Paragraph("Cliente: " + clientFilter).setFontSize(10).setMarginBottom(2));
                 }
-                if (statusFilter != null && !statusFilter.isEmpty() && !statusFilter.equals("ALL")) {
+                if (reportSegment == null && statusFilter != null && !statusFilter.isEmpty()
+                        && !statusFilter.equals("ALL")) {
                     document.add(new Paragraph("Status: " + statusFilter).setFontSize(10).setMarginBottom(2));
                 }
                 if (categoryFilter != null && !categoryFilter.isEmpty() && !categoryFilter.equals("ALL")) {
@@ -511,6 +522,71 @@ public class PaymentReportService {
         };
     }
 
+    private String normalizeReceivableReportSegment(String segment) {
+        if (segment == null || segment.isBlank()) {
+            return null;
+        }
+        String s = segment.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+        s = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+        return switch (s) {
+            case "INADIMPLENCIA" -> "INADIMPLENCIA";
+            case "RECEBIDOS" -> "RECEBIDOS";
+            case "A_VENCER", "AVENCER" -> "A_VENCER";
+            case "VENCIDOS" -> "VENCIDOS";
+            default -> null;
+        };
+    }
+
+    private boolean matchesReceivableReportSegment(AccountsReceivable account, String segment) {
+        LocalDate today = LocalDate.now();
+        ReceivableStatus st = account.getStatus();
+        LocalDate due = account.getDueDate();
+        return switch (segment) {
+            case "RECEBIDOS" -> st == ReceivableStatus.PAID;
+            case "A_VENCER" -> (st == ReceivableStatus.PENDING || st == ReceivableStatus.PARTIAL)
+                    && due != null && !due.isBefore(today);
+            case "VENCIDOS" -> st != ReceivableStatus.PAID && st != ReceivableStatus.CANCELLED
+                    && due != null && due.isBefore(today);
+            case "INADIMPLENCIA" -> st == ReceivableStatus.OVERDUE;
+            default -> true;
+        };
+    }
+
+    private boolean matchesReceivableStatusOrSegment(AccountsReceivable account, String statusFilter,
+            String reportSegment) {
+        if (reportSegment != null && !reportSegment.isEmpty()) {
+            return matchesReceivableReportSegment(account, reportSegment);
+        }
+        return statusFilter == null || statusFilter.isEmpty() || statusFilter.equals("ALL") ||
+                account.getStatus().toString().equals(statusFilter);
+    }
+
+    private String receivableReportTitleForSegment(String segment) {
+        if (segment == null) {
+            return "RELATÓRIO DE CONTAS A RECEBER";
+        }
+        return switch (segment) {
+            case "INADIMPLENCIA" -> "RELATÓRIO DE INADIMPLÊNCIA";
+            case "RECEBIDOS" -> "RELATÓRIO DE CONTAS RECEBIDAS";
+            case "A_VENCER" -> "RELATÓRIO DE CONTAS A VENCER";
+            case "VENCIDOS" -> "RELATÓRIO DE CONTAS VENCIDAS";
+            default -> "RELATÓRIO DE CONTAS A RECEBER";
+        };
+    }
+
+    private String receivableReportSegmentLabel(String segment) {
+        if (segment == null) {
+            return "";
+        }
+        return switch (segment) {
+            case "INADIMPLENCIA" -> "Inadimplência";
+            case "RECEBIDOS" -> "Recebidos";
+            case "A_VENCER" -> "A vencer";
+            case "VENCIDOS" -> "Vencidos";
+            default -> segment;
+        };
+    }
+
     /**
      * Buscar contas a receber com filtros
      */
@@ -522,7 +598,8 @@ public class PaymentReportService {
             String paymentMethodFilter,
             BigDecimal amountMin,
             BigDecimal amountMax,
-            List<String> selectedIds) {
+            List<String> selectedIds,
+            String reportSegment) {
         List<AccountsReceivable> accounts = accountsReceivableRepository.findAll();
         log.info("Encontradas {} contas a receber no banco de dados", accounts.size());
 
@@ -532,8 +609,7 @@ public class PaymentReportService {
                 .filter(account -> endDate == null || !account.getIssueDate().isAfter(endDate))
                 .filter(account -> clientFilter == null || clientFilter.isEmpty() ||
                         account.getClient().getName().toLowerCase().contains(clientFilter.toLowerCase()))
-                .filter(account -> statusFilter == null || statusFilter.isEmpty() || statusFilter.equals("ALL") ||
-                        account.getStatus().toString().equals(statusFilter))
+                .filter(account -> matchesReceivableStatusOrSegment(account, statusFilter, reportSegment))
                 .filter(account -> categoryFilter == null || categoryFilter.isEmpty() || categoryFilter.equals("ALL") ||
                         account.getCategory().toString().equals(categoryFilter))
                 .filter(account -> paymentMethodFilter == null || paymentMethodFilter.isEmpty()

@@ -77,7 +77,8 @@ const RelatoriosTab: React.FC = () => {
     startDate: subDays(new Date(), 30),
     endDate: new Date(),
     status: 'TODOS',
-    tipo: 'TODOS'
+    tipo: 'TODOS',
+    contasReceberSegment: 'GERAL'
   });
 
   // Estado para filtros aplicados a uma empresa específica
@@ -477,6 +478,13 @@ const RelatoriosTab: React.FC = () => {
           const queryParams = new URLSearchParams();
           if (filters.startDate) queryParams.append('startDate', format(filters.startDate, 'yyyy-MM-dd'));
           if (filters.endDate) queryParams.append('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+          if (
+            selectedReport === ReportType.CONTAS_RECEBER &&
+            filters.contasReceberSegment &&
+            filters.contasReceberSegment !== 'GERAL'
+          ) {
+            queryParams.append('segment', filters.contasReceberSegment.trim());
+          }
 
           switch (selectedReport) {
             case ReportType.CONTAS_PAGAR:
@@ -565,6 +573,13 @@ const RelatoriosTab: React.FC = () => {
       const queryParams = new URLSearchParams();
       if (filters.startDate) queryParams.append('startDate', format(filters.startDate, 'yyyy-MM-dd'));
       if (filters.endDate) queryParams.append('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+      if (
+        selectedReport === ReportType.CONTAS_RECEBER &&
+        filters.contasReceberSegment &&
+        filters.contasReceberSegment !== 'GERAL'
+      ) {
+        queryParams.append('segment', filters.contasReceberSegment.trim());
+      }
 
       let endpoint = '';
       switch (selectedReport) {
@@ -1211,6 +1226,40 @@ const RelatoriosTab: React.FC = () => {
                   </Select>
                 </div>
               </div>
+              {selectedReport === ReportType.CONTAS_RECEBER ? (
+                <div className="mt-4">
+                  <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">
+                    Escopo do relatório (PDF)
+                  </label>
+                  <Select
+                    value={filters.contasReceberSegment || 'GERAL'}
+                    onValueChange={(value) =>
+                      setFilters((prev) => ({ ...prev, contasReceberSegment: value }))
+                    }
+                  >
+                    <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder="Geral (período por emissão)" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      <SelectItem value="GERAL" className="text-white hover:bg-seguranca-graphite">
+                        Geral (período por emissão)
+                      </SelectItem>
+                      <SelectItem value="RECEBIDOS" className="text-white hover:bg-seguranca-graphite">
+                        Recebidos
+                      </SelectItem>
+                      <SelectItem value="A_VENCER" className="text-white hover:bg-seguranca-graphite">
+                        A vencer
+                      </SelectItem>
+                      <SelectItem value="VENCIDOS" className="text-white hover:bg-seguranca-graphite">
+                        Vencidos
+                      </SelectItem>
+                      <SelectItem value="INADIMPLENCIA" className="text-white hover:bg-seguranca-graphite">
+                        Inadimplência
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
             </div>
 
             {/* Formato do Relatório */}
@@ -1241,6 +1290,17 @@ const RelatoriosTab: React.FC = () => {
                 <p>• Período: {filters.startDate ? format(filters.startDate, 'dd/MM/yyyy') : 'Não definido'} - {filters.endDate ? format(filters.endDate, 'dd/MM/yyyy') : 'Não definido'}</p>
                 <p>• Status: {filters.status}</p>
                 <p>• Tipo: {filters.tipo}</p>
+                {selectedReport === ReportType.CONTAS_RECEBER &&
+                filters.contasReceberSegment &&
+                filters.contasReceberSegment !== 'GERAL' ? (
+                  <p>
+                    • Escopo contas a receber (PDF):{' '}
+                    {filters.contasReceberSegment === 'RECEBIDOS' && 'Recebidos'}
+                    {filters.contasReceberSegment === 'A_VENCER' && 'A vencer'}
+                    {filters.contasReceberSegment === 'VENCIDOS' && 'Vencidos'}
+                    {filters.contasReceberSegment === 'INADIMPLENCIA' && 'Inadimplência'}
+                  </p>
+                ) : null}
                 <p>• Formato: {selectedFormat}</p>
               </div>
             </div>

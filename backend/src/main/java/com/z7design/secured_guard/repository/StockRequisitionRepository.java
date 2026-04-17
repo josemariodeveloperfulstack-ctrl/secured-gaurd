@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +26,21 @@ public interface StockRequisitionRepository extends JpaRepository<StockRequisiti
             ORDER BY r.createdAt DESC
             """)
     List<StockRequisitionListItemDTO> findAllListItems();
+
+    @Query("""
+            SELECT new com.z7design.secured_guard.dto.StockRequisitionListItemDTO(
+              r.id, r.requisitionNumber, r.status, e.name, r.movementReason, r.createdAt, u.name,
+              (SELECT COUNT(l.id) FROM StockRequisitionLine l WHERE l.requisition.id = r.id)
+            )
+            FROM StockRequisition r
+            LEFT JOIN r.employee e
+            LEFT JOIN r.requestedByUser u
+            WHERE r.createdAt >= :start AND r.createdAt <= :end
+            ORDER BY r.createdAt DESC
+            """)
+    List<StockRequisitionListItemDTO> findAllListItemsCreatedBetween(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 
     @Query("""
             SELECT DISTINCT r FROM StockRequisition r
