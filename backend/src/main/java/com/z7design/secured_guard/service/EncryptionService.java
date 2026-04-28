@@ -32,6 +32,18 @@ public class EncryptionService {
      * Criptografa um embedding facial
      */
     public String encryptEmbedding(String embedding) {
+        return encryptText(embedding);
+    }
+    
+    /**
+     * Criptografa uma senha de e-mail ou texto genérico
+     */
+    public String encryptPassword(String password) {
+        return encryptText(password);
+    }
+
+    private String encryptText(String text) {
+        if (text == null) return null;
         try {
             // Gerar chave secreta
             SecretKey secretKey = generateSecretKey();
@@ -45,8 +57,8 @@ public class EncryptionService {
             GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH * 8, iv);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmSpec);
             
-            // Criptografar embedding
-            byte[] encryptedBytes = cipher.doFinal(embedding.getBytes(StandardCharsets.UTF_8));
+            // Criptografar texto
+            byte[] encryptedBytes = cipher.doFinal(text.getBytes(StandardCharsets.UTF_8));
             
             // Combinar IV + dados criptografados
             byte[] combined = new byte[iv.length + encryptedBytes.length];
@@ -57,8 +69,8 @@ public class EncryptionService {
             return Base64.getEncoder().encodeToString(combined);
             
         } catch (Exception e) {
-            log.error("Erro ao criptografar embedding facial", e);
-            throw new RuntimeException("Falha na criptografia do embedding", e);
+            log.error("Erro ao criptografar texto", e);
+            throw new RuntimeException("Falha na criptografia", e);
         }
     }
     
@@ -66,9 +78,21 @@ public class EncryptionService {
      * Descriptografa um embedding facial
      */
     public String decryptEmbedding(String encryptedEmbedding) {
+        return decryptText(encryptedEmbedding);
+    }
+    
+    /**
+     * Descriptografa uma senha de e-mail ou texto genérico
+     */
+    public String decryptPassword(String encryptedPassword) {
+        return decryptText(encryptedPassword);
+    }
+
+    private String decryptText(String encryptedText) {
+        if (encryptedText == null) return null;
         try {
             // Decodificar Base64
-            byte[] combined = Base64.getDecoder().decode(encryptedEmbedding);
+            byte[] combined = Base64.getDecoder().decode(encryptedText);
             
             // Separar IV e dados criptografados
             byte[] iv = new byte[GCM_IV_LENGTH];
@@ -85,14 +109,14 @@ public class EncryptionService {
             GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH * 8, iv);
             cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmSpec);
             
-            // Descriptografar embedding
+            // Descriptografar texto
             byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
             
             return new String(decryptedBytes, StandardCharsets.UTF_8);
             
         } catch (Exception e) {
-            log.error("Erro ao descriptografar embedding facial", e);
-            throw new RuntimeException("Falha na descriptografia do embedding", e);
+            log.error("Erro ao descriptografar texto", e);
+            throw new RuntimeException("Falha na descriptografia", e);
         }
     }
     

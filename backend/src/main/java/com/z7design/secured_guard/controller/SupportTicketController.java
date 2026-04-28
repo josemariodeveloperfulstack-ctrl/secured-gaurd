@@ -148,7 +148,7 @@ public class SupportTicketController {
      * Criar novo ticket
      */
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPPORT_CREATE', 'SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_CREATE', 'SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO', 'ROLE_COLABORADOR')")
     public ResponseEntity<SupportTicketDTO> createTicket(@Valid @RequestBody CreateTicketRequest request) {
         log.info("POST /api/v1/support/tickets - Criando novo ticket: {}", request.getTitle());
         SupportTicketDTO ticket = ticketService.createTicket(request);
@@ -185,7 +185,7 @@ public class SupportTicketController {
      * Adicionar mensagem ao ticket
      */
     @PostMapping("/{id}/messages")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_WRITE', 'SUPPORT_MANAGE', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO', 'ROLE_COLABORADOR')")
     public ResponseEntity<TicketMessageDTO> addMessageToTicket(
             @PathVariable UUID id,
             @Valid @RequestBody AddTicketMessageRequest request,
@@ -204,7 +204,7 @@ public class SupportTicketController {
      * Buscar mensagens de um ticket
      */
     @GetMapping("/{id}/messages")
-    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO')")
+    @PreAuthorize("hasAnyAuthority('SUPPORT_READ', 'SUPPORT_MANAGE', 'ATTENDANCE_READ', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ESTOQUE', 'ROLE_COMPRAS', 'ROLE_SUPRIMENTOS', 'ROLE_ALMOXARIFADO', 'ROLE_COLABORADOR')")
     public ResponseEntity<List<TicketMessageDTO>> getTicketMessages(@PathVariable UUID id) {
         log.info("GET /api/v1/support/tickets/{}/messages - Buscando mensagens do ticket", id);
         List<TicketMessageDTO> messages = ticketService.getTicketMessages(id);

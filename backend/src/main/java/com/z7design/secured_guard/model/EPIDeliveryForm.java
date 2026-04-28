@@ -2,6 +2,7 @@ package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -54,6 +55,14 @@ public class EPIDeliveryForm {
     @JoinColumn(name = "responsible_employee_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "unit", "position", "user"})
     private Employee responsibleEmployee;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_type", length = 30)
+    @Builder.Default
+    private EPIDeliveryType deliveryType = EPIDeliveryType.PRIMEIRA_ENTREGA;
+
+    @Column(name = "employee_work_sector")
+    private String employeeWorkSector;
 
     @Column(columnDefinition = "TEXT")
     private String observations;

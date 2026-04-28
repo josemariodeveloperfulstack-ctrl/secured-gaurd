@@ -1,7 +1,7 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.FunctionalityDTO;
-import com.z7design.secured_guard.dto.MessageResponseDTO;
+import com.z7design.secured_guard.dto.SimpleResponseDTO;
 import com.z7design.secured_guard.dto.UpdateProfileRequestDTO;
 import com.z7design.secured_guard.dto.UserProfileDTO;
 import com.z7design.secured_guard.model.User;
@@ -74,8 +74,8 @@ public class UserProfileController {
                     .roles(roles)
                     .status(user.getStatus().toString())
                     .active(user.isActive())
-                    .firstAccess(user.isFirstAccess())
-                    .twoFactorEnabled(user.isTwoFactorEnabled())
+                    .firstAccess(Boolean.TRUE.equals(user.getFirstAccessCompleted()))
+                    .twoFactorEnabled(Boolean.TRUE.equals(user.getTwoFactorEnabled()))
                     .lastPasswordChange(user.getLastPasswordChange())
                     .createdAt(user.getCreatedAt())
                     .updatedAt(user.getUpdatedAt())
@@ -93,7 +93,7 @@ public class UserProfileController {
 
     @Operation(summary = "Atualiza perfil do usuário", description = "Atualiza dados do perfil do usuário logado")
     @PutMapping
-    public ResponseEntity<MessageResponseDTO> updateProfile(
+    public ResponseEntity<SimpleResponseDTO> updateProfile(
             @Valid @RequestBody UpdateProfileRequestDTO request,
             @AuthenticationPrincipal UserDetails userDetails) {
         
@@ -111,7 +111,7 @@ public class UserProfileController {
                 // Verificar se email já está em uso por outro usuário
                 Optional<User> existingUser = userRepository.findByEmail(newEmail);
                 if (existingUser.isPresent() && !existingUser.get().getId().equals(user.getId())) {
-                    return ResponseEntity.badRequest().body(MessageResponseDTO.builder()
+                    return ResponseEntity.badRequest().body(SimpleResponseDTO.builder()
                             .message("Email já está em uso por outro usuário")
                             .success(false)
                             .build());
@@ -141,7 +141,7 @@ public class UserProfileController {
                         role.getName().equals("FINANCEIRO")
                     )) {
                     log.warn("⚠️ SEGURANÇA: Usuário {} tentando usar email com padrão privilegiado sem ter o role correspondente", user.getUsername());
-                    return ResponseEntity.badRequest().body(MessageResponseDTO.builder()
+                    return ResponseEntity.badRequest().body(SimpleResponseDTO.builder()
                             .message("Você não pode usar um email com padrão de role privilegiado (admin.*, rh.*, supervisor.*, financeiro.*) sem ter o role correspondente")
                             .success(false)
                             .build());
@@ -167,14 +167,14 @@ public class UserProfileController {
             logService.logUserActivity(user.getUsername(), "PROFILE_UPDATE", 
                 "Perfil atualizado");
 
-            return ResponseEntity.ok(MessageResponseDTO.builder()
-                    .message("Perfil atualizado com sucesso!")
-                    .success(true)
-                    .build());
+            return ResponseEntity.ok(SimpleResponseDTO.builder()
+                        .message("Perfil atualizado com sucesso")
+                        .success(true)
+                        .build());
 
         } catch (Exception e) {
             log.error("💥 Erro ao atualizar perfil: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body(MessageResponseDTO.builder()
+            return ResponseEntity.status(500).body(SimpleResponseDTO.builder()
                     .message("Erro ao atualizar perfil: " + e.getMessage())
                     .success(false)
                     .build());

@@ -15,6 +15,7 @@ import com.z7design.secured_guard.model.enums.VacationStatus;
 import com.z7design.secured_guard.model.enums.VacationType;
 import com.z7design.secured_guard.repository.VacationRepository;
 import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -24,6 +25,7 @@ public class VacationService {
     
     private final VacationRepository vacationRepository;
     private final UserRepository userRepository;
+    private final EmployeeRepository employeeRepository;
     
     @Transactional
     public Vacation create(Vacation vacation) {
@@ -101,11 +103,15 @@ public class VacationService {
     }
     
     public List<Vacation> findByEmployeeId(UUID employeeId) {
-        return vacationRepository.findByEmployeeId(employeeId);
+        return employeeRepository.findByUserId(employeeId)
+            .map(e -> vacationRepository.findByEmployeeId(e.getId()))
+            .orElseGet(() -> vacationRepository.findByEmployeeId(employeeId));
     }
     
     public List<Vacation> findByEmployeeIdAndStatus(UUID employeeId, VacationStatus status) {
-        return vacationRepository.findByEmployeeIdAndStatus(employeeId, status);
+        return employeeRepository.findByUserId(employeeId)
+            .map(e -> vacationRepository.findByEmployeeIdAndStatus(e.getId(), status))
+            .orElseGet(() -> vacationRepository.findByEmployeeIdAndStatus(employeeId, status));
     }
     
     public List<Vacation> findByStartDateBetween(LocalDate startDate, LocalDate endDate) {

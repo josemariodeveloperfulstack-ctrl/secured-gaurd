@@ -14,8 +14,8 @@ export const MobileNavbar: React.FC = () => {
     if (!isCollaborator) return null;
 
     const navItems = [
-        { icon: Home, label: 'Início', to: '/dashboard' },
-        { icon: FileText, label: 'Documentos', to: '/meus-holerites' },
+        { icon: Home, label: 'Início', to: '/area-funcionario' },
+        { icon: FileText, label: 'Documentos', to: '/area-funcionario' }, // Pode manter para facilitar, mas o portal centraliza
         { icon: Clock, label: 'Ponto', to: '/meu-ponto' },
         { icon: MessageSquare, label: 'Mensagens', to: '/mensagens' },
         { icon: User, label: 'Perfil', to: '/profile' },

@@ -20,7 +20,8 @@ import {
   Bell,
   Loader2,
   Layers,
-  ClipboardList
+  ClipboardList,
+  HardHat
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { stockService } from '@/services/stockService';
@@ -34,6 +35,7 @@ import QrCodeScanner from '@/components/stock/QrCodeScanner';
 import StockReportsContent from '@/components/stock/StockReportsContent';
 import ShelfManagement from '@/components/stock/ShelfManagement';
 import StockRequisitionsPanel from '@/components/stock/StockRequisitionsPanel';
+import { FichasEntregaEPIContent } from '@/components/epi/FichasEntregaEPIContent';
 
 const EstoqueSimplificado: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -382,6 +384,10 @@ const EstoqueSimplificado: React.FC = () => {
               <ClipboardList className="h-4 w-4 mr-2" />
               Requisições ({stockRequisitions.length})
             </TabsTrigger>
+            <TabsTrigger value="fichas-epi" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
+              <HardHat className="h-4 w-4 mr-2" />
+              Fichas de EPI
+            </TabsTrigger>
             <TabsTrigger value="alerts" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <Bell className="h-4 w-4 mr-2" />
               Alertas ({Array.isArray(activeAlerts) ? activeAlerts.length : 0})
@@ -422,6 +428,10 @@ const EstoqueSimplificado: React.FC = () => {
               loading={loading}
               onRefresh={loadRequisitionsOnly}
             />
+          </TabsContent>
+
+          <TabsContent value="fichas-epi" className="mt-6">
+            <FichasEntregaEPIContent />
           </TabsContent>
 
           <TabsContent value="alerts" className="mt-6">

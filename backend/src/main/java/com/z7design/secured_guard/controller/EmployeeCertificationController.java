@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.z7design.secured_guard.dto.CreateEmployeeCertificationRequest;
 import com.z7design.secured_guard.dto.UpdateEmployeeCertificationRequest;
 import com.z7design.secured_guard.dto.EmployeeCertificationResponse;
+import com.z7design.secured_guard.dto.CertificationStatsResponse;
 import com.z7design.secured_guard.model.EmployeeCertification;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 import com.z7design.secured_guard.service.EmployeeCertificationService;
@@ -119,6 +120,12 @@ public class EmployeeCertificationController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(pdf);
+    }
+
+    @Operation(summary = "Busca estatísticas das certificações")
+    @GetMapping("/stats")
+    public ResponseEntity<CertificationStatsResponse> getStats() {
+        return ResponseEntity.ok(certificationService.getStats());
     }
 
     @Operation(summary = "Cancela certificação")

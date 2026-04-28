@@ -153,6 +153,7 @@ interface CollapsibleSidebarProps {
 // Menu principal
 const mainMenuItems = [
   { icon: Home, text: 'Dashboard', to: '/dashboard', id: 'dashboard' },
+  { icon: UserCheck, text: 'Área do Funcionário', to: '/area-funcionario', id: 'area-funcionario' },
   { icon: FileSpreadsheet, text: 'Holerites', to: '/holerites', id: 'holerites' },
   { icon: Truck, text: 'Frota', to: '/frota', id: 'frota' },
   { icon: Building2, text: 'Filiais', to: '/filiais', id: 'filiais' },
@@ -265,6 +266,7 @@ const comunicacaoInternaMenuItems = [
   { icon: MessageCircle, text: 'Chat Interno', to: '/chat-interno', id: 'chat-interno' },
   // Para usuários comuns, vamos usar /mensagens (caixa de entrada / envio básico)
   { icon: Send, text: 'Enviar Mensagens', to: '/mensagens', id: 'mensagens' },
+  { icon: Mail, text: 'Gestão de E-mails', to: '/webmail', id: 'webmail' },
   { icon: Users, text: 'Grupos de Mensagens', to: '/gestao-mensagens/grupos', id: 'gestao-mensagens-grupos' },
   { icon: Bell, text: 'Notificações', to: '/gestao-mensagens/notificacoes', id: 'gestao-mensagens-notificacoes' },
 ];
@@ -325,6 +327,7 @@ const sistemaMenuItems = [
 const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   COLABORADOR: new Set([
     'dashboard',
+    'area-funcionario',
     'meus-holerites',
     'chat-interno',
     'mensagens',
@@ -423,6 +426,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'crm',
     'chat-interno',
     'mensagens',
+    'webmail',
   ]),
   GESTOR_COMERCIAL: new Set([
     'dashboard',
@@ -435,6 +439,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'crm',
     'chat-interno',
     'mensagens',
+    'webmail',
   ]),
   ASSISTENTE_COMERCIAL: new Set([
     'dashboard',
@@ -445,6 +450,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'crm',
     'chat-interno',
     'mensagens',
+    'webmail',
   ]),
   OPERACIONAL: new Set([
     'dashboard',
@@ -499,6 +505,10 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-relatorios',
     'chat-interno',
     'mensagens',
+    'rh-funcionarios',
+    'dp-funcionarios',
+    'rh-sst-epis',
+    'dp-epis',
   ]),
   ALMOXARIFADO: new Set([
     'dashboard',
@@ -516,6 +526,10 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
     'gestao-atendimento-tickets',
+    'rh-funcionarios',
+    'dp-funcionarios',
+    'rh-sst-epis',
+    'dp-epis',
   ]),
   ESTOQUE: new Set([
     'dashboard',
@@ -533,6 +547,10 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
     'gestao-atendimento-tickets',
+    'rh-funcionarios',
+    'dp-funcionarios',
+    'rh-sst-epis',
+    'dp-epis',
   ]),
   COMPRAS: new Set([
     'dashboard',
@@ -569,6 +587,10 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
     'gestao-atendimento-tickets',
+    'rh-funcionarios',
+    'dp-funcionarios',
+    'rh-sst-epis',
+    'dp-epis',
   ]),
 };
 

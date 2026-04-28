@@ -14,6 +14,8 @@ import { SearchableSelect } from '../ui/searchable-select';
 
 import { companyService } from '@/services/companyService';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
+import { clientService, Client as ClientDTO } from '@/services/clientService';
+import workPostService, { WorkPost } from '@/services/workPostService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
@@ -75,6 +77,11 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   const [companies, setCompanies] = useState<any[]>([]);
 
   const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
+  const [clients, setClients] = useState<ClientDTO[]>([]);
+  const [allWorkPosts, setAllWorkPosts] = useState<WorkPost[]>([]);
+  const [filteredWorkPosts, setFilteredWorkPosts] = useState<WorkPost[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
@@ -124,12 +131,16 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   const loadData = async () => {
     setLoadingData(true);
     try {
-      const [companiesData, costCentersData] = await Promise.all([
+      const [companiesData, costCentersData, clientsData, workPostsData] = await Promise.all([
         companyService.getAllCompanies(),
-        costCenterService.listActive()
+        costCenterService.listActive(),
+        clientService.getAllClients().catch(err => { console.warn('Erro ao carregar clientes:', err); return []; }),
+        workPostService.getAllWorkPosts().catch(err => { console.warn('Erro ao carregar postos:', err); return []; })
       ]);
       setCompanies(companiesData);
       setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
+      setClients(clientsData);
+      setAllWorkPosts(Array.isArray(workPostsData) ? workPostsData : []);
 
       console.log('📊 Centros de Custo carregados:', costCentersData);
     } catch (error) {
@@ -738,23 +749,58 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               </div>
 
               <div className="space-y-2">
-                <Label>Departamento (Centro de Custo)</Label>
+                <Label>Cliente</Label>
                 <SearchableSelect
-                  options={costCenters.map(cc => ({
-                    value: cc.id || cc.name,
-                    label: cc.name,
-                    description: cc.code ? `Código: ${cc.code}` : undefined
+                  options={clients.map(c => ({
+                    value: c.id,
+                    label: c.name,
+                    description: c.cnpj || ''
+                  }))}
+                  value={selectedClientId}
+                  onChange={async (val) => {
+                    setSelectedClientId(val);
+                    setForm(prev => ({ ...prev, department: '' }));
+                    setFilteredWorkPosts([]);
+                    if (val) {
+                      setLoadingWorkPosts(true);
+                      try {
+                        const posts = await workPostService.getWorkPostsByClient(val);
+                        setFilteredWorkPosts(Array.isArray(posts) ? posts : []);
+                      } catch (err) {
+                        console.warn('Erro ao carregar setores do cliente:', err);
+                        setFilteredWorkPosts([]);
+                      } finally {
+                        setLoadingWorkPosts(false);
+                      }
+                    }
+                  }}
+                  disabled={loadingData}
+                  placeholder="Selecione o cliente"
+                  searchPlaceholder="Buscar cliente..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Selecione o cliente para listar os setores de trabalho.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Setor de Trabalho</Label>
+                <SearchableSelect
+                  options={(
+                    selectedClientId
+                      ? filteredWorkPosts
+                      : allWorkPosts
+                  ).map(wp => ({
+                    value: wp.id || wp.name,
+                    label: wp.name,
+                    description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || '')
                   }))}
                   value={form.department}
                   onChange={(value) => setForm(prev => ({ ...prev, department: value }))}
-                  disabled={loadingData}
-                  placeholder="Selecione o departamento"
-                  searchPlaceholder="Buscar departamento..."
+                  disabled={loadingData || loadingWorkPosts}
+                  placeholder={loadingWorkPosts ? 'Carregando setores...' : (selectedClientId ? 'Selecione o setor de trabalho' : 'Selecione um cliente primeiro')}
+                  searchPlaceholder="Buscar setor..."
                 />
-                <p className="text-xs text-muted-foreground">
-                  No PDF do contrato, o campo <span className="font-medium text-foreground">Setor de trabalho</span> usa o
-                  setor, a unidade e o posto de trabalho cadastrados no funcionário — não este centro de custo.
-                </p>
               </div>
             </div>
           </div>

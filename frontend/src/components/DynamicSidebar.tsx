@@ -818,6 +818,20 @@ export function DynamicSidebar() {
         return isAllowed;
       }
 
+      // Regras para ADMIN e ADMINISTRADOR - Esconder módulos de sistema sensíveis
+      if (['ADMIN', 'ADMINISTRADOR'].includes(normalizedRole)) {
+        const forbiddenSystemIds = new Set([
+          'atividades',
+          'sistema',
+          'configuracoes',
+          'whatsapp-connection',
+          'backup'
+        ]);
+        if (forbiddenSystemIds.has(item.id)) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -949,121 +963,7 @@ export function DynamicSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Módulo Sistema - FORÇADO para SUPER_ADMIN - MOVIDO PARA CIMA */}
-        {console.log('🔍 Tentando renderizar seção Sistema...')}
-        {console.log('🔍 Usuário atual na sidebar:', user)}
-        {console.log('🔍 É SUPER_ADMIN?', user?.role === 'SUPER_ADMIN')}
-        {true && (
-          <SidebarGroup>
-            {/* Debug visual simples */}
-            <div className="p-2 text-xs text-red-500 bg-red-900/50 rounded mb-2">
-              🔥 DEBUG: Seção Sistema sendo renderizada!
-            </div>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Settings size={16} className="mr-2 text-seguranca-yellow" />
-              Sistema
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {/* Itens fixos para SUPER_ADMIN */}
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'usuarios'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'usuarios'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/usuarios" className="flex items-center w-full">
-                      <Users size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Usuários</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'grupos'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'grupos'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/grupos" className="flex items-center w-full">
-                      <Database size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Grupos</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'atividades'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'atividades'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/atividades" className="flex items-center w-full">
-                      <Activity size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Gestão de Atividades</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'sistema'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'sistema'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/sistema" className="flex items-center w-full">
-                      <Activity size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Sistema</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'configuracoes'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'configuracoes'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/configuracoes" className="flex items-center w-full">
-                      <Settings size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Configurações</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         {/* Módulo RH */}
         {menuGroups.rh.length > 0 && (
@@ -1474,8 +1374,8 @@ export function DynamicSidebar() {
         )}
 
 
-        {/* Módulo Sistema - Versão original (comentada para debug) */}
-        {false && menuGroups.sistema.length > 0 && (
+        {/* Módulo Sistema */}
+        {menuGroups.sistema.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
               <Settings size={16} className="mr-2 text-seguranca-yellow" />
@@ -1508,32 +1408,7 @@ export function DynamicSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Debug temporário para SUPER_ADMIN */}
-        {user?.role === 'SUPER_ADMIN' && (
-          <div className="p-2 text-xs text-yellow-400 bg-yellow-900/20 rounded">
-            DEBUG SUPER_ADMIN: Sistema tem {menuGroups.sistema.length} itens
-            <br />
-            Itens: {menuGroups.sistema.map(item => item.text).join(', ')}
-          </div>
-        )}
 
-        {/* Debug sempre visível */}
-        <div className="p-2 text-xs text-red-400 bg-red-900/20 rounded">
-          DEBUG GERAL:
-          <br />
-          User: {user ? user.name : 'null'}
-          <br />
-          Role: {user ? user.role : 'null'}
-          <br />
-          Is SUPER_ADMIN: {user?.role === 'SUPER_ADMIN' ? 'SIM' : 'NÃO'}
-          <br />
-          Sistema length: {menuGroups.sistema.length}
-        </div>
-
-        {/* Teste simples */}
-        <div className="p-2 text-xs text-blue-400 bg-blue-900/20 rounded">
-          TESTE SIMPLES: Se você vê isso, a sidebar está funcionando
-        </div>
 
       </SidebarContent>
 

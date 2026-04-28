@@ -36,7 +36,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-const MinhasFerias: React.FC = () => {
+interface MinhasFeriasProps {
+    standalone?: boolean;
+}
+
+const MinhasFerias: React.FC<MinhasFeriasProps> = ({ standalone = false }) => {
     const { user } = useAuth();
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
@@ -124,7 +128,7 @@ const MinhasFerias: React.FC = () => {
     };
 
     return (
-        <StandardLayout>
+        <StandardLayout isSubPage={standalone}>
             <div className="max-w-2xl mx-auto px-4 py-8 space-y-6 pb-24">
                 <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500">

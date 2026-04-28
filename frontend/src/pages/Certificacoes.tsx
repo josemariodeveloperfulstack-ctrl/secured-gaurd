@@ -23,14 +23,19 @@ import {
   Shield,
   Settings,
   BookOpen,
-  Zap
+  Zap,
+  Eye
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import certificationService from '@/services/certificationService';
 import { Certification, CertificationType, CertificationStatus } from '@/types/certification';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const Certificacoes: React.FC = () => {
+interface CertificacoesProps {
+  standalone?: boolean;
+}
+
+const Certificacoes: React.FC<CertificacoesProps> = ({ standalone = false }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<CertificationType | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<CertificationStatus | 'ALL'>('ALL');
@@ -139,7 +144,7 @@ const Certificacoes: React.FC = () => {
   // Loading state
   if (certificationsLoading || statsLoading) {
     return (
-      <StandardLayout>
+    <StandardLayout isSubPage={standalone}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
           <span className="ml-2 text-seguranca-lightgray">Carregando certificações...</span>
@@ -151,7 +156,7 @@ const Certificacoes: React.FC = () => {
   // Error state
   if (certificationsError) {
     return (
-      <StandardLayout>
+    <StandardLayout isSubPage={standalone}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <AlertTriangle className="h-8 w-8 text-seguranca-red mx-auto mb-2" />
@@ -169,7 +174,7 @@ const Certificacoes: React.FC = () => {
   }
 
   return (
-    <StandardLayout>
+    <StandardLayout isSubPage={standalone}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

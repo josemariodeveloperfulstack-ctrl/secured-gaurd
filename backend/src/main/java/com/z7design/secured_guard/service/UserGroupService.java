@@ -572,7 +572,7 @@ public class UserGroupService {
         // GRUPO_ESTOQUE - Estoque
         permissions.put(UserGroup.GRUPO_ESTOQUE, new HashSet<>(Arrays.asList(
                 "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "STOCK_READ",
-                "REPORTS_READ")));
+                "REPORTS_READ", "EMPLOYEES_READ")));
 
         // GRUPO_ASSISTENTE_COMERCIAL - Assistente Comercial
         permissions.put(UserGroup.GRUPO_ASSISTENTE_COMERCIAL, new HashSet<>(Arrays.asList(

@@ -30,40 +30,40 @@ class CertificationService {
   async getCertifications(filters?: {
     type?: CertificationType;
     status?: CertificationStatus;
-    employeeId?: number;
+    employeeId?: string;
     issuingOrganization?: string;
   }): Promise<Certification[]> {
     try {
       const params = new URLSearchParams();
-      if (filters?.type) params.append('type', filters.type);
+      // if (filters?.type) params.append('type', filters.type);
       if (filters?.status) params.append('status', filters.status);
-      if (filters?.employeeId) params.append('employeeId', filters.employeeId.toString());
-      if (filters?.issuingOrganization) params.append('issuingOrganization', filters.issuingOrganization);
+      if (filters?.employeeId) params.append('employeeId', filters.employeeId);
+      // if (filters?.issuingOrganization) params.append('issuingOrganization', filters.issuingOrganization);
 
-      const url = `/certifications${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `/employee-certifications${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await api.get(url);
       
-      return response.data.map((cert: CertificationAPI) => ({
+      return response.data.map((cert: any) => ({
         id: cert.id,
-        name: cert.name,
-        description: cert.description,
-        type: cert.type,
+        name: cert.trainingName || 'N/A',
+        description: cert.trainingDescription || '',
+        type: 'TECHNICAL', // Default as model doesn't have type
         status: cert.status,
         employeeId: cert.employeeId,
         employeeName: cert.employeeName,
-        employeeCpf: cert.employeeCpf,
-        issuingOrganization: cert.issuingOrganization,
-        certificateNumber: cert.certificateNumber,
+        employeeCpf: cert.employeeDocument,
+        issuingOrganization: cert.provider || cert.workPostName || 'N/A',
+        certificateNumber: cert.certificationNumber,
         issueDate: cert.issueDate,
-        expiryDate: cert.expiryDate,
-        renewalDate: cert.renewalDate,
-        cost: cert.cost,
-        location: cert.location,
-        notes: cert.notes,
-        attachments: cert.attachments,
-        createdBy: cert.createdBy,
-        createdAt: cert.createdAt,
-        updatedAt: cert.updatedAt
+        expiryDate: cert.expirationDate,
+        renewalDate: null,
+        cost: 0,
+        location: cert.workPostName || 'N/A',
+        notes: '',
+        attachments: cert.documentUrl ? [cert.documentUrl] : [],
+        createdBy: 'N/A',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       }));
     } catch (error) {
       console.error('Erro ao buscar certificações:', error);
@@ -72,32 +72,32 @@ class CertificationService {
   }
 
   // Buscar certificação por ID
-  async getCertification(id: number): Promise<Certification | null> {
+  async getCertification(id: string): Promise<Certification | null> {
     try {
-      const response = await api.get(`/certifications/${id}`);
-      const cert: CertificationAPI = response.data;
+      const response = await api.get(`/employee-certifications/${id}`);
+      const cert: any = response.data;
       
       return {
         id: cert.id,
-        name: cert.name,
-        description: cert.description,
-        type: cert.type,
+        name: cert.trainingName || 'N/A',
+        description: cert.trainingDescription || '',
+        type: 'TECHNICAL',
         status: cert.status,
         employeeId: cert.employeeId,
         employeeName: cert.employeeName,
-        employeeCpf: cert.employeeCpf,
-        issuingOrganization: cert.issuingOrganization,
-        certificateNumber: cert.certificateNumber,
+        employeeCpf: cert.employeeDocument,
+        issuingOrganization: cert.provider || cert.workPostName || 'N/A',
+        certificateNumber: cert.certificationNumber,
         issueDate: cert.issueDate,
-        expiryDate: cert.expiryDate,
-        renewalDate: cert.renewalDate,
-        cost: cert.cost,
-        location: cert.location,
-        notes: cert.notes,
-        attachments: cert.attachments,
-        createdBy: cert.createdBy,
-        createdAt: cert.createdAt,
-        updatedAt: cert.updatedAt
+        expiryDate: cert.expirationDate,
+        renewalDate: null,
+        cost: 0,
+        location: cert.workPostName || 'N/A',
+        notes: '',
+        attachments: cert.documentUrl ? [cert.documentUrl] : [],
+        createdBy: 'N/A',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
     } catch (error) {
       console.error('Erro ao buscar certificação:', error);
@@ -106,9 +106,9 @@ class CertificationService {
   }
 
   // Criar nova certificação
-  async createCertification(certification: Omit<Certification, 'id' | 'createdAt' | 'updatedAt'>): Promise<Certification> {
+  async createCertification(certification: any): Promise<any> {
     try {
-      const response = await api.post('/certifications', certification);
+      const response = await api.post('/employee-certifications', certification);
       return response.data;
     } catch (error) {
       console.error('Erro ao criar certificação:', error);
@@ -117,9 +117,9 @@ class CertificationService {
   }
 
   // Atualizar certificação
-  async updateCertification(id: number, certification: Partial<Certification>): Promise<Certification> {
+  async updateCertification(id: string, certification: any): Promise<any> {
     try {
-      const response = await api.put(`/certifications/${id}`, certification);
+      const response = await api.put(`/employee-certifications/${id}`, certification);
       return response.data;
     } catch (error) {
       console.error('Erro ao atualizar certificação:', error);
@@ -128,9 +128,9 @@ class CertificationService {
   }
 
   // Deletar certificação
-  async deleteCertification(id: number): Promise<void> {
+  async deleteCertification(id: string): Promise<void> {
     try {
-      await api.delete(`/certifications/${id}`);
+      await api.delete(`/employee-certifications/${id}`);
     } catch (error) {
       console.error('Erro ao deletar certificação:', error);
       throw new Error('Erro ao deletar certificação');
@@ -138,13 +138,9 @@ class CertificationService {
   }
 
   // Renovar certificação
-  async renewCertification(id: number, renewalData: {
-    renewalDate: string;
-    cost: number;
-    notes?: string;
-  }): Promise<Certification> {
+  async renewCertification(id: string, renewalData: any): Promise<any> {
     try {
-      const response = await api.patch(`/certifications/${id}/renew`, renewalData);
+      const response = await api.put(`/employee-certifications/${id}/renew`, renewalData);
       return response.data;
     } catch (error) {
       console.error('Erro ao renovar certificação:', error);
@@ -153,9 +149,9 @@ class CertificationService {
   }
 
   // Cancelar certificação
-  async cancelCertification(id: number, reason: string): Promise<Certification> {
+  async cancelCertification(id: string, reason: string): Promise<any> {
     try {
-      const response = await api.patch(`/certifications/${id}/cancel`, { reason });
+      const response = await api.delete(`/employee-certifications/${id}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao cancelar certificação:', error);
@@ -164,9 +160,9 @@ class CertificationService {
   }
 
   // Buscar certificações por funcionário
-  async getCertificationsByEmployee(employeeId: number): Promise<Certification[]> {
+  async getCertificationsByEmployee(employeeId: string): Promise<Certification[]> {
     try {
-      const response = await api.get(`/certifications/employee/${employeeId}`);
+      const response = await api.get(`/employee-certifications?employeeId=${employeeId}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar certificações do funcionário:', error);
@@ -177,7 +173,10 @@ class CertificationService {
   // Buscar certificações expirando em breve
   async getExpiringCertifications(days: number = 30): Promise<Certification[]> {
     try {
-      const response = await api.get(`/certifications/expiring?days=${days}`);
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      const isoDate = date.toISOString().split('T')[0];
+      const response = await api.get(`/employee-certifications?expiringBefore=${isoDate}`);
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar certificações expirando:', error);
@@ -186,19 +185,9 @@ class CertificationService {
   }
 
   // Buscar estatísticas de certificações
-  async getCertificationStats(): Promise<{
-    total: number;
-    active: number;
-    expired: number;
-    pending: number;
-    cancelled: number;
-    expiringSoon: number;
-    totalCost: number;
-    byType: Record<CertificationType, number>;
-    byOrganization: Record<string, number>;
-  }> {
+  async getCertificationStats(): Promise<any> {
     try {
-      const response = await api.get('/certifications/stats');
+      const response = await api.get('/employee-certifications/stats');
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);

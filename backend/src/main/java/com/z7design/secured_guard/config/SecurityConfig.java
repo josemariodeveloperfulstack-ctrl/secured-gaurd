@@ -66,6 +66,8 @@ public class SecurityConfig {
                                                  .requestMatchers("/api/messages/unread/count").authenticated()
                                                  // Endpoints públicos
                                                  .requestMatchers("/api/auth/**").permitAll()
+                                                .requestMatchers("/api/security-settings/**").hasAuthority("ROLE_SUPER_ADMIN")
+                                                .requestMatchers("/api/backup/**").hasAuthority("ROLE_SUPER_ADMIN")
                                                 .requestMatchers("/api/files/**").permitAll()
                                                 .requestMatchers("/api/test/**").permitAll()
                                                 .requestMatchers("/api/health").permitAll()
@@ -109,12 +111,9 @@ public class SecurityConfig {
                                                 }).permitAll()
                                                 .requestMatchers("/ws/**").authenticated()
                                                 .requestMatchers("/ws").authenticated()
-                                                .requestMatchers("/api/email/test").authenticated()
-                                                .requestMatchers("/api/email/config").authenticated()
-                                                // Endpoints públicos do portal (vagas, etc)
-                                                .requestMatchers("/api/public/**").permitAll()
-                                                // WhatsApp controller - público para pareamento/health em dev
-                                                .requestMatchers("/api/whatsapp/**").permitAll()
+                                                .requestMatchers("/api/email/test", "/api/email/config").hasAuthority("ROLE_SUPER_ADMIN")
+                                                // WhatsApp controller - restrito a SUPER_ADMIN
+                                                .requestMatchers("/api/whatsapp/**").hasAuthority("ROLE_SUPER_ADMIN")
                                                 .requestMatchers("/api/payslips/test-download/**").permitAll()
                                                 .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
                                                 .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()
@@ -544,7 +543,8 @@ public class SecurityConfig {
                                                 // Endpoints operacionais - temporariamente públicos para teste de
                                                 // integração
                                                 .requestMatchers("/api/schedules/**").permitAll()
-                                                .requestMatchers("/api/activity-reports/**").permitAll()
+                                                .requestMatchers("/api/activity-logs/**").hasAuthority("ROLE_SUPER_ADMIN")
+                                                .requestMatchers("/api/activity-reports/**").hasAuthority("ROLE_SUPER_ADMIN")
                                                 .requestMatchers("/api/orders-of-service/**").permitAll()
                                                 .requestMatchers("/api/operational/**").permitAll()
                                                 .requestMatchers("/api/occurrences/**").permitAll()

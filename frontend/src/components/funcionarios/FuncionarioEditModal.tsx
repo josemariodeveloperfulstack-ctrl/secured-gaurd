@@ -33,6 +33,7 @@ import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import { useToast } from '@/hooks/use-toast';
 import workPostService, { WorkPost } from '@/services/workPostService';
 import departmentService, { Department } from '@/services/departmentService';
+import { clientService, Client as ClientDTO } from '@/services/clientService';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { doctorService } from '@/services/doctorService';
@@ -119,7 +120,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     grauInstrucao: '',
     matriculaEsocial: '',
     cbo: '',
-    salario: 0,
+    salario: '' as any,
     salarioPorExtenso: '',
     periodoPagamento: '',
     horarioTrabalho: '',
@@ -187,6 +188,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [loadingData, setLoadingData] = useState(false);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [clients, setClients] = useState<ClientDTO[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [filteredWorkPosts, setFilteredWorkPosts] = useState<WorkPost[]>([]);
+  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
   
   // Estados para busca e filtros
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -584,7 +589,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           grauInstrucao: employeeData.grauInstrucao || '',
           matriculaEsocial: employeeData.matriculaEsocial || '',
           cbo: employeeData.cbo || '',
-          salario: employeeData.salario || 0,
+          salario: employeeData.salario
+            ? (typeof employeeData.salario === 'number'
+              ? String(employeeData.salario)
+              : employeeData.salario)
+            : '' as any,
           salarioPorExtenso: employeeData.salarioPorExtenso || '',
           periodoPagamento: employeeData.periodoPagamento || '',
           horarioTrabalho: employeeData.horarioTrabalho || '',
@@ -860,7 +869,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setLoadingData(true);
     try {
       console.log('📥 Carregando dados dos selects...');
-      const [positionsData, unitsData, usersData, companiesData, workPostsData, departmentsData] = await Promise.all([
+      const [positionsData, unitsData, usersData, companiesData, workPostsData, departmentsData, clientsData] = await Promise.all([
         positionService.getPositions().catch(err => { console.warn('⚠️ Erro ao carregar cargos:', err); return []; }),
         unitService.getAllUnits().catch(err => { console.warn('⚠️ Erro ao carregar unidades:', err); return []; }),
         userService.getAllUsers().catch(err => { console.warn('⚠️ Erro ao carregar usuários:', err); return []; }),
@@ -872,14 +881,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           return []; 
         }),
         workPostService.getAllWorkPosts().catch(err => { console.warn('⚠️ Erro ao carregar postos de trabalho:', err); return []; }),
-        departmentService.listActive().catch(err => { console.warn('⚠️ Erro ao carregar departamentos:', err); return []; })
+        departmentService.listActive().catch(err => { console.warn('⚠️ Erro ao carregar departamentos:', err); return []; }),
+        clientService.getAllClients().catch(err => { console.warn('⚠️ Erro ao carregar clientes:', err); return []; })
       ]);
       
       console.log('✅ Dados carregados:', {
         positions: positionsData.length,
         units: unitsData.length,
         users: usersData.length,
-        companies: companiesData.length
+        companies: companiesData.length,
+        clients: clientsData.length
       });
       
       if (companiesData.length === 0) {
@@ -895,6 +906,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       setCompanies(companiesData);
       setWorkPosts(workPostsData);
       setDepartments(departmentsData);
+      setClients(clientsData);
       
       // Carregar médicos
       await loadDoctors();
@@ -3569,19 +3581,59 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               </div>
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                            <span className="truncate">Departamento</span>
+                            <span className="truncate">Cliente</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
                             <SearchableSelect
-                              options={departments.map(d => ({
-                                value: String(d.id),
-                                label: d.name,
-                                description: d.code ? `Código: ${d.code}` : ''
+                              options={clients.map(c => ({
+                                value: String(c.id),
+                                label: c.name,
+                                description: c.cnpj || ''
+                              }))}
+                              value={selectedClientId}
+                              onChange={async (val) => {
+                                setSelectedClientId(val);
+                                setForm(prev => ({ ...(prev as any), departmentId: '' }));
+                                setFilteredWorkPosts([]);
+                                if (val) {
+                                  setLoadingWorkPosts(true);
+                                  try {
+                                    const posts = await workPostService.getWorkPostsByClient(val);
+                                    setFilteredWorkPosts(Array.isArray(posts) ? posts : []);
+                                  } catch (err) {
+                                    console.warn('Erro ao carregar setores do cliente:', err);
+                                    setFilteredWorkPosts([]);
+                                  } finally {
+                                    setLoadingWorkPosts(false);
+                                  }
+                                }
+                              }}
+                              placeholder="Selecione o cliente"
+                              emptyMessage="Nenhum cliente encontrado"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                              Selecione o cliente para listar os setores de trabalho disponíveis.
+                            </p>
+              </div>
+              <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Setor de Trabalho</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                            <SearchableSelect
+                              options={(
+                                selectedClientId
+                                  ? filteredWorkPosts
+                                  : workPosts
+                              ).map(wp => ({
+                                value: String(wp.id),
+                                label: wp.name,
+                                description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || '')
                               }))}
                               value={(form as any).departmentId || ''}
                               onChange={(val) => setForm(prev => ({ ...(prev as any), departmentId: val }))}
-                              placeholder="Selecione o departamento"
-                              emptyMessage="Nenhum departamento encontrado"
+                              placeholder={loadingWorkPosts ? 'Carregando setores...' : (selectedClientId ? 'Selecione o setor de trabalho' : 'Selecione um cliente primeiro')}
+                              emptyMessage={selectedClientId ? 'Nenhum setor encontrado para este cliente' : 'Selecione um cliente para listar os setores'}
                             />
               </div>
               <div>

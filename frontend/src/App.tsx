@@ -190,6 +190,7 @@ const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
 const Grupos = lazyWithRetry(() => import('@/pages/Grupos'), 'Grupos');
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
+const ConfiguracaoBackup = lazy(() => import('@/pages/ConfiguracaoBackup'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const Holerites = lazy(() => import('@/pages/Holerites'));
 const EnvioHolerites = lazy(() => import('@/pages/EnvioHolerites'));
@@ -248,13 +249,14 @@ const GestaoVisitasSupervisor = lazy(() => import('@/pages/GestaoVisitasSupervis
 const GuiaTransporte = lazy(() => import('@/pages/GuiaTransporte'));
 const RotaSemanalSupervisao = lazy(() => import('@/pages/RotaSemanalSupervisao'));
 const Supervisao = lazy(() => import('@/pages/Supervisao'));
+const RemoteSignaturePage = lazy(() => import('@/pages/RemoteSignaturePage'));
+const DeliveryManagement = lazy(() => import('@/components/estoque/DeliveryManagement'));
+const WebmailApp = lazy(() => import('@/pages/Webmail/WebmailApp'));
+const EmployeePortal = lazy(() => import('@/pages/EmployeePortal'));
 const ActivityManagement = lazy(() => import('@/pages/ActivityManagement'));
 const UserProfile = lazy(() => import('@/pages/UserProfile'));
 
-// Configurações avançadas
-const ConfiguracaoBackup = lazy(() => import('@/pages/ConfiguracaoBackup'));
-
-// Módulo Operacional
+// Módulo Operacional (Páginas restauradas com caminhos corrigidos)
 const OperacionalDashboard = lazy(() => import('@/pages/OperacionalDashboard'));
 const GestaoPostos = lazy(() => import('@/pages/GestaoPostos'));
 const GestaoEscalas = lazy(() => import('@/pages/GestaoEscalas'));
@@ -262,8 +264,6 @@ const GestaoFerias = lazy(() => import('@/pages/GestaoFerias'));
 const GestaoTarefas = lazy(() => import('@/pages/GestaoTarefas'));
 const RelatoriosOperacionais = lazy(() => import('@/pages/RelatoriosOperacionais'));
 const ApuracaoHoras = lazy(() => import('@/pages/operacional/ApuracaoHoras'));
-const RemoteSignaturePage = lazy(() => import('@/pages/RemoteSignaturePage'));
-const DeliveryManagement = lazy(() => import('@/components/estoque/DeliveryManagement'));
 
 
 function App() {
@@ -336,7 +336,7 @@ function App() {
                     {/* Sistema Administrativo */}
                     <Route path="/admin" element={<Navigate to="/login" replace />} />
                     <Route path="/sistema" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <Index />
                         </Suspense>
@@ -427,13 +427,20 @@ function App() {
                         </Suspense>
                       </ProtectedRoute>
                     } />
-                    <Route path="/dashboard-colaborador" element={
-                      <ProtectedRoute>
-                        <Suspense fallback={<LoadingSpinner />}>
-                          <DashboardColaborador />
-                        </Suspense>
-                      </ProtectedRoute>
-                    } />
+                     <Route path="/dashboard-colaborador" element={
+                       <ProtectedRoute>
+                         <Suspense fallback={<LoadingSpinner />}>
+                           <EmployeePortal />
+                         </Suspense>
+                       </ProtectedRoute>
+                     } />
+                     <Route path="/area-funcionario" element={
+                       <ProtectedRoute>
+                         <Suspense fallback={<LoadingSpinner />}>
+                           <EmployeePortal />
+                         </Suspense>
+                       </ProtectedRoute>
+                     } />
                     <Route path="/dashboard-vigilante" element={
                       <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
@@ -487,9 +494,17 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/whatsapp-connection" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <WhatsAppConnection />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    
+                    <Route path="/webmail" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <WebmailApp />
                         </Suspense>
                       </ProtectedRoute>
                     } />
@@ -1079,7 +1094,7 @@ function App() {
 
                     {/* Gestão de Atividades - Exclusivo SUPER_ADMIN */}
                     <Route path="/atividades" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
                         <ActivityManagement />
                       </ProtectedRoute>
                     } />
@@ -1098,12 +1113,12 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/configuracoes" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
                         <Configuracoes />
                       </ProtectedRoute>
                     } />
                     <Route path="/configuracoes/backup" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <ConfiguracaoBackup />
                         </Suspense>

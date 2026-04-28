@@ -12,6 +12,8 @@ export interface EPIDeliveryFormItem {
   observations?: string;
 }
 
+export type EPIDeliveryType = 'PRIMEIRA_ENTREGA' | 'SUBSTITUICAO' | 'DEVOLUCAO' | 'TROCA';
+
 export interface CreateEPIDeliveryForm {
   employeeId: string;
   companyId: string;
@@ -19,6 +21,7 @@ export interface CreateEPIDeliveryForm {
   responsibleEmployeeId?: string;
   observations?: string;
   pdfUrl?: string;
+  deliveryType?: EPIDeliveryType;
   items: EPIDeliveryFormItem[];
 }
 
@@ -37,6 +40,8 @@ export interface EPIDeliveryForm {
   pdfUrl?: string;
   createdById?: string;
   createdByName?: string;
+  deliveryType?: EPIDeliveryType;
+  employeeWorkSector?: string;
   createdAt: string;
   updatedAt: string;
   items: EPIDeliveryFormItem[];

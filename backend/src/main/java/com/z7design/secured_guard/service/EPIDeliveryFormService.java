@@ -6,11 +6,15 @@ import com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.model.Employee;
+import com.z7design.secured_guard.model.EmployeeChangeHistory;
 import com.z7design.secured_guard.model.EPIDeliveryForm;
 import com.z7design.secured_guard.model.EPIDeliveryFormItem;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.PersonalProtectiveEquipment;
+import com.z7design.secured_guard.model.enums.EPIDeliveryType;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.EmployeeChangeHistoryRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.PersonalProtectiveEquipmentRepository;
@@ -24,6 +28,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +45,7 @@ public class EPIDeliveryFormService {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final PersonalProtectiveEquipmentRepository epiRepository;
+    private final EmployeeChangeHistoryRepository employeeChangeHistoryRepository;
 
     @Transactional
     public EPIDeliveryFormDTO create(CreateEPIDeliveryFormDTO dto, UUID createdByUserId) {
@@ -64,18 +70,29 @@ public class EPIDeliveryFormService {
                     .orElse(null);
         }
 
+        // Capturar setor do funcionário (snapshot)
+        String workSectorSnapshot = buildWorkSectorSnapshot(employee);
+
+        // Determinar tipo de entrega
+        EPIDeliveryType deliveryType = dto.getDeliveryType() != null
+                ? dto.getDeliveryType()
+                : EPIDeliveryType.PRIMEIRA_ENTREGA;
+
         // Criar ficha
         EPIDeliveryForm form = EPIDeliveryForm.builder()
                 .employee(employee)
                 .company(company)
                 .deliveryDate(dto.getDeliveryDate())
                 .responsibleEmployee(responsibleEmployee)
+                .deliveryType(deliveryType)
+                .employeeWorkSector(workSectorSnapshot)
                 .observations(dto.getObservations())
                 .pdfUrl(dto.getPdfUrl())
                 .createdBy(createdBy)
                 .build();
 
         // Adicionar itens e dar baixa no estoque
+        StringBuilder itemsSummary = new StringBuilder();
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
                 String epiName = itemDto.getEpiName();
@@ -144,11 +161,38 @@ public class EPIDeliveryFormService {
                         .observations(itemDto.getObservations())
                         .build();
                 form.getItems().add(item);
+
+                // Construir resumo para histórico
+                if (itemsSummary.length() > 0) itemsSummary.append(", ");
+                itemsSummary.append(quantity).append("x ").append(epiName);
+                if (itemDto.getCa() != null && !itemDto.getCa().isBlank()) {
+                    itemsSummary.append(" (CA: ").append(itemDto.getCa()).append(")");
+                }
             }
         }
 
         EPIDeliveryForm savedForm = epiDeliveryFormRepository.save(form);
         log.info("✅ Ficha de entrega de EPI criada com sucesso: {}", savedForm.getId());
+
+        // Registrar no histórico do funcionário
+        String historyDetail = String.format(
+                "Tipo: %s | Data: %s | Itens: %s | Setor: %s | Empresa: %s",
+                deliveryType.getDescription(),
+                dto.getDeliveryDate(),
+                itemsSummary.toString(),
+                workSectorSnapshot != null ? workSectorSnapshot : "—",
+                company.getName());
+        if (responsibleEmployee != null) {
+            historyDetail += " | Responsável: " + responsibleEmployee.getName();
+        }
+
+        recordHistory(
+                employee.getId(),
+                createdBy,
+                "ENTREGA_EPI",
+                "Ficha de Entrega de EPI (" + deliveryType.getDescription() + ")",
+                historyDetail,
+                dto.getObservations());
 
         return EPIDeliveryFormDTO.fromEntity(savedForm);
     }
@@ -264,6 +308,52 @@ public class EPIDeliveryFormService {
         epiDeliveryFormRepository.deleteById(id);
         log.info("🗑️ Ficha de entrega de EPI deletada: {}", id);
     }
+
+    /**
+     * Captura um snapshot do setor/posto/cargo do funcionário no momento da entrega.
+     */
+    private static String buildWorkSectorSnapshot(Employee employee) {
+        if (employee == null) return null;
+        List<String> parts = new ArrayList<>();
+        if (employee.getDepartment() != null && employee.getDepartment().getName() != null
+                && !employee.getDepartment().getName().isBlank()) {
+            parts.add("Setor: " + employee.getDepartment().getName());
+        }
+        if (employee.getWorkPost() != null && employee.getWorkPost().getName() != null
+                && !employee.getWorkPost().getName().isBlank()) {
+            parts.add("Posto: " + employee.getWorkPost().getName());
+        }
+        if (employee.getPosition() != null && employee.getPosition().getName() != null
+                && !employee.getPosition().getName().isBlank()) {
+            parts.add("Cargo: " + employee.getPosition().getName());
+        }
+        // Fallback: unit
+        if (parts.isEmpty() && employee.getUnit() != null && employee.getUnit().getName() != null
+                && !employee.getUnit().getName().isBlank()) {
+            parts.add("Unidade: " + employee.getUnit().getName());
+        }
+        return parts.isEmpty() ? null : String.join(" | ", parts);
+    }
+
+    /**
+     * Registra um evento no histórico de alterações do funcionário.
+     */
+    private void recordHistory(UUID employeeId, User changedBy, String fieldName, String fieldLabel,
+                               String newValue, String reason) {
+        try {
+            EmployeeChangeHistory history = EmployeeChangeHistory.builder()
+                    .employeeId(employeeId)
+                    .changedAt(Instant.now())
+                    .changedByUser(changedBy)
+                    .category(EmployeeChangeCategory.OUTROS)
+                    .fieldName(fieldName)
+                    .fieldLabel(fieldLabel)
+                    .newValue(newValue)
+                    .reason(reason)
+                    .build();
+            employeeChangeHistoryRepository.save(history);
+        } catch (Exception e) {
+            log.warn("⚠️ Não foi possível registrar histórico de EPI para funcionário {}: {}", employeeId, e.getMessage());
+        }
+    }
 }
-
-

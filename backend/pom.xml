@@ -408,7 +408,7 @@
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>9.22.3</version>
                 <configuration>
-                    <url>jdbc:postgresql://localhost:5433/secured_guard_dev</url>
+                    <url>jdbc:postgresql://localhost:5432/secured_guard</url>
                     <user>postgres</user>
                     <password>1234567</password>
                     <cleanDisabled>false</cleanDisabled>

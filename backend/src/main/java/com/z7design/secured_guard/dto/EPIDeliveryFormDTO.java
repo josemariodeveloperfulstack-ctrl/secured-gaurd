@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.dto;
 
 import com.z7design.secured_guard.model.EPIDeliveryForm;
+import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +23,8 @@ public class EPIDeliveryFormDTO {
         private String pdfUrl;
         private UUID createdById;
         private String createdByName;
+        private EPIDeliveryType deliveryType;
+        private String employeeWorkSector;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private List<EPIDeliveryFormItemDTO> items;
@@ -166,6 +169,22 @@ public class EPIDeliveryFormDTO {
                 this.items = items;
         }
 
+        public EPIDeliveryType getDeliveryType() {
+                return deliveryType;
+        }
+
+        public void setDeliveryType(EPIDeliveryType deliveryType) {
+                this.deliveryType = deliveryType;
+        }
+
+        public String getEmployeeWorkSector() {
+                return employeeWorkSector;
+        }
+
+        public void setEmployeeWorkSector(String employeeWorkSector) {
+                this.employeeWorkSector = employeeWorkSector;
+        }
+
         public static EPIDeliveryFormDTO fromEntity(EPIDeliveryForm form) {
                 EPIDeliveryFormDTO dto = new EPIDeliveryFormDTO();
                 dto.setId(form.getId());
@@ -186,6 +205,8 @@ public class EPIDeliveryFormDTO {
                 }
                 dto.setObservations(form.getObservations());
                 dto.setPdfUrl(form.getPdfUrl());
+                dto.setDeliveryType(form.getDeliveryType());
+                dto.setEmployeeWorkSector(form.getEmployeeWorkSector());
                 if (form.getCreatedBy() != null) {
                         dto.setCreatedById(form.getCreatedBy().getId());
                         dto.setCreatedByName(form.getCreatedBy().getName());

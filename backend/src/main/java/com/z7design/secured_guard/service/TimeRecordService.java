@@ -167,7 +167,9 @@ public class TimeRecordService {
     }
 
     private Employee resolveEmployee(UUID employeeIdOrUserId) {
-        return employeeRepository.findById(employeeIdOrUserId).orElseGet(() -> {
+        return employeeRepository.findById(employeeIdOrUserId)
+                .or(() -> employeeRepository.findByUserId(employeeIdOrUserId))
+                .orElseGet(() -> {
             log.warn("⚠️ Funcionário não encontrado pelo ID {}. Tentando resolver pelo CPF autenticado...",
                     employeeIdOrUserId);
             return authenticatedCpfResolver.resolve(

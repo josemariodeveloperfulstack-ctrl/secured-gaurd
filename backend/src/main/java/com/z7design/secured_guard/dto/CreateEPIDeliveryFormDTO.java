@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.dto;
 
+import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ public class CreateEPIDeliveryFormDTO {
     private UUID responsibleEmployeeId;
     private String observations;
     private String pdfUrl;
+    private EPIDeliveryType deliveryType;
 
     @NotEmpty(message = "É necessário pelo menos um item de EPI")
     private List<EPIDeliveryFormItemDTO> items;
@@ -74,6 +76,14 @@ public class CreateEPIDeliveryFormDTO {
 
     public void setPdfUrl(String pdfUrl) {
         this.pdfUrl = pdfUrl;
+    }
+
+    public EPIDeliveryType getDeliveryType() {
+        return deliveryType;
+    }
+
+    public void setDeliveryType(EPIDeliveryType deliveryType) {
+        this.deliveryType = deliveryType;
     }
 
     public List<EPIDeliveryFormItemDTO> getItems() {
