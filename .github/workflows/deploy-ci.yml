@@ -35,7 +35,7 @@ jobs:
             if [ -z "$APP_PATH" ]; then APP_PATH="/var/www/secured_guard/ci"; fi
             cd "$APP_PATH"
             # Usar PAT (Personal Access Token), não senha da conta
-            git remote set-url origin https://${{ secrets.USER_GITHUB }}:${{ secrets.TOKEN_GITHUB }}@github.com/zemarioramos/secured-guard.git 2>/dev/null || true
+            git remote set-url origin https://${{ secrets.USER_GITHUB }}:${{ secrets.TOKEN_GITHUB }}@github.com/${{ github.repository }}.git 2>/dev/null || true
             git fetch origin "$BRANCH"
             git reset --hard "origin/$BRANCH"
             git checkout "$BRANCH"
