@@ -39,6 +39,7 @@ jobs:
             git fetch origin "$BRANCH"
             git reset --hard "origin/$BRANCH"
             git checkout "$BRANCH"
+            echo "📍 Deploying commit: $(git log -1 --oneline)"
             cd deploy
-            docker-compose -f docker-compose.env-ci.yml build backend-ci frontend-ci
+            docker-compose -f docker-compose.env-ci.yml build --no-cache backend-ci frontend-ci
             docker-compose -f docker-compose.env-ci.yml up -d --force-recreate
