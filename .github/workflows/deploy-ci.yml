@@ -27,7 +27,7 @@ jobs:
           username: ${{ secrets.VPS_USER_CI }}
           password: ${{ secrets.VPS_PASSWORD_CI }}
           port: ${{ secrets.VPS_SSH_PORT_CI || 22 }}
-          script_timeout: 10m
+          command_timeout: 20m
           script: |
             set -e
             BRANCH="${{ github.ref_name }}"
@@ -40,5 +40,5 @@ jobs:
             git reset --hard "origin/$BRANCH"
             git checkout "$BRANCH"
             cd deploy
-            docker-compose -f docker-compose.env-ci.yml build --no-cache backend-ci frontend-ci
+            docker-compose -f docker-compose.env-ci.yml build backend-ci frontend-ci
             docker-compose -f docker-compose.env-ci.yml up -d --force-recreate
