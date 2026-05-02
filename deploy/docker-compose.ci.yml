@@ -47,7 +47,7 @@ services:
   # BACKEND API (CI/Test)
   # ========================================
   backend-ci:
-    image: ghcr.io/zemarioramos/secured-guard-backend:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-backend:ci
     container_name: secured-guard-backend-ci
     environment:
       SERVER_PORT: 8080
@@ -89,7 +89,7 @@ services:
   # FRONTEND (CI/Test)
   # ========================================
   frontend-ci:
-    image: ghcr.io/zemarioramos/secured-guard-frontend:ci
+    image: ghcr.io/z7devplenojava-afk/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
     environment:
       VITE_API_URL: https://ci.z7botsolutions.com.br/api
