@@ -11,6 +11,7 @@ on:
     branches:
       - ci
       - prod
+  workflow_dispatch:
 
 concurrency:
   group: deploy-ci
@@ -33,13 +34,31 @@ jobs:
             BRANCH="${{ github.ref_name }}"
             APP_PATH="${{ secrets.VPS_APP_PATH_CI }}"
             if [ -z "$APP_PATH" ]; then APP_PATH="/var/www/secured_guard/ci"; fi
+
+            echo "🚀 Iniciando deploy | Branch: $BRANCH | Path: $APP_PATH"
+
+            # Verificar se o diretório existe
+            if [ ! -d "$APP_PATH" ]; then
+              echo "❌ ERRO: Diretório $APP_PATH não existe na VPS!"
+              echo "💡 Execute manualmente: mkdir -p $APP_PATH && git clone <repo> $APP_PATH"
+              exit 1
+            fi
+
             cd "$APP_PATH"
+
             # Usar PAT (Personal Access Token), não senha da conta
             git remote set-url origin https://${{ secrets.USER_GITHUB }}:${{ secrets.TOKEN_GITHUB }}@github.com/${{ github.repository }}.git 2>/dev/null || true
+
+            echo "📥 Fazendo fetch de origin/$BRANCH..."
             git fetch origin "$BRANCH"
             git reset --hard "origin/$BRANCH"
             git checkout "$BRANCH"
+
             echo "📍 Deploying commit: $(git log -1 --oneline)"
+
             cd deploy
+            echo "🐳 Build dos containers..."
             docker-compose -f docker-compose.env-ci.yml build --no-cache backend-ci frontend-ci
             docker-compose -f docker-compose.env-ci.yml up -d --force-recreate
+
+            echo "✅ Deploy concluído com sucesso!"

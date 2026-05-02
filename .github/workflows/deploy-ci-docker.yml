@@ -357,17 +357,25 @@ jobs:
       # 1️⃣3️⃣ EXECUTE ALL DEPLOYMENT COMMANDS IN SINGLE SSH SESSION
       # ============================================
       - name: 🚀 Execute Deployment (Single SSH Session)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_ACTOR: ${{ github.actor }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=15 -o ServerAliveCountMax=60 -o ConnectTimeout=60 -o IPQoS=none -o TCPKeepAlive=yes"
-          
+
           SUCCESS=0
           for i in 1 2 3 4 5; do
             echo "======================================"
             echo "🔁 Tentativa $i de 5 de conexão SSH..."
             echo "======================================"
-            
+
             set +e
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            # IMPORTANTE: Usar heredoc sem aspas (EOF sem aspas) para que variáveis de
+            # ambiente do runner ($GHCR_TOKEN, $GHCR_ACTOR, $REPO_OWNER) sejam expandidas
+            # ANTES de enviar para a VPS via SSH. Isso corrige o bug do docker login falhar
+            # quando as expressões ${{ }} ficavam literais dentro de << 'EOF' (com aspas).
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
             set -e
             export DOCKER_CLIENT_TIMEOUT=600
             export DOCKER_HTTP_TIMEOUT=600
@@ -375,23 +383,21 @@ jobs:
 
             echo "🔧 Force exit Swarm mode and complete cleanup..."
             docker swarm leave --force 2>/dev/null || true
-            # NÃO deletar ci.yml - ele é necessário como fallback para o Traefik descobrir o nginx-ci
             cd /var/www/secured_guard/ci
             docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            docker ps -a | grep "secured-guard-.*-ci" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            docker ps -a | grep "secured-guard-.*-ci" | awk '{print \$1}' | xargs -r docker rm -f 2>/dev/null || true
 
-            # Rede nomeada secured-guard-ci: se algum container externo a usar, "docker network rm" falha e o próximo "up" dá "already exists".
             remove_secured_guard_ci_network() {
               local net=secured-guard-ci
-              docker network inspect "$net" >/dev/null 2>&1 || return 0
+              docker network inspect "\$net" >/dev/null 2>&1 || return 0
               local cids
-              cids=$(docker network inspect "$net" -f '{{range $k, $v := .Containers}}{{$k}} {{end}}' 2>/dev/null || true)
-              for cid in $cids; do
-                [ -n "$cid" ] || continue
-                echo "   Desligando endpoint $cid da rede $net..."
-                docker network disconnect -f "$net" "$cid" 2>/dev/null || true
+              cids=\$(docker network inspect "\$net" -f '{{range \$k, \$v := .Containers}}{{\$k}} {{end}}' 2>/dev/null || true)
+              for cid in \$cids; do
+                [ -n "\$cid" ] || continue
+                echo "   Desligando endpoint \$cid da rede \$net..."
+                docker network disconnect -f "\$net" "\$cid" 2>/dev/null || true
               done
-              docker network rm "$net" 2>/dev/null && echo "✅ Rede $net removida" || echo "⚠️ Rede $net ainda não removida (tentativa seguinte ou uso manual)"
+              docker network rm "\$net" 2>/dev/null && echo "✅ Rede \$net removida" || echo "⚠️ Rede \$net ainda em uso"
             }
             remove_secured_guard_ci_network
 
@@ -403,132 +409,127 @@ jobs:
                 GHCR_OK=1
                 break
               fi
-              WAIT=$((j * 10))
-              echo "⚠️ Tentativa $j de acesso ao GHCR falhou, aguardando ${WAIT}s..."
-              sleep $WAIT
+              WAIT=\$((j * 10))
+              echo "⚠️ Tentativa \$j de acesso ao GHCR falhou, aguardando \${WAIT}s..."
+              sleep \$WAIT
             done
-            if [ $GHCR_OK -eq 0 ]; then
-              echo "⚠️ GHCR inacessível da VPS (Contabo). Tentando usar imagens em cache..."
-            fi
+            [ \$GHCR_OK -eq 0 ] && echo "⚠️ GHCR inacessível da VPS. Tentando usar imagens em cache..."
 
-            echo "🔐 Login no GitHub Container Registry..."
-            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin 2>/dev/null || echo "⚠️ Login falhou (GHCR pode estar inacessível)"
+            echo "🔐 Login no GitHub Container Registry (actor: $GHCR_ACTOR)..."
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin \
+              && echo "✅ Login GHCR realizado com sucesso" \
+              || echo "⚠️ Login GHCR falhou — pull pode usar cache"
 
-            # Pull com fallback: se falhar, usar imagens em cache
             pull_or_use_cache() {
-              local img=$1
-              local name=$2
+              local img=\$1
+              local name=\$2
               for j in 1 2 3 4 5; do
-                if docker pull "$img" 2>/dev/null; then echo "✅ $name baixado"; return 0; fi
-                WAIT=$((j * 10 + 5))
-                echo "⚠️ Pull $name falhou ($j/5), aguardando ${WAIT}s..."
-                sleep $WAIT
+                if docker pull "\$img" 2>/dev/null; then echo "✅ \$name baixado com sucesso"; return 0; fi
+                WAIT=\$((j * 10 + 5))
+                echo "⚠️ Pull \$name falhou (\$j/5), aguardando \${WAIT}s..."
+                sleep \$WAIT
               done
-              if docker image inspect "$img" >/dev/null 2>&1; then
-                echo "⚠️ Usando imagem $name em cache (GHCR inacessível)"
+              if docker image inspect "\$img" >/dev/null 2>&1; then
+                echo "⚠️ Usando imagem \$name em cache (GHCR inacessível)"
                 return 0
               fi
-              echo "❌ $name não disponível e sem cache"; return 1
+              echo "❌ \$name não disponível e sem cache"; return 1
             }
             echo "📥 Pull backend..."
-            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci "backend" || exit 1
+            pull_or_use_cache ghcr.io/$REPO_OWNER/secured-guard-backend:ci "backend" || exit 1
             echo "📥 Pull frontend..."
-            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci "frontend" || exit 1
+            pull_or_use_cache ghcr.io/$REPO_OWNER/secured-guard-frontend:ci "frontend" || exit 1
             echo "📥 Pull whatsapp..."
-            pull_or_use_cache ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci "whatsapp" || exit 1
+            pull_or_use_cache ghcr.io/$REPO_OWNER/secured-guard-whatsapp:ci "whatsapp" || exit 1
 
-            echo "🧹 Removendo imagens antigas (após pull bem-sucedido)..."
+            echo "🔎 Verificando commit das imagens baixadas:"
+            docker image inspect ghcr.io/$REPO_OWNER/secured-guard-backend:ci \
+              --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
+            docker image inspect ghcr.io/$REPO_OWNER/secured-guard-frontend:ci \
+              --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
+
+            echo "🧹 Removendo imagens dangling..."
             docker image prune -f --filter "dangling=true" 2>/dev/null || true
 
-            echo "🔎 Labels das imagens:"
-            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
-            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
-            docker image inspect ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
-
-            echo "🧹 Limpando redes (compose down + desligar endpoints da secured-guard-ci)..."
+            echo "🧹 Limpando redes..."
             docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
             remove_secured_guard_ci_network
             sleep 2
-            
+
             echo "📦 Iniciando banco de dados (Postgres + Redis)..."
             docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
-            echo "⏳ Aguardando Postgres aceitar conexões (até ~200s; VPS lenta pode demorar)..."
+            echo "⏳ Aguardando Postgres aceitar conexões (até ~200s)..."
             PG_READY=0
-            for j in $(seq 1 40); do
+            for j in \$(seq 1 40); do
               if docker exec secured-guard-db-ci pg_isready -U secured_guard_ci -d secured_guard_ci 2>/dev/null \
                 && docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -tAc "SELECT 1" >/dev/null 2>&1; then
-                echo "✅ Postgres pronto (pg_isready + SELECT 1) após ~$(((j - 1) * 5))s"
+                echo "✅ Postgres pronto após ~\$(((j - 1) * 5))s"
                 PG_READY=1
                 break
               fi
-              if [ $((j % 5)) -eq 0 ]; then
-                echo "   ...ainda aguardando Postgres (tentativa $j/40, ~$((j * 5))s)..."
+              if [ \$((j % 5)) -eq 0 ]; then
+                echo "   ...aguardando Postgres (tentativa \$j/40, ~\$((j * 5))s)..."
               fi
-              [ $j -eq 40 ] && { echo "⚠️ Timeout aguardando Postgres após 200s"; exit 1; }
+              [ \$j -eq 40 ] && { echo "⚠️ Timeout aguardando Postgres após 200s"; exit 1; }
               sleep 5
             done
-            [ "$PG_READY" -eq 1 ] || { echo "⚠️ Postgres não ficou pronto"; exit 1; }
+            [ "\$PG_READY" -eq 1 ] || { echo "⚠️ Postgres não ficou pronto"; exit 1; }
             sleep 3
-            
+
             echo "🧹 Executando limpeza de duplicatas (Roles & Permissions)..."
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci < scripts/fix_all_duplicates.sql || echo "⚠️ Erro na limpeza, continuando..."
-            
-            echo "🔧 Flyway: removendo entradas de migrações falhas em flyway_schema_history (permite reexecutar V1013, etc.)..."
+
+            echo "🔧 Flyway: removendo entradas de migrações falhas..."
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE success = false;" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '457';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '1008';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
-            
-            echo "🚀 Iniciando todos os containers (usando imagens já baixadas)..."
+
+            echo "🚀 Iniciando todos os containers (usando imagens recém baixadas)..."
             docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
-            
-            echo "⏳ Aguardando backend + Flyway em /api/health (máx. 540s; compose start_period=420s)..."
-            for j in $(seq 1 54); do
-              BACKEND_STATE=$(docker inspect secured-guard-backend-ci --format '{{.State.Status}}' 2>/dev/null || echo "missing")
-              if [ "$BACKEND_STATE" = "exited" ] || [ "$BACKEND_STATE" = "dead" ]; then
-                echo "❌ Backend crashou (status: $BACKEND_STATE). Logs:"
+
+            echo "⏳ Aguardando backend + Flyway em /api/health (máx. 540s)..."
+            for j in \$(seq 1 54); do
+              BACKEND_STATE=\$(docker inspect secured-guard-backend-ci --format '{{.State.Status}}' 2>/dev/null || echo "missing")
+              if [ "\$BACKEND_STATE" = "exited" ] || [ "\$BACKEND_STATE" = "dead" ]; then
+                echo "❌ Backend crashou (status: \$BACKEND_STATE). Logs:"
                 docker logs --tail 100 secured-guard-backend-ci 2>&1 || true
                 exit 1
               fi
               if curl -sf http://localhost:8081/api/health >/dev/null 2>&1; then
-                echo "✅ Backend respondendo após ~$(((j - 1) * 10))s"
+                echo "✅ Backend respondendo após ~\$(((j - 1) * 10))s"
                 break
               fi
-              echo "   Aguardando... ~$((j * 10))s (backend status: $BACKEND_STATE)"
+              echo "   Aguardando... ~\$((j * 10))s (backend status: \$BACKEND_STATE)"
               sleep 10
-              if [ $j -eq 54 ]; then
+              if [ \$j -eq 54 ]; then
                 echo "❌ Timeout 540s - backend não respondeu em /api/health. Logs:"
                 docker logs --tail 200 secured-guard-backend-ci 2>&1 || true
                 exit 1
               fi
             done
-            
+
             docker-compose -f docker-compose.ci.yml ps
-            
-            echo "🔐 Verificando JWT_SECRET e configs..."
-            cat .env | grep JWT_SECRET || true
-            
-            echo "--- Logs do backend (últimas 80 linhas) ---"
-            docker logs --tail 80 secured-guard-backend-ci 2>&1 || true
-            
+
             echo "🌐 Testando conexão local..."
             curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
-            
+
             echo "🔄 Rodando script proativo de correção 404 do Traefik..."
             chmod +x /var/www/secured_guard/ci/scripts/fix-404-traefik.sh 2>/dev/null || true
             bash /var/www/secured_guard/ci/scripts/fix-404-traefik.sh 2>/dev/null || true
             sleep 5
-            
+
             echo "🏥 Iniciando script de Health Check internamente..."
             chmod +x /var/www/secured_guard/ci/scripts/health-check-ci.sh
             /var/www/secured_guard/ci/scripts/health-check-ci.sh
-            
+
             echo "🧹 Limpando cache do Service Worker..."
             chmod +x /var/www/secured_guard/ci/scripts/clear-service-worker-cache.sh
             /var/www/secured_guard/ci/scripts/clear-service-worker-cache.sh
-            
+
           EOF
+
             SSH_EXIT_CODE=$?
             set -e
             
