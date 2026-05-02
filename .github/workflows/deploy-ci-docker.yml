@@ -371,10 +371,6 @@ jobs:
             echo "======================================"
 
             set +e
-            # IMPORTANTE: Usar heredoc sem aspas (EOF sem aspas) para que variáveis de
-            # ambiente do runner ($GHCR_TOKEN, $GHCR_ACTOR, $REPO_OWNER) sejam expandidas
-            # ANTES de enviar para a VPS via SSH. Isso corrige o bug do docker login falhar
-            # quando as expressões ${{ }} ficavam literais dentro de << 'EOF' (com aspas).
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
             set -e
             export DOCKER_CLIENT_TIMEOUT=600
