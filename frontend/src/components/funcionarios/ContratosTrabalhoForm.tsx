@@ -307,6 +307,12 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     const isExperiencia = pdfKind === 'EXPERIENCE';
     const cidadeContrato = resolveCompanySigningCity(empresa as { city?: string; address?: string });
 
+    // Resolve o nome do posto de trabalho selecionado no formulário
+    const selectedWorkPost = allWorkPosts.find(wp => wp.id === form.department);
+    const departmentName = selectedWorkPost 
+      ? selectedWorkPost.name 
+      : buildSetorLocalTrabalhoContrato(fullEmployee);
+
     return {
       companyId: empresa!.id,
       employeeName: fullEmployee.name,
@@ -319,7 +325,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       maritalStatus: fullEmployee.maritalStatus || '',
       pis: fullEmployee.pis || '',
       position: form.position,
-      department: buildSetorLocalTrabalhoContrato(fullEmployee),
+      department: departmentName,
       salary: form.salary ? parseFloat(form.salary.replace(/\./g, '').replace(',', '.')) : 0,
       admissionDate: form.startDate || null,
       workHoursDescription: '44 horas semanais', // Placeholder or add form field if exists
