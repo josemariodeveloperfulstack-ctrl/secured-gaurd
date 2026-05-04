@@ -289,6 +289,7 @@ jobs:
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/recover-ci-502.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/fix-404-traefik.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/free-host-ports-for-traefik.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/fix_all_duplicates.sql ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik-dynamic-ci.yml 2>/dev/null || true
             sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || true
             return 0
@@ -397,17 +398,23 @@ jobs:
             }
             remove_secured_guard_ci_network
 
-            echo "🔎 Verificando acesso ao GHCR (forçar IPv4)..."
+            echo "🔎 Verificando acesso ao GHCR (Aplicando hack de conectividade Contabo)..."
+            # Forçar IP do GHCR no hosts para evitar falhas de DNS/IPv6 comuns na Contabo
+            GHCR_IP=\$(dig +short ghcr.io | head -n1)
+            if [ -z "\$GHCR_IP" ]; then GHCR_IP="140.82.121.33"; fi
+            echo "🔧 Mapeando ghcr.io para \$GHCR_IP no /etc/hosts..."
+            sudo sed -i '/ghcr.io/d' /etc/hosts || true
+            echo "\$GHCR_IP ghcr.io" | sudo tee -a /etc/hosts > /dev/null
+
             GHCR_OK=0
             for j in 1 2 3 4 5; do
-              if curl -4 --connect-timeout 30 -fsSL https://ghcr.io/v2/ >/dev/null 2>&1; then
+              if curl -4 --connect-timeout 20 -fsSL https://ghcr.io/v2/ >/dev/null 2>&1; then
                 echo "✅ GHCR acessível"
                 GHCR_OK=1
                 break
               fi
-              WAIT=\$((j * 10))
-              echo "⚠️ Tentativa \$j de acesso ao GHCR falhou, aguardando \${WAIT}s..."
-              sleep \$WAIT
+              echo "⚠️ Tentativa \$j de acesso ao GHCR falhou, tentando alternativa..."
+              sleep 5
             done
             [ \$GHCR_OK -eq 0 ] && echo "⚠️ GHCR inacessível da VPS. Tentando usar imagens em cache..."
 
