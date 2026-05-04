@@ -40,6 +40,7 @@ import { doctorService } from '@/services/doctorService';
 import { Doctor } from '@/types/doctor';
 import { formatTituloEleitorForInput, validateCPF, formatCpfForInput } from '@/utils/validation';
 import DocumentosGerarTab from './DocumentosGerarTab';
+import { EmployeeDocumentsTab } from './EmployeeDocumentsTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
 import { History, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
@@ -1777,9 +1778,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-                <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-4' : 'grid-cols-3'} bg-seguranca-graphite border border-gray-600`}>
+                <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-5' : 'grid-cols-4'} bg-seguranca-graphite border border-gray-600`}>
                   <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
                   <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
+                  <TabsTrigger value="documentos">Documentos</TabsTrigger>
                   <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
                   {canSeeHistory && (
                     <TabsTrigger value="historico" className="flex items-center gap-1.5">
@@ -3935,6 +3937,23 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     </div>
                   </Card>
 
+                </TabsContent>
+                <TabsContent value="documentos" className="space-y-4 sm:space-y-6">
+                   {funcionario?.id ? (
+                     <EmployeeDocumentsTab employeeId={funcionario.id} />
+                   ) : (
+                     <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                       <div className="p-12 text-center space-y-4">
+                         <div className="p-4 bg-seguranca-yellow/20 rounded-full w-fit mx-auto">
+                           <AlertCircle className="h-10 w-10 text-seguranca-yellow" />
+                         </div>
+                         <h3 className="text-xl font-bold text-white">Salve o cadastro primeiro</h3>
+                         <p className="text-gray-400 max-w-sm mx-auto">
+                           É necessário salvar o cadastro básico do funcionário antes de iniciar a importação de documentos.
+                         </p>
+                       </div>
+                     </Card>
+                   )}
                 </TabsContent>
                 <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
                   {/* Ficha para Contabilidade - Agora em primeiro */}

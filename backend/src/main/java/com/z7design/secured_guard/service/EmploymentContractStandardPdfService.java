@@ -239,6 +239,10 @@ public class EmploymentContractStandardPdfService {
 
                 String empregadorNome = company.getName() != null ? company.getName() : "";
                 String funcao = request.getPosition() != null ? request.getPosition().trim().toUpperCase() : "";
+                String ctpsCompleta = (request.getEmployeeCtps() != null ? request.getEmployeeCtps() : "")
+                                + (request.getEmployeeCtpsSeries() != null && !request.getEmployeeCtpsSeries().isBlank()
+                                                ? " série " + request.getEmployeeCtpsSeries()
+                                                : "");
 
                 return template
                                 .replace("{{EMPREGADOR_NOME}}", empregadorNome)
@@ -248,6 +252,10 @@ public class EmploymentContractStandardPdfService {
                                 .replace("{{EMPREGADO_RG}}", nullToEmpty(request.getEmployeeRg()))
                                 .replace("{{EMPREGADO_CPF}}", CompanyDataFormatter.formatCpf(request.getEmployeeCpf()))
                                 .replace("{{EMPREGADO_ENDERECO}}", nullToEmpty(request.getEmployeeAddress()))
+                                .replace("{{EMPREGADO_NACIONALIDADE}}", nullToEmpty(request.getNationality()))
+                                .replace("{{EMPREGADO_ESTADO_CIVIL}}", translateMaritalStatus(request.getMaritalStatus()))
+                                .replace("{{EMPREGADO_CTPS}}", ctpsCompleta)
+                                .replace("{{EMPREGADO_PIS}}", nullToEmpty(request.getPis()))
                                 .replace("{{FUNCAO}}", funcao)
                                 .replace("{{SALARIO_VALOR}}", salarioValor)
                                 .replace("{{SALARIO_EXTENSO}}", salarioExtenso)
@@ -301,6 +309,7 @@ public class EmploymentContractStandardPdfService {
          */
         private static String experienceDaysPhrase(int days) {
                 return switch (days) {
+                        case 30 -> "30 (TRINTA) dias";
                         case 60 -> "60 (SESSENTA) dias";
                         case 90 -> "90 (NOVENTA) dias";
                         default -> "45 (QUARENTA E CINCO) dias";
@@ -410,5 +419,19 @@ public class EmploymentContractStandardPdfService {
 
         private String formatDateExtended(LocalDate date) {
                 return date.format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("pt", "BR")));
+        }
+
+        private String translateMaritalStatus(String status) {
+                if (status == null || status.trim().isEmpty())
+                        return "";
+                return switch (status.toUpperCase()) {
+                        case "SINGLE", "SOLTEIRO", "SOLTEIRA" -> "Solteiro(a)";
+                        case "MARRIED", "CASADO", "CASADA" -> "Casado(a)";
+                        case "DIVORCED", "DIVORCIADO", "DIVORCIADA" -> "Divorciado(a)";
+                        case "WIDOWED", "VIUVO", "VIUVA" -> "Viúvo(a)";
+                        case "SEPARATED", "SEPARADO", "SEPARADA" -> "Separado(a)";
+                        case "STABLE_UNION", "UNIAO_ESTAVEL" -> "União Estável";
+                        default -> status;
+                };
         }
 }

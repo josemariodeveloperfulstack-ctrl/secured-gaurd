@@ -98,6 +98,8 @@ export function EmployeeCombobox({
             companySigla: emp.company?.sigla,
             positionName: emp.position?.name,
             unitName: emp.unit?.name,
+            workPostId: emp.workPostId || emp.workPost?.id,
+            workPostName: emp.workPostName || emp.workPost?.name,
           };
           setEmployees(prev => [...prev, simple])
           setSelectedEmployee(simple)

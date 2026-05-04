@@ -530,10 +530,9 @@ public class SecurityConfig {
                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de clientes - temporariamente públicos para debug
                                                 .requestMatchers("/api/clients/**").permitAll()
-                                                // Endpoints de documentos - temporariamente públicos para debug
-                                                .requestMatchers("/api/documents/**").permitAll()
-                                                // Endpoints de certificações de funcionários - temporariamente públicos
-                                                .requestMatchers("/api/employee-certifications/**").permitAll()
+                                                // Endpoints de documentos e certificações - restritos a RH e Admins
+                                                .requestMatchers("/api/documents/**", "/api/employee-certifications/**")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "RH", "ADMIN", "SUPER_ADMIN")
                                                 // Endpoints de multas - requerem apenas autenticação (temporário para
                                                 // desenvolvimento)
                                                 .requestMatchers("/api/fines/**").authenticated()

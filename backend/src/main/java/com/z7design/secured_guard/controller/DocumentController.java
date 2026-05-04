@@ -61,7 +61,29 @@ public class DocumentController {
                     schema = @Schema(implementation = Document.class),
                     examples = @ExampleObject(value = "{\"documentType\": \"CNH\", \"documentNumber\": \"123456789\", \"issueDate\": \"2020-01-01\", \"expiryDate\": \"2025-12-31\", \"employee\": {\"id\": \"UUID_DO_FUNCIONARIO\"}}")))
     @PostMapping
-    public ResponseEntity<Document> create(@RequestBody Document document) {
+    public ResponseEntity<Document> create(@RequestBody com.z7design.secured_guard.dto.CreateDocumentRequest request) {
+        log.info("Recebendo requisição para criar documento: {}", request);
+        
+        Document document = new Document();
+        document.setType(request.getType());
+        document.setNumber(request.getNumber());
+        
+        if (request.getIssueDate() != null) {
+            document.setIssueDate(request.getIssueDate().atStartOfDay());
+        }
+        
+        if (request.getExpirationDate() != null) {
+            document.setExpirationDate(request.getExpirationDate().atStartOfDay());
+        }
+        
+        document.setDescription(request.getDescription());
+        
+        if (request.getEmployeeId() != null) {
+            com.z7design.secured_guard.model.Employee employee = new com.z7design.secured_guard.model.Employee();
+            employee.setId(request.getEmployeeId());
+            document.setEmployee(employee);
+        }
+        
         return ResponseEntity.ok(documentService.create(document));
     }
     

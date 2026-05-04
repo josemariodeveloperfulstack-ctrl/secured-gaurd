@@ -43,9 +43,14 @@ public class EmploymentContractRequest {
      */
     private String contractKind;
 
-    /** Dias do período de experiência: 45, 60 ou 90 (usado quando contractKind = EXPERIENCE). */
+    /** Dias do período de experiência: 30, 45, 60 ou 90 (usado quando contractKind = EXPERIENCE). */
     private Integer experienceDurationDays;
 
     /** Salário por extenso (ex.: cadastro do funcionário). Opcional; se vazio, usa texto orientativo no PDF. */
     private String salaryInWords;
+
+    // Novos campos para enriquecer o PDF
+    private String nationality;
+    private String maritalStatus;
+    private String pis;
 }

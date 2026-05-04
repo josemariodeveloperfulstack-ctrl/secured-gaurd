@@ -21,8 +21,11 @@ export interface Employee {
   email?: string;
   cnhNumber?: string;
   ctps?: string;
+  ctpsSeries?: string;
   cbo?: string;
   pis?: string;
+  nationality?: string;
+  maritalStatus?: string;
   salario?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -65,6 +68,7 @@ export interface SimpleEmployee {
   unitName?: string;
   departmentName?: string;
   workPostName?: string;
+  workPostId?: string;
 }
 
 export interface EmployeeFilters {
@@ -231,7 +235,9 @@ export const employeeService = {
           name: emp.name,
           email: emp.email,
           phone: emp.phone,
-          document: emp.document
+          document: emp.document,
+          workPostId: emp.workPostId || emp.workPost?.id,
+          workPostName: emp.workPostName || emp.workPost?.name
         }));
       }
 

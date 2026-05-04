@@ -113,7 +113,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               hireDate: emp.hireDate,
               positionName: emp.position?.name,
               unitName: emp.unit?.name,
-              address: emp.address
+              address: emp.address,
+              workPostId: emp.workPostId || emp.workPost?.id,
+              workPostName: emp.workPostName || emp.workPost?.name
             } as SimpleEmployee);
           }
         } catch (error) {
@@ -155,27 +157,56 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     }
   };
 
+  // Carregar postos quando o cliente mudar
+  useEffect(() => {
+    if (selectedClientId) {
+      const fetchPosts = async () => {
+        setLoadingWorkPosts(true);
+        try {
+          const posts = await workPostService.getWorkPostsByClient(selectedClientId);
+          setFilteredWorkPosts(Array.isArray(posts) ? posts : []);
+        } catch (err) {
+          console.warn('Erro ao carregar setores do cliente:', err);
+          setFilteredWorkPosts([]);
+        } finally {
+          setLoadingWorkPosts(false);
+        }
+      };
+      fetchPosts();
+    } else {
+      setFilteredWorkPosts([]);
+    }
+  }, [selectedClientId]);
+
   // Pre-fill some fields when employee is selected
   useEffect(() => {
-    if (funcionario) {
+    if (funcionario && allWorkPosts.length > 0) {
       // Try to find cost center by unit name
       const unitName = (funcionario as any).unit?.name;
       const matchingCostCenter = unitName
         ? costCenters.find(cc => cc.name.toLowerCase() === unitName.toLowerCase())
         : null;
 
+      // Buscar posto de trabalho associado ao funcionário
+      const workPostId = (funcionario as any).workPostId || (funcionario as any).workPost?.id;
+      const matchingWorkPost = workPostId ? allWorkPosts.find(wp => wp.id === workPostId) : null;
+
       setForm(prev => {
         const salaryValue = (funcionario as any).salario;
         return {
           ...prev,
           position: (funcionario as any).positionName || (funcionario as any).position?.name || prev.position,
-          department: matchingCostCenter?.id || prev.department,
+          department: matchingWorkPost?.id || matchingCostCenter?.id || prev.department,
           startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
           salary: salaryValue != null ? String(salaryValue).replace('.', ',') : prev.salary,
         };
       });
+
+      if (matchingWorkPost?.clientId) {
+        setSelectedClientId(matchingWorkPost.clientId);
+      }
     }
-  }, [funcionario, costCenters]);
+  }, [funcionario, costCenters, allWorkPosts]);
 
   // Auto-calculate end date for experience contracts
   useEffect(() => {
@@ -208,6 +239,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   ];
 
   const experienceDurations = [
+    { value: '30', label: '30 dias' },
     { value: '45', label: '45 dias' },
     { value: '60', label: '60 dias' },
     { value: '90', label: '90 dias' },
@@ -254,7 +286,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     if (form.contractType === 'Contrato de Experiência' && !form.experienceDuration) {
       toast({
         title: 'Atenção',
-        description: 'Selecione a duração do período de experiência (45, 60 ou 90 dias)!',
+        description: 'Selecione a duração do período de experiência (30, 45, 60 ou 90 dias)!',
         variant: 'destructive'
       });
       return false;
@@ -283,6 +315,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       employeeAddress: addressValue,
       employeeCtps: (fullEmployee as any).ctps || '',
       employeeCtpsSeries: (fullEmployee as any).ctpsSeries || '',
+      nationality: fullEmployee.nationality || '',
+      maritalStatus: fullEmployee.maritalStatus || '',
+      pis: fullEmployee.pis || '',
       position: form.position,
       department: buildSetorLocalTrabalhoContrato(fullEmployee),
       salary: form.salary ? parseFloat(form.salary.replace(/\./g, '').replace(',', '.')) : 0,
@@ -413,28 +448,54 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     onChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                     disabled={loadingData}
                     onEmployeeSelect={(emp) => {
-                      setSelectedEmployeeData(emp);
+                      setSelectedEmployeeData({
+                        ...emp,
+                        workPostId: emp.workPostId,
+                        workPostName: emp.workPostName
+                      });
                       if (emp.companyId) {
                         setForm(prev => ({ ...prev, companyId: emp.companyId! }));
                       }
                     }}
                   />
                   {funcionario && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
-                      <User className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs font-semibold text-foreground">
-                        {funcionario.name}
-                      </span>
-                      {(funcionario.cpf || (funcionario as any).document) && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · CPF: {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
-                        </span>
-                      )}
-                      {(funcionario as any).position?.name && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · Cargo: {(funcionario as any).position?.name}
-                        </span>
-                      )}
+                    <div className="mt-2.5 rounded-xl bg-seguranca-black/40 p-3.5 border border-seguranca-yellow/10 shadow-inner group transition-all hover:border-seguranca-yellow/30">
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-seguranca-yellow/10 border border-seguranca-yellow/20">
+                            <User className="h-4 w-4 text-seguranca-yellow" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-seguranca-lightgray truncate leading-tight" title={funcionario.name}>
+                              {funcionario.name}
+                            </span>
+                            {(funcionario as any).positionName && (
+                              <span className="text-[11px] font-medium text-seguranca-yellow/80 mt-0.5 uppercase tracking-wider">
+                                {(funcionario as any).positionName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2.5 border-t border-white/5">
+                          {(funcionario.cpf || (funcionario as any).document) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">CPF</span>
+                              <span className="text-[11px] font-mono text-seguranca-lightgray/70">
+                                {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
+                              </span>
+                            </div>
+                          )}
+                          {(funcionario as any).registrationNumber && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">Matrícula</span>
+                              <span className="text-[11px] font-mono text-seguranca-lightgray/70">
+                                {(funcionario as any).registrationNumber}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -459,21 +520,35 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     searchPlaceholder="Buscar empresa..."
                   />
                   {empresa && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
-                      <Building className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs font-semibold text-foreground">
-                        {empresa.sigla || empresa.tradeName || empresa.name}
-                      </span>
-                      {empresa.name && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · Razão Social: {empresa.name}
-                        </span>
-                      )}
-                      {empresa.cnpj && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · CNPJ: {formatCNPJ(empresa.cnpj)}
-                        </span>
-                      )}
+                    <div className="mt-2.5 rounded-xl bg-seguranca-black/40 p-3.5 border border-seguranca-yellow/10 shadow-inner group transition-all hover:border-seguranca-yellow/30">
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-seguranca-yellow/10 border border-seguranca-yellow/20">
+                            <Building className="h-4 w-4 text-seguranca-yellow" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-seguranca-lightgray truncate leading-tight" title={empresa.sigla || empresa.tradeName || empresa.name}>
+                              {empresa.sigla || empresa.tradeName || empresa.name}
+                            </span>
+                            {empresa.name && (
+                              <span className="text-[11px] font-medium text-seguranca-yellow/80 mt-0.5 uppercase tracking-wider truncate" title={empresa.name}>
+                                {empresa.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2.5 border-t border-white/5">
+                          {empresa.cnpj && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">CNPJ</span>
+                              <span className="text-[11px] font-mono text-seguranca-lightgray/70">
+                                {formatCNPJ(empresa.cnpj)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -757,22 +832,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     description: c.cnpj || ''
                   }))}
                   value={selectedClientId}
-                  onChange={async (val) => {
+                  onChange={(val) => {
                     setSelectedClientId(val);
                     setForm(prev => ({ ...prev, department: '' }));
-                    setFilteredWorkPosts([]);
-                    if (val) {
-                      setLoadingWorkPosts(true);
-                      try {
-                        const posts = await workPostService.getWorkPostsByClient(val);
-                        setFilteredWorkPosts(Array.isArray(posts) ? posts : []);
-                      } catch (err) {
-                        console.warn('Erro ao carregar setores do cliente:', err);
-                        setFilteredWorkPosts([]);
-                      } finally {
-                        setLoadingWorkPosts(false);
-                      }
-                    }
                   }}
                   disabled={loadingData}
                   placeholder="Selecione o cliente"
