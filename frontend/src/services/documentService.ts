@@ -141,4 +141,4 @@ class DocumentService {
 }
 
 export const documentService = new DocumentService();
-export type { Document, DocumentType };
+export type { Document, DocumentType } from '@/types/document';

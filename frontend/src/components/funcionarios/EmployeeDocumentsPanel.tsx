@@ -38,7 +38,8 @@ import {
   Star,
   TrendingUp
 } from 'lucide-react';
-import { documentService, Document as ApiDocument } from '@/services/documentService';
+import { documentService } from '@/services/documentService';
+import type { Document as ApiDocument } from '@/types/document';
 import { useToast } from '@/hooks/use-toast';
 
 // Tipagem local que a UI deste painel utiliza

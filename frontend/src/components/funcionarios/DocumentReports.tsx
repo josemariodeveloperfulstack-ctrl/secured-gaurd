@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, AlertTriangle, CheckCircle, Clock, Download, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { documentService, Document } from '@/services/documentService';
+import { documentService } from '@/services/documentService';
+import type { Document } from '@/types/document';
 
 interface DocumentReportsProps {
   employeeId?: string;

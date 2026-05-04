@@ -47,7 +47,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentService } from '@/services/documentService';
-import { Document, DocumentType } from '@/services/documentService';
+import type { Document, DocumentType } from '@/types/document';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatDateSafe } from '@/utils/dateUtils';
