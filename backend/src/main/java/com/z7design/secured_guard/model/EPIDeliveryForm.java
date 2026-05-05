@@ -11,6 +11,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,12 +39,14 @@ public class EPIDeliveryForm {
 
     @NotNull(message = "Funcionário é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "employee_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "unit", "position", "user"})
     private Employee employee;
 
     @NotNull(message = "Empresa é obrigatória")
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "company_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Company company;
@@ -52,6 +56,7 @@ public class EPIDeliveryForm {
     private LocalDate deliveryDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "responsible_employee_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "unit", "position", "user"})
     private Employee responsibleEmployee;
@@ -71,6 +76,7 @@ public class EPIDeliveryForm {
     private String pdfUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "created_by_user_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User createdBy;
