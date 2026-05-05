@@ -345,7 +345,7 @@ public class SecurityConfig {
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de suppliers (fornecedores) - requerem permissões
                                                 // administrativas
                                                 // ou financeiras
@@ -380,7 +380,7 @@ public class SecurityConfig {
                                                                 "SUPER_ADMIN", "ADMIN", "FINANCEIRO",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de bank-reconciliation (conciliação bancária) - requerem
                                                 // permissões
                                                 // específicas
