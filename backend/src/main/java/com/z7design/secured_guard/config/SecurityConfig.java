@@ -280,7 +280,8 @@ public class SecurityConfig {
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_OPERATIONAL_SUPERVISOR",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS",
-                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO")
+                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO",
+                                                                "ROLE_RH", "RH", "ROLE_DEPARTAMENTO_PESSOAL", "DEPARTAMENTO_PESSOAL")
                                                 // Endpoints de requisições de compras - requerem permissões financeiras
                                                 // ou administrativas
                                                 .requestMatchers("/api/purchase-requests", "/api/purchase-requests/**")
