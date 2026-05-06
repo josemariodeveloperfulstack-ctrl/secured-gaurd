@@ -603,7 +603,8 @@ public class SecurityConfig {
                                                                 "STOCK_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "SUPER_ADMIN", "ADMIN",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
-                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO")
+                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO",
+                                                                "ROLE_RH", "RH", "ROLE_DEPARTAMENTO_PESSOAL", "DEPARTAMENTO_PESSOAL")
                                                 // Endpoints de modelos de documentos - temporariamente público para
                                                 // teste
                                                 .requestMatchers("/api/modelos-documentos/**").permitAll()

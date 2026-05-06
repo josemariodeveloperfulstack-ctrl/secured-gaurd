@@ -35,8 +35,8 @@ public class VacationDTO {
     public static VacationDTO fromEntity(Vacation vacation) {
         return VacationDTO.builder()
                 .id(vacation.getId())
-                .employeeId(vacation.getEmployee().getId())
-                .employeeName(vacation.getEmployee().getName())
+                .employeeId(vacation.getEmployee() != null ? vacation.getEmployee().getId() : null)
+                .employeeName(vacation.getEmployee() != null ? vacation.getEmployee().getName() : "Funcionário removido")
                 .startDate(vacation.getStartDate())
                 .endDate(vacation.getEndDate())
                 .daysTaken(vacation.getDaysTaken())

@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,12 +31,13 @@ public class VacationCoverage {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "vacation_id", nullable = false)
     private Vacation vacation;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "substitute_employee_id", nullable = false)
-    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
+    @NotFound(action = NotFoundAction.IGNORE)
     private Employee substituteEmployee;
 
     @Column(name = "coverage_start_date", nullable = false)
@@ -44,6 +47,7 @@ public class VacationCoverage {
     private LocalDate coverageEndDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "location_id")
     private WorkPost location;
 
@@ -63,6 +67,7 @@ public class VacationCoverage {
     private Boolean isConfirmed = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "confirmed_by")
     private User confirmedBy;
 
