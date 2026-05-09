@@ -7,6 +7,7 @@ import com.z7design.secured_guard.model.ProposalItem;
 import com.z7design.secured_guard.model.enums.ProposalStatus;
 import com.z7design.secured_guard.repository.ProposalRepository;
 import com.z7design.secured_guard.repository.ProposalItemRepository;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.ClientRepository;
 import com.z7design.secured_guard.repository.LeadRepository;
 import com.z7design.secured_guard.repository.UserRepository;
@@ -48,14 +49,14 @@ public class ProposalService {
     }
 
     public List<ProposalDTO> findAll() {
-        List<Proposal> proposals = proposalRepository.findAll();
+        List<Proposal> proposals = proposalRepository.findAllActive();
         return proposals.stream()
                 .map(this::mapToDTO)
                 .toList();
     }
 
     public Page<ProposalDTO> findAll(Pageable pageable) {
-        Page<Proposal> proposals = proposalRepository.findAll(pageable);
+        Page<Proposal> proposals = proposalRepository.findAllActive(pageable);
         return proposals.map(this::mapToDTO);
     }
 
@@ -235,9 +236,42 @@ public class ProposalService {
         return proposalRepository.save(proposal);
     }
 
-    public void delete(UUID id) {
+    public void delete(UUID id, String reason, User user) {
         Proposal proposal = findById(id);
-        proposalRepository.delete(proposal);
+        proposal.setDeleted(true);
+        proposal.setDeletionReason(reason);
+        proposal.setDeletedAt(LocalDateTime.now());
+        proposal.setDeletedBy(user);
+        proposalRepository.save(proposal);
+    }
+
+    @Transactional
+    public void deleteAll(String reason, User user) {
+        List<Proposal> proposals = proposalRepository.findAllActive();
+        for (Proposal proposal : proposals) {
+            proposal.setDeleted(true);
+            proposal.setDeletionReason(reason);
+            proposal.setDeletedAt(LocalDateTime.now());
+            proposal.setDeletedBy(user);
+        }
+        proposalRepository.saveAll(proposals);
+    }
+
+    @Transactional
+    public void deleteBulk(List<UUID> ids, String reason, User user) {
+        List<Proposal> proposals = proposalRepository.findAllById(ids);
+        for (Proposal proposal : proposals) {
+            proposal.setDeleted(true);
+            proposal.setDeletionReason(reason);
+            proposal.setDeletedAt(LocalDateTime.now());
+            proposal.setDeletedBy(user);
+        }
+        proposalRepository.saveAll(proposals);
+    }
+
+    public User findUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + username));
     }
 
     public List<Proposal> findByStatus(ProposalStatus status) {

@@ -690,8 +690,8 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
               <p className="text-sm text-gray-400 mb-2">Itens</p>
               <ul className="text-sm space-y-1 border border-gray-600/30 rounded-md p-2 max-h-40 overflow-y-auto">
                 {detail!.lines.map((l) => (
-                  <li key={l.id || l.stockItemId} className="flex justify-between gap-2">
-                    <span className="truncate">{l.stockItemFullName || l.stockItemCode}</span>
+                  <li key={l.id || l.stockItemId} className="flex justify-between gap-2 min-w-0">
+                    <span className="truncate min-w-0 flex-1">{l.stockItemFullName || l.stockItemCode}</span>
                     <span className="text-seguranca-yellow shrink-0">×{l.quantity}</span>
                   </li>
                 ))}

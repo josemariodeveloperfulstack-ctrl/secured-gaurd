@@ -110,6 +110,75 @@ public class StockReportService {
         return baos.toByteArray();
     }
 
+    public byte[] generatePhysicalInventoryWorksheetPDF(UUID companyId) throws IOException {
+        log.info("Gerando planilha de conferência física de estoque para empresa: {}", companyId);
+
+        List<StockItemDTO> items = stockService.getAllItems();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+
+        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("PLANILHA DE CONFERÊNCIA FÍSICA (INVENTÁRIO)")
+                .reportSubTitle("Data de geração: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")))
+                .build();
+
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
+        Document document = docWithPdf.getDocument();
+
+        Table table = new Table(UnitValue.createPercentArray(new float[] { 15, 35, 15, 15, 20 }))
+                .useAllAvailableWidth()
+                .setMarginTop(20);
+
+        table.addHeaderCell(layoutService.createHeaderCell("Código"));
+        table.addHeaderCell(layoutService.createHeaderCell("Item"));
+        table.addHeaderCell(layoutService.createHeaderCell("Categoria"));
+        table.addHeaderCell(layoutService.createHeaderCell("Estoque Sist."));
+        table.addHeaderCell(layoutService.createHeaderCell("Estoque Físico"));
+
+        for (StockItemDTO item : items) {
+            table.addCell(layoutService.createDataCell(item.getCode()));
+            table.addCell(layoutService.createDataCell(item.getName()));
+            table.addCell(layoutService.createDataCell(item.getCategory() != null ? item.getCategory().toString() : "-"));
+            table.addCell(layoutService.createDataCell(String.valueOf(item.getCurrentQuantity())));
+            table.addCell(layoutService.createDataCell("________________"));
+        }
+
+        document.add(table);
+        document.add(new Paragraph("\nObservações: ________________________________________________________________________________").setItalic().setFontSize(9));
+        document.add(new Paragraph("Assinatura do Conferente: _______________________________________ Data: ___/___/___").setMarginTop(20));
+
+        document.close();
+        return baos.toByteArray();
+    }
+
+    public byte[] generateConsolidatedRequisitionsPDF(UUID companyId, LocalDateTime start, LocalDateTime end) throws IOException {
+        log.info("Gerando relatório consolidado de requisições para empresa: {}", companyId);
+
+        List<StockRequisitionListItemDTO> requisitions = stockRequisitionRepository.findAllListItemsCreatedBetween(start, end);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String period = "Período: " + start.format(dtf) + " até " + (end != null ? end.format(dtf) : "Hoje");
+
+        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                .companyId(companyId)
+                .reportTitle("RELATÓRIO CONSOLIDADO DE REQUISIÇÕES")
+                .reportSubTitle(period)
+                .build();
+
+        StandardReportLayoutService.DocumentWithPdf docWithPdf = layoutService.createDocumentWithLayout(writer, config);
+        Document document = docWithPdf.getDocument();
+
+        addRequisitionsTable(document, requisitions);
+
+        document.close();
+        return baos.toByteArray();
+    }
+
     /**
      * Relatório único: período, itens em baixo estoque (situação atual), movimentações (entrada/saída),
      * requisições no período e quantidades por localização (prateleira/andar).

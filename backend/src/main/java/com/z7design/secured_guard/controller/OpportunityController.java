@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
@@ -54,7 +55,7 @@ public class OpportunityController {
 
     @GetMapping
     public List<OpportunityResponse> getAll() {
-        return opportunityService.findAll().stream()
+        return opportunityService.findAllActive().stream()
                 .map(OpportunityResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -101,11 +102,45 @@ public class OpportunityController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
-    public ResponseEntity<Void> delete(@PathVariable String id) {
+    public ResponseEntity<Void> delete(@PathVariable String id, @RequestParam String reason) {
         if (!opportunityService.findById(UUID.fromString(id)).isPresent()) {
             return ResponseEntity.notFound().build();
         }
-        opportunityService.delete(UUID.fromString(id));
+        
+        // Obter usuário logado (simulado ou via SecurityContext)
+        // No contexto atual, assumimos que o SecurityContext está configurado
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        com.z7design.secured_guard.model.User user = opportunityService.findUserByUsername(username);
+        
+        opportunityService.delete(UUID.fromString(id), reason, user);
+        return ResponseEntity.noContent().build();
+    }
+    @DeleteMapping("/all")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
+    public ResponseEntity<Void> deleteAll(@RequestParam String reason) {
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        com.z7design.secured_guard.model.User user = opportunityService.findUserByUsername(username);
+        
+        opportunityService.deleteAll(reason, user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/bulk-delete")
+    @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
+    public ResponseEntity<Void> deleteBulk(@RequestBody java.util.Map<String, Object> payload) {
+        List<String> idsStr = (List<String>) payload.get("ids");
+        String reason = (String) payload.get("reason");
+        
+        if (reason == null || reason.isEmpty()) {
+            reason = "Exclusão em massa via sistema";
+        }
+        
+        List<UUID> ids = idsStr.stream().map(UUID::fromString).collect(Collectors.toList());
+        
+        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        com.z7design.secured_guard.model.User user = opportunityService.findUserByUsername(username);
+        
+        opportunityService.deleteBulk(ids, reason, user);
         return ResponseEntity.noContent().build();
     }
 } 

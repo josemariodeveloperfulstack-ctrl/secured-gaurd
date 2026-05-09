@@ -30,8 +30,23 @@ import {
   StockRequisitionStatusLabels,
   StockRequisitionStatus,
   type StockItem,
-  type StockRequisitionListItem
+  type StockRequisitionListItem,
+  type StockDashboardDTO,
+  type StockMovementChartDTO
 } from '@/types/stock';
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  PieChart, 
+  Pie, 
+  Cell 
+} from 'recharts';
 import { normalizeStockItem } from '@/services/stockService';
 
 type ReportTypeOption =
@@ -47,7 +62,9 @@ type ReportTypeOption =
   | 'by-item'
   | 'by-shelf'
   | 'top-exits'
-  | 'qty-range';
+  | 'qty-range'
+  | 'physical-inventory'
+  | 'consolidated-requisitions';
 
 type MovementDirectionFilter = 'ALL' | 'ENTRADA' | 'SAIDA';
 
@@ -162,7 +179,11 @@ const StockReportsContent: React.FC = () => {
     totalValue: 0,
     totalQuantity: 0,
     averageTurnover: 0,
+    generatedRequisitions: 0,
+    consolidatedRequisitions: 0,
   });
+
+  const [dashboardData, setDashboardData] = useState<any>(null);
 
   useEffect(() => {
     void fetchCompany();
@@ -420,15 +441,26 @@ const StockReportsContent: React.FC = () => {
       });
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
-      setStats({
-        totalProducts: 0,
-        lowStockProducts: 0,
-        outOfStockProducts: 0,
-        overStockProducts: 0,
-        totalValue: 0,
-        totalQuantity: 0,
-        averageTurnover: 0,
-      });
+    }
+
+    // Carregar dados do dashboard analítico
+    if (empresa?.id) {
+      try {
+        const { stockService } = await import('@/services/stockService');
+        const { start, end } = getPeriodBounds(dateRange);
+        const data = await stockService.getStockDashboard(empresa.id, start.toISOString(), end.toISOString());
+        setDashboardData(data);
+        
+        if (data) {
+          setStats(prev => ({
+            ...prev,
+            generatedRequisitions: data.generatedRequisitionsCount || 0,
+            consolidatedRequisitions: data.consolidatedRequisitionsCount || 0
+          }));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dashboard analítico:', error);
+      }
     }
   };
 
@@ -531,6 +563,10 @@ const StockReportsContent: React.FC = () => {
         await stockService.downloadLowStockPDF(currentEmpresa.id);
       } else if (reportType === 'movements') {
         await stockService.downloadMovementsPDF(currentEmpresa.id, startDateISO, endDateISO);
+      } else if (reportType === 'physical-inventory') {
+        await stockService.downloadPhysicalInventoryPDF(currentEmpresa.id);
+      } else if (reportType === 'consolidated-requisitions') {
+        await stockService.downloadConsolidatedRequisitionsPDF(currentEmpresa.id, startDateISO, endDateISO);
       } else {
         await stockService.downloadGeneralStockPDF(currentEmpresa.id);
       }
@@ -569,79 +605,132 @@ const StockReportsContent: React.FC = () => {
       </div>
 
       {/* Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Package className="h-4 w-4 text-seguranca-yellow" />
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-seguranca-lightgray">Total de Produtos</p>
+                <p className="text-sm font-medium text-gray-400">Total de Produtos</p>
                 <p className="text-2xl font-bold text-seguranca-lightgray">{stats.totalProducts}</p>
               </div>
+              <Package className="h-8 w-8 text-seguranca-yellow opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-seguranca-lightgray">Estoque Baixo</p>
-                <p className="text-2xl font-bold text-red-500">{stats.lowStockProducts}</p>
+                <p className="text-sm font-medium text-gray-400">Estoque Crítico (Baixo/Zero)</p>
+                <p className="text-2xl font-bold text-red-500">{stats.lowStockProducts + stats.outOfStockProducts}</p>
               </div>
+              <AlertTriangle className="h-8 w-8 text-red-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingDown className="h-4 w-4 text-red-500" />
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-seguranca-lightgray">Sem Estoque</p>
-                <p className="text-2xl font-bold text-red-500">{stats.outOfStockProducts}</p>
+                <p className="text-sm font-medium text-gray-400">Requisições Geradas</p>
+                <p className="text-2xl font-bold text-blue-500">{stats.generatedRequisitions}</p>
               </div>
+              <BarChart3 className="h-8 w-8 text-blue-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-seguranca-graphite border-gray-600">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-4 w-4 text-yellow-500" />
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-seguranca-lightgray">Estoque Alto</p>
-                <p className="text-2xl font-bold text-yellow-500">{stats.overStockProducts}</p>
+                <p className="text-sm font-medium text-gray-400">Valor em Estoque</p>
+                <p className="text-2xl font-bold text-green-500">{formatCurrency(stats.totalValue)}</p>
               </div>
+              <DollarSign className="h-8 w-8 text-green-500 opacity-50" />
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 bg-seguranca-graphite border-gray-600">
+          <CardHeader>
+            <CardTitle className="text-seguranca-lightgray text-lg">Movimentações de Estoque ({dateRange} dias)</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dashboardData?.movementsChart || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" vertical={false} />
+                <XAxis dataKey="label" stroke="#999" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#999" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#444', color: '#fff', borderRadius: '8px' }}
+                  itemStyle={{ color: '#fff' }}
+                  cursor={{ fill: '#333' }}
+                />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+                <Bar dataKey="entries" name="Entradas" fill="#4ade80" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar dataKey="exits" name="Saídas" fill="#f87171" radius={[4, 4, 0, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
         <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4 text-blue-500" />
-              <div>
-                <p className="text-sm font-medium text-seguranca-lightgray">Valor Total</p>
-                <p className="text-2xl font-bold text-blue-500">{formatCurrency(stats.totalValue)}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {formatNumber(stats.totalQuantity)} unidades em estoque
-                </p>
+          <CardHeader>
+            <CardTitle className="text-seguranca-lightgray text-lg">Status do Estoque</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px] flex flex-col items-center justify-center">
+            {dashboardData?.stockStatusDistribution ? (
+              <>
+                <ResponsiveContainer width="100%" height="80%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Normal', value: dashboardData.stockStatusDistribution.NORMAL || 0 },
+                        { name: 'Baixo', value: dashboardData.stockStatusDistribution.BAIXO || 0 },
+                        { name: 'Sem Estoque', value: dashboardData.stockStatusDistribution.SEM_ESTOQUE || 0 },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      <Cell fill="#4ade80" />
+                      <Cell fill="#facc15" />
+                      <Cell fill="#f87171" />
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#444', color: '#fff', borderRadius: '8px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex gap-4 mt-2">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-[#4ade80]" />
+                    <span className="text-xs text-gray-400">Normal</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-[#facc15]" />
+                    <span className="text-xs text-gray-400">Baixo</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded-full bg-[#f87171]" />
+                    <span className="text-xs text-gray-400">Crítico</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+                Carregando...
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-seguranca-graphite border-gray-600">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <BarChart3 className="h-4 w-4 text-green-500" />
-              <div>
-                <p className="text-sm font-medium text-seguranca-lightgray">Giro Médio</p>
-                <p className="text-2xl font-bold text-green-500">{formatPercentage(stats.averageTurnover)}</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -660,8 +749,10 @@ const StockReportsContent: React.FC = () => {
                 <div className="space-y-2">
                   <Label className="text-seguranca-lightgray">Por período</Label>
                   <Select value={dateRange} onValueChange={setDateRange}>
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Período" />
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray w-full min-w-0">
+                      <div className="flex-1 truncate text-left">
+                        <SelectValue placeholder="Período" />
+                      </div>
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-graphite border-gray-600">
                       <SelectItem value="7">Últimos 7 dias</SelectItem>
@@ -675,8 +766,10 @@ const StockReportsContent: React.FC = () => {
                 <div className="space-y-2 md:col-span-2">
                   <Label className="text-seguranca-lightgray">Tipo de relatório</Label>
                   <Select value={reportType} onValueChange={(v) => setReportType(v as ReportTypeOption)}>
-                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                      <SelectValue placeholder="Tipo" />
+                    <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray w-full min-w-0">
+                      <div className="flex-1 truncate text-left">
+                        <SelectValue placeholder="Tipo" />
+                      </div>
                     </SelectTrigger>
                     <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[320px]">
                       <SelectItem value="low-stock">Estoque baixo</SelectItem>
@@ -688,6 +781,8 @@ const StockReportsContent: React.FC = () => {
                       <SelectItem value="top-exits">Tipos de itens que mais saem</SelectItem>
                       <SelectItem value="requisitions">Requisições (solicitadas / aprovadas)</SelectItem>
                       <SelectItem value="locations">Quantidade por prateleira / localização</SelectItem>
+                      <SelectItem value="physical-inventory">Planilha de conferência física (Inventário)</SelectItem>
+                      <SelectItem value="consolidated-requisitions">Relatório de requisições consolidadas</SelectItem>
                       <SelectItem value="by-item">Por item</SelectItem>
                       <SelectItem value="by-shelf">Por prateleira</SelectItem>
                       <SelectItem value="qty-range">Quantidade mínima e máxima (estoque atual)</SelectItem>

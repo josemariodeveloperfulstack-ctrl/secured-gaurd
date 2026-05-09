@@ -115,8 +115,19 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               unitName: emp.unit?.name,
               address: emp.address,
               workPostId: emp.workPostId || emp.workPost?.id,
-              workPostName: emp.workPostName || emp.workPost?.name
+              workPostName: emp.workPostName || emp.workPost?.name,
+              salario: emp.salario,
+              diasTrabalho: emp.diasTrabalho,
+              horarioTrabalho: emp.horarioTrabalho,
+              escalaTrabalho: emp.escalaTrabalho,
+              companyId: emp.company?.id || (emp as any).companyId
             } as SimpleEmployee);
+
+            // Também atualizar o form.companyId se ele estiver vazio
+            setForm(prev => ({
+              ...prev,
+              companyId: prev.companyId || emp.company?.id || (emp as any).companyId || ''
+            }));
           }
         } catch (error) {
           console.error("Erro ao carregar dados iniciais do funcionário:", error);
@@ -199,6 +210,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
           department: matchingWorkPost?.id || matchingCostCenter?.id || prev.department,
           startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
           salary: salaryValue != null ? String(salaryValue).replace('.', ',') : prev.salary,
+          workSchedule: (funcionario as any).escalaTrabalho && (funcionario as any).horarioTrabalho
+            ? `${(funcionario as any).escalaTrabalho} - ${(funcionario as any).horarioTrabalho}`
+            : (funcionario as any).escalaTrabalho || (funcionario as any).horarioTrabalho || (funcionario as any).diasTrabalho || prev.workSchedule,
         };
       });
 
@@ -340,8 +354,8 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     };
   };
 
-  const handleGenerateContract = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateContract = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!validateForm()) return;
 
     setLoading(true);
@@ -744,7 +758,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     value={form.experienceDuration}
                     onValueChange={(value) => setForm(prev => ({ ...prev, experienceDuration: value }))}
                   >
-                    <SelectTrigger className="bg-white h-12 border-orange-400 focus:border-orange-600 text-base font-semibold">
+                    <SelectTrigger className="bg-white h-12 border-orange-400 focus:border-orange-600 text-base font-semibold text-gray-800">
                       <SelectValue placeholder="Selecione o período" />
                     </SelectTrigger>
                     <SelectContent>
@@ -761,7 +775,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     <Label className="text-orange-700 font-semibold">Data de Término Calculada</Label>
                     <div className="flex items-center gap-3 p-3 bg-white rounded-lg border-2 border-orange-400">
                       <Calendar className="h-5 w-5 text-orange-600" />
-                      <span className="font-bold text-base">
+                      <span className="font-bold text-base text-gray-800">
                         {form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : 'Calculando...'}
                       </span>
                       <Badge className="ml-auto bg-orange-600">Automático</Badge>
@@ -920,6 +934,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
             <Button
+              type="button"
               onClick={handlePreviewContract}
               variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
@@ -938,7 +953,8 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               )}
             </Button>
             <Button
-              onClick={handleGenerateContract}
+              type="button"
+              onClick={() => handleGenerateContract()}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || loadingData || !funcionario || !empresa}
             >

@@ -20,9 +20,15 @@ import java.util.UUID;
 public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
 
     /** Busca proposta por ID com itens carregados (evita LazyInitializationException no mapToDTO). DISTINCT evita múltiplas linhas por item. */
-    @Query("SELECT DISTINCT p FROM Proposal p LEFT JOIN FETCH p.items WHERE p.id = :id")
+    @Query("SELECT DISTINCT p FROM Proposal p LEFT JOIN FETCH p.items WHERE p.id = :id AND p.isDeleted = false")
     Optional<Proposal> findByIdWithItems(@Param("id") UUID id);
     
+    @Query("SELECT p FROM Proposal p WHERE p.isDeleted = false")
+    List<Proposal> findAllActive();
+
+    @Query("SELECT p FROM Proposal p WHERE p.isDeleted = false")
+    Page<Proposal> findAllActive(Pageable pageable);
+
     // Buscar propostas por status
     List<Proposal> findByStatus(ProposalStatus status);
     

@@ -322,7 +322,7 @@ public class UserGroupService {
         dto.setPermissions(group.getPermissions());
 
         // Calcular contagem de usuários via consulta direta
-        String countQuery = "SELECT COUNT(u) FROM User u JOIN u.groups g WHERE g.id = :groupId";
+        String countQuery = "SELECT COUNT(u) FROM com.z7design.secured_guard.model.User u JOIN u.groups g WHERE g.id = :groupId";
         Long userCount = entityManager.createQuery(countQuery, Long.class)
                 .setParameter("groupId", group.getId())
                 .getSingleResult();

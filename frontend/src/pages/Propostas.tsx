@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -116,6 +117,13 @@ const Propostas = () => {
   const [generatingReport, setGeneratingReport] = useState<'pdf' | 'excel' | null>(null);
   const [generatingContract, setGeneratingContract] = useState<string | null>(null);
   const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
+  
+  // States para deleção e seleção
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleteReasonModalOpen, setIsDeleteReasonModalOpen] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'single' | 'bulk' | 'all' | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [proposalToDelete, setProposalToDelete] = useState<string | null>(null);
 
   // Form state (inclui termsConditions e notes para edição completa)
   const [formData, setFormData] = useState<CreateProposalRequest & { clientId?: number | string; leadId?: number | string; assignedToId?: number | string; termsConditions?: string; notes?: string }>({
@@ -452,25 +460,74 @@ const Propostas = () => {
     }
   };
 
-  // Handle delete proposal
-  const handleDeleteProposal = async (proposalId: number | string) => {
-    if (!confirm('Tem certeza que deseja excluir esta proposta?')) return;
+  // Prepara a exclusão de uma proposta individual
+  const handleDeleteProposal = (proposalId: number | string) => {
+    const id = typeof proposalId === 'string' ? proposalId : String(proposalId);
+    setProposalToDelete(id);
+    setDeleteMode('single');
+    setDeleteReason('');
+    setIsDeleteReasonModalOpen(true);
+  };
+
+  // Prepara exclusão em massa
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) {
+      toast({ title: 'Aviso', description: 'Selecione ao menos uma proposta.', variant: 'destructive' });
+      return;
+    }
+    setDeleteMode('bulk');
+    setDeleteReason('');
+    setIsDeleteReasonModalOpen(true);
+  };
+
+  // Prepara exclusão de todos
+  const handleDeleteAll = () => {
+    setDeleteMode('all');
+    setDeleteReason('');
+    setIsDeleteReasonModalOpen(true);
+  };
+
+  // Confirmação final da deleção (individual, múltipla ou todas)
+  const confirmDelete = async () => {
+    if (!deleteReason.trim()) {
+      toast({ title: 'Erro', description: 'O motivo da exclusão é obrigatório.', variant: 'destructive' });
+      return;
+    }
+
     try {
-      // Converter ID para string se necessário
-      const id = typeof proposalId === 'string' ? proposalId : String(proposalId);
-      await proposalService.deleteProposal(id);
-      toast({
-        title: "Sucesso",
-        description: "Proposta excluída com sucesso!",
-      });
+      if (deleteMode === 'single' && proposalToDelete) {
+        await proposalService.deleteProposal(proposalToDelete, deleteReason);
+        toast({ title: 'Sucesso', description: 'Proposta excluída com sucesso!' });
+      } else if (deleteMode === 'bulk') {
+        await proposalService.deleteProposalsBulk(selectedIds, deleteReason);
+        toast({ title: 'Sucesso', description: 'Propostas excluídas com sucesso!' });
+        setSelectedIds([]);
+      } else if (deleteMode === 'all') {
+        await proposalService.deleteAllProposals(deleteReason);
+        toast({ title: 'Sucesso', description: 'Todas as propostas foram excluídas!' });
+        setSelectedIds([]);
+      }
+      setIsDeleteReasonModalOpen(false);
+      setDeleteReason('');
       await loadProposals();
     } catch (error: any) {
-      console.error('Erro ao excluir proposta:', error);
-      toast({
-        title: "Erro",
-        description: error.response?.data?.message || "Não foi possível excluir a proposta.",
-        variant: "destructive"
-      });
+      toast({ title: 'Erro', description: error.response?.data?.message || 'Erro ao excluir.', variant: 'destructive' });
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(filteredProposals.map(p => String(p.id)));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectProposal = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(item => item !== id));
     }
   };
 
@@ -852,8 +909,30 @@ const Propostas = () => {
 
             {/* Tabela de Propostas */}
             <Card className="bg-seguranca-graphite border-gray-600">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-seguranca-lightgray">Lista de Propostas</CardTitle>
+                <div className="flex gap-2">
+                  {selectedIds.length > 0 && (
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleDeleteSelected}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir Selecionados ({selectedIds.length})
+                    </Button>
+                  )}
+                  {filteredProposals.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      onClick={handleDeleteAll}
+                      className="border-red-600 text-red-500 hover:bg-red-600 hover:text-white"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Limpar Tudo
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -869,6 +948,13 @@ const Propostas = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="border-gray-600">
+                          <TableHead className="w-12">
+                            <Checkbox 
+                              checked={selectedIds.length === filteredProposals.length && filteredProposals.length > 0}
+                              onCheckedChange={handleSelectAll}
+                              aria-label="Selecionar todos"
+                            />
+                          </TableHead>
                           <TableHead className="text-seguranca-lightgray">Número</TableHead>
                           <TableHead className="text-seguranca-lightgray">Título</TableHead>
                           <TableHead className="text-seguranca-lightgray">Cliente</TableHead>
@@ -882,6 +968,13 @@ const Propostas = () => {
                       <TableBody>
                         {filteredProposals.map((proposal) => (
                           <TableRow key={proposal.id} className="border-gray-600">
+                            <TableCell>
+                              <Checkbox 
+                                checked={selectedIds.includes(String(proposal.id))}
+                                onCheckedChange={(checked) => handleSelectProposal(String(proposal.id), !!checked)}
+                                aria-label={`Selecionar proposta ${proposal.title}`}
+                              />
+                            </TableCell>
                             <TableCell className="text-seguranca-lightgray font-medium">
                               {proposal.proposalNumber || '-'}
                             </TableCell>
@@ -978,6 +1071,43 @@ const Propostas = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Modal de Motivo de Exclusão */}
+            <Dialog open={isDeleteReasonModalOpen} onOpenChange={setIsDeleteReasonModalOpen}>
+              <DialogContent className="bg-seguranca-graphite border-gray-600">
+                <DialogHeader>
+                  <DialogTitle className="text-seguranca-lightgray">
+                    {deleteMode === 'all' ? 'Excluir Todas as Propostas' : 
+                     deleteMode === 'bulk' ? `Excluir Propostas Selecionadas (${selectedIds.length})` : 
+                     'Excluir Proposta'}
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-400">
+                    Por favor, informe o motivo para esta exclusão. Esta ação ficará registrada no histórico.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="deleteReason" className="text-seguranca-lightgray">Motivo da exclusão <span className="text-red-500">*</span></Label>
+                    <Textarea
+                      id="deleteReason"
+                      value={deleteReason}
+                      onChange={(e) => setDeleteReason(e.target.value)}
+                      placeholder="Ex: Proposta cancelada pelo cliente, cadastro duplicado, etc."
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray min-h-[100px]"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => setIsDeleteReasonModalOpen(false)} className="bg-transparent border-gray-600 text-seguranca-lightgray hover:bg-gray-800">
+                    Cancelar
+                  </Button>
+                  <Button variant="destructive" onClick={confirmDelete} disabled={!deleteReason.trim()} className="bg-seguranca-red hover:bg-red-700 text-white">
+                    Confirmar Exclusão
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Modal de Visualização */}
             <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>

@@ -20,6 +20,7 @@ public class DisciplinaryWarningRequest {
     private String employeeName;
     private String employeeCpf;
     private String employeePosition; // Cargo
+    private String sector; // Setor/Posto de Trabalho
 
     // Dados da Infração
     private String reason; // Motivo da advertência

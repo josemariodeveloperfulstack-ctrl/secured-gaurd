@@ -22,6 +22,10 @@ public class CreateEPIDeliveryFormDTO {
     private String observations;
     private String pdfUrl;
     private EPIDeliveryType deliveryType;
+    private String signatureBase64;
+    private String signatureType;
+    private String employeeWorkSector;
+    private com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status;
 
     @NotEmpty(message = "É necessário pelo menos um item de EPI")
     private List<EPIDeliveryFormItemDTO> items;
@@ -30,6 +34,29 @@ public class CreateEPIDeliveryFormDTO {
     }
 
     // Manual Getters and Setters
+    public String getSignatureBase64() {
+        return signatureBase64;
+    }
+
+    public void setSignatureBase64(String signatureBase64) {
+        this.signatureBase64 = signatureBase64;
+    }
+
+    public String getSignatureType() {
+        return signatureType;
+    }
+
+    public void setSignatureType(String signatureType) {
+        this.signatureType = signatureType;
+    }
+
+    public com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status) {
+        this.status = status;
+    }
     public UUID getEmployeeId() {
         return employeeId;
     }
@@ -84,6 +111,14 @@ public class CreateEPIDeliveryFormDTO {
 
     public void setDeliveryType(EPIDeliveryType deliveryType) {
         this.deliveryType = deliveryType;
+    }
+
+    public String getEmployeeWorkSector() {
+        return employeeWorkSector;
+    }
+
+    public void setEmployeeWorkSector(String employeeWorkSector) {
+        this.employeeWorkSector = employeeWorkSector;
     }
 
     public List<EPIDeliveryFormItemDTO> getItems() {

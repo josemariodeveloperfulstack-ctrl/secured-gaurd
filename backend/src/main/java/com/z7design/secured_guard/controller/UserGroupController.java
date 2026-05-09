@@ -4,9 +4,11 @@ import com.z7design.secured_guard.dto.UserGroupDTO;
 import com.z7design.secured_guard.dto.UserResponseDTO;
 import com.z7design.secured_guard.service.UserGroupService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -40,12 +42,21 @@ public class UserGroupController {
         } catch (IllegalArgumentException e) {
             // Se não for um UUID válido, retornar lista vazia
             return ResponseEntity.ok(List.of());
-        } catch (Exception e) {
+        } catch (Throwable t) {
             // Log do erro para debug
-            System.err.println("Erro ao buscar grupos do usuário " + userId + ": " + e.getMessage());
-            e.printStackTrace();
-            // Retornar lista vazia em caso de erro para não quebrar o frontend
-            return ResponseEntity.ok(List.of());
+            System.err.println("ERRO CRÍTICO ao buscar grupos do usuário " + userId + ": " + t.getMessage());
+            t.printStackTrace();
+            
+            // Tentar identificar a causa raiz
+            String rootMsg = t.getMessage();
+            if (t.getCause() != null) {
+                rootMsg += " | Cause: " + t.getCause().getMessage();
+            }
+            
+            // Retornar 500 com a mensagem para debug se for o caso
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .header("X-Error-Message", rootMsg)
+                    .body(new ArrayList<UserGroupDTO>());
         }
     }
     

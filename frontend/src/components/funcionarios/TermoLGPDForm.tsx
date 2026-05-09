@@ -67,9 +67,18 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
               phone: emp.phone,
               registrationNumber: emp.registrationNumber,
               hireDate: emp.hireDate,
+              rg: emp.rg,
               positionName: emp.position?.name,
               unitName: emp.unit?.name,
-              address: emp.address
+              departmentName: emp.department?.name,
+              workPostId: (emp as any).workPostId || emp.workPost?.id,
+              workPostName: (emp as any).workPostName || emp.workPost?.name,
+              companyId: emp.company?.id,
+              companySigla: emp.company?.sigla,
+              address: emp.address,
+              salario: emp.salario,
+              escalaTrabalho: emp.escalaTrabalho,
+              horarioTrabalho: emp.horarioTrabalho,
             } as SimpleEmployee);
           }
         } catch (error) {
@@ -134,23 +143,49 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
     setLoading(true);
     try {
-      const addressValue = funcionario.address || '';
+      const address = funcionario.address;
+      let employeeAddress = '';
+      let employeeNumber = '';
+      let employeeComplement = '';
+      let employeeNeighborhood = '';
+      let employeeCity = '';
+      let employeeState = '';
+      let employeeCep = '';
+
+      if (typeof address === 'object' && address !== null) {
+        employeeAddress = (address as any).street || '';
+        employeeNumber = (address as any).number || '';
+        employeeComplement = (address as any).complement || '';
+        employeeNeighborhood = (address as any).neighborhood || '';
+        employeeCity = (address as any).city || '';
+        employeeState = (address as any).state || '';
+        employeeCep = (address as any).zipCode || '';
+      } else {
+        employeeAddress = String(address || '');
+      }
+
 
       const payload = {
         companyId: empresa.id,
         employeeId: funcionario.id,
         employeeName: funcionario.name,
         employeeCpf: funcionario.cpf || (funcionario as any).document || '',
+        employeeRg: funcionario.rg || '',
         employeePosition: (funcionario as any).positionName || (funcionario as any).position?.name || '',
-        employeeDepartment: (funcionario as any).unitName || (funcionario as any).unit?.name || (funcionario as any).positionName || '',
-        employeeAddress: addressValue,
+        employeeAddress: employeeAddress,
+        employeeNumber: employeeNumber,
+        employeeComplement: employeeComplement,
+        employeeNeighborhood: employeeNeighborhood,
+        employeeCity: employeeCity,
+        employeeState: employeeState,
+        employeeCep: employeeCep,
 
         consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
         dataUsagePurpose: formData.dataUsage,
         retentionPeriod: formData.dataRetention,
         additionalInformation: formData.additionalInfo,
         consentDate: formData.consentDate,
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : ''
+        city: empresa.city || '',
       };
 
       const response = await api.post('/api/lgpd-consent/generate-pdf', payload, {
@@ -196,23 +231,48 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
 
     setLoading(true);
     try {
-      const addressValue = funcionario.address || '';
+      const address = funcionario.address;
+      let employeeAddress = '';
+      let employeeNumber = '';
+      let employeeComplement = '';
+      let employeeNeighborhood = '';
+      let employeeCity = '';
+      let employeeState = '';
+      let employeeCep = '';
+
+      if (typeof address === 'object' && address !== null) {
+        employeeAddress = (address as any).street || '';
+        employeeNumber = (address as any).number || '';
+        employeeComplement = (address as any).complement || '';
+        employeeNeighborhood = (address as any).neighborhood || '';
+        employeeCity = (address as any).city || '';
+        employeeState = (address as any).state || '';
+        employeeCep = (address as any).zipCode || '';
+      } else {
+        employeeAddress = String(address || '');
+      }
 
       const payload = {
         companyId: empresa.id,
         employeeId: funcionario.id,
         employeeName: funcionario.name,
         employeeCpf: funcionario.cpf || (funcionario as any).document || '',
+        employeeRg: funcionario.rg || '',
         employeePosition: (funcionario as any).positionName || (funcionario as any).position?.name || '',
-        employeeDepartment: (funcionario as any).unitName || (funcionario as any).unit?.name || (funcionario as any).positionName || '',
-        employeeAddress: addressValue,
+        employeeAddress: employeeAddress,
+        employeeNumber: employeeNumber,
+        employeeComplement: employeeComplement,
+        employeeNeighborhood: employeeNeighborhood,
+        employeeCity: employeeCity,
+        employeeState: employeeState,
+        employeeCep: employeeCep,
 
         consentTypes: formData.consentTypes.map(id => consentOptions.find(opt => opt.id === id)?.label || id),
         dataUsagePurpose: formData.dataUsage,
         retentionPeriod: formData.dataRetention,
         additionalInformation: formData.additionalInfo,
         consentDate: formData.consentDate,
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : ''
+        city: empresa.city || '',
       };
 
       const response = await api.post('/api/lgpd-consent/preview-pdf', payload, {
@@ -399,7 +459,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
+                      {funcionario.unitName || (funcionario as any).workPostName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
                     </div>
                   </div>
                 </div>

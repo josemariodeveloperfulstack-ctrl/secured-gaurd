@@ -35,6 +35,54 @@ public class EPIDeliveryFormController {
 
     private final EPIDeliveryFormService epiDeliveryFormService;
     private final EPIDeliveryStandardPdfService epiDeliveryPdfService;
+    private final com.z7design.secured_guard.repository.UserRepository userRepository;
+    private final com.z7design.secured_guard.service.EPIDeliveryReportService epiDeliveryReportService;
+
+    @Operation(summary = "Exportar relatório analítico de EPIs para Excel")
+    @GetMapping("/report/export")
+    public ResponseEntity<byte[]> exportReport(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) UUID companyId,
+            @RequestParam(required = false) UUID sectorId,
+            @RequestParam(required = false) String reportType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            log.info("📊 Exportando relatório de EPIs, tipo: {}", reportType);
+            byte[] report = epiDeliveryReportService.generateAnalyticalReport(employeeId, companyId, sectorId, startDate, endDate, reportType);
+            String fileName = "relatorio-epi-" + LocalDate.now() + ".xlsx";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    .body(report);
+        } catch (Exception e) {
+            log.error("❌ Erro ao exportar relatório de EPIs: {}", e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @Operation(summary = "Exportar relatório analítico de EPIs para PDF")
+    @GetMapping("/report/export-pdf")
+    public ResponseEntity<byte[]> exportReportPdf(
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) UUID companyId,
+            @RequestParam(required = false) UUID sectorId,
+            @RequestParam(required = false) String reportType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            log.info("📊 Exportando relatório de EPIs em PDF, tipo: {}", reportType);
+            byte[] report = epiDeliveryReportService.generateAnalyticalReportPdf(employeeId, companyId, sectorId, startDate, endDate, reportType);
+            String fileName = "relatorio-epi-" + LocalDate.now() + ".pdf";
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
+                    .body(report);
+        } catch (Exception e) {
+            log.error("❌ Erro ao exportar relatório de EPIs em PDF: {}", e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
     @Operation(summary = "Cria uma nova ficha de entrega de EPI")
     @PostMapping
@@ -42,16 +90,35 @@ public class EPIDeliveryFormController {
             @RequestBody CreateEPIDeliveryFormDTO dto,
             Authentication authentication) {
         log.info("📝 Recebendo requisição para criar ficha de entrega de EPI");
-
-        UUID createdByUserId = null;
-        if (authentication != null && authentication.getPrincipal() instanceof UserDetails) {
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            // Aqui você precisaria buscar o UUID do usuário pelo username
-            // Por enquanto, vamos deixar null
-        }
-
+        UUID createdByUserId = resolveUserId(authentication);
         EPIDeliveryFormDTO created = epiDeliveryFormService.create(dto, createdByUserId);
         return ResponseEntity.ok(created);
+    }
+
+    @Operation(summary = "Atualiza uma ficha de entrega de EPI")
+    @PutMapping("/{id}")
+    public ResponseEntity<EPIDeliveryFormDTO> update(
+            @PathVariable UUID id,
+            @RequestBody CreateEPIDeliveryFormDTO dto,
+            Authentication authentication) {
+        log.info("📝 Recebendo requisição para atualizar ficha de entrega de EPI: {}", id);
+        UUID updatedByUserId = resolveUserId(authentication);
+        EPIDeliveryFormDTO updated = epiDeliveryFormService.update(id, dto, updatedByUserId);
+        return ResponseEntity.ok(updated);
+    }
+
+    private UUID resolveUserId(Authentication authentication) {
+        if (authentication != null && authentication.getPrincipal() != null) {
+            try {
+                String username = authentication.getName();
+                return userRepository.findByUsername(username)
+                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + username))
+                        .getId();
+            } catch (Exception e) {
+                log.warn("Erro ao obter usuário: {}", e.getMessage());
+            }
+        }
+        return null;
     }
 
     @Operation(summary = "Busca uma ficha de entrega de EPI por ID")

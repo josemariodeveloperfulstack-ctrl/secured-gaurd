@@ -27,6 +27,9 @@ export interface Employee {
   nationality?: string;
   maritalStatus?: string;
   salario?: number;
+  diasTrabalho?: string;
+  horarioTrabalho?: string;
+  escalaTrabalho?: string;
   createdAt?: string;
   updatedAt?: string;
   rg?: string;
@@ -69,6 +72,10 @@ export interface SimpleEmployee {
   departmentName?: string;
   workPostName?: string;
   workPostId?: string;
+  salario?: number;
+  diasTrabalho?: string;
+  horarioTrabalho?: string;
+  escalaTrabalho?: string;
 }
 
 export interface EmployeeFilters {
@@ -241,10 +248,33 @@ export const employeeService = {
         }));
       }
 
-      return [];
+      return data.map((emp: any) => ({
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        phone: emp.phone,
+        document: emp.document,
+        workPostId: emp.workPostId || emp.workPost?.id,
+        workPostName: emp.workPostName || emp.workPost?.name
+      }));
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
       return [];
+    }
+  },
+
+  /**
+   * Exportar histórico de movimentações (funcionário) para PDF
+   */
+  async exportEmployeeHistoryPDF(employeeId: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/employees/${employeeId}/generate-history-pdf`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar PDF de histórico do funcionário:', error);
+      throw error;
     }
   },
 

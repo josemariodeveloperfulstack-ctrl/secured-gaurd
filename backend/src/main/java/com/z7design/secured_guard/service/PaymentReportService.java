@@ -18,8 +18,10 @@ import com.z7design.secured_guard.model.enums.ScheduledPaymentStatus;
 import com.z7design.secured_guard.repository.AccountsReceivableRepository;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.ScheduledPaymentRepository;
+import com.z7design.secured_guard.repository.UnitRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
+import com.z7design.secured_guard.model.Unit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,6 +50,7 @@ public class PaymentReportService {
     private final JasperReportService jasperReportService;
     private final StandardReportLayoutService standardReportLayoutService;
     private final CompanyRepository companyRepository;
+    private final UnitRepository unitRepository;
 
     /**
      * Gerar relatório de contas a receber
@@ -58,25 +63,26 @@ public class PaymentReportService {
             String paymentMethodFilter,
             BigDecimal amountMin,
             BigDecimal amountMax,
+            String unitFilter,
             List<String> selectedIds,
             String reportSegment) throws IOException {
         String normalizedSegment = normalizeReceivableReportSegment(reportSegment);
         log.info(
-                "Gerando relatório PDF de contas a receber com layout padrão - Período: {} a {}, Cliente: {}, Status: {}, Segmento: {}, Categoria: {}, Método: {}, Valor: {} a {}, IDs: {}",
-                startDate, endDate, clientFilter, statusFilter, normalizedSegment, categoryFilter, paymentMethodFilter,
+                "Gerando relatório PDF de contas a receber com layout padrão - Período: {} a {}, Cliente: {}, Empresa/Filial: {}, Status: {}, Segmento: {}, Categoria: {}, Método: {}, Valor: {} a {}, IDs: {}",
+                startDate, endDate, clientFilter, unitFilter, statusFilter, normalizedSegment, categoryFilter, paymentMethodFilter,
                 amountMin, amountMax, selectedIds);
 
         try {
             // Buscar dados com filtros
             List<AccountsReceivable> accounts = getAccountsReceivableFiltered(
-                    startDate, endDate, clientFilter, statusFilter, categoryFilter,
+                    startDate, endDate, clientFilter, unitFilter, statusFilter, categoryFilter,
                     paymentMethodFilter, amountMin, amountMax, selectedIds, normalizedSegment);
 
             log.info("Dados obtidos: {} contas a receber", accounts.size());
 
             // Usar iText com layout padrão
             return generateAccountsReceivableReportPDFWithIText(
-                    accounts, startDate, endDate, clientFilter, statusFilter,
+                    accounts, startDate, endDate, clientFilter, unitFilter, statusFilter,
                     categoryFilter, paymentMethodFilter, amountMin, amountMax, normalizedSegment);
 
         } catch (Exception e) {
@@ -92,6 +98,7 @@ public class PaymentReportService {
             LocalDate startDate,
             LocalDate endDate,
             String clientFilter,
+            String unitFilter,
             String statusFilter,
             String categoryFilter,
             String paymentMethodFilter,
@@ -146,9 +153,24 @@ public class PaymentReportService {
             document.add(reportInfo);
 
             // Filtros aplicados
-            if (startDate != null || endDate != null || clientFilter != null || statusFilter != null ||
+            if (startDate != null || endDate != null || clientFilter != null || unitFilter != null || statusFilter != null ||
                     categoryFilter != null || paymentMethodFilter != null || amountMin != null || amountMax != null
                     || reportSegment != null) {
+                if (unitFilter != null && !unitFilter.isEmpty() && !unitFilter.equalsIgnoreCase("all")) {
+                    String unitName = unitFilter;
+                    try {
+                        UUID unitId = UUID.fromString(unitFilter);
+                        Optional<Unit> unit = unitRepository.findById(unitId);
+                        if (unit.isPresent()) {
+                            unitName = unit.get().getName();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Erro ao buscar nome da filial para relatório: {}", unitFilter);
+                    }
+                    document.add(new Paragraph("Empresa: " + unitName)
+                            .setFontSize(10)
+                            .setMarginBottom(2));
+                }
                 if (reportSegment != null) {
                     document.add(new Paragraph("Tipo de relatório: " + receivableReportSegmentLabel(reportSegment))
                             .setFontSize(10)
@@ -557,8 +579,23 @@ public class PaymentReportService {
         if (reportSegment != null && !reportSegment.isEmpty()) {
             return matchesReceivableReportSegment(account, reportSegment);
         }
-        return statusFilter == null || statusFilter.isEmpty() || statusFilter.equals("ALL") ||
-                account.getStatus().toString().equals(statusFilter);
+        if (statusFilter == null || statusFilter.isEmpty() || statusFilter.equalsIgnoreCase("ALL")) {
+            return true;
+        }
+
+        String accountStatus = account.getStatus().toString();
+        if (accountStatus.equalsIgnoreCase(statusFilter)) {
+            return true;
+        }
+
+        // Mapeamento de status do frontend
+        return switch (statusFilter.toUpperCase(Locale.ROOT)) {
+            case "ABERTA" -> account.getStatus() == ReceivableStatus.PENDING || account.getStatus() == ReceivableStatus.PARTIAL;
+            case "RECEBIDA" -> account.getStatus() == ReceivableStatus.PAID;
+            case "VENCIDA" -> account.getStatus() == ReceivableStatus.OVERDUE;
+            case "CANCELADA" -> account.getStatus() == ReceivableStatus.CANCELLED;
+            default -> false;
+        };
     }
 
     private String receivableReportTitleForSegment(String segment) {
@@ -593,6 +630,7 @@ public class PaymentReportService {
     private List<AccountsReceivable> getAccountsReceivableFiltered(LocalDate startDate,
             LocalDate endDate,
             String clientFilter,
+            String unitFilter,
             String statusFilter,
             String categoryFilter,
             String paymentMethodFilter,
@@ -605,16 +643,18 @@ public class PaymentReportService {
 
         // Aplicar filtros
         return accounts.stream()
-                .filter(account -> startDate == null || !account.getIssueDate().isBefore(startDate))
-                .filter(account -> endDate == null || !account.getIssueDate().isAfter(endDate))
+                .filter(account -> startDate == null || !account.getDueDate().isBefore(startDate))
+                .filter(account -> endDate == null || !account.getDueDate().isAfter(endDate))
                 .filter(account -> clientFilter == null || clientFilter.isEmpty() ||
                         account.getClient().getName().toLowerCase().contains(clientFilter.toLowerCase()))
+                .filter(account -> unitFilter == null || unitFilter.isEmpty() || unitFilter.equalsIgnoreCase("all") ||
+                        (account.getUnit() != null && account.getUnit().getId().toString().equals(unitFilter)))
                 .filter(account -> matchesReceivableStatusOrSegment(account, statusFilter, reportSegment))
-                .filter(account -> categoryFilter == null || categoryFilter.isEmpty() || categoryFilter.equals("ALL") ||
-                        account.getCategory().toString().equals(categoryFilter))
+                .filter(account -> categoryFilter == null || categoryFilter.isEmpty() || categoryFilter.equalsIgnoreCase("ALL") ||
+                        account.getCategory().toString().equalsIgnoreCase(categoryFilter))
                 .filter(account -> paymentMethodFilter == null || paymentMethodFilter.isEmpty()
-                        || paymentMethodFilter.equals("ALL") ||
-                        account.getPaymentMethod().toString().equals(paymentMethodFilter))
+                        || paymentMethodFilter.equalsIgnoreCase("ALL") ||
+                        account.getPaymentMethod().toString().equalsIgnoreCase(paymentMethodFilter))
                 .filter(account -> amountMin == null || account.getAmount().compareTo(amountMin) >= 0)
                 .filter(account -> amountMax == null || account.getAmount().compareTo(amountMax) <= 0)
                 .filter(account -> selectedIds == null || selectedIds.isEmpty() ||

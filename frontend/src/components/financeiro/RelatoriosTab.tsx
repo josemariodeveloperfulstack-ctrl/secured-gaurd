@@ -1148,7 +1148,7 @@ const RelatoriosTab: React.FC = () => {
 
       {/* Modal de Configuração */}
       <Dialog open={showConfigModal} onOpenChange={setShowConfigModal}>
-        <DialogContent className="sm:max-w-[600px] bg-seguranca-black text-seguranca-lightgray border-gray-700">
+        <DialogContent className="sm:max-w-[600px] w-[95vw] max-h-[90vh] overflow-y-auto bg-seguranca-black text-seguranca-lightgray border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-seguranca-yellow flex items-center gap-2 text-xl">
               <Settings size={24} />
@@ -1166,7 +1166,7 @@ const RelatoriosTab: React.FC = () => {
                 <Calendar className="text-blue-500" />
                 Período do Relatório
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Data Início</label>
                   <Input
@@ -1194,7 +1194,7 @@ const RelatoriosTab: React.FC = () => {
                 <Filter className="text-blue-500" />
                 Filtros Adicionais
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Status</label>
                   <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
@@ -1306,19 +1306,19 @@ const RelatoriosTab: React.FC = () => {
             </div>
 
             {/* Botões */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-600">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-600">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setShowConfigModal(false)}
-                className="text-seguranca-lightgray border-gray-600 hover:bg-seguranca-graphite"
+                className="w-full sm:w-auto text-seguranca-lightgray border-gray-600 hover:bg-seguranca-graphite order-2 sm:order-1"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleConfirmarGeracao}
                 disabled={loading}
-                className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90 font-medium"
+                className="w-full sm:w-auto bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90 font-medium order-1 sm:order-2"
               >
                 {loading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-black mr-2"></div>

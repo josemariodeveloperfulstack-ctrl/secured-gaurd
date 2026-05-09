@@ -3,6 +3,8 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.StockItemDTO;
 import com.z7design.secured_guard.dto.StockMovementDTO;
 import com.z7design.secured_guard.dto.StockAlertDTO;
+import com.z7design.secured_guard.dto.StockDashboardDTO;
+import com.z7design.secured_guard.dto.StockMovementChartDTO;
 import com.z7design.secured_guard.dto.PhysicalInventoryImportResultDTO;
 import com.z7design.secured_guard.dto.InventoryRequisitionSummaryDTO;
 import com.z7design.secured_guard.model.enums.StockCategory;
@@ -12,6 +14,7 @@ import com.z7design.secured_guard.service.StockService;
 import com.z7design.secured_guard.service.StockReportService;
 import com.z7design.secured_guard.service.StockPhysicalInventoryImportService;
 import com.z7design.secured_guard.service.StockItemInventoryImportService;
+import com.z7design.secured_guard.service.StockDashboardService;
 import com.z7design.secured_guard.repository.UserRepository;
 import java.io.IOException;
 
@@ -50,6 +53,7 @@ public class StockController {
     private final StockReportService stockReportService;
     private final StockPhysicalInventoryImportService stockPhysicalInventoryImportService;
     private final StockItemInventoryImportService stockItemInventoryImportService;
+    private final StockDashboardService stockDashboardService;
     private final UserRepository userRepository;
 
     // ===== ITENS DE ESTOQUE =====
@@ -110,6 +114,31 @@ public class StockController {
         log.info("GET /api/stock/items/qr/{} - Buscando item por QR Code", qrCode);
         StockItemDTO item = stockService.getItemByQrCode(qrCode);
         return ResponseEntity.ok(item);
+    }
+
+    @PatchMapping("/items/qr/{qrCode}/inventory-adjust")
+    @Operation(summary = "Ajustar inventário via QR Code", description = "Ajusta a quantidade física de um item via leitura de QR Code")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    public ResponseEntity<StockMovementDTO> adjustInventoryViaQrCode(
+            @Parameter(description = "QR Code do item") @PathVariable String qrCode,
+            @RequestBody Map<String, Integer> payload,
+            Authentication authentication) {
+
+        Integer physicalQuantity = payload.get("physicalQuantity");
+        if (physicalQuantity == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        log.info("PATCH /api/stock/items/qr/{}/inventory-adjust - Ajustando quantidade física para {}", qrCode, physicalQuantity);
+        UUID userId = resolveStockUserId(authentication);
+        StockMovementDTO movement = stockService.adjustInventoryViaQrCode(qrCode, physicalQuantity, userId);
+        
+        if (movement == null) {
+            // Se não houve alteração (quantidade igual), podemos retornar 204 ou o estado atual do item
+            return ResponseEntity.noContent().build();
+        }
+        
+        return ResponseEntity.ok(movement);
     }
 
     @PostMapping("/items")
@@ -350,6 +379,16 @@ public class StockController {
         return ResponseEntity.ok(report);
     }
 
+    @GetMapping("/dashboard")
+    @Operation(summary = "Dashboard de estoque", description = "Retorna dados analíticos para gráficos e indicadores")
+    public ResponseEntity<StockDashboardDTO> getStockDashboard(
+            @RequestParam("companyId") UUID companyId,
+            @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        log.info("GET /api/stock/dashboard - Buscando dados analíticos");
+        return ResponseEntity.ok(stockDashboardService.getDashboardData(companyId, start, end));
+    }
+
     @GetMapping("/reports/item/{itemId}")
     @Operation(summary = "Relatório por item", description = "Retorna relatório detalhado de um item específico")
     public ResponseEntity<com.z7design.secured_guard.dto.StockItemReportDTO> getItemReport(@PathVariable UUID itemId) {
@@ -524,6 +563,32 @@ public class StockController {
         return ResponseEntity.ok()
                 .header("Content-Type", "application/pdf")
                 .header("Content-Disposition", "attachment; filename=relatorio-estoque-consolidado.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/physical-inventory/pdf")
+    @Operation(summary = "Gerar Planilha de Conferência Física")
+    public ResponseEntity<byte[]> getPhysicalInventoryWorksheetPDF(@RequestParam("companyId") UUID companyId) throws IOException {
+        log.info("GET /api/stock/reports/physical-inventory/pdf - Gerando planilha de conferência");
+        byte[] pdf = stockReportService.generatePhysicalInventoryWorksheetPDF(companyId);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=planilha-conferencia-estoque.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/consolidated-requisitions/pdf")
+    @Operation(summary = "Gerar Relatório de Requisições Consolidadas")
+    public ResponseEntity<byte[]> getConsolidatedRequisitionsPDF(
+            @RequestParam("companyId") UUID companyId,
+            @RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam("end") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end)
+            throws IOException {
+        log.info("GET /api/stock/reports/consolidated-requisitions/pdf - Gerando relatório de requisições");
+        byte[] pdf = stockReportService.generateConsolidatedRequisitionsPDF(companyId, start, end);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=requisicoes-consolidadas.pdf")
                 .body(pdf);
     }
 

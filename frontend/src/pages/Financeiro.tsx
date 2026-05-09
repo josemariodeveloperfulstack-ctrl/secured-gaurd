@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { StandardLayout } from '@/components/StandardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions } from '@/types/user';
@@ -10,8 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Search, Filter, Eye, DollarSign, TrendingUp, TrendingDown, Calendar, Loader2, BarChart3, LayoutDashboard, Receipt, Layers, Activity, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { FinanceiroDashboard } from '@/components/financeiro/FinanceiroDashboard';
-import ContasAPagarTab from '@/components/financeiro/ContasAPagarTab';
-import ContasAReceberTab from '@/components/financeiro/ContasAReceberTab';
+import ContasAPagar from '@/components/financeiro/ContasAPagar';
+import ContasAReceber from '@/components/financeiro/ContasAReceber';
 import FluxoCaixaTab from '@/components/financeiro/FluxoCaixaTab';
 import PagamentosTab from '@/components/financeiro/PagamentosTab';
 import RelatoriosTab from '@/components/financeiro/RelatoriosTab';
@@ -148,11 +148,11 @@ const FinanceiroSimple: React.FC = () => {
             </TabsContent>
 
             <TabsContent value="contas-pagar">
-              <ContasAPagarTab />
+              <ContasAPagar />
             </TabsContent>
 
             <TabsContent value="contas-receber">
-              <ContasAReceberTab />
+              <ContasAReceber />
             </TabsContent>
 
             <TabsContent value="fluxo-caixa">

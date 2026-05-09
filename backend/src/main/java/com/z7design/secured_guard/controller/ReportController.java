@@ -491,7 +491,7 @@ public class ReportController {
                 effectiveSegment = "INADIMPLENCIA";
             }
             byte[] pdf = paymentReportService.generateAccountsReceivableReportPDF(
-                    startDate, endDate, client, status, null, null, null, null, null, effectiveSegment);
+                    startDate, endDate, client, status, null, null, null, null, null, null, effectiveSegment);
             String filename = accountsReceivablePdfFilename(effectiveSegment);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)

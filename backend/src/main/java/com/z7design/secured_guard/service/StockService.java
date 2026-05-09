@@ -39,6 +39,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+
 
 import com.z7design.secured_guard.model.StorageShelf;
 import jakarta.persistence.criteria.Predicate;
@@ -66,9 +69,13 @@ public class StockService {
     private final StockRequisitionPdfService stockRequisitionPdfService;
     private final EmailService emailService;
     private final PersonalProtectiveEquipmentRepository epiRepository;
-    private final EPIDeliveryFormService epiDeliveryFormService;
+
+    @Autowired
+    @Lazy
+    private EPIDeliveryFormService epiDeliveryFormService;
 
     // ===== GESTÃO DE ITENS =====
+
 
     public List<StockItemDTO> getAllItems() {
         log.info("Buscando todos os itens de estoque");
@@ -118,7 +125,15 @@ public class StockService {
         log.info("Buscando item por QR Code: {}", qrCode);
         StockItem item = stockItemRepository.findByQrCode(qrCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado com QR Code: " + qrCode));
-        return StockItemDTO.fromEntity(item);
+        StockItemDTO dto = StockItemDTO.fromEntity(item);
+        
+        // Buscar localizações para exibir no scanner
+        List<StockItemLocation> locations = stockItemLocationRepository.findByStockItem(item);
+        dto.setLocations(locations.stream()
+                .map(com.z7design.secured_guard.dto.StockItemLocationDTO::fromEntity)
+                .collect(Collectors.toList()));
+                
+        return dto;
     }
 
     public StockItemDTO createItem(StockItemDTO dto) {
@@ -1271,6 +1286,51 @@ public class StockService {
                 .stream()
                 .map(StockMovementDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    public StockMovementDTO adjustInventoryViaQrCode(String qrCode, Integer physicalQuantity, UUID userId) {
+        log.info("Ajustando inventário via QR Code: {}, Quantidade física: {}", qrCode, physicalQuantity);
+        
+        StockItem item = stockItemRepository.findByQrCode(qrCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado com QR Code: " + qrCode));
+                
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + userId));
+                
+        int currentQuantity = item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0;
+        int diff = physicalQuantity - currentQuantity;
+        
+        if (diff == 0) {
+            log.info("Nenhuma diferença detectada para o item: {}. Quantidade permanece {}", item.getName(), currentQuantity);
+            return null; 
+        }
+        
+        StockMovement movement = new StockMovement();
+        movement.setStockItem(item);
+        movement.setUser(user);
+        movement.setMovementDate(LocalDateTime.now());
+        movement.setPreviousQuantity(currentQuantity);
+        movement.setNewQuantity(physicalQuantity);
+        movement.setQuantity(Math.abs(diff));
+        movement.setQrCodeUsed(qrCode);
+        movement.setNotes("Ajuste de inventário via leitura de QR Code");
+        
+        if (diff > 0) {
+            movement.setMovementType(MovementType.ENTRADA);
+            movement.setReason(MovementReason.AJUSTE_ENTRADA);
+        } else {
+            movement.setMovementType(MovementType.SAIDA);
+            movement.setReason(MovementReason.AJUSTE_SAIDA);
+        }
+        
+        movement = stockMovementRepository.save(movement);
+        
+        item.setCurrentQuantity(physicalQuantity);
+        stockItemRepository.save(item);
+        
+        checkAndCreateLowStockAlert(item);
+        
+        return StockMovementDTO.fromEntity(movement);
     }
 
     /**

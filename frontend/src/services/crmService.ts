@@ -16,8 +16,12 @@ export async function updateOpportunity(id, opportunity) {
   return data;
 }
 
-export async function deleteOpportunity(id) {
-  await api.delete(`/opportunities/${id}`);
+export async function deleteOpportunity(id, reason = "Exclusão individual") {
+  await api.delete(`/api/opportunities/${id}?reason=${encodeURIComponent(reason)}`);
+}
+
+export async function deleteMultipleOpportunities(ids, reason = "Exclusão em massa") {
+  await api.post('/api/opportunities/bulk-delete', { ids, reason });
 }
 
 // Status do Kanban

@@ -1,5 +1,6 @@
 package com.z7design.secured_guard;
 
+// Force recompile to resolve ClassLoader issues
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;

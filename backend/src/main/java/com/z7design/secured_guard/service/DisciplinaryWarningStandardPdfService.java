@@ -45,6 +45,7 @@ public class DisciplinaryWarningStandardPdfService {
                                         .companyId(request.getCompanyId())
                                         .reportTitle(REPORT_TITLE)
                                         .includeEmailInFooter(true)
+                                        .marginExtraTop(-35f)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -105,11 +106,12 @@ public class DisciplinaryWarningStandardPdfService {
         private void addContent(Document document, DisciplinaryWarningRequest request, Company company) {
                 // Seção: Identificação do Funcionário
                 document.add(createSectionHeader("IDENTIFICAÇÃO DO FUNCIONÁRIO"));
-                Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
+                Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 60, 40 }))
                                 .useAllAvailableWidth();
                 employeeTable.addCell(createLabelValueCell("NOME:", request.getEmployeeName()));
                 employeeTable.addCell(createLabelValueCell("CPF:", request.getEmployeeCpf()));
                 employeeTable.addCell(createLabelValueCell("CARGO:", request.getEmployeePosition()));
+                employeeTable.addCell(createLabelValueCell("SETOR:", request.getSector()));
                 document.add(employeeTable);
 
                 // Seção: Detalhes da Ocorrência
@@ -137,12 +139,18 @@ public class DisciplinaryWarningStandardPdfService {
                 }
 
                 Paragraph warningText = new Paragraph()
-                                .setFontSize(10f)
-                                .setTextAlignment(TextAlignment.JUSTIFIED)
-                                .setMarginTop(10f);
+                                .setFontSize(11f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                                .setMarginTop(15f)
+                                .setMarginBottom(15f)
+                                .setPadding(15f)
+                                .setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(255, 245, 245))
+                                .setBorder(new com.itextpdf.layout.borders.SolidBorder(com.itextpdf.kernel.colors.DeviceRgb.RED, 1.5f));
+                
                 warningText.add("Pela presente, aplicamos-lhe a pena de ");
-                warningText.add(new Text("ADVERTÊNCIA DISCIPLINAR").setBold());
-                warningText.add(" em razão da ocorrência acima descrita. Esclarecemos que a reincidência em falta desta natureza ou o cometimento de outras infrações poderá ensejar medidas disciplinares mais severas, inclusive a suspensão ou rescisão do contrato de trabalho por justa causa, conforme previsto no artigo 482 da Consolidação das Leis do Trabalho (CLT).");
+                warningText.add(new Text("ADVERTÊNCIA DISCIPLINAR").setBold().setFontColor(com.itextpdf.kernel.colors.DeviceRgb.RED));
+                warningText.add(" em razão da ocorrência acima descrita.\n\n");
+                warningText.add(new Text("Esclarecemos que a reincidência em falta desta natureza ou o cometimento de outras infrações poderá ensejar medidas disciplinares mais severas, inclusive a suspensão ou rescisão do contrato de trabalho por justa causa, conforme previsto no artigo 482 da Consolidação das Leis do Trabalho (CLT).").setFontSize(9f).setItalic());
                 document.add(warningText);
 
                 document.add(new Paragraph("Solicitamos que V.S.a aponha seu ciente na cópia deste documento.")

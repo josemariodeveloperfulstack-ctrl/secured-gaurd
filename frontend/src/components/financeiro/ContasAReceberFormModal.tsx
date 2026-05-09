@@ -673,7 +673,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
               <Tag size={18} />
               Classificação
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
               {/* Categoria */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
@@ -710,7 +710,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                       >
                         Nenhuma categoria
                       </SelectItem>
-                      {/* Categorias padrão do enum */}
                       {[
                         { value: 'INVOICE', label: 'Fatura' },
                         { value: 'NOTE', label: 'Nota Fiscal' },
@@ -727,7 +726,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                           {cat.label}
                         </SelectItem>
                       ))}
-                      {/* Categorias customizadas */}
                       {categories.filter(cat => !['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER'].includes(cat)).map((category) => (
                         <SelectItem 
                           key={category} 
@@ -749,18 +747,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     <Plus size={16} />
                   </Button>
                 </div>
-                {categories.length === 0 && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    Nenhuma categoria cadastrada.{' '}
-                    <button 
-                      type="button" 
-                      className="text-seguranca-yellow underline hover:text-seguranca-yellow/80"
-                      onClick={() => setNewCategoryModalOpen(true)}
-                    >
-                      Cadastrar categoria
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Forma de Pagamento */}
@@ -778,21 +764,34 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     <SelectValue placeholder="Selecione a forma de pagamento" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="PIX" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      PIX
-                    </SelectItem>
-                    <SelectItem value="BOLETO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Boleto
-                    </SelectItem>
-                    <SelectItem value="TRANSFER" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Transferência
-                    </SelectItem>
-                    <SelectItem value="CASH" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Dinheiro
-                    </SelectItem>
-                    <SelectItem value="CARD" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Cartão
-                    </SelectItem>
+                    <SelectItem value="PIX" className="text-seguranca-lightgray hover:bg-seguranca-graphite">PIX</SelectItem>
+                    <SelectItem value="BOLETO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Boleto</SelectItem>
+                    <SelectItem value="TRANSFER" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Transferência</SelectItem>
+                    <SelectItem value="CASH" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Dinheiro</SelectItem>
+                    <SelectItem value="CARD" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cartão</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Tag size={14} />
+                  Status *
+                </label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: any) => handleInputChange('status', value)}
+                  required
+                >
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione o status" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value="ABERTA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pendente / Aberta</SelectItem>
+                    <SelectItem value="RECEBIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pago / Recebida</SelectItem>
+                    <SelectItem value="VENCIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Vencido</SelectItem>
+                    <SelectItem value="CANCELADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -813,20 +812,9 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem
-                      value="NENHUM"
-                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                    >
-                      Nenhum centro de custo
-                    </SelectItem>
+                    <SelectItem value="NENHUM" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Nenhum centro de custo</SelectItem>
                     {costCenters.map((center) => (
-                      <SelectItem
-                        key={center}
-                        value={center}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {center}
-                      </SelectItem>
+                      <SelectItem key={center} value={center} className="text-seguranca-lightgray hover:bg-seguranca-graphite">{center}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

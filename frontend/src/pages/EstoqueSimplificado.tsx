@@ -31,7 +31,7 @@ import StockMovementsTable from '@/components/stock/StockMovementsTable';
 import StockAlertsPanel from '@/components/stock/StockAlertsPanel';
 import StockItemModal from '@/components/stock/StockItemModal';
 import StockMovementModal from '@/components/stock/StockMovementModal';
-import QrCodeScanner from '@/components/stock/QrCodeScanner';
+import StockInventoryScanner from '@/components/stock/StockInventoryScanner';
 import StockReportsContent from '@/components/stock/StockReportsContent';
 import ShelfManagement from '@/components/stock/ShelfManagement';
 import StockRequisitionsPanel from '@/components/stock/StockRequisitionsPanel';
@@ -53,7 +53,7 @@ const EstoqueSimplificado: React.FC = () => {
   // Estados para modais
   const [showItemModal, setShowItemModal] = useState(false);
   const [showMovementModal, setShowMovementModal] = useState(false);
-  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [showInventoryScanner, setShowInventoryScanner] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
 
   // Carregar dados iniciais
@@ -334,11 +334,11 @@ const EstoqueSimplificado: React.FC = () => {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowQrScanner(true)}
+              onClick={() => setShowInventoryScanner(true)}
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
             >
               <QrCode size={16} className="mr-2" />
-              QR Code
+              Sincronizar QR
             </Button>
             
             <Button
@@ -465,10 +465,10 @@ const EstoqueSimplificado: React.FC = () => {
           onSave={handleRefresh}
         />
 
-        <QrCodeScanner
-          open={showQrScanner}
-          onOpenChange={setShowQrScanner}
-          onScan={handleQrCodeScan}
+        <StockInventoryScanner
+          open={showInventoryScanner}
+          onOpenChange={setShowInventoryScanner}
+          onSyncComplete={handleRefresh}
         />
       </div>
     </StandardLayout>

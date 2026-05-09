@@ -117,8 +117,18 @@ export const proposalService = {
     return response.data;
   },
 
-  async deleteProposal(id: number | string): Promise<void> {
-    await api.delete(`/api/proposals/${id}`);
+  async deleteProposal(id: number | string, reason: string): Promise<void> {
+    await api.delete(`/api/proposals/${id}`, { params: { reason } });
+  },
+
+  async deleteProposalsBulk(ids: (number | string)[], reason: string): Promise<void> {
+    await api.delete('/api/proposals/bulk', {
+      data: { ids, reason }
+    });
+  },
+
+  async deleteAllProposals(reason: string): Promise<void> {
+    await api.delete('/api/proposals/all', { params: { reason } });
   },
 
   async getProposalsByStatus(status: string): Promise<Proposal[]> {

@@ -68,9 +68,9 @@ import MeuPerfil from './MeuPerfil';
 import MeuPonto from './MeuPonto';
 import MeusHolerites from './MeusHolerites';
 import MinhasFerias from './MinhasFerias';
-import Certificacoes from './Certificacoes';
+import MeusEPIs from './MeusEPIs';
 
-type TabType = 'dashboard' | 'perfil' | 'ponto' | 'holerites' | 'documentos' | 'treinamentos' | 'ferias' | 'notificacoes';
+type TabType = 'dashboard' | 'perfil' | 'ponto' | 'holerites' | 'documentos' | 'treinamentos' | 'ferias' | 'notificacoes' | 'epis';
 
 const EmployeePortal: React.FC = () => {
   const { user, logout } = useAuth();
@@ -181,6 +181,7 @@ const EmployeePortal: React.FC = () => {
     { id: 'documentos', label: 'Documentos', icon: FileSignature },
     { id: 'treinamentos', label: 'Treinamentos', icon: GraduationCap },
     { id: 'ferias', label: 'Férias', icon: Palmtree },
+    { id: 'epis', label: 'Meus EPIs', icon: HardHat },
     { id: 'notificacoes', label: 'Notificações', icon: Bell },
   ];
 
@@ -331,6 +332,7 @@ const EmployeePortal: React.FC = () => {
       case 'holerites': return <div className="animate-in fade-in duration-500"><MeusHolerites standalone={true} /></div>;
       case 'ferias': return <div className="animate-in fade-in duration-500"><MinhasFerias standalone={true} /></div>;
       case 'treinamentos': return <div className="animate-in fade-in duration-500"><Certificacoes standalone={true} /></div>;
+      case 'epis': return <div className="animate-in fade-in duration-500"><MeusEPIs standalone={true} /></div>;
       case 'documentos':
         return (
           <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in duration-500">

@@ -40,7 +40,9 @@ import {
   Trash2,
   CreditCard,
   BarChart3,
-  PieChart
+  PieChart,
+  FileDown,
+  Check
 } from 'lucide-react';
 import { ContasAReceberGuard } from './FinanceiroPermissionGuard';
 import { ContasAReceberFormModal } from './ContasAReceberFormModal';
@@ -60,6 +62,7 @@ import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth, startOfDa
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { DateRange } from 'react-day-picker';
 import { contasAReceberService, Cliente, ContaAReceber } from '@/services/contasAReceberService';
+import { unitService } from '@/services/unitService';
 
 interface HistoricoCobranca {
   id: string;
@@ -82,6 +85,13 @@ function isStatusAberta(s: string | undefined) {
 }
 function isStatusCancelada(s: string | undefined) {
   return s === 'CANCELADA' || s === 'CANCELLED';
+}
+
+function mapBackendStatusToFrontend(s: string | undefined): 'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA' {
+  if (isStatusRecebida(s)) return 'RECEBIDA';
+  if (isStatusCancelada(s)) return 'CANCELADA';
+  if (isStatusVencida(s)) return 'VENCIDA';
+  return 'ABERTA';
 }
 
 /** Dias até o vencimento (0 = hoje) para considerar "vencendo" em amarelo */
@@ -153,9 +163,15 @@ export const ContasAReceber: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterCliente, setFilterCliente] = useState('all');
-  // Sem período por padrão: filtrar só pelo calendário em "Filtros Avançados" evita lista vazia
-  // quando os vencimentos estão fora do mês atual.
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [filterUnit, setFilterUnit] = useState('all');
+  const [filterAmountMin, setFilterAmountMin] = useState('');
+  const [filterAmountMax, setFilterAmountMax] = useState('');
+  const [units, setUnits] = useState<any[]>([]);
+  // Período por padrão: mês atual (igual ao Contas a Pagar)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
 
   // Estados do modal
   const [showFormModal, setShowFormModal] = useState(false);
@@ -173,6 +189,13 @@ export const ContasAReceber: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const [contaParaMarcarPaga, setContaParaMarcarPaga] = useState<ContaAReceber | null>(null);
+  
+  // Novos estados para alteração de status
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [newStatus, setNewStatus] = useState<'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA'>('ABERTA');
+  const [selectedPaymentDate, setSelectedPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  
   const { toast } = useToast();
 
   const canEditReceivable = Boolean(user?.permissions?.FINANCIAL_RECEIVABLE_WRITE);
@@ -291,12 +314,20 @@ export const ContasAReceber: React.FC = () => {
         params.set('startDate', startDate);
         params.set('endDate', endDate);
       }
+      
+      if (filterStatus !== 'all') params.set('statusFilter', filterStatus);
+      if (filterCliente !== 'all') params.set('clientFilter', filterCliente);
+      if (filterUnit !== 'all') params.set('unitFilter', filterUnit);
+      if (filterCategoria !== 'all') params.set('categoryFilter', filterCategoria);
+      if (filterAmountMin) params.set('amountMin', filterAmountMin);
+      if (filterAmountMax) params.set('amountMax', filterAmountMax);
+      
       if (opts.segment) {
-        params.set('segment', opts.segment);
+        params.set('reportSegment', opts.segment);
       }
 
       const qs = params.toString();
-      const url = `/api/reports/accounts-receivable/pdf${qs ? `?${qs}` : ''}`;
+      const url = `/api/accounts-receivable/reports/pdf${qs ? `?${qs}` : ''}`;
 
       const response = await fetch(url, {
         headers: {
@@ -329,6 +360,83 @@ export const ContasAReceber: React.FC = () => {
       });
     } finally {
       setExportLoading(false);
+    }
+  };
+
+  const downloadSingleAccountPdf = async (conta: ContaAReceber) => {
+    if (!conta.id) return;
+    setExportLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('selectedIds', conta.id);
+      
+      const qs = params.toString();
+      const url = `/api/accounts-receivable/reports/pdf?${qs}`;
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Falha ao gerar PDF');
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `fatura-${conta.invoiceNumber || conta.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      toast({
+        title: 'Sucesso',
+        description: 'PDF da conta gerado com sucesso.'
+      });
+    } catch (error) {
+      console.error('Erro ao gerar PDF individual:', error);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar o PDF. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedConta?.id) return;
+    
+    setUpdatingStatus(true);
+    try {
+      if (newStatus === 'RECEBIDA') {
+        // Se for marcar como paga, usa o método específico que aceita a data
+        await contasAReceberService.markContaAReceberAsPaid(selectedConta.id, selectedPaymentDate);
+      } else {
+        // Para outros status, usa o update genérico
+        await contasAReceberService.updateContaAReceber(selectedConta.id, {
+          status: newStatus
+        });
+      }
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Status da conta atualizado com sucesso!'
+      });
+      loadContas();
+      setShowStatusModal(false);
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o status. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -395,23 +503,23 @@ export const ContasAReceber: React.FC = () => {
     }
   };
 
-  const calcularEstatisticas = () => {
-    const total = contas.length;
-    const valorTotal = contas.reduce((sum, c) => sum + (c?.amount || c?.valor || 0), 0);
-    const valorPago = contas.reduce((sum, c) => sum + (c?.amountPaid || 0), 0);
-    const valorPendente = contas.reduce((sum, c) => sum + (c?.pendingAmount || 0), 0);
-    const vencidas = contas.filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA').length;
-    const valorVencido = contas
+  const calcularEstatisticas = (listaParaCalcular: ContaAReceber[]) => {
+    const total = listaParaCalcular.length;
+    const valorTotal = listaParaCalcular.reduce((sum, c) => sum + (c?.amount || c?.valor || 0), 0);
+    const valorPago = listaParaCalcular.reduce((sum, c) => sum + (c?.amountPaid || 0), 0);
+    const valorPendente = listaParaCalcular.reduce((sum, c) => sum + (c?.pendingAmount || 0), 0);
+    const vencidas = listaParaCalcular.filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA').length;
+    const valorVencido = listaParaCalcular
       .filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA')
       .reduce((sum, c) => sum + (c?.pendingAmount || c?.amount || c?.valor || 0), 0);
 
-    const contasComAtraso = contas.filter(c => (c?.overdueDays || 0) > 0);
+    const contasComAtraso = listaParaCalcular.filter(c => (c?.overdueDays || 0) > 0);
     const mediaAtraso = contasComAtraso.length > 0
       ? contasComAtraso.reduce((sum, c) => sum + (c?.overdueDays || 0), 0) / contasComAtraso.length
       : 0;
 
     // Distribuição por status (somatório de valores por status)
-    const porStatus: Record<string, number> = contas.reduce((acc, conta) => {
+    const porStatus: Record<string, number> = listaParaCalcular.reduce((acc, conta) => {
       if (!conta) return acc;
       const key = conta.status || 'UNKNOWN';
       const valor = typeof conta.amount === 'number' ? conta.amount : (conta.valor || 0);
@@ -448,6 +556,14 @@ export const ContasAReceber: React.FC = () => {
       console.log('Clientes carregados:', clientesData);
       setClientes(clientesData);
 
+      // Carregar filiais (empresas)
+      try {
+        const unitsData = await unitService.getUnits();
+        setUnits(unitsData);
+      } catch (err) {
+        console.error('Erro ao carregar filiais:', err);
+      }
+
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast({
@@ -464,8 +580,6 @@ export const ContasAReceber: React.FC = () => {
   useEffect(() => {
     loadContas();
   }, []);
-
-  const stats = calcularEstatisticas();
 
   // Filtros aplicados
   const filteredContas = contas.filter(conta => {
@@ -487,6 +601,7 @@ export const ContasAReceber: React.FC = () => {
       (filterStatus === 'CANCELADA' && isStatusCancelada(conta.status));
     const matchesCategoria = filterCategoria === 'all' || conta.categoria === filterCategoria;
     const matchesCliente = filterCliente === 'all' || conta.client?.id === filterCliente;
+    const matchesUnit = filterUnit === 'all' || conta.unit?.id === filterUnit || conta.empresaId === filterUnit;
 
     // Filtro por data
     let matchesDate = true;
@@ -500,8 +615,10 @@ export const ContasAReceber: React.FC = () => {
       }
     }
 
-    return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesDate;
+    return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesUnit && matchesDate;
   });
+
+  const stats = calcularEstatisticas(filteredContas);
 
   return (
     <ContasAReceberGuard requiredPermission="VIEW_ACCOUNTS_RECEIVABLE">
@@ -535,11 +652,11 @@ export const ContasAReceber: React.FC = () => {
                     downloadContasReceberPdf({
                       includePeriod: true,
                       filePrefix: 'relatorio-contas-a-receber',
-                      successDescription: 'Relatório por período (data de emissão) gerado com sucesso.'
+                      successDescription: 'Relatório por período (data de vencimento) gerado com sucesso.'
                     })
                   }
                 >
-                  Por período (emissão)
+                  Por período (Vencimento)
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
@@ -664,17 +781,37 @@ export const ContasAReceber: React.FC = () => {
             {/* Filtros Avançados */}
             {showAdvancedFilters && (
               <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-seguranca-lightgray">Período</label>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Período de Vencimento</label>
                     <DatePickerWithRange
                       date={dateRange}
                       onDateChange={setDateRange}
+                      placeholder="Selecione o período"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-seguranca-lightgray">Cliente</label>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Empresa</label>
+                    <Select value={filterUnit} onValueChange={setFilterUnit}>
+                      <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                        <SelectValue placeholder="Selecionar empresa" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Todas as Empresas</SelectItem>
+                        {units && Array.isArray(units) ? units
+                          .filter(unit => unit && unit.id && unit.name)
+                          .map(unit => (
+                            <SelectItem key={unit.id} value={unit.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                              {unit.name}
+                            </SelectItem>
+                          )) : null}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Cliente</label>
                     <Select value={filterCliente} onValueChange={setFilterCliente}>
                       <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                         <SelectValue placeholder="Selecionar cliente" />
@@ -692,22 +829,47 @@ export const ContasAReceber: React.FC = () => {
                     </Select>
                   </div>
 
-                  <div className="flex items-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSearchTerm('');
-                        setFilterStatus('all');
-                        setFilterCategoria('all');
-                        setFilterCliente('all');
-                        setDateRange(undefined);
-                      }}
-                      className="w-full border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Limpar Filtros
-                    </Button>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Valor Mínimo</label>
+                    <Input
+                      type="number"
+                      placeholder="R$ 0,00"
+                      value={filterAmountMin}
+                      onChange={(e) => setFilterAmountMin(e.target.value)}
+                      className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    />
                   </div>
+
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Valor Máximo</label>
+                    <Input
+                      type="number"
+                      placeholder="R$ 0,00"
+                      value={filterAmountMax}
+                      onChange={(e) => setFilterAmountMax(e.target.value)}
+                      className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterStatus('all');
+                      setFilterCategoria('all');
+                      setFilterCliente('all');
+                      setFilterUnit('all');
+                      setFilterAmountMin('');
+                      setFilterAmountMax('');
+                      setDateRange(undefined);
+                    }}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Limpar Filtros
+                  </Button>
                 </div>
 
                 <div className="text-sm text-gray-400">
@@ -1119,20 +1281,29 @@ export const ContasAReceber: React.FC = () => {
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
-                              {(isStatusAberta(conta.status) || isStatusVencida(conta.status)) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
-                                  onClick={() => {
-                                    setSelectedConta(conta);
-                                    setShowCobrancaModal(true);
-                                  }}
-                                  title="Enviar cobrança"
-                                >
-                                  <Send className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                                onClick={() => {
+                                  setSelectedConta(conta);
+                                  setNewStatus(mapBackendStatusToFrontend(conta.status) as any);
+                                  setShowStatusModal(true);
+                                }}
+                                title="Alterar status"
+                              >
+                                <DollarSign className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                                onClick={() => downloadSingleAccountPdf(conta)}
+                                title="Gerar PDF"
+                                disabled={exportLoading}
+                              >
+                                <FileDown className="w-4 h-4" />
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1155,49 +1326,72 @@ export const ContasAReceber: React.FC = () => {
 
         </Tabs>
 
-        {/* Modal de Cobrança */}
-        <Dialog open={showCobrancaModal} onOpenChange={setShowCobrancaModal}>
-          <DialogContent className="max-w-md">
+        {/* Modal de Alteração de Status */}
+        <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
+          <DialogContent className="max-w-md bg-seguranca-graphite border-gray-600 text-white">
             <DialogHeader>
-              <DialogTitle>Enviar Cobrança</DialogTitle>
-              <DialogDescription>
-                Enviar cobrança para {selectedConta?.client?.name || selectedConta?.cliente || 'cliente'}
+              <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
+                <Check className="w-5 h-5" />
+                Alterar Status da Cobrança
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                Atualize o status da conta para {selectedConta?.client?.name || selectedConta?.cliente || 'o cliente'}.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Tipo de Cobrança</label>
-                <Select value={cobrancaTipo} onValueChange={setCobrancaTipo}>
-                  <SelectTrigger>
+                <Label className="text-seguranca-lightgray">Novo Status</Label>
+                <Select value={newStatus} onValueChange={(val: any) => setNewStatus(val)}>
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">E-mail</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="sms">SMS</SelectItem>
+                  <SelectContent className="bg-seguranca-black border-gray-600 text-white">
+                    <SelectItem value="ABERTA">Pendente / Aberta</SelectItem>
+                    <SelectItem value="RECEBIDA">Pago / Recebida</SelectItem>
+                    <SelectItem value="VENCIDA">Vencido</SelectItem>
+                    <SelectItem value="CANCELADA">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label>Mensagem Personalizada</Label>
-                <Textarea
-                  value={cobrancaTexto}
-                  onChange={(e) => setCobrancaTexto(e.target.value)}
-                  placeholder="Digite uma mensagem personalizada (opcional)"
-                  rows={4}
-                />
-              </div>
+              {newStatus === 'RECEBIDA' && (
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Data do Recebimento</Label>
+                  <Input
+                    type="date"
+                    value={selectedPaymentDate}
+                    onChange={(e) => setSelectedPaymentDate(e.target.value)}
+                    className="bg-seguranca-black border-gray-600 text-white"
+                  />
+                </div>
+              )}
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCobrancaModal(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowStatusModal(false)}
+                className="border-gray-600 text-white hover:bg-seguranca-black"
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleCobrancaPersonalizada}>
-                <Send className="w-4 h-4 mr-2" />
-                Enviar Cobrança
+              <Button 
+                onClick={handleUpdateStatus}
+                disabled={updatingStatus}
+                className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-black"
+              >
+                {updatingStatus ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Confirmar Alteração
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

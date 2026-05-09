@@ -341,3 +341,21 @@ export const MovementReasonLabels: Record<MovementReason, string> = {
   [MovementReason.PERDA]: 'Perda',
   [MovementReason.AJUSTE_SAIDA]: 'Ajuste de Estoque - Saída'
 };
+
+export interface StockMovementChartDTO {
+  label: string;
+  entries: number;
+  exits: number;
+}
+
+export interface StockDashboardDTO {
+  totalItems: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  totalQuantity: number;
+  totalValue: number;
+  generatedRequisitionsCount: number;
+  consolidatedRequisitionsCount: number;
+  movementsChart: StockMovementChartDTO[];
+  stockStatusDistribution: Record<string, number>;
+}

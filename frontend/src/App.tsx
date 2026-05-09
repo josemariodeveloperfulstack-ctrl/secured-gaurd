@@ -200,6 +200,7 @@ const MeusHolerites = lazy(() => import('@/pages/MeusHolerites'));
 const MeuPonto = lazy(() => import('@/pages/MeuPonto'));
 const MinhasFerias = lazy(() => import('@/pages/MinhasFerias'));
 const MeusPlantoes = lazy(() => import('@/pages/MeusPlantoes'));
+const MeusEPIs = lazy(() => import('@/pages/MeusEPIs'));
 const Mensagens = lazy(() => import('@/pages/Mensagens'));
 const GestaoMensagens = lazy(() => import('@/pages/GestaoMensagens'));
 const GestaoAtendimento = lazy(() => import('@/pages/GestaoAtendimento'));
@@ -238,6 +239,7 @@ const ControleRondas = lazy(() => import('@/pages/ControleRondas'));
 
 // Módulo Comercial
 const Leads = lazy(() => import('@/pages/Leads'));
+const ComercialMarketing = lazy(() => import('@/pages/ComercialMarketing'));
 const Propostas = lazy(() => import('@/pages/Propostas'));
 const Orcamentos = lazy(() => import('@/pages/Orcamentos'));
 const CrmKanban = lazy(() => import('@/pages/CrmKanban'));
@@ -722,6 +724,13 @@ function App() {
                         <DeliveryManagement />
                       </ProtectedRoute>
                     } />
+                    <Route path="/comercial/marketing" element={
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <ComercialMarketing />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
                     <Route path="/comercial/empresas" element={
                       <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
                         <Empresas />
@@ -1177,6 +1186,13 @@ function App() {
                       <ProtectedRoute>
                         <Suspense fallback={<LoadingSpinner />}>
                           <MeusPlantoes />
+                        </Suspense>
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/meus-epis" element={
+                      <ProtectedRoute>
+                        <Suspense fallback={<LoadingSpinner />}>
+                          <MeusEPIs />
                         </Suspense>
                       </ProtectedRoute>
                     } />

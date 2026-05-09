@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Calculator, 
   Plus, 
@@ -86,6 +87,7 @@ const Orcamentos = () => {
   const [leads, setLeads] = useState<any[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
+  const [selectedQuoteIds, setSelectedQuoteIds] = useState<Set<string | number>>(new Set());
 
   // Form state
   const [formData, setFormData] = useState<CreateQuoteRequest & { status?: string }>({
@@ -373,7 +375,7 @@ const Orcamentos = () => {
   };
 
   // Handle delete quote
-  const handleDeleteQuote = async (quoteId: number) => {
+  const handleDeleteQuote = async (quoteId: number | string) => {
     if (!confirm('Tem certeza que deseja excluir este orçamento?')) return;
     try {
       await quoteService.deleteQuote(quoteId);
@@ -381,6 +383,10 @@ const Orcamentos = () => {
         title: "Sucesso",
         description: "Orçamento excluído com sucesso!",
       });
+      // Remover das seleções se estiver lá
+      const newSelected = new Set(selectedQuoteIds);
+      newSelected.delete(quoteId);
+      setSelectedQuoteIds(newSelected);
       await loadQuotes();
     } catch (error: any) {
       console.error('Erro ao excluir orçamento:', error);
@@ -389,6 +395,78 @@ const Orcamentos = () => {
         description: error.response?.data?.message || "Não foi possível excluir o orçamento.",
         variant: "destructive"
       });
+    }
+  };
+
+  // Handle bulk delete
+  const handleDeleteSelected = async () => {
+    if (selectedQuoteIds.size === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir os ${selectedQuoteIds.size} orçamentos selecionados?`)) return;
+    
+    try {
+      setIsSubmitting(true);
+      await quoteService.deleteQuotesBulk(Array.from(selectedQuoteIds));
+      toast({
+        title: "Sucesso",
+        description: `${selectedQuoteIds.size} orçamentos excluídos com sucesso!`,
+      });
+      setSelectedQuoteIds(new Set());
+      await loadQuotes();
+    } catch (error: any) {
+      console.error('Erro ao excluir orçamentos:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível excluir os orçamentos selecionados.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle delete all
+  const handleDeleteAll = async () => {
+    if (!confirm('ATENÇÃO: Tem certeza que deseja excluir TODOS os orçamentos do sistema? Esta ação não pode ser desfeita.')) return;
+    
+    try {
+      setIsSubmitting(true);
+      await quoteService.deleteAllQuotes();
+      toast({
+        title: "Sucesso",
+        description: "Todos os orçamentos foram excluídos com sucesso!",
+      });
+      setSelectedQuoteIds(new Set());
+      await loadQuotes();
+    } catch (error: any) {
+      console.error('Erro ao excluir todos os orçamentos:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível excluir todos os orçamentos.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle toggle selection
+  const toggleSelectQuote = (id: string | number) => {
+    const newSelected = new Set(selectedQuoteIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedQuoteIds(newSelected);
+  };
+
+  // Handle toggle select all
+  const toggleSelectAll = () => {
+    if (selectedQuoteIds.size === filteredQuotes.length && filteredQuotes.length > 0) {
+      setSelectedQuoteIds(new Set());
+    } else {
+      const allIds = filteredQuotes.map(q => q.id);
+      setSelectedQuoteIds(new Set(allIds));
     }
   };
 
@@ -533,9 +611,32 @@ const Orcamentos = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            {selectedQuoteIds.size > 0 && (
+              <Button 
+                variant="destructive"
+                onClick={handleDeleteSelected}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={isSubmitting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Selecionados ({selectedQuoteIds.size})
+              </Button>
+            )}
+            
+            <Button 
+              variant="outline"
+              className="bg-seguranca-black border-gray-600 text-red-500 hover:text-red-400 hover:bg-gray-800"
+              onClick={handleDeleteAll}
+              disabled={isSubmitting || quotes.length === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Limpar Tudo
+            </Button>
+
             <Button 
               className="bg-seguranca-red hover:bg-seguranca-darkred"
               onClick={() => setIsCreateModalOpen(true)}
+              disabled={isSubmitting}
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Orçamento
@@ -698,6 +799,13 @@ const Orcamentos = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="border-gray-600">
+                          <TableHead className="w-[50px]">
+                            <Checkbox 
+                              checked={selectedQuoteIds.size === filteredQuotes.length && filteredQuotes.length > 0}
+                              onCheckedChange={toggleSelectAll}
+                              className="border-gray-400 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                            />
+                          </TableHead>
                           <TableHead className="text-seguranca-lightgray">Número</TableHead>
                           <TableHead className="text-seguranca-lightgray">Título</TableHead>
                           <TableHead className="text-seguranca-lightgray">Cliente</TableHead>
@@ -712,6 +820,13 @@ const Orcamentos = () => {
                       <TableBody>
                         {filteredQuotes.map((quote) => (
                           <TableRow key={quote.id} className="border-gray-600">
+                            <TableCell>
+                              <Checkbox 
+                                checked={selectedQuoteIds.has(quote.id)}
+                                onCheckedChange={() => toggleSelectQuote(quote.id)}
+                                className="border-gray-400 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                              />
+                            </TableCell>
                             <TableCell className="text-seguranca-lightgray font-medium">
                               {quote.quoteNumber || '-'}
                             </TableCell>
@@ -802,7 +917,7 @@ const Orcamentos = () => {
                                   variant="outline"
                                   size="sm"
                                   className="bg-seguranca-black border-gray-600 text-red-400 hover:text-red-300"
-                                  onClick={() => handleDeleteQuote(Number(quote.id))}
+                                  onClick={() => handleDeleteQuote(quote.id)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>

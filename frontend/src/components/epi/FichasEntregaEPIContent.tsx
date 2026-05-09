@@ -33,7 +33,9 @@ import {
   RefreshCw,
   HardHat,
   Plus,
-  MapPin
+  MapPin,
+  Edit,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { epiDeliveryFormService, EPIDeliveryForm, EPIDeliveryType } from '@/services/epiDeliveryFormService';
@@ -43,6 +45,7 @@ import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import FichaEntregaEPIForm from '@/components/funcionarios/FichaEntregaEPIForm';
+import EPIDeliveryReportModal from './EPIDeliveryReportModal';
 
 const DELIVERY_TYPE_LABELS: Record<string, string> = {
   PRIMEIRA_ENTREGA: 'Primeira Entrega',
@@ -57,6 +60,17 @@ const DELIVERY_TYPE_COLORS: Record<string, string> = {
   DEVOLUCAO: 'bg-amber-100 text-amber-800 border-amber-200',
   TROCA: 'bg-purple-100 text-purple-800 border-purple-200',
 };
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export const FichasEntregaEPIContent: React.FC = () => {
   const { toast } = useToast();
@@ -75,6 +89,12 @@ export const FichasEntregaEPIContent: React.FC = () => {
   const [companyFilter, setCompanyFilter] = useState<string>('');
   const [startDateFilter, setStartDateFilter] = useState<string>('');
   const [endDateFilter, setEndDateFilter] = useState<string>('');
+  const [editingFichaId, setEditingFichaId] = useState<string | null>(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  
+  // Estados para o Modal de Exclusão
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [fichaToDelete, setFichaToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadFichas();
@@ -181,13 +201,16 @@ export const FichasEntregaEPIContent: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta ficha?')) {
-      return;
-    }
+  const handleDelete = (id: string) => {
+    setFichaToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!fichaToDelete) return;
 
     try {
-      await epiDeliveryFormService.delete(id);
+      await epiDeliveryFormService.delete(fichaToDelete);
       toast({
         title: 'Sucesso',
         description: 'Ficha excluída com sucesso!',
@@ -200,8 +223,21 @@ export const FichasEntregaEPIContent: React.FC = () => {
         description: 'Não foi possível excluir a ficha.',
         variant: 'destructive'
       });
+    } finally {
+      setFichaToDelete(null);
+      setDeleteDialogOpen(false);
     }
   };
+
+  const handleEdit = (id: string) => {
+    setEditingFichaId(id);
+    setManualEntryOpen(true);
+  };
+
+  const handleExportReport = () => {
+    setReportModalOpen(true);
+  };
+
 
   const filteredFichas = fichas.filter(ficha => {
     if (!searchTerm) return true;
@@ -253,12 +289,25 @@ export const FichasEntregaEPIContent: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                   <Button
-                    onClick={() => setManualEntryOpen(true)}
+                    onClick={() => {
+                      setEditingFichaId(null);
+                      setManualEntryOpen(true);
+                    }}
                     size="sm"
                     className="flex items-center gap-2 bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
                   >
                     <Plus className="h-4 w-4" />
                     Nova Entrega Manual
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportReport}
+                    className="flex items-center gap-2 text-seguranca-red border-seguranca-red/20 hover:bg-seguranca-red/10"
+                    disabled={loading}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Relatórios Avançados
                   </Button>
                   <Button
                     variant="outline"
@@ -404,6 +453,15 @@ export const FichasEntregaEPIContent: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  onClick={() => handleEdit(ficha.id)}
+                                  className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  title="Editar"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleGeneratePdf(ficha)}
                                   disabled={generatingPdfId === ficha.id}
                                   className="h-8 w-8 p-0"
@@ -490,7 +548,14 @@ export const FichasEntregaEPIContent: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <FichaEntregaEPIForm />
+              <FichaEntregaEPIForm 
+                fichaId={editingFichaId || undefined} 
+                onSuccess={() => {
+                  setManualEntryOpen(false);
+                  setEditingFichaId(null);
+                  loadFichas();
+                }}
+              />
             </CardContent>
           </Card>
         )}
@@ -594,6 +659,38 @@ export const FichasEntregaEPIContent: React.FC = () => {
             )}
           </DialogContent>
         </Dialog>
+        {/* Modal de Confirmação de Exclusão */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="bg-slate-900 border-seguranca-yellow/20 max-w-[400px]">
+            <AlertDialogHeader className="flex flex-col items-center justify-center text-center space-y-4">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
+                <Trash2 className="h-6 w-6 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-xl font-bold text-white">
+                Confirmar Exclusão
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-400 text-base">
+                Tem certeza que deseja excluir esta ficha? <br />
+                Esta ação não poderá ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex flex-row gap-3 mt-6 sm:justify-center">
+              <AlertDialogCancel className="flex-1 bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDelete}
+                className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-bold transition-all"
+              >
+                Sim, Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <EPIDeliveryReportModal 
+          isOpen={reportModalOpen}
+          onClose={() => setReportModalOpen(false)}
+        />
       </div>
     </>
   );

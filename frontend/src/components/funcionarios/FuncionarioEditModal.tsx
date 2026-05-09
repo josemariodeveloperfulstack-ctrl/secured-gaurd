@@ -571,9 +571,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           spouseEmail: employeeData.spouseEmail || '',
           
           // Campos da ficha de registro
-          empresaNome: employeeData.empresaNome || '',
-          empresaEndereco: employeeData.empresaEndereco || '',
-          empresaCnpj: employeeData.empresaCnpj || '',
+          empresaNome: employeeData.empresaNome || (companies.find(c => String(c.id) === String(employeeData.company?.id || (employeeData as any).companyId))?.name || ''),
+          empresaEndereco: employeeData.empresaEndereco || (companies.find(c => String(c.id) === String(employeeData.company?.id || (employeeData as any).companyId))?.address || ''),
+          empresaCnpj: employeeData.empresaCnpj || (companies.find(c => String(c.id) === String(employeeData.company?.id || (employeeData as any).companyId))?.cnpj || ''),
           tituloEleitor: employeeData.tituloEleitor || '',
           tituloEleitorZona: employeeData.tituloEleitorZona || '',
           tituloEleitorSecao: employeeData.tituloEleitorSecao || '',

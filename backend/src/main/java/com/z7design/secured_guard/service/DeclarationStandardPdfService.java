@@ -48,6 +48,7 @@ public class DeclarationStandardPdfService {
                     .companyId(request.getCompanyId())
                     .reportTitle(title)
                     .includeEmailInFooter(true)
+                    .marginExtraTop(-35f)
                     .build();
 
             DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -102,13 +103,12 @@ public class DeclarationStandardPdfService {
     private void addContent(Document document, DeclarationRequest request, Company company) {
         // Seção: Identificação
         document.add(createSectionHeader("IDENTIFICAÇÃO"));
-        Table personTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
+        Table personTable = new Table(UnitValue.createPercentArray(new float[] { 60, 40 }))
                 .useAllAvailableWidth();
         personTable.addCell(createLabelValueCell("NOME:", request.getPersonName()));
         personTable.addCell(createLabelValueCell("CPF:", request.getPersonCpf()));
-        if (request.getPersonPosition() != null && !request.getPersonPosition().isEmpty()) {
-            personTable.addCell(createLabelValueCell("CARGO:", request.getPersonPosition()));
-        }
+        personTable.addCell(createLabelValueCell("CARGO:", request.getPersonPosition()));
+        personTable.addCell(createLabelValueCell("SETOR:", request.getSector()));
         document.add(personTable);
 
         // Seção: Conteúdo da Declaração

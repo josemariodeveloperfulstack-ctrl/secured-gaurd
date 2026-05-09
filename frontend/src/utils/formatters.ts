@@ -8,9 +8,10 @@ export const formatDate = (dateString: string | null | undefined): string => {
     return '-';
   }
   try {
-    // Adicionar T00:00:00 para garantir que a data seja interpretada no fuso horário local
-    // e não seja afetada por ajustes de fuso (ex: UTC-3 fazendo a data voltar um dia).
-    const date = new Date(`${dateString}T00:00:00`);
+    // Adicionar T00:00:00 apenas se não for uma data/hora completa (ISO string)
+    // para evitar "RangeError: Invalid time value" (ex: "2024-07-31T10:00:00.000ZT00:00:00")
+    const isoString = dateString.includes('T') ? dateString : `${dateString}T00:00:00`;
+    const date = new Date(isoString);
     return new Intl.DateTimeFormat('pt-BR').format(date);
   } catch (error) {
     console.error("Erro ao formatar data:", dateString, error);

@@ -60,6 +60,11 @@ const breadcrumbMap: Record<string, BreadcrumbItem[]> = {
     { label: 'Comercial', path: '/leads' },
     { label: 'Leads', path: '/leads' }
   ],
+  '/comercial/marketing': [
+    { label: 'Dashboard', path: '/dashboard', icon: Home },
+    { label: 'Comercial', path: '/leads' },
+    { label: 'Marketing', path: '/comercial/marketing' }
+  ],
   '/clientes': [
     { label: 'Dashboard', path: '/dashboard', icon: Home },
     { label: 'Comercial', path: '/clientes' },

@@ -40,4 +40,11 @@ public class OperationalServiceOrderRequest {
     // Dados Gerais
     private String city;
     private LocalDate documentDate;
+
+    // Segurança e Medicina do Trabalho (NR-01)
+    private String activities;
+    private String risks;
+    private String preventiveMeasures;
+    private String uniform;
+    private String mandatoryTrainings;
 }

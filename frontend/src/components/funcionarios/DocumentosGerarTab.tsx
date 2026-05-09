@@ -85,6 +85,7 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({ employeeId: pro
             return (
               <Button
                 key={t.key}
+                type="button"
                 variant={isActive ? 'default' : 'outline'}
                 onClick={() => setTipo(t.key)}
                 className={`

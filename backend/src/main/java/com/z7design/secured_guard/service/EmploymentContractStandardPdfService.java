@@ -150,13 +150,13 @@ public class EmploymentContractStandardPdfService {
                 if (isExperienceContract(request)) {
                         String raw = experienceTemplateLoader.loadRawTemplate();
                         String filled = fillExperiencePlaceholders(raw, request, company);
-                        appendMultipagePlainText(document, filled);
+                        appendMultipagePlainText(document, filled, request, company);
                         return;
                 }
                 if (isIndefiniteContract(request)) {
                         String raw = experienceTemplateLoader.loadIndefiniteRawTemplate();
                         String filled = fillIndefinitePlaceholders(raw, request, company);
-                        appendMultipagePlainText(document, filled);
+                        appendMultipagePlainText(document, filled, request, company);
                         return;
                 }
 
@@ -318,8 +318,10 @@ public class EmploymentContractStandardPdfService {
 
         /**
          * Quebra o texto em blocos (parágrafos) para o iText fluir em várias páginas com alinhamento justificado.
+         * Detecta o marcador {{ASSINATURAS_DUAS_COLUNAS}} e renderiza assinaturas em duas colunas.
          */
-        private void appendMultipagePlainText(Document document, String text) {
+        private void appendMultipagePlainText(Document document, String text,
+                        EmploymentContractRequest request, Company company) {
                 String normalized = text.replace("\r\n", "\n");
                 document.add(new Paragraph("").setMarginBottom(8f));
                 String[] blocks = normalized.split("\n\n+");
@@ -328,11 +330,70 @@ public class EmploymentContractStandardPdfService {
                         if (b.isEmpty()) {
                                 continue;
                         }
+                        if (b.contains("{{ASSINATURAS_DUAS_COLUNAS}}")) {
+                                addTwoColumnSignatures(document, request, company);
+                                continue;
+                        }
                         document.add(new Paragraph(b)
                                         .setFontSize(9f)
                                         .setTextAlignment(TextAlignment.JUSTIFIED)
                                         .setMarginBottom(6f));
                 }
+        }
+
+        private void addTwoColumnSignatures(Document document, EmploymentContractRequest request, Company company) {
+                String line = "________________________________________";
+                float fontSize = 8f;
+
+                Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 48, 4, 48 }))
+                                .useAllAvailableWidth()
+                                .setMarginTop(15f);
+
+                // Linha 1: Empregador | espaço | Responsável Legal
+                sigTable.addCell(new Cell()
+                                .add(new Paragraph(line).setFontSize(fontSize).setMarginBottom(0f))
+                                .add(new Paragraph(company != null ? company.getName() : "Empregador")
+                                                .setFontSize(fontSize).setBold())
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
+                                .setPaddingBottom(12f));
+                sigTable.addCell(new Cell()
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
+                sigTable.addCell(new Cell()
+                                .add(new Paragraph(line).setFontSize(fontSize).setMarginBottom(0f))
+                                .add(new Paragraph("Responsável Legal (Caso menor de idade)")
+                                                .setFontSize(fontSize))
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
+                                .setPaddingBottom(12f));
+
+                // Linha 2: Empregado | espaço | Testemunha
+                sigTable.addCell(new Cell()
+                                .add(new Paragraph(line).setFontSize(fontSize).setMarginBottom(0f))
+                                .add(new Paragraph(request.getEmployeeName() != null
+                                                ? request.getEmployeeName().toUpperCase() : "Empregado")
+                                                .setFontSize(fontSize).setBold())
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
+                                .setPaddingBottom(12f));
+                sigTable.addCell(new Cell()
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
+                sigTable.addCell(new Cell()
+                                .add(new Paragraph(line).setFontSize(fontSize).setMarginBottom(0f))
+                                .add(new Paragraph("Testemunha")
+                                                .setFontSize(fontSize))
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
+                                .setPaddingBottom(12f));
+
+                // Linha 3: vazio | espaço | Testemunha
+                sigTable.addCell(new Cell()
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
+                sigTable.addCell(new Cell()
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
+                sigTable.addCell(new Cell()
+                                .add(new Paragraph(line).setFontSize(fontSize).setMarginBottom(0f))
+                                .add(new Paragraph("Testemunha")
+                                                .setFontSize(fontSize))
+                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
+
+                document.add(sigTable);
         }
 
         private void addClauseAsSection(Document document, String title, String content) {

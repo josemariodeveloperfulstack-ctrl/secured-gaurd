@@ -36,7 +36,6 @@ import {
   TrendingUp, 
   Package,
   RefreshCw,
-  Upload,
   Trash2,
   SquareMousePointer
 } from 'lucide-react';
@@ -59,7 +58,6 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
 }) => {
   const [items, setItems] = useState<StockItem[]>(Array.isArray(initialItems) ? initialItems : []);
   const [loading, setLoading] = useState(false);
-  const [importingInventory, setImportingInventory] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [lowStockFilter, setLowStockFilter] = useState<string>('all');
@@ -69,7 +67,6 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
   const [confirmBulkOpen, setConfirmBulkOpen] = useState(false);
   const [confirmOneOpen, setConfirmOneOpen] = useState(false);
   const [itemPendingDelete, setItemPendingDelete] = useState<StockItem | null>(null);
-  const inventoryFileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -213,32 +210,6 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
     }
   };
 
-  const handleItemInventoryImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setImportingInventory(true);
-    try {
-      const result = await stockService.importItemInventory(file);
-      const ok = result.lines.filter((l) => !l.skipped).length;
-      const skipped = result.lines.filter((l) => l.skipped).length;
-      const skipPart = skipped > 0 ? `, ${skipped} ignorada(s).` : '.';
-      toast({
-        title: 'Inventário importado',
-        description: `Requisição ${result.requisitionNumber}. ${ok} linha(s) aplicadas${skipPart} Itens que não estão na planilha ficam com estoque zerado.`,
-      });
-      if (result.warnings?.length) {
-        console.warn('Avisos import inventário:', result.warnings);
-      }
-      await Promise.resolve(onRefresh());
-    } catch (err: unknown) {
-      const ax = err as { response?: { data?: { error?: string } } };
-      const msg = ax?.response?.data?.error ?? (err instanceof Error ? err.message : 'Falha no import');
-      toast({ title: 'Erro no import', description: msg, variant: 'destructive' });
-    } finally {
-      setImportingInventory(false);
-    }
-  };
 
   const getStockBadge = (item: StockItem) => {
     if (item.currentQuantity === 0) {
@@ -252,50 +223,6 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
 
   return (
     <div className="space-y-4">
-      <Card className="bg-seguranca-graphite border-gray-600 border-amber-900/40">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-seguranca-lightgray">
-            <Upload className="h-5 w-5 text-amber-500" />
-            Inventário por planilha (cadastro de itens)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-gray-400">
-            Use esta opção para <strong className="text-seguranca-lightgray">substituir o inventário contado</strong>: o sistema{' '}
-            <strong className="text-amber-200/90">zera o estoque de todos os itens ativos</strong> e, em seguida, aplica cada linha do Excel.
-            São lidas <strong className="text-seguranca-lightgray">todas as abas detalhadas</strong> (a aba &quot;Resumo Estoque&quot; é ignorada).{' '}
-            <strong className="text-seguranca-lightgray">Linha a linha:</strong>{' '}
-            <strong className="text-seguranca-lightgray">Código</strong> ou <strong className="text-seguranca-lightgray">Tamanho</strong> (código vira ABA-TAMANHO, ex. CAMISAS-VIGILANCIA-P), mais{' '}
-            <strong className="text-seguranca-lightgray">Estoque</strong> ou <strong className="text-seguranca-lightgray">Quantidade</strong>; opcional <strong>Item</strong>, <strong>Categoria</strong>, <strong>Mín</strong>, <strong>Valor unit.</strong>,{' '}
-            <strong>Prateleira</strong>/<strong>Localização</strong> e <strong>Compartimento</strong>/<strong>Andar</strong>.{' '}
-            <strong className="text-seguranca-lightgray">Matriz Calçados:</strong> coluna <strong>Tamanho</strong> e duas ou mais colunas de modelo (Sapato Segurança, Coturno, etc.) — um item por célula, ex.{' '}
-            <code className="text-seguranca-yellow">CALCADOS-SAPATO-SEGURANCA-34</code>.{' '}
-            <strong className="text-seguranca-lightgray">Descartes:</strong> aba com &quot;Descartes&quot; no nome e colunas <strong>Item</strong> + <strong>Quantidade</strong> (nome importado com prefixo <code className="text-seguranca-yellow">[Descarte]</code>).{' '}
-            Célula no formato <code className="text-seguranca-yellow">1 Min: 2</code> lê quantidade e mínimo automaticamente.
-          </p>
-          <input
-            ref={inventoryFileRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleItemInventoryImport}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            disabled={importingInventory}
-            className="border-amber-700/60 text-seguranca-lightgray hover:bg-seguranca-black"
-            onClick={() => inventoryFileRef.current?.click()}
-          >
-            {importingInventory ? (
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4 mr-2" />
-            )}
-            {importingInventory ? 'Importando…' : 'Selecionar planilha de inventário'}
-          </Button>
-        </CardContent>
-      </Card>
 
       {/* Filtros */}
       <Card className="bg-seguranca-graphite border-gray-600">
@@ -456,11 +383,11 @@ const StockItemsTable: React.FC<StockItemsTableProps> = ({
                       {item.code}
                     </TableCell>
                     
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-seguranca-lightgray">{item.name}</p>
+                    <TableCell className="min-w-0">
+                      <div className="min-w-0 max-w-[300px]">
+                        <p className="font-medium text-seguranca-lightgray truncate" title={item.name}>{item.name}</p>
                         {item.sizeVariation && (
-                          <p className="text-sm text-gray-400">Tamanho: {item.sizeVariation}</p>
+                          <p className="text-sm text-gray-400 truncate">Tamanho: {item.sizeVariation}</p>
                         )}
                       </div>
                     </TableCell>

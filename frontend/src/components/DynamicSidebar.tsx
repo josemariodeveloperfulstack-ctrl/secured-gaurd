@@ -41,6 +41,7 @@ import {
   Wallet,
   ArrowUpDown,
   Target,
+  Megaphone,
   Package,
   ShoppingCart,
   CheckCircle,
@@ -176,6 +177,13 @@ export function DynamicSidebar() {
       to: '/contratos',
       id: 'contratos',
       requiredPermission: 'CONTRACTS_READ'
+    },
+    {
+      icon: Megaphone,
+      text: 'Marketing',
+      to: '/comercial/marketing',
+      id: 'marketing',
+      requiredPermission: 'LEADS_READ'
     },
 
     {
@@ -666,7 +674,7 @@ export function DynamicSidebar() {
         ['empresas', 'filiais', 'clientes', 'fornecedores'].includes(item.id)
       ),
       comercial: filteredItems.filter(item =>
-        ['leads', 'propostas', 'orcamentos', 'contratos', 'crm'].includes(item.id)
+        ['leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm'].includes(item.id)
       ),
       compras: filteredItems.filter(item =>
         ['compras', 'compras-solicitacoes', 'compras-aprovacoes', 'compras-cotacoes', 'compras-relatorios'].includes(item.id)

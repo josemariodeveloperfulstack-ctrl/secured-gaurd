@@ -2,6 +2,7 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.LeadDTO;
 import com.z7design.secured_guard.model.Lead;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import com.z7design.secured_guard.model.enums.LeadSource;
 import com.z7design.secured_guard.service.LeadService;
@@ -162,7 +163,7 @@ public class LeadController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Atualizar status do lead", description = "Atualiza apenas o status de um lead")
-    public ResponseEntity<Lead> updateLeadStatus(@PathVariable String id, @RequestBody Map<String, String> statusUpdate) {
+    public ResponseEntity<Lead> updateLeadStatus(@PathVariable String id, @RequestBody java.util.Map<String, String> statusUpdate) {
         String status = statusUpdate.get("status");
         Lead updatedLead = leadService.updateStatus(UUID.fromString(id), status);
         return ResponseEntity.ok(updatedLead);
@@ -170,8 +171,38 @@ public class LeadController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Excluir lead", description = "Exclui um lead do sistema")
-    public ResponseEntity<Void> deleteLead(@PathVariable String id) {
-        leadService.delete(UUID.fromString(id));
+    public ResponseEntity<Void> deleteLead(@PathVariable String id, @RequestParam String reason) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = leadService.findUserByUsername(username);
+        leadService.delete(UUID.fromString(id), reason, user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/all")
+    @Operation(summary = "Excluir todos os leads", description = "Exclui permanentemente todos os leads do sistema")
+    public ResponseEntity<Void> deleteAllLeads(@RequestParam String reason) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = leadService.findUserByUsername(username);
+        leadService.deleteAll(reason, user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/bulk-delete")
+    @Operation(summary = "Excluir leads em massa", description = "Exclui múltiplos leads do sistema")
+    public ResponseEntity<Void> deleteLeadsBulk(@RequestBody java.util.Map<String, Object> payload) {
+        List<String> idsStr = (List<String>) payload.get("ids");
+        String reason = (String) payload.get("reason");
+        
+        if (reason == null || reason.isEmpty()) {
+            reason = "Exclusão em massa via sistema";
+        }
+        
+        List<UUID> ids = idsStr.stream().map(UUID::fromString).collect(java.util.stream.Collectors.toList());
+        
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = leadService.findUserByUsername(username);
+        
+        leadService.deleteBulk(ids, reason, user);
         return ResponseEntity.noContent().build();
     }
 
@@ -228,8 +259,8 @@ public class LeadController {
 
     @GetMapping("/stats/count-by-status")
     @Operation(summary = "Estatísticas por status", description = "Retorna contagem de leads por status")
-    public ResponseEntity<Map<String, Long>> getCountByStatus() {
-        Map<String, Long> stats = Map.of(
+    public ResponseEntity<java.util.Map<String, Long>> getCountByStatus() {
+        java.util.Map<String, Long> stats = java.util.Map.of(
             "NEW", leadService.countByStatus(LeadStatus.NEW),
             "CONTACTED", leadService.countByStatus(LeadStatus.CONTACTED),
             "QUALIFIED", leadService.countByStatus(LeadStatus.QUALIFIED),
@@ -243,8 +274,8 @@ public class LeadController {
 
     @GetMapping("/stats/count-by-source")
     @Operation(summary = "Estatísticas por fonte", description = "Retorna contagem de leads por fonte")
-    public ResponseEntity<Map<String, Long>> getCountBySource() {
-        Map<String, Long> stats = Map.of(
+    public ResponseEntity<java.util.Map<String, Long>> getCountBySource() {
+        java.util.Map<String, Long> stats = java.util.Map.of(
             "WEBSITE", leadService.countBySource(LeadSource.WEBSITE),
             "REFERRAL", leadService.countBySource(LeadSource.REFERRAL),
             "SOCIAL_MEDIA", leadService.countBySource(LeadSource.SOCIAL_MEDIA),

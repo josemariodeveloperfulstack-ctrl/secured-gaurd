@@ -54,4 +54,6 @@ public interface StockRequisitionRepository extends JpaRepository<StockRequisiti
             WHERE r.id = :id
             """)
     Optional<StockRequisition> findByIdFetched(@Param("id") UUID id);
+
+    long countByStatus(com.z7design.secured_guard.model.enums.StockRequisitionStatus status);
 }

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2, ChevronsUpDown, Check } from 'lucide-react';
+import { FileText, Download, Eye, User, Building, Calendar, Shield, Plus, X, HardHat, Loader2, CheckCircle2, ChevronsUpDown, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { employeeService, SimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
@@ -20,6 +20,10 @@ import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { caepiService, CAEPIResponse } from '@/services/caepiService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
+import SignaturePad from '@/components/SignaturePad';
+import { stockService } from '@/services/stockService';
+import { StockItem } from '@/types/stock';
+import { Switch } from '@/components/ui/switch';
 
 const epiOptions = [
   'Capacete de Segurança',
@@ -54,6 +58,8 @@ const uniformePecasOptions = [
 interface FichaEntregaEPIFormProps {
   employeeId?: string;
   companyId?: string;
+  fichaId?: string;
+  onSuccess?: () => void;
 }
 
 const MIN_EMPLOYEE_SEARCH_CHARS = 3;
@@ -63,29 +69,96 @@ function resolveCompanyIdFromEmployee(emp: SimpleEmployee | undefined): string {
   return emp.companyId || '';
 }
 
+function buildWorkSectorSnapshot(emp: SimpleEmployee | null): string {
+  if (!emp) return '';
+  const parts = [];
+  if (emp.departmentName) parts.push(emp.departmentName);
+  if (emp.unitName) parts.push(emp.unitName);
+  if (emp.positionName) parts.push(emp.positionName);
+  return parts.filter(Boolean).join(' / ').toUpperCase();
+}
 
-const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, companyId }) => {
+
+const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, companyId, fichaId, onSuccess }) => {
   const { toast } = useToast();
+
+  // Load ficha data if editing
+  useEffect(() => {
+    if (fichaId) {
+      const loadFicha = async () => {
+        try {
+          setLoadingData(true);
+          const ficha = await epiDeliveryFormService.getById(fichaId);
+          setForm({
+            funcionarioId: ficha.employeeId,
+            empresaId: ficha.companyId,
+            dataEntrega: ficha.deliveryDate,
+            responsavelEntregaId: ficha.responsibleEmployeeId || '',
+            observacoes: ficha.observations || '',
+            status: ficha.status || 'DRAFT',
+            signatureType: ficha.signatureType || 'ON_SCREEN',
+            signatureBase64: '', // Signature is not returned for security/storage reasons in edit mode usually, or we can't edit it easily
+          });
+          setEpis(ficha.items.map(item => ({
+            nome: item.epiName,
+            quantidade: String(item.quantity),
+            ca: item.ca || '',
+            caName: item.caName || '',
+            validade: item.validityDate || '',
+            observacoes: item.observations || '',
+            uniformeTipo: item.uniformType || '',
+            uniformePeca: item.uniformPiece || '',
+            stockItemId: item.stockItemId || '',
+          })));
+          
+          // Trigger data resolution for employee and company
+          const emp = await employeeService.getEmployeeById(ficha.employeeId);
+          setSelectedEmployeeData(emp);
+          
+          if (ficha.responsibleEmployeeId) {
+            const resp = await employeeService.getEmployeeById(ficha.responsibleEmployeeId);
+            setSelectedResponsibleData(resp);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar ficha para edição:', error);
+          toast({
+            title: 'Erro',
+            description: 'Não foi possível carregar os dados da ficha.',
+            variant: 'destructive'
+          });
+        } finally {
+          setLoadingData(false);
+        }
+      };
+      loadFicha();
+    }
+  }, [fichaId]);
   
   // 1. All State and Ref declarations first
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
-    dataEntrega: '',
+    dataEntrega: new Date().toISOString().split('T')[0],
     responsavelEntregaId: '',
     observacoes: '',
+    status: 'DRAFT' as 'DRAFT' | 'COMPLETED',
+    signatureType: 'ON_SCREEN' as 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT',
+    signatureBase64: '',
+    employeeWorkSector: '',
+    tipoEntrega: 'PRIMEIRA_ENTREGA'
   });
 
   const [epis, setEpis] = useState([
     {
       nome: '',
       quantidade: '1',
-      ca: '', // Número do Certificado de Aprovação
-      caName: '', // Nome/Descrição do CA
+      ca: '',
+      caName: '',
       validade: '',
       observacoes: '',
-      uniformeTipo: '', // 'COMPLETO' ou 'INDIVIDUAL'
-      uniformePeca: '' // Peça específica se for individual
+      uniformeTipo: '',
+      uniformePeca: '',
+      stockItemId: ''
     }
   ]);
 
@@ -98,21 +171,31 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
   const [loadingData, setLoadingData] = useState(false);
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [selectedResponsibleData, setSelectedResponsibleData] = useState<SimpleEmployee | null>(null);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
+
+  useEffect(() => {
+    const fetchStockItems = async () => {
+      try {
+        const items = await stockService.getAllItems();
+        setStockItems(items);
+      } catch (error) {
+        console.error('Erro ao buscar itens de estoque:', error);
+      }
+    };
+    fetchStockItems();
+  }, []);
   const [companies, setCompanies] = useState<any[]>([]);
 
   
   const prevFuncionarioIdForCompanySync = useRef<string | undefined>(undefined);
 
 
-  // 2. Memoized values
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.empresaId);
   const responsavel = selectedResponsibleData;
 
 
-  // 3. All Effects
-  
-  // Atualizar funcionarioId e empresaId quando props mudarem
   useEffect(() => {
     setForm(prev => ({
       ...prev,
@@ -121,7 +204,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }));
   }, [employeeId, companyId]);
 
-  // Preenche empresa pelo cadastro do funcionário
   useEffect(() => {
     if (!selectedEmployeeData) return;
     if (companyId) return;
@@ -138,14 +220,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     });
   }, [form.funcionarioId, selectedEmployeeData, companyId]);
 
-  // Carregar dados iniciais do funcionário se vier apenas o ID via props
   useEffect(() => {
     if (form.funcionarioId && !selectedEmployeeData) {
       const fetchEmployee = async () => {
         try {
           const emp = await employeeService.getEmployeeById(form.funcionarioId);
           if (emp) {
-            setSelectedEmployeeData({
+            const mappedEmp = {
               id: emp.id,
               name: emp.name,
               document: emp.document || emp.cpf,
@@ -154,12 +235,16 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               phone: emp.phone,
               registrationNumber: emp.registrationNumber,
               hireDate: emp.hireDate,
+              terminationDate: emp.terminationDate,
               positionName: emp.position?.name,
               unitName: emp.unit?.name,
+              departmentName: emp.department?.name,
               address: emp.address,
               companyId: emp.company?.id,
               companySigla: emp.company?.sigla
-            } as SimpleEmployee);
+            } as SimpleEmployee;
+            setSelectedEmployeeData(mappedEmp);
+            setForm(prev => ({ ...prev, employeeWorkSector: buildWorkSectorSnapshot(mappedEmp) }));
           }
         } catch (error) {
           console.error("Erro ao carregar dados iniciais do funcionário:", error);
@@ -169,12 +254,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }
   }, [form.funcionarioId, selectedEmployeeData]);
 
-  // Carregar dados iniciais
   useEffect(() => {
     loadData();
   }, []);
 
-  // Carregar EPIs padrão quando empresa for selecionada
   useEffect(() => {
     if (form.empresaId && companies.length > 0) {
       const selectedCompany = companies.find(c => c.id === form.empresaId);
@@ -189,7 +272,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               nome: epi.epiName || '',
               quantidade: String(epi.quantity || 1),
               ca: epi.caNumber || '',
-              caName: epi.caName || '', // added missing property
+              caName: epi.caName || '',
               validade: epi.validity || '',
               observacoes: epi.observations || '',
               uniformeTipo: '',
@@ -208,7 +291,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               nome: '', 
               quantidade: '1', 
               ca: '', 
-              caName: '', // added missing property
+              caName: '',
               validade: '', 
               observacoes: '', 
               uniformeTipo: '', 
@@ -218,7 +301,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.empresaId]);
 
 
@@ -239,15 +321,23 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }
   };
 
-  const handleEpiChange = (idx: number, field: string, value: string) => {
+  const handleEpiChange = (idx: number, field: string, value: any) => {
     setEpis(prevEpis => {
       const updatedEpis = [...prevEpis];
-      updatedEpis[idx] = { ...updatedEpis[idx], [field]: value };
+      const updatedItem = { ...updatedEpis[idx], [field]: value };
+      
+      if (field === 'stockItemId' && value && value !== 'none') {
+        const selectedItem = stockItems.find(item => item.id === value);
+        if (selectedItem && !updatedItem.nome) {
+          updatedItem.nome = selectedItem.name || selectedItem.fullName || '';
+        }
+      }
+      
+      updatedEpis[idx] = updatedItem;
       return updatedEpis;
     });
   };
 
-  // Função para buscar CA quando o usuário digita
   const handleCABlur = async (idx: number, caNumber: string) => {
     if (!caNumber || caNumber.trim().length < 3) {
       setShowCaSuggestions(prev => ({ ...prev, [idx]: false }));
@@ -275,9 +365,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }
   };
 
-  // Função para buscar sugestões de CA enquanto digita
   const handleCASearch = async (idx: number, searchTerm: string) => {
-    // Limpar timeout anterior
     if (caSearchTimeouts[idx]) {
       clearTimeout(caSearchTimeouts[idx]);
     }
@@ -288,7 +376,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       return;
     }
 
-    // Debounce de 500ms
     const timeout = setTimeout(async () => {
       try {
         setCaLoading(prev => ({ ...prev, [idx]: true }));
@@ -305,7 +392,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     setCaSearchTimeouts(prev => ({ ...prev, [idx]: timeout }));
   };
 
-  // Função para selecionar uma sugestão de CA
   const handleCASelect = (idx: number, ca: CAEPIResponse) => {
     handleEpiChange(idx, 'ca', ca.numero);
     handleEpiChange(idx, 'caName', ca.nome || ca.descricao || '');
@@ -351,7 +437,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       return;
     }
 
-    // Validar campos específicos de Uniforme de Trabalho
     if (epis.some(epi => epi.nome === 'Uniforme de Trabalho' && !epi.uniformeTipo)) {
       toast({
         title: 'Atenção',
@@ -370,6 +455,15 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       return;
     }
 
+    if (epis.some(epi => epi.nome === 'Uniforme de Trabalho' && epi.uniformeTipo === 'INDIVIDUAL' && (!epi.stockItemId || epi.stockItemId === 'none'))) {
+      toast({
+        title: 'Atenção',
+        description: 'Uniforme de Trabalho Individual deve ser vinculado a um item do estoque!',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     if (!funcionario || !empresa) {
       toast({
         title: 'Atenção',
@@ -381,7 +475,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
 
     try {
       setLoading(true);
-      // Buscar dados completos do funcionário
       const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
       if (!fullEmployee) {
         toast({
@@ -398,6 +491,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         deliveryDate: form.dataEntrega,
         responsibleEmployeeId: form.responsavelEntregaId || undefined,
         observations: form.observacoes || undefined,
+        employeeWorkSector: form.employeeWorkSector,
         items: epis.map(epi => ({
           epiName: epi.nome,
           quantity: parseInt(epi.quantidade) || 1,
@@ -410,7 +504,6 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         }))
       };
 
-      // Gerar PDF com o mesmo layout padrão, mas apenas para visualização (abre em nova aba)
       const blob = await epiDeliveryFormService.generateAndSavePdf(formData);
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
@@ -428,8 +521,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
     }
   };
 
-  const handleGerarPDF = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGerarPDF = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
     if (!form.funcionarioId || !form.empresaId || !form.dataEntrega) {
       toast({
@@ -460,47 +553,10 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
 
     setLoading(true);
     try {
-      // Buscar dados completos do funcionário
       const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
       if (!fullEmployee) {
         throw new Error('Funcionário não encontrado');
       }
-
-      const payload = {
-        templateName: 'ficha-entrega-epi.html',
-        funcionario: fullEmployee.name,
-        cpf: fullEmployee.cpf || fullEmployee.document || '',
-        cargo: (fullEmployee as any).position?.name || '',
-        setor: (fullEmployee as any).unit?.name || '',
-        empresa: empresa.name,
-        cnpj: empresa.cnpj || '',
-        dataEntrega: form.dataEntrega,
-        responsavelEntrega: responsavel?.name || '',
-        epis: epis.map(epi => {
-          // Formatar nome do EPI para incluir informações de uniforme se aplicável
-          let nomeFormatado = epi.nome;
-          if (epi.nome === 'Uniforme de Trabalho') {
-            if (epi.uniformeTipo === 'INDIVIDUAL' && epi.uniformePeca) {
-              const pecaLabel = uniformePecasOptions.find(p => p.value === epi.uniformePeca)?.label || epi.uniformePeca;
-              nomeFormatado = `Uniforme de Trabalho - Individual (${pecaLabel})`;
-            } else if (epi.uniformeTipo === 'COMPLETO') {
-              nomeFormatado = 'Uniforme de Trabalho - Completo';
-            }
-          }
-
-          return {
-            nome: nomeFormatado,
-            quantidade: epi.quantidade,
-            ca: epi.ca || '',
-            validade: epi.validade || '',
-            observacoes: epi.observacoes || '',
-            uniformeTipo: epi.uniformeTipo || '',
-            uniformePeca: epi.uniformePeca || ''
-          };
-        }),
-        observacoes: form.observacoes || '',
-        dataAtual: new Date().toLocaleDateString('pt-BR')
-      };
 
       const buildEpiFormData = () => ({
         employeeId: form.funcionarioId,
@@ -508,6 +564,11 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         deliveryDate: form.dataEntrega,
         responsibleEmployeeId: form.responsavelEntregaId || undefined,
         observations: form.observacoes || undefined,
+        deliveryType: form.tipoEntrega || 'PRIMEIRA_ENTREGA',
+        signatureBase64: form.signatureBase64 || undefined,
+        signatureType: form.signatureType,
+        employeeWorkSector: form.employeeWorkSector || undefined,
+        status: form.status,
         items: epis.map(epi => ({
           epiName: epi.nome,
           quantity: parseInt(epi.quantidade) || 1,
@@ -516,14 +577,13 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
           validityDate: epi.validade || undefined,
           uniformType: epi.uniformeTipo || undefined,
           uniformPiece: epi.uniformePeca || undefined,
-          observations: epi.observacoes || undefined
+          observations: epi.observacoes || undefined,
+          stockItemId: epi.stockItemId || undefined
         }))
       });
 
-      // Gerar PDF completo (novo padrão de layout) e salvar no banco
       const blob = await epiDeliveryFormService.generateAndSavePdf(buildEpiFormData());
 
-      // Fazer download do PDF
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -568,6 +628,15 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
       return;
     }
 
+    if (form.status === 'COMPLETED' && !form.signatureBase64 && form.signatureType === 'ON_SCREEN') {
+      toast({
+        title: 'Assinatura Obrigatória',
+        description: 'Para concluir a ficha, a assinatura do funcionário é necessária!',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const formData = {
@@ -576,23 +645,44 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         deliveryDate: form.dataEntrega,
         responsibleEmployeeId: form.responsavelEntregaId || undefined,
         observations: form.observacoes || undefined,
+        status: form.status,
+        signatureType: form.signatureType,
+        signatureBase64: form.signatureBase64 || undefined,
+        employeeWorkSector: form.employeeWorkSector || undefined,
+        deliveryType: form.tipoEntrega || 'PRIMEIRA_ENTREGA',
         items: epis.map(epi => ({
           epiName: epi.nome,
-          quantity: parseInt(epi.quantidade) || 1,
+          quantity: parseInt(epi.quantity) || 1,
           ca: epi.ca || undefined,
           caName: epi.caName || undefined,
           validityDate: epi.validade || undefined,
           uniformType: epi.uniformeTipo || undefined,
           uniformPiece: epi.uniformePeca || undefined,
-          observations: epi.observacoes || undefined
+          observations: epi.observacoes || undefined,
+          stockItemId: epi.stockItemId || undefined
         }))
       };
 
-      await epiDeliveryFormService.create(formData);
+      if (fichaId) {
+        await epiDeliveryFormService.update(fichaId, formData);
+      } else {
+        await epiDeliveryFormService.create(formData);
+      }
+
       toast({
-        title: '✅ Salvo',
-        description: 'Ficha de entrega de EPI salva com sucesso!',
+        title: '✅ Sucesso',
+        description: form.status === 'COMPLETED' 
+          ? 'Ficha concluída e estoque atualizado com sucesso!' 
+          : 'Ficha salva com sucesso!',
       });
+      
+      if (form.status === 'COMPLETED') {
+        setForm(prev => ({ ...prev, signatureBase64: '' }));
+      }
+
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err: any) {
       console.error('❌ Erro ao salvar ficha de EPI:', err);
       toast({
@@ -653,7 +743,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                     setForm(prev => ({
                       ...prev,
                       funcionarioId: emp.id,
-                      empresaId: cid || prev.empresaId
+                      empresaId: cid || prev.empresaId,
+                      employeeWorkSector: buildWorkSectorSnapshot(emp)
                     }));
                   }}
                 />
@@ -766,9 +857,9 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
 
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor</Label>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor / Departamento</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.unitName || '-'}
+                        {funcionario.departmentName || funcionario.unitName || '-'}
                       </div>
                     </div>
                   </div>
@@ -821,39 +912,97 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               <span>Dados da Entrega</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div className="md:col-span-4 space-y-2">
                 <Label className="text-base font-semibold">Data de Entrega</Label>
                 <Input
                   type="date"
                   value={form.dataEntrega}
                   onChange={(e) => {
                     let value = e.target.value;
-                    // Limpar qualquer valor inválido ou duplicado
-                    // Formato esperado: YYYY-MM-DD (10 caracteres)
                     if (value && value.length > 10) {
-                      // Se o valor for maior que 10 caracteres, pode estar duplicado
-                      // Tentar extrair apenas a parte válida
                       const match = value.match(/(\d{4}-\d{2}-\d{2})/);
-                      if (match) {
-                        value = match[1];
-                      }
+                      if (match) value = match[1];
                     }
                     setForm(prev => ({ ...prev, dataEntrega: value }));
                   }}
-                  className="h-11 bg-background"
+                  className="h-11 bg-background border-2 border-gray-600 focus:border-seguranca-yellow"
                   max="9999-12-31"
-                  pattern="\d{4}-\d{2}-\d{2}"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-base font-semibold">Responsável pela Entrega</Label>
-                <EmployeeCombobox
-                  value={form.responsavelEntregaId}
-                  onChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
-                  onEmployeeSelect={(emp) => setSelectedResponsibleData(emp)}
-                />
+              <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+                <div className="space-y-2 min-w-0">
+                  <Label className="text-base font-semibold">Setor/Trabalho</Label>
+                  <Input
+                    value={form.employeeWorkSector}
+                    onChange={(e) => setForm(prev => ({ ...prev, employeeWorkSector: e.target.value }))}
+                    placeholder="Setor/Cargo do funcionário"
+                    className="h-11 bg-background border-2 border-gray-600 focus:border-seguranca-yellow"
+                  />
+                </div>
+                <div className="space-y-2 min-w-0">
+                  <Label className="text-base font-semibold">Responsável pela Entrega</Label>
+                  <EmployeeCombobox
+                    value={form.responsavelEntregaId}
+                    onChange={(value) => setForm(prev => ({ ...prev, responsavelEntregaId: value }))}
+                    onEmployeeSelect={(emp) => setSelectedResponsibleData(emp)}
+                    placeholder="Selecione o responsável"
+                  />
+                  {!form.responsavelEntregaId && (
+                    <p className="text-[10px] text-muted-foreground italic pl-1 leading-tight">
+                      * Padrão: <strong>Almoxarifado</strong>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Status e Tipo de Assinatura */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-dashed">
+              <div className="flex items-center justify-between p-4 bg-background rounded-lg border border-primary/20 shadow-sm">
+                <div className="space-y-1">
+                  <Label className="text-base font-semibold flex items-center gap-2">
+                    <CheckCircle2 className={cn("h-4 w-4", form.status === 'COMPLETED' ? "text-green-500" : "text-muted-foreground")} />
+                    Status da Ficha
+                  </Label>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {form.status === 'COMPLETED' 
+                      ? 'CONCLUÍDA: Gera baixa automática no estoque.' 
+                      : 'RASCUNHO: Apenas salva as informações.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant={form.status === 'COMPLETED' ? 'default' : 'secondary'} className="h-6">
+                    {form.status === 'COMPLETED' ? 'CONCLUÍDA' : 'RASCUNHO'}
+                  </Badge>
+                  <Switch
+                    checked={form.status === 'COMPLETED'}
+                    onCheckedChange={(checked) => setForm(prev => ({ 
+                      ...prev, 
+                      status: checked ? 'COMPLETED' : 'DRAFT' 
+                    }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 p-4 bg-background rounded-lg border shadow-sm">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  Forma de Assinatura
+                </Label>
+                <Select
+                  value={form.signatureType}
+                  onValueChange={(value: any) => setForm(prev => ({ ...prev, signatureType: value }))}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ON_SCREEN">Assinar na Tela Digital</SelectItem>
+                    <SelectItem value="PHYSICAL_ACKNOWLEDGEMENT">Assinatura em Papel (Anexo)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -923,30 +1072,80 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                     <div className="space-y-4">
                       {/* Primeira linha: Nome do EPI */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Vincular ao Estoque (Prioridade) */}
                         <div className="space-y-2 lg:col-span-2">
-                          <Label>Nome do EPI</Label>
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            Vincular ao Estoque
+                            <Badge variant="outline" className="text-[10px] h-4">Recomendado</Badge>
+                          </Label>
                           <Select
-                            value={epi.nome || ''}
-                            onValueChange={(value) => {
-                              handleEpiChange(idx, 'nome', value);
-                              // Limpar campos de uniforme se mudar o EPI
-                              if (value !== 'Uniforme de Trabalho') {
-                                handleEpiChange(idx, 'uniformeTipo', '');
-                                handleEpiChange(idx, 'uniformePeca', '');
-                              }
-                            }}
+                            value={epi.stockItemId || 'none'}
+                            onValueChange={(value) => handleEpiChange(idx, 'stockItemId', value === 'none' ? '' : value)}
                           >
-                            <SelectTrigger className="bg-background w-full">
-                              <SelectValue placeholder="Selecione o EPI" />
+                            <SelectTrigger className="h-10 bg-background border-primary/20">
+                              <SelectValue placeholder="Selecione um item do estoque" />
                             </SelectTrigger>
-                            <SelectContent className="max-h-[300px]">
-                              {epiOptions.map(option => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
+                            <SelectContent>
+                              <SelectItem value="none">Nenhum vínculo (Entrada Manual)</SelectItem>
+                              {stockItems.map(item => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.fullName || item.name} {item.code ? `(${item.code})` : ''} - Saldo: {item.currentStock || 0}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          <p className="text-[10px] text-muted-foreground">
+                            O nome do EPI será preenchido automaticamente ao selecionar um item.
+                          </p>
+                        </div>
+
+                        {/* Nome do EPI */}
+                        <div className="space-y-2 lg:col-span-2">
+                          <Label className="text-sm font-medium">Nome do EPI / Equipamento</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className="w-full h-10 justify-between font-normal bg-background"
+                              >
+                                {epi.nome || "Selecione ou digite o nome..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder="Buscar EPI..." />
+                                <CommandList>
+                                  <CommandEmpty>Nenhum EPI encontrado.</CommandEmpty>
+                                  <CommandGroup heading="Sugestões">
+                                    {epiOptions.map((option) => (
+                                      <CommandItem
+                                        key={option}
+                                        value={option}
+                                        onSelect={() => {
+                                          handleEpiChange(idx, 'nome', option);
+                                          // Limpar campos de uniforme se mudar o EPI
+                                          if (option !== 'Uniforme de Trabalho') {
+                                            handleEpiChange(idx, 'uniformeTipo', '');
+                                            handleEpiChange(idx, 'uniformePeca', '');
+                                          }
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            epi.nome === option ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        {option}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
 
                         {/* Campos padrão quando NÃO é Uniforme de Trabalho */}
@@ -1174,6 +1373,57 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
             />
           </div>
 
+          {/* Assinatura Digital */}
+          {form.signatureType === 'ON_SCREEN' && (
+            <div className="space-y-4 p-6 bg-muted/30 rounded-xl border border-primary/20 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span>Assinatura do Funcionário</span>
+                </div>
+                {form.signatureBase64 ? (
+                  <Badge className="bg-green-500 hover:bg-green-600 gap-1 text-white border-none">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Assinado
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-amber-500 border-amber-500 gap-1 animate-pulse">
+                    <AlertCircle className="h-3 w-3" />
+                    Aguardando Assinatura
+                  </Badge>
+                )}
+              </div>
+              
+              {!form.signatureBase64 ? (
+                <div className="bg-white rounded-lg p-2 border-2 border-dashed border-muted-foreground/30">
+                  <SignaturePad 
+                    onSave={(base64) => setForm(prev => ({ ...prev, signatureBase64: base64 }))} 
+                  />
+                </div>
+              ) : (
+                <div className="relative group max-w-lg mx-auto bg-white rounded-lg border-2 border-green-200 p-4 shadow-inner">
+                  <img 
+                    src={form.signatureBase64} 
+                    alt="Assinatura" 
+                    className="max-h-32 mx-auto" 
+                  />
+                  <Button 
+                    type="button"
+                    variant="destructive" 
+                    size="sm" 
+                    className="absolute -top-2 -right-2 h-8 w-8 rounded-full p-0 shadow-lg"
+                    onClick={() => setForm(prev => ({ ...prev, signatureBase64: '' }))}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <p className="text-[10px] text-center text-muted-foreground mt-2 uppercase tracking-widest font-mono">
+                    Assinatura Digital Registrada
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <Separator />
 
           {/* Ações */}
@@ -1198,6 +1448,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               )}
             </Button>
             <Button
+              type="button"
               onClick={handlePreview}
               variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
@@ -1216,7 +1467,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               )}
             </Button>
             <Button
-              onClick={handleGerarPDF}
+              type="button"
+              onClick={() => handleGerarPDF()}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || loadingData || !funcionario || !empresa}
             >

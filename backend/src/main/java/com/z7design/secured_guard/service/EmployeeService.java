@@ -1024,8 +1024,11 @@ public class EmployeeService {
                             .companyId(emp.getCompany() != null ? emp.getCompany().getId() : null)
                             .companySigla(emp.getCompany() != null ? emp.getCompany().getSigla() : null)
                             .salario(emp.getSalario())
+                            .escalaTrabalho(emp.getEscalaTrabalho())
+                            .horarioTrabalho(emp.getHorarioTrabalho())
                             .build())
                     .collect(java.util.stream.Collectors.toList());
+
         } catch (Exception e) {
             System.err.println(
                     "[ERROR] EmployeeService.findSimpleEmployeesByNameOrDocument - Erro ao buscar funcionários: "
@@ -2026,8 +2029,11 @@ public class EmployeeService {
                         .email(emp.getEmail())
                         .positionName(emp.getPosition() != null ? emp.getPosition().getName() : null)
                         .salario(emp.getSalario())
+                        .escalaTrabalho(emp.getEscalaTrabalho())
+                        .horarioTrabalho(emp.getHorarioTrabalho())
                         .build())
                 .collect(java.util.stream.Collectors.toList());
+
     }
 
     /**

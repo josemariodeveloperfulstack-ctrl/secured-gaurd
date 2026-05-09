@@ -77,9 +77,7 @@ const RelatorioMovimentacaoForm: React.FC<RelatorioMovimentacaoFormProps> = ({ e
         } catch(e) { console.error(e); }
       }
 
-      const blob = await remanejamentoService.exportRemanejamentosReportPDF({
-        employeeId: funcionarioId
-      });
+      const blob = await employeeService.exportEmployeeHistoryPDF(funcionarioId);
 
       const url = window.URL.createObjectURL(blob);
       setPdfUrl(url);

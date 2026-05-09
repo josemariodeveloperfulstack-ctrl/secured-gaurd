@@ -109,22 +109,43 @@ public class CompanyDataFormatter {
         if (company == null) {
             return "";
         }
-        if (company.getCity() != null && !company.getCity().isBlank()) {
+        
+        // 1. Prioridade para o campo city se estiver preenchido e não for um endereço
+        if (company.getCity() != null && !company.getCity().isBlank() && !company.getCity().contains(",")) {
             return company.getCity().trim();
         }
+        
+        // 2. Tentar extrair do endereço completo (Rua - Bairro - Cidade/UF - CEP)
         String legacy = company.getAddress();
         if (legacy == null || legacy.isBlank()) {
             return "";
         }
+        
         String[] parts = legacy.split("\\s*-\\s*");
-        if (parts.length < 2) {
-            return "";
+        
+        // No padrão "Rua - Bairro - Cidade/UF - CEP", a cidade é o penúltimo ou antepenúltimo
+        for (int i = parts.length - 1; i >= 0; i--) {
+            String p = parts[i].trim();
+            
+            // Ignorar CEP (XXXXX-XXX)
+            if (p.matches("\\d{5}-\\d{3}")) continue;
+            
+            // Ignorar UF pura (2 letras)
+            if (p.length() == 2 && p.chars().allMatch(Character::isLetter)) continue;
+            
+            // Se encontrar padrão Cidade/UF (ex: Contagem/MG)
+            if (p.contains("/")) {
+                String cityPart = p.split("/")[0].trim();
+                if (!cityPart.isEmpty()) return cityPart;
+            }
+            
+            // Se for apenas a cidade antes da UF (que já ignoramos se fosse pura)
+            // No caso de "Contagem - MG", se estamos no loop e MG foi ignorado, o próximo é Contagem
+            if (!p.isEmpty() && !p.contains(",") && p.length() > 2) {
+                return p;
+            }
         }
-        String last = parts[parts.length - 1].trim();
-        // UF com 2 letras (ex.: MG)
-        if (last.length() == 2 && last.chars().allMatch(Character::isLetter)) {
-            return parts[parts.length - 2].trim();
-        }
+        
         return "";
     }
 

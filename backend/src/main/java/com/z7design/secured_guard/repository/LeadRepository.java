@@ -17,6 +17,9 @@ import java.util.UUID;
 @Repository
 public interface LeadRepository extends JpaRepository<Lead, UUID> {
     
+    @Query("SELECT l FROM Lead l WHERE l.isDeleted = false")
+    List<Lead> findAllActive();
+    
     // Buscar leads por status
     List<Lead> findByStatus(LeadStatus status);
     

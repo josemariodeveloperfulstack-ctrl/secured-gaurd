@@ -343,9 +343,8 @@ public class StandardReportLayoutService {
                     .setTextAlignment(TextAlignment.CENTER)
                     .setFontColor(new DeviceRgb(0, 0, 0)) // Texto preto (fora da barra gradiente)
                     .setMultipliedLeading(1.1f)
-                    .setMarginTop(55f) // Margin top de 55pt
-                    .setMarginBottom(config.getReportSubTitle() != null ? 5f : 45f); // Se tiver subtítulo, margin
-                                                                                     // bottom menor
+                    .setMarginTop(20f) // Margin top reduzida para 20pt conforme solicitado
+                    .setMarginBottom(config.getReportSubTitle() != null ? 5f : 30f); // Margin bottom ajustada
             canvas.add(title.setFixedPosition(0, titleY, pageWidth));
 
             // Subtítulo do relatório
@@ -381,10 +380,10 @@ public class StandardReportLayoutService {
             Paragraph companyNameFooter = new Paragraph(company.getName())
                     .setFontSize(9)
                     .setBold()
-                    .setTextAlignment(TextAlignment.CENTER)
+                    .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(companyNameFooter.setFixedPosition(0, yPosition + 30f, pageWidth));
+            canvas.add(companyNameFooter.setFixedPosition(12f, yPosition + 30f, pageWidth));
         }
 
         // Segunda linha: Endereço completo
@@ -392,10 +391,10 @@ public class StandardReportLayoutService {
         if (!address.isEmpty()) {
             Paragraph addressFooter = new Paragraph(address)
                     .setFontSize(8)
-                    .setTextAlignment(TextAlignment.CENTER)
+                    .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(addressFooter.setFixedPosition(0, yPosition + 20f, pageWidth));
+            canvas.add(addressFooter.setFixedPosition(12f, yPosition + 20f, pageWidth));
         }
 
         // Terceira linha: CNPJ
@@ -403,10 +402,10 @@ public class StandardReportLayoutService {
         if (!cnpjText.isEmpty()) {
             Paragraph cnpjFooter = new Paragraph(cnpjText)
                     .setFontSize(8)
-                    .setTextAlignment(TextAlignment.CENTER)
+                    .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(cnpjFooter.setFixedPosition(0, yPosition + 10f, pageWidth));
+            canvas.add(cnpjFooter.setFixedPosition(12f, yPosition + 10f, pageWidth));
         }
 
         // Bloco direito: usuário e data da geração (acima da numeração), alinhado à direita

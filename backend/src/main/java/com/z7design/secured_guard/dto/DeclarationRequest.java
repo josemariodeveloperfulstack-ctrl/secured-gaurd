@@ -19,6 +19,7 @@ public class DeclarationRequest {
     private String personName;
     private String personCpf;
     private String personPosition; // Cargo (opcional)
+    private String sector; // Setor / Posto de Trabalho
 
     // Conteúdo da Declaração
     private String title; // Título da Declaração (Ex: Declaração de Matrícula, Declaração de

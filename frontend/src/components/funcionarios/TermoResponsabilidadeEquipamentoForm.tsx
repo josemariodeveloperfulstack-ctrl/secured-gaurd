@@ -174,7 +174,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
             value: 0.0
           }
         ],
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        city: empresa.city || '',
         documentDate: form.dataEntrega
       };
 
@@ -226,7 +226,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
             value: 0.0
           }
         ],
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        city: empresa.city || '',
         documentDate: form.dataEntrega
       };
 
@@ -433,7 +433,16 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {funcionario.address || '-'}
+                      {typeof funcionario.address === 'string' 
+                        ? (funcionario.address || '-') 
+                        : (funcionario.address && typeof funcionario.address === 'object'
+                            ? [
+                                (funcionario.address as any).street, 
+                                (funcionario.address as any).number, 
+                                (funcionario.address as any).neighborhood, 
+                                (funcionario.address as any).city
+                              ].filter(Boolean).join(', ')
+                            : '-')}
                     </div>
                   </div>
                 </div>

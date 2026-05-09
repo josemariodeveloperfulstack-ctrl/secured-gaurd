@@ -13,25 +13,44 @@ import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.PersonalProtectiveEquipment;
 import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
+import com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus;
+import com.z7design.secured_guard.model.enums.StockRequisitionStatus;
+import com.z7design.secured_guard.model.enums.MovementReason;
+import com.z7design.secured_guard.model.enums.MovementType;
+import com.z7design.secured_guard.model.*;
+
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.repository.EmployeeChangeHistoryRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.EPIDeliveryFormRepository;
 import com.z7design.secured_guard.repository.PersonalProtectiveEquipmentRepository;
 import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.repository.StockItemRepository;
+import com.z7design.secured_guard.repository.StockRequisitionRepository;
+import com.z7design.secured_guard.repository.StockMovementRepository;
+
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import com.z7design.secured_guard.service.StockService;
+
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -46,12 +65,19 @@ public class EPIDeliveryFormService {
     private final UserRepository userRepository;
     private final PersonalProtectiveEquipmentRepository epiRepository;
     private final EmployeeChangeHistoryRepository employeeChangeHistoryRepository;
+    private final StockItemRepository stockItemRepository;
+    private final StockRequisitionRepository stockRequisitionRepository;
+    private final StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    @Lazy
+    private StockService stockService;
 
     @Transactional
+
     public EPIDeliveryFormDTO create(CreateEPIDeliveryFormDTO dto, UUID createdByUserId) {
         log.info("📝 Criando nova ficha de entrega de EPI para funcionário: {}", dto.getEmployeeId());
 
-        // Buscar entidades relacionadas
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado com id: " + dto.getEmployeeId()));
 
@@ -66,20 +92,17 @@ public class EPIDeliveryFormService {
 
         User createdBy = null;
         if (createdByUserId != null) {
-            createdBy = userRepository.findById(createdByUserId)
-                    .orElse(null);
+            createdBy = userRepository.findById(createdByUserId).orElse(null);
         }
 
-        // Capturar setor do funcionário (snapshot)
-        String workSectorSnapshot = buildWorkSectorSnapshot(employee);
+        String workSectorSnapshot = dto.getEmployeeWorkSector() != null ? dto.getEmployeeWorkSector() : buildWorkSectorSnapshot(employee);
+        EPIDeliveryType deliveryType = dto.getDeliveryType() != null ? dto.getDeliveryType() : EPIDeliveryType.PRIMEIRA_ENTREGA;
+        EPIDeliveryFormStatus status = dto.getStatus() != null 
+                ? dto.getStatus() 
+                : EPIDeliveryFormStatus.DRAFT;
 
-        // Determinar tipo de entrega
-        EPIDeliveryType deliveryType = dto.getDeliveryType() != null
-                ? dto.getDeliveryType()
-                : EPIDeliveryType.PRIMEIRA_ENTREGA;
-
-        // Criar ficha
         EPIDeliveryForm form = EPIDeliveryForm.builder()
+
                 .employee(employee)
                 .company(company)
                 .deliveryDate(dto.getDeliveryDate())
@@ -89,112 +112,223 @@ public class EPIDeliveryFormService {
                 .observations(dto.getObservations())
                 .pdfUrl(dto.getPdfUrl())
                 .createdBy(createdBy)
+                .signatureBase64(dto.getSignatureBase64())
+                .signatureType(dto.getSignatureType() != null ? dto.getSignatureType() : "ON_SCREEN")
+                .status(status)
                 .build();
 
-        // Adicionar itens e dar baixa no estoque
-        StringBuilder itemsSummary = new StringBuilder();
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
             for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
-                String epiName = itemDto.getEpiName();
-                if (epiName == null || epiName.trim().isEmpty()) {
-                    log.warn("⚠️ Item de EPI sem nome informado. Usando valor padrão.");
-                    epiName = "EPI";
-                }
-                Integer quantity = itemDto.getQuantity() != null ? itemDto.getQuantity() : 1;
-                
-                // Buscar EPI pelo nome no estoque
-                List<PersonalProtectiveEquipment> epis = epiRepository.findByNameContainingIgnoreCase(epiName);
-                PersonalProtectiveEquipment epi = null;
-                
-                // Tentar encontrar EPI exato primeiro
-                for (PersonalProtectiveEquipment e : epis) {
-                    if (e.getName().equalsIgnoreCase(epiName) && e.getIsActive()) {
-                        epi = e;
-                        break;
-                    }
-                }
-                
-                // Se não encontrou exato, pegar o primeiro ativo
-                if (epi == null && !epis.isEmpty()) {
-                    epi = epis.stream()
-                            .filter(e -> e.getIsActive())
-                            .findFirst()
-                            .orElse(null);
-                }
-                
-                // Se encontrou o EPI no estoque, verificar e dar baixa
-                if (epi != null) {
-                    Integer availableStock = epi.getCurrentStock();
-
-                    if (availableStock == null) {
-                        log.warn("⚠️ Estoque atual do EPI '{}' está indefinido. Entrega registrada sem baixa.", epiName);
-                    } else if (availableStock < quantity) {
-                        log.warn("⚠️ Estoque insuficiente para o EPI '{}'. Disponível: {}, Solicitado: {}. Entrega registrada sem baixa.",
-                            epiName, availableStock, quantity);
-                    } else {
-                        Integer newStock = availableStock - quantity;
-                        epi.setCurrentStock(newStock);
-                        epiRepository.save(epi);
-
-                        log.info("📦 Baixa no estoque: EPI '{}' - Quantidade: {} - Estoque anterior: {} - Estoque atual: {}",
-                            epiName, quantity, availableStock, newStock);
-
-                        if (epi.getMinimumStock() != null && newStock <= epi.getMinimumStock()) {
-                            log.warn("⚠️ Estoque baixo para o EPI '{}': {} unidades (mínimo: {})",
-                                epiName, newStock, epi.getMinimumStock());
-                        }
-                    }
-                } else {
-                    log.warn("⚠️ EPI '{}' não encontrado no estoque. Entrega registrada sem baixa no estoque.", epiName);
-                }
-                
-                // Criar item da ficha
                 EPIDeliveryFormItem item = EPIDeliveryFormItem.builder()
                         .deliveryForm(form)
-                        .epiName(epiName)
-                        .quantity(quantity)
+                        .epiName(itemDto.getEpiName())
+                        .quantity(itemDto.getQuantity() != null ? itemDto.getQuantity() : 1)
                         .ca(itemDto.getCa())
                         .caName(itemDto.getCaName())
                         .validityDate(itemDto.getValidityDate())
                         .uniformType(itemDto.getUniformType())
                         .uniformPiece(itemDto.getUniformPiece())
                         .observations(itemDto.getObservations())
+                        .stockItemId(itemDto.getStockItemId())
                         .build();
                 form.getItems().add(item);
-
-                // Construir resumo para histórico
-                if (itemsSummary.length() > 0) itemsSummary.append(", ");
-                itemsSummary.append(quantity).append("x ").append(epiName);
-                if (itemDto.getCa() != null && !itemDto.getCa().isBlank()) {
-                    itemsSummary.append(" (CA: ").append(itemDto.getCa()).append(")");
-                }
             }
         }
 
         EPIDeliveryForm savedForm = epiDeliveryFormRepository.save(form);
-        log.info("✅ Ficha de entrega de EPI criada com sucesso: {}", savedForm.getId());
-
-        // Registrar no histórico do funcionário
-        String historyDetail = String.format(
-                "Tipo: %s | Data: %s | Itens: %s | Setor: %s | Empresa: %s",
-                deliveryType.getDescription(),
-                dto.getDeliveryDate(),
-                itemsSummary.toString(),
-                workSectorSnapshot != null ? workSectorSnapshot : "—",
-                company.getName());
-        if (responsibleEmployee != null) {
-            historyDetail += " | Responsável: " + responsibleEmployee.getName();
+        
+        // Se a ficha foi criada como CONCLUÍDA, gera a requisição e baixa no estoque
+        if (savedForm.getStatus() == com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.COMPLETED) {
+            syncWithStockRequisition(savedForm, createdByUserId);
         }
 
-        recordHistory(
-                employee.getId(),
-                createdBy,
-                "ENTREGA_EPI",
-                "Ficha de Entrega de EPI (" + deliveryType.getDescription() + ")",
-                historyDetail,
-                dto.getObservations());
+        log.info("✅ Ficha de entrega de EPI criada com sucesso: {}", savedForm.getId());
+        recordHistoryForForm(savedForm, createdBy, "CRIAÇÃO");
 
         return EPIDeliveryFormDTO.fromEntity(savedForm);
+    }
+
+    @Transactional
+    public EPIDeliveryFormDTO update(UUID id, CreateEPIDeliveryFormDTO dto, UUID updatedByUserId) {
+        log.info("📝 Atualizando ficha de entrega de EPI: {}", id);
+        
+        EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
+
+        // Se já estava concluída, precisamos lidar com a requisição existente
+        boolean wasCompleted = form.getStatus() == com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.COMPLETED;
+        
+        // Atualizar campos básicos
+        if (dto.getResponsibleEmployeeId() != null) {
+            Employee resp = employeeRepository.findById(dto.getResponsibleEmployeeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Responsável não encontrado"));
+            form.setResponsibleEmployee(resp);
+        }
+        
+        form.setDeliveryDate(dto.getDeliveryDate());
+        form.setObservations(dto.getObservations());
+        form.setDeliveryType(dto.getDeliveryType() != null ? dto.getDeliveryType() : form.getDeliveryType());
+        form.setSignatureBase64(dto.getSignatureBase64());
+        form.setSignatureType(dto.getSignatureType() != null ? dto.getSignatureType() : form.getSignatureType());
+        form.setEmployeeWorkSector(dto.getEmployeeWorkSector() != null ? dto.getEmployeeWorkSector() : form.getEmployeeWorkSector());
+        form.setStatus(dto.getStatus() != null ? dto.getStatus() : form.getStatus());
+
+        // Atualizar itens (remover antigos e adicionar novos para simplificar)
+        form.getItems().clear();
+        if (dto.getItems() != null) {
+            for (EPIDeliveryFormItemDTO itemDto : dto.getItems()) {
+                EPIDeliveryFormItem item = EPIDeliveryFormItem.builder()
+                        .deliveryForm(form)
+                        .epiName(itemDto.getEpiName())
+                        .quantity(itemDto.getQuantity() != null ? itemDto.getQuantity() : 1)
+                        .ca(itemDto.getCa())
+                        .caName(itemDto.getCaName())
+                        .validityDate(itemDto.getValidityDate())
+                        .uniformType(itemDto.getUniformType())
+                        .uniformPiece(itemDto.getUniformPiece())
+                        .observations(itemDto.getObservations())
+                        .stockItemId(itemDto.getStockItemId())
+                        .build();
+                form.getItems().add(item);
+            }
+        }
+
+        EPIDeliveryForm savedForm = epiDeliveryFormRepository.save(form);
+        
+        // Sincronizar com estoque
+        if (savedForm.getStatus() == EPIDeliveryFormStatus.COMPLETED) {
+            syncWithStockRequisition(savedForm, updatedByUserId);
+        } else if (wasCompleted) {
+            // Se mudou de COMPLETED para DRAFT, cancela a requisição e devolve ao estoque
+            cancelStockRequisition(savedForm, updatedByUserId);
+        }
+
+
+        User updatedBy = updatedByUserId != null ? userRepository.findById(updatedByUserId).orElse(null) : null;
+        recordHistoryForForm(savedForm, updatedBy, "ATUALIZAÇÃO");
+
+        return EPIDeliveryFormDTO.fromEntity(savedForm);
+    }
+
+    private void syncWithStockRequisition(EPIDeliveryForm form, UUID userId) {
+        log.info("📦 Sincronizando ficha EPI {} com requisição de estoque", form.getId());
+        
+        // Se já existe uma requisição, vamos cancelar ela e as movimentações para gerar uma nova
+        // (Isso garante que alterações na lista de itens sejam refletidas corretamente no estoque)
+        if (form.getStockRequisitionId() != null) {
+            cancelStockRequisition(form, userId);
+        }
+
+        // Criar nova requisição de estoque
+        StockRequisition requisition = StockRequisition.builder()
+                .requisitionNumber("REQ-EPI-" + form.getId().toString().substring(0, 8).toUpperCase())
+                .employee(form.getEmployee())
+                .requestedByUser(userRepository.findById(userId).orElse(null))
+                .movementReason(form.getDeliveryType() == EPIDeliveryType.PRIMEIRA_ENTREGA ? 
+                        MovementReason.ENTREGA_INICIAL : 
+                        MovementReason.REPOSICAO)
+                .notes("Gerado automaticamente pela Ficha de EPI: " + form.getId())
+                .employeeWorkSector(form.getEmployeeWorkSector())
+                .status(StockRequisitionStatus.DELIVERED)
+                .deliveredAt(LocalDateTime.now())
+                .deliveredByUser(userRepository.findById(userId).orElse(null))
+                .signatureType(StockMovement.SignatureType.DIGITAL)
+                .digitalSignature(form.getSignatureBase64())
+                .signatureAt(LocalDateTime.now())
+                .build();
+
+        for (EPIDeliveryFormItem item : form.getItems()) {
+            // Regra: Vincular ao estoque apenas se houver ID do item de estoque
+            // O frontend garante que Uniforme de Trabalho - Individual SEJA obrigatório ter stockItemId
+            if (item.getStockItemId() != null) {
+                StockItem stockItem = stockItemRepository.findById(item.getStockItemId())
+                        .orElse(null);
+                
+                if (stockItem != null) {
+                    StockRequisitionLine line = StockRequisitionLine.builder()
+                            .stockItem(stockItem)
+                            .quantity(item.getQuantity())
+                            .build();
+                    requisition.addLine(line);
+                    
+                    // Gerar movimentação de saída imediata
+                    com.z7design.secured_guard.dto.StockMovementDTO movDto = new com.z7design.secured_guard.dto.StockMovementDTO();
+                    movDto.setStockItemId(stockItem.getId());
+                    movDto.setMovementType(MovementType.SAIDA);
+                    movDto.setReason(requisition.getMovementReason());
+                    movDto.setQuantity(item.getQuantity());
+                    movDto.setEmployeeId(form.getEmployee().getId());
+                    movDto.setRequisitionNumber(requisition.getRequisitionNumber());
+                    movDto.setNotes("Baixa automática via Ficha de EPI");
+                    movDto.setDigitalSignature(form.getSignatureBase64());
+                    movDto.setSignatureType(StockMovement.SignatureType.DIGITAL);
+                    movDto.setSignatureDate(LocalDateTime.now());
+                    
+                    stockService.createMovement(movDto, userId);
+                }
+            }
+        }
+
+        StockRequisition savedReq = stockRequisitionRepository.save(requisition);
+
+        form.setStockRequisitionId(savedReq.getId());
+        epiDeliveryFormRepository.save(form);
+    }
+
+    private void cancelStockRequisition(EPIDeliveryForm form, UUID userId) {
+        if (form.getStockRequisitionId() == null) return;
+        
+        log.info("🗑️ Cancelando requisição de estoque legada {} da ficha EPI", form.getStockRequisitionId());
+        
+        StockRequisition req = stockRequisitionRepository.findById(form.getStockRequisitionId())
+                .orElse(null);
+        
+        if (req != null) {
+            // Estornar movimentações vinculadas
+            List<StockMovement> movements = stockMovementRepository.findByRequisitionNumberOrderByMovementDateAsc(req.getRequisitionNumber());
+            for (StockMovement m : movements) {
+                // Criar entrada compensatória para devolver ao estoque
+                com.z7design.secured_guard.dto.StockMovementDTO storno = new com.z7design.secured_guard.dto.StockMovementDTO();
+                storno.setStockItemId(m.getStockItem().getId());
+                storno.setMovementType(MovementType.ENTRADA);
+                storno.setReason(MovementReason.AJUSTE_ENTRADA);
+                storno.setQuantity(m.getQuantity());
+                storno.setNotes("Estorno automático por alteração na Ficha de EPI: " + form.getId());
+                stockService.createMovement(storno, userId);
+                
+                // Marcar movimento original como cancelado (se houver campo) ou apenas deletar se permitido
+                // Aqui vamos apenas deletar para limpar o histórico, ou marcar como deletado se tiver soft delete
+                stockMovementRepository.delete(m);
+            }
+            
+            stockRequisitionRepository.delete(req);
+            form.setStockRequisitionId(null);
+        }
+    }
+
+
+    private void recordHistoryForForm(EPIDeliveryForm form, User user, String action) {
+        StringBuilder itemsSummary = new StringBuilder();
+        for (EPIDeliveryFormItem item : form.getItems()) {
+            if (itemsSummary.length() > 0) itemsSummary.append(", ");
+            itemsSummary.append(item.getQuantity()).append("x ").append(item.getEpiName());
+        }
+
+        String historyDetail = String.format(
+                "%s | Status: %s | Itens: %s",
+                action,
+                form.getStatus(),
+                itemsSummary.toString()
+        );
+
+        recordHistory(
+                form.getEmployee().getId(),
+                user,
+                "FICHA_EPI",
+                "Ficha de Entrega de EPI",
+                historyDetail,
+                form.getObservations()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -264,49 +398,48 @@ public class EPIDeliveryFormService {
         EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
         
-        // Devolver itens ao estoque antes de deletar
-        if (form.getItems() != null && !form.getItems().isEmpty()) {
-            for (EPIDeliveryFormItem item : form.getItems()) {
-                String epiName = item.getEpiName();
-                Integer quantity = item.getQuantity() != null ? item.getQuantity() : 1;
-                
-                // Buscar EPI pelo nome no estoque
-                List<PersonalProtectiveEquipment> epis = epiRepository.findByNameContainingIgnoreCase(epiName);
-                PersonalProtectiveEquipment epi = null;
-                
-                // Tentar encontrar EPI exato primeiro
-                for (PersonalProtectiveEquipment e : epis) {
-                    if (e.getName().equalsIgnoreCase(epiName) && e.getIsActive()) {
-                        epi = e;
-                        break;
-                    }
-                }
-                
-                // Se não encontrou exato, pegar o primeiro ativo
-                if (epi == null && !epis.isEmpty()) {
-                    epi = epis.stream()
-                            .filter(e -> e.getIsActive())
-                            .findFirst()
-                            .orElse(null);
-                }
-                
-                // Se encontrou o EPI, devolver ao estoque
-                if (epi != null) {
-                    Integer currentStock = epi.getCurrentStock();
-                    Integer newStock = currentStock + quantity;
-                    epi.setCurrentStock(newStock);
-                    epiRepository.save(epi);
-                    
-                    log.info("📦 Devolução ao estoque: EPI '{}' - Quantidade: {} - Estoque anterior: {} - Estoque atual: {}", 
-                        epiName, quantity, currentStock, newStock);
-                } else {
-                    log.warn("⚠️ EPI '{}' não encontrado no estoque. Não foi possível devolver ao estoque.", epiName);
-                }
-            }
-        }
+        // Devolver itens ao estoque via cancelamento de requisição
+        cancelStockRequisition(form, null);
         
         epiDeliveryFormRepository.deleteById(id);
         log.info("🗑️ Ficha de entrega de EPI deletada: {}", id);
+    }
+
+    /**
+     * Resolve um EPI pelo nome, usando cache para evitar buscas duplicadas no mesmo transaction.
+     * Prioriza match exato e ativo, depois qualquer ativo que contenha o nome.
+     */
+    private PersonalProtectiveEquipment resolveEpi(String epiName, Map<UUID, PersonalProtectiveEquipment> cache) {
+        // Verificar se já temos no cache pelo nome
+        for (PersonalProtectiveEquipment cached : cache.values()) {
+            if (cached.getName().equalsIgnoreCase(epiName)) {
+                return cached;
+            }
+        }
+
+        List<PersonalProtectiveEquipment> epis = epiRepository.findByNameContainingIgnoreCase(epiName);
+        PersonalProtectiveEquipment epi = null;
+
+        // Tentar encontrar EPI exato primeiro
+        for (PersonalProtectiveEquipment e : epis) {
+            if (e.getName().equalsIgnoreCase(epiName) && e.getIsActive()) {
+                epi = e;
+                break;
+            }
+        }
+
+        // Se não encontrou exato, pegar o primeiro ativo
+        if (epi == null && !epis.isEmpty()) {
+            epi = epis.stream()
+                    .filter(e -> e.getIsActive())
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (epi != null) {
+            cache.put(epi.getId(), epi);
+        }
+        return epi;
     }
 
     /**

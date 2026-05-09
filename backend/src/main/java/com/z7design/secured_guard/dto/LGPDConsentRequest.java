@@ -9,7 +9,15 @@ public class LGPDConsentRequest {
     private String employeeName;
     private String employeeCpf;
     private String employeeRg;
+    private String employeeRgOrgao;
     private String employeePosition;
+    private String employeeAddress;
+    private String employeeCity;
+    private String employeeState;
+    private String employeeNeighborhood;
+    private String employeeNumber;
+    private String employeeComplement;
+    private String employeeCep;
     private String city;
     private LocalDate consentDate;
 
@@ -57,12 +65,76 @@ public class LGPDConsentRequest {
         this.employeeRg = employeeRg;
     }
 
+    public String getEmployeeRgOrgao() {
+        return employeeRgOrgao;
+    }
+
+    public void setEmployeeRgOrgao(String employeeRgOrgao) {
+        this.employeeRgOrgao = employeeRgOrgao;
+    }
+
     public String getEmployeePosition() {
         return employeePosition;
     }
 
     public void setEmployeePosition(String employeePosition) {
         this.employeePosition = employeePosition;
+    }
+
+    public String getEmployeeAddress() {
+        return employeeAddress;
+    }
+
+    public void setEmployeeAddress(String employeeAddress) {
+        this.employeeAddress = employeeAddress;
+    }
+
+    public String getEmployeeCity() {
+        return employeeCity;
+    }
+
+    public void setEmployeeCity(String employeeCity) {
+        this.employeeCity = employeeCity;
+    }
+
+    public String getEmployeeState() {
+        return employeeState;
+    }
+
+    public void setEmployeeState(String employeeState) {
+        this.employeeState = employeeState;
+    }
+
+    public String getEmployeeNeighborhood() {
+        return employeeNeighborhood;
+    }
+
+    public void setEmployeeNeighborhood(String employeeNeighborhood) {
+        this.employeeNeighborhood = employeeNeighborhood;
+    }
+
+    public String getEmployeeNumber() {
+        return employeeNumber;
+    }
+
+    public void setEmployeeNumber(String employeeNumber) {
+        this.employeeNumber = employeeNumber;
+    }
+
+    public String getEmployeeComplement() {
+        return employeeComplement;
+    }
+
+    public void setEmployeeComplement(String employeeComplement) {
+        this.employeeComplement = employeeComplement;
+    }
+
+    public String getEmployeeCep() {
+        return employeeCep;
+    }
+
+    public void setEmployeeCep(String employeeCep) {
+        this.employeeCep = employeeCep;
     }
 
     public String getCity() {

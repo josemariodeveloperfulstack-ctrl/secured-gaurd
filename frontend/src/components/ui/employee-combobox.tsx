@@ -98,8 +98,13 @@ export function EmployeeCombobox({
             companySigla: emp.company?.sigla,
             positionName: emp.position?.name,
             unitName: emp.unit?.name,
+            departmentName: emp.department?.name,
             workPostId: emp.workPostId || emp.workPost?.id,
             workPostName: emp.workPostName || emp.workPost?.name,
+            salario: emp.salario,
+            diasTrabalho: emp.diasTrabalho,
+            horarioTrabalho: emp.horarioTrabalho,
+            escalaTrabalho: emp.escalaTrabalho,
           };
           setEmployees(prev => [...prev, simple])
           setSelectedEmployee(simple)
@@ -133,14 +138,14 @@ export function EmployeeCombobox({
           className="w-full justify-between border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50"
         >
           {displayLabel ? (
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className="truncate">{displayLabel}</span>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <User className="h-4 w-4 shrink-0" />
+              <span className="truncate text-left">{displayLabel}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span>{placeholder}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <User className="h-4 w-4 shrink-0" />
+              <span className="truncate">{placeholder}</span>
             </div>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

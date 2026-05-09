@@ -71,6 +71,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/files/**").permitAll()
                                                 .requestMatchers("/api/test/**").permitAll()
                                                 .requestMatchers("/api/health").permitAll()
+                                                .requestMatchers("/api/webhooks/sendgrid/**").permitAll()
                                                  .requestMatchers("/api/public/**").permitAll()
                                                  .requestMatchers("/api/diagnostic/**").permitAll()
                                                  .requestMatchers("/api/debug/**").permitAll()
@@ -334,6 +335,13 @@ public class SecurityConfig {
                                                                 "PROPOSALS_CREATE", "PROPOSALS_DELETE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
+                                                // Campanhas de e-mail (SendGrid) — mesmo perfil comercial/admin
+                                                .requestMatchers("/api/v1/email-campaigns/**")
+                                                .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
+                                                                "LEADS_DELETE",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL",
+                                                                "ROLE_ASSISTENTE_COMERCIAL")
                                                 // Endpoints financeiros - requerem permissões específicas
                                                 .requestMatchers("/api/financial/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",

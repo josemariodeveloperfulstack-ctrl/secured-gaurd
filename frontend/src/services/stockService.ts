@@ -157,10 +157,22 @@ export const stockService = {
   async getItemByQrCode(qrCode: string): Promise<StockItem> {
     try {
       const response = await api.get(`/api/stock/items/qr/${qrCode}`);
-      return response.data;
+      return normalizeStockItem(response.data as unknown as Record<string, unknown>);
     } catch (error) {
       console.error('Erro ao buscar item por QR Code:', error);
       throw new Error('Falha ao buscar item por QR Code');
+    }
+  },
+
+  async adjustInventoryViaQrCode(qrCode: string, physicalQuantity: number): Promise<any> {
+    try {
+      const response = await api.patch(`/api/stock/items/qr/${qrCode}/inventory-adjust`, {
+        physicalQuantity
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao ajustar inventário via QR Code:', error);
+      throw new Error(error?.response?.data?.message || 'Falha ao ajustar inventário');
     }
   },
 
@@ -596,6 +608,55 @@ export const stockService = {
     } catch (error) {
       console.error('Erro ao baixar PDF consolidado de estoque:', error);
       throw new Error('Falha ao baixar relatório consolidado');
+    }
+  },
+
+  async downloadPhysicalInventoryPDF(companyId: string): Promise<void> {
+    try {
+      const response = await api.get(`/api/stock/reports/physical-inventory/pdf?companyId=${companyId}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'planilha-conferencia-estoque.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF de conferência física:', error);
+      throw new Error('Falha ao baixar planilha de conferência');
+    }
+  },
+
+  async downloadConsolidatedRequisitionsPDF(companyId: string, startDate: string, endDate: string): Promise<void> {
+    try {
+      const isoStart = this.convertDateToISO(startDate, true);
+      const isoEnd = this.convertDateToISO(endDate, false);
+      if (!isoStart || !isoEnd) {
+        throw new Error('Período inválido');
+      }
+      const params = new URLSearchParams({
+        companyId,
+        start: isoStart,
+        end: isoEnd
+      });
+      const response = await api.get(`/api/stock/reports/consolidated-requisitions/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'requisicoes-consolidadas.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF de requisições consolidadas:', error);
+      throw new Error('Falha ao baixar relatório de requisições');
+    }
+  },
+
+  async getStockDashboard(companyId: string, start?: string, end?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      params.append('companyId', companyId);
+      if (start) params.append('start', start);
+      if (end) params.append('end', end);
+
+      const response = await api.get(`/api/stock/dashboard?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar dashboard de estoque:', error);
+      throw new Error('Falha ao buscar dados do dashboard');
     }
   },
 

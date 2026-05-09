@@ -149,6 +149,7 @@ const FichaEntregaEPIManualForm: React.FC<FichaEntregaEPIManualFormProps> = ({ c
                     </div>
 
                     <Button
+                        type="button"
                         onClick={handleGerarPDF}
                         disabled={loading || !selectedCompanyId}
                         className="w-full h-12 bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-seguranca-graphite font-bold text-lg shadow-lg"

@@ -10,9 +10,11 @@ export interface EPIDeliveryFormItem {
   uniformType?: string;
   uniformPiece?: string;
   observations?: string;
+  stockItemId?: string; // ID do item no estoque para baixa automática
 }
 
 export type EPIDeliveryType = 'PRIMEIRA_ENTREGA' | 'SUBSTITUICAO' | 'DEVOLUCAO' | 'TROCA';
+export type EPIDeliveryFormStatus = 'DRAFT' | 'COMPLETED';
 
 export interface CreateEPIDeliveryForm {
   employeeId: string;
@@ -23,6 +25,9 @@ export interface CreateEPIDeliveryForm {
   pdfUrl?: string;
   deliveryType?: EPIDeliveryType;
   items: EPIDeliveryFormItem[];
+  signatureBase64?: string;
+  signatureType?: 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT';
+  status?: EPIDeliveryFormStatus;
 }
 
 export interface EPIDeliveryForm {
@@ -45,11 +50,15 @@ export interface EPIDeliveryForm {
   createdAt: string;
   updatedAt: string;
   items: EPIDeliveryFormItem[];
+  status?: EPIDeliveryFormStatus;
+  signatureType?: 'ON_SCREEN' | 'PHYSICAL_ACKNOWLEDGEMENT';
 }
 
 export interface EPIDeliveryFormFilters {
   employeeId?: string;
   companyId?: string;
+  sectorId?: string;
+  reportType?: string;
   startDate?: string;
   endDate?: string;
   page?: number;
@@ -89,6 +98,19 @@ export const epiDeliveryFormService = {
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar ficha de entrega de EPI:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Atualizar uma ficha de entrega de EPI
+   */
+  async update(id: string, data: CreateEPIDeliveryForm): Promise<EPIDeliveryForm> {
+    try {
+      const response = await api.put(`/epi-delivery-forms/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao atualizar ficha de entrega de EPI:', error);
       throw error;
     }
   },
@@ -239,6 +261,38 @@ export const epiDeliveryFormService = {
       return response.data;
     } catch (error) {
       console.error('Erro ao gerar PDF em branco da ficha de entrega de EPI:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Exportar relatório analítico de entregas de EPI (Excel)
+   */
+  async exportReport(filters: EPIDeliveryFormFilters): Promise<Blob> {
+    try {
+      const response = await api.get('/epi-delivery-forms/report/export', {
+        params: filters,
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar relatório de EPI (Excel):', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Exportar relatório analítico de entregas de EPI (PDF)
+   */
+  async exportReportPdf(filters: EPIDeliveryFormFilters): Promise<Blob> {
+    try {
+      const response = await api.get('/epi-delivery-forms/report/export-pdf', {
+        params: filters,
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar relatório de EPI (PDF):', error);
       throw error;
     }
   },

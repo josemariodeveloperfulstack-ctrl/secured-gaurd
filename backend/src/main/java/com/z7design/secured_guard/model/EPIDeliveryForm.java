@@ -81,6 +81,20 @@ public class EPIDeliveryForm {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User createdBy;
 
+    @Column(name = "signature_base64", columnDefinition = "TEXT")
+    private String signatureBase64;
+
+    @Column(name = "signature_type", length = 50)
+    private String signatureType = "ON_SCREEN";
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 30)
+    @Builder.Default
+    private com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status = com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.DRAFT;
+
+    @Column(name = "stock_requisition_id")
+    private UUID stockRequisitionId;
+
     @OneToMany(mappedBy = "deliveryForm", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     @Builder.Default

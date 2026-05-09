@@ -54,6 +54,9 @@ interface KanbanCardProps {
   getPriorityColor: (priority: string) => string;
   getLeadStatusColor: (status: string) => string;
   getLeadStatusText: (status: string) => string;
+  selected?: boolean;
+  onSelect?: (id: number) => void;
+  onDelete?: (id: number) => void;
   formatCurrency: (value: number) => string;
   formatDate: (dateString: string) => string;
 }
@@ -65,6 +68,9 @@ export default function KanbanCard({
   getPriorityColor,
   getLeadStatusColor,
   getLeadStatusText,
+  selected,
+  onSelect,
+  onDelete,
   formatCurrency,
   formatDate
 }: KanbanCardProps) {
@@ -88,14 +94,36 @@ export default function KanbanCard({
 
   return (
     <Card 
-      className="bg-seguranca-black border-gray-600 hover:border-seguranca-yellow transition-colors cursor-pointer"
+      className={`bg-seguranca-black border-gray-600 hover:border-seguranca-yellow transition-all cursor-pointer ${selected ? 'ring-2 ring-seguranca-yellow border-seguranca-yellow bg-seguranca-graphite' : ''}`}
       draggable 
       onDragStart={e => onDragStart(e, opportunity.id)}
       onClick={() => setShowDetails(!showDetails)}
     >
-      <CardContent className="p-4">
+      <CardContent className="p-4 relative">
+        {/* Checkbox de seleção */}
+        <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
+          <input 
+            type="checkbox" 
+            checked={selected} 
+            onChange={() => onSelect?.(opportunity.id)}
+            className="h-4 w-4 rounded border-gray-600 bg-seguranca-black text-seguranca-yellow focus:ring-seguranca-yellow"
+          />
+        </div>
+
+        {/* Botão de exclusão rápida */}
+        <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onDelete?.(opportunity.id)}
+            className="h-7 w-7 text-gray-500 hover:text-red-500 hover:bg-red-500/10"
+          >
+            <XCircle className="h-4 w-4" />
+          </Button>
+        </div>
+
         {/* Header com prioridade e valor */}
-        <div className="flex justify-between items-start mb-3">
+        <div className="flex justify-between items-start mb-3 ml-6">
           <div className="flex items-center gap-2">
             <Badge className={`${getPriorityColor(opportunity.priority)} text-white text-xs`}>
               {opportunity.priority === 'URGENT' ? 'URGENTE' : 
@@ -155,7 +183,7 @@ export default function KanbanCard({
         )}
 
         {/* Tags */}
-        {opportunity.tags.length > 0 && (
+        {opportunity.tags && opportunity.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-3">
             {opportunity.tags.slice(0, 3).map((tag, index) => (
               <Badge key={index} variant="outline" className="text-xs border-gray-600 text-gray-400">

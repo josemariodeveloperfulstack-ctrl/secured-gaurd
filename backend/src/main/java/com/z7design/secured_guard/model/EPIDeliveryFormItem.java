@@ -59,6 +59,9 @@ public class EPIDeliveryFormItem {
 
     @Column(columnDefinition = "TEXT")
     private String observations;
+
+    @Column(name = "stock_item_id")
+    private UUID stockItemId;
 }
 
 

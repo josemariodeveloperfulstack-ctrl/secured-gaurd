@@ -9,6 +9,7 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Calendar, Clock, MapPin, AlertTriangle, CheckCircle2, Loader2, Briefcase } from 'lucide-react';
 import { employeeService, Employee, SimpleEmployee } from '@/services/employeeService';
+import { SearchableSelect } from '../ui/searchable-select';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 
 import { companyService } from '@/services/companyService';
@@ -16,6 +17,38 @@ import { clientService, Client } from '@/services/clientService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+
+// Predefined Safety Templates for common roles
+const SAFETY_TEMPLATES: Record<string, any> = {
+  'RECEPCIONISTA': {
+    activities: 'Recepcionar membros da comunidade e visitantes procurando identificá-los, averiguando suas pretensões para prestar-lhes informações e/ou encaminhá-los a pessoas ou setor procurados. Atender chamadas telefônicas. Anotar recados. Prestar informações.',
+    risks: 'Riscos Ergonômicos: Postura inadequada.',
+    preventiveMeasures: '- Adoção de medidas de proteção em ordem: coletivas e individuais.',
+    uniform: '- Uniforme completo.',
+    mandatoryTrainings: '- Treinamento de Ambientação de Segurança do Trabalho (SIM)\n- DSS – Diálogo de Segurança e Saúde Ocupacional\n- Treinamento sobre aspectos legais e técnicos no uso e conservação de EPIs.'
+  },
+  'PORTEIRO': {
+    activities: 'Fiscalizar a guarda do patrimônio e exercer a observação de fábricas, armazéns, residências, estacionamentos, edifícios públicos, privados e outros estabelecimentos, percorrendo-os sistematicamente e inspecionando suas dependências.',
+    risks: 'Riscos Ergonômicos: Postura inadequada, trabalho em pé.\nRiscos de Acidentes: Intrusão, violência física.',
+    preventiveMeasures: '- Pausas ergonômicas.\n- Cumprimento de procedimentos de segurança.\n- Manter comunicação via rádio.',
+    uniform: '- Uniforme completo padrão da portaria.',
+    mandatoryTrainings: '- Treinamento de Ambientação de Segurança do Trabalho (SIM)\n- Procedimentos de Portaria e Controle de Acesso\n- Primeiros Socorros Básicos\n- DSS Diário'
+  },
+  'VIGILANTE': {
+    activities: 'Garantir a segurança patrimonial e física do local, realizando rondas, controle de acesso e monitoramento. Agir preventivamente para evitar ocorrências e atuar de forma repressiva quando necessário e de acordo com a legislação.',
+    risks: 'Riscos de Acidentes: Violência, assaltos.\nRiscos Ergonômicos: Postura prolongada.\nRiscos Físicos: Exposição a intempéries.',
+    preventiveMeasures: '- Uso de colete balístico (se aplicável).\n- Atenção contínua e adoção de protocolos de segurança armada/desarmada.\n- Adoção de medidas de proteção coletivas e individuais.',
+    uniform: '- Uniforme tático/padrão completo.\n- Calçado de segurança.',
+    mandatoryTrainings: '- Reciclagem de Vigilante (obrigatório PF)\n- Treinamento de Ambientação de Segurança do Trabalho\n- Uso Progressivo da Força\n- Defesa Pessoal e Armamento (se aplicável)'
+  },
+  'AUXILIAR DE LIMPEZA': {
+    activities: 'Realizar a limpeza e conservação das dependências do cliente. Varrer, lavar, encerar, limpar vidros e janelas, recolher o lixo, e repor materiais de higiene.',
+    risks: 'Riscos Químicos: Manuseio de produtos de limpeza.\nRiscos Ergonômicos: Movimentos repetitivos.\nRiscos de Acidentes: Quedas em piso escorregadio.',
+    preventiveMeasures: '- Uso de EPIs adequados (luvas, botas de borracha, óculos).\n- Sinalização de piso molhado.\n- Diluição correta de produtos químicos.',
+    uniform: '- Uniforme padrão de limpeza.\n- Bota de borracha/Calçado fechado antiderrapante.',
+    mandatoryTrainings: '- Treinamento de manuseio de produtos químicos (FISPQ)\n- Uso e conservação de EPIs\n- NR-32 (se aplicável a ambiente hospitalar)\n- DSS Semanal'
+  }
+};
 
 interface OrdemServicosFormProps {
   employeeId?: string;
@@ -36,17 +69,23 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     startTime: '',
     endTime: '',
     description: '',
-    priority: '',
     status: '',
     observations: '',
+    workPostId: '',
+    activities: '',
+    risks: '',
+    preventiveMeasures: '',
+    uniform: '',
+    mandatoryTrainings: '',
   });
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
-
   const [clients, setClients] = useState<Client[]>([]);
+  const [workPosts, setWorkPosts] = useState<any[]>([]);
+  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
@@ -76,9 +115,18 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               phone: emp.phone,
               registrationNumber: emp.registrationNumber,
               hireDate: emp.hireDate,
+              rg: emp.rg,
               positionName: emp.position?.name,
               unitName: emp.unit?.name,
-              address: emp.address
+              departmentName: emp.department?.name,
+              workPostId: (emp as any).workPostId || emp.workPost?.id,
+              workPostName: (emp as any).workPostName || emp.workPost?.name,
+              companyId: emp.company?.id,
+              companySigla: emp.company?.sigla,
+              address: emp.address,
+              salario: emp.salario,
+              escalaTrabalho: emp.escalaTrabalho,
+              horarioTrabalho: emp.horarioTrabalho,
             } as SimpleEmployee);
           }
         } catch (error) {
@@ -125,7 +173,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     }
   }, [funcionario]);
 
-  // Pre-fill location when client changes
+  // Pre-fill location when client changes & fetch work posts
   useEffect(() => {
     if (cliente && cliente.address) {
       setForm(prev => ({
@@ -133,7 +181,59 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
         location: cliente.address || prev.location
       }));
     }
-  }, [cliente]);
+    if (form.clientId) {
+      const fetchWorkPosts = async () => {
+        setLoadingWorkPosts(true);
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`/api/work-posts/by-client/${form.clientId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setWorkPosts(data);
+          }
+        } catch (e) {
+          console.error('Erro ao buscar postos:', e);
+        } finally {
+          setLoadingWorkPosts(false);
+        }
+      };
+      fetchWorkPosts();
+    } else {
+      setWorkPosts([]);
+    }
+  }, [form.clientId]);
+
+  const handleApplyTemplate = () => {
+    if (!funcionario?.positionName) return;
+    const pos = funcionario.positionName.toUpperCase();
+    
+    // Tenta encontrar um template que corresponda ao cargo do funcionário
+    const templateKey = Object.keys(SAFETY_TEMPLATES).find(k => pos.includes(k));
+    
+    if (templateKey) {
+      const tpl = SAFETY_TEMPLATES[templateKey];
+      setForm(prev => ({
+        ...prev,
+        activities: prev.activities || tpl.activities,
+        risks: prev.risks || tpl.risks,
+        preventiveMeasures: prev.preventiveMeasures || tpl.preventiveMeasures,
+        uniform: prev.uniform || tpl.uniform,
+        mandatoryTrainings: prev.mandatoryTrainings || tpl.mandatoryTrainings
+      }));
+      toast({
+        title: "Template Aplicado",
+        description: `Dados de segurança para o cargo de ${templateKey} foram carregados.`,
+      });
+    } else {
+      toast({
+        title: "Template não encontrado",
+        description: `Não há um template padrão configurado para o cargo: ${pos}.`,
+        variant: "destructive"
+      });
+    }
+  };
 
   const serviceTypes = [
     'Vigilância Patrimonial',
@@ -179,12 +279,15 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
       if (!fullEmployee) throw new Error('Funcionário não encontrado');
 
+      const selectedWorkPost = workPosts.find(wp => wp.id === form.workPostId);
+      const sectorName = selectedWorkPost?.name || (fullEmployee as any).workPost?.name || (fullEmployee as any).unit?.name || (fullEmployee as any).department?.name || '';
+
       const payload = {
         companyId: empresa.id,
         employeeName: fullEmployee.name,
         employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
-        employeePosition: form.position,
-        sector: (fullEmployee as any).unit?.name || '',
+        employeePosition: fullEmployee.position?.name || '',
+        sector: sectorName,
         clientName: cliente.name,
         clientAddress: cliente.address || '',
         serviceType: form.serviceType,
@@ -197,8 +300,13 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
         status: form.status,
         description: form.description,
         observations: form.observations,
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
-        documentDate: new Date().toISOString().split('T')[0]
+        city: empresa.city || '',
+        documentDate: new Date().toISOString().split('T')[0],
+        activities: form.activities,
+        risks: form.risks,
+        preventiveMeasures: form.preventiveMeasures,
+        uniform: form.uniform,
+        mandatoryTrainings: form.mandatoryTrainings,
       };
 
       const response = await api.post('/api/operational-service-order/generate-pdf', payload, {
@@ -245,12 +353,15 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     try {
       const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
 
+      const selectedWorkPost = workPosts.find(wp => wp.id === form.workPostId);
+      const sectorName = selectedWorkPost?.name || (fullEmployee as any).workPost?.name || (fullEmployee as any).unit?.name || (fullEmployee as any).department?.name || '';
+
       const payload = {
         companyId: empresa.id,
         employeeName: fullEmployee.name,
         employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
-        employeePosition: form.position,
-        sector: (fullEmployee as any).unit?.name || '',
+        employeePosition: fullEmployee.position?.name || '',
+        sector: sectorName,
         clientName: cliente.name,
         clientAddress: cliente.address || '',
         serviceType: form.serviceType,
@@ -263,8 +374,13 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
         status: form.status,
         description: form.description,
         observations: form.observations,
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
-        documentDate: new Date().toISOString().split('T')[0]
+        city: empresa.city || '',
+        documentDate: new Date().toISOString().split('T')[0],
+        activities: form.activities,
+        risks: form.risks,
+        preventiveMeasures: form.preventiveMeasures,
+        uniform: form.uniform,
+        mandatoryTrainings: form.mandatoryTrainings,
       };
 
       const response = await api.post('/api/operational-service-order/preview-pdf', payload, {
@@ -493,9 +609,26 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
+                      {(funcionario as any).workPostName || funcionario.unitName || (funcionario as any).departmentName || '-'}
                     </div>
                   </div>
+                  {workPosts.length > 0 && (
+                    <div className="space-y-1.5 mt-3">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor de Trabalho (Cliente)</Label>
+                      <SearchableSelect
+                        options={workPosts.map((wp: any) => ({
+                          value: wp.id,
+                          label: wp.name,
+                          description: wp.address || ''
+                        }))}
+                        value={form.workPostId}
+                        onChange={(value) => setForm(prev => ({ ...prev, workPostId: value }))}
+                        disabled={loadingWorkPosts}
+                        placeholder={loadingWorkPosts ? 'Carregando...' : 'Selecione o setor'}
+                        searchPlaceholder="Buscar setor..."
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -663,6 +796,81 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 className="bg-background resize-none"
               />
             </div>
+            <Separator />
+            
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Segurança e Medicina do Trabalho (NR-01)</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleApplyTemplate}
+                disabled={!funcionario?.positionName}
+                title="Preenche os campos baseado no cargo do funcionário selecionado"
+              >
+                <Briefcase className="h-4 w-4 mr-2" />
+                Carregar Padrão do Cargo
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Atividades Habituais</Label>
+                <Textarea
+                  value={form.activities}
+                  onChange={(e) => setForm(prev => ({ ...prev, activities: e.target.value }))}
+                  placeholder="Descreva as atividades habituais..."
+                  rows={3}
+                  className="bg-background resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Riscos</Label>
+                <Textarea
+                  value={form.risks}
+                  onChange={(e) => setForm(prev => ({ ...prev, risks: e.target.value }))}
+                  placeholder="Ex: Riscos Ergonômicos: Postura inadequada..."
+                  rows={2}
+                  className="bg-background resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Medidas Preventivas</Label>
+                <Textarea
+                  value={form.preventiveMeasures}
+                  onChange={(e) => setForm(prev => ({ ...prev, preventiveMeasures: e.target.value }))}
+                  placeholder="Ex: Adoção de medidas de proteção..."
+                  rows={2}
+                  className="bg-background resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Uniforme de Uso Obrigatório</Label>
+                <Textarea
+                  value={form.uniform}
+                  onChange={(e) => setForm(prev => ({ ...prev, uniform: e.target.value }))}
+                  placeholder="Ex: Uniforme completo..."
+                  rows={2}
+                  className="bg-background resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Treinamentos Obrigatórios</Label>
+                <Textarea
+                  value={form.mandatoryTrainings}
+                  onChange={(e) => setForm(prev => ({ ...prev, mandatoryTrainings: e.target.value }))}
+                  placeholder="Ex: Treinamento de Ambientação, DSS..."
+                  rows={3}
+                  className="bg-background resize-none"
+                />
+              </div>
+            </div>
           </div>
 
           <Separator />
@@ -670,6 +878,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
             <Button
+              type="button"
               onClick={handlePreviewOrder}
               variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
@@ -688,6 +897,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               )}
             </Button>
             <Button
+              type="button"
               onClick={handleGenerateOrder}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || !funcionario || !empresa || !cliente}

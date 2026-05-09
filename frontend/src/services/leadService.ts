@@ -95,8 +95,16 @@ class LeadService {
     return response.data;
   }
 
-  async deleteLead(id: number | string): Promise<void> {
-    await api.delete(`/api/leads/${id}`);
+  async deleteLead(id: number | string, reason: string = "Exclusão individual"): Promise<void> {
+    await api.delete(`/api/leads/${id}?reason=${encodeURIComponent(reason)}`);
+  }
+
+  async deleteAllLeads(reason: string = "Exclusão de todos os leads"): Promise<void> {
+    await api.delete(`/api/leads/all?reason=${encodeURIComponent(reason)}`);
+  }
+
+  async deleteLeadsBulk(ids: (number | string)[], reason: string = "Exclusão em massa"): Promise<void> {
+    await api.post('/api/leads/bulk-delete', { ids, reason });
   }
 
   async getLeadsByStatus(status: string): Promise<Lead[]> {

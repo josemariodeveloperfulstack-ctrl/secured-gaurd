@@ -42,6 +42,7 @@ import {
   Handshake,
   ArrowUpDown,
   Kanban,
+  Megaphone,
   Mail,
   Route,
   MessageCircle,
@@ -238,6 +239,7 @@ const departamentoPessoalMenuItems = [
 // Módulo Comercial
 const comercialMenuItems = [
   { icon: Target, text: 'Leads', to: '/leads', id: 'leads' },
+  { icon: Megaphone, text: 'Marketing', to: '/comercial/marketing', id: 'marketing', requiredPermission: 'LEADS_READ' },
   { icon: Building, text: 'Empresas', to: '/comercial/empresas', id: 'empresas' },
   { icon: Building2, text: 'Clientes', to: '/clientes', id: 'clientes' },
   { icon: FileCheck, text: 'Propostas', to: '/propostas', id: 'propostas' },
@@ -418,6 +420,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   COMERCIAL: new Set([
     'dashboard',
     'leads',
+    'marketing',
     'empresas',
     'clientes',
     'propostas',
@@ -431,6 +434,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   GESTOR_COMERCIAL: new Set([
     'dashboard',
     'leads',
+    'marketing',
     'empresas',
     'clientes',
     'propostas',
@@ -444,6 +448,7 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ASSISTENTE_COMERCIAL: new Set([
     'dashboard',
     'leads',
+    'marketing',
     'clientes',
     'propostas',
     'orcamentos',

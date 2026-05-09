@@ -31,7 +31,7 @@ public class OsStandardPdfService {
                 this.pdfLayoutService = pdfLayoutService;
         }
 
-        private static final String REPORT_TITLE = "ORDEM DE SERVIÇO OPERACIONAL";
+        private static final String REPORT_TITLE = "ORDEM DE SERVIÇOS";
 
         public byte[] generatePdf(OperationalServiceOrderRequest request) {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -41,7 +41,7 @@ public class OsStandardPdfService {
                                         .companyId(request.getCompanyId())
                                         .reportTitle(REPORT_TITLE)
                                         .includeEmailInFooter(true)
-                                        .marginExtraTop(20f)
+                                        .marginExtraTop(-35f)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -59,152 +59,124 @@ public class OsStandardPdfService {
         }
 
         private void addContent(Document document, OperationalServiceOrderRequest request, Company company) {
-                // Status e Prioridade (Tabela superior)
-                Table statusTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
-                                .useAllAvailableWidth();
-                statusTable.setMarginBottom(20f);
+                // Intro Text
+                String introText = "Conforme estabelecido no item 1.7, letra \"b\", NR-01 da Portaria 3214/MTE, cabe ao empregador elaborar Ordem de Serviço (OS) sobre Segurança e Medicina do Trabalho, dando ciência aos empregados.";
+                document.add(new Paragraph(introText).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(10f));
 
-                statusTable.addCell(createLabelValueCell("STATUS:", request.getStatus()));
-                statusTable.addCell(createLabelValueCell("PRIORIDADE:", request.getPriority()));
+                // Main Table
+                Table table = new Table(UnitValue.createPercentArray(new float[] { 100 })).useAllAvailableWidth();
 
-                document.add(statusTable);
+                // Header
+                table.addCell(new Cell().add(new Paragraph("SEGURANÇA E MEDICINA DO TRABALHO").setBold().setTextAlignment(TextAlignment.CENTER))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(3f));
 
-                // Empresa Prestadora
-                document.add(createSectionHeader("EMPRESA PRESTADORA DO SERVIÇO"));
-                Table companyTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-                companyTable.addCell(createLabelValueCell("RAZÃO SOCIAL:", company.getName()));
-                companyTable.addCell(createLabelValueCell("CNPJ:", CompanyDataFormatter.formatCnpj(company.getCnpj())));
-                companyTable.addCell(
-                                createLabelValueCell("ENDEREÇO:", CompanyDataFormatter.formatFullAddress(company)));
-                document.add(companyTable);
+                // Company and Sector
+                Table row1 = new Table(UnitValue.createPercentArray(new float[] { 70, 30 })).useAllAvailableWidth();
+                row1.addCell(new Cell().add(new Paragraph("EMPRESA: " + (company != null ? company.getName().toUpperCase() : "")).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
+                row1.addCell(new Cell().add(new Paragraph("SETOR: " + safeStr(request.getSector()).toUpperCase()).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER).setBorderLeft(new com.itextpdf.layout.borders.SolidBorder(1f)));
+                table.addCell(new Cell().add(row1).setPadding(2f));
 
-                // Cliente
-                document.add(createSectionHeader("CLIENTE"));
-                Table clientTable = new Table(UnitValue.createPercentArray(new float[] { 100 })).useAllAvailableWidth();
-                clientTable.addCell(createLabelValueCell("NOME/RAZÃO SOCIAL:", request.getClientName()));
-                clientTable.addCell(createLabelValueCell("ENDEREÇO DO CLIENTE:", request.getClientAddress()));
-                document.add(clientTable);
+                // Responsibility
+                table.addCell(new Cell().add(new Paragraph("RESPONSABILIDADE: " + safeStr(request.getServiceType()).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
 
-                // Responsável pela Execução
-                document.add(createSectionHeader("RESPONSÁVEL PELA EXECUÇÃO"));
-                Table execTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
-                                .useAllAvailableWidth();
-                execTable.addCell(createLabelValueCell("NOME:", request.getEmployeeName()));
-                execTable.addCell(createLabelValueCell("CPF:", request.getEmployeeCpf()));
-                execTable.addCell(createLabelValueCell("CARGO:", request.getEmployeePosition()));
-                execTable.addCell(createLabelValueCell("SETOR:", request.getSector()));
-                document.add(execTable);
+                // Dates
+                Table row2 = new Table(UnitValue.createPercentArray(new float[] { 70, 30 })).useAllAvailableWidth();
+                row2.addCell(new Cell().add(new Paragraph("ELABORADO EM: " + formatDate(request.getDocumentDate())).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
+                row2.addCell(new Cell().add(new Paragraph("REVISÃO:").setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER).setBorderLeft(new com.itextpdf.layout.borders.SolidBorder(1f)));
+                table.addCell(new Cell().add(row2).setPadding(2f));
 
-                // Detalhes do Serviço
-                document.add(createSectionHeader("DETALHES DO SERVIÇO"));
-                Table serviceTable = new Table(UnitValue.createPercentArray(new float[] { 50, 50 }))
-                                .useAllAvailableWidth();
-                serviceTable.addCell(createLabelValueCell("TIPO DE SERVIÇO:", request.getServiceType()));
-                serviceTable.addCell(createLabelValueCell("LOCAL DO SERVIÇO:", request.getLocation()));
+                // Employee Info
+                table.addCell(new Cell().add(new Paragraph("NOME DO EMPREGADO: " + safeStr(request.getEmployeeName()).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
+                table.addCell(new Cell().add(new Paragraph("CARGO: " + safeStr(request.getEmployeePosition()).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
 
-                String periodo = String.format("%s a %s",
-                                formatDate(request.getStartDate()),
-                                request.getEndDate() != null ? formatDate(request.getEndDate()) : "Indeterminado");
-                serviceTable.addCell(createLabelValueCell("PERÍODO:", periodo));
+                // Obligations Header
+                table.addCell(new Cell().add(new Paragraph("OBRIGAÇÕES DO EMPREGADO").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(3f));
 
-                String horario = String.format("%s às %s",
-                                request.getStartTime() != null ? request.getStartTime() : "--:--",
-                                request.getEndTime() != null ? request.getEndTime() : "--:--");
-                serviceTable.addCell(createLabelValueCell("HORÁRIO:", horario));
-                document.add(serviceTable);
+                // Obligations List
+                com.itextpdf.layout.element.List list = new com.itextpdf.layout.element.List()
+                        .setSymbolIndent(12)
+                        .setListSymbol("•")
+                        .setFontSize(8.5f);
+                list.add(new com.itextpdf.layout.element.ListItem("Cumprir todas as normas expedidas pelo Empregador, inclusive esta ordem de serviço;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Executar as tarefas que lhe forem delegadas após treinamento específico para execução da mesma;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Manter a ordem, disciplina, higiene e segurança no trabalho;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Participar de treinamentos relacionados à segurança e saúde ocupacional;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Usar obrigatoriamente os Equipamentos de Proteção Individual indicado para a função;"));
+                list.add(new com.itextpdf.layout.element.ListItem("Colaborar com a empresa na aplicação das Normas Regulamentadoras – NR's. (PPRA – PCMSO)"));
+                list.add(new com.itextpdf.layout.element.ListItem("É responsabilidade do empregado usar, guardar, conservar, e comunicar ao empregador qualquer alteração que torne impróprio uso do Equipamento de Proteção Individual."));
+                
+                table.addCell(new Cell().add(list).setPadding(5f));
 
-                // Descrição
-                if (request.getDescription() != null && !request.getDescription().isEmpty()) {
-                        document.add(new Paragraph(new Text("DESCRIÇÃO DO SERVIÇO:").setBold()).setFontSize(10f)
-                                        .setMarginTop(10f));
-                        document.add(
-                                        new Paragraph(request.getDescription()).setFontSize(10f)
-                                                        .setTextAlignment(TextAlignment.JUSTIFIED));
-                }
+                // Habitual Activities
+                table.addCell(new Cell().add(new Paragraph("ATIVIDADES HABITUAIS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(3f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getActivities())).setFontSize(9f)).setPadding(5f));
 
-                // Observações
-                if (request.getObservations() != null && !request.getObservations().isEmpty()) {
-                        document.add(new Paragraph(new Text("OBSERVAÇÕES:").setBold()).setFontSize(10f)
-                                        .setMarginTop(10f));
-                        document.add(new Paragraph(request.getObservations()).setFontSize(10f)
-                                        .setTextAlignment(TextAlignment.JUSTIFIED));
-                }
+                // Risks
+                table.addCell(new Cell().add(new Paragraph("RISCOS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(3f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getRisks())).setFontSize(9f)).setPadding(5f));
 
-                // Assinaturas
+                // Preventive Measures
+                table.addCell(new Cell().add(new Paragraph("MEDIDAS PREVENTIVAS PARA REALIZAÇÃO DAS ATIVIDADES").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(3f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getPreventiveMeasures())).setFontSize(9f)).setPadding(5f));
+
+                // Uniform
+                table.addCell(new Cell().add(new Paragraph("UNIFORME DE USO OBRIGATÓRIO").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(3f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getUniform())).setFontSize(9f)).setPadding(5f));
+
+                // Trainings
+                table.addCell(new Cell().add(new Paragraph("TREINAMENTOS OBRIGATÓRIOS").setBold().setTextAlignment(TextAlignment.CENTER).setFontSize(10f))
+                        .setBackgroundColor(com.itextpdf.kernel.colors.ColorConstants.LIGHT_GRAY)
+                        .setPadding(3f));
+                table.addCell(new Cell().add(new Paragraph(safeStr(request.getMandatoryTrainings())).setFontSize(9f)).setPadding(5f));
+
+                document.add(table);
+
+                // Warning Text
+                String warningText1 = "O descumprimento desta Ordem de Serviço caracteriza ato de indisciplina do empregado. Permitindo aplicar as penalidades que a critério da empresa poderá ser advertência verbal por escrito e até rescisão de contrato de trabalho por justa causa, independentemente de outras medidas de ordem jurídicas aplicáveis no art. 158 da CLT, norma regulamentadora nº 01 da portaria 3214/78 (subitens 1.8 e 1.8.1).";
+                String warningText2 = "Declara o empregado que recebeu cópia da presente Ordem de Serviço, que fica em seu poder passando o original a fazer parte do seu contrato de trabalho, para todos os fins previstos em lei.";
+                
+                document.add(new Paragraph(warningText1).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginTop(10f));
+                document.add(new Paragraph(warningText2).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginTop(10f));
+
+                // Signatures
                 addSignatures(document, request, company);
         }
 
-        private Cell createLabelValueCell(String label, String value) {
-                Paragraph p = new Paragraph();
-                p.add(new Text(label).setBold().setFontSize(9f));
-                p.add(new Text(" " + (value != null ? value : "-")).setFontSize(10f));
-                return new Cell().add(p).setPadding(5f);
-        }
-
-        private Paragraph createSectionHeader(String title) {
-                return new Paragraph(title)
-                                .setBold()
-                                .setFontSize(11f)
-                                .setFontColor(com.itextpdf.kernel.colors.DeviceRgb.RED)
-                                .setMarginTop(15f)
-                                .setMarginBottom(5f)
-                                .setBorderLeft(
-                                                new com.itextpdf.layout.borders.SolidBorder(
-                                                                com.itextpdf.kernel.colors.DeviceRgb.RED, 3f))
-                                .setPaddingLeft(5f);
+        private String safeStr(String str) {
+                return str != null && !str.trim().isEmpty() ? str : "-";
         }
 
         private void addSignatures(Document document, OperationalServiceOrderRequest request, Company company) {
                 String city = request.getCity() != null ? request.getCity()
                                 : (company.getCity() != null ? company.getCity() : "_______________");
-                String date = formatDateExtended(
+                String date = formatDate(
                                 request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now());
 
                 Paragraph dateLoc = new Paragraph(city + ", " + date)
-                                .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginTop(30f)
+                                .setTextAlignment(TextAlignment.LEFT)
+                                .setMarginTop(25f)
                                 .setMarginBottom(40f)
-                                .setFontSize(10f);
+                                .setFontSize(10f).setBold();
                 document.add(dateLoc);
 
-                Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 45, 10, 45 }))
-                                .useAllAvailableWidth();
-
-                Cell cell1 = new Cell()
-                                .add(new Paragraph("_________________________________")
-                                                .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(company.getName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Emitente").setTextAlignment(TextAlignment.CENTER).setFontSize(8f))
-                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                Cell spacer = new Cell().setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                Cell cell2 = new Cell()
-                                .add(new Paragraph("_________________________________")
-                                                .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(request.getEmployeeName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Executante").setTextAlignment(TextAlignment.CENTER).setFontSize(8f))
-                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                sigTable.addCell(cell1);
-                sigTable.addCell(spacer);
-                sigTable.addCell(cell2);
-
-                document.add(sigTable);
+                document.add(new Paragraph("_________________________________________________").setMarginBottom(0f));
+                document.add(new Paragraph(safeStr(request.getEmployeeName()).toUpperCase()).setFontSize(10f).setBold());
         }
 
         private String formatDate(LocalDate date) {
                 if (date == null)
                         return "__/__/____";
                 return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-        }
-
-        private String formatDateExtended(LocalDate date) {
-                return date.format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("pt", "BR")));
         }
 }

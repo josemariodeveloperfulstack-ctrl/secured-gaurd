@@ -13,11 +13,19 @@ public class EPIDeliveryFormItemDTO {
     private String uniformType;
     private String uniformPiece;
     private String observations;
+    private UUID stockItemId;
 
     public EPIDeliveryFormItemDTO() {
     }
 
     // Manual Getters and Setters
+    public UUID getStockItemId() {
+        return stockItemId;
+    }
+
+    public void setStockItemId(UUID stockItemId) {
+        this.stockItemId = stockItemId;
+    }
     public UUID getId() {
         return id;
     }

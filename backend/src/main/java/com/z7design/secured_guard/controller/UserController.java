@@ -169,7 +169,7 @@ public class UserController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('GESTOR') or hasRole('ASSISTENCIA_RH')")
     @Operation(summary = "Buscar usuários", description = "Busca usuários por nome, email ou username com filtro dinâmico")
     public ResponseEntity<List<UserListResponseDTO>> searchUsers(
             @RequestParam(value = "query", required = false) String query) {
