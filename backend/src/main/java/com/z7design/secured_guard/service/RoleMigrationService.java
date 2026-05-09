@@ -177,7 +177,8 @@ public class RoleMigrationService {
                 "ESTOQUE",
                 "SUPRIMENTOS",
                 "COMPRAS",
-                "GESTOR_OPERACIONAL"
+                "GESTOR_OPERACIONAL",
+                "GESTAO_SUPERVISAO"
         };
 
         for (String roleName : defaultRoles) {

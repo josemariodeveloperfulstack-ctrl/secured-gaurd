@@ -191,44 +191,44 @@ public class SecurityConfig {
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO")
                                                 .requestMatchers("/api/epis/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO")
                                                 .requestMatchers("/api/epi-control/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO")
                                                 // Endpoints da frota - requerem permissões operacionais
                                                 .requestMatchers("/api/frota/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de fuel-records
                                                 .requestMatchers("/api/fuel-records/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de veículos
                                                 .requestMatchers("/api/vehicles/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de work-posts
                                                 .requestMatchers("/api/work-posts/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_RH")
@@ -522,6 +522,7 @@ public class SecurityConfig {
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                                "GESTAO_SUPERVISAO", "ROLE_GESTAO_SUPERVISAO",
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de funcionários, unidades, empresas e cargos - requerem
                                                 // permissões de RH, admin ou financeiro (empresas usadas em Contas a Pagar)
@@ -533,6 +534,7 @@ public class SecurityConfig {
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                                "GESTAO_SUPERVISAO", "ROLE_GESTAO_SUPERVISAO",
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR",
                                                                 "COMERCIAL", "ROLE_COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
@@ -551,8 +553,10 @@ public class SecurityConfig {
                                                 // Endpoints operacionais - temporariamente públicos para teste de
                                                 // integração
                                                 .requestMatchers("/api/schedules/**").permitAll()
-                                                .requestMatchers("/api/activity-logs/**").hasAuthority("ROLE_SUPER_ADMIN")
-                                                .requestMatchers("/api/activity-reports/**").hasAuthority("ROLE_SUPER_ADMIN")
+                                                .requestMatchers("/api/activity-logs/**")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_GESTAO_SUPERVISAO", "ROLE_GESTOR_OPERACIONAL", "ROLE_SUPERVISOR")
+                                                .requestMatchers("/api/activity-reports/**")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_GESTAO_SUPERVISAO", "ROLE_GESTOR_OPERACIONAL", "ROLE_SUPERVISOR")
                                                 .requestMatchers("/api/orders-of-service/**").permitAll()
                                                 .requestMatchers("/api/operational/**").permitAll()
                                                 .requestMatchers("/api/occurrences/**").permitAll()

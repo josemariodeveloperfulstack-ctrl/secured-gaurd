@@ -293,6 +293,7 @@ public class UserGroupService {
                 "ADMIN", UserGroup.GRUPO_ADMIN,
                 "RH", UserGroup.GRUPO_RH,
                 "SUPERVISOR", UserGroup.GRUPO_SUPERVISOR,
+                "GESTAO_SUPERVISAO", UserGroup.GRUPO_GESTOR_SUPERVISAO,
                 "COLABORADOR", UserGroup.GRUPO_COLABORADORES,
                 "OPERACIONAL", UserGroup.GRUPO_OPERACIONAL,
                 "FINANCEIRO", UserGroup.GRUPO_FINANCEIRO,
@@ -521,10 +522,12 @@ public class UserGroupService {
                 "EMPLOYEES_WRITE", "REPORTS_READ", "CLIENTS_READ", "CONTRACTS_READ",
                 "FINANCIAL_READ", "EQUIPMENTS_READ", "DOCUMENTS_READ")));
 
-        // GRUPO_SUPERVISOR - Supervisão
+        // GRUPO_SUPERVISOR - Supervisão (visitas e campo)
         permissions.put(UserGroup.GRUPO_SUPERVISOR, new HashSet<>(Arrays.asList(
-                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "EMPLOYEES_READ",
-                "REPORTS_READ", "EQUIPMENTS_READ")));
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "EMPLOYEES_READ", "EMPLOYEES_WRITE",
+                "REPORTS_READ", "REPORTS_GENERATE", "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
+                "VISITS_READ", "VISITS_WRITE", "VISITS_CREATE", "VISITS_UPDATE",
+                "CONTRACTS_READ", "MESSAGES_READ", "MESSAGES_WRITE", "DASHBOARD_READ")));
 
         // GRUPO_COLABORADORES - Colaboradores
         permissions.put(UserGroup.GRUPO_COLABORADORES, new HashSet<>(Arrays.asList(
@@ -587,10 +590,16 @@ public class UserGroupService {
                 "QUOTES_WRITE", "CLIENTS_READ", "CLIENTS_WRITE", "CONTRACTS_READ",
                 "REPORTS_READ")));
 
-        // GRUPO_GESTOR_SUPERVISAO - Gestor de Supervisão
+        // GRUPO_GESTOR_SUPERVISAO - Gestor de Supervisão (alinhado ao módulo operacional completo no front)
         permissions.put(UserGroup.GRUPO_GESTOR_SUPERVISAO, new HashSet<>(Arrays.asList(
-                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "EMPLOYEES_READ",
-                "EMPLOYEES_WRITE", "REPORTS_READ", "CONTRACTS_READ", "EQUIPMENTS_READ")));
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE",
+                "EMPLOYEES_READ", "EMPLOYEES_WRITE", "EMPLOYEE_HISTORY_READ",
+                "REPORTS_READ", "REPORTS_GENERATE", "CONTRACTS_READ",
+                "EQUIPMENTS_READ", "EQUIPMENTS_WRITE", "EQUIPMENTS_ASSIGN", "EQUIPMENTS_CREATE",
+                "VISITS_READ", "VISITS_WRITE", "VISITS_CREATE", "VISITS_UPDATE", "VISITS_DELETE", "VISITS_MANAGE",
+                "TIME_RECORD_READ", "TIME_RECORD_CREATE", "TIME_RECORD_UPDATE", "TIME_RECORD_MANAGE",
+                "PAYROLL_READ", "ATTENDANCE_READ", "ATTENDANCE_WRITE", "ATTENDANCE_MANAGE",
+                "MESSAGES_READ", "MESSAGES_WRITE", "MESSAGES_CREATE", "DASHBOARD_READ")));
 
         // GRUPO_GESTOR_FINANCEIRO - Gestor Financeiro
         permissions.put(UserGroup.GRUPO_GESTOR_FINANCEIRO, new HashSet<>(Arrays.asList(

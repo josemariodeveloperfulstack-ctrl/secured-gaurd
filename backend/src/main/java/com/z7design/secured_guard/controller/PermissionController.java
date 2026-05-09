@@ -255,6 +255,13 @@ public class PermissionController {
             "color", "🟨",
             "permissions", "Perfil próprio e visualização de holerites"
         ));
+
+        hierarchy.put("GESTAO_SUPERVISAO", Map.of(
+            "level", 3,
+            "description", "Gestão de supervisão — módulo operacional completo (coordenação de supervisores e operações)",
+            "color", "🟦",
+            "permissions", "Mesmo escopo operacional do Gestor Operacional; sem módulo financeiro"
+        ));
         
         return ResponseEntity.ok(hierarchy);
     }
@@ -267,6 +274,7 @@ public class PermissionController {
             case RH: return "Recursos Humanos";
             case FINANCEIRO: return "Financeiro";
             case GESTOR_OPERACIONAL: return "Gestor Operacional";
+            case GESTAO_SUPERVISAO: return "Gestão de Supervisão";
             case TI_SUPORTE: return "TI / Suporte Técnico";
             case AUDITOR: return "Auditor / Consultor";
             case COLABORADOR: return "Colaborador";
@@ -290,6 +298,7 @@ public class PermissionController {
             case RH: return "Gerencia informações contratuais e pessoais dos colaboradores";
             case FINANCEIRO: return "Controla relatórios financeiros, movimentações e conferências de pagamento";
             case GESTOR_OPERACIONAL: return "Acesso total ao módulo Operacional; sem acesso ao módulo Financeiro";
+            case GESTAO_SUPERVISAO: return "Acesso total ao módulo Operacional para coordenação de supervisão; sem módulo Financeiro";
             case TI_SUPORTE: return "Gerencia configuração técnica, logs, backups e integrações";
             case AUDITOR: return "Acesso somente leitura para fins de auditoria ou análise externa";
             case COLABORADOR: return "Acesso limitado exclusivamente ao seu próprio perfil";
@@ -313,6 +322,7 @@ public class PermissionController {
             case RH: return "🟨";
             case FINANCEIRO: return "🟧";
             case GESTOR_OPERACIONAL: return "🟦";
+            case GESTAO_SUPERVISAO: return "🟦";
             case TI_SUPORTE: return "🟪";
             case AUDITOR: return "🟫";
             case COLABORADOR: return "🟨";

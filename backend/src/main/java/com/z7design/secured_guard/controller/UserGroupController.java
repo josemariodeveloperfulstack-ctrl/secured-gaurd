@@ -48,9 +48,9 @@ public class UserGroupController {
             t.printStackTrace();
             
             // Tentar identificar a causa raiz
-            String rootMsg = t.getMessage();
-            if (t.getCause() != null) {
-                rootMsg += " | Cause: " + t.getCause().getMessage();
+            String rootMsg = t.getMessage() != null ? t.getMessage().replaceAll("[\\r\\n]", " ") : "Unknown error";
+            if (t.getCause() != null && t.getCause().getMessage() != null) {
+                rootMsg += " | Cause: " + t.getCause().getMessage().replaceAll("[\\r\\n]", " ");
             }
             
             // Retornar 500 com a mensagem para debug se for o caso

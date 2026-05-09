@@ -73,8 +73,8 @@ const MeuPonto: React.FC<MeuPontoProps> = ({ standalone = false }) => {
         if (!employeeId) return;
         try {
             const [todayRes, nextRes] = await Promise.all([
-                timeRecordService.getTodayRecords(employeeId),
-                timeRecordService.getNextRecordType(employeeId)
+                timeRecordService.getTodayRecords(employeeId).catch(() => ({ success: false, data: [] })),
+                timeRecordService.getNextRecordType(employeeId).catch(() => ({ success: false, nextRecordType: 'ENTRADA' }))
             ]);
             if (todayRes?.success && Array.isArray(todayRes.data)) {
                 setRegistrosHoje(todayRes.data);

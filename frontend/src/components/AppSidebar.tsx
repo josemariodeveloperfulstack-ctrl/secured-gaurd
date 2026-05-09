@@ -316,7 +316,9 @@ export function AppSidebar() {
   const getMainMenuItems = () => {
     const baseItems = [
       { icon: BarChart3, text: 'Dashboard', to: '/dashboard', id: 'dashboard' },
-      ...(normalizedRole !== 'GESTOR_OPERACIONAL' ? [{ icon: DollarSign, text: 'Financeiro', to: '/financeiro', id: 'financeiro' }] : []),
+      ...(normalizedRole !== 'GESTOR_OPERACIONAL' && normalizedRole !== 'GESTAO_SUPERVISAO'
+        ? [{ icon: DollarSign, text: 'Financeiro', to: '/financeiro', id: 'financeiro' }]
+        : []),
       { icon: FileSpreadsheet, text: 'Holerites', to: '/holerites', id: 'holerites' },
       { icon: FileSpreadsheet, text: 'Folha de Pagamento', to: '/payrolls', id: 'payrolls' },
       { icon: FileText, text: 'Documentos Unificados', to: '/documentos-unificados', id: 'documentos-unificados' },
@@ -392,7 +394,7 @@ export function AppSidebar() {
         ))}
 
         {/* Módulo Financeiro - Oculto para RH, Departamento Pessoal e Gestor Operacional */}
-        {!['RH', 'DEPARTAMENTO_PESSOAL', 'GESTOR_OPERACIONAL'].includes(normalizedRole) && (
+        {!['RH', 'DEPARTAMENTO_PESSOAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO'].includes(normalizedRole) && (
           <>
             <div className="text-seguranca-lightgray mb-2 mt-6 flex items-center">
               <DollarSign size={16} className="mr-2 text-seguranca-yellow" />

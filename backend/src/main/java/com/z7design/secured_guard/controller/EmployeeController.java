@@ -738,7 +738,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/{id}/change-history")
-    @PreAuthorize("hasAnyAuthority('EMPLOYEE_HISTORY_READ', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE')")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_HISTORY_READ', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'EMPLOYEES_READ', 'EMPLOYEES_WRITE')")
     @Operation(summary = "Histórico de mudanças do funcionário", description = "Lista paginada de alterações de dados do funcionário")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
@@ -941,7 +941,7 @@ public class EmployeeController {
     }
 
     @GetMapping("/search/simple")
-    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'RH', 'DEPARTAMENTO_PESSOAL', 'ESTOQUE', 'ALMOXARIFADO', 'RECURSOS_HUMANOS', 'GERENTE')")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEES_READ', 'EMPLOYEES_WRITE', 'EMPLOYEES_CREATE', 'EMPLOYEES_DELETE', 'SUPER_ADMIN', 'ADMIN', 'HR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_HR', 'HR_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'RH', 'DEPARTAMENTO_PESSOAL', 'ESTOQUE', 'ALMOXARIFADO', 'RECURSOS_HUMANOS', 'GERENTE')")
     @Operation(summary = "Buscar funcionários simplificados", description = "Retorna dados simplificados de funcionários para seleção em formulários")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de funcionários simplificados retornada com sucesso"),

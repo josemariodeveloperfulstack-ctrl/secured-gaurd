@@ -9,8 +9,7 @@ import com.z7design.secured_guard.model.enums.EmailLogStatus;
 import com.z7design.secured_guard.repository.EmailAttachmentRepository;
 import com.z7design.secured_guard.repository.EmailLogRepository;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,9 +31,8 @@ import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SendGridInboundParseService {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(SendGridInboundParseService.class);
 
     private static final Pattern ANGLE_EMAIL = Pattern.compile("<([^>]+)>");
     private static final long MAX_ATTACHMENT_BYTES = 25L * 1024 * 1024;
@@ -61,12 +59,12 @@ public class SendGridInboundParseService {
             log.warn("SendGrid inbound: nenhum EmailLog para remetente {}", fromEmail);
             return;
         }
-        EmailLog log = candidates.get(0);
-        log.setStatus(EmailLogStatus.REPLIED);
-        if (log.getRepliedAt() == null) {
-            log.setRepliedAt(Instant.now());
+        EmailLog emailLog = candidates.get(0);
+        emailLog.setStatus(EmailLogStatus.REPLIED);
+        if (emailLog.getRepliedAt() == null) {
+            emailLog.setRepliedAt(Instant.now());
         }
-        emailLogRepository.save(log);
+        emailLogRepository.save(emailLog);
 
         String attachmentInfoJson = request.getParameter("attachment-info");
         if (attachmentInfoJson != null && !attachmentInfoJson.isBlank()) {
@@ -82,7 +80,7 @@ public class SendGridInboundParseService {
                     continue;
                 }
                 if (file.getSize() > MAX_ATTACHMENT_BYTES) {
-                    LOGGER.warn("SendGrid inbound: anexo {} excede tamanho máximo", key);
+                    log.warn("SendGrid inbound: anexo {} excede tamanho máximo", key);
                     continue;
                 }
                 JsonNode meta = root.get(key);
@@ -107,7 +105,8 @@ public class SendGridInboundParseService {
                         .contentType(contentType)
                         .originalFilename(filename)
                         .scanStatus(scan)
-                        .build();
+                        .build()
+                ;
                 emailAttachmentRepository.save(att);
             }
         }

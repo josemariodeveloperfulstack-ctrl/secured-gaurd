@@ -14,6 +14,7 @@ export const USER_ROLE_LIST: UserRole[] = [
   'FINANCEIRO',
   'OPERACIONAL',
   'GESTOR_OPERACIONAL',
+  'GESTAO_SUPERVISAO',
   'TI_SUPORTE',
   'AUDITOR',
   'COLABORADOR',
@@ -689,9 +690,10 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       };
 
     case 'GESTOR_OPERACIONAL':
+    case 'GESTAO_SUPERVISAO':
       return {
         ...basePermissions,
-        // Gestor Operacional - Acesso total ao módulo Operacional; sem módulo Financeiro
+        // Gestor Operacional / Gestão de Supervisão — módulo Operacional completo; sem módulo Financeiro
         EQUIPMENTS_READ: true,
         EQUIPMENTS_WRITE: true,
         EQUIPMENTS_ASSIGN: true,
@@ -1444,6 +1446,22 @@ export const generatePermissionsFromGroups = (groups: UserGroupData[]): UserPerm
     'ATTENDANCE_READ': 'ATTENDANCE_READ',
     'ATTENDANCE_WRITE': 'ATTENDANCE_WRITE',
     'ATTENDANCE_MANAGE': 'ATTENDANCE_MANAGE',
+    'VISITS_READ': 'VISITS_READ',
+    'VISITS_WRITE': 'VISITS_WRITE',
+    'VISITS_CREATE': 'VISITS_CREATE',
+    'VISITS_UPDATE': 'VISITS_UPDATE',
+    'VISITS_DELETE': 'VISITS_DELETE',
+    'VISITS_MANAGE': 'VISITS_MANAGE',
+    'EQUIPMENTS_READ': 'EQUIPMENTS_READ',
+    'EQUIPMENTS_WRITE': 'EQUIPMENTS_WRITE',
+    'EQUIPMENTS_DELETE': 'EQUIPMENTS_DELETE',
+    'EQUIPMENTS_CREATE': 'EQUIPMENTS_CREATE',
+    'EQUIPMENTS_ASSIGN': 'EQUIPMENTS_ASSIGN',
+    'TIME_RECORD_READ': 'TIME_RECORD_READ',
+    'TIME_RECORD_CREATE': 'TIME_RECORD_CREATE',
+    'TIME_RECORD_UPDATE': 'TIME_RECORD_UPDATE',
+    'TIME_RECORD_DELETE': 'TIME_RECORD_DELETE',
+    'TIME_RECORD_MANAGE': 'TIME_RECORD_MANAGE',
     'ALL_PERMISSIONS': 'ALL_PERMISSIONS',
 
     // ---- Mapeamento de permissões legadas de grupos (VIEW_*/MANAGE_*/EDIT_*) para o modelo novo ----
@@ -1599,6 +1617,7 @@ export const getRoleDisplayName = (role: UserRole): string => {
     FINANCEIRO: 'Financeiro',
     OPERACIONAL: 'Operacional',
     GESTOR_OPERACIONAL: 'Gestor Operacional',
+    GESTAO_SUPERVISAO: 'Gestão de Supervisão',
     VIGILANTE: 'Vigilante',
     AUXI_ADMINISTRATIVO: 'Auxiliar Administrativo',
     AUX_DEP: 'Auxiliar Depto. Pessoal',
@@ -1631,6 +1650,7 @@ export const getRoleColor = (role: UserRole): string => {
     FINANCEIRO: 'bg-orange-100 text-orange-800',
     OPERACIONAL: 'bg-cyan-100 text-cyan-800',
     GESTOR_OPERACIONAL: 'bg-cyan-100 text-cyan-800',
+    GESTAO_SUPERVISAO: 'bg-teal-100 text-teal-800',
     VIGILANTE: 'bg-slate-100 text-slate-800',
     AUXI_ADMINISTRATIVO: 'bg-pink-100 text-pink-800',
     AUX_DEP: 'bg-lime-100 text-lime-800',

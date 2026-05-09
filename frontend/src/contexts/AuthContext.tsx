@@ -52,6 +52,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (groupNames.includes('GRUPO_GESTOR')) {
       return 'GESTOR';
     }
+    if (groupNames.includes('GRUPO_GESTOR_SUPERVISAO')) {
+      return 'GESTAO_SUPERVISAO';
+    }
 
     // Se cair aqui, mantém como colaborador
     return currentRole || 'COLABORADOR';
@@ -286,6 +289,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         'ASSISTENCIA_RH',
         'DEPARTAMENTO_PESSOAL',
         'GESTOR',
+        'GESTOR_OPERACIONAL',
+        'GESTAO_SUPERVISAO',
         'SUPERVISOR',
         'FINANCEIRO',
         'COMERCIAL',

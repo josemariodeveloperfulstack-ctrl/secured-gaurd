@@ -33,14 +33,14 @@ public class StockRequisitionController {
     private final UserRepository userRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Listar requisições de estoque", description = "Todas as requisições (almoxarifado, RH, operacional)")
     public ResponseEntity<List<StockRequisitionListItemDTO>> list() {
         return ResponseEntity.ok(stockRequisitionService.listAll());
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Criar requisição", description = "Registra requisição pendente. A baixa no estoque ocorre na aprovação.")
     public ResponseEntity<?> create(@Valid @RequestBody CreateStockRequisitionRequest body, Authentication auth) {
         try {
@@ -58,7 +58,7 @@ public class StockRequisitionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Obter requisição por ID")
     public ResponseEntity<?> get(@PathVariable UUID id) {
         try {
@@ -69,7 +69,7 @@ public class StockRequisitionController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'GERENTE', 'GESTOR_OPERACIONAL', 'RH', 'DEPARTAMENTO_PESSOAL', 'FINANCEIRO', 'ESTOQUE', 'ALMOXARIFADO', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'GERENTE', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'RH', 'DEPARTAMENTO_PESSOAL', 'FINANCEIRO', 'ESTOQUE', 'ALMOXARIFADO', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Aprovar requisição", description = "Aprova e baixa o estoque (saídas). A assinatura do funcionário é registrada depois em /deliver.")
     public ResponseEntity<?> approve(@PathVariable UUID id, Authentication auth) {
         try {

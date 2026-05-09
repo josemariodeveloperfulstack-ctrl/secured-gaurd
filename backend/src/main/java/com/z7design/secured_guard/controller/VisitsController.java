@@ -28,7 +28,7 @@ public class VisitsController {
     private final VisitService visitService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<Page<VisitDTO>> getAllVisits(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -53,7 +53,7 @@ public class VisitsController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<VisitDTO> getVisitById(@PathVariable UUID id) {
         try {
             VisitDTO visit = visitService.findById(id);
@@ -68,7 +68,7 @@ public class VisitsController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('VISITS_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_CREATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<?> createVisit(@RequestBody CreateVisitDTO createVisitDTO) {
         try {
             log.info("Criando nova visita para supervisor: {}", createVisitDTO.getSupervisorId());
@@ -98,7 +98,7 @@ public class VisitsController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('VISITS_UPDATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_UPDATE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<VisitDTO> updateVisit(@PathVariable UUID id, @RequestBody CreateVisitDTO updateDTO) {
         try {
             log.info("Atualizando visita: {}", id);
@@ -116,7 +116,7 @@ public class VisitsController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('VISITS_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_DELETE', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<Void> deleteVisit(@PathVariable UUID id) {
         try {
             visitService.delete(id);
@@ -131,7 +131,7 @@ public class VisitsController {
     }
 
     @GetMapping("/supervisor/{supervisorId}")
-    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<Page<VisitDTO>> getVisitsBySupervisor(
             @PathVariable UUID supervisorId,
             @RequestParam(defaultValue = "0") int page,
@@ -148,7 +148,7 @@ public class VisitsController {
     }
 
     @GetMapping("/date-range")
-    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<Page<VisitDTO>> getVisitsByDateRange(
             @RequestParam String startDate,
             @RequestParam String endDate,
@@ -168,7 +168,7 @@ public class VisitsController {
     }
 
     @GetMapping("/today/scheduled")
-    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<List<VisitDTO>> getTodayScheduledVisits() {
         try {
             log.info("Buscando visitas agendadas para hoje");
@@ -181,7 +181,7 @@ public class VisitsController {
     }
 
     @GetMapping("/today/supervisor/{supervisorId}")
-    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    @PreAuthorize("hasAnyAuthority('VISITS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'ROLE_GESTAO_SUPERVISAO')")
     public ResponseEntity<List<VisitDTO>> getTodayVisitsBySupervisor(@PathVariable UUID supervisorId) {
         try {
             log.info("Buscando visitas de hoje do supervisor: {}", supervisorId);

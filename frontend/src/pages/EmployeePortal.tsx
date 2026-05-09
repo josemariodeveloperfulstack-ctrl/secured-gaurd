@@ -33,7 +33,8 @@ import {
   Lock,
   Shield,
   MessageCircle,
-  QrCode
+  QrCode,
+  HardHat
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -69,6 +70,7 @@ import MeuPonto from './MeuPonto';
 import MeusHolerites from './MeusHolerites';
 import MinhasFerias from './MinhasFerias';
 import MeusEPIs from './MeusEPIs';
+import Certificacoes from './Certificacoes';
 
 type TabType = 'dashboard' | 'perfil' | 'ponto' | 'holerites' | 'documentos' | 'treinamentos' | 'ferias' | 'notificacoes' | 'epis';
 
@@ -102,14 +104,14 @@ const EmployeePortal: React.FC = () => {
       const employeeId = user.id;
       
       const [recordsRes, nextRes, feriasRes, certsRes] = await Promise.all([
-        timeRecordService.getTodayRecords(employeeId),
-        timeRecordService.getNextRecordType(employeeId),
+        timeRecordService.getTodayRecords(employeeId).catch(() => ({ success: false, data: [] })),
+        timeRecordService.getNextRecordType(employeeId).catch(() => ({ success: false, nextRecordType: 'ENTRADA' })),
         feriasService.getFeriasByEmployee(employeeId).catch(() => []),
         trainingService.getEmployeeCertifications({ employeeId }).catch(() => [])
       ]);
 
-      if (recordsRes.success) setTodayRecords(recordsRes.data || []);
-      if (nextRes.success) setNextRecordType(nextRes.nextRecordType || 'ENTRADA');
+      if (recordsRes?.success) setTodayRecords(recordsRes.data || []);
+      if (nextRes?.success) setNextRecordType(nextRes.nextRecordType || 'ENTRADA');
       
       if (feriasRes && feriasRes.length > 0) {
         setVacationInfo(feriasRes[0]);

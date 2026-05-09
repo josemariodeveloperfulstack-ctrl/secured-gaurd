@@ -60,7 +60,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/all")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_RH', 'RH', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'ROLE_RH', 'RH', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
     @Operation(summary = "Listar todos os postos de trabalho (sem paginação)", description = "Retorna uma lista completa de todos os postos de trabalho")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
@@ -237,7 +237,7 @@ public class WorkPostController {
     }
     
     @GetMapping("/by-company/{companyId}")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL')")
     @Operation(summary = "Listar postos por empresa", description = "Retorna postos de trabalho que possuem funcionários da empresa informada")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),

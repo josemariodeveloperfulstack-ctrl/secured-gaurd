@@ -21,5 +21,7 @@ public enum UserRole {
     SUPRIMENTOS,   // Suprimentos e almoxarifado
     COMPRAS,       // Gestão de compras
     ALMOXARIFADO,  // Almoxarifado
+    /** Gestão de supervisão: mesmo escopo operacional de {@link #GESTOR_OPERACIONAL}; authority {@code ROLE_GESTAO_SUPERVISAO} */
+    GESTAO_SUPERVISAO,
     GESTOR_OPERACIONAL // Acesso total ao módulo Operacional; sem acesso ao módulo Financeiro
 }
