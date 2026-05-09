@@ -54,7 +54,8 @@ public class StandardReportLayoutService {
 
     private final CompanyRepository companyRepository;
 
-    @Value("${app.upload.dir:uploads}")
+    /** Mesmo root que {@link WebConfig} e {@code FileUploadController} ({@code app.upload.base-dir}). */
+    @Value("${app.upload.base-dir:${app.upload.dir:uploads}}")
     private String uploadDir;
 
     /** URL pública do front (e-mails, links). Não usar para /api/uploads no servidor — ver {@link #resolveBackendInternalBaseUrl()}. */
@@ -659,7 +660,8 @@ public class StandardReportLayoutService {
                         }
                     } else {
                         try {
-                            imageData = ImageDataFactory.create(logoPath);
+                            byte[] logoBytes = Files.readAllBytes(Paths.get(logoPath));
+                            imageData = ImageDataFactory.create(logoBytes);
                         } catch (OutOfMemoryError e) {
                             log.error(
                                     "❌ Erro de memória ao carregar logo do caminho {}: imagem muito grande. Tamanho do arquivo: {} bytes",
@@ -701,6 +703,11 @@ public class StandardReportLayoutService {
                         company.getName(), e.getMessage());
                 return null;
             }
+            if (isCausedByFileNotFoundException(e)) {
+                log.warn("⚠️ Logo da empresa {} não disponível (arquivo não encontrado no disco nem via HTTP)",
+                        company.getName());
+                return null;
+            }
             log.warn("Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage());
             log.debug("Detalhe", e);
             return null;
@@ -710,6 +717,15 @@ public class StandardReportLayoutService {
     private static boolean isCausedByConnectException(Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
             if (t instanceof java.net.ConnectException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isCausedByFileNotFoundException(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.io.FileNotFoundException) {
                 return true;
             }
         }

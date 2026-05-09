@@ -229,9 +229,13 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       dados = dados.filter((item) => statusMatchesFilter(String(item.status), filtros.status));
     }
 
-    // Filtro por tipo de despesa (só faz sentido para despesas; receitas não têm expenseType)
-    if (filtros.tipoDespesa !== 'all' && filtros.tipo !== 'INCOME') {
-      dados = dados.filter((item) => item.expenseType === filtros.tipoDespesa);
+    // Filtro por tipo de despesa (receitas não têm expenseType; não podem ser excluídas quando tipo = todos)
+    if (filtros.tipoDespesa !== 'all') {
+      dados = dados.filter(
+        (item) =>
+          item.type === 'INCOME' ||
+          item.expenseType === filtros.tipoDespesa
+      );
     }
 
     // Datas: intervalo parcial (só início ou só fim) e, se ambos os grupos estão preenchidos,
@@ -264,9 +268,15 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       );
     }
 
-    // Filtro por fornecedor (receitas normalmente não têm fornecedor)
+    // Filtro por fornecedor (receitas não têm fornecedor; com tipo "Todos" não pode esconder receitas)
     if (filtros.fornecedor !== 'all' && filtros.tipo !== 'INCOME') {
-      dados = dados.filter((item) => item.supplier?.id === filtros.fornecedor);
+      if (filtros.tipo === 'EXPENSE') {
+        dados = dados.filter((item) => item.supplier?.id === filtros.fornecedor);
+      } else {
+        dados = dados.filter(
+          (item) => item.type === 'INCOME' || item.supplier?.id === filtros.fornecedor
+        );
+      }
     }
 
     // Filtro por valor mínimo / máximo (aceita formato brasileiro no campo)
@@ -275,7 +285,8 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       dados = dados.filter((item) => Number(item.amount) >= vmin);
     }
 
-    const vmax = parseMoneyInput(filtros.valorMax);
+    const valorMaxStr = filtros.valorMax != null ? String(filtros.valorMax).trim() : '';
+    const vmax = valorMaxStr ? parseMoneyInput(filtros.valorMax) : null;
     if (vmax !== null) {
       dados = dados.filter((item) => {
         const a = Number(item.amount);
@@ -349,11 +360,16 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
     refreshData();
   };
 
+  /** Evita quebra entre R$ e sinal negativo do Intl (`R$ -`) em cards estreitos. */
   const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+    const fmt = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const abs = fmt.format(Math.abs(valor));
+    return valor < 0 ? `\u2212${abs}` : abs;
   };
 
   const formatarData = (data: string) => {
@@ -654,78 +670,93 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
         </CardContent>
       </Card>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="bg-seguranca-graphite border-gray-600">
+      {/* Estatísticas: no máx. 3 colunas para caber valores longos sem quebrar o sinal */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-400">Total</p>
-                <p className="text-2xl font-bold text-seguranca-lightgray">{estatisticas.total}</p>
+                <p className="text-xl sm:text-2xl font-bold tabular-nums text-seguranca-lightgray whitespace-nowrap">
+                  {estatisticas.total}
+                </p>
               </div>
-              <FileText className="h-8 w-8 text-blue-500" />
+              <FileText className="h-8 w-8 text-blue-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1 overflow-x-auto">
                 <p className="text-sm text-gray-400">Receitas</p>
-                <p className="text-2xl font-bold text-green-500">{formatarMoeda(estatisticas.receitas)}</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold tabular-nums text-green-500 whitespace-nowrap">
+                  {formatarMoeda(estatisticas.receitas)}
+                </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
+              <TrendingUp className="h-8 w-8 text-green-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1 overflow-x-auto">
                 <p className="text-sm text-gray-400">Despesas</p>
-                <p className="text-2xl font-bold text-red-500">{formatarMoeda(estatisticas.despesas)}</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold tabular-nums text-red-500 whitespace-nowrap">
+                  {formatarMoeda(estatisticas.despesas)}
+                </p>
               </div>
-              <TrendingDown className="h-8 w-8 text-red-500" />
+              <TrendingDown className="h-8 w-8 text-red-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1 overflow-x-auto">
                 <p className="text-sm text-gray-400">Saldo</p>
-                <p className={`text-2xl font-bold ${estatisticas.saldo >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <p
+                  className={`text-lg sm:text-xl lg:text-2xl font-bold tabular-nums whitespace-nowrap ${
+                    estatisticas.saldo >= 0 ? 'text-green-500' : 'text-red-500'
+                  }`}
+                  title={formatarMoeda(estatisticas.saldo)}
+                >
                   {formatarMoeda(estatisticas.saldo)}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-yellow-500" />
+              <DollarSign className="h-8 w-8 text-yellow-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-400">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-500">{estatisticas.pendentes}</p>
+                <p className="text-xl sm:text-2xl font-bold tabular-nums text-yellow-500 whitespace-nowrap">
+                  {estatisticas.pendentes}
+                </p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-yellow-500" />
+              <AlertTriangle className="h-8 w-8 text-yellow-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-400">Vencidas</p>
-                <p className="text-2xl font-bold text-red-500">{estatisticas.vencidas}</p>
+                <p className="text-xl sm:text-2xl font-bold tabular-nums text-red-500 whitespace-nowrap">
+                  {estatisticas.vencidas}
+                </p>
               </div>
-              <Calendar className="h-8 w-8 text-red-500" />
+              <Calendar className="h-8 w-8 text-red-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -751,41 +782,54 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto rounded-md border border-gray-700/60 -mx-1">
+            <Table className="min-w-[72rem] w-full text-sm">
               <TableHeader>
                 <TableRow className="border-gray-600">
-                  <TableHead className="text-seguranca-lightgray">Descrição</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Tipo</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Valor</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Data Lançamento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Data Vencimento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Categoria</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Departamento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Centro de Custo</TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[180px] max-w-[280px]">
+                    Descrição
+                  </TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Tipo</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Valor</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Status</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Data Lançamento</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Data Vencimento</TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[120px] max-w-[180px]">Categoria</TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[120px] max-w-[200px]">
+                    Departamento
+                  </TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[120px] max-w-[200px]">
+                    Centro de Custo
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {dadosFiltrados.map((item) => (
                   <TableRow key={item.id} className="border-gray-600 hover:bg-seguranca-black">
-                    <TableCell className="text-seguranca-lightgray">
-                      <div>
-                        <div className="font-medium">{item.description}</div>
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[280px] min-w-[180px]">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="font-medium truncate" title={item.description || ''}>
+                          {item.description}
+                        </div>
                         {item.reference && (
-                          <div className="text-sm text-gray-400">Ref: {item.reference}</div>
+                          <div className="text-xs text-gray-400 truncate" title={`Ref: ${item.reference}`}>
+                            Ref: {item.reference}
+                          </div>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
                       <Badge className={`${getTipoColor(item.type)} bg-transparent border`}>
                         {item.type === 'INCOME' ? 'Receita' : 'Despesa'}
                       </Badge>
                     </TableCell>
-                    <TableCell className={`font-bold ${getTipoColor(item.type)}`}>
+                    <TableCell
+                      className={`font-bold tabular-nums whitespace-nowrap align-top ${getTipoColor(item.type)}`}
+                      title={formatarMoeda(Number(item.amount) || 0)}
+                    >
                       {formatarMoeda(Number(item.amount) || 0)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
                       <Badge className={`${getStatusColor(item.status)} text-white`}>
                         {item.status === 'PENDING' || item.status === 'PENDENTE' ? 'Pendente' :
                           item.status === 'CONFIRMED' ? 'Confirmado' :
@@ -794,20 +838,26 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
                                 item.status === 'PENDENTE_ERRO' ? 'Atrasado' : item.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
+                    <TableCell className="text-seguranca-lightgray whitespace-nowrap align-top">
                       {item.date ? formatarData(item.date) : '-'}
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
+                    <TableCell className="text-seguranca-lightgray whitespace-nowrap align-top">
                       {item.dueDate ? formatarData(item.dueDate) : '-'}
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
-                      {item.category || '-'}
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[180px] min-w-[120px]">
+                      <span className="line-clamp-2 break-words" title={item.category || ''}>
+                        {item.category || '-'}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
-                      {item.unit?.name || '-'}
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[200px] min-w-[120px]">
+                      <span className="truncate block max-w-full" title={item.unit?.name || ''}>
+                        {item.unit?.name || '-'}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
-                      {item.costCenter || '-'}
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[200px] min-w-[120px]">
+                      <span className="truncate block max-w-full" title={item.costCenter || ''}>
+                        {item.costCenter || '-'}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}

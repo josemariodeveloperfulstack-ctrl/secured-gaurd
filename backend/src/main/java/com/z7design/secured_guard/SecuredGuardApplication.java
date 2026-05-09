@@ -25,6 +25,12 @@ import com.z7design.secured_guard.config.JwtConfig;
 @EnableJpaRepositories("com.z7design.secured_guard.repository")
 @ComponentScan(basePackages = "com.z7design.secured_guard")
 public class SecuredGuardApplication {
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        // Garantir que o Spring e a JVM rodem no fuso horário do Brasil
+        // para evitar que relatórios gerados à noite peguem a data do dia seguinte no servidor Docker UTC.
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("America/Sao_Paulo"));
+    }
 
     public static void main(String[] args) {
         SpringApplication.run(SecuredGuardApplication.class, args);

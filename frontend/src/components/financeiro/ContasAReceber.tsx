@@ -58,7 +58,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth, startOfDay, differenceInCalendarDays } from 'date-fns';
+import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth, startOfDay, endOfDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { DateRange } from 'react-day-picker';
 import { contasAReceberService, Cliente, ContaAReceber } from '@/services/contasAReceberService';
@@ -167,11 +167,8 @@ export const ContasAReceber: React.FC = () => {
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
   const [units, setUnits] = useState<any[]>([]);
-  // Período por padrão: mês atual (igual ao Contas a Pagar)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  });
+  /** Sem período por defeito: antes filtrava só o mês actual e a lista parecia vazia quando os vencimentos eram outros meses. Use "Filtros Avançados" para restringir por vencimento. */
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Estados do modal
   const [showFormModal, setShowFormModal] = useState(false);
@@ -558,7 +555,7 @@ export const ContasAReceber: React.FC = () => {
 
       // Carregar filiais (empresas)
       try {
-        const unitsData = await unitService.getUnits();
+        const unitsData = await unitService.getAllUnits();
         setUnits(unitsData);
       } catch (err) {
         console.error('Erro ao carregar filiais:', err);
@@ -603,13 +600,16 @@ export const ContasAReceber: React.FC = () => {
     const matchesCliente = filterCliente === 'all' || conta.client?.id === filterCliente;
     const matchesUnit = filterUnit === 'all' || conta.unit?.id === filterUnit || conta.empresaId === filterUnit;
 
-    // Filtro por data
+    // Filtro por data de vencimento (só quando o utilizador define período em Filtros Avançados)
     let matchesDate = true;
     if (dateRange?.from && dateRange?.to) {
       try {
-        const contaDate = new Date(conta.dueDate);
-        if (isNaN(contaDate.getTime())) return false;
-        matchesDate = contaDate >= dateRange.from && contaDate <= dateRange.to;
+        const raw = conta.dueDate ?? conta.vencimento;
+        const contaDate = startOfDay(new Date(raw as Date | string));
+        if (Number.isNaN(contaDate.getTime())) return false;
+        const from = startOfDay(dateRange.from);
+        const to = endOfDay(dateRange.to);
+        matchesDate = contaDate >= from && contaDate <= to;
       } catch {
         matchesDate = false;
       }

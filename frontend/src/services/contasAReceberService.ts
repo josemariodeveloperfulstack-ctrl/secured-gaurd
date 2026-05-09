@@ -146,6 +146,49 @@ function mapBackendTypeToFrontend(backendTypeOrCategory: string | undefined): 'F
   }
 }
 
+/** Normaliza uma linha da API de contas a receber (lista paginada ou /all). */
+function mapAccountsReceivableListItem(account: any): ContaAReceber | null {
+  if (!account || !account.id) return null;
+  return {
+    id: account.id,
+    numeroFatura: account.invoiceNumber,
+    dataEmissao: parseDateFromBackend(account.issueDate),
+    vencimento: parseDateFromBackend(account.dueDate) || new Date(),
+    cliente: account.clientName || account.client?.name || 'Não informado',
+    clienteId: account.clientId || account.client?.id,
+    empresa: account.unitSigla || account.unitName || 'Não informado',
+    empresaId: account.unitId,
+    descricao: account.description || '',
+    tipo: mapBackendTypeToFrontend(account.type || account.category),
+    valor: parseFloat(account.amount || 0),
+    amount: parseFloat(account.amount || 0),
+    amountPaid: parseFloat(account.amountPaid || 0),
+    pendingAmount: parseFloat(
+      account.pendingAmount ||
+        (parseFloat(account.amount || 0) - parseFloat(account.amountPaid || 0)) ||
+        0
+    ),
+    overdueDays: account.overdueDays || 0,
+    codigoBarras: account.barcode,
+    status: mapBackendStatusToFrontend(account.status),
+    baixa: account.baixa || false,
+    dataPagamento: parseDateFromBackend(account.paymentDate),
+    observacoes: account.notes,
+    categoria: account.category,
+    centroCusto: account.centroCusto,
+    paymentMethod: account.paymentMethod || 'PIX',
+    invoiceNumber: account.invoiceNumber,
+    measurementNumber: account.measurementNumber,
+    dueDate: parseDateFromBackend(account.dueDate) || new Date(),
+    client: account.client
+      ? {
+          id: account.client.id,
+          name: account.client.name || account.clientName || 'Não informado',
+        }
+      : undefined,
+  };
+}
+
 export const contasAReceberService = {
   // ===== CONTAS A RECEBER =====
   
@@ -175,39 +218,39 @@ export const contasAReceberService = {
     console.log('🔍 DEBUG: Accounts processados:', accounts);
     
     return accounts
-      .filter((account: any) => account && account.id) // Filtrar itens inválidos
-      .map((account: any): ContaAReceber => ({
-        id: account.id,
-        numeroFatura: account.invoiceNumber,
-        dataEmissao: parseDateFromBackend(account.issueDate),
-        vencimento: parseDateFromBackend(account.dueDate) || new Date(),
-        cliente: account.clientName || account.client?.name || 'Não informado',
-        clienteId: account.clientId || account.client?.id,
-        empresa: account.unitSigla || account.unitName || 'Não informado',
-        empresaId: account.unitId,
-        descricao: account.description || '',
-        tipo: mapBackendTypeToFrontend(account.type || account.category),
-        valor: parseFloat(account.amount || 0),
-        amount: parseFloat(account.amount || 0), // Campo adicional para compatibilidade
-        amountPaid: parseFloat(account.amountPaid || 0), // Valor pago
-        pendingAmount: parseFloat(account.pendingAmount || (parseFloat(account.amount || 0) - parseFloat(account.amountPaid || 0)) || 0), // Valor pendente
-        overdueDays: account.overdueDays || 0, // Dias em atraso
-        codigoBarras: account.barcode,
-        status: mapBackendStatusToFrontend(account.status),
-        baixa: account.baixa || false,
-        dataPagamento: parseDateFromBackend(account.paymentDate),
-        observacoes: account.notes,
-        categoria: account.category,
-        centroCusto: account.centroCusto,
-        paymentMethod: account.paymentMethod || 'PIX', // Incluir paymentMethod do backend
-        invoiceNumber: account.invoiceNumber, // Número da fatura
-        measurementNumber: account.measurementNumber, // Número da medição
-        dueDate: parseDateFromBackend(account.dueDate) || new Date(), // Data de vencimento
-        client: account.client ? {
-          id: account.client.id,
-          name: account.client.name || account.clientName || 'Não informado'
-        } : undefined
-      }));
+      .map(mapAccountsReceivableListItem)
+      .filter((c): c is ContaAReceber => c != null);
+  },
+
+  /**
+   * Lista completa para relatórios.
+   * Preferência: GET /all. Se falhar ou vier vazio por erro de rota, pagina até juntar todos (mesmo fluxo da tela de contas).
+   */
+  async getAllContasAReceber(): Promise<ContaAReceber[]> {
+    try {
+      const response = await api.get('/api/accounts-receivable/all');
+      const accounts = Array.isArray(response.data) ? response.data : [];
+      const mapped = accounts
+        .map(mapAccountsReceivableListItem)
+        .filter((c): c is ContaAReceber => c != null);
+      if (mapped.length > 0) {
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('getAllContasAReceber: /all indisponível ou vazio, usando paginação:', err);
+    }
+
+    const pageSize = 500;
+    let page = 0;
+    const aggregated: ContaAReceber[] = [];
+    for (let guard = 0; guard < 1000; guard++) {
+      const batch = await this.getContasAReceber({ page, size: pageSize });
+      if (!batch.length) break;
+      aggregated.push(...batch);
+      if (batch.length < pageSize) break;
+      page += 1;
+    }
+    return aggregated;
   },
 
   // Buscar conta por ID

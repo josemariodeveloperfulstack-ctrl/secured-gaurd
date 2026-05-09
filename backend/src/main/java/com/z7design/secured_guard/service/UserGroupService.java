@@ -52,7 +52,7 @@ public class UserGroupService {
 
     public List<UserGroupDTO> getGroupsByUserId(UUID userId) {
         return userGroupRepository.findByUserId(userId).stream()
-                .map(this::convertToDTO)
+                .map(this::convertToDTOWithoutUsers)
                 .collect(Collectors.toList());
     }
 
@@ -320,7 +320,7 @@ public class UserGroupService {
         dto.setGroupName(group.getGroupName() != null ? group.getGroupName().name() : null);
         dto.setDisplayName(group.getDisplayName());
         dto.setDescription(group.getDescription());
-        dto.setPermissions(group.getPermissions());
+        dto.setPermissions(copyPermissionsForDto(group.getPermissions()));
 
         // Calcular contagem de usuários via consulta direta
         String countQuery = "SELECT COUNT(u) FROM com.z7design.secured_guard.model.User u JOIN u.groups g WHERE g.id = :groupId";
@@ -338,9 +338,17 @@ public class UserGroupService {
         dto.setGroupName(group.getGroupName() != null ? group.getGroupName().name() : null);
         dto.setDisplayName(group.getDisplayName());
         dto.setDescription(group.getDescription());
-        dto.setPermissions(group.getPermissions());
+        dto.setPermissions(copyPermissionsForDto(group.getPermissions()));
         dto.setUserCount(null); // Não calcular contagem para evitar ciclo
         return dto;
+    }
+
+    /** Cópia simples para JSON (evita expor coleções internas do Hibernate). */
+    private Set<String> copyPermissionsForDto(Set<String> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(raw);
     }
 
     private UserResponseDTO convertUserToDTO(com.z7design.secured_guard.model.User user) {

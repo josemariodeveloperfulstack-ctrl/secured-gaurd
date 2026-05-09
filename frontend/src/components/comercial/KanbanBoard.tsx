@@ -261,6 +261,8 @@ export default function KanbanBoard() {
   });
   const [users, setUsers] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
+  /** Backend devolve IDs UUID nos status Kanban; usado para validar criação de oportunidades. */
+  const [hasValidStatuses, setHasValidStatuses] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<string>('all');

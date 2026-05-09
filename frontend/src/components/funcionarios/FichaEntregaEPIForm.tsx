@@ -73,9 +73,12 @@ function buildWorkSectorSnapshot(emp: SimpleEmployee | null): string {
   if (!emp) return '';
   const parts = [];
   if (emp.departmentName) parts.push(emp.departmentName);
+  if (emp.workPostName) parts.push(emp.workPostName);
   if (emp.unitName) parts.push(emp.unitName);
   if (emp.positionName) parts.push(emp.positionName);
-  return parts.filter(Boolean).join(' / ').toUpperCase();
+  
+  // Use Set to remove potential duplicates (e.g. if department and workPost have same name)
+  return Array.from(new Set(parts)).filter(Boolean).join(' / ').toUpperCase();
 }
 
 
@@ -98,6 +101,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
             status: ficha.status || 'DRAFT',
             signatureType: ficha.signatureType || 'ON_SCREEN',
             signatureBase64: '', // Signature is not returned for security/storage reasons in edit mode usually, or we can't edit it easily
+            employeeWorkSector: ficha.employeeWorkSector || '',
           });
           setEpis(ficha.items.map(item => ({
             nome: item.epiName,
@@ -239,6 +243,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
               positionName: emp.position?.name,
               unitName: emp.unit?.name,
               departmentName: emp.department?.name,
+              workPostName: emp.workPost?.name,
               address: emp.address,
               companyId: emp.company?.id,
               companySigla: emp.company?.sigla

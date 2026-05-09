@@ -74,7 +74,7 @@ public class InvoiceController {
         return ResponseEntity.ok(dtos);
     }
     
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Buscar fatura por ID", description = "Retorna uma fatura específica pelo seu ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Fatura encontrada"),
@@ -239,7 +239,7 @@ public class InvoiceController {
         }
     }
     
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Atualizar fatura", description = "Atualiza os dados de uma fatura existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Fatura atualizada com sucesso"),
@@ -289,7 +289,7 @@ public class InvoiceController {
         }
     }
     
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Excluir fatura", description = "Exclui uma fatura do sistema")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Fatura excluída com sucesso"),
@@ -301,21 +301,21 @@ public class InvoiceController {
         return ResponseEntity.noContent().build();
     }
     
-    @PatchMapping("/{id}/status")
+    @PatchMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/status")
     @Operation(summary = "Atualizar status da fatura", description = "Atualiza apenas o status de uma fatura")
     public ResponseEntity<InvoiceDTO> updateStatus(@PathVariable String id, @RequestParam ExpenseStatus status) {
         Invoice updated = invoiceService.updateStatus(UUID.fromString(id), status);
         return ResponseEntity.ok(InvoiceDTO.fromEntity(updated));
     }
     
-    @PatchMapping("/{id}/mark-as-paid")
+    @PatchMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/mark-as-paid")
     @Operation(summary = "Marcar fatura como paga", description = "Marca uma fatura como paga")
     public ResponseEntity<InvoiceDTO> markAsPaid(@PathVariable String id, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate paymentDate) {
         Invoice updated = invoiceService.markAsPaid(UUID.fromString(id), paymentDate);
         return ResponseEntity.ok(InvoiceDTO.fromEntity(updated));
     }
     
-    @PatchMapping("/{id}/cancel")
+    @PatchMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/cancel")
     @Operation(summary = "Cancelar fatura", description = "Cancela uma fatura")
     public ResponseEntity<InvoiceDTO> cancel(@PathVariable String id) {
         Invoice updated = invoiceService.cancel(UUID.fromString(id));

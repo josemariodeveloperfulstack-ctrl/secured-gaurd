@@ -104,6 +104,19 @@ export interface FinancialFilters {
   sortDir?: 'ASC' | 'DESC';
 }
 
+/** Aceita lista direta ou corpo paginado/aninhado de alguns proxies. */
+function unwrapResponseList(payload: unknown): Record<string, unknown>[] {
+  if (payload == null) return [];
+  if (Array.isArray(payload)) return payload as Record<string, unknown>[];
+  if (typeof payload === 'object') {
+    const o = payload as Record<string, unknown>;
+    if (Array.isArray(o.content)) return o.content as Record<string, unknown>[];
+    if (Array.isArray(o.data)) return o.data as Record<string, unknown>[];
+    if (Array.isArray(o.items)) return o.items as Record<string, unknown>[];
+  }
+  return [];
+}
+
 function normalizeFinancialTransaction(raw: Record<string, unknown>): FinancialTransaction {
   const amount = raw.amount != null ? Number(raw.amount) : 0;
   const unitId = raw.unitId as string | undefined;
@@ -159,8 +172,8 @@ export const financialService = {
       ? `/api/financial/transactions?${queryString}`
       : `/api/financial/transactions`;
     const response = await api.get(url);
-    const list = Array.isArray(response.data) ? response.data : [];
-    return list.map((row) => normalizeFinancialTransaction(row as Record<string, unknown>));
+    const list = unwrapResponseList(response.data);
+    return list.map((row) => normalizeFinancialTransaction(row));
   },
 
   // Criar nova transação
@@ -206,8 +219,13 @@ export const financialService = {
 
   /** Lista completa de faturas/despesas (sem paginação) — uso em relatórios */
   async getAllInvoices(): Promise<Invoice[]> {
-    const response = await api.get<Invoice[]>('/api/invoices/all');
-    return Array.isArray(response.data) ? response.data : [];
+    const response = await api.get<Invoice[] | { content?: Invoice[] }>('/api/invoices/all');
+    const d = response.data as unknown;
+    if (Array.isArray(d)) return d;
+    if (d && typeof d === 'object' && Array.isArray((d as { content?: Invoice[] }).content)) {
+      return (d as { content: Invoice[] }).content;
+    }
+    return [];
   },
 
   // Criar nova fatura
