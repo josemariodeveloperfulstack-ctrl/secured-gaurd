@@ -13,6 +13,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '@/components/ui/date-picker';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import {
   DollarSign,
@@ -42,7 +43,8 @@ import {
   BarChart3,
   PieChart,
   FileDown,
-  Check
+  Check,
+  RefreshCw
 } from 'lucide-react';
 import { ContasAReceberGuard } from './FinanceiroPermissionGuard';
 import { ContasAReceberFormModal } from './ContasAReceberFormModal';
@@ -193,6 +195,12 @@ export const ContasAReceber: React.FC = () => {
   const [newStatus, setNewStatus] = useState<'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA'>('ABERTA');
   const [selectedPaymentDate, setSelectedPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   
+  // Relatórios estados
+  const [showReportPeriodModal, setShowReportPeriodModal] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState<Date>(startOfMonth(new Date()));
+  const [reportEndDate, setReportEndDate] = useState<Date>(endOfMonth(new Date()));
+  const [reportSegment, setReportSegment] = useState<string>('GERAL');
+  
   const { toast } = useToast();
 
   const canEditReceivable = Boolean(user?.permissions?.FINANCIAL_RECEIVABLE_WRITE);
@@ -297,17 +305,19 @@ export const ContasAReceber: React.FC = () => {
     includePeriod?: boolean;
     filePrefix: string;
     successDescription: string;
+    startDate?: string;
+    endDate?: string;
   }) => {
     setExportLoading(true);
     try {
       const params = new URLSearchParams();
       if (opts.includePeriod) {
-        const startDate = dateRange?.from
+        const startDate = opts.startDate || (dateRange?.from
           ? format(dateRange.from, 'yyyy-MM-dd')
-          : format(startOfMonth(new Date()), 'yyyy-MM-dd');
-        const endDate = dateRange?.to
+          : format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+        const endDate = opts.endDate || (dateRange?.to
           ? format(dateRange.to, 'yyyy-MM-dd')
-          : format(endOfMonth(new Date()), 'yyyy-MM-dd');
+          : format(endOfMonth(new Date()), 'yyyy-MM-dd'));
         params.set('startDate', startDate);
         params.set('endDate', endDate);
       }
@@ -638,7 +648,7 @@ export const ContasAReceber: React.FC = () => {
                   className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
                 >
                   <FileText className="w-4 h-4 mr-2" />
-                  Relatórios PDF
+                  Gerar Relatórios
                   <ChevronDown className="w-4 h-4 ml-2 opacity-70" />
                 </Button>
               </DropdownMenuTrigger>
@@ -648,63 +658,48 @@ export const ContasAReceber: React.FC = () => {
               >
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
-                  onClick={() =>
-                    downloadContasReceberPdf({
-                      includePeriod: true,
-                      filePrefix: 'relatorio-contas-a-receber',
-                      successDescription: 'Relatório por período (data de vencimento) gerado com sucesso.'
-                    })
-                  }
+                  onClick={() => {
+                    setReportSegment('GERAL');
+                    setShowReportPeriodModal(true);
+                  }}
                 >
-                  Por período (Vencimento)
+                  Geral por Período
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
-                  onClick={() =>
-                    downloadContasReceberPdf({
-                      segment: 'RECEBIDOS',
-                      filePrefix: 'relatorio-contas-recebidas',
-                      successDescription: 'Relatório de contas recebidas (pagas) gerado com sucesso.'
-                    })
-                  }
+                  onClick={() => {
+                    setReportSegment('RECEBIDOS');
+                    setShowReportPeriodModal(true);
+                  }}
                 >
-                  Recebidos
+                  Recebidos por Período
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
-                  onClick={() =>
-                    downloadContasReceberPdf({
-                      segment: 'A_VENCER',
-                      filePrefix: 'relatorio-contas-a-vencer',
-                      successDescription: 'Relatório de contas a vencer gerado com sucesso.'
-                    })
-                  }
+                  onClick={() => {
+                    setReportSegment('A_VENCER');
+                    setShowReportPeriodModal(true);
+                  }}
                 >
-                  A vencer
+                  A vencer por Período
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
-                  onClick={() =>
-                    downloadContasReceberPdf({
-                      segment: 'VENCIDOS',
-                      filePrefix: 'relatorio-contas-vencidas',
-                      successDescription: 'Relatório de contas vencidas (não pagas) gerado com sucesso.'
-                    })
-                  }
+                  onClick={() => {
+                    setReportSegment('VENCIDOS');
+                    setShowReportPeriodModal(true);
+                  }}
                 >
-                  Vencidos
+                  Vencidos por Período
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
-                  onClick={() =>
-                    downloadContasReceberPdf({
-                      segment: 'INADIMPLENCIA',
-                      filePrefix: 'relatorio-inadimplencia',
-                      successDescription: 'Relatório de inadimplência (status vencido) gerado com sucesso.'
-                    })
-                  }
+                  onClick={() => {
+                    setReportSegment('INADIMPLENCIA');
+                    setShowReportPeriodModal(true);
+                  }}
                 >
-                  Inadimplência
+                  Inadimplência por Período
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1358,11 +1353,10 @@ export const ContasAReceber: React.FC = () => {
               {newStatus === 'RECEBIDA' && (
                 <div className="space-y-2">
                   <Label className="text-seguranca-lightgray">Data do Recebimento</Label>
-                  <Input
-                    type="date"
-                    value={selectedPaymentDate}
-                    onChange={(e) => setSelectedPaymentDate(e.target.value)}
-                    className="bg-seguranca-black border-gray-600 text-white"
+                   <DatePicker
+                    date={selectedPaymentDate ? new Date(selectedPaymentDate) : new Date()}
+                    onDateChange={(date) => setSelectedPaymentDate(date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))}
+                    className="w-full"
                   />
                 </div>
               )}
@@ -1633,6 +1627,115 @@ export const ContasAReceber: React.FC = () => {
                   <>
                     <Trash2 className="w-4 h-4 mr-2" />
                     Excluir
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Modal de Seleção de Período para Relatório */}
+        <Dialog open={showReportPeriodModal} onOpenChange={setShowReportPeriodModal}>
+          <DialogContent className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white shadow-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Configurar Relatório
+              </DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Personalize o período e o escopo do relatório PDF.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-6 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="report-segment" className="text-seguranca-lightgray font-medium">Tipo de Relatório</Label>
+                <Select value={reportSegment} onValueChange={setReportSegment}>
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value="GERAL" className="text-white hover:bg-seguranca-graphite">Geral (Todas as Contas)</SelectItem>
+                    <SelectItem value="RECEBIDOS" className="text-white hover:bg-seguranca-graphite">Somente Recebidos</SelectItem>
+                    <SelectItem value="A_VENCER" className="text-white hover:bg-seguranca-graphite">Somente A Vencer</SelectItem>
+                    <SelectItem value="VENCIDOS" className="text-white hover:bg-seguranca-graphite">Somente Vencidos</SelectItem>
+                    <SelectItem value="INADIMPLENCIA" className="text-white hover:bg-seguranca-graphite">Taxa de Inadimplência</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="report-startDate" className="text-seguranca-lightgray font-medium text-xs uppercase tracking-wider">Início (Vencimento)</Label>
+                  <DatePicker
+                    date={reportStartDate}
+                    onDateChange={(date) => date && setReportStartDate(date)}
+                    className="w-full bg-seguranca-black border-gray-600 text-white"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="report-endDate" className="text-seguranca-lightgray font-medium text-xs uppercase tracking-wider">Fim (Vencimento)</Label>
+                  <DatePicker
+                    date={reportEndDate}
+                    onDateChange={(date) => date && setReportEndDate(date)}
+                    className="w-full bg-seguranca-black border-gray-600 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-seguranca-black/50 border border-gray-700 rounded-lg">
+                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Dica Operacional</p>
+                <p className="text-xs text-gray-400">
+                  O relatório considerará a data de <strong>vencimento</strong> das contas dentro do intervalo selecionado.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowReportPeriodModal(false)}
+                className="border-gray-600 text-white hover:bg-seguranca-black hover:text-seguranca-yellow"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  const prefixMap: Record<string, string> = {
+                    'GERAL': 'relatorio-contas-geral',
+                    'RECEBIDOS': 'relatorio-contas-recebidas',
+                    'A_VENCER': 'relatorio-contas-a-vencer',
+                    'VENCIDOS': 'relatorio-contas-vencidas',
+                    'INADIMPLENCIA': 'relatorio-inadimplencia'
+                  };
+                  const descMap: Record<string, string> = {
+                    'GERAL': 'Relatório geral gerado com sucesso.',
+                    'RECEBIDOS': 'Relatório de contas recebidas gerado com sucesso.',
+                    'A_VENCER': 'Relatório de contas a vencer gerado com sucesso.',
+                    'VENCIDOS': 'Relatório de contas vencidas gerado com sucesso.',
+                    'INADIMPLENCIA': 'Relatório de inadimplência gerado com sucesso.'
+                  };
+
+                  void downloadContasReceberPdf({
+                    segment: reportSegment === 'GERAL' ? null : reportSegment,
+                    includePeriod: true,
+                    filePrefix: prefixMap[reportSegment] || 'relatorio-contas',
+                    successDescription: descMap[reportSegment] || 'Relatório gerado com sucesso.',
+                    startDate: format(reportStartDate, 'yyyy-MM-dd'),
+                    endDate: format(reportEndDate, 'yyyy-MM-dd')
+                  });
+                  setShowReportPeriodModal(false);
+                }}
+                disabled={exportLoading}
+                className="bg-seguranca-yellow text-black hover:bg-seguranca-yellow/90 font-bold shadow-[0_0_15px_rgba(234,179,8,0.3)]"
+              >
+                {exportLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Gerar PDF Premium
                   </>
                 )}
               </Button>

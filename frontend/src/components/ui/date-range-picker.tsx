@@ -33,27 +33,27 @@ export function DatePickerWithRange({
           variant="outline"
           disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal",
-            !date && "text-muted-foreground",
+            "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow hover:border-seguranca-yellow/50 transition-all rounded-md h-10",
+            !date && "text-gray-500",
             className
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
+          <CalendarIcon className="mr-2 h-4 w-4 text-seguranca-yellow opacity-70" />
           {date?.from ? (
             date.to ? (
-              <>
+              <span className="truncate">
                 {format(date.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
                 {format(date.to, "dd/MM/yyyy", { locale: ptBR })}
-              </>
+              </span>
             ) : (
               format(date.from, "dd/MM/yyyy", { locale: ptBR })
             )
           ) : (
-            <span>{placeholder}</span>
+            <span className="text-gray-500">{placeholder}</span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0 bg-seguranca-black border-gray-700 shadow-2xl z-[1000]" align="start">
         <Calendar
           initialFocus
           mode="range"

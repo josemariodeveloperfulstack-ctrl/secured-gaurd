@@ -75,7 +75,7 @@ export function DatePicker({
           placeholder={placeholder}
           disabled={disabled}
           className={cn(
-            "w-full pr-10 bg-inherit border-inherit text-inherit",
+            "w-full pr-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow transition-all",
             className
           )}
         />
@@ -89,7 +89,7 @@ export function DatePicker({
           </button>
         </PopoverTrigger>
       </div>
-      <PopoverContent className="w-[280px] p-0 bg-popover border border-border shadow-2xl z-[10100]" align="start">
+      <PopoverContent className="w-[280px] p-0 bg-seguranca-black border border-gray-700 shadow-2xl z-[10100]" align="start">
         <Calendar
           mode="single"
           selected={date}
