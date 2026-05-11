@@ -102,6 +102,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
             signatureType: ficha.signatureType || 'ON_SCREEN',
             signatureBase64: '', // Signature is not returned for security/storage reasons in edit mode usually, or we can't edit it easily
             employeeWorkSector: ficha.employeeWorkSector || '',
+            tipoEntrega: ficha.deliveryType || 'PRIMEIRA_ENTREGA',
           });
           setEpis(ficha.items.map(item => ({
             nome: item.epiName,
@@ -117,11 +118,51 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
           
           // Trigger data resolution for employee and company
           const emp = await employeeService.getEmployeeById(ficha.employeeId);
-          setSelectedEmployeeData(emp);
-          
+          if (emp) {
+            const mappedEmp: SimpleEmployee = {
+              id: emp.id,
+              name: emp.name,
+              document: emp.document || emp.cpf,
+              cpf: emp.cpf || emp.document,
+              email: emp.email,
+              phone: emp.phone,
+              registrationNumber: emp.registrationNumber,
+              hireDate: emp.hireDate,
+              terminationDate: emp.terminationDate,
+              positionName: emp.position?.name,
+              unitName: emp.unit?.name,
+              departmentName: emp.department?.name,
+              workPostName: emp.workPost?.name,
+              address: emp.address,
+              companyId: emp.company?.id,
+              companySigla: emp.company?.sigla,
+            } as SimpleEmployee;
+            setSelectedEmployeeData(mappedEmp);
+          }
+
           if (ficha.responsibleEmployeeId) {
             const resp = await employeeService.getEmployeeById(ficha.responsibleEmployeeId);
-            setSelectedResponsibleData(resp);
+            if (resp) {
+              const mappedResp: SimpleEmployee = {
+                id: resp.id,
+                name: resp.name,
+                document: resp.document || resp.cpf,
+                cpf: resp.cpf || resp.document,
+                email: resp.email,
+                phone: resp.phone,
+                registrationNumber: resp.registrationNumber,
+                hireDate: resp.hireDate,
+                terminationDate: resp.terminationDate,
+                positionName: resp.position?.name,
+                unitName: resp.unit?.name,
+                departmentName: resp.department?.name,
+                workPostName: resp.workPost?.name,
+                address: resp.address,
+                companyId: resp.company?.id,
+                companySigla: resp.company?.sigla,
+              } as SimpleEmployee;
+              setSelectedResponsibleData(mappedResp);
+            }
           }
         } catch (error) {
           console.error('Erro ao carregar ficha para edição:', error);
@@ -264,6 +305,8 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
   }, []);
 
   useEffect(() => {
+    if (fichaId) return;
+
     if (form.empresaId && companies.length > 0) {
       const selectedCompany = companies.find(c => c.id === form.empresaId);
       if (selectedCompany) {
@@ -864,7 +907,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor / Departamento</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.departmentName || funcionario.unitName || '-'}
+                        {form.employeeWorkSector || buildWorkSectorSnapshot(funcionario) || funcionario.departmentName || funcionario.unitName || '-'}
                       </div>
                     </div>
                   </div>
