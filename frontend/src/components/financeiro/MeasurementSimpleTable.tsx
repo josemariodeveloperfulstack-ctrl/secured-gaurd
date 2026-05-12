@@ -215,8 +215,8 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
     
     setInternalLoading(true);
     try {
-      const deletePromises = Array.from(selectedBulletins).map(id => 
-        api.delete(`/measurements/${id}`)
+      const deletePromises = Array.from(selectedBulletins).map((id) =>
+        measurementService.deleteBulletin(id)
       );
       
       await Promise.all(deletePromises);

@@ -39,7 +39,7 @@ public class MeasurementBulletin {
     @OneToMany(mappedBy = "bulletin", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MeasurementItem> items = new ArrayList<>();
 
-    @OneToOne(mappedBy = "bulletin", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToOne(mappedBy = "bulletin", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, optional = true)
     private CalculationMemory calculationMemory;
 
     @ManyToOne(fetch = FetchType.LAZY)

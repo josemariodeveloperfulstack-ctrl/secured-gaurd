@@ -464,13 +464,12 @@ public class MeasurementService {
     public void deleteBulletin(UUID id) {
         log.info("Excluindo boletim de medição: {}", id);
 
-        if (!bulletinRepository.existsById(id)) {
-            log.warn("Boletim de medição {} não existe mais — tratando DELETE como idempotente (no-op).", id);
+        int removed = bulletinRepository.deleteBulletinNative(id);
+        if (removed == 0) {
+            log.warn("Boletim de medição {} não existe — DELETE idempotente (no-op).", id);
             return;
         }
-
-        bulletinRepository.deleteById(id);
-        log.info("Boletim excluído com sucesso: {}", id);
+        log.info("Boletim excluído com sucesso: {} (linhas em measurement_bulletins: {})", id, removed);
     }
 
     // ===== MEMÓRIA DE CÁLCULO =====

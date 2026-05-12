@@ -186,6 +186,8 @@ export const ContasAReceber: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contaToDelete, setContaToDelete] = useState<ContaAReceber | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const [contaParaMarcarPaga, setContaParaMarcarPaga] = useState<ContaAReceber | null>(null);
   
@@ -225,8 +227,8 @@ export const ContasAReceber: React.FC = () => {
     setEditMode(false);
   };
 
-  const handleFormSuccess = () => {
-    loadContas();
+  const handleFormSuccess = async () => {
+    await loadContas();
     handleCloseFormModal();
   };
   const handleCobrancaAutomatica = async (contaId: string, tipo: 'email' | 'whatsapp' | 'telefone') => {
@@ -433,7 +435,7 @@ export const ContasAReceber: React.FC = () => {
         title: 'Sucesso',
         description: 'Status da conta atualizado com sucesso!'
       });
-      loadContas();
+      await loadContas();
       setShowStatusModal(false);
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
@@ -495,7 +497,7 @@ export const ContasAReceber: React.FC = () => {
         title: 'Sucesso',
         description: 'Conta a receber excluída com sucesso!'
       });
-      loadContas();
+      await loadContas();
       setShowDeleteConfirm(false);
       setContaToDelete(null);
     } catch (error) {
@@ -553,8 +555,8 @@ export const ContasAReceber: React.FC = () => {
       setLoading(true);
       console.log('Carregando dados de Contas a Receber...');
 
-      // Carregar contas a receber
-      const contasData = await contasAReceberService.getContasAReceber();
+      // Lista completa (/all) — evita paginação implícita size=20 que faz exclusões parecerem falhar ou "duplicar" linhas na mesma página
+      const contasData = await contasAReceberService.getAllContasAReceber();
       console.log('Contas carregadas:', contasData);
       setContas(contasData);
 
@@ -630,6 +632,41 @@ export const ContasAReceber: React.FC = () => {
 
   const stats = calcularEstatisticas(filteredContas);
 
+  const idsContasFiltradas = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of filteredContas) {
+      const id = c?.id != null ? String(c.id).trim() : '';
+      if (id) ids.add(id);
+    }
+    return Array.from(ids);
+  }, [filteredContas]);
+
+  const handleConfirmBulkDelete = async () => {
+    if (idsContasFiltradas.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      await contasAReceberService.deleteContasReceberBulk(idsContasFiltradas);
+      toast({
+        title: 'Sucesso',
+        description:
+          idsContasFiltradas.length === 1
+            ? '1 conta a receber excluída.'
+            : `${idsContasFiltradas.length} contas a receber excluídas.`
+      });
+      await loadContas();
+      setShowBulkDeleteConfirm(false);
+    } catch (error) {
+      console.error('Erro ao excluir contas em massa:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir todas as contas. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <ContasAReceberGuard requiredPermission="VIEW_ACCOUNTS_RECEIVABLE">
       <div className="space-y-6">
@@ -703,6 +740,18 @@ export const ContasAReceber: React.FC = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {canEditReceivable && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={idsContasFiltradas.length === 0 || bulkDeleting}
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="flex items-center gap-2 border-red-700/80 text-red-400 hover:bg-red-950/40 hover:text-red-300"
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir todas (filtradas)
+              </Button>
+            )}
             <Button
               onClick={() => handleOpenFormModal()}
               className="flex items-center gap-2 bg-seguranca-red text-white hover:bg-seguranca-red/90"
@@ -1583,6 +1632,52 @@ export const ContasAReceber: React.FC = () => {
                   </>
                 ) : (
                   'Confirmar pagamento'
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={showBulkDeleteConfirm}
+          onOpenChange={(open) => {
+            if (!bulkDeleting) setShowBulkDeleteConfirm(open);
+          }}
+        >
+          <AlertDialogContent className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[480px]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-seguranca-red">
+                Excluir todas as contas filtradas?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-300">
+                Serão excluídas <strong>{idsContasFiltradas.length}</strong> conta(s) com ID distinto que aparecem na lista
+                atual (após busca e filtros). A exclusão por linha na tabela continua disponível. Esta ação não pode ser
+                desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel
+                disabled={bulkDeleting}
+                className="border-gray-600 bg-transparent text-white hover:bg-seguranca-black hover:text-white"
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                disabled={bulkDeleting || idsContasFiltradas.length === 0}
+                className="bg-seguranca-red hover:bg-red-700 text-white"
+                onClick={() => void handleConfirmBulkDelete()}
+              >
+                {bulkDeleting ? (
+                  <>
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Excluindo…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir todas
+                  </>
                 )}
               </Button>
             </AlertDialogFooter>

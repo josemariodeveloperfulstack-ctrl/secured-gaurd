@@ -93,6 +93,24 @@ export default function MeasurementCompleteTable({
     if (onRefresh) onRefresh();
   };
 
+  const handleTestAPI = async () => {
+    try {
+      const { data } = await api.get<{ message?: string; totalCount?: number; hasData?: boolean }>('/measurements/test');
+      toast({
+        title: 'Teste de Dados',
+        description: `${data?.message ?? 'OK'} — Total: ${data?.totalCount ?? '—'}`,
+        variant: data?.hasData ? 'default' : 'destructive'
+      });
+    } catch (error) {
+      console.error('Erro no teste:', error);
+      toast({
+        title: 'Erro no Teste',
+        description: 'Não foi possível testar os dados',
+        variant: 'destructive'
+      });
+    }
+  };
+
   // Função helper para determinar se uma medição é completa
   const isCompleteMeasurement = (bulletin: MeasurementBulletin): boolean => {
     // Priorizar notas explícitas
@@ -477,7 +495,7 @@ export default function MeasurementCompleteTable({
               Recarregar
             </Button>
             <Button
-              onClick={testAPI}
+              onClick={() => void handleTestAPI()}
               variant="outline"
               className="border-orange-600 text-orange-400 hover:bg-orange-600/20"
             >

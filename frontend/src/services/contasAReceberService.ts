@@ -207,7 +207,10 @@ export const contasAReceberService = {
     if (filters.endDate) params.append('endDate', filters.endDate);
     if (filters.searchTerm) params.append('searchTerm', filters.searchTerm);
     if (filters.page !== undefined) params.append('page', filters.page.toString());
+    else params.append('page', '0');
+    // Spring Data default size é 20 — sem isto a UI parece "não apagar" ou duplicar lógica ao misturar página truncada com estado local
     if (filters.size !== undefined) params.append('size', filters.size.toString());
+    else params.append('size', '5000');
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
@@ -221,9 +224,14 @@ export const contasAReceberService = {
     
     console.log('🔍 DEBUG: Accounts processados:', accounts);
     
-    return accounts
+    const mapped = accounts
       .map(mapAccountsReceivableListItem)
       .filter((c): c is ContaAReceber => c != null);
+    const byId = new Map<string, ContaAReceber>();
+    for (const c of mapped) {
+      if (c.id) byId.set(String(c.id), c);
+    }
+    return Array.from(byId.values());
   },
 
   /**
@@ -528,6 +536,13 @@ export const contasAReceberService = {
   // Excluir conta
   async deleteContaAReceber(id: string): Promise<void> {
     await api.delete(`/api/accounts-receivable/${id}`);
+  },
+
+  /** Exclui várias contas (mesmo endpoint usado pelo relatório). Corpo: lista de UUIDs em string. */
+  async deleteContasReceberBulk(ids: string[]): Promise<void> {
+    const unique = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
+    if (unique.length === 0) return;
+    await api.delete('/api/accounts-receivable/bulk-delete', { data: unique });
   },
 
   /** Marca a conta como totalmente paga (usa data de pagamento no backend). Formato: YYYY-MM-DD */
