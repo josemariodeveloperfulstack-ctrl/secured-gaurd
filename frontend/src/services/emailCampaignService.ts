@@ -16,9 +16,38 @@ export interface EmailCampaignSummary {
   totalLimit?: number | null;
   dailyLimit?: number | null;
   hourlyLimit?: number | null;
+  minIntervalSeconds?: number | null;
   scheduledAt?: string | null;
   createdAt: string;
   recipientCount: number;
+}
+
+/** Resposta de GET /api/v1/email-campaigns/:id (entidade serializada). */
+export interface EmailCampaignDetail {
+  id: string;
+  title: string;
+  description?: string | null;
+  templateId?: string | null;
+  defaultTemplate?: { id: string; name?: string } | null;
+  providerType?: EmailProviderType | string | null;
+  status?: EmailCampaignStatus | string | null;
+  totalLimit?: number | null;
+  dailyLimit?: number | null;
+  hourlyLimit?: number | null;
+  minIntervalSeconds?: number | null;
+  scheduledAt?: string | null;
+}
+
+export interface UpdateEmailCampaignPayload {
+  title: string;
+  description?: string | null;
+  defaultTemplateId?: string | null;
+  providerType?: EmailProviderType;
+  totalLimit?: number | null;
+  dailyLimit?: number | null;
+  hourlyLimit?: number | null;
+  minIntervalSeconds?: number | null;
+  scheduledAt?: string | null;
 }
 
 export interface EmailCampaignMetrics {
@@ -76,10 +105,39 @@ export interface ImportRecipientsResponse {
   detectedColumns: string[];
 }
 
+export interface MarketingUnsubscribeRow {
+  email: string;
+  source: string | null;
+  reason: string | null;
+  /** ISO-8601 (instant) */
+  confirmedAt: string;
+}
+
+export interface SpringPage<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+}
+
 class EmailCampaignService {
   async list(): Promise<EmailCampaignSummary[]> {
     const { data } = await api.get<EmailCampaignSummary[]>('/api/v1/email-campaigns');
     return data;
+  }
+
+  async getById(campaignId: string): Promise<EmailCampaignDetail> {
+    const { data } = await api.get<EmailCampaignDetail>(`/api/v1/email-campaigns/${campaignId}`);
+    return data;
+  }
+
+  async update(campaignId: string, payload: UpdateEmailCampaignPayload): Promise<void> {
+    await api.patch(`/api/v1/email-campaigns/${campaignId}`, payload);
+  }
+
+  async delete(campaignId: string): Promise<void> {
+    await api.delete(`/api/v1/email-campaigns/${campaignId}`);
   }
 
   async getMetrics(campaignId: string): Promise<EmailCampaignMetrics> {
@@ -123,6 +181,37 @@ class EmailCampaignService {
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
     return data;
+  }
+
+  /** Lista paginada de e-mails com opt-out de marketing confirmado (área Comercial → Descadastrados). */
+  async listMarketingUnsubscribes(page = 0, size = 25): Promise<SpringPage<MarketingUnsubscribeRow>> {
+    const { data } = await api.get<SpringPage<MarketingUnsubscribeRow>>(
+      '/api/v1/email-campaigns/marketing-unsubscribes',
+      { params: { page, size } }
+    );
+    return data;
+  }
+
+  /** Até 500 e-mails por pedido; fatia automaticamente listas maiores. */
+  async checkUnsubscribed(emails: string[]): Promise<string[]> {
+    const unique = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
+    const out: string[] = [];
+    const size = 500;
+    for (let i = 0; i < unique.length; i += size) {
+      const slice = unique.slice(i, i + size);
+      if (!slice.length) continue;
+      const { data } = await api.post<{ unsubscribed: string[] }>(
+        '/api/v1/email-campaigns/unsubscribe-check',
+        { emails: slice }
+      );
+      out.push(...(data.unsubscribed ?? []));
+    }
+    return out;
+  }
+
+  /** Acrescenta destinatários a uma campanha em rascunho (dedupe no servidor). */
+  async appendRecipients(campaignId: string, recipients: EmailCampaignRecipientInput[]): Promise<void> {
+    await api.put(`/api/v1/email-campaigns/${campaignId}/recipients`, { recipients });
   }
 }
 

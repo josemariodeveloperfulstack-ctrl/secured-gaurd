@@ -554,4 +554,14 @@ public class LeadService {
         }
         return leads;
     }
+
+    @Transactional(readOnly = true)
+    public long countByCreatedAtRange(LocalDateTime startInclusive, LocalDateTime endExclusive) {
+        return leadRepository.countByCreatedAtRange(startInclusive, endExclusive);
+    }
+
+    @Transactional(readOnly = true)
+    public long countByStatusAndCreatedAtRange(LeadStatus status, LocalDateTime startInclusive, LocalDateTime endExclusive) {
+        return leadRepository.countByStatusAndCreatedAtRange(status, startInclusive, endExclusive);
+    }
 } 

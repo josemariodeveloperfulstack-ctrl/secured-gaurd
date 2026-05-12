@@ -10,10 +10,14 @@ import com.z7design.secured_guard.repository.EmailLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -57,6 +61,19 @@ public class EmailDispatchService {
     private final SmtpMailSendService smtpMailSendService;
     private final EmailTemplateRenderer renderer;
     private final EmailUnsubscribeService unsubscribeService;
+    private final Environment environment;
+
+    @Value("${app.email.marketing.assets-base-url}")
+    private String emailMarketingAssetsBaseUrl;
+
+    @Value("${app.email.marketing.assets-base-url-fallback:}")
+    private String emailMarketingAssetsBaseUrlFallback;
+
+    @Value("${app.email.marketing.presentation-mailto:comercial@promovervigilancia.com.br}")
+    private String presentationMailto;
+
+    @Value("${app.email.marketing.whatsapp-url:https://wa.me/5531998224451}")
+    private String emailMarketingWhatsappUrl;
 
     /**
      * Processa um único envio elegível para a campanha respeitando todos os
@@ -148,6 +165,13 @@ public class EmailDispatchService {
             return true;
         }
 
+        if (recipient.isEmailMarketingSuppressed()) {
+            log.setStatus(EmailLogStatus.DROPPED);
+            log.setBounceReason("Destinatário excluído do marketing (opt-out)");
+            emailLogRepository.save(log);
+            return true;
+        }
+
         // Renderiza com unsubscribeUrl real
         Map<String, String> context = buildContext(recipient, ctx, campaign);
         String subject = renderer.renderText(ctx.baseSubject, context);
@@ -201,7 +225,8 @@ public class EmailDispatchService {
 
     private Map<String, String> buildContext(EmailCampaignRecipient r, DispatchContext ctx, EmailCampaign campaign) {
         Map<String, String> map = new HashMap<>();
-        map.put("nomeContato", r.getName() != null ? r.getName() : "");
+        String nomeContato = resolveRecipientDisplayName(r);
+        map.put("nomeContato", nomeContato);
         map.put("email", r.getEmail() != null ? r.getEmail() : "");
         if (r.getMetadata() != null) {
             for (Map.Entry<String, Object> e : r.getMetadata().entrySet()) {
@@ -212,11 +237,128 @@ public class EmailDispatchService {
             putAlias(map, "telefone", r.getMetadata().get("phone"));
             putAlias(map, "celular", r.getMetadata().get("mobile"));
         }
+        if (!map.containsKey("nomeEmpresa") || map.get("nomeEmpresa") == null || map.get("nomeEmpresa").isBlank()) {
+            map.put("nomeEmpresa", "sua empresa");
+        }
         if (ctx.extras != null) map.putAll(ctx.extras);
         // unsubscribe — sempre presente, mesmo quando base-url não está configurada
         String unsubUrl = unsubscribeService.buildUnsubscribeUrl(r.getEmail(), campaign);
         map.put("unsubscribeUrl", unsubUrl);
+        String assetsBase = resolvePublicAssetsBase();
+        map.put("brandLogoUrl", assetsBase + "/email-marketing/promover-logo.png");
+        map.put("brandBannerUrl", assetsBase + "/email-marketing/promover-hero-banner.png");
+        String wa = buildWhatsappUrlWithPrefill(nomeContato);
+        map.put("whatsappUrl", wa);
+        map.put("ctaUrl", wa);
+        map.put("solicitarApresentacaoUrl", buildPresentationMailto(nomeContato, map.get("email"), map.get("nomeEmpresa")));
         return map;
+    }
+
+    /**
+     * Nome amigável para saudação: nome do destinatário ou parte local do e-mail formatada.
+     */
+    private static String resolveRecipientDisplayName(EmailCampaignRecipient r) {
+        if (r.getName() != null && !r.getName().isBlank()) {
+            return r.getName().trim();
+        }
+        String em = r.getEmail();
+        if (em == null || em.isBlank()) {
+            return "Cliente";
+        }
+        int at = em.indexOf('@');
+        String local = at > 0 ? em.substring(0, at) : em;
+        local = local.replace('.', ' ').replace('_', ' ').trim();
+        if (local.isBlank()) {
+            return "Cliente";
+        }
+        String[] parts = local.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p.isEmpty()) {
+                continue;
+            }
+            sb.append(Character.toUpperCase(p.charAt(0)));
+            if (p.length() > 1) {
+                sb.append(p.substring(1).toLowerCase());
+            }
+            sb.append(' ');
+        }
+        return sb.toString().trim();
+    }
+
+    private String buildWhatsappUrlWithPrefill(String nomeContato) {
+        String base = emailMarketingWhatsappUrl != null ? emailMarketingWhatsappUrl.trim() : "";
+        if (base.isBlank()) {
+            base = "https://wa.me/5531998224451";
+        }
+        if (base.contains("?")) {
+            return base;
+        }
+        String msg = "Olá, sou " + nomeContato + " e gostaria de falar com a Promover Vigilância Patrimonial.";
+        return base + "?text=" + URLEncoder.encode(msg, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Abre o cliente de e-mail do destinatário para escrever à equipa comercial (solicitar apresentação).
+     */
+    private String buildPresentationMailto(String nomeContato, String email, String nomeEmpresa) {
+        String to = presentationMailto != null ? presentationMailto.trim() : "comercial@promovervigilancia.com.br";
+        String subject = "Solicitação de apresentação — " + nomeContato;
+        String body = "Olá,\r\n\r\n"
+                + "Gostaria de solicitar uma apresentação da Promover Vigilância Patrimonial.\r\n\r\n"
+                + "Dados do contacto:\r\n"
+                + "- Nome: " + nomeContato + "\r\n"
+                + "- E-mail: " + (email != null ? email : "") + "\r\n"
+                + "- Empresa: " + (nomeEmpresa != null ? nomeEmpresa : "") + "\r\n\r\n"
+                + "Obrigado.";
+        return "mailto:" + to
+                + "?subject=" + URLEncoder.encode(subject, StandardCharsets.UTF_8)
+                + "&body=" + URLEncoder.encode(body, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Gmail e outros clientes carregam imagens por HTTPS a partir da máquina do utilizador;
+     * {@code localhost} ou IP interno quebra o carregamento — use fallback público em produção.
+     */
+    private String resolvePublicAssetsBase() {
+        String primary = stripTrailingSlashes(emailMarketingAssetsBaseUrl);
+        String fallback = stripTrailingSlashes(emailMarketingAssetsBaseUrlFallback);
+        if (isUnsafeForPublicEmailImages(primary) && !fallback.isBlank()) {
+            LOG.debug("E-mail marketing: a usar assets-base-url-fallback (URL principal não é publicamente acessível).");
+            return fallback;
+        }
+        if (!primary.isBlank()) {
+            return primary;
+        }
+        if (!fallback.isBlank()) {
+            return fallback;
+        }
+        String port = environment.getProperty("server.port", "8083");
+        return "http://localhost:" + port;
+    }
+
+    private static String stripTrailingSlashes(String s) {
+        if (s == null) {
+            return "";
+        }
+        String t = s.trim();
+        while (t.endsWith("/")) {
+            t = t.substring(0, t.length() - 1);
+        }
+        return t;
+    }
+
+    private static boolean isUnsafeForPublicEmailImages(String url) {
+        if (url == null || url.isBlank()) {
+            return true;
+        }
+        String lower = url.toLowerCase();
+        return lower.contains("localhost")
+                || lower.contains("127.0.0.1")
+                || lower.contains("0.0.0.0")
+                || lower.startsWith("http://192.168.")
+                || lower.startsWith("http://10.")
+                || lower.startsWith("http://172.");
     }
 
     private static void putAlias(Map<String, String> ctx, String alias, Object value) {

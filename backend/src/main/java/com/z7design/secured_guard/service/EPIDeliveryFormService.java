@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO;
+import com.z7design.secured_guard.dto.DeliverStockRequisitionRequest;
 import com.z7design.secured_guard.dto.EPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
@@ -9,14 +10,18 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.EmployeeChangeHistory;
 import com.z7design.secured_guard.model.EPIDeliveryForm;
 import com.z7design.secured_guard.model.EPIDeliveryFormItem;
+import com.z7design.secured_guard.model.StockItem;
+import com.z7design.secured_guard.model.StockRequisition;
+import com.z7design.secured_guard.model.StockRequisitionLine;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.PersonalProtectiveEquipment;
 import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus;
-import com.z7design.secured_guard.model.enums.StockRequisitionStatus;
 import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.model.enums.MovementType;
+import com.z7design.secured_guard.model.enums.StockCategory;
+import com.z7design.secured_guard.model.enums.StockRequisitionStatus;
 import com.z7design.secured_guard.model.*;
 
 import com.z7design.secured_guard.repository.CompanyRepository;
@@ -51,6 +56,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -124,6 +130,7 @@ public class EPIDeliveryFormService {
                 .signatureBase64(dto.getSignatureBase64())
                 .signatureType(dto.getSignatureType() != null ? dto.getSignatureType() : "ON_SCREEN")
                 .status(status)
+                .stockRequisitionId(dto.getStockRequisitionId())
                 .build();
 
         if (dto.getItems() != null && !dto.getItems().isEmpty()) {
@@ -146,8 +153,8 @@ public class EPIDeliveryFormService {
 
         EPIDeliveryForm savedForm = epiDeliveryFormRepository.save(form);
         
-        // Se a ficha foi criada como CONCLUÍDA, gera a requisição e baixa no estoque
-        if (savedForm.getStatus() == com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.COMPLETED) {
+        // Concluir ficha sem vínculo a requisição de almoxarifado: gera REQ-EPI e baixa estoque
+        if (savedForm.getStatus() == EPIDeliveryFormStatus.COMPLETED && savedForm.getStockRequisitionId() == null) {
             syncWithStockRequisition(savedForm, createdByUserId);
         }
 
@@ -204,12 +211,20 @@ public class EPIDeliveryFormService {
 
         EPIDeliveryForm savedForm = epiDeliveryFormRepository.save(form);
         
-        // Sincronizar com estoque
         if (savedForm.getStatus() == EPIDeliveryFormStatus.COMPLETED) {
-            syncWithStockRequisition(savedForm, updatedByUserId);
+            if (savedForm.getStockRequisitionId() == null) {
+                syncWithStockRequisition(savedForm, updatedByUserId);
+            } else {
+                log.debug("Ficha EPI {} concluída com vínculo a requisição de estoque {}; baixa já tratada fora da ficha.",
+                        savedForm.getId(), savedForm.getStockRequisitionId());
+            }
         } else if (wasCompleted) {
-            // Se mudou de COMPLETED para DRAFT, cancela a requisição e devolve ao estoque
-            cancelStockRequisition(savedForm, updatedByUserId);
+            if (savedForm.getStockRequisitionId() == null) {
+                cancelStockRequisition(savedForm, updatedByUserId);
+            } else {
+                log.warn("Ficha EPI {} deixou de estar concluída mas está vinculada à requisição {}; estorno automático de estoque não aplicado.",
+                        savedForm.getId(), savedForm.getStockRequisitionId());
+            }
         }
 
 
@@ -292,27 +307,35 @@ public class EPIDeliveryFormService {
         StockRequisition req = stockRequisitionRepository.findById(form.getStockRequisitionId())
                 .orElse(null);
         
-        if (req != null) {
-            // Estornar movimentações vinculadas
-            List<StockMovement> movements = stockMovementRepository.findByRequisitionNumberOrderByMovementDateAsc(req.getRequisitionNumber());
-            for (StockMovement m : movements) {
-                // Criar entrada compensatória para devolver ao estoque
-                com.z7design.secured_guard.dto.StockMovementDTO storno = new com.z7design.secured_guard.dto.StockMovementDTO();
-                storno.setStockItemId(m.getStockItem().getId());
-                storno.setMovementType(MovementType.ENTRADA);
-                storno.setReason(MovementReason.AJUSTE_ENTRADA);
-                storno.setQuantity(m.getQuantity());
-                storno.setNotes("Estorno automático por alteração na Ficha de EPI: " + form.getId());
-                stockService.createMovement(storno, userId);
-                
-                // Marcar movimento original como cancelado (se houver campo) ou apenas deletar se permitido
-                // Aqui vamos apenas deletar para limpar o histórico, ou marcar como deletado se tiver soft delete
-                stockMovementRepository.delete(m);
-            }
-            
-            stockRequisitionRepository.delete(req);
+        if (req == null) {
             form.setStockRequisitionId(null);
+            return;
         }
+        if (req.getRequisitionNumber() == null || !req.getRequisitionNumber().startsWith("REQ-EPI-")) {
+            log.info("Requisição {} não foi criada pela sincronização REQ-EPI; cancelamento automático ignorado.",
+                    req.getRequisitionNumber());
+            return;
+        }
+        
+        // Estornar movimentações vinculadas
+        List<StockMovement> movements = stockMovementRepository.findByRequisitionNumberOrderByMovementDateAsc(req.getRequisitionNumber());
+        for (StockMovement m : movements) {
+            // Criar entrada compensatória para devolver ao estoque
+            com.z7design.secured_guard.dto.StockMovementDTO storno = new com.z7design.secured_guard.dto.StockMovementDTO();
+            storno.setStockItemId(m.getStockItem().getId());
+            storno.setMovementType(MovementType.ENTRADA);
+            storno.setReason(MovementReason.AJUSTE_ENTRADA);
+            storno.setQuantity(m.getQuantity());
+            storno.setNotes("Estorno automático por alteração na Ficha de EPI: " + form.getId());
+            stockService.createMovement(storno, userId);
+            
+            // Marcar movimento original como cancelado (se houver campo) ou apenas deletar se permitido
+            // Aqui vamos apenas deletar para limpar o histórico, ou marcar como deletado se tiver soft delete
+            stockMovementRepository.delete(m);
+        }
+        
+        stockRequisitionRepository.delete(req);
+        form.setStockRequisitionId(null);
     }
 
 
@@ -338,6 +361,122 @@ public class EPIDeliveryFormService {
                 historyDetail,
                 form.getObservations()
         );
+    }
+
+    /**
+     * Após aprovação da requisição de almoxarifado (baixa no estoque): cria ficha de EPI em rascunho com todos os itens
+     * elegíveis (EPI, uniformes, calçados), vinculada ao ID da requisição.
+     */
+    @Transactional
+    public void ensureDraftEpiFormFromApprovedStockRequisition(StockRequisition r, UUID actingUserId) {
+        List<StockRequisitionLine> eligibleLines = r.getLines().stream()
+                .filter(line -> line.getStockItem() != null && isStockItemEligibleForEpiFicha(line.getStockItem()))
+                .collect(Collectors.toList());
+
+        Optional<EPIDeliveryForm> existingOpt = epiDeliveryFormRepository.findFirstByStockRequisitionIdOrderByCreatedAtDesc(r.getId());
+
+        if (eligibleLines.isEmpty()) {
+            existingOpt.ifPresent(f -> {
+                epiDeliveryFormRepository.delete(f);
+                log.info("Removida ficha EPI vinculada à requisição {} — sem itens elegíveis para ficha.", r.getRequisitionNumber());
+            });
+            return;
+        }
+
+        existingOpt.ifPresent(epiDeliveryFormRepository::delete);
+
+        Employee emp = r.getEmployee();
+        UUID companyId = emp.getCompany() != null ? emp.getCompany().getId() : null;
+        if (companyId == null) {
+            log.warn("Funcionário {} sem empresa vinculada; ficha EPI a partir da requisição {} não criada.",
+                    emp.getId(), r.getRequisitionNumber());
+            return;
+        }
+
+        CreateEPIDeliveryFormDTO dto = new CreateEPIDeliveryFormDTO();
+        dto.setEmployeeId(emp.getId());
+        dto.setCompanyId(companyId);
+        dto.setDeliveryDate(LocalDate.now());
+        dto.setEmployeeWorkSector(r.getEmployeeWorkSector());
+        dto.setDeliveryType(mapMovementReasonToEpiDeliveryType(r.getMovementReason()));
+        String baseObs = "Gerado pela requisição de almoxarifado " + r.getRequisitionNumber();
+        if (r.getNotes() != null && !r.getNotes().isBlank()) {
+            baseObs = baseObs + ". Obs. requisição: " + r.getNotes();
+        }
+        dto.setObservations(baseObs);
+        dto.setStockRequisitionId(r.getId());
+        dto.setStatus(EPIDeliveryFormStatus.DRAFT);
+
+        List<EPIDeliveryFormItemDTO> items = eligibleLines.stream().map(line -> {
+            StockItem si = line.getStockItem();
+            EPIDeliveryFormItemDTO i = new EPIDeliveryFormItemDTO();
+            i.setEpiName(si.getFullName());
+            i.setQuantity(line.getQuantity());
+            i.setStockItemId(si.getId());
+            return i;
+        }).collect(Collectors.toList());
+        dto.setItems(items);
+
+        create(dto, actingUserId);
+        log.info("Ficha EPI (rascunho) criada para requisição {} com {} item(ns) elegíveis.", r.getRequisitionNumber(), items.size());
+    }
+
+    /**
+     * Na confirmação de entrega (assinatura), conclui a ficha de EPI vinculada à mesma requisição, sem nova baixa de estoque.
+     */
+    @Transactional
+    public void completeLinkedEpiFormAfterStockRequisitionDelivery(StockRequisition r,
+                                                                   DeliverStockRequisitionRequest req,
+                                                                   UUID delivererUserId) {
+        Optional<EPIDeliveryForm> opt = epiDeliveryFormRepository.findFirstByStockRequisitionIdOrderByCreatedAtDesc(r.getId());
+        if (opt.isEmpty()) {
+            return;
+        }
+        EPIDeliveryForm form = opt.get();
+        LocalDate deliveryDay = r.getDeliveredAt() != null ? r.getDeliveredAt().toLocalDate() : LocalDate.now();
+        form.setDeliveryDate(deliveryDay);
+        form.setStatus(EPIDeliveryFormStatus.COMPLETED);
+
+        if (req.getSignatureType() == StockMovement.SignatureType.DIGITAL) {
+            form.setSignatureBase64(req.getDigitalSignature());
+            form.setSignatureType("ON_SCREEN");
+        } else {
+            form.setSignatureBase64(null);
+            form.setSignatureType("PHYSICAL");
+            String ack = req.getPhysicalAcknowledgment();
+            if (ack != null && !ack.isBlank()) {
+                String obs = form.getObservations() != null ? form.getObservations() : "";
+                form.setObservations(obs + (obs.isBlank() ? "" : "\n") + "Recebimento físico: " + ack);
+            }
+        }
+
+        epiDeliveryFormRepository.save(form);
+        User deliverer = delivererUserId != null ? userRepository.findById(delivererUserId).orElse(null) : null;
+        recordHistoryForForm(form, deliverer, "CONCLUSÃO_PÓS_REQUISIÇÃO_ALMOXARIFADO");
+        log.info("Ficha EPI {} concluída após entrega da requisição {}", form.getId(), r.getRequisitionNumber());
+    }
+
+    private static boolean isStockItemEligibleForEpiFicha(StockItem item) {
+        if (item.getCategory() == null) {
+            return false;
+        }
+        StockCategory c = item.getCategory();
+        if (c == StockCategory.EPI || c == StockCategory.CALCADOS) {
+            return true;
+        }
+        return c.name().startsWith("UNIFORME");
+    }
+
+    private static EPIDeliveryType mapMovementReasonToEpiDeliveryType(MovementReason reason) {
+        if (reason == null) {
+            return EPIDeliveryType.PRIMEIRA_ENTREGA;
+        }
+        return switch (reason) {
+            case REPOSICAO -> EPIDeliveryType.SUBSTITUICAO;
+            case TROCA -> EPIDeliveryType.TROCA;
+            case DEVOLUCAO -> EPIDeliveryType.DEVOLUCAO;
+            default -> EPIDeliveryType.PRIMEIRA_ENTREGA;
+        };
     }
 
     @Transactional(readOnly = true)

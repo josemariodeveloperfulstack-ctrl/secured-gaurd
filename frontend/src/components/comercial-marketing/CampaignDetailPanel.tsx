@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,8 @@ import {
 
 interface CampaignDetailPanelProps {
   campaign: EmailCampaignSummary;
+  /** Abre direto a aba de registros (ex.: `replied` ao vir da caixa de respostas dos leads). */
+  initialRecipientLogTab?: string;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -68,7 +70,7 @@ const FUNNEL: FunnelStep[] = [
   {
     key: 'SENT',
     label: 'Enviados',
-    statuses: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'],
+    statuses: ['SENT', 'DEFERRED', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'],
     icon: <Send className="h-4 w-4" />,
     color: 'from-blue-500/40 to-blue-500/10 border-blue-500/40',
   },
@@ -112,7 +114,12 @@ interface TabSpec {
 const TABS: TabSpec[] = [
   { value: 'all', label: 'Todos', statuses: undefined, icon: <Inbox className="h-3.5 w-3.5" /> },
   { value: 'pending', label: 'Pendentes', statuses: ['PENDING'], icon: <Clock className="h-3.5 w-3.5" /> },
-  { value: 'sent', label: 'Enviados', statuses: ['SENT', 'DELIVERED'], icon: <Send className="h-3.5 w-3.5" /> },
+  {
+    value: 'sent',
+    label: 'Enviados',
+    statuses: ['SENT', 'DEFERRED', 'DELIVERED'],
+    icon: <Send className="h-3.5 w-3.5" />,
+  },
   { value: 'opened', label: 'Lidos', statuses: ['OPENED'], icon: <Eye className="h-3.5 w-3.5" /> },
   { value: 'clicked', label: 'Clicados', statuses: ['CLICKED'], icon: <MousePointerClick className="h-3.5 w-3.5" /> },
   { value: 'replied', label: 'Respondidos', statuses: ['REPLIED'], icon: <MessageSquareText className="h-3.5 w-3.5" /> },
@@ -124,9 +131,25 @@ const TABS: TabSpec[] = [
   },
 ];
 
-const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({ campaign }) => {
+const VALID_LOG_TAB_VALUES = new Set(TABS.map((t) => t.value));
+
+function normalizeRecipientLogTab(tab: string | undefined): string {
+  if (tab && VALID_LOG_TAB_VALUES.has(tab)) return tab;
+  return 'all';
+}
+
+const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({
+  campaign,
+  initialRecipientLogTab,
+}) => {
   const campaignId = campaign.id;
   const isLive = campaign.status === 'RUNNING' || campaign.status === 'SCHEDULED';
+
+  const defaultLogTab = normalizeRecipientLogTab(initialRecipientLogTab);
+  const [recipientLogTab, setRecipientLogTab] = useState(defaultLogTab);
+  useEffect(() => {
+    setRecipientLogTab(normalizeRecipientLogTab(initialRecipientLogTab));
+  }, [campaignId, initialRecipientLogTab]);
 
   const metricsQuery = useQuery({
     queryKey: ['email-campaign-metrics', campaignId],
@@ -256,7 +279,7 @@ const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({ campaign }) =
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="all">
+          <Tabs value={recipientLogTab} onValueChange={setRecipientLogTab}>
             <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-seguranca-black/40">
               {TABS.map((tab) => {
                 const tabCount = tab.statuses

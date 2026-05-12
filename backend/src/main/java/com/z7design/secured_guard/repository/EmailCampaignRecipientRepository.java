@@ -2,6 +2,7 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.EmailCampaignRecipient;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,4 +16,12 @@ public interface EmailCampaignRecipientRepository extends JpaRepository<EmailCam
 
     @Query("select r from EmailCampaignRecipient r where lower(r.email) = lower(:email)")
     Optional<EmailCampaignRecipient> findFirstByEmailIgnoreCase(@Param("email") String email);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update EmailCampaignRecipient r
+            set r.emailMarketingSuppressed = true
+            where lower(trim(r.email)) = lower(trim(:email))
+            """)
+    int suppressMarketingByEmailIgnoreCase(@Param("email") String email);
 }

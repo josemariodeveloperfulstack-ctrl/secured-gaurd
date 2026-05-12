@@ -444,7 +444,12 @@ export const employeeService = {
   async searchSimpleEmployees(query: string): Promise<SimpleEmployee[]> {
     try {
       const response = await api.get(`/api/employees/search/simple?q=${encodeURIComponent(query)}`);
-      return response.data;
+      const raw = response.data;
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw === 'object' && Array.isArray((raw as { content?: unknown }).content)) {
+        return (raw as { content: SimpleEmployee[] }).content;
+      }
+      return [];
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
       return [];

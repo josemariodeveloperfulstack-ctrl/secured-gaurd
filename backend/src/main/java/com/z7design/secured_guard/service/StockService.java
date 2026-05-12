@@ -310,11 +310,12 @@ public class StockService {
             
             // Se for EPI/Uniforme e NÃO for uma movimentação originada pela própria ficha de EPI, registrar entrega
             boolean isFromEPIForm = dto.getNotes() != null && dto.getNotes().contains("Baixa automática via Ficha de EPI");
+            boolean skipEpiAuto = Boolean.TRUE.equals(dto.getSkipEpiDeliveryFormAutoRecord());
             boolean isEligibleForEPIForm = item.getCategory() == StockCategory.EPI || 
                                          item.getCategory().name().startsWith("UNIFORME") ||
                                          item.getCategory() == StockCategory.CALCADOS;
             
-            if (isEligibleForEPIForm && !isFromEPIForm) {
+            if (isEligibleForEPIForm && !isFromEPIForm && !skipEpiAuto) {
                 try {
                     recordEPIDelivery(movement, employee, user);
                 } catch (Exception e) {

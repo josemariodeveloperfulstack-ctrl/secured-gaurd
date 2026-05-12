@@ -175,3 +175,133 @@ export function toRecipientInputs(
     sourceType,
   }));
 }
+
+/** Mapeamento manual: cabeçalhos da planilha → campos conhecidos. */
+export interface SpreadsheetColumnMapping {
+  email: string;
+  name?: string;
+  company?: string;
+  position?: string;
+  phone?: string;
+  /** Gravado em metadata.segment (segmento / texto livre). */
+  segment?: string;
+}
+
+function readFirstSheetRows(fileBuffer: ArrayBuffer): Record<string, unknown>[] {
+  const wb = XLSX.read(fileBuffer, { type: 'array' });
+  const sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+    defval: '',
+    raw: false,
+  });
+}
+
+/** Cabeçalhos da primeira folha (nomes de coluna da primeira linha de dados). */
+export async function previewSpreadsheetHeaders(file: File): Promise<string[]> {
+  const buf = await file.arrayBuffer();
+  const json = readFirstSheetRows(buf);
+  if (json.length > 0) {
+    return Object.keys(json[0]);
+  }
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const row1 = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 })[0] as string[] | undefined;
+  return (row1 || []).map((h) => String(h || '').trim()).filter(Boolean);
+}
+
+export function guessEmailColumn(headers: string[]): string {
+  const found = headers.find((x) => {
+    const t = x.trim().toLowerCase();
+    return t === 'email' || t === 'e-mail' || t === 'mail' || t.includes('email');
+  });
+  return found ?? headers[0] ?? '';
+}
+
+function pickHeader(headers: string[], re: RegExp): string | undefined {
+  return headers.find((x) => re.test(x.trim()));
+}
+
+/** Sugestão inicial de mapeamento a partir dos cabeçalhos da planilha. */
+export function buildDefaultSpreadsheetMapping(headers: string[]): SpreadsheetColumnMapping {
+  return {
+    email: guessEmailColumn(headers),
+    name: pickHeader(headers, /nome|^name$/i),
+    company: pickHeader(headers, /empresa|company|organization/i),
+    position: pickHeader(headers, /cargo|position|role|titulo|título/i),
+    phone: pickHeader(headers, /telefone|phone|celular|whatsapp|mobile/i),
+    segment: pickHeader(headers, /segmento|segment|tags?/i),
+  };
+}
+
+function cell(row: Record<string, unknown>, col?: string): string | undefined {
+  if (!col) return undefined;
+  const v = row[col];
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  return s === '' ? undefined : s;
+}
+
+/**
+ * Parse de planilha usando colunas escolhidas pelo usuário (e-mail obrigatório).
+ */
+export async function parseRecipientFileWithMapping(
+  file: File,
+  mapping: SpreadsheetColumnMapping,
+): Promise<ParseResult> {
+  if (!mapping.email) {
+    return { rows: [], invalid: [{ row: 0, email: '', reason: 'Indique a coluna de e-mail' }], headers: [] };
+  }
+  const buf = await file.arrayBuffer();
+  const json = readFirstSheetRows(buf);
+  const headers = json.length > 0 ? Object.keys(json[0]) : [];
+
+  const usedCols = new Set(
+    [mapping.email, mapping.name, mapping.company, mapping.position, mapping.phone, mapping.segment].filter(Boolean),
+  );
+
+  const rows: ParsedRow[] = [];
+  const invalid: ParseResult['invalid'] = [];
+
+  json.forEach((row, index) => {
+    const emailRaw = cell(row, mapping.email);
+    const email = emailRaw ? emailRaw.toLowerCase() : '';
+    if (!email || !EMAIL_RE.test(email)) {
+      invalid.push({
+        row: index + 2,
+        email: emailRaw || '',
+        reason: !emailRaw ? 'E-mail vazio' : 'Formato inválido',
+      });
+      return;
+    }
+    const name = cell(row, mapping.name);
+    const company = cell(row, mapping.company);
+    const position = cell(row, mapping.position);
+    const phone = cell(row, mapping.phone);
+    const segment = cell(row, mapping.segment);
+
+    const metadata: Record<string, unknown> = {};
+    if (company) metadata.company = company;
+    if (position) metadata.position = position;
+    if (phone) metadata.phone = phone;
+    if (segment) metadata.segment = segment;
+
+    for (const k of Object.keys(row)) {
+      if (!k || usedCols.has(k)) continue;
+      const v = row[k];
+      if (v == null || String(v).trim() === '') continue;
+      metadata[k.trim()] = v;
+    }
+
+    rows.push({ raw: row, email, name, company, position, phone, metadata });
+  });
+
+  const seen = new Set<string>();
+  const deduped = rows.filter((r) => {
+    if (seen.has(r.email)) return false;
+    seen.add(r.email);
+    return true;
+  });
+
+  return { rows: deduped, invalid, headers };
+}

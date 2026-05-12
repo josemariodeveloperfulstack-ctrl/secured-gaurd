@@ -6,11 +6,15 @@ import com.z7design.secured_guard.dto.sendgrid.EmailCampaignRecipientDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailLogRowDto;
 import com.z7design.secured_guard.dto.sendgrid.SendEmailCampaignRequest;
+import com.z7design.secured_guard.dto.sendgrid.UpdateEmailCampaignRequest;
 import com.z7design.secured_guard.model.EmailCampaign;
 import com.z7design.secured_guard.model.EmailCampaignRecipient;
 import com.z7design.secured_guard.model.EmailLog;
 import com.z7design.secured_guard.model.EmailTemplate;
+import com.z7design.secured_guard.model.enums.EmailCampaignStatus;
 import com.z7design.secured_guard.model.enums.EmailLogStatus;
+import com.z7design.secured_guard.model.enums.EmailProviderType;
+import com.z7design.secured_guard.model.enums.RecipientSourceType;
 import com.z7design.secured_guard.model.Lead;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.EmailCampaignRecipientRepository;
@@ -82,29 +86,59 @@ public class EmailCampaignService {
         currentUser().ifPresent(campaign::setCreatedBy);
 
         for (EmailCampaignRecipientDto dto : request.recipients()) {
-            EmailCampaignRecipient r = EmailCampaignRecipient.builder()
-                    .campaign(campaign)
-                    .email(dto.email().trim())
-                    .name(dto.name())
-                    .metadata(dto.metadata() != null ? new HashMap<>(dto.metadata()) : new HashMap<>())
-                    .build();
-            if (dto.sourceType() != null && !dto.sourceType().isBlank()) {
-                try {
-                    r.setSourceType(
-                            com.z7design.secured_guard.model.enums.RecipientSourceType.valueOf(
-                                    dto.sourceType().trim().toUpperCase()));
-                } catch (IllegalArgumentException ignored) {
-                    // mantém MANUAL default
-                }
+            attachRecipientFromDto(campaign, dto);
+        }
+        return campaignRepository.save(campaign);
+    }
+
+    private void attachRecipientFromDto(EmailCampaign campaign, EmailCampaignRecipientDto dto) {
+        EmailCampaignRecipient r = EmailCampaignRecipient.builder()
+                .campaign(campaign)
+                .email(dto.email().trim())
+                .name(dto.name())
+                .metadata(dto.metadata() != null ? new HashMap<>(dto.metadata()) : new HashMap<>())
+                .build();
+        if (dto.sourceType() != null && !dto.sourceType().isBlank()) {
+            try {
+                r.setSourceType(RecipientSourceType.valueOf(dto.sourceType().trim().toUpperCase()));
+            } catch (IllegalArgumentException ignored) {
+                // mantém MANUAL default
             }
-            if (dto.leadId() != null) {
-                Lead lead = leadRepository.findById(dto.leadId()).orElse(null);
-                if (lead != null) {
-                    r.setLead(lead);
-                    r.setSourceType(com.z7design.secured_guard.model.enums.RecipientSourceType.LEAD);
-                }
+        }
+        if (dto.leadId() != null) {
+            Lead lead = leadRepository.findById(dto.leadId()).orElse(null);
+            if (lead != null) {
+                r.setLead(lead);
+                r.setSourceType(RecipientSourceType.LEAD);
             }
-            campaign.getRecipients().add(r);
+        }
+        campaign.getRecipients().add(r);
+    }
+
+    /**
+     * Acrescenta destinatários a uma campanha em {@link EmailCampaignStatus#DRAFT},
+     * ignorando duplicados pelo e-mail (case-insensitive).
+     */
+    @Transactional
+    public EmailCampaign appendRecipients(UUID campaignId, List<EmailCampaignRecipientDto> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            return get(campaignId);
+        }
+        EmailCampaign campaign = get(campaignId);
+        if (campaign.getStatus() != EmailCampaignStatus.DRAFT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Somente campanhas em rascunho permitem adicionar destinatários.");
+        }
+        java.util.Set<String> seen = campaign.getRecipients().stream()
+                .map(r -> r.getEmail().toLowerCase())
+                .collect(Collectors.toSet());
+        for (EmailCampaignRecipientDto dto : dtos) {
+            String key = dto.email().trim().toLowerCase();
+            if (seen.contains(key)) {
+                continue;
+            }
+            seen.add(key);
+            attachRecipientFromDto(campaign, dto);
         }
         return campaignRepository.save(campaign);
     }
@@ -255,6 +289,74 @@ public class EmailCampaignService {
             log.setBounceReason("Campanha cancelada");
             emailLogRepository.save(log);
         });
+    }
+
+    /**
+     * Atualiza metadados da campanha.
+     * <ul>
+     *   <li>{@code COMPLETED} / {@code CANCELED}: apenas título e descrição (registro / relatório).</li>
+     *   <li>{@code DRAFT} / {@code SCHEDULED}: todos os campos; status ajustado conforme {@code scheduledAt}.</li>
+     *   <li>{@code PAUSED} / {@code RUNNING}: limites, template, provedor, agendamento e texto — sem mudar o status da campanha.</li>
+     * </ul>
+     */
+    @Transactional
+    public EmailCampaign updateCampaign(UUID id, UpdateEmailCampaignRequest req) {
+        EmailCampaign c = get(id);
+        EmailCampaignStatus st = c.getStatus();
+
+        if (st == EmailCampaignStatus.COMPLETED || st == EmailCampaignStatus.CANCELED) {
+            c.setTitle(req.title().trim());
+            c.setDescription(req.description());
+            return campaignRepository.save(c);
+        }
+
+        c.setTitle(req.title().trim());
+        c.setDescription(req.description());
+        if (req.providerType() != null && !req.providerType().isBlank()) {
+            try {
+                c.setProviderType(EmailProviderType.valueOf(req.providerType().trim().toUpperCase()));
+            } catch (IllegalArgumentException ignored) {
+                // mantém o tipo já configurado
+            }
+        }
+        c.setTotalLimit(req.totalLimit());
+        c.setDailyLimit(req.dailyLimit());
+        c.setHourlyLimit(req.hourlyLimit());
+        c.setMinIntervalSeconds(req.minIntervalSeconds());
+        c.setScheduledAt(req.scheduledAt());
+
+        if (req.defaultTemplateId() != null) {
+            EmailTemplate t = emailTemplateRepository.findById(req.defaultTemplateId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template não encontrado"));
+            c.setDefaultTemplate(t);
+        } else {
+            c.setDefaultTemplate(null);
+        }
+
+        if (st == EmailCampaignStatus.DRAFT || st == EmailCampaignStatus.SCHEDULED) {
+            Instant sched = req.scheduledAt();
+            if (sched != null && sched.isAfter(Instant.now())) {
+                c.setStatus(EmailCampaignStatus.SCHEDULED);
+            } else {
+                c.setStatus(EmailCampaignStatus.DRAFT);
+            }
+        }
+
+        return campaignRepository.save(c);
+    }
+
+    /**
+     * Remove a campanha, todos os logs de envio e destinatários (cascade).
+     */
+    @Transactional
+    public void deleteCampaign(UUID campaignId) {
+        EmailCampaign c = get(campaignId);
+        dispatchScheduler.clearContext(campaignId);
+        List<EmailLog> logs = emailLogRepository.findByCampaign_IdOrderByCreatedAtDesc(campaignId);
+        if (!logs.isEmpty()) {
+            emailLogRepository.deleteAll(logs);
+        }
+        campaignRepository.delete(c);
     }
 
     @Transactional(readOnly = true)

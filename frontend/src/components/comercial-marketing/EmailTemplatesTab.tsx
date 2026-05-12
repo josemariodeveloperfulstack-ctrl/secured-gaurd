@@ -14,17 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-
-const PREVIEW_SAMPLE: Record<string, string> = {
-  nomeContato: 'Maria Silva',
-  email: 'maria@empresa.com',
-  nomeEmpresa: 'Empresa Exemplo Ltda.',
-  cargo: 'Gerente de Compras',
-  telefone: '(11) 4002-8922',
-  celular: '(11) 99999-0000',
-  ctaUrl: 'https://exemplo.com/oferta',
-  unsubscribeUrl: 'https://exemplo.com/descadastrar',
-};
+import { getEmailTemplatePreviewSample } from '@/utils/emailTemplatePreviewSample';
 
 function renderPreview(template: string, sample: Record<string, string>): string {
   return template.replace(/\{\{\s*([A-Za-z0-9_.]+)\s*\}\}/g, (_m, key: string) =>
@@ -59,9 +49,10 @@ const EmailTemplatesTab: React.FC = () => {
   });
 
   const templates = templatesQuery.data ?? [];
-  const previewHtml = previewTemplate ? renderPreview(previewTemplate.htmlBody, PREVIEW_SAMPLE) : '';
+  const previewSample = getEmailTemplatePreviewSample();
+  const previewHtml = previewTemplate ? renderPreview(previewTemplate.htmlBody, previewSample) : '';
   const previewSubject = previewTemplate
-    ? renderPreview(previewTemplate.subject, PREVIEW_SAMPLE)
+    ? renderPreview(previewTemplate.subject, previewSample)
     : '';
 
   return (

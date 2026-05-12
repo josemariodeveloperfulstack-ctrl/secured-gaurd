@@ -747,6 +747,21 @@ export const stockService = {
     return response.data;
   },
 
+  async updateStockRequisition(id: string, payload: CreateStockRequisitionPayload): Promise<StockRequisitionDTO> {
+    const response = await api.put(`/api/stock/requisitions/${id}`, payload);
+    return response.data;
+  },
+
+  async deleteStockRequisition(id: string): Promise<void> {
+    await api.delete(`/api/stock/requisitions/${id}`);
+  },
+
+  async deleteStockRequisitionsBulk(ids: string[]): Promise<void> {
+    const unique = [...new Set(ids.map((x) => String(x).trim()).filter(Boolean))];
+    if (unique.length === 0) return;
+    await api.delete('/api/stock/requisitions/bulk-delete', { data: unique });
+  },
+
   async getStockRequisition(id: string): Promise<StockRequisitionDTO> {
     const response = await api.get(`/api/stock/requisitions/${id}`);
     return response.data;

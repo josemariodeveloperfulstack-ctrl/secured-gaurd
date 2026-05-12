@@ -125,6 +125,12 @@ export default defineConfig(({ mode }) => {
           secure: false,
           ws: true,
         },
+        // Imagens dos e-mails de marketing (classpath static no backend)
+        '/email-marketing': {
+          target: 'http://localhost:8083',
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     plugins,

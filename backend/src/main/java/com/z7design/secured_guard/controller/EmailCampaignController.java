@@ -1,17 +1,25 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.sendgrid.EmailMarketingUnsubscribeRowDto;
+import com.z7design.secured_guard.dto.sendgrid.AppendRecipientsRequest;
 import com.z7design.secured_guard.dto.sendgrid.CreateEmailCampaignRequest;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignMetricsDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailLogRowDto;
 import com.z7design.secured_guard.dto.sendgrid.ImportRecipientsResponse;
 import com.z7design.secured_guard.dto.sendgrid.SendEmailCampaignRequest;
+import com.z7design.secured_guard.dto.sendgrid.UpdateEmailCampaignRequest;
+import com.z7design.secured_guard.dto.sendgrid.UnsubscribeCheckRequest;
+import com.z7design.secured_guard.dto.sendgrid.UnsubscribeCheckResponse;
 import com.z7design.secured_guard.model.EmailCampaign;
 import com.z7design.secured_guard.model.enums.EmailLogStatus;
 import com.z7design.secured_guard.service.sendgrid.EmailCampaignService;
 import com.z7design.secured_guard.service.sendgrid.EmailRecipientImportService;
+import com.z7design.secured_guard.service.sendgrid.EmailUnsubscribeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,10 +38,19 @@ public class EmailCampaignController {
 
     private final EmailCampaignService emailCampaignService;
     private final EmailRecipientImportService emailRecipientImportService;
+    private final EmailUnsubscribeService emailUnsubscribeService;
 
     @GetMapping
     public ResponseEntity<List<EmailCampaignSummaryDto>> list() {
         return ResponseEntity.ok(emailCampaignService.listSummaries());
+    }
+
+    /**
+     * Lista e-mails que cancelaram o recebimento de campanhas de marketing (opt-out confirmado).
+     */
+    @GetMapping("/marketing-unsubscribes")
+    public ResponseEntity<Page<EmailMarketingUnsubscribeRowDto>> listMarketingUnsubscribes(Pageable pageable) {
+        return ResponseEntity.ok(emailUnsubscribeService.listConfirmedUnsubscribes(pageable));
     }
 
     @PostMapping
@@ -45,6 +62,19 @@ public class EmailCampaignController {
     @GetMapping("/{id}")
     public ResponseEntity<EmailCampaign> get(@PathVariable UUID id) {
         return ResponseEntity.ok(emailCampaignService.get(id));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<EmailCampaign> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateEmailCampaignRequest body) {
+        return ResponseEntity.ok(emailCampaignService.updateCampaign(id, body));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        emailCampaignService.deleteCampaign(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/logs")
@@ -108,5 +138,23 @@ public class EmailCampaignController {
     @PostMapping(path = "/import-recipients", consumes = "multipart/form-data")
     public ResponseEntity<ImportRecipientsResponse> importRecipients(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(emailRecipientImportService.parse(file));
+    }
+
+    /**
+     * Verifica, entre os e-mails informados, quais constam como descadastrados (opt-out).
+     * Limite de 500 endereços por requisição.
+     */
+    @PostMapping("/unsubscribe-check")
+    public ResponseEntity<UnsubscribeCheckResponse> unsubscribeCheck(@Valid @RequestBody UnsubscribeCheckRequest request) {
+        List<String> unsubscribed = emailUnsubscribeService.findUnsubscribedAmong(request.emails());
+        return ResponseEntity.ok(new UnsubscribeCheckResponse(unsubscribed));
+    }
+
+    /** Acrescenta destinatários a uma campanha em rascunho (ignora duplicados). */
+    @PutMapping("/{id}/recipients")
+    public ResponseEntity<EmailCampaign> appendRecipients(
+            @PathVariable UUID id,
+            @Valid @RequestBody AppendRecipientsRequest body) {
+        return ResponseEntity.ok(emailCampaignService.appendRecipients(id, body.recipients()));
     }
 }

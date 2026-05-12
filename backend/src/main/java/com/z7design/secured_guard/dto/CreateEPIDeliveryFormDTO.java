@@ -27,6 +27,9 @@ public class CreateEPIDeliveryFormDTO {
     private String employeeWorkSector;
     private com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status;
 
+    /** Requisição de estoque (almoxarifado) à qual esta ficha está associada; não confundir com REQ-EPI gerada pela sincronização da ficha. */
+    private UUID stockRequisitionId;
+
     @NotEmpty(message = "É necessário pelo menos um item de EPI")
     private List<EPIDeliveryFormItemDTO> items;
 
@@ -127,5 +130,13 @@ public class CreateEPIDeliveryFormDTO {
 
     public void setItems(List<EPIDeliveryFormItemDTO> items) {
         this.items = items;
+    }
+
+    public UUID getStockRequisitionId() {
+        return stockRequisitionId;
+    }
+
+    public void setStockRequisitionId(UUID stockRequisitionId) {
+        this.stockRequisitionId = stockRequisitionId;
     }
 }

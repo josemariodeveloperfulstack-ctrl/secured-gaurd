@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Plus, 
@@ -50,7 +50,7 @@ interface KanbanStatus {
 }
 
 interface Lead {
-  id: number;
+  id: string | number | null;
   name: string;
   company: string;
   email: string;
@@ -62,10 +62,10 @@ interface Lead {
 }
 
 interface Opportunity {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
-  statusId: number;
+  statusId: string | number;
   lead: Lead;
   value: number;
   probability: number;
@@ -266,73 +266,110 @@ export default function KanbanBoard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
-  const [selectedOppIds, setSelectedOppIds] = useState<number[]>([]);
+  const [selectedOppIds, setSelectedOppIds] = useState<string[]>([]);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'bulk' | 'single' | 'all'>('bulk');
+  const [deleteReason, setDeleteReason] = useState('Exclusão em massa via sistema');
+  const [deleteSingleId, setDeleteSingleId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const toggleSelect = (id: number) => {
-    setSelectedOppIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+  const isOpportunityUuid = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  const toggleSelect = (id: string | number) => {
+    const key = String(id);
+    setSelectedOppIds(prev =>
+      prev.includes(key) ? prev.filter(i => i !== key) : [...prev, key]
     );
   };
 
   const selectAll = () => {
-    setSelectedOppIds(filteredOpportunities.map(opp => opp.id));
+    setSelectedOppIds(filteredOpportunities.map(opp => String(opp.id)));
   };
 
   const deselectAll = () => {
     setSelectedOppIds([]);
   };
 
-  const handleDeleteSelected = async () => {
+  const openBulkDeleteDialog = () => {
     if (selectedOppIds.length === 0) return;
-    
-    const reason = prompt("Por favor, informe o motivo da exclusão:", "Exclusão em massa via sistema");
-    if (reason === null) return; // Cancelado
-
-    if (!confirm(`Deseja realmente excluir ${selectedOppIds.length} oportunidades?`)) return;
-
-    try {
-      setLoading(true);
-      await deleteMultipleOpportunities(selectedOppIds, reason);
+    const valid = selectedOppIds.filter(isOpportunityUuid);
+    if (valid.length === 0) {
       toast({
-        title: "Sucesso",
-        description: `${selectedOppIds.length} oportunidades excluídas com sucesso!`,
+        title: 'Exclusão indisponível',
+        description:
+          'Os cartões selecionados não têm ID de oportunidade válido (ex.: dados de exemplo offline). Recarregue o Kanban com o servidor ou selecione oportunidades reais.',
+        variant: 'destructive',
       });
-      setSelectedOppIds([]);
-      await loadData();
-    } catch (err: any) {
-      console.error('Erro ao excluir em massa:', err);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir as oportunidades selecionadas.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
+      return;
     }
+    setDeleteMode('bulk');
+    setDeleteReason('Exclusão em massa via sistema');
+    setDeleteSingleId(null);
+    setDeleteModalOpen(true);
   };
 
-  const handleDeleteOpportunity = async (id: number) => {
-    const reason = prompt("Por favor, informe o motivo da exclusão:", "Exclusão individual");
-    if (reason === null) return; // Cancelado
+  const openSingleDeleteDialog = (id: string | number) => {
+    const sid = String(id);
+    if (!isOpportunityUuid(sid)) {
+      toast({
+        title: 'Exclusão indisponível',
+        description: 'Este cartão não possui um ID de oportunidade válido no servidor.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setDeleteMode('single');
+    setDeleteSingleId(sid);
+    setDeleteReason('Exclusão individual');
+    setDeleteModalOpen(true);
+  };
 
-    if (!confirm('Deseja realmente excluir esta oportunidade?')) return;
+  const openDeleteAllDialog = () => {
+    setDeleteMode('all');
+    setDeleteSingleId(null);
+    setDeleteReason('Limpeza total do CRM');
+    setDeleteModalOpen(true);
+  };
 
+  const executeDeleteFromModal = async () => {
+    const reason = deleteReason.trim() || 'Exclusão via sistema';
     try {
       setLoading(true);
-      await deleteOpportunity(id, reason);
-      toast({
-        title: "Sucesso",
-        description: "Oportunidade excluída com sucesso!",
-      });
-      setSelectedOppIds(prev => prev.filter(i => i !== id));
+      if (deleteMode === 'bulk') {
+        const valid = selectedOppIds.filter(isOpportunityUuid);
+        if (valid.length === 0) {
+          toast({ title: 'Nada a excluir', description: 'Nenhum ID válido selecionado.', variant: 'destructive' });
+          return;
+        }
+        await deleteMultipleOpportunities(valid, reason);
+        toast({
+          title: 'Sucesso',
+          description: `${valid.length} oportunidade(s) excluída(s).`,
+        });
+        setSelectedOppIds([]);
+      } else if (deleteMode === 'single' && deleteSingleId) {
+        await deleteOpportunity(deleteSingleId, reason);
+        toast({ title: 'Sucesso', description: 'Oportunidade excluída com sucesso.' });
+        setSelectedOppIds(prev => prev.filter(i => i !== deleteSingleId));
+      } else if (deleteMode === 'all') {
+        await leadService.deleteAllLeads(reason);
+        toast({ title: 'Sucesso', description: 'Todos os leads e oportunidades foram excluídos.' });
+        setSelectedOppIds([]);
+      }
+      setDeleteModalOpen(false);
       await loadData();
     } catch (err: any) {
-      console.error('Erro ao excluir oportunidade:', err);
+      console.error('Erro na exclusão:', err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Não foi possível concluir a exclusão.';
       toast({
-        title: "Erro",
-        description: "Não foi possível excluir a oportunidade.",
-        variant: "destructive"
+        title: 'Erro',
+        description: msg,
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -781,32 +818,6 @@ export default function KanbanBoard() {
     }
   };
 
-  const handleDeleteAllLeads = async () => {
-    if (!confirm('⚠️ ATENÇÃO: Esta ação irá excluir PERMANENTEMENTE TODOS os leads e oportunidades do sistema. Deseja continuar?')) return;
-    
-    const reason = prompt("Por favor, informe o motivo da exclusão de TODOS os dados:", "Limpeza total do CRM");
-    if (reason === null) return;
-
-    try {
-      setLoading(true);
-      await leadService.deleteAllLeads(reason);
-      toast({
-        title: "Sucesso",
-        description: "Todos os leads e oportunidades foram excluídos!",
-      });
-      await loadData();
-    } catch (err: any) {
-      console.error('Erro ao excluir todos os leads:', err);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir todos os leads.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'URGENT': return 'bg-red-500';
@@ -907,7 +918,11 @@ export default function KanbanBoard() {
               <div>
                 <p className="text-sm text-gray-400">Média de Valor</p>
                 <p className="text-2xl font-bold text-seguranca-yellow">
-                  {formatCurrency(opportunities.reduce((sum, opp) => sum + opp.value, 0) / opportunities.length)}
+                  {formatCurrency(
+                    opportunities.length > 0
+                      ? opportunities.reduce((sum, opp) => sum + opp.value, 0) / opportunities.length
+                      : 0
+                  )}
                 </p>
               </div>
               <Star className="h-8 w-8 text-seguranca-yellow" />
@@ -968,7 +983,7 @@ export default function KanbanBoard() {
                 <>
                   <Button 
                     variant="destructive" 
-                    onClick={handleDeleteSelected}
+                    onClick={openBulkDeleteDialog}
                     className="bg-red-600 hover:bg-red-700 text-white"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -994,7 +1009,7 @@ export default function KanbanBoard() {
 
               <Button 
                 variant="destructive" 
-                onClick={handleDeleteAllLeads}
+                onClick={openDeleteAllDialog}
                 className="bg-red-900/50 hover:bg-red-900 text-white border-red-800"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -1036,16 +1051,16 @@ export default function KanbanBoard() {
               <div className="space-y-3">
                 {statusOpportunities.map(opp => (
                   <KanbanCard
-                    key={opp.id}
+                    key={String(opp.id)}
                     opportunity={opp}
                     onEdit={openEditModal}
                     onDragStart={() => {}}
                     getPriorityColor={getPriorityColor}
                     getLeadStatusColor={getLeadStatusColor}
                     getLeadStatusText={getLeadStatusText}
-                    selected={selectedOppIds.includes(opp.id)}
+                    selected={selectedOppIds.includes(String(opp.id))}
                     onSelect={toggleSelect}
-                    onDelete={handleDeleteOpportunity}
+                    onDelete={openSingleDeleteDialog}
                     formatCurrency={formatCurrency}
                     formatDate={formatDate}
                   />
@@ -1066,6 +1081,58 @@ export default function KanbanBoard() {
           );
         })}
       </div>
+
+      {/* Confirmação de exclusão (tema CRM) */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md border border-gray-600 bg-seguranca-graphite p-6 text-seguranca-lightgray shadow-2xl [&>button]:text-seguranca-lightgray">
+          <DialogHeader className="text-center sm:text-center space-y-2">
+            <DialogTitle className="text-xl text-seguranca-lightgray">
+              {deleteMode === 'all'
+                ? 'Excluir todos os dados do CRM?'
+                : deleteMode === 'bulk'
+                  ? `Excluir ${selectedOppIds.filter(isOpportunityUuid).length} oportunidade(s)?`
+                  : 'Excluir esta oportunidade?'}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-center">
+              {deleteMode === 'all'
+                ? 'Esta ação remove permanentemente todos os leads e oportunidades. Informe o motivo para o registro de auditoria.'
+                : 'Informe o motivo da exclusão (obrigatório para auditoria).'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-left">
+            <Label htmlFor="delete-reason" className="text-seguranca-lightgray">
+              Motivo da exclusão
+            </Label>
+            <Textarea
+              id="delete-reason"
+              value={deleteReason}
+              onChange={e => setDeleteReason(e.target.value)}
+              rows={3}
+              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray resize-none"
+              placeholder="Descreva o motivo..."
+            />
+          </div>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-center gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+              onClick={() => setDeleteModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => void executeDeleteFromModal()}
+              disabled={loading}
+            >
+              {deleteMode === 'all' ? 'Confirmar limpeza total' : 'Confirmar exclusão'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Oportunidade */}
       <Dialog open={showModal} onOpenChange={setShowModal}>

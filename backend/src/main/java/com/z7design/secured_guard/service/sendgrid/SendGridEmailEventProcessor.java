@@ -10,11 +10,13 @@ import com.z7design.secured_guard.repository.EmailWebhookEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,7 +61,12 @@ public class SendGridEmailEventProcessor {
 
         Optional<EmailLog> logOpt = resolveLog(event);
         if (logOpt.isEmpty()) {
-            log.debug("SendGrid webhook: log não encontrado para evento {}", sgEventId);
+            log.debug(
+                    "SendGrid webhook: log não encontrado para evento {} tipo={} email={} sg_message_id={}",
+                    sgEventId,
+                    event.has("event") ? event.get("event").asText() : "",
+                    event.has("email") ? event.get("email").asText() : "",
+                    event.has("sg_message_id") ? event.get("sg_message_id").asText() : "");
             emailWebhookEventRepository.save(EmailWebhookEvent.builder()
                     .sgEventId(sgEventId)
                     .processedAt(Instant.now())
@@ -147,19 +154,90 @@ public class SendGridEmailEventProcessor {
     }
 
     private Optional<EmailLog> resolveLog(JsonNode event) {
-        if (event.hasNonNull("email_log_id")) {
-            try {
-                UUID id = UUID.fromString(event.get("email_log_id").asText());
-                return emailLogRepository.findById(id);
-            } catch (IllegalArgumentException ignored) {
-                // continua
-            }
+        Optional<EmailLog> byUuid = resolveEmailLogIdFromEvent(event);
+        if (byUuid.isPresent()) {
+            return byUuid;
         }
-        if (event.hasNonNull("sg_message_id")) {
-            String mid = normalizeMessageId(event.get("sg_message_id").asText());
-            return emailLogRepository.findByProviderMessageId(mid);
+        String rawMid = extractSgMessageId(event);
+        if (rawMid == null || rawMid.isBlank()) {
+            return Optional.empty();
+        }
+        String mid = normalizeMessageId(rawMid);
+        Optional<EmailLog> exact = emailLogRepository.findByProviderMessageId(mid);
+        if (exact.isPresent()) {
+            return exact;
+        }
+        List<EmailLog> fuzzy = emailLogRepository.findByProviderMessageIdFuzzy(mid, PageRequest.of(0, 3));
+        if (!fuzzy.isEmpty()) {
+            return Optional.of(fuzzy.get(0));
         }
         return Optional.empty();
+    }
+
+    private Optional<EmailLog> resolveEmailLogIdFromEvent(JsonNode event) {
+        Optional<EmailLog> id = tryEmailLogUuid(event, "email_log_id");
+        if (id.isPresent()) {
+            return id;
+        }
+        for (String field : List.of("unique_args", "custom_args")) {
+            if (!event.has(field) || event.get(field).isNull()) {
+                continue;
+            }
+            JsonNode node = event.get(field);
+            if (node.isObject()) {
+                id = tryEmailLogUuid(node, "email_log_id");
+                if (id.isPresent()) {
+                    return id;
+                }
+            } else if (node.isTextual()) {
+                try {
+                    JsonNode inner = objectMapper.readTree(node.asText());
+                    if (inner.isObject()) {
+                        id = tryEmailLogUuid(inner, "email_log_id");
+                        if (id.isPresent()) {
+                            return id;
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // não é JSON
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<EmailLog> tryEmailLogUuid(JsonNode node, String key) {
+        if (node == null || !node.hasNonNull(key)) {
+            return Optional.empty();
+        }
+        try {
+            UUID uuid = UUID.fromString(node.get(key).asText());
+            return emailLogRepository.findById(uuid);
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * {@code sg_message_id} costuma existir em todos os eventos; em alguns casos
+     * só há {@code smtp-id} com o identificador interno (prefixo útil para match).
+     */
+    private static String extractSgMessageId(JsonNode event) {
+        if (event.hasNonNull("sg_message_id")) {
+            return event.get("sg_message_id").asText();
+        }
+        if (event.hasNonNull("smtp-id")) {
+            String smtpId = event.get("smtp-id").asText();
+            if (smtpId == null) {
+                return null;
+            }
+            String t = smtpId.trim();
+            if (t.startsWith("<") && t.contains("@")) {
+                int at = t.indexOf('@');
+                return t.substring(1, at);
+            }
+        }
+        return null;
     }
 
     private static String normalizeMessageId(String raw) {

@@ -10,7 +10,6 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.EmployeeChangeHistory;
 import com.z7design.secured_guard.model.StockItem;
 import com.z7design.secured_guard.model.StockMovement;
-import com.z7design.secured_guard.model.StockMovement;
 import com.z7design.secured_guard.model.StockRequisition;
 import com.z7design.secured_guard.model.StockRequisitionLine;
 import com.z7design.secured_guard.model.User;
@@ -51,6 +50,7 @@ public class StockRequisitionService {
     private final EmployeeChangeHistoryRepository employeeChangeHistoryRepository;
     private final StockService stockService;
     private final StockRequisitionPdfService stockRequisitionPdfService;
+    private final EPIDeliveryFormService epiDeliveryFormService;
 
     private String nextRequisitionNumber() {
         return "REQ-EST-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
@@ -101,6 +101,59 @@ public class StockRequisitionService {
         return StockRequisitionDTO.fromEntity(loadFetched(r.getId()));
     }
 
+    /**
+     * Atualiza cabeçalho e linhas. Permitido apenas enquanto {@link StockRequisitionStatus#PENDING}
+     * (antes da baixa no estoque).
+     */
+    public StockRequisitionDTO update(UUID id, CreateStockRequisitionRequest req) {
+        StockRequisition r = loadFetched(id);
+        if (r.getStatus() != StockRequisitionStatus.PENDING) {
+            throw new IllegalArgumentException("Somente requisições pendentes podem ser alteradas.");
+        }
+        Employee employee = employeeRepository.findWithOrgContextById(req.getEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado: " + req.getEmployeeId()));
+        String sectorSnapshot = buildWorkSectorSnapshot(employee);
+
+        r.setEmployee(employee);
+        r.setMovementReason(req.getMovementReason());
+        r.setNotes(req.getNotes());
+        r.setEmployeeWorkSector(sectorSnapshot);
+
+        r.getLines().clear();
+        for (CreateStockRequisitionRequest.Line line : req.getLines()) {
+            StockItem item = stockItemRepository.findById(line.getStockItemId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: " + line.getStockItemId()));
+            StockRequisitionLine l = StockRequisitionLine.builder()
+                    .stockItem(item)
+                    .quantity(line.getQuantity())
+                    .build();
+            r.addLine(l);
+        }
+
+        stockRequisitionRepository.save(r);
+        return StockRequisitionDTO.fromEntity(loadFetched(id));
+    }
+
+    /** Exclui requisição ainda pendente (sem movimentações de estoque). */
+    public void delete(UUID id) {
+        StockRequisition r = loadFetched(id);
+        if (r.getStatus() != StockRequisitionStatus.PENDING) {
+            throw new IllegalArgumentException("Somente requisições pendentes podem ser excluídas.");
+        }
+        stockRequisitionRepository.delete(r);
+    }
+
+    public void deleteMultiple(List<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        for (UUID id : ids) {
+            if (id != null) {
+                delete(id);
+            }
+        }
+    }
+
     public StockRequisitionDTO approve(UUID id, UUID approverUserId) {
         StockRequisition r = loadFetched(id);
         if (r.getStatus() != StockRequisitionStatus.PENDING) {
@@ -128,6 +181,8 @@ public class StockRequisitionService {
                 "Requisição de estoque aprovada (baixa no estoque)",
                 apprDetail,
                 null);
+
+        epiDeliveryFormService.ensureDraftEpiFormFromApprovedStockRequisition(loadFetched(id), approverUserId);
 
         return StockRequisitionDTO.fromEntity(loadFetched(id));
     }
@@ -192,6 +247,8 @@ public class StockRequisitionService {
                         + " (" + req.getSignatureType() + ")",
                 req.getPhysicalAcknowledgment());
 
+        epiDeliveryFormService.completeLinkedEpiFormAfterStockRequisitionDelivery(loadFetched(id), req, delivererUserId);
+
         return StockRequisitionDTO.fromEntity(loadFetched(id));
     }
 
@@ -214,6 +271,7 @@ public class StockRequisitionService {
             mov.setEmployeeId(empId);
             mov.setRequisitionNumber(reqNum);
             mov.setNotes(fullNotes);
+            mov.setSkipEpiDeliveryFormAutoRecord(true);
             stockService.createMovement(mov, actingUserId);
         }
     }

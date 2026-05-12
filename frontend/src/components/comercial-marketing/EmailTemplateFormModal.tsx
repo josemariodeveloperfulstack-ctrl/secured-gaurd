@@ -17,6 +17,7 @@ import emailTemplateService, {
   SUGGESTED_VARIABLES,
   type EmailTemplate,
 } from '@/services/emailTemplateService';
+import { getEmailTemplatePreviewSample } from '@/utils/emailTemplatePreviewSample';
 import { Loader2, Eye, Pencil } from 'lucide-react';
 
 interface Props {
@@ -24,17 +25,6 @@ interface Props {
   template: EmailTemplate | null;
   onOpenChange: (open: boolean) => void;
 }
-
-const PREVIEW_SAMPLE: Record<string, string> = {
-  nomeContato: 'Maria Silva',
-  email: 'maria@empresa.com',
-  nomeEmpresa: 'Empresa Exemplo Ltda.',
-  cargo: 'Gerente de Compras',
-  telefone: '(11) 4002-8922',
-  celular: '(11) 99999-0000',
-  ctaUrl: 'https://exemplo.com/oferta',
-  unsubscribeUrl: 'https://exemplo.com/descadastrar',
-};
 
 function renderPreview(template: string, sample: Record<string, string>): string {
   return template.replace(/\{\{\s*([A-Za-z0-9_.]+)\s*\}\}/g, (_m, key: string) =>
@@ -63,8 +53,9 @@ export const EmailTemplateFormModal: React.FC<Props> = ({ open, template, onOpen
     }
   }, [open, template]);
 
-  const previewSubject = useMemo(() => renderPreview(subject, PREVIEW_SAMPLE), [subject]);
-  const previewHtml = useMemo(() => renderPreview(htmlBody, PREVIEW_SAMPLE), [htmlBody]);
+  const previewSample = useMemo(() => getEmailTemplatePreviewSample(), [open, activeView]);
+  const previewSubject = useMemo(() => renderPreview(subject, previewSample), [subject, previewSample]);
+  const previewHtml = useMemo(() => renderPreview(htmlBody, previewSample), [htmlBody, previewSample]);
 
   const saveMutation = useMutation({
     mutationFn: () => {
@@ -249,7 +240,7 @@ export const EmailTemplateFormModal: React.FC<Props> = ({ open, template, onOpen
                 Valores de amostra usados no preview
               </p>
               <ul className="space-y-0.5 text-[11px] text-seguranca-lightgray">
-                {Object.entries(PREVIEW_SAMPLE).map(([k, val]) => (
+                {Object.entries(previewSample).map(([k, val]) => (
                   <li key={k}>
                     <code className="text-seguranca-yellow">{k}</code>: {val}
                   </li>

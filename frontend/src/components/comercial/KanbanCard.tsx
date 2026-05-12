@@ -21,7 +21,7 @@ import {
 import styles from './KanbanBoard.module.css';
 
 interface Lead {
-  id: number;
+  id: string | number | null;
   name: string;
   company: string;
   email: string;
@@ -33,10 +33,10 @@ interface Lead {
 }
 
 interface Opportunity {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
-  statusId: number;
+  statusId: string | number;
   lead: Lead;
   value: number;
   probability: number;
@@ -50,13 +50,13 @@ interface Opportunity {
 interface KanbanCardProps {
   opportunity: Opportunity;
   onEdit: (opp: Opportunity) => void;
-  onDragStart: (e: React.DragEvent, oppId: number) => void;
+  onDragStart: (e: React.DragEvent, oppId: string | number) => void;
   getPriorityColor: (priority: string) => string;
   getLeadStatusColor: (status: string) => string;
   getLeadStatusText: (status: string) => string;
   selected?: boolean;
-  onSelect?: (id: number) => void;
-  onDelete?: (id: number) => void;
+  onSelect?: (id: string | number) => void;
+  onDelete?: (id: string | number) => void;
   formatCurrency: (value: number) => string;
   formatDate: (dateString: string) => string;
 }

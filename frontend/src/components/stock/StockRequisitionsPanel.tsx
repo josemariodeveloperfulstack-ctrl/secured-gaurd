@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -10,10 +11,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ClipboardList, Eye, Loader2, RefreshCw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ClipboardList, Edit, Eye, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { StockRequisitionListItem, StockRequisitionStatus } from '@/types/stock';
 import StockRequisitionModal from '@/components/stock/StockRequisitionModal';
 import CreateWarehouseRequisitionButton from '@/components/stock/CreateWarehouseRequisitionButton';
+import { stockService } from '@/services/stockService';
+import { useToast } from '@/hooks/use-toast';
 
 const statusBadge = (s: StockRequisitionStatus) => {
   switch (s) {
@@ -30,6 +42,10 @@ const statusBadge = (s: StockRequisitionStatus) => {
   }
 };
 
+function isPending(row: StockRequisitionListItem): boolean {
+  return row.status === StockRequisitionStatus.PENDING;
+}
+
 interface StockRequisitionsPanelProps {
   items: StockRequisitionListItem[];
   loading?: boolean;
@@ -37,9 +53,33 @@ interface StockRequisitionsPanelProps {
 }
 
 const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, loading, onRefresh }) => {
+  const { toast } = useToast();
   const [viewId, setViewId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpenMode, setModalOpenMode] = useState<'view' | 'edit'>('view');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [singleDeleteRow, setSingleDeleteRow] = useState<StockRequisitionListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const pendingIds = useMemo(() => items.filter(isPending).map((r) => r.id), [items]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+  const allPendingSelected =
+    pendingIds.length > 0 && pendingIds.every((id) => selectedSet.has(id));
+  const somePendingSelected =
+    !allPendingSelected && pendingIds.some((id) => selectedSet.has(id));
+  const headerCheckboxState: boolean | 'indeterminate' = allPendingSelected
+    ? true
+    : somePendingSelected
+      ? 'indeterminate'
+      : false;
+
+  const selectedPendingIds = useMemo(
+    () => selectedIds.filter((id) => pendingIds.includes(id)),
+    [selectedIds, pendingIds]
+  );
 
   const handleRefresh = async () => {
     try {
@@ -50,9 +90,63 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
     }
   };
 
-  const openRow = (id: string) => {
+  const openView = (id: string) => {
     setViewId(id);
+    setModalOpenMode('view');
     setModalOpen(true);
+  };
+
+  const openEdit = (id: string) => {
+    setViewId(id);
+    setModalOpenMode('edit');
+    setModalOpen(true);
+  };
+
+  const toggleRow = (row: StockRequisitionListItem, checked: boolean) => {
+    if (!isPending(row)) return;
+    setSelectedIds((prev) => {
+      if (checked) return prev.includes(row.id) ? prev : [...prev, row.id];
+      return prev.filter((x) => x !== row.id);
+    });
+  };
+
+  const toggleSelectAllPending = () => {
+    if (allPendingSelected) {
+      const drop = new Set(pendingIds);
+      setSelectedIds((prev) => prev.filter((id) => !drop.has(id)));
+    } else {
+      setSelectedIds((prev) => [...new Set([...prev, ...pendingIds])]);
+    }
+  };
+
+  const runDeleteIds = async (ids: string[]) => {
+    const unique = [...new Set(ids.map((x) => String(x).trim()).filter(Boolean))];
+    if (unique.length === 0) return;
+    setDeleting(true);
+    try {
+      if (unique.length === 1) {
+        await stockService.deleteStockRequisition(unique[0]);
+      } else {
+        await stockService.deleteStockRequisitionsBulk(unique);
+      }
+      toast({
+        title: 'Sucesso',
+        description:
+          unique.length === 1 ? 'Requisição excluída.' : `${unique.length} requisições excluídas.`,
+      });
+      setSelectedIds((prev) => prev.filter((id) => !unique.includes(id)));
+      setBulkDeleteOpen(false);
+      setSingleDeleteRow(null);
+      await onRefresh();
+    } catch (e: any) {
+      toast({
+        title: 'Não foi possível excluir',
+        description: e?.response?.data?.error || e?.message || 'Só requisições pendentes podem ser excluídas.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -76,6 +170,22 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
                 {refreshing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                 Atualizar
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-red-700/60 text-red-400 hover:bg-red-950/30 disabled:opacity-40"
+                disabled={selectedPendingIds.length === 0 || deleting}
+                onClick={() => setBulkDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir selecionadas
+                {selectedPendingIds.length > 0 ? (
+                  <span className="ml-1.5 rounded-full bg-red-900/80 px-2 py-0.5 text-xs font-semibold">
+                    {selectedPendingIds.length}
+                  </span>
+                ) : null}
+              </Button>
               <CreateWarehouseRequisitionButton
                 size="sm"
                 variant="default"
@@ -85,7 +195,8 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
             </div>
           </div>
           <p className="text-sm text-gray-400 mt-2">
-            Requisições criadas pelo Operacional, RH/Departamento Pessoal ou Estoque aparecem aqui. Aprovação e entrega ficam com o almoxarifado.
+            Requisições criadas pelo Operacional, RH/Departamento Pessoal ou Estoque aparecem aqui. Aprovação e entrega ficam com o almoxarifado. Apenas requisições{' '}
+            <strong className="text-seguranca-lightgray">pendentes</strong> podem ser editadas ou excluídas (incluindo exclusão em massa).
           </p>
         </CardHeader>
         <CardContent>
@@ -100,6 +211,15 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
               <Table>
                 <TableHeader>
                   <TableRow className="border-gray-600 hover:bg-transparent">
+                    <TableHead className="w-12 text-center text-seguranca-yellow">
+                      <Checkbox
+                        checked={headerCheckboxState}
+                        onCheckedChange={() => toggleSelectAllPending()}
+                        disabled={pendingIds.length === 0}
+                        aria-label="Selecionar todas as requisições pendentes"
+                        className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                      />
+                    </TableHead>
                     <TableHead className="text-seguranca-yellow">Número</TableHead>
                     <TableHead className="text-seguranca-yellow">Status</TableHead>
                     <TableHead className="text-seguranca-yellow">Funcionário</TableHead>
@@ -111,31 +231,69 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((row) => (
-                    <TableRow key={row.id} className="border-gray-600/50 text-seguranca-lightgray">
-                      <TableCell className="font-mono text-sm">{row.requisitionNumber}</TableCell>
-                      <TableCell>{statusBadge(row.status)}</TableCell>
-                      <TableCell className="max-w-[160px] truncate">{row.employeeName ?? '—'}</TableCell>
-                      <TableCell className="max-w-[180px] truncate text-sm">{row.movementReasonLabel ?? '—'}</TableCell>
-                      <TableCell>{row.linesCount}</TableCell>
-                      <TableCell className="max-w-[140px] truncate text-sm">{row.requestedByName ?? '—'}</TableCell>
-                      <TableCell className="text-sm whitespace-nowrap">
-                        {row.createdAt ? new Date(row.createdAt).toLocaleString('pt-BR') : '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-seguranca-yellow hover:text-white"
-                          onClick={() => openRow(row.id)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Abrir
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {items.map((row) => {
+                    const pending = isPending(row);
+                    return (
+                      <TableRow key={row.id} className="border-gray-600/50 text-seguranca-lightgray">
+                        <TableCell className="text-center align-middle">
+                          <Checkbox
+                            checked={selectedSet.has(row.id)}
+                            disabled={!pending}
+                            title={pending ? 'Selecionar para exclusão em massa' : 'Só pendentes podem ser selecionadas'}
+                            onCheckedChange={(v) => toggleRow(row, Boolean(v))}
+                            className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{row.requisitionNumber}</TableCell>
+                        <TableCell>{statusBadge(row.status)}</TableCell>
+                        <TableCell className="max-w-[160px] truncate">{row.employeeName ?? '—'}</TableCell>
+                        <TableCell className="max-w-[180px] truncate text-sm">{row.movementReasonLabel ?? '—'}</TableCell>
+                        <TableCell>{row.linesCount}</TableCell>
+                        <TableCell className="max-w-[140px] truncate text-sm">{row.requestedByName ?? '—'}</TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {row.createdAt ? new Date(row.createdAt).toLocaleString('pt-BR') : '—'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-seguranca-yellow hover:text-white"
+                              onClick={() => openView(row.id)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Abrir
+                            </Button>
+                            {pending && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-amber-300 hover:text-white"
+                                onClick={() => openEdit(row.id)}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Editar
+                              </Button>
+                            )}
+                            {pending && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-400 hover:text-red-200"
+                                onClick={() => setSingleDeleteRow(row)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Excluir
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -151,8 +309,65 @@ const StockRequisitionsPanel: React.FC<StockRequisitionsPanelProps> = ({ items, 
         }}
         prefill={null}
         initialRequisitionId={viewId}
+        initialOpenMode={modalOpenMode}
         onRecorded={() => void onRefresh()}
       />
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={(o) => !deleting && setBulkDeleteOpen(o)}>
+        <AlertDialogContent className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-seguranca-red">Excluir requisições selecionadas?</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300">
+              Serão excluídas <strong>{selectedPendingIds.length}</strong> requisição(ões) <strong>pendente(s)</strong>. Esta
+              ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel
+              disabled={deleting}
+              className="border-gray-600 bg-transparent text-white hover:bg-seguranca-black hover:text-white"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-seguranca-red hover:bg-red-700 text-white"
+              disabled={deleting || selectedPendingIds.length === 0}
+              onClick={() => void runDeleteIds(selectedPendingIds)}
+            >
+              {deleting ? 'Excluindo…' : 'Excluir'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!singleDeleteRow} onOpenChange={(o) => !deleting && !o && setSingleDeleteRow(null)}>
+        <AlertDialogContent className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-seguranca-red">Excluir requisição?</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300">
+              Confirma a exclusão da requisição <span className="font-mono text-seguranca-yellow">{singleDeleteRow?.requisitionNumber}</span>? Só é permitido
+              enquanto estiver pendente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel
+              disabled={deleting}
+              className="border-gray-600 bg-transparent text-white hover:bg-seguranca-black hover:text-white"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              className="bg-seguranca-red hover:bg-red-700 text-white"
+              disabled={deleting || !singleDeleteRow}
+              onClick={() => singleDeleteRow && void runDeleteIds([singleDeleteRow.id])}
+            >
+              {deleting ? 'Excluindo…' : 'Excluir'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

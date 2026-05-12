@@ -667,6 +667,8 @@ public class SecurityConfig {
                                                 // Endpoints de folha de ponto (time-sheets) - qualquer autenticado
                                                 // (dados por funcionário/CPF no serviço)
                                                 .requestMatchers("/api/time-sheets/**").authenticated()
+                                                // Imagens dos templates de e-mail marketing (clientes de correio não enviam JWT)
+                                                .requestMatchers("/email-marketing/**").permitAll()
                                                 // Todo o resto requer autenticação
                                 .anyRequest().authenticated())
                 .exceptionHandling(exception -> exception

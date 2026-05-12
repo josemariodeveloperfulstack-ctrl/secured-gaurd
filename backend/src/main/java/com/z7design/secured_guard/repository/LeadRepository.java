@@ -119,6 +119,15 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     @Query("SELECT COUNT(l) FROM Lead l WHERE l.createdAt BETWEEN :startDate AND :endDate")
     long countByPeriod(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
+    /** Intervalo meio-aberto [start, end) — alinhado a filtros por mês no dashboard CRM. */
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.createdAt >= :start AND l.createdAt < :end")
+    long countByCreatedAtRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.status = :status AND l.createdAt >= :start AND l.createdAt < :end")
+    long countByStatusAndCreatedAtRange(@Param("status") LeadStatus status,
+                                        @Param("start") LocalDateTime start,
+                                        @Param("end") LocalDateTime end);
+
     // Buscar leads por responsável dentro de um período
     @Query("SELECT l FROM Lead l WHERE l.assignedTo.id = :userId AND l.createdAt BETWEEN :startDate AND :endDate")
     List<Lead> findByAssignedToIdAndPeriod(@Param("userId") UUID userId,

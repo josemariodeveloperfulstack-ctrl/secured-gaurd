@@ -61,6 +61,14 @@ public class EmailCampaignRecipient {
     @Builder.Default
     private boolean autoLeadCreated = false;
 
+    /**
+     * {@code true} após opt-out de marketing (link &quot;Cancelar inscrição&quot; ou exclusão manual).
+     * O envio ignora estes destinatários em conjunto com {@code email_unsubscribes}.
+     */
+    @Column(name = "email_marketing_suppressed", nullable = false)
+    @Builder.Default
+    private boolean emailMarketingSuppressed = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

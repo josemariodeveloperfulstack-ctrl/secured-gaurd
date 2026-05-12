@@ -31,7 +31,8 @@ public class PublicEmailController {
         boolean ok = unsubscribeService.confirmByToken(token, reason);
         String body = ok
                 ? buildHtml("Descadastro confirmado",
-                "Você foi removido da nossa lista de e-mails. Sentiremos sua falta.")
+                "Você foi removido da nossa lista de e-mails de marketing. Não receberá novas campanhas neste endereço. "
+                        + "A nossa equipa comercial pode consultar esta exclusão na área Marketing → Descadastrados.")
                 : buildHtml("Link inválido",
                 "Não foi possível confirmar o descadastro. Verifique o link ou entre em contato.");
         return ResponseEntity.ok(body);

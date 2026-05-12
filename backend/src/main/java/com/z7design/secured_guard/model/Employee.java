@@ -39,7 +39,8 @@ public class Employee {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = true)
+    /** Vários employees podem partilhar o mesmo user_id em dados legados; OneToOne quebrava o Hibernate 6 (ASSERT em duplicados). */
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore

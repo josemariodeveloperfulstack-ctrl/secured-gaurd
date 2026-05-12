@@ -2,6 +2,8 @@ package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -12,8 +14,9 @@ public class Remanejamento {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "employee_id", nullable = false)
+    @Fetch(FetchMode.SELECT)
     @JsonIgnoreProperties({ "timeRecords", "payrolls", "documents", "benefits", "schedules", "occurrences", "epis",
             "dependents" })
     @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
@@ -37,10 +40,12 @@ public class Remanejamento {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "origin_workstation_id")
+    @Fetch(FetchMode.SELECT)
     private WorkPost originWorkstation;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "destination_workstation_id")
+    @Fetch(FetchMode.SELECT)
     private WorkPost destinationWorkstation;
 
     // Getters e setters

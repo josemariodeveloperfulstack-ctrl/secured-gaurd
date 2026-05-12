@@ -2,6 +2,7 @@ package com.z7design.secured_guard.repository;
 
 import com.z7design.secured_guard.model.EmailLog;
 import com.z7design.secured_guard.model.enums.EmailLogStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +15,29 @@ import java.util.UUID;
 public interface EmailLogRepository extends JpaRepository<EmailLog, UUID> {
 
     Optional<EmailLog> findByProviderMessageId(String providerMessageId);
+
+    /**
+     * Correlaciona eventos do SendGrid quando {@code sg_message_id} no webhook
+     * não coincide exatamente com o valor guardado em {@code provider_message_id}
+     * (ex.: sufixos adicionais ou diferença de normalização).
+     */
+    @Query("""
+            select l from EmailLog l
+            where l.providerMessageId is not null
+              and (
+                l.providerMessageId = :mid
+                or (
+                  length(l.providerMessageId) >= 16
+                  and lower(:mid) like lower(concat(l.providerMessageId, '%'))
+                )
+                or (
+                  length(:mid) >= 16
+                  and lower(l.providerMessageId) like lower(concat(:mid, '%'))
+                )
+              )
+            order by l.updatedAt desc
+            """)
+    List<EmailLog> findByProviderMessageIdFuzzy(@Param("mid") String mid, Pageable pageable);
 
     List<EmailLog> findByCampaign_IdOrderByCreatedAtDesc(UUID campaignId);
 

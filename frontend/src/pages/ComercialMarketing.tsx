@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,6 +7,8 @@ import { MarketingHero, type MarketingFeature, type MarketingKpi } from '@/compo
 import CampaignsTab from '@/components/comercial-marketing/CampaignsTab';
 import EmailTemplatesTab from '@/components/comercial-marketing/EmailTemplatesTab';
 import ComingSoonTab from '@/components/comercial-marketing/ComingSoonTab';
+import CampaignLeadsListTab from '@/components/comercial-marketing/CampaignLeadsListTab';
+import MarketingUnsubscribesTab from '@/components/comercial-marketing/MarketingUnsubscribesTab';
 import emailCampaignService from '@/services/emailCampaignService';
 import emailTemplateService from '@/services/emailTemplateService';
 import {
@@ -13,15 +16,22 @@ import {
   MessageCircle,
   Users,
   Send,
-  FileText,
   Bot,
   Megaphone,
+  Ban,
 } from 'lucide-react';
 
-type TabId = 'campaigns' | 'email-templates' | 'whatsapp-templates' | 'alfred' | 'leads';
+type TabId = 'campaigns' | 'email-templates' | 'whatsapp-templates' | 'alfred' | 'leads' | 'unsubscribes';
 
 const ComercialMarketing: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>('campaigns');
+
+  useEffect(() => {
+    if (searchParams.get('caixa') === 'respostas') {
+      setActiveTab('campaigns');
+    }
+  }, [searchParams]);
 
   const campaignsQuery = useQuery({
     queryKey: ['email-campaigns'],
@@ -112,6 +122,13 @@ const ComercialMarketing: React.FC = () => {
               <Users className="mr-2 h-4 w-4" />
               Lista de Leads
             </TabsTrigger>
+            <TabsTrigger
+              value="unsubscribes"
+              className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black"
+            >
+              <Ban className="mr-2 h-4 w-4" />
+              Descadastrados
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="campaigns" className="mt-0">
@@ -149,16 +166,11 @@ const ComercialMarketing: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="leads" className="mt-0">
-            <ComingSoonTab
-              Icon={FileText}
-              title="Lista de leads para campanhas"
-              description="Importe contatos por CSV/Excel ou puxe diretamente da base de leads do CRM, marcando quem entra em cada campanha."
-              bullets={[
-                'Upload de planilha com mapeamento de colunas para variáveis.',
-                'Filtrar leads existentes por origem, status, segmento.',
-                'Marcar destinatários como descadastrados (unsubscribe) automaticamente.',
-              ]}
-            />
+            <CampaignLeadsListTab />
+          </TabsContent>
+
+          <TabsContent value="unsubscribes" className="mt-0">
+            <MarketingUnsubscribesTab />
           </TabsContent>
         </Tabs>
       </div>

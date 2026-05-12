@@ -50,12 +50,16 @@ export default function CrmDashboard() {
     ],
   };
 
-  // Gráfico: Evolução de status
+  // Gráfico: Evolução de status (statusHistory: mês -> { STATUS: count })
   const statusLabels = monthlyLabels;
-  const statusDatasets = Object.entries(metrics.statusHistory).map(([status, history]: any, idx) => ({
-    label: status,
-    data: statusLabels.map((label: string) => history[label] || 0),
-    borderColor: ['#ffd600', '#10b981', '#3b82f6', '#ef4444', '#a3a3a3'][idx % 5],
+  const statusKeys = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST'];
+  const statusDatasets = statusKeys.map((statusKey, idx) => ({
+    label: statusKey,
+    data: statusLabels.map((monthLabel: string) => {
+      const byMonth = metrics.statusHistory?.[monthLabel];
+      return byMonth && typeof byMonth[statusKey] === 'number' ? byMonth[statusKey] : 0;
+    }),
+    borderColor: ['#ffd600', '#10b981', '#3b82f6', '#8b5cf6', '#f97316', '#22c55e', '#ef4444'][idx % 7],
     backgroundColor: 'transparent',
     tension: 0.3,
   }));

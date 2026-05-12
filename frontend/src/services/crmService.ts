@@ -16,12 +16,18 @@ export async function updateOpportunity(id, opportunity) {
   return data;
 }
 
-export async function deleteOpportunity(id, reason = "Exclusão individual") {
-  await api.delete(`/api/opportunities/${id}?reason=${encodeURIComponent(reason)}`);
+export async function deleteOpportunity(id: string | number, reason = 'Exclusão individual') {
+  await api.delete(
+    `/api/opportunities/${encodeURIComponent(String(id))}?reason=${encodeURIComponent(reason)}`
+  );
 }
 
-export async function deleteMultipleOpportunities(ids, reason = "Exclusão em massa") {
-  await api.post('/api/opportunities/bulk-delete', { ids, reason });
+export async function deleteMultipleOpportunities(
+  ids: (string | number)[],
+  reason = 'Exclusão em massa'
+) {
+  const idsAsStrings = (ids ?? []).map((id) => String(id).trim()).filter(Boolean);
+  await api.post('/api/opportunities/bulk-delete', { ids: idsAsStrings, reason });
 }
 
 // Status do Kanban

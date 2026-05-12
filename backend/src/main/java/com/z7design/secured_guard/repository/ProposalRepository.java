@@ -102,7 +102,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
     List<Object[]> sumTotalValueByStatus();
     
     // Calcular valor total das propostas por status específico
-    @Query("SELECT SUM(p.totalValue) FROM Proposal p WHERE p.status = :status")
+    @Query("SELECT COALESCE(SUM(p.totalValue), 0) FROM Proposal p WHERE p.status = :status")
     BigDecimal getTotalValueByStatus(@Param("status") ProposalStatus status);
     
     // Buscar propostas por texto (busca em título, descrição, número)

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,17 @@ import emailTemplateService from '@/services/emailTemplateService';
 import CampaignWizardModal from './CampaignWizardModal';
 import SmtpSettingsModal from './SmtpSettingsModal';
 import CampaignDetailPanel from './CampaignDetailPanel';
+import EditCampaignModal from './EditCampaignModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Plus,
   Send,
@@ -49,6 +61,8 @@ import {
   PlayCircle,
   XCircle,
   Server,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 const CAMPAIGN_STATUS_LABELS: Record<string, string> = {
@@ -77,6 +91,9 @@ function campaignStatusVariant(status?: string | null): 'default' | 'secondary' 
 }
 
 const CampaignsTab: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const leadRepliedInbox = searchParams.get('caixa') === 'respostas';
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -87,6 +104,10 @@ const CampaignsTab: React.FC = () => {
   const [sendTemplateId, setSendTemplateId] = useState<string>('');
   const [sendSubject, setSendSubject] = useState('');
   const [sendHtml, setSendHtml] = useState('');
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editCampaignId, setEditCampaignId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const campaignsQuery = useQuery({
     queryKey: ['email-campaigns'],
@@ -194,6 +215,27 @@ const CampaignsTab: React.FC = () => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => emailCampaignService.delete(id),
+    onSuccess: async (_, deletedId) => {
+      toast({ title: 'Campanha excluída' });
+      if (selectedId === deletedId) {
+        setSelectedId(null);
+      }
+      setDeleteTargetId(null);
+      await queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
+      await queryClient.removeQueries({ queryKey: ['email-campaign-metrics', deletedId] });
+      await queryClient.removeQueries({ queryKey: ['email-campaign-logs', deletedId] });
+    },
+    onError: (err: unknown) => {
+      toast({
+        title: 'Não foi possível excluir',
+        description: err instanceof Error ? err.message : 'Erro inesperado.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const canPause =
     selectedCampaign?.status === 'RUNNING' || selectedCampaign?.status === 'SCHEDULED';
   const canResume = selectedCampaign?.status === 'PAUSED';
@@ -201,6 +243,19 @@ const CampaignsTab: React.FC = () => {
     selectedCampaign &&
     selectedCampaign.status !== 'COMPLETED' &&
     selectedCampaign.status !== 'CANCELED';
+
+  const canEditCampaign = Boolean(selectedCampaign);
+
+  const canStartSend =
+    selectedCampaign &&
+    selectedCampaign.status !== 'COMPLETED' &&
+    selectedCampaign.status !== 'CANCELED';
+
+  const openEditFor = (id: string) => {
+    setSelectedId(id);
+    setEditCampaignId(id);
+    setEditOpen(true);
+  };
 
   const handleSendSubmit = () => {
     if (!selectedId) return;
@@ -270,11 +325,43 @@ const CampaignsTab: React.FC = () => {
             <Plus className="h-4 w-4" />
             <span className="ml-2">Nova campanha</span>
           </Button>
+          {canEditCampaign && selectedId && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-seguranca-graphite text-seguranca-lightgray hover:text-seguranca-yellow"
+              onClick={() => openEditFor(selectedId)}
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="ml-2">Editar</span>
+            </Button>
+          )}
+          {selectedId && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-red-600/50 text-red-300 hover:bg-red-500/10"
+              disabled={deleteMutation.isPending}
+              onClick={() => setDeleteTargetId(selectedId)}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="ml-2">Excluir</span>
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
             variant="secondary"
-            disabled={!selectedId}
+            disabled={!selectedId || !canStartSend}
+            title={
+              !selectedId
+                ? undefined
+                : !canStartSend
+                  ? 'Campanha concluída ou cancelada não pode ser reenviada.'
+                  : 'Abre o assistente de disparo (template ou HTML manual).'
+            }
             onClick={() => setSendOpen(true)}
           >
             <Send className="h-4 w-4" />
@@ -322,7 +409,11 @@ const CampaignsTab: React.FC = () => {
               className="border-red-500 text-red-300 hover:bg-red-500/10"
               disabled={cancelMutation.isPending}
               onClick={() => {
-                if (window.confirm('Tem certeza que deseja cancelar esta campanha? Envios pendentes serão descartados.')) {
+                if (
+                        globalThis.confirm(
+                          'Tem certeza que deseja cancelar esta campanha? Envios pendentes serão descartados.'
+                        )
+                      ) {
                   cancelMutation.mutate();
                 }
               }}
@@ -366,10 +457,12 @@ const CampaignsTab: React.FC = () => {
                     <TableHead className="text-seguranca-lightgray">Título</TableHead>
                     <TableHead className="text-seguranca-lightgray">Status</TableHead>
                     <TableHead className="text-right text-seguranca-lightgray">Dest.</TableHead>
+                    <TableHead className="w-[120px] text-right text-seguranca-lightgray">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {campaigns.map((c: EmailCampaignSummary) => (
+                  {campaigns.map((c: EmailCampaignSummary) => {
+                    return (
                     <TableRow
                       key={c.id}
                       className={`cursor-pointer border-seguranca-graphite ${
@@ -377,7 +470,7 @@ const CampaignsTab: React.FC = () => {
                       }`}
                       onClick={() => setSelectedId(c.id)}
                     >
-                      <TableCell className="max-w-[180px] truncate font-medium text-white">
+                      <TableCell className="max-w-[140px] truncate font-medium text-white">
                         {c.title}
                       </TableCell>
                       <TableCell>
@@ -388,8 +481,34 @@ const CampaignsTab: React.FC = () => {
                       <TableCell className="text-right text-seguranca-lightgray">
                         {c.recipientCount}
                       </TableCell>
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-seguranca-lightgray hover:text-seguranca-yellow"
+                            title="Editar campanha"
+                            onClick={() => openEditFor(c.id)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-seguranca-lightgray hover:text-red-400"
+                            title="Excluir campanha"
+                            disabled={deleteMutation.isPending}
+                            onClick={() => setDeleteTargetId(c.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -437,7 +556,111 @@ const CampaignsTab: React.FC = () => {
                   </Badge>
                 )}
               </div>
-              <CampaignDetailPanel campaign={selectedCampaign} />
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={!canStartSend}
+                  title={
+                    !canStartSend
+                      ? 'Campanha concluída ou cancelada não pode ser reenviada.'
+                      : 'Iniciar disparo de e-mails'
+                  }
+                  onClick={() => setSendOpen(true)}
+                >
+                  <Send className="h-4 w-4" />
+                  <span className="ml-1.5">Iniciar envio</span>
+                </Button>
+                {canPause && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-500 text-amber-300 hover:bg-amber-500/10"
+                    disabled={pauseMutation.isPending}
+                    onClick={() => pauseMutation.mutate()}
+                  >
+                    {pauseMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PauseCircle className="h-4 w-4" />
+                    )}
+                    <span className="ml-1.5">Pausar</span>
+                  </Button>
+                )}
+                {canResume && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-emerald-500 text-emerald-300 hover:bg-emerald-500/10"
+                    disabled={resumeMutation.isPending}
+                    onClick={() => resumeMutation.mutate()}
+                  >
+                    {resumeMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlayCircle className="h-4 w-4" />
+                    )}
+                    <span className="ml-1.5">Retomar</span>
+                  </Button>
+                )}
+                {canCancel && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-red-500 text-red-300 hover:bg-red-500/10"
+                    disabled={cancelMutation.isPending}
+                    onClick={() => {
+                      if (
+                        globalThis.confirm(
+                          'Tem certeza que deseja cancelar esta campanha? Envios pendentes serão descartados.'
+                        )
+                      ) {
+                        cancelMutation.mutate();
+                      }
+                    }}
+                  >
+                    {cancelMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <XCircle className="h-4 w-4" />
+                    )}
+                    <span className="ml-1.5">Cancelar campanha</span>
+                  </Button>
+                )}
+                {canEditCampaign && selectedId && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-seguranca-graphite text-seguranca-lightgray hover:text-seguranca-yellow"
+                    onClick={() => openEditFor(selectedId)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span className="ml-1.5">Editar</span>
+                  </Button>
+                )}
+                {selectedId && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-red-600/50 text-red-300 hover:bg-red-500/10"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => setDeleteTargetId(selectedId)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="ml-1.5">Excluir</span>
+                  </Button>
+                )}
+              </div>
+              <CampaignDetailPanel
+                campaign={selectedCampaign}
+                initialRecipientLogTab={leadRepliedInbox ? 'replied' : undefined}
+              />
             </>
           )}
         </div>
@@ -512,9 +735,11 @@ const CampaignsTab: React.FC = () => {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-seguranca-lightgray">
-                  Variáveis como <code>{'{{nomeContato}}'}</code> e{' '}
-                  <code>{'{{nomeEmpresa}}'}</code> são preenchidas por destinatário a partir dos
-                  metadados informados.
+                  Variáveis como <code>{'{{nomeContato}}'}</code>, <code>{'{{nomeEmpresa}}'}</code>,{' '}
+                  <code>{'{{whatsappUrl}}'}</code> e <code>{'{{solicitarApresentacaoUrl}}'}</code> são
+                  preenchidas no envio. Imagens usam <code>{'{{brandLogoUrl}}'}</code> /{' '}
+                  <code>{'{{brandBannerUrl}}'}</code> — configure a URL pública da API (HTTPS) para o Gmail
+                  carregar as imagens.
                 </p>
               </div>
             ) : (
@@ -561,6 +786,40 @@ const CampaignsTab: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EditCampaignModal
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          if (!o) setEditCampaignId(null);
+        }}
+        campaignId={editCampaignId}
+        onSaved={() => void invalidateAll()}
+      />
+
+      <AlertDialog open={Boolean(deleteTargetId)} onOpenChange={(o) => { if (!o) setDeleteTargetId(null); }}>
+        <AlertDialogContent className="border-seguranca-graphite bg-seguranca-black text-white sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir campanha?</AlertDialogTitle>
+            <AlertDialogDescription className="text-seguranca-lightgray">
+              Remove a campanha, os destinatários e todo o histórico de envios. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-seguranca-graphite bg-transparent text-seguranca-lightgray">
+              Voltar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => {
+                if (deleteTargetId) deleteMutation.mutate(deleteTargetId);
+              }}
+            >
+              Excluir definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

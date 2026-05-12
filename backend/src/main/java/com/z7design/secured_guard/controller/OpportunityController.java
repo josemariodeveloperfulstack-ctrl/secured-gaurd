@@ -6,15 +6,16 @@ import com.z7design.secured_guard.model.Opportunity;
 import com.z7design.secured_guard.service.OpportunityService;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
@@ -128,19 +129,46 @@ public class OpportunityController {
     @PostMapping("/bulk-delete")
     @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<Void> deleteBulk(@RequestBody java.util.Map<String, Object> payload) {
-        List<String> idsStr = (List<String>) payload.get("ids");
-        String reason = (String) payload.get("reason");
-        
-        if (reason == null || reason.isEmpty()) {
+        List<UUID> ids = parseOpportunityIds(payload.get("ids"));
+        if (ids.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+
+        Object reasonObj = payload.get("reason");
+        String reason = reasonObj != null ? String.valueOf(reasonObj).trim() : "";
+        if (reason.isEmpty() || "null".equalsIgnoreCase(reason)) {
             reason = "Exclusão em massa via sistema";
         }
-        
-        List<UUID> ids = idsStr.stream().map(UUID::fromString).collect(Collectors.toList());
-        
+
         String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
         com.z7design.secured_guard.model.User user = opportunityService.findUserByUsername(username);
-        
+
         opportunityService.deleteBulk(ids, reason, user);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Aceita lista JSON de strings ou números (Jackson pode deserializar de formas distintas).
+     */
+    private static List<UUID> parseOpportunityIds(Object idsRaw) {
+        if (!(idsRaw instanceof List<?> rawList)) {
+            return List.of();
+        }
+        List<UUID> ids = new ArrayList<>();
+        for (Object o : rawList) {
+            if (o == null) {
+                continue;
+            }
+            String s = String.valueOf(o).trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            try {
+                ids.add(UUID.fromString(s));
+            } catch (IllegalArgumentException ignored) {
+                // ignora entradas inválidas
+            }
+        }
+        return ids;
     }
 } 

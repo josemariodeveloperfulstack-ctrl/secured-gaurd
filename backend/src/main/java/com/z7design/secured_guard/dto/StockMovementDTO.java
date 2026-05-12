@@ -44,6 +44,12 @@ public class StockMovementDTO {
     /** Mesmo número em todas as linhas geradas por um import de inventário físico */
     private String requisitionNumber;
 
+    /**
+     * Quando true, não cria ficha de EPI automática em {@link com.z7design.secured_guard.service.StockService#createMovement}
+     * (ex.: saídas geradas pela aprovação de requisição de almoxarifado, onde a ficha é criada em lote).
+     */
+    private Boolean skipEpiDeliveryFormAutoRecord;
+
     public static StockMovementDTO fromEntity(StockMovement entity) {
         StockMovementDTO dto = new StockMovementDTO();
         dto.setId(entity.getId());

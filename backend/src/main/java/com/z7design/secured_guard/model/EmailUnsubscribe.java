@@ -44,4 +44,8 @@ public class EmailUnsubscribe {
     @CreationTimestamp
     @Column(name = "unsubscribed_at", nullable = false, updatable = false)
     private Instant unsubscribedAt;
+
+    /** Preenchido quando o utilizador confirma o descadastro pelo link (pode diferir de {@link #unsubscribedAt}). */
+    @Column(name = "unsubscribe_confirmed_at")
+    private Instant unsubscribeConfirmedAt;
 }

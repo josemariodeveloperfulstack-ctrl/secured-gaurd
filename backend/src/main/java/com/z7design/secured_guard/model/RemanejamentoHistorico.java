@@ -16,7 +16,7 @@ public class RemanejamentoHistorico {
     private Remanejamento remanejamento;
 
     @ManyToOne
-    @JoinColumn(name = "employee_id", nullable = false)
+    @JoinColumn(name = "employee_id", nullable = true)
     private Employee employee;
 
     @Enumerated(EnumType.STRING)

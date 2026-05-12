@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -80,6 +81,11 @@ public interface EPIDeliveryFormRepository extends JpaRepository<EPIDeliveryForm
         WHERE f.id = :id
         """)
     java.util.Optional<EPIDeliveryForm> findByIdWithDetails(@Param("id") UUID id);
+
+    /**
+     * Ficha de EPI vinculada a uma requisição de almoxarifado (campo {@code stock_requisition_id}).
+     */
+    Optional<EPIDeliveryForm> findFirstByStockRequisitionIdOrderByCreatedAtDesc(UUID stockRequisitionId);
 }
 
 

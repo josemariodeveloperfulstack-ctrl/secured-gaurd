@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -44,7 +45,8 @@ import {
   PieChart,
   FileDown,
   Check,
-  RefreshCw
+  RefreshCw,
+  ListChecks
 } from 'lucide-react';
 import { ContasAReceberGuard } from './FinanceiroPermissionGuard';
 import { ContasAReceberFormModal } from './ContasAReceberFormModal';
@@ -188,6 +190,9 @@ export const ContasAReceber: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  /** Modo seleção: mostra checkboxes na lista para escolher quais contas excluir em massa */
+  const [receivableSelectionMode, setReceivableSelectionMode] = useState(false);
+  const [selectedReceivableIds, setSelectedReceivableIds] = useState<string[]>([]);
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   const [contaParaMarcarPaga, setContaParaMarcarPaga] = useState<ContaAReceber | null>(null);
   
@@ -500,6 +505,10 @@ export const ContasAReceber: React.FC = () => {
       await loadContas();
       setShowDeleteConfirm(false);
       setContaToDelete(null);
+      if (contaToDelete.id) {
+        const removed = String(contaToDelete.id);
+        setSelectedReceivableIds((prev) => prev.filter((id) => id !== removed));
+      }
     } catch (error) {
       console.error('Erro ao deletar conta:', error);
       toast({
@@ -632,34 +641,78 @@ export const ContasAReceber: React.FC = () => {
 
   const stats = calcularEstatisticas(filteredContas);
 
-  const idsContasFiltradas = React.useMemo(() => {
-    const ids = new Set<string>();
+  const idsContasFiltradasComId = React.useMemo(() => {
+    const ids: string[] = [];
     for (const c of filteredContas) {
       const id = c?.id != null ? String(c.id).trim() : '';
-      if (id) ids.add(id);
+      if (id) ids.push(id);
     }
-    return Array.from(ids);
+    return ids;
   }, [filteredContas]);
 
+  const selectedReceivableSet = React.useMemo(() => new Set(selectedReceivableIds), [selectedReceivableIds]);
+
+  const idsSelecionadosParaExclusao = React.useMemo(() => {
+    const allowed = new Set(idsContasFiltradasComId);
+    return selectedReceivableIds.filter((id) => allowed.has(id));
+  }, [idsContasFiltradasComId, selectedReceivableIds]);
+
+  const allFilteredReceivablesSelected =
+    idsContasFiltradasComId.length > 0 && idsContasFiltradasComId.every((id) => selectedReceivableSet.has(id));
+
+  const someFilteredReceivablesSelected =
+    !allFilteredReceivablesSelected &&
+    idsContasFiltradasComId.some((id) => selectedReceivableSet.has(id));
+
+  const headerReceivableCheckboxState: boolean | 'indeterminate' = allFilteredReceivablesSelected
+    ? true
+    : someFilteredReceivablesSelected
+      ? 'indeterminate'
+      : false;
+
+  const toggleReceivableRowSelect = (rawId: string | undefined) => {
+    const id = rawId != null ? String(rawId).trim() : '';
+    if (!id) return;
+    setSelectedReceivableIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAllFilteredReceivables = () => {
+    if (allFilteredReceivablesSelected) {
+      const drop = new Set(idsContasFiltradasComId);
+      setSelectedReceivableIds((prev) => prev.filter((x) => !drop.has(x)));
+    } else {
+      setSelectedReceivableIds((prev) => [...new Set([...prev, ...idsContasFiltradasComId])]);
+    }
+  };
+
+  const setReceivableSelectionModeAndClear = (on: boolean) => {
+    setReceivableSelectionMode(on);
+    if (!on) {
+      setSelectedReceivableIds([]);
+      setShowBulkDeleteConfirm(false);
+    }
+  };
+
   const handleConfirmBulkDelete = async () => {
-    if (idsContasFiltradas.length === 0) return;
+    if (idsSelecionadosParaExclusao.length === 0) return;
     setBulkDeleting(true);
     try {
-      await contasAReceberService.deleteContasReceberBulk(idsContasFiltradas);
+      await contasAReceberService.deleteContasReceberBulk(idsSelecionadosParaExclusao);
       toast({
         title: 'Sucesso',
         description:
-          idsContasFiltradas.length === 1
+          idsSelecionadosParaExclusao.length === 1
             ? '1 conta a receber excluída.'
-            : `${idsContasFiltradas.length} contas a receber excluídas.`
+            : `${idsSelecionadosParaExclusao.length} contas a receber excluídas.`
       });
       await loadContas();
+      setSelectedReceivableIds([]);
       setShowBulkDeleteConfirm(false);
     } catch (error) {
       console.error('Erro ao excluir contas em massa:', error);
       toast({
         title: 'Erro',
-        description: 'Não foi possível excluir todas as contas. Tente novamente.',
+        description: 'Não foi possível excluir as contas selecionadas. Tente novamente.',
         variant: 'destructive'
       });
     } finally {
@@ -741,16 +794,36 @@ export const ContasAReceber: React.FC = () => {
               </DropdownMenuContent>
             </DropdownMenu>
             {canEditReceivable && (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={idsContasFiltradas.length === 0 || bulkDeleting}
-                onClick={() => setShowBulkDeleteConfirm(true)}
-                className="flex items-center gap-2 border-red-700/80 text-red-400 hover:bg-red-950/40 hover:text-red-300"
-              >
-                <Trash2 className="w-4 h-4" />
-                Excluir todas (filtradas)
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant={receivableSelectionMode ? 'secondary' : 'outline'}
+                  onClick={() => setReceivableSelectionModeAndClear(!receivableSelectionMode)}
+                  className={
+                    receivableSelectionMode
+                      ? 'flex items-center gap-2 border-seguranca-yellow/60 bg-seguranca-yellow/10 text-seguranca-yellow hover:bg-seguranca-yellow/20'
+                      : 'flex items-center gap-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow'
+                  }
+                >
+                  <ListChecks className="w-4 h-4" />
+                  {receivableSelectionMode ? 'Cancelar seleção' : 'Seleção para excluir'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!receivableSelectionMode || idsSelecionadosParaExclusao.length === 0 || bulkDeleting}
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="flex items-center gap-2 border-red-700/80 text-red-400 hover:bg-red-950/40 hover:text-red-300 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Excluir selecionadas
+                  {receivableSelectionMode && idsSelecionadosParaExclusao.length > 0 ? (
+                    <span className="ml-1 rounded-full bg-red-900/80 px-2 py-0.5 text-xs font-semibold text-white">
+                      {idsSelecionadosParaExclusao.length}
+                    </span>
+                  ) : null}
+                </Button>
+              </>
             )}
             <Button
               onClick={() => handleOpenFormModal()}
@@ -1208,6 +1281,17 @@ export const ContasAReceber: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-seguranca-graphite border-b border-gray-700">
                       <tr>
+                        {canEditReceivable && receivableSelectionMode ? (
+                          <th className="w-12 px-2 py-3 text-center text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
+                            <Checkbox
+                              checked={headerReceivableCheckboxState}
+                              onCheckedChange={() => toggleSelectAllFilteredReceivables()}
+                              disabled={idsContasFiltradasComId.length === 0}
+                              aria-label="Selecionar todas as contas visíveis na lista"
+                              className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                            />
+                          </th>
+                        ) : null}
                         <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
                           Cliente / Fatura
                         </th>
@@ -1231,6 +1315,22 @@ export const ContasAReceber: React.FC = () => {
                     <tbody className="bg-seguranca-black divide-y divide-gray-700">
                       {filteredContas.map((conta) => (
                         <tr key={conta.id} className="hover:bg-seguranca-graphite/50">
+                          {canEditReceivable && receivableSelectionMode ? (
+                            <td className="w-12 px-2 py-4 text-center align-middle">
+                              {conta.id ? (
+                                <Checkbox
+                                  checked={selectedReceivableSet.has(String(conta.id))}
+                                  onCheckedChange={() => toggleReceivableRowSelect(conta.id)}
+                                  aria-label="Selecionar conta para exclusão em massa"
+                                  className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                                />
+                              ) : (
+                                <span className="text-xs text-gray-600" title="Sem ID">
+                                  —
+                                </span>
+                              )}
+                            </td>
+                          ) : null}
                           <td className="px-4 py-4">
                             <div>
                               <div className="font-medium text-seguranca-lightgray">{conta.client?.name || conta.cliente || '-'}</div>
@@ -1647,12 +1747,11 @@ export const ContasAReceber: React.FC = () => {
           <AlertDialogContent className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[480px]">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-seguranca-red">
-                Excluir todas as contas filtradas?
+                Excluir contas selecionadas?
               </AlertDialogTitle>
               <AlertDialogDescription className="text-gray-300">
-                Serão excluídas <strong>{idsContasFiltradas.length}</strong> conta(s) com ID distinto que aparecem na lista
-                atual (após busca e filtros). A exclusão por linha na tabela continua disponível. Esta ação não pode ser
-                desfeita.
+                Serão excluídas <strong>{idsSelecionadosParaExclusao.length}</strong> conta(s) que marcou na lista. A
+                exclusão individual (ícone na linha) continua disponível. Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2 sm:gap-0">
@@ -1664,7 +1763,7 @@ export const ContasAReceber: React.FC = () => {
               </AlertDialogCancel>
               <Button
                 type="button"
-                disabled={bulkDeleting || idsContasFiltradas.length === 0}
+                disabled={bulkDeleting || idsSelecionadosParaExclusao.length === 0}
                 className="bg-seguranca-red hover:bg-red-700 text-white"
                 onClick={() => void handleConfirmBulkDelete()}
               >
@@ -1676,7 +1775,7 @@ export const ContasAReceber: React.FC = () => {
                 ) : (
                   <>
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir todas
+                    Excluir selecionadas
                   </>
                 )}
               </Button>
