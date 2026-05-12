@@ -30,6 +30,7 @@ import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
 import { contasAPagarService } from '@/services/contasAPagarService';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import { format, addDays, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
@@ -1080,22 +1081,26 @@ const ContasAPagarTab: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div>
-                  <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Início</label>
-                  <input
-                    type="date"
-                    value={reportFilters.startDate ? format(reportFilters.startDate, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: new Date(e.target.value) }))}
-                    className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Fim</label>
-                  <input
-                    type="date"
-                    value={reportFilters.endDate ? format(reportFilters.endDate, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: new Date(e.target.value) }))}
-                    className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                <div className="md:col-span-2">
+                  <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Período</label>
+                  <DatePickerWithRange
+                    date={{ from: reportFilters.startDate, to: reportFilters.endDate }}
+                    onDateChange={(range) => {
+                      if (!range) {
+                        setReportFilters(prev => ({
+                          ...prev,
+                          startDate: new Date(new Date().getFullYear(), 0, 1),
+                          endDate: new Date(new Date().getFullYear(), 11, 31)
+                        }));
+                        return;
+                      }
+                      setReportFilters(prev => ({
+                        ...prev,
+                        startDate: range.from ?? prev.startDate,
+                        endDate: range.to ?? range.from ?? prev.endDate
+                      }));
+                    }}
+                    className="w-full"
                   />
                 </div>
                 <div>

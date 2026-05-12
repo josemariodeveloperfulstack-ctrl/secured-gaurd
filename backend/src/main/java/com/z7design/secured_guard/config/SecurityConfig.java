@@ -73,6 +73,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/health").permitAll()
                                                 .requestMatchers("/api/webhooks/sendgrid/**").permitAll()
                                                  .requestMatchers("/api/public/**").permitAll()
+                                                .requestMatchers("/api/v1/public/**").permitAll()
                                                  .requestMatchers("/api/diagnostic/**").permitAll()
                                                  .requestMatchers("/api/debug/**").permitAll()
                                                  .requestMatchers("/api/users/public/**").permitAll()

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -1169,20 +1170,20 @@ const RelatoriosTab: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Data Início</label>
-                  <Input
-                    type="date"
-                    value={filters.startDate ? format(filters.startDate, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, startDate: new Date(e.target.value) }))}
-                    className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                   <DatePicker
+                    date={filters.startDate}
+                    onDateChange={(date) => setFilters(prev => ({ ...prev, startDate: date }))}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Data Fim</label>
-                  <Input
-                    type="date"
-                    value={filters.endDate ? format(filters.endDate, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, endDate: new Date(e.target.value) }))}
-                    className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                   <DatePicker
+                    date={filters.endDate}
+                    onDateChange={(date) => setFilters(prev => ({ ...prev, endDate: date }))}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
                   />
                 </div>
               </div>

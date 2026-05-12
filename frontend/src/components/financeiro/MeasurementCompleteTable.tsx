@@ -36,6 +36,9 @@ import { BulkDeleteDialog } from './BulkDeleteDialog';
 import api from '@/lib/axios';
 
 interface MeasurementCompleteTableProps {
+  bulletins: MeasurementBulletin[];
+  loading?: boolean;
+  onRefresh?: () => void;
   onView?: (bulletin: MeasurementBulletin) => void;
   onEdit?: (bulletin: MeasurementBulletin) => void;
   onDelete?: (bulletin: MeasurementBulletin) => void;
@@ -44,6 +47,9 @@ interface MeasurementCompleteTableProps {
 }
 
 export default function MeasurementCompleteTable({
+  bulletins: externalBulletins,
+  loading: externalLoading = false,
+  onRefresh,
   onView,
   onEdit,
   onDelete,
@@ -51,8 +57,9 @@ export default function MeasurementCompleteTable({
   onValidate
 }: MeasurementCompleteTableProps) {
   const { toast } = useToast();
-  const [bulletins, setBulletins] = useState<MeasurementBulletin[]>([]);
-  const [loading, setLoading] = useState(true);
+  // bulletins e loading removidos daqui para usar props
+  const [internalLoading, setInternalLoading] = useState(false);
+  const loading = externalLoading || internalLoading;
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<MeasurementStatus | 'all'>('all');
   const [contractFilter, setContractFilter] = useState<string>('all');
@@ -71,71 +78,20 @@ export default function MeasurementCompleteTable({
   const [selectedBulletin, setSelectedBulletin] = useState<MeasurementBulletin | null>(null);
 
   // Carregar boletins
+  // Removido carregamento interno para evitar duplicidade e stale state
+  /*
   const loadBulletins = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Iniciando carregamento de boletins...');
-      const data = await measurementService.getBulletins();
-      console.log('📊 Dados recebidos:', data);
-      setBulletins(data);
-      
-      // Se não há dados mas não houve erro, é normal
-      if (data.length === 0) {
-        console.log('ℹ️ Nenhum boletim de medição encontrado');
-        toast({
-          title: "Informação",
-          description: "Nenhum boletim de medição encontrado. A tabela está vazia.",
-          variant: "default"
-        });
-      } else {
-        console.log(`✅ ${data.length} boletins carregados com sucesso`);
-      }
-    } catch (error) {
-      console.error('❌ Erro ao carregar boletins:', error);
-      // Só mostrar toast se for um erro real, não se for lista vazia
-      if (error instanceof Error && error.message !== 'Falha ao buscar boletins de medição') {
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os boletins de medição",
-          variant: "destructive"
-        });
-      }
-      // Em caso de erro, definir lista vazia
-      setBulletins([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Função para testar a API (usa axios com token do interceptor)
-  const testAPI = async () => {
-    try {
-      console.log('🧪 Testando conectividade com API de medições...');
-      const response = await api.get('/measurements');
-      console.log('📡 Status da resposta:', response.status);
-      console.log('📡 Headers da resposta:', response.headers);
-      const data = response.data;
-      console.log('✅ API funcionando! Dados recebidos:', data);
-      toast({
-        title: "API OK!",
-        description: `Endpoint funcionando. ${Array.isArray(data?.content) ? data.content.length : Array.isArray(data) ? data.length : 0} registros encontrados.`,
-        variant: "default"
-      });
-    } catch (error: any) {
-      const status = error?.response?.status;
-      const details = error?.response?.data ? JSON.stringify(error.response.data) : String(error);
-      console.error('❌ API retornou erro:', status, details);
-      toast({
-        title: "Erro na API",
-        description: `Status ${status || 'desconhecido'}: ${details}`,
-        variant: "destructive"
-      });
-    }
+    ...
   };
 
   useEffect(() => {
     loadBulletins();
   }, []);
+  */
+
+  const handleManualRefresh = () => {
+    if (onRefresh) onRefresh();
+  };
 
   // Função helper para determinar se uma medição é completa
   const isCompleteMeasurement = (bulletin: MeasurementBulletin): boolean => {
@@ -161,7 +117,8 @@ export default function MeasurementCompleteTable({
   };
 
   // Filtrar boletins - apenas medições completas
-  const filteredBulletins = Array.isArray(bulletins) ? bulletins.filter(bulletin => {
+  const bulletins = Array.isArray(externalBulletins) ? externalBulletins : [];
+  const filteredBulletins = bulletins.filter(bulletin => {
     // Filtrar apenas medições completas
     const matchesType = isCompleteMeasurement(bulletin);
     
@@ -174,7 +131,7 @@ export default function MeasurementCompleteTable({
     const matchesContract = contractFilter === 'all' || bulletin.contractNumber === contractFilter;
 
     return matchesType && matchesSearch && matchesStatus && matchesContract;
-  }) : [];
+  });
 
   // Obter contratos únicos para filtro
   const uniqueContracts = Array.isArray(bulletins) 
@@ -212,10 +169,12 @@ export default function MeasurementCompleteTable({
   };
 
   const confirmBulkDelete = async () => {
+    if (selectedBulletins.size === 0) return;
+    
+    setInternalLoading(true);
     try {
-      setLoading(true);
       const deletePromises = Array.from(selectedBulletins).map(id => 
-        measurementService.deleteBulletin(id)
+        api.delete(`/measurements/${id}`)
       );
       
       await Promise.all(deletePromises);
@@ -223,24 +182,22 @@ export default function MeasurementCompleteTable({
       toast({
         title: "Sucesso",
         description: `${selectedBulletins.size} boletim(ns) excluído(s) com sucesso.`,
-        variant: "default"
       });
       
-      // Limpar seleção e recarregar dados
       setSelectedBulletins(new Set());
       setIsAllSelected(false);
       setShowBulkDeleteDialog(false);
-      loadBulletins();
       
+      if (onRefresh) onRefresh();
     } catch (error) {
       console.error('Erro ao excluir boletins:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível excluir alguns boletins. Tente novamente.",
+        description: "Não foi possível excluir alguns boletins. Eles podem já ter sido excluídos ou estarem vinculados a outros registros.",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setInternalLoading(false);
     }
   };
 
@@ -270,19 +227,19 @@ export default function MeasurementCompleteTable({
   };
 
   const handleSuccess = () => {
-    loadBulletins();
+    if (onRefresh) onRefresh();
     setShowCreateModal(false);
     setShowEditModal(false);
   };
 
   const handleDeleteSuccess = () => {
-    loadBulletins();
+    if (onRefresh) onRefresh();
     setShowDeleteDialog(false);
     setSelectedBulletin(null);
   };
 
   const handleValidationSuccess = () => {
-    loadBulletins();
+    if (onRefresh) onRefresh();
     setShowValidationModal(false);
     setSelectedBulletin(null);
   };
@@ -512,7 +469,7 @@ export default function MeasurementCompleteTable({
               Nova Medição
             </Button>
             <Button
-              onClick={loadBulletins}
+              onClick={handleManualRefresh}
               variant="outline"
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
             >

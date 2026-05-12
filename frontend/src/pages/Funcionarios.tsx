@@ -58,6 +58,8 @@ import { positionService, Position } from '@/services/positionService';
 import { Employee } from '@/types/employee';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 import { EmployeeDocuments } from '@/components/funcionarios/EmployeeDocuments';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useLocation, useNavigate } from 'react-router-dom';
 import EmployeeTrainingTab from '@/components/funcionarios/EmployeeTrainingTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1336,41 +1338,33 @@ Para excluir este funcionário:
 
                 <div className="flex flex-col gap-1">
                   <label htmlFor="hire-date-from" className="text-xs text-gray-400">Admissão (de)</label>
-                  <Input
-                    id="hire-date-from"
-                    type="date"
-                    value={hireDateFrom}
-                    onChange={(e) => setHireDateFrom(e.target.value)}
+                  <DatePicker
+                    date={hireDateFrom ? parseISO(hireDateFrom) : undefined}
+                    onDateChange={(date) => setHireDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="hire-date-to" className="text-xs text-gray-400">Admissão (até)</label>
-                  <Input
-                    id="hire-date-to"
-                    type="date"
-                    value={hireDateTo}
-                    onChange={(e) => setHireDateTo(e.target.value)}
+                  <DatePicker
+                    date={hireDateTo ? parseISO(hireDateTo) : undefined}
+                    onDateChange={(date) => setHireDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="termination-date-from" className="text-xs text-gray-400">Demissão (de)</label>
-                  <Input
-                    id="termination-date-from"
-                    type="date"
-                    value={terminationDateFrom}
-                    onChange={(e) => setTerminationDateFrom(e.target.value)}
+                  <DatePicker
+                    date={terminationDateFrom ? parseISO(terminationDateFrom) : undefined}
+                    onDateChange={(date) => setTerminationDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="termination-date-to" className="text-xs text-gray-400">Demissão (até)</label>
-                  <Input
-                    id="termination-date-to"
-                    type="date"
-                    value={terminationDateTo}
-                    onChange={(e) => setTerminationDateTo(e.target.value)}
+                  <DatePicker
+                    date={terminationDateTo ? parseISO(terminationDateTo) : undefined}
+                    onDateChange={(date) => setTerminationDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>

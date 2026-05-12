@@ -39,6 +39,9 @@ public class MeasurementBulletin {
     @OneToMany(mappedBy = "bulletin", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MeasurementItem> items = new ArrayList<>();
 
+    @OneToOne(mappedBy = "bulletin", cascade = CascadeType.ALL, orphanRemoval = true)
+    private CalculationMemory calculationMemory;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id")
     private Client client;
@@ -239,5 +242,13 @@ public class MeasurementBulletin {
         items.add(item);
         item.setBulletin(this);
         calculateSubtotal();
+    }
+
+    public CalculationMemory getCalculationMemory() {
+        return calculationMemory;
+    }
+
+    public void setCalculationMemory(CalculationMemory calculationMemory) {
+        this.calculationMemory = calculationMemory;
     }
 }

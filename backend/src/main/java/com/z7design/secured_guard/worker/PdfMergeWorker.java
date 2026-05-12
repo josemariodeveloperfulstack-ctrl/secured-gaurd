@@ -10,9 +10,11 @@ import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.repository.UnifiedDocumentRepository;
 import com.z7design.secured_guard.service.MinIOService;
+import com.z7design.secured_guard.service.RedisAvailabilityProbe;
 import com.z7design.secured_guard.service.UnifiedDocumentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
@@ -41,6 +43,7 @@ public class PdfMergeWorker {
     private final UnifiedDocumentRepository unifiedDocumentRepository;
     private final UnifiedDocumentService unifiedDocumentService;
     private final MinIOService minIOService;
+    private final RedisAvailabilityProbe redisAvailabilityProbe;
     
     private static final String STREAM_MATCHED = "stream:matched";
     private static final String STREAM_MERGED = "stream:merged";
@@ -52,6 +55,8 @@ public class PdfMergeWorker {
     public void init() {
         try {
             redisTemplate.opsForStream().createGroup(STREAM_MATCHED, ReadOffset.from("0"), CONSUMER_GROUP);
+        } catch (RedisConnectionFailureException e) {
+            log.warn("PdfMergeWorker: Redis indisponível na inicialização - consumer group será criado quando o Redis voltar");
         } catch (Exception e) {
             log.debug("Consumer group já existe ou erro ao criar: {}", e.getMessage());
         }
@@ -72,6 +77,9 @@ public class PdfMergeWorker {
     @Scheduled(fixedDelay = 2000) // Processa a cada 2 segundos
     @Transactional
     public void processMatches() {
+        if (!redisAvailabilityProbe.isAvailable()) {
+            return;
+        }
         try {
             @SuppressWarnings("unchecked")
             List<MapRecord<String, String, String>> records = (List<MapRecord<String, String, String>>) (List<?>) redisTemplate.opsForStream().read(
@@ -93,6 +101,8 @@ public class PdfMergeWorker {
                     log.error("Erro ao processar match", e);
                 }
             }
+        } catch (RedisConnectionFailureException e) {
+            log.warn("PdfMergeWorker: Redis indisponível - {}", e.getMessage());
         } catch (Exception e) {
             log.error("Erro no PdfMergeWorker", e);
         }

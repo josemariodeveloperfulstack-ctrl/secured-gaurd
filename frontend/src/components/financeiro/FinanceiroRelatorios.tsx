@@ -21,9 +21,9 @@ import {
 import { FinancialTransaction, Invoice } from '@/services/financialService';
 import { unitService, Unit } from '@/services/unitService';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { format, startOfDay, endOfDay, isWithinInterval, isBefore, isAfter } from 'date-fns';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
+import { DateRange } from 'react-day-picker';
+import { format, startOfDay, endOfDay, isWithinInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { useToast } from '@/hooks/use-toast';
 
@@ -134,10 +134,8 @@ interface FiltrosRelatorio {
   tipo: string;
   status: string;
   tipoDespesa: string;
-  dataInicio: Date | null;
-  dataFim: Date | null;
-  vencimentoInicio: Date | null;
-  vencimentoFim: Date | null;
+  rangeLancamento: DateRange | undefined;
+  rangeVencimento: DateRange | undefined;
   centroCusto: string;
   departamento: string;
   fornecedor: string;
@@ -159,10 +157,11 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
     tipo: 'all',
     status: 'all',
     tipoDespesa: 'all',
-    dataInicio: null,
-    dataFim: null,
-    vencimentoInicio: null,
-    vencimentoFim: null,
+    rangeLancamento: {
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date())
+    },
+    rangeVencimento: undefined,
     centroCusto: '',
     departamento: 'all',
     fornecedor: 'all',
@@ -240,12 +239,13 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
 
     // Datas: intervalo parcial (só início ou só fim) e, se ambos os grupos estão preenchidos,
     // usar OU entre “data de lançamento” e “data de vencimento” (evita lista vazia por combinação impossível).
-    const hasLanc = Boolean(filtros.dataInicio || filtros.dataFim);
-    const hasVenc = Boolean(filtros.vencimentoInicio || filtros.vencimentoFim);
+    const hasLanc = Boolean(filtros.rangeLancamento?.from || filtros.rangeLancamento?.to);
+    const hasVenc = Boolean(filtros.rangeVencimento?.from || filtros.rangeVencimento?.to);
+    
     const predLanc = (item: FinancialTransaction) =>
-      matchesDateBounds(item, filtros.dataInicio, filtros.dataFim, (i) => i.date);
+      matchesDateBounds(item, filtros.rangeLancamento?.from || null, filtros.rangeLancamento?.to || null, (i) => i.date);
     const predVenc = (item: FinancialTransaction) =>
-      matchesDateBounds(item, filtros.vencimentoInicio, filtros.vencimentoFim, (i) => i.dueDate);
+      matchesDateBounds(item, filtros.rangeVencimento?.from || null, filtros.rangeVencimento?.to || null, (i) => i.dueDate);
 
     if (hasLanc && hasVenc) {
       dados = dados.filter((item) => predLanc(item) || predVenc(item));
@@ -346,10 +346,11 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       tipo: 'all',
       status: 'all',
       tipoDespesa: 'all',
-      dataInicio: null,
-      dataFim: null,
-      vencimentoInicio: null,
-      vencimentoFim: null,
+      rangeLancamento: {
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date())
+      },
+      rangeVencimento: undefined,
       centroCusto: '',
       departamento: 'all',
       fornecedor: 'all',
@@ -402,8 +403,8 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
-      if (filtros.dataInicio) queryParams.append('startDate', format(filtros.dataInicio, 'yyyy-MM-dd'));
-      if (filtros.dataFim) queryParams.append('endDate', format(filtros.dataFim, 'yyyy-MM-dd'));
+      if (filtros.rangeLancamento?.from) queryParams.append('startDate', format(filtros.rangeLancamento.from, 'yyyy-MM-dd'));
+      if (filtros.rangeLancamento?.to) queryParams.append('endDate', format(filtros.rangeLancamento.to, 'yyyy-MM-dd'));
 
       let endpoint = '';
       if (filtros.tipo === 'INCOME') {
@@ -577,55 +578,23 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
               />
             </div>
 
-            {/* Data de Lançamento Início */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Lançamento (Início)</label>
-              <DatePicker
-                selected={filtros.dataInicio}
-                onChange={(date) => handleFiltroChange('dataInicio', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
+            {/* Período de Lançamento */}
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Período de Lançamento</label>
+              <DatePickerWithRange
+                date={filtros.rangeLancamento}
+                onDateChange={(range) => handleFiltroChange('rangeLancamento', range)}
+                className="form-input"
               />
             </div>
 
-            {/* Data de Lançamento Fim */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Lançamento (Fim)</label>
-              <DatePicker
-                selected={filtros.dataFim}
-                onChange={(date) => handleFiltroChange('dataFim', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-              />
-            </div>
-
-            {/* Data de Vencimento Início */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Vencimento (Início)</label>
-              <DatePicker
-                selected={filtros.vencimentoInicio}
-                onChange={(date) => handleFiltroChange('vencimentoInicio', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-              />
-            </div>
-
-            {/* Data de Vencimento Fim */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Vencimento (Fim)</label>
-              <DatePicker
-                selected={filtros.vencimentoFim}
-                onChange={(date) => handleFiltroChange('vencimentoFim', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
+            {/* Período de Vencimento */}
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Período de Vencimento</label>
+              <DatePickerWithRange
+                date={filtros.rangeVencimento}
+                onDateChange={(range) => handleFiltroChange('rangeVencimento', range)}
+                className="form-input"
               />
             </div>
 

@@ -36,7 +36,8 @@ import { ContasAPagarTable } from '@/components/financeiro/ContasAPagarTable';
 import { ContasAPagarDashboard } from '@/components/financeiro/ContasAPagarDashboard';
 import { ContasAPagarViewModal } from '@/components/financeiro/ContasAPagarViewModal';
 import { contasAPagarService } from '@/services/contasAPagarService';
-import { format, addDays, isBefore } from 'date-fns';
+import { format, addDays, isBefore, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const ContasAPagar: React.FC = () => {
   const { toast } = useToast();
@@ -1232,20 +1233,18 @@ const ContasAPagar: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div>
                     <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Início</label>
-                    <input
-                      type="date"
-                      value={format(reportFilters.startDate, 'yyyy-MM-dd')}
-                      onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: new Date(e.target.value) }))}
-                      className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    <DatePicker
+                      date={reportFilters.startDate}
+                      onDateChange={(date) => setReportFilters(prev => ({ ...prev, startDate: date || new Date() }))}
+                      className="w-full bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white"
                     />
                   </div>
                   <div>
                     <label className="text-sm font-medium text-seguranca-lightgray mb-3 block">Data Fim</label>
-                    <input
-                      type="date"
-                      value={format(reportFilters.endDate, 'yyyy-MM-dd')}
-                      onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: new Date(e.target.value) }))}
-                      className="w-full px-4 py-3 bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                    <DatePicker
+                      date={reportFilters.endDate}
+                      onDateChange={(date) => setReportFilters(prev => ({ ...prev, endDate: date || new Date() }))}
+                      className="w-full bg-seguranca-black/50 border border-gray-600/50 rounded-xl text-white"
                     />
                   </div>
                   <div>

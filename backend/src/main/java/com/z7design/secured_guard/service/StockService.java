@@ -308,8 +308,13 @@ public class StockService {
         if (dto.getMovementType() == MovementType.SAIDA && employee != null) {
             recordEmployeeStockHistory(movement, employee, user);
             
-            // Se for EPI, registrar entrega de EPI também
-            if (item.getCategory() == StockCategory.EPI) {
+            // Se for EPI/Uniforme e NÃO for uma movimentação originada pela própria ficha de EPI, registrar entrega
+            boolean isFromEPIForm = dto.getNotes() != null && dto.getNotes().contains("Baixa automática via Ficha de EPI");
+            boolean isEligibleForEPIForm = item.getCategory() == StockCategory.EPI || 
+                                         item.getCategory().name().startsWith("UNIFORME") ||
+                                         item.getCategory() == StockCategory.CALCADOS;
+            
+            if (isEligibleForEPIForm && !isFromEPIForm) {
                 try {
                     recordEPIDelivery(movement, employee, user);
                 } catch (Exception e) {
@@ -362,6 +367,7 @@ public class StockService {
         com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO itemDto = new com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO();
         itemDto.setEpiName(movement.getStockItem().getFullName());
         itemDto.setQuantity(movement.getQuantity());
+        itemDto.setStockItemId(movement.getStockItem().getId());
         
         epiDto.setItems(List.of(itemDto));
         

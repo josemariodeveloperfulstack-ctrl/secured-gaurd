@@ -179,7 +179,13 @@ public class TimeRecordService {
                         return employeeRepository.findByCpf(cpf)
                                 .or(() -> employeeRepository.findByDocument(cpf));
                     })
-                    .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+                    .orElseThrow(() -> {
+                        log.error("❌ Falha crítica: Nenhum perfil de Employee encontrado para o usuário/ID {}. " +
+                                "O usuário deve ter um registro de Funcionário vinculado para usar funções de ponto.", 
+                                employeeIdOrUserId);
+                        return new com.z7design.secured_guard.exception.ResourceNotFoundException(
+                            "Perfil de funcionário não encontrado. Verifique se o usuário possui um cadastro de funcionário ativo.");
+                    });
         });
     }
 

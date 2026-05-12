@@ -26,6 +26,7 @@ export function DatePicker({
   className
 }: DatePickerProps) {
   const [inputValue, setInputValue] = React.useState<string>("");
+  const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (date) {
@@ -38,10 +39,8 @@ export function DatePicker({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
 
-    // Allow only numbers and slashes
     const cleanValue = value.replace(/[^\d/]/g, "");
 
-    // Auto-formatting (dd/mm/yyyy)
     let formattedValue = cleanValue;
     if (cleanValue.length === 2 && !cleanValue.includes("/") && value.length > inputValue.length) {
       formattedValue = cleanValue + "/";
@@ -49,11 +48,9 @@ export function DatePicker({
       formattedValue = cleanValue + "/";
     }
 
-    // Limit length
     if (formattedValue.length <= 10) {
       setInputValue(formattedValue);
 
-      // If it's a complete date, try to parse it
       if (formattedValue.length === 10) {
         const parsedDate = parse(formattedValue, "dd/MM/yyyy", new Date());
         if (isValid(parsedDate)) {
@@ -65,8 +62,15 @@ export function DatePicker({
     }
   };
 
+  const handleCalendarSelect = (selected: Date | undefined) => {
+    onDateChange?.(selected);
+    if (selected) {
+      setOpen(false);
+    }
+  };
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <div className="relative w-full">
         <Input
           type="text"
@@ -93,7 +97,7 @@ export function DatePicker({
         <Calendar
           mode="single"
           selected={date}
-          onSelect={onDateChange}
+          onSelect={handleCalendarSelect}
           initialFocus
           locale={ptBR}
           className="rounded-md"

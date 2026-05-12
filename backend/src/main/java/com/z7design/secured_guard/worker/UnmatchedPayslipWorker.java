@@ -8,6 +8,7 @@ import com.z7design.secured_guard.repository.DocumentPageRepository;
 import com.z7design.secured_guard.repository.PaymentReceiptRepository;
 import com.z7design.secured_guard.repository.PayslipRepository;
 import com.z7design.secured_guard.service.MinIOService;
+import com.z7design.secured_guard.service.RedisAvailabilityProbe;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -15,6 +16,7 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
@@ -52,6 +54,7 @@ public class UnmatchedPayslipWorker {
     private final PayslipRepository payslipRepository;
     private final PaymentReceiptRepository paymentReceiptRepository;
     private final MinIOService minIOService;
+    private final RedisAvailabilityProbe redisAvailabilityProbe;
     
     private static final String STREAM_VALIDATED = "stream:validated";
     private static final String CONSUMER_GROUP = "unmatched-group";
@@ -66,6 +69,8 @@ public class UnmatchedPayslipWorker {
         try {
             redisTemplate.opsForStream().createGroup(STREAM_VALIDATED, ReadOffset.from("0"), CONSUMER_GROUP);
             log.info("✅ UNMATCHED PAYSLIP WORKER: Consumer group '{}' criado/verificado", CONSUMER_GROUP);
+        } catch (RedisConnectionFailureException e) {
+            log.warn("⚠️ UNMATCHED PAYSLIP WORKER: Redis indisponível na inicialização - consumer group será criado quando o Redis voltar");
         } catch (Exception e) {
             log.info("ℹ️ UNMATCHED PAYSLIP WORKER: Consumer group '{}' já existe ou erro: {}", CONSUMER_GROUP, e.getMessage());
         }
@@ -76,6 +81,9 @@ public class UnmatchedPayslipWorker {
     @Scheduled(fixedDelay = 2000) // Processa a cada 2 segundos
     @Transactional
     public void processValidatedDocuments() {
+        if (!redisAvailabilityProbe.isAvailable()) {
+            return;
+        }
         try {
             // Log periódico para debug (a cada 5 segundos)
             long currentTime = System.currentTimeMillis();
@@ -135,6 +143,8 @@ public class UnmatchedPayslipWorker {
                     log.error("Erro ao processar documento validado", e);
                 }
             }
+        } catch (RedisConnectionFailureException e) {
+            log.warn("UnmatchedPayslipWorker: Redis indisponível - {}", e.getMessage());
         } catch (Exception e) {
             log.error("Erro no UnmatchedPayslipWorker", e);
         }

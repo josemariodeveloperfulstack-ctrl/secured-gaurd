@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.z7design.secured_guard.model.enums.RecipientSourceType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -40,6 +41,25 @@ public class EmailCampaignRecipient {
     @Column(columnDefinition = "jsonb")
     @Builder.Default
     private Map<String, Object> metadata = new HashMap<>();
+
+    /** Origem do destinatário: LEAD = veio do CRM, IMPORT = planilha, MANUAL = digitado. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_type", nullable = false, length = 20)
+    @Builder.Default
+    private RecipientSourceType sourceType = RecipientSourceType.MANUAL;
+
+    /**
+     * Lead vinculado (do CRM original ou criado automaticamente após engajamento).
+     * Veja {@link #autoLeadCreated} para distinguir.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lead_id")
+    private Lead lead;
+
+    /** {@code true} quando o {@link #lead} foi criado automaticamente por engajamento. */
+    @Column(name = "auto_lead_created", nullable = false)
+    @Builder.Default
+    private boolean autoLeadCreated = false;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

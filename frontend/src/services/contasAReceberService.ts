@@ -9,7 +9,9 @@ export type ContaAReceber = ContaAReceberForm & {
   pendingAmount?: number; // Valor pendente
   overdueDays?: number; // Dias em atraso
   invoiceNumber?: string; // Número da fatura
-  measurementNumber?: string; // Número da medição
+  measurementNumber?: string; // Número da medição (texto livre)
+  measurementId?: string; // FK do boletim de medição
+  measurementInfo?: string; // Texto amigável devolvido pelo backend
   dueDate?: Date; // Data de vencimento
   client?: {
     id: string;
@@ -179,6 +181,8 @@ function mapAccountsReceivableListItem(account: any): ContaAReceber | null {
     paymentMethod: account.paymentMethod || 'PIX',
     invoiceNumber: account.invoiceNumber,
     measurementNumber: account.measurementNumber,
+    measurementId: account.measurementId,
+    measurementInfo: account.measurementInfo,
     dueDate: parseDateFromBackend(account.dueDate) || new Date(),
     client: account.client
       ? {
@@ -327,6 +331,14 @@ export const contasAReceberService = {
       requestData.invoiceNumber = conta.numeroFatura;
     }
 
+    // Vincular boletim de medição (FK) e/ou número livre da medição
+    if (conta.measurementId) {
+      requestData.measurementId = String(conta.measurementId);
+    }
+    if (conta.measurementNumber && String(conta.measurementNumber).trim()) {
+      requestData.measurementNumber = String(conta.measurementNumber).trim();
+    }
+
     console.log('Dados da requisição:', requestData);
 
     try {
@@ -359,6 +371,8 @@ export const contasAReceberService = {
       barcode: conta.codigoBarras !== undefined ? conta.codigoBarras : contaExistente.codigoBarras,
       notes: conta.observacoes !== undefined ? conta.observacoes : contaExistente.observacoes,
       centroCusto: conta.centroCusto !== undefined ? conta.centroCusto : contaExistente.centroCusto,
+      measurementId: conta.measurementId !== undefined ? (conta.measurementId || undefined) : contaExistente.measurementId,
+      measurementNumber: conta.measurementNumber !== undefined ? (conta.measurementNumber || undefined) : contaExistente.measurementNumber,
       overdueDays: Number(contaExistente.overdueDays || 0),
       lateFee: Number(contaExistente.lateFee || 0),
       latePenalty: Number(contaExistente.latePenalty || 0)
@@ -476,6 +490,9 @@ export const contasAReceberService = {
     }
     if (requestData.measurementNumber && String(requestData.measurementNumber).trim()) {
       cleanRequestData.measurementNumber = String(requestData.measurementNumber).trim();
+    }
+    if (requestData.measurementId) {
+      cleanRequestData.measurementId = String(requestData.measurementId);
     }
     if (requestData.overdueDays !== undefined && requestData.overdueDays !== null) {
       cleanRequestData.overdueDays = Number(requestData.overdueDays);

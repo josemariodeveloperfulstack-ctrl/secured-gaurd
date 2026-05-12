@@ -60,6 +60,8 @@ import leadService from '@/services/leadService';
 import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import { Loader2, Plus as PlusIcon } from 'lucide-react';
 import { saveAs } from 'file-saver';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface QuoteExtended extends Quote {
   quoteNumber?: string;
@@ -1244,12 +1246,10 @@ const Orcamentos = () => {
                         <Calendar className="h-4 w-4" />
                         Válido Até
                       </Label>
-                      <Input
-                        id="validUntil"
-                        type="date"
-                        value={formData.validUntil || ''}
-                        onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      <DatePicker
+                        date={formData.validUntil ? parseISO(formData.validUntil) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, validUntil: date ? format(date, 'yyyy-MM-dd') : '' })}
+                        className="w-full bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-11"
                       />
                     </div>
                     <div className="space-y-2">
@@ -1537,12 +1537,10 @@ const Orcamentos = () => {
                         <Calendar className="h-4 w-4" />
                         Válido Até
                       </Label>
-                      <Input
-                        id="edit-validUntil"
-                        type="date"
-                        value={formData.validUntil || ''}
-                        onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      <DatePicker
+                        date={formData.validUntil ? parseISO(formData.validUntil) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, validUntil: date ? format(date, 'yyyy-MM-dd') : '' })}
+                        className="w-full bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-11"
                       />
                     </div>
                     <div className="space-y-2">

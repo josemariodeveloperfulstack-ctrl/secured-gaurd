@@ -1192,9 +1192,21 @@ export const ContasAReceber: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <div className="text-sm text-seguranca-lightgray">
-                              {conta.measurementNumber || '-'}
-                            </div>
+                            {conta.measurementInfo || conta.measurementNumber ? (
+                              <div className="space-y-0.5">
+                                <div className="text-sm font-medium text-seguranca-lightgray">
+                                  {conta.measurementInfo || conta.measurementNumber}
+                                </div>
+                                {conta.measurementInfo && conta.measurementNumber &&
+                                  conta.measurementInfo !== conta.measurementNumber && (
+                                    <div className="text-xs text-gray-400">
+                                      Ref.: {conta.measurementNumber}
+                                    </div>
+                                  )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             <div>

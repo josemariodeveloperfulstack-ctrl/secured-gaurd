@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { format, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +16,7 @@ import { FileText, Save, X } from 'lucide-react';
 import { BankAccount, CreateReconciliationRequest } from '@/types/bankReconciliation';
 import { useToast } from '@/hooks/use-toast';
 import bankReconciliationService from '@/services/bankReconciliationService';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface ReconciliationFormModalProps {
   isOpen: boolean;
@@ -182,14 +184,12 @@ const ReconciliationFormModal: React.FC<ReconciliationFormModalProps> = ({
               <Label htmlFor="referenceDate" className="text-seguranca-lightgray">
                 Data de Referência *
               </Label>
-              <Input
-                id="referenceDate"
-                type="date"
-                value={formData.referenceDate}
-                onChange={(e) => handleInputChange('referenceDate', e.target.value)}
-                className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                disabled={isLoading}
-              />
+                   <DatePicker
+                    date={formData.referenceDate ? parseISO(formData.referenceDate) : undefined}
+                    onDateChange={(date) => handleInputChange('referenceDate', date ? format(date, 'yyyy-MM-dd') : '')}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
+                  />
               {errors.referenceDate && (
                 <p className="text-red-400 text-sm">{errors.referenceDate}</p>
               )}

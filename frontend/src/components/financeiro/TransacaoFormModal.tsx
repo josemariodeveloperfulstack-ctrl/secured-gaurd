@@ -7,8 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Plus, DollarSign, Upload } from 'lucide-react';
 import CurrencyInput from 'react-currency-input-field';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { DatePicker } from '@/components/ui/date-picker';
 import { financialService, FinancialTransaction } from '@/services/financialService';
 import { unitService, Unit } from '@/services/unitService';
 import { format, parse } from 'date-fns';
@@ -399,25 +398,19 @@ export const TransacaoFormModal: React.FC<TransacaoFormModalProps> = ({
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Data de Vencimento *</label>
               <DatePicker
-                selected={formData.dataVencimento}
-                onChange={(date: Date) => handleInputChange('dataVencimento', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-                required
+                date={formData.dataVencimento || undefined}
+                onDateChange={(date) => handleInputChange('dataVencimento', date || null)}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Data do Lançamento *</label>
               <DatePicker
-                selected={formData.dataLancamento}
-                onChange={(date: Date) => handleInputChange('dataLancamento', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-                required
+                date={formData.dataLancamento}
+                onDateChange={(date) => handleInputChange('dataLancamento', date || new Date())}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
           </div>

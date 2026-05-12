@@ -81,8 +81,17 @@ public class EPIDeliveryFormService {
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Funcionário não encontrado com id: " + dto.getEmployeeId()));
 
-        Company company = companyRepository.findById(dto.getCompanyId())
-                .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada com id: " + dto.getCompanyId()));
+        Company company = null;
+        if (dto.getCompanyId() != null) {
+            company = companyRepository.findById(dto.getCompanyId())
+                    .orElse(null);
+            if (company == null) {
+                log.warn("⚠️ Empresa com id {} não encontrada, continuando sem vínculo de empresa.", dto.getCompanyId());
+            }
+        } else if (employee.getCompany() != null) {
+            company = employee.getCompany();
+            log.info("🏢 Usando empresa do funcionário: {}", company.getName());
+        }
 
         Employee responsibleEmployee = null;
         if (dto.getResponsibleEmployeeId() != null) {

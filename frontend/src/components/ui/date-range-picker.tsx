@@ -26,8 +26,17 @@ export function DatePickerWithRange({
   disabled = false,
   className
 }: DatePickerWithRangeProps) {
+  const [open, setOpen] = React.useState(false);
+
+  const handleSelect = (range: DateRange | undefined) => {
+    onDateChange?.(range);
+    if (range?.from && range?.to) {
+      setOpen(false);
+    }
+  };
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -59,7 +68,7 @@ export function DatePickerWithRange({
           mode="range"
           defaultMonth={date?.from}
           selected={date}
-          onSelect={onDateChange}
+          onSelect={handleSelect}
           numberOfMonths={2}
           locale={ptBR}
         />

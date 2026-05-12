@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -646,12 +647,12 @@ const PagamentosTab: React.FC = () => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-seguranca-lightgray">Data do Pagamento</label>
-                    <Input
-                      type="date"
-                      value={format(paymentForm.dataPagamento, 'yyyy-MM-dd')}
-                      onChange={(e) => setPaymentForm(prev => ({ ...prev, dataPagamento: new Date(e.target.value) }))}
-                      className="border-gray-600 bg-seguranca-black text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
-                    />
+                   <DatePicker
+                    date={paymentForm.dataPagamento}
+                    onDateChange={(date) => setPaymentForm(prev => ({ ...prev, dataPagamento: date || new Date() }))}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
+                  />
                   </div>
                 </div>
 

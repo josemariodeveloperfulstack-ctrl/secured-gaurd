@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,8 @@ import BankAccountFormModal from './BankAccountFormModal';
 import ReconciliationFormModal from './ReconciliationFormModal';
 import ImportStatementModal from './ImportStatementModal';
 import ReconciliationViewModal from './ReconciliationViewModal';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
+import { format, parseISO } from 'date-fns';
 
 const ConciliacaoBancaria: React.FC = () => {
   const { toast } = useToast();
@@ -263,21 +265,19 @@ const ConciliacaoBancaria: React.FC = () => {
               </SelectContent>
             </Select>
 
-            <Input
-              type="date"
-              placeholder="Data Inicial"
-              value={dateFilter.startDate}
-              onChange={(e) => setDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
-              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-            />
-
-            <Input
-              type="date"
-              placeholder="Data Final"
-              value={dateFilter.endDate}
-              onChange={(e) => setDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
-              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-            />
+            <div className="lg:col-span-2">
+              <DatePickerWithRange
+                date={{ 
+                  from: dateFilter.startDate ? parseISO(dateFilter.startDate) : undefined, 
+                  to: dateFilter.endDate ? parseISO(dateFilter.endDate) : undefined 
+                }}
+                onDateChange={(range) => setDateFilter({ 
+                  startDate: range?.from ? format(range.from, 'yyyy-MM-dd') : '', 
+                  endDate: range?.to ? format(range.to, 'yyyy-MM-dd') : '' 
+                })}
+                className="w-full"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end mt-4">

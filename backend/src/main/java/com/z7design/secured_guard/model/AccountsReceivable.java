@@ -44,7 +44,12 @@ public class AccountsReceivable {
     @Size(max = 100, message = "Número da medição deve ter no máximo 100 caracteres")
     @Column(name = "measurement_number")
     private String measurementNumber;
-    
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "measurement_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "items", "calculationMemory"})
+    private MeasurementBulletin measurement;
+
     @NotBlank(message = "Descrição é obrigatória")
     @Size(max = 500, message = "Descrição deve ter no máximo 500 caracteres")
     @Column(name = "description", nullable = false)
@@ -165,7 +170,15 @@ public class AccountsReceivable {
     public void setMeasurementNumber(String measurementNumber) {
         this.measurementNumber = measurementNumber;
     }
-    
+
+    public MeasurementBulletin getMeasurement() {
+        return measurement;
+    }
+
+    public void setMeasurement(MeasurementBulletin measurement) {
+        this.measurement = measurement;
+    }
+
     public String getDescription() {
         return description;
     }

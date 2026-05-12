@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { feriasService } from '@/services/feriasService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { useQuery } from '@tanstack/react-query';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   FileSpreadsheet,
   Download,
@@ -334,12 +336,10 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
                   <Label htmlFor="dataInicio" className="text-gray-300 text-sm">
                     Data Início
                   </Label>
-                  <Input
-                    id="dataInicio"
-                    type="date"
-                    value={filters.dataInicio}
-                    onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
-                    className="bg-gray-900/50 border-gray-600 text-white"
+                  <DatePicker
+                    date={filters.dataInicio ? parseISO(filters.dataInicio) : undefined}
+                    onDateChange={(date) => handleFilterChange('dataInicio', date ? format(date, 'yyyy-MM-dd') : '')}
+                    className="w-full bg-gray-900/50 border-gray-600 text-white"
                   />
                 </div>
 
@@ -347,12 +347,10 @@ const FeriasReportModal: React.FC<FeriasReportModalProps> = ({ isOpen, onClose }
                   <Label htmlFor="dataFim" className="text-gray-300 text-sm">
                     Data Fim
                   </Label>
-                  <Input
-                    id="dataFim"
-                    type="date"
-                    value={filters.dataFim}
-                    onChange={(e) => handleFilterChange('dataFim', e.target.value)}
-                    className="bg-gray-900/50 border-gray-600 text-white"
+                  <DatePicker
+                    date={filters.dataFim ? parseISO(filters.dataFim) : undefined}
+                    onDateChange={(date) => handleFilterChange('dataFim', date ? format(date, 'yyyy-MM-dd') : '')}
+                    className="w-full bg-gray-900/50 border-gray-600 text-white"
                   />
                 </div>
               </div>

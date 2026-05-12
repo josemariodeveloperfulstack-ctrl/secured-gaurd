@@ -30,6 +30,9 @@ public class AccountsReceivableDTO {
 
     // Suporte a vinculação por ID da medição (opcional)
     private UUID measurementId;
+
+    // Texto amigável da medição para exibição em listas (ex.: "CTC-CBM 148/295/2025 — 01/05/2026 a 31/05/2026")
+    private String measurementInfo;
     
     @NotBlank(message = "Descrição é obrigatória")
     @Size(max = 500, message = "Descrição deve ter no máximo 500 caracteres")
@@ -80,6 +83,14 @@ public class AccountsReceivableDTO {
         this.client = ClientDTO.fromEntity(entity.getClient());
         this.invoiceNumber = entity.getInvoiceNumber();
         this.measurementNumber = entity.getMeasurementNumber();
+
+        if (entity.getMeasurement() != null) {
+            this.measurementId = entity.getMeasurement().getId();
+            this.measurementInfo = buildMeasurementInfo(entity.getMeasurement());
+        } else if (this.measurementNumber != null && !this.measurementNumber.isBlank()) {
+            this.measurementInfo = this.measurementNumber;
+        }
+
         this.description = entity.getDescription();
         this.amount = entity.getAmount();
         this.amountPaid = entity.getAmountPaid();
@@ -101,6 +112,24 @@ public class AccountsReceivableDTO {
     // Static factory method
     public static AccountsReceivableDTO fromEntity(AccountsReceivable entity) {
         return new AccountsReceivableDTO(entity);
+    }
+
+    private static String buildMeasurementInfo(com.z7design.secured_guard.model.MeasurementBulletin m) {
+        StringBuilder sb = new StringBuilder();
+        if (m.getContractNumber() != null && !m.getContractNumber().isBlank()) {
+            sb.append(m.getContractNumber());
+        } else if (m.getNfNumber() != null && !m.getNfNumber().isBlank()) {
+            sb.append("NF ").append(m.getNfNumber());
+        } else {
+            sb.append("Medição ").append(m.getId().toString(), 0, 8);
+        }
+        if (m.getPeriodStart() != null && m.getPeriodEnd() != null) {
+            sb.append(" — ")
+                    .append(m.getPeriodStart())
+                    .append(" a ")
+                    .append(m.getPeriodEnd());
+        }
+        return sb.toString();
     }
     
     // Helper methods

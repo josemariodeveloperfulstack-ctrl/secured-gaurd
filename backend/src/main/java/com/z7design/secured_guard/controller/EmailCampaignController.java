@@ -4,16 +4,23 @@ import com.z7design.secured_guard.dto.sendgrid.CreateEmailCampaignRequest;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignMetricsDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailLogRowDto;
+import com.z7design.secured_guard.dto.sendgrid.ImportRecipientsResponse;
 import com.z7design.secured_guard.dto.sendgrid.SendEmailCampaignRequest;
 import com.z7design.secured_guard.model.EmailCampaign;
+import com.z7design.secured_guard.model.enums.EmailLogStatus;
 import com.z7design.secured_guard.service.sendgrid.EmailCampaignService;
+import com.z7design.secured_guard.service.sendgrid.EmailRecipientImportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -22,6 +29,7 @@ import java.util.UUID;
 public class EmailCampaignController {
 
     private final EmailCampaignService emailCampaignService;
+    private final EmailRecipientImportService emailRecipientImportService;
 
     @GetMapping
     public ResponseEntity<List<EmailCampaignSummaryDto>> list() {
@@ -40,8 +48,24 @@ public class EmailCampaignController {
     }
 
     @GetMapping("/{id}/logs")
-    public ResponseEntity<List<EmailLogRowDto>> logs(@PathVariable UUID id) {
-        return ResponseEntity.ok(emailCampaignService.listLogs(id));
+    public ResponseEntity<List<EmailLogRowDto>> logs(
+            @PathVariable UUID id,
+            @RequestParam(name = "status", required = false) String status) {
+        Set<EmailLogStatus> statuses = parseStatuses(status);
+        return ResponseEntity.ok(emailCampaignService.listLogs(id, statuses));
+    }
+
+    private Set<EmailLogStatus> parseStatuses(String raw) {
+        if (raw == null || raw.isBlank()) return Set.of();
+        Set<EmailLogStatus> out = EnumSet.noneOf(EmailLogStatus.class);
+        for (String token : Arrays.asList(raw.split(","))) {
+            try {
+                out.add(EmailLogStatus.valueOf(token.trim().toUpperCase()));
+            } catch (IllegalArgumentException ignored) {
+                // status desconhecido — ignora
+            }
+        }
+        return out;
     }
 
     @PostMapping("/{id}/send")
@@ -50,8 +74,39 @@ public class EmailCampaignController {
         return ResponseEntity.accepted().build();
     }
 
+    /** Pausa a campanha (mantém PENDING para retomada posterior). */
+    @PostMapping("/{id}/pause")
+    public ResponseEntity<Void> pause(@PathVariable UUID id) {
+        emailCampaignService.pauseCampaign(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Retoma campanha pausada (volta para RUNNING). */
+    @PostMapping("/{id}/resume")
+    public ResponseEntity<Void> resume(@PathVariable UUID id) {
+        emailCampaignService.resumeCampaign(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Cancela campanha — PENDING vira DROPPED, status final CANCELED. */
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<Void> cancel(@PathVariable UUID id) {
+        emailCampaignService.cancelCampaign(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/metrics")
     public ResponseEntity<EmailCampaignMetricsDto> metrics(@PathVariable UUID id) {
         return ResponseEntity.ok(emailCampaignService.metrics(id));
+    }
+
+    /**
+     * Faz o parse de um arquivo CSV/XLSX e devolve a lista de destinatários extraídos
+     * (sem persistir) para o front pré-popular o wizard de criação.
+     * Aceita {@code multipart/form-data} com o campo {@code file}.
+     */
+    @PostMapping(path = "/import-recipients", consumes = "multipart/form-data")
+    public ResponseEntity<ImportRecipientsResponse> importRecipients(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(emailRecipientImportService.parse(file));
     }
 }

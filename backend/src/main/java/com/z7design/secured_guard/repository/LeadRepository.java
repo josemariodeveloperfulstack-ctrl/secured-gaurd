@@ -31,6 +31,10 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     
     // Buscar leads por email
     List<Lead> findByEmailContainingIgnoreCase(String email);
+
+    // Buscar primeiro Lead por email exato (ignorando case)
+    @Query("SELECT l FROM Lead l WHERE lower(l.email) = lower(:email) ORDER BY l.createdAt DESC")
+    java.util.Optional<Lead> findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(@Param("email") String email);
     
     // Buscar leads por nome
     List<Lead> findByNameContainingIgnoreCase(String name);

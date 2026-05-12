@@ -7,9 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
 import CurrencyInput from 'react-currency-input-field';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { formatDateForBackend, parseDateFromBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
+import { DatePicker } from '@/components/ui/date-picker';
+import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 import { unitService, Unit } from '@/services/unitService';
 import { financialService, Invoice } from '@/services/financialService';
 
@@ -177,21 +176,19 @@ export const FaturaFormModal: React.FC<FaturaFormModalProps> = ({
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Data de Emissão *</label>
               <DatePicker
-                selected={formData.issueDate}
-                onChange={(date: Date) => handleInputChange('issueDate', date)}
-                {...DEFAULT_DATE_PICKER_PROPS}
-                className="form-input w-full"
-                required
+                date={formData.issueDate}
+                onDateChange={(date) => handleInputChange('issueDate', date || new Date())}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Data de Vencimento *</label>
               <DatePicker
-                selected={formData.dueDate}
-                onChange={(date: Date) => handleInputChange('dueDate', date)}
-                {...DEFAULT_DATE_PICKER_PROPS}
-                className="form-input w-full"
-                required
+                date={formData.dueDate}
+                onDateChange={(date) => handleInputChange('dueDate', date || new Date())}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
           </div>

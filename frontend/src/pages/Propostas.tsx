@@ -60,6 +60,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { contractService } from '@/services/contractService';
 import { saveAs } from 'file-saver';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 
 /** Converte PropostaComercial em itens para o backend (com notes para agrupamento no PDF) */
 function propostaComercialToItems(p: PropostaComercial): { description: string; quantity: number; unitPrice: number; notes: string }[] {
@@ -1336,12 +1338,10 @@ const Propostas = () => {
                     </div>
                     <div>
                       <Label htmlFor="validUntil" className="text-seguranca-lightgray">Válida Até</Label>
-                      <Input
-                        id="validUntil"
-                        type="date"
-                        value={formData.validUntil || ''}
-                        onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                        className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                      <DatePicker
+                        date={formData.validUntil ? parseISO(formData.validUntil) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, validUntil: date ? format(date, 'yyyy-MM-dd') : undefined })}
+                        className="w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                       />
                     </div>
                     <div>
@@ -1508,12 +1508,10 @@ const Propostas = () => {
                     </div>
                     <div>
                       <Label htmlFor="edit-validUntil" className="text-seguranca-lightgray">Válida Até</Label>
-                      <Input
-                        id="edit-validUntil"
-                        type="date"
-                        value={formData.validUntil || ''}
-                        onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
-                        className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                      <DatePicker
+                        date={formData.validUntil ? parseISO(formData.validUntil) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, validUntil: date ? format(date, 'yyyy-MM-dd') : undefined })}
+                        className="w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                       />
                     </div>
                     <div>

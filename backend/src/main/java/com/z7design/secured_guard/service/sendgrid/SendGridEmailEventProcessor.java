@@ -26,6 +26,7 @@ public class SendGridEmailEventProcessor {
     private final ObjectMapper objectMapper;
     private final EmailLogRepository emailLogRepository;
     private final EmailWebhookEventRepository emailWebhookEventRepository;
+    private final RecipientLeadAutoCreationService recipientLeadAutoCreationService;
 
     @Transactional
     public void processPayload(String rawJson) {
@@ -84,6 +85,7 @@ public class SendGridEmailEventProcessor {
                 if (emailLog.getReadAt() == null) {
                     emailLog.setReadAt(ts);
                 }
+                tryAutoCreateLead(emailLog);
             }
             case "click" -> {
                 promoteStatus(emailLog, EmailLogStatus.CLICKED, ts, false);
@@ -93,6 +95,7 @@ public class SendGridEmailEventProcessor {
                 if (emailLog.getReadAt() == null) {
                     emailLog.setReadAt(ts);
                 }
+                tryAutoCreateLead(emailLog);
             }
             case "bounce", "blocked" -> {
                 emailLog.setStatus(EmailLogStatus.BOUNCED);
@@ -114,6 +117,19 @@ public class SendGridEmailEventProcessor {
                 .processedAt(Instant.now())
                 .payloadSnippet(truncate(event.toString()))
                 .build());
+    }
+
+    /** Aciona o serviço de auto-criação de Lead se o destinatário ainda não tiver vínculo. */
+    private void tryAutoCreateLead(EmailLog emailLog) {
+        try {
+            if (emailLog.getRecipient() != null && emailLog.getRecipient().getLead() == null) {
+                recipientLeadAutoCreationService.ensureLeadFor(emailLog.getRecipient());
+            }
+        } catch (Exception e) {
+            log.warn("Falha ao auto-criar Lead a partir do recipient {}: {}",
+                    emailLog.getRecipient() != null ? emailLog.getRecipient().getId() : null,
+                    e.getMessage());
+        }
     }
 
     private static String buildBounceReason(JsonNode event) {

@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag } from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { ptBR } from 'date-fns/locale';
-import { formatDateForBackend, parseDateFromBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
+import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Ruler } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 import { contasAReceberService, Client } from '@/services/contasAReceberService';
+import { measurementService } from '@/services/measurementService';
+import type { MeasurementBulletin } from '@/types/measurement';
 
 export interface ContaAReceber {
   id?: string;
@@ -33,6 +33,9 @@ export interface ContaAReceber {
   categoria?: string | undefined;
   centroCusto?: string | undefined;
   paymentMethod?: string; // PaymentMethod enum: PIX, BOLETO, TRANSFER, CASH, CARD
+  measurementId?: string; // FK para o Boletim de Medição (opcional)
+  measurementNumber?: string; // Texto livre da medição (ex.: número, contrato)
+  measurementInfo?: string; // Texto amigável devolvido pelo backend
   createdAt?: Date;
 }
 
@@ -55,6 +58,8 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useState<Client[]>([]);
   const [empresas, setEmpresas] = useState<any[]>([]);
+  const [medicoes, setMedicoes] = useState<MeasurementBulletin[]>([]);
+  const [medicoesLoading, setMedicoesLoading] = useState(false);
   
   const [formData, setFormData] = useState<ContaAReceber>({
     numeroFatura: '',
@@ -73,7 +78,9 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     observacoes: '',
     categoria: 'INVOICE', // Valor padrão - enum ReceivableCategory
     centroCusto: undefined,
-    paymentMethod: 'PIX' // Valor padrão - enum PaymentMethod
+    paymentMethod: 'PIX', // Valor padrão - enum PaymentMethod
+    measurementId: undefined,
+    measurementNumber: ''
   });
 
   const [categories, setCategories] = useState<string[]>([]);
@@ -114,6 +121,18 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
             { id: '2', name: 'Empresa Exemplo 2' }
           ]);
         });
+
+      // Carregar boletins de medição (para vincular a Conta a Receber)
+      setMedicoesLoading(true);
+      measurementService.getBulletins()
+        .then(data => {
+          setMedicoes(Array.isArray(data) ? data : []);
+        })
+        .catch(error => {
+          console.error('Erro ao carregar boletins de medição:', error);
+          setMedicoes([]);
+        })
+        .finally(() => setMedicoesLoading(false));
 
       // Não precisamos mais carregar categorias via API, usando valores fixos do enum
       // setCategories(['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER']);
@@ -190,7 +209,9 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           observacoes: initialData.observacoes || '',
           categoria: categoriaMapeada,
           centroCusto: initialData.centroCusto ? String(initialData.centroCusto).trim() : undefined,
-          paymentMethod: initialData.paymentMethod || 'PIX'
+          paymentMethod: initialData.paymentMethod || 'PIX',
+          measurementId: initialData.measurementId || undefined,
+          measurementNumber: initialData.measurementNumber || ''
         });
         
         console.log('✅ FormData preenchido:', {
@@ -234,7 +255,9 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           observacoes: '',
           categoria: undefined,
           centroCusto: undefined,
-          paymentMethod: 'PIX'
+          paymentMethod: 'PIX',
+          measurementId: undefined,
+          measurementNumber: ''
         });
       }
     }
@@ -374,6 +397,55 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     }));
   };
 
+  // Texto exibido para um boletim no Select (contrato + período + NF)
+  const formatMedicaoLabel = (m: MeasurementBulletin): string => {
+    const partes: string[] = [];
+    if (m.contractNumber) partes.push(m.contractNumber);
+    else if (m.nfNumber) partes.push(`NF ${m.nfNumber}`);
+    else partes.push(`Medição ${String(m.id).substring(0, 8)}`);
+
+    if (m.periodStart && m.periodEnd) {
+      const fmt = (d: string) => {
+        try {
+          return new Date(d).toLocaleDateString('pt-BR');
+        } catch {
+          return d;
+        }
+      };
+      partes.push(`${fmt(m.periodStart)} a ${fmt(m.periodEnd)}`);
+    }
+    if (m.clientName) partes.push(m.clientName);
+    return partes.join(' — ');
+  };
+
+  // Quando muda a medição, derivamos automaticamente o measurementNumber (texto) caso esteja vazio.
+  const handleMedicaoChange = (medicaoId: string) => {
+    if (medicaoId === 'NENHUMA') {
+      setFormData(prev => ({ ...prev, measurementId: undefined, measurementNumber: '' }));
+      return;
+    }
+    const m = medicoes.find(x => String(x.id) === medicaoId);
+    if (!m) {
+      setFormData(prev => ({ ...prev, measurementId: medicaoId }));
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      measurementId: medicaoId,
+      // Preenche o texto sugerido — usuário pode sobrescrever
+      measurementNumber: m.nfNumber || m.contractNumber || prev.measurementNumber || ''
+    }));
+  };
+
+  // Filtra medições do cliente selecionado (se houver) — não esconde as demais, apenas lista as "do cliente" primeiro
+  const medicoesOrdenadas = useMemo(() => {
+    if (!formData.clienteId) return medicoes;
+    const clienteIdStr = String(formData.clienteId);
+    const doCliente = medicoes.filter(m => String(m.clientId ?? m.client?.id ?? '') === clienteIdStr);
+    const outras = medicoes.filter(m => String(m.clientId ?? m.client?.id ?? '') !== clienteIdStr);
+    return [...doCliente, ...outras];
+  }, [medicoes, formData.clienteId]);
+
   const handleCreateCategory = () => {
     const categoryName = newCategoryName.trim();
     if (categoryName) {
@@ -499,13 +571,10 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   Data de Emissão *
                 </label>
                 <DatePicker
-                  selected={formData.dataEmissao}
-                  onChange={(date: Date | null) => handleInputChange('dataEmissao', date)}
-                  dateFormat="dd/MM/yyyy"
-                  locale={ptBR}
-                  placeholderText="dd/mm/aaaa"
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white [&_input]:placeholder-gray-500"
-                  required
+                  date={formData.dataEmissao}
+                  onDateChange={(date) => handleInputChange('dataEmissao', date)}
+                  placeholder="dd/mm/aaaa"
+                  className="w-full"
                 />
               </div>
 
@@ -516,14 +585,91 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   Data de Vencimento *
                 </label>
                 <DatePicker
-                  selected={formData.vencimento}
-                  onChange={(date: Date | null) => handleInputChange('vencimento', date)}
-                  dateFormat="dd/MM/yyyy"
-                  locale={ptBR}
-                  placeholderText="dd/mm/aaaa"
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white [&_input]:placeholder-gray-500"
-                  required
+                  date={formData.vencimento}
+                  onDateChange={(date) => handleInputChange('vencimento', date)}
+                  placeholder="dd/mm/aaaa"
+                  className="w-full"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Medição vinculada (opcional) */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <Ruler size={18} />
+              Medição Vinculada
+              <span className="text-xs font-normal text-seguranca-lightgray ml-2">(opcional)</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Boletim de Medição */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Ruler size={14} />
+                  Boletim de Medição
+                </label>
+                <Select
+                  value={formData.measurementId ? String(formData.measurementId) : 'NENHUMA'}
+                  onValueChange={handleMedicaoChange}
+                  disabled={medicoesLoading}
+                >
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue
+                      placeholder={
+                        medicoesLoading
+                          ? 'Carregando medições...'
+                          : 'Selecione um boletim de medição'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600 max-h-72">
+                    <SelectItem
+                      value="NENHUMA"
+                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                    >
+                      Nenhum (sem vínculo)
+                    </SelectItem>
+                    {medicoesOrdenadas.length === 0 && !medicoesLoading && (
+                      <SelectItem
+                        value="__empty__"
+                        disabled
+                        className="text-gray-500"
+                      >
+                        Nenhuma medição cadastrada
+                      </SelectItem>
+                    )}
+                    {medicoesOrdenadas.map(m => (
+                      <SelectItem
+                        key={String(m.id)}
+                        value={String(m.id)}
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {formatMedicaoLabel(m)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-seguranca-lightgray">
+                  Selecione o boletim de medição que originou esta conta. Aparece na coluna
+                  "Medição" da listagem.
+                </p>
+              </div>
+
+              {/* Número/identificação da medição (texto livre — preenchido automaticamente quando há vínculo) */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <FileText size={14} />
+                  Número da Medição
+                </label>
+                <Input
+                  value={formData.measurementNumber || ''}
+                  onChange={(e) => handleInputChange('measurementNumber', e.target.value)}
+                  placeholder="Ex.: NF-27917 ou CTC-CBM 148/295/2025"
+                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                />
+                <p className="text-xs text-seguranca-lightgray">
+                  Texto livre para casos em que não há um boletim cadastrado.
+                </p>
               </div>
             </div>
           </div>

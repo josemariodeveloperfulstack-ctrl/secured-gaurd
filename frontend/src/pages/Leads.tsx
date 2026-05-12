@@ -54,6 +54,8 @@ import {
   Tag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const Leads = () => {
   const { user } = useAuth();
@@ -1028,12 +1030,10 @@ const Leads = () => {
                         <Calendar className="h-4 w-4" />
                         Próximo Follow-up
                       </Label>
-                      <Input
-                        id="edit-nextFollowUp"
-                        type="date"
-                        value={formData.nextFollowUp || ''}
-                        onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
-                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      <DatePicker
+                        date={formData.nextFollowUp ? parseISO(formData.nextFollowUp) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, nextFollowUp: date ? format(date, 'yyyy-MM-dd') : undefined })}
+                        className="w-full bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-11"
                       />
                     </div>
                   </div>
@@ -1285,12 +1285,10 @@ const Leads = () => {
                         <Calendar className="h-4 w-4" />
                         Próximo Follow-up
                       </Label>
-                      <Input
-                        id="nextFollowUp"
-                        type="date"
-                        value={formData.nextFollowUp || ''}
-                        onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
-                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      <DatePicker
+                        date={formData.nextFollowUp ? parseISO(formData.nextFollowUp) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, nextFollowUp: date ? format(date, 'yyyy-MM-dd') : undefined })}
+                        className="w-full bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-11"
                       />
                     </div>
                   </div>

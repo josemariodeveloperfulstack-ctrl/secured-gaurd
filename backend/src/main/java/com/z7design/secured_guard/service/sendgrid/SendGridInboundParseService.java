@@ -41,6 +41,7 @@ public class SendGridInboundParseService {
     private final EmailLogRepository emailLogRepository;
     private final EmailAttachmentRepository emailAttachmentRepository;
     private final AttachmentVirusScanner attachmentVirusScanner;
+    private final RecipientLeadAutoCreationService recipientLeadAutoCreationService;
 
     @Value("${app.upload.base-dir:uploads}")
     private String uploadBaseDir;
@@ -63,6 +64,9 @@ public class SendGridInboundParseService {
         emailLog.setStatus(EmailLogStatus.REPLIED);
         if (emailLog.getRepliedAt() == null) {
             emailLog.setRepliedAt(Instant.now());
+        }
+        if (emailLog.getRecipient() != null && emailLog.getRecipient().getLead() == null) {
+            recipientLeadAutoCreationService.ensureLeadFor(emailLog.getRecipient());
         }
         emailLogRepository.save(emailLog);
 
