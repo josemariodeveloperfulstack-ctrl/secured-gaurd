@@ -177,6 +177,10 @@ public class StockRequisitionController {
 
     private UUID resolveUserId(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() != null) {
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof com.z7design.secured_guard.model.User) {
+                return ((com.z7design.secured_guard.model.User) principal).getId();
+            }
             try {
                 String username = authentication.getName();
                 return userRepository.findByUsername(username)

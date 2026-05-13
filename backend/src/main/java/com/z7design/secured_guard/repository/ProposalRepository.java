@@ -72,12 +72,11 @@ public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
     @Query("SELECT p FROM Proposal p WHERE p.createdAt BETWEEN :startDate AND :endDate")
     List<Proposal> findByCreatedAtBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     
-    // Contar propostas por status
-    @Query("SELECT p.status, COUNT(p) FROM Proposal p GROUP BY p.status")
-    List<Object[]> countByStatus();
-    
-    // Contar propostas por status específico
-    long countByStatus(ProposalStatus status);
+    @Query("SELECT p.status, COUNT(p) FROM Proposal p WHERE p.isDeleted = false GROUP BY p.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("SELECT COUNT(p) FROM Proposal p WHERE p.status = :status AND p.isDeleted = false")
+    long countByStatus(@Param("status") ProposalStatus status);
     
     // Buscar propostas com valor total acima de um valor
     @Query("SELECT p FROM Proposal p WHERE p.totalValue >= :minValue")

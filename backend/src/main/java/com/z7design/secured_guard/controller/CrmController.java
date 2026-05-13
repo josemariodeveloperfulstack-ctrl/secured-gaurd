@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -90,7 +91,10 @@ public class CrmController {
             return ResponseEntity.ok(metrics);
         } catch (Exception e) {
             log.error("❌ Erro ao calcular métricas do CRM", e);
-            return ResponseEntity.internalServerError().build();
+            Map<String, Object> body = new HashMap<>();
+            body.put("error", true);
+            body.put("message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
         }
     }
 
@@ -114,7 +118,10 @@ public class CrmController {
             return ResponseEntity.ok(Map.of("summary", summary));
         } catch (Exception e) {
             log.error("❌ Erro ao calcular resumo do Kanban", e);
-            return ResponseEntity.internalServerError().build();
+            Map<String, Object> body = new HashMap<>();
+            body.put("error", true);
+            body.put("message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
         }
     }
 }

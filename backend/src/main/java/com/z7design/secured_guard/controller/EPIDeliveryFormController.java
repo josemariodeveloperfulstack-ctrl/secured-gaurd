@@ -2,6 +2,7 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EPIDeliveryFormDTO;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.EPIDeliveryFormService;
 import com.z7design.secured_guard.service.EPIDeliveryStandardPdfService;
 import org.springframework.http.HttpHeaders;
@@ -108,17 +109,20 @@ public class EPIDeliveryFormController {
     }
 
     private UUID resolveUserId(Authentication authentication) {
-        if (authentication != null && authentication.getPrincipal() != null) {
-            try {
-                String username = authentication.getName();
-                return userRepository.findByUsername(username)
-                        .orElseThrow(() -> new RuntimeException("Usuário não encontrado: " + username))
-                        .getId();
-            } catch (Exception e) {
-                log.warn("Erro ao obter usuário: {}", e.getMessage());
-            }
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
         }
-        return null;
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof User) {
+            return ((User) principal).getId();
+        }
+        try {
+            String username = authentication.getName();
+            return userRepository.findByUsername(username).map(User::getId).orElse(null);
+        } catch (Exception e) {
+            log.warn("Erro ao obter usuário: {}", e.getMessage());
+            return null;
+        }
     }
 
     @Operation(summary = "Busca uma ficha de entrega de EPI por ID")
@@ -179,8 +183,9 @@ public class EPIDeliveryFormController {
 
     @Operation(summary = "Deleta uma ficha de entrega de EPI")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
-        epiDeliveryFormService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable UUID id, Authentication authentication) {
+        UUID actingUserId = resolveUserId(authentication);
+        epiDeliveryFormService.delete(id, actingUserId);
         return ResponseEntity.noContent().build();
     }
 

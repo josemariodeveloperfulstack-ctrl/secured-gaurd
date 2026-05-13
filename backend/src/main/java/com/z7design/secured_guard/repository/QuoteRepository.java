@@ -61,12 +61,11 @@ public interface QuoteRepository extends JpaRepository<Quote, UUID> {
     @Query("SELECT q FROM Quote q WHERE q.createdAt BETWEEN :startDate AND :endDate")
     List<Quote> findByCreatedAtBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     
-    // Contar quotes por status
-    @Query("SELECT q.status, COUNT(q) FROM Quote q GROUP BY q.status")
-    List<Object[]> countByStatus();
-    
-    // Contar quotes por status específico
-    long countByStatus(QuoteStatus status);
+    @Query("SELECT q.status, COUNT(q) FROM Quote q WHERE q.isDeleted = false GROUP BY q.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("SELECT COUNT(q) FROM Quote q WHERE q.status = :status AND q.isDeleted = false")
+    long countByStatus(@Param("status") QuoteStatus status);
     
     // Buscar quotes com valor total acima de um valor
     @Query("SELECT q FROM Quote q WHERE q.totalValue >= :minValue")

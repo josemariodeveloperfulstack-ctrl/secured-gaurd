@@ -319,7 +319,28 @@ public class EPIDeliveryFormService {
         
         // Estornar movimentações vinculadas
         List<StockMovement> movements = stockMovementRepository.findByRequisitionNumberOrderByMovementDateAsc(req.getRequisitionNumber());
+
+        UUID effectiveUserId = null;
+        if (!movements.isEmpty()) {
+            effectiveUserId = userId;
+            if (effectiveUserId == null && form.getCreatedBy() != null) {
+                effectiveUserId = form.getCreatedBy().getId();
+            }
+            if (effectiveUserId == null && movements.get(0).getUser() != null) {
+                effectiveUserId = movements.get(0).getUser().getId();
+            }
+            if (effectiveUserId == null) {
+                throw new IllegalArgumentException(
+                        "Não foi possível identificar o usuário para registrar o estorno de estoque ao excluir a ficha EPI. "
+                                + "Faça login novamente ou associe um criador à ficha.");
+            }
+        }
+
         for (StockMovement m : movements) {
+            if (m.getStockItem() == null || m.getStockItem().getId() == null) {
+                log.warn("Movimento {} sem item de estoque; estorno ignorado.", m.getId());
+                continue;
+            }
             // Criar entrada compensatória para devolver ao estoque
             com.z7design.secured_guard.dto.StockMovementDTO storno = new com.z7design.secured_guard.dto.StockMovementDTO();
             storno.setStockItemId(m.getStockItem().getId());
@@ -327,7 +348,7 @@ public class EPIDeliveryFormService {
             storno.setReason(MovementReason.AJUSTE_ENTRADA);
             storno.setQuantity(m.getQuantity());
             storno.setNotes("Estorno automático por alteração na Ficha de EPI: " + form.getId());
-            stockService.createMovement(storno, userId);
+            stockService.createMovement(storno, effectiveUserId);
             
             // Marcar movimento original como cancelado (se houver campo) ou apenas deletar se permitido
             // Aqui vamos apenas deletar para limpar o histórico, ou marcar como deletado se tiver soft delete
@@ -542,12 +563,12 @@ public class EPIDeliveryFormService {
     }
 
     @Transactional
-    public void delete(UUID id) {
+    public void delete(UUID id, UUID actingUserId) {
         EPIDeliveryForm form = epiDeliveryFormRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ficha de entrega de EPI não encontrada com id: " + id));
         
-        // Devolver itens ao estoque via cancelamento de requisição
-        cancelStockRequisition(form, null);
+        // Devolver itens ao estoque via cancelamento de requisição (exige usuário para movimentação)
+        cancelStockRequisition(form, actingUserId);
         
         epiDeliveryFormRepository.deleteById(id);
         log.info("🗑️ Ficha de entrega de EPI deletada: {}", id);

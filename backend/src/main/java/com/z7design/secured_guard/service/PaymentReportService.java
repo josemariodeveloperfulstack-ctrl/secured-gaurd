@@ -701,16 +701,21 @@ public class PaymentReportService {
     public void deleteMultipleAccountsReceivable(List<String> ids) {
         log.info("Excluindo {} contas a receber", ids.size());
 
-        for (String id : ids) {
-            try {
-                accountsReceivableRepository.deleteById(java.util.UUID.fromString(id));
-                log.info("Conta a receber excluída: {}", id);
-            } catch (Exception e) {
-                log.error("Erro ao excluir conta a receber {}: {}", id, e.getMessage());
-            }
+        List<UUID> uuids = ids.stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(UUID::fromString)
+                .distinct()
+                .toList();
+
+        if (uuids.isEmpty()) {
+            log.warn("Nenhum UUID válido após normalizar a lista de exclusão");
+            return;
         }
 
-        log.info("Exclusão múltipla de contas a receber concluída");
+        int removed = accountsReceivableRepository.deleteByIds(uuids);
+        log.info("Exclusão em massa concluída: {} registro(s) removido(s) para {} id(s) solicitado(s)",
+                removed, uuids.size());
     }
 
     /**

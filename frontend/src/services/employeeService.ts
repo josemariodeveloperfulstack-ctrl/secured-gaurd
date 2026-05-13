@@ -42,7 +42,7 @@ export interface Employee {
   ageTurning?: number;
   position?: { id?: string; name?: string };
   unit?: { id?: string; name?: string };
-  company?: { id?: string; sigla?: string };
+  company?: { id?: string; name?: string; sigla?: string };
   department?: { id?: string; name?: string };
 }
 

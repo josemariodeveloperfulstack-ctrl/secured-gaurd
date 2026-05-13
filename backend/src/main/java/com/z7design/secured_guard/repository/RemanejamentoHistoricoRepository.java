@@ -5,6 +5,7 @@ import com.z7design.secured_guard.model.AcaoHistorico;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,6 +19,14 @@ public interface RemanejamentoHistoricoRepository extends JpaRepository<Remaneja
     
     // Buscar histórico por remanejamento
     List<RemanejamentoHistorico> findByRemanejamentoIdOrderByDataExecucaoDesc(UUID remanejamentoId);
+
+    /**
+     * Libera a FK {@code remanejamento_id} em todos os registos de auditoria antes de apagar o remanejamento.
+     * Evita violações de integridade e dispensa N saves em loop.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE RemanejamentoHistorico h SET h.remanejamento = null WHERE h.remanejamento.id = :remanejamentoId")
+    int clearRemanejamentoReference(@Param("remanejamentoId") UUID remanejamentoId);
     
     // Buscar histórico por funcionário
     List<RemanejamentoHistorico> findByEmployeeIdOrderByDataExecucaoDesc(UUID employeeId);

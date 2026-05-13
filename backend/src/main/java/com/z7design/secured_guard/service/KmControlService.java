@@ -20,6 +20,7 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -287,6 +288,42 @@ public class KmControlService {
         
         kmControlRepository.deleteById(uuid);
         log.info("Registro de controle de KM deletado com ID: {}", id);
+    }
+
+    /**
+     * Exclui vários registros de controle de KM numa única transação (evita falhas com muitas requisições paralelas).
+     */
+    @Transactional
+    public int deleteKmControlsBulk(List<String> idStrings) {
+        if (idStrings == null || idStrings.isEmpty()) {
+            return 0;
+        }
+        Set<UUID> uniqueIds = new LinkedHashSet<>();
+        for (String raw : idStrings) {
+            if (raw == null) {
+                continue;
+            }
+            String s = raw.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            try {
+                uniqueIds.add(UUID.fromString(s));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("ID inválido: " + raw);
+            }
+        }
+        if (uniqueIds.isEmpty()) {
+            return 0;
+        }
+        List<KmControl> existing = kmControlRepository.findAllById(uniqueIds);
+        if (existing.isEmpty()) {
+            log.warn("Bulk delete KM: nenhum dos {} IDs existe na base", uniqueIds.size());
+            return 0;
+        }
+        kmControlRepository.deleteAllInBatch(existing);
+        log.info("Bulk delete KM: {} registro(s) removido(s) (solicitados {} UUID distintos)", existing.size(), uniqueIds.size());
+        return existing.size();
     }
     
     /**

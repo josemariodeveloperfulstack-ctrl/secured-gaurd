@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import net.sf.jasperreports.engine.JRException;
@@ -147,6 +148,39 @@ public class KmControlController {
         } catch (Exception e) {
             log.error("❌ Erro ao criar dados de teste", e);
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Excluir vários registros de controle de KM (corpo: lista de UUID em string).
+     */
+    @PostMapping("/bulk-delete")
+    public ResponseEntity<Map<String, Object>> bulkDeleteKmControls(@RequestBody List<String> ids) {
+        List<String> cleaned = ids == null ? List.of() : ids.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        int requested = cleaned.size();
+        try {
+            int deleted = kmControlService.deleteKmControlsBulk(cleaned);
+            return ResponseEntity.ok(Map.of(
+                    "deletedCount", deleted,
+                    "requestedCount", requested));
+        } catch (IllegalArgumentException e) {
+            log.warn("Bulk delete KM inválido: {}", e.getMessage());
+            Map<String, Object> body = new HashMap<>();
+            body.put("error", e.getMessage());
+            body.put("deletedCount", 0);
+            body.put("requestedCount", requested);
+            return ResponseEntity.badRequest().body(body);
+        } catch (Exception e) {
+            log.error("Erro ao excluir registros de KM em lote", e);
+            Map<String, Object> body = new HashMap<>();
+            body.put("error", e.getMessage() != null ? e.getMessage() : "Erro interno");
+            body.put("deletedCount", 0);
+            body.put("requestedCount", requested);
+            return ResponseEntity.internalServerError().body(body);
         }
     }
     

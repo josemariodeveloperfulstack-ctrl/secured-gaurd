@@ -242,12 +242,12 @@ public class AccountsReceivableService {
     public void deleteAccountsReceivable(UUID id) {
         log.info("Excluindo conta a receber: {}", id);
 
-        if (!accountsReceivableRepository.existsById(id)) {
+        if (accountsReceivableRepository.countByReceivableId(id) == 0) {
             log.warn("Conta a receber {} já não existe no banco — tratando DELETE como idempotente (no-op).", id);
             return;
         }
 
-        accountsReceivableRepository.deleteById(id);
+        accountsReceivableRepository.deleteByIds(List.of(id));
         log.info("Conta a receber excluída com sucesso: {}", id);
     }
     

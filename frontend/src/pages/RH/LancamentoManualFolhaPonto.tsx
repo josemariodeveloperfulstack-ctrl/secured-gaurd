@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar, Clock, User, Building2, Briefcase, FileText, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { employeeService, SimpleEmployee } from '@/services/employeeService';
+import { employeeService, SimpleEmployee, type Employee } from '@/services/employeeService';
 import { timeSheetService } from '@/services/timeSheetService';
 import { companyService } from '@/services/companyService';
 import timeRecordService from '@/services/timeRecordService';
@@ -94,6 +94,22 @@ export interface DayRow {
   saida: string;
 }
 
+/** Rótulo da empresa para selects (alinha ao exemplo com sigla). */
+function formatCompanyLabel(c: { name: string; sigla?: string | null }): string {
+  const s = c.sigla?.trim();
+  if (s) return `(${s}) ${c.name}`.trim();
+  return c.name || '—';
+}
+
+/** Setor de trabalho: prioriza posto (operacional), depois departamento, depois unidade. */
+function resolveEmployeeSetor(emp: Employee): string {
+  const anyEmp = emp as Record<string, unknown>;
+  const workPostName = emp.workPost?.name ?? (anyEmp.workPostName as string | undefined);
+  const deptName = emp.department?.name ?? (anyEmp.departmentName as string | undefined);
+  const unitName = emp.unit?.name ?? (anyEmp.unitName as string | undefined);
+  return workPostName || deptName || unitName || '—';
+}
+
 function buildDaysInPeriod(start: Date, end: Date): DayRow[] {
   const list: DayRow[] = [];
   const curr = new Date(start);
@@ -131,7 +147,8 @@ const LancamentoManualFolhaPonto: React.FC = () => {
     const d = new Date();
     return d.toISOString().slice(0, 10);
   });
-  const [companyName, setCompanyName] = useState<string>('');
+  /** Empresa do cabeçalho do lançamento manual (lista cadastrada). */
+  const [formCompanyId, setFormCompanyId] = useState<string>('');
   const [cargaHorariaNormal, setCargaHorariaNormal] = useState<number>(8);
   const [rows, setRows] = useState<DayRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,7 +156,7 @@ const LancamentoManualFolhaPonto: React.FC = () => {
   const [pdfMonth, setPdfMonth] = useState(new Date().getMonth() + 1);
   const [pdfCompanyId, setPdfCompanyId] = useState<string>('');
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string; sigla?: string }[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowsRef = useRef<DayRow[]>([]);
@@ -159,9 +176,18 @@ const LancamentoManualFolhaPonto: React.FC = () => {
           companyService.getAllCompanies(),
         ]);
         setEmployees(list || []);
-        const comps = Array.isArray(companiesList) ? companiesList : [];
+        const comps: { id: string; name: string; sigla?: string }[] = (Array.isArray(companiesList) ? companiesList : []).map(
+          (c: { id?: string; name?: string; sigla?: string }) => ({
+            id: String(c.id ?? ''),
+            name: String(c.name ?? ''),
+            sigla: c.sigla,
+          }),
+        ).filter((c) => c.id);
         setCompanies(comps);
-        if (comps.length > 0) setPdfCompanyId((prev) => (prev ? prev : comps[0].id));
+        if (comps.length > 0) {
+          setPdfCompanyId((prev) => (prev ? prev : comps[0].id));
+          setFormCompanyId((prev) => (prev ? prev : comps[0].id));
+        }
       } catch (e) {
         console.error(e);
         toast({ title: 'Erro', description: 'Não foi possível carregar os colaboradores.', variant: 'destructive' });
@@ -177,14 +203,20 @@ const LancamentoManualFolhaPonto: React.FC = () => {
     setLoading(true);
     employeeService
       .getEmployeeById(selectedEmployeeId)
-      .then((emp: any) => {
+      .then((emp: Employee | null) => {
         if (emp) {
-          const positionName = emp.position?.name ?? emp.positionName ?? '';
+          const anyEmp = emp as Record<string, unknown>;
+          const positionName = emp.position?.name ?? (anyEmp.positionName as string | undefined) ?? '';
           setEmployeeDetail({
             name: emp.name ?? '—',
             funcao: positionName || '—',
-            setor: emp.department?.name ?? emp.departmentName ?? '—',
+            setor: resolveEmployeeSetor(emp),
           });
+
+          const cid = emp.company?.id ? String(emp.company.id) : '';
+          if (cid && companies.some((c) => c.id === cid)) {
+            setFormCompanyId(cid);
+          }
 
           // Para funções típicas de vigilância/portaria (ex.: 12x36), sugerir 12h/dia,
           // sem sobrescrever se o usuário já alterou manualmente.
@@ -198,7 +230,7 @@ const LancamentoManualFolhaPonto: React.FC = () => {
       })
       .catch(() => setEmployeeDetail(null))
       .finally(() => setLoading(false));
-  }, [selectedEmployeeId]);
+  }, [selectedEmployeeId, companies]);
 
   useEffect(() => {
     if (!startDate || !endDate || startDate > endDate) {
@@ -387,7 +419,7 @@ const LancamentoManualFolhaPonto: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {companies.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{formatCompanyLabel(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -442,11 +474,27 @@ const LancamentoManualFolhaPonto: React.FC = () => {
               <Building2 className="h-4 w-4" />
               Empresa
             </Label>
-            <Input
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Ex: (00555) PROMOVER VIGILANCIA PATRIMONIAL LTDA"
-            />
+            {companies.length > 0 ? (
+              <Select value={formCompanyId || companies[0]?.id} onValueChange={setFormCompanyId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecione a empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {formatCompanyLabel(c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                className="mt-1"
+                readOnly
+                value=""
+                placeholder="Carregando empresas… (ou sem permissão para listar)"
+              />
+            )}
           </div>
           <div className="flex gap-4 items-end">
             <div className="flex-1">

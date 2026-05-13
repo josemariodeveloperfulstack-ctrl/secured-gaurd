@@ -15,16 +15,41 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
 
+const EMPTY_CRM_METRICS = {
+  totalLeads: 0,
+  activeOpportunities: 0,
+  totalOpportunities: 0,
+  totalProposals: 0,
+  totalQuotes: 0,
+  conversionRate: 0,
+  estimatedRevenue: 0,
+  totalValue: 0,
+  monthlyCount: {} as Record<string, number>,
+  statusHistory: {} as Record<string, Record<string, number>>,
+};
+
 export default function CrmDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await fetchCrmMetrics();
-      setMetrics(data);
-      setLoading(false);
+      setLoadError(null);
+      try {
+        const data = await fetchCrmMetrics();
+        setMetrics(data);
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } };
+        const msg =
+          err?.response?.data?.message ||
+          (e instanceof Error ? e.message : 'Não foi possível carregar as métricas.');
+        setLoadError(msg);
+        setMetrics({ ...EMPTY_CRM_METRICS });
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
@@ -71,6 +96,20 @@ export default function CrmDashboard() {
   return (
     <div style={{ padding: 12, maxWidth: 1200, margin: '0 auto' }}>
       <h2 style={{ marginBottom: 24, fontSize: 22 }}>Dashboard CRM</h2>
+      {loadError && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 8,
+            background: '#fef2f2',
+            color: '#991b1b',
+            border: '1px solid #fecaca',
+          }}
+        >
+          {loadError}
+        </div>
+      )}
       {/* Cards de Métricas */}
       <div
         style={{

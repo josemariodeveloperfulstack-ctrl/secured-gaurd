@@ -5,11 +5,13 @@ import com.z7design.secured_guard.model.enums.ReceivableStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -77,4 +79,19 @@ public interface AccountsReceivableRepository extends JpaRepository<AccountsRece
     // Somar valores pendentes
     @Query("SELECT SUM(ar.amount - ar.amountPaid) FROM AccountsReceivable ar WHERE ar.status IN ('PENDING', 'OVERDUE')")
     Double sumPendingAmount();
+
+    /**
+     * Contagem por PK (não usa {@code find}/{@code existsById}), evitando falha do Hibernate quando
+     * o SELECT por id devolver mais de uma linha na persistência.
+     */
+    @Query("SELECT COUNT(ar) FROM AccountsReceivable ar WHERE ar.id = :id")
+    long countByReceivableId(@Param("id") UUID id);
+
+    /**
+     * Exclusão sem carregar a entidade — contorna {@code Duplicate row was found and ASSERT was specified}
+     * em {@code deleteById} quando o load por id não é inequivocamente uma linha.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM AccountsReceivable ar WHERE ar.id IN :ids")
+    int deleteByIds(@Param("ids") Collection<UUID> ids);
 }
