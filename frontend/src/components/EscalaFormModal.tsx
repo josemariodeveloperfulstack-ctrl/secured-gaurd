@@ -26,7 +26,6 @@ import {
   CalendarIcon,
   Clock,
   User,
-  MapPin,
   Building,
   AlertCircle,
   CheckCircle2,
@@ -36,7 +35,6 @@ import {
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
-import { ClientSearchCombobox } from '@/components/ui/client-search-combobox';
 import type { ScheduleStatus } from '@/services/scheduleService';
 import { employeeService } from '@/services/employeeService';
 import { clientService } from '@/services/clientService';
@@ -192,20 +190,19 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     };
   }, [open, mode, formData.workPostId, formData.locationId, selectedClientId]);
 
-  // Atualizar lista de postos filtrados: somente postos do cliente escolhido (ids normalizados como string)
+  // Atualizar lista de postos filtrados:
+  // - Com cliente derivado do funcionário selecionado: filtra somente postos daquele cliente.
+  // - Sem cliente (ex.: nenhum funcionário selecionado ainda): mostra todos os postos.
   useEffect(() => {
     if (selectedClientId) {
       const sid = String(selectedClientId).toLowerCase().trim();
-      const filtered = postosTrabalho.filter(
-        (posto) => {
-          if (!posto.clientId) return false;
-          return String(posto.clientId).toLowerCase().trim() === sid;
-        }
-      );
-      console.log('🔄 Postos do cliente', sid, ':', filtered.length);
+      const filtered = postosTrabalho.filter((posto) => {
+        if (!posto.clientId) return false;
+        return String(posto.clientId).toLowerCase().trim() === sid;
+      });
       setPostosFiltrados(filtered);
     } else {
-      setPostosFiltrados([]);
+      setPostosFiltrados(postosTrabalho);
     }
   }, [postosTrabalho, selectedClientId]);
 
@@ -294,10 +291,6 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
 
     if (!formData.employeeId) {
       newErrors.employeeId = 'Funcionário é obrigatório';
-    }
-
-    if (!selectedClientId) {
-      newErrors.locationId = 'Cliente é obrigatório';
     }
 
     if (!formData.workPostId) {
@@ -1004,44 +997,6 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             )}
           </div>
 
-          {/* Cliente — busca após 3 caracteres; postos dependem do cliente */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-seguranca-yellow" />
-              <Label htmlFor="locationId" className="text-sm font-medium">
-                Cliente <span className="text-red-400">*</span>
-              </Label>
-            </div>
-            <div
-              className={
-                errors.locationId ? 'rounded-md ring-2 ring-red-500 ring-offset-0 ring-offset-transparent' : ''
-              }
-            >
-              <ClientSearchCombobox
-                value={String(selectedClientId || '')}
-                onChange={(clientId) => {
-                  setSelectedClientId(clientId);
-                  setDisplayClientName('');
-                  handleInputChange('locationId', '');
-                  handleInputChange('workPostId', '');
-                  if (errors.locationId) setErrors((prev) => ({ ...prev, locationId: undefined }));
-                  if (errors.workPostId) setErrors((prev) => ({ ...prev, workPostId: undefined }));
-                }}
-                disabled={mode === 'view'}
-                minChars={3}
-                initialDisplayName={displayClientName || undefined}
-                placeholder="Selecione um cliente"
-                searchPlaceholder="Digite pelo menos 3 letras do nome ou CNPJ..."
-              />
-            </div>
-            {errors.locationId && (
-              <div className="flex items-center gap-2 text-red-400 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                {errors.locationId}
-              </div>
-            )}
-          </div>
-
           {/* Posto de Trabalho */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -1066,18 +1021,18 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                   setErrors(prev => ({ ...prev, locationId: undefined }));
                 }
               }}
-              disabled={mode === 'view' || !selectedClientId}
+              disabled={mode === 'view'}
             >
               <SelectTrigger className={`bg-seguranca-black border-2 transition-colors h-11 ${errors.workPostId
                 ? 'border-red-500 focus:border-red-500'
                 : 'border-gray-600 hover:border-gray-500 focus:border-seguranca-yellow'
-                } ${mode === 'view' || !selectedClientId ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <SelectValue placeholder={selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"}>
-                  {formData.workPostId ? (
-                    postosFiltrados.find(p => String(p.id) === String(formData.workPostId))?.name || 
-                    postosTrabalho.find(p => String(p.id) === String(formData.workPostId))?.name || 
-                    'Selecione um posto de trabalho'
-                  ) : selectedClientId ? "Selecione um posto de trabalho" : "Selecione primeiro um cliente"}
+                } ${mode === 'view' ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                <SelectValue placeholder="Selecione um posto de trabalho">
+                  {formData.workPostId
+                    ? postosFiltrados.find(p => String(p.id) === String(formData.workPostId))?.name ||
+                      postosTrabalho.find(p => String(p.id) === String(formData.workPostId))?.name ||
+                      'Selecione um posto de trabalho'
+                    : 'Selecione um posto de trabalho'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-seguranca-graphite border-gray-600">
@@ -1095,11 +1050,9 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                   ))
                 ) : (
                   <SelectItem value="loading" disabled>
-                    {!selectedClientId
-                      ? 'Selecione primeiro um cliente'
-                      : postosTrabalho.length === 0
-                        ? 'Carregando postos de trabalho...'
-                        : 'Nenhum posto disponível para este cliente'}
+                    {postosTrabalho.length === 0
+                      ? 'Carregando postos de trabalho...'
+                      : 'Nenhum posto disponível'}
                   </SelectItem>
                 )}
               </SelectContent>

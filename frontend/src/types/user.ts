@@ -219,10 +219,20 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface SupervisorSessionPayload {
+  id: string;
+  name?: string;
+  email?: string;
+  cpf?: string;
+  phone?: string;
+  isActive?: boolean;
+}
+
 export interface AuthContextType {
   user: User | null;
   profile?: any;
   login: (email: string, password: string) => Promise<void>;
+  loginAsSupervisor: (supervisor: SupervisorSessionPayload, token: string) => User;
   logout: () => void;
   signOut: () => void;
   isLoading: boolean;

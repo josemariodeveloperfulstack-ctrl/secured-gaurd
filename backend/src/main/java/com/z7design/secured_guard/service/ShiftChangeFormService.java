@@ -1,15 +1,23 @@
 package com.z7design.secured_guard.service;
 
 import com.z7design.secured_guard.dto.ShiftChangeFormDTO;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.ShiftChangeForm;
+import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
+import com.z7design.secured_guard.model.enums.ShiftChangeStatus;
 import com.z7design.secured_guard.model.enums.ShiftTime;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.ShiftChangeFormRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.model.Company;
@@ -29,9 +37,13 @@ import java.time.format.DateTimeFormatter;
 @Slf4j
 public class ShiftChangeFormService {
 
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     private final ShiftChangeFormRepository shiftChangeFormRepository;
     private final StandardReportLayoutService layoutService;
     private final CompanyRepository companyRepository;
+    private final EmployeeRepository employeeRepository;
+    private final EmployeeChangeHistoryService employeeChangeHistoryService;
 
     /**
      * Gera relatório PDF de troca de plantão com layout premium
@@ -181,7 +193,21 @@ public class ShiftChangeFormService {
         log.info("Criando nova solicitação de troca de plantão: {}", dto.getRequesterFullName());
         validateShiftChange(dto);
         ShiftChangeForm entity = dto.toEntity();
-        return new ShiftChangeFormDTO(shiftChangeFormRepository.save(entity));
+
+        // Resolver IDs faltantes pelo nome do funcionário (fallback de compatibilidade)
+        if (entity.getRequesterEmployeeId() == null && entity.getRequesterFullName() != null) {
+            entity.setRequesterEmployeeId(resolveEmployeeIdByName(entity.getRequesterFullName()));
+        }
+        if (entity.getReplacingEmployeeId() == null && entity.getReplacingFullName() != null) {
+            entity.setReplacingEmployeeId(resolveEmployeeIdByName(entity.getReplacingFullName()));
+        }
+
+        ShiftChangeForm saved = shiftChangeFormRepository.save(entity);
+
+        // Registra no histórico de AMBOS os funcionários envolvidos
+        recordShiftChangeCreatedHistory(saved);
+
+        return new ShiftChangeFormDTO(saved);
     }
 
     @Transactional(readOnly = true)
@@ -208,6 +234,8 @@ public class ShiftChangeFormService {
 
         validateShiftChange(dto);
 
+        ShiftChangeStatus previousStatus = existingEntity.getStatus();
+
         existingEntity.setDateOfRequest(dto.getDateOfRequest());
         existingEntity.setRequesterFullName(dto.getRequesterFullName());
         existingEntity.setRequesterSector(dto.getRequesterSector());
@@ -219,12 +247,34 @@ public class ShiftChangeFormService {
         existingEntity.setReplacingDayOffDate(dto.getReplacingDayOffDate());
         existingEntity.setShiftTime(dto.getShiftTime());
 
+        // Manter IDs sincronizados: prioriza o que veio no DTO; senão preserva o existente; senão tenta resolver pelo nome.
+        if (dto.getRequesterEmployeeId() != null) {
+            existingEntity.setRequesterEmployeeId(dto.getRequesterEmployeeId());
+        } else if (existingEntity.getRequesterEmployeeId() == null && existingEntity.getRequesterFullName() != null) {
+            existingEntity.setRequesterEmployeeId(resolveEmployeeIdByName(existingEntity.getRequesterFullName()));
+        }
+        if (dto.getReplacingEmployeeId() != null) {
+            existingEntity.setReplacingEmployeeId(dto.getReplacingEmployeeId());
+        } else if (existingEntity.getReplacingEmployeeId() == null && existingEntity.getReplacingFullName() != null) {
+            existingEntity.setReplacingEmployeeId(resolveEmployeeIdByName(existingEntity.getReplacingFullName()));
+        }
+
         // Só atualiza o status se foi enviado (não nulo)
         if (dto.getStatus() != null) {
             existingEntity.setStatus(dto.getStatus());
         }
+        if (dto.getApprovedBy() != null) {
+            existingEntity.setApprovedBy(dto.getApprovedBy());
+        }
 
-        return new ShiftChangeFormDTO(shiftChangeFormRepository.save(existingEntity));
+        ShiftChangeForm saved = shiftChangeFormRepository.save(existingEntity);
+
+        // Se o status mudou, registra no histórico de ambos os funcionários
+        if (previousStatus != saved.getStatus()) {
+            recordShiftChangeStatusHistory(saved, previousStatus);
+        }
+
+        return new ShiftChangeFormDTO(saved);
     }
 
     @Transactional
@@ -250,5 +300,115 @@ public class ShiftChangeFormService {
 
     private boolean isDayShift(ShiftTime shiftTime) {
         return shiftTime == ShiftTime.SHIFT_6H_18H || shiftTime == ShiftTime.SHIFT_7H_19H;
+    }
+
+    // ===================== Integração com histórico do funcionário =====================
+
+    /**
+     * Registra a criação de uma solicitação de troca de plantão no histórico de AMBOS
+     * os funcionários envolvidos (solicitante e colega que assumirá).
+     */
+    private void recordShiftChangeCreatedHistory(ShiftChangeForm sc) {
+        UUID actorUserId = getCurrentUserId();
+        String shiftLabel = getShiftTimeLabel(sc.getShiftTime());
+        String requesterShiftDate = sc.getRequesterShiftDate() != null ? sc.getRequesterShiftDate().format(DATE_FMT) : "-";
+        String replacingShiftDate = sc.getReplacingShiftDate() != null ? sc.getReplacingShiftDate().format(DATE_FMT) : "-";
+
+        // Registro para o SOLICITANTE
+        if (sc.getRequesterEmployeeId() != null) {
+            String detail = String.format(
+                    "Solicitou troca de plantão (%s, %s) com %s [Status: %s]",
+                    shiftLabel, requesterShiftDate,
+                    sc.getReplacingFullName() != null ? sc.getReplacingFullName() : "—",
+                    sc.getStatus() != null ? sc.getStatus().name() : ShiftChangeStatus.PENDING.name());
+            safeRecord(sc.getRequesterEmployeeId(), EmployeeChangeCategory.ESCALA,
+                    "shift_change_request", "Solicitação de troca de plantão",
+                    null, detail, actorUserId);
+        }
+
+        // Registro para o COLEGA QUE ASSUMIRÁ
+        if (sc.getReplacingEmployeeId() != null) {
+            String detail = String.format(
+                    "Indicado para cobrir plantão (%s, %s) de %s [Status: %s]",
+                    shiftLabel, replacingShiftDate,
+                    sc.getRequesterFullName() != null ? sc.getRequesterFullName() : "—",
+                    sc.getStatus() != null ? sc.getStatus().name() : ShiftChangeStatus.PENDING.name());
+            safeRecord(sc.getReplacingEmployeeId(), EmployeeChangeCategory.ESCALA,
+                    "shift_change_replacement", "Cobertura em troca de plantão",
+                    null, detail, actorUserId);
+        }
+    }
+
+    /**
+     * Registra mudança de status (aprovação/rejeição/etc.) da troca de plantão
+     * no histórico dos dois funcionários envolvidos.
+     */
+    private void recordShiftChangeStatusHistory(ShiftChangeForm sc, ShiftChangeStatus previousStatus) {
+        UUID actorUserId = getCurrentUserId();
+        String oldStatus = previousStatus != null ? previousStatus.name() : null;
+        String newStatus = sc.getStatus() != null ? sc.getStatus().name() : null;
+        String shiftLabel = getShiftTimeLabel(sc.getShiftTime());
+        String date = sc.getRequesterShiftDate() != null ? sc.getRequesterShiftDate().format(DATE_FMT) : "-";
+        String approver = sc.getApprovedBy() != null && !sc.getApprovedBy().isBlank() ? " por " + sc.getApprovedBy() : "";
+
+        String detail = String.format("Troca de plantão (%s, %s) %s%s",
+                shiftLabel, date, statusLabel(sc.getStatus()), approver);
+
+        if (sc.getRequesterEmployeeId() != null) {
+            safeRecord(sc.getRequesterEmployeeId(), EmployeeChangeCategory.ESCALA,
+                    "shift_change_status", "Status da troca de plantão",
+                    oldStatus, detail + " (solicitante)", actorUserId);
+        }
+        if (sc.getReplacingEmployeeId() != null) {
+            safeRecord(sc.getReplacingEmployeeId(), EmployeeChangeCategory.ESCALA,
+                    "shift_change_status", "Status da troca de plantão",
+                    oldStatus, detail + " (cobertura)", actorUserId);
+        }
+        // Mantém o newStatus em uso (já incluso no detail) para evitar warning
+        log.debug("Histórico de troca de plantão atualizado: {} -> {}", oldStatus, newStatus);
+    }
+
+    private void safeRecord(UUID employeeId, EmployeeChangeCategory cat, String fieldName, String fieldLabel,
+                            String oldValue, String newValue, UUID actorUserId) {
+        try {
+            employeeChangeHistoryService.recordChange(employeeId, cat, fieldName, fieldLabel, oldValue, newValue, actorUserId);
+        } catch (Exception ex) {
+            // Falha no histórico não deve quebrar a operação principal
+            log.warn("Falha ao registrar histórico de troca de plantão para employeeId={}: {}", employeeId, ex.getMessage());
+        }
+    }
+
+    private String statusLabel(ShiftChangeStatus status) {
+        if (status == null) return "atualizada";
+        switch (status) {
+            case APPROVED: return "aprovada";
+            case REJECTED: return "rejeitada";
+            case PENDING:  return "pendente";
+            default:       return status.name().toLowerCase();
+        }
+    }
+
+    private UUID resolveEmployeeIdByName(String fullName) {
+        if (fullName == null || fullName.isBlank()) return null;
+        try {
+            return employeeRepository.findByNameIgnoreCase(fullName.trim())
+                    .map(Employee::getId)
+                    .orElse(null);
+        } catch (Exception ex) {
+            log.warn("Falha ao resolver employeeId pelo nome '{}': {}", fullName, ex.getMessage());
+            return null;
+        }
+    }
+
+    private UUID getCurrentUserId() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof User) {
+                return ((User) auth.getPrincipal()).getId();
+            }
+        } catch (Exception ignored) {
+            // sem usuário autenticado disponível
+        }
+        return null;
     }
 }

@@ -40,21 +40,26 @@ public class PermissionService {
             Permission.ATTENDANCE_READ, Permission.ATTENDANCE_WRITE, Permission.ATTENDANCE_MANAGE
         )));
 
-        // 🟩 SUPERVISOR — operações em campo: visitas, registros de atividade, equipe e equipamentos
+        // 🟩 SUPERVISOR — APENAS módulo operacional (visitas, escalas, postos, equipe em campo)
+        // ❌ NÃO tem acesso a Financeiro, Comercial, Holerites/Folha, RH SST, Compras, Estoque.
         rolePermissions.put(UserRole.SUPERVISOR, new HashSet<>(Arrays.asList(
-            Permission.EMPLOYEES_READ, Permission.EMPLOYEES_WRITE,
-            Permission.CONTRACTS_READ, Permission.CONTRACTS_WRITE,
-            Permission.PAYSLIPS_READ, Permission.PAYSLIPS_WRITE,
-            Permission.EQUIPMENTS_READ, Permission.EQUIPMENTS_WRITE, Permission.EQUIPMENTS_ASSIGN,
-            Permission.REPORTS_READ, Permission.REPORTS_GENERATE,
-            Permission.DASHBOARD_READ,
-            Permission.PROFILE_READ, Permission.PROFILE_WRITE,
+            // Operacional core
             Permission.VISITS_READ, Permission.VISITS_WRITE, Permission.VISITS_CREATE,
             Permission.ACTIVITY_REPORTS_READ, Permission.ACTIVITY_REPORTS_WRITE, Permission.ACTIVITY_REPORTS_CREATE,
-            Permission.TIME_RECORDS_READ,
+            Permission.OCCURRENCES_READ, Permission.OCCURRENCES_WRITE, Permission.OCCURRENCES_CREATE,
             Permission.WORK_POSTS_READ,
-            Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE,
-            Permission.ATTENDANCE_READ
+            Permission.SCHEDULES_READ,
+            Permission.TIME_RECORDS_READ,
+            // Consultas necessárias durante a visita
+            Permission.EMPLOYEES_READ,
+            Permission.EQUIPMENTS_READ,
+            Permission.TRAINING_READ,
+            // Relatórios operacionais
+            Permission.REPORTS_READ, Permission.REPORTS_GENERATE,
+            // Dashboard + perfil + comunicação
+            Permission.DASHBOARD_READ,
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE,
+            Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
         )));
 
         // 🟨 RH - Gerencia informações contratuais e pessoais

@@ -33,6 +33,11 @@ interface EmployeeComboboxProps {
   initialDisplayName?: string;
   /** Callback disparado quando um funcionário é selecionado, retornando o objeto completo */
   onEmployeeSelect?: (employee: SimpleEmployee) => void;
+  /**
+   * Filtro local por cargo do funcionário. Aceita uma string ou lista de strings;
+   * a busca é case-insensitive e considera "contém". Útil para listar apenas supervisores, etc.
+   */
+  positionFilter?: string | string[];
 }
 
 export function EmployeeCombobox({ 
@@ -44,7 +49,8 @@ export function EmployeeCombobox({
   disabled = false,
   minChars = 3,
   initialDisplayName,
-  onEmployeeSelect
+  onEmployeeSelect,
+  positionFilter
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -53,12 +59,29 @@ export function EmployeeCombobox({
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const [selectedEmployee, setSelectedEmployee] = React.useState<SimpleEmployee | null>(null)
 
+  // Normaliza positionFilter em array de tokens (lowercase)
+  const positionTokens = React.useMemo(() => {
+    if (!positionFilter) return [] as string[];
+    const list = Array.isArray(positionFilter) ? positionFilter : [positionFilter];
+    return list
+      .map(s => (s ?? '').toString().trim().toLowerCase())
+      .filter(s => s.length > 0);
+  }, [positionFilter])
+
+  const matchesPositionFilter = React.useCallback((emp: SimpleEmployee): boolean => {
+    if (positionTokens.length === 0) return true;
+    const pos = (emp.positionName ?? '').toLowerCase();
+    return positionTokens.some(t => pos.includes(t));
+  }, [positionTokens])
+
   // Buscar funcionários quando o usuário digitar (a partir de minChars caracteres)
   React.useEffect(() => {
     if (debouncedSearchTerm.trim().length >= minChars) {
       setLoading(true)
       employeeService.searchSimpleEmployees(debouncedSearchTerm.trim())
-        .then(setEmployees)
+        .then(result => {
+          setEmployees(result.filter(matchesPositionFilter))
+        })
         .catch(error => {
           console.error('Erro ao buscar funcionários:', error)
           setEmployees([])
@@ -67,7 +90,7 @@ export function EmployeeCombobox({
     } else {
       setEmployees([])
     }
-  }, [debouncedSearchTerm, minChars])
+  }, [debouncedSearchTerm, minChars, matchesPositionFilter])
 
   // Garantir que o funcionário selecionado apareça na lista mesmo se não estiver carregado
   React.useEffect(() => {
@@ -174,7 +197,9 @@ export function EmployeeCombobox({
                 <CommandEmpty className="text-seguranca-lightgray">
                   {searchTerm.trim().length < minChars
                     ? `Digite pelo menos ${minChars} caracteres para buscar...`
-                    : emptyPlaceholder
+                    : (positionTokens.length > 0
+                        ? `Nenhum funcionário com cargo "${positionTokens.join('/')}" encontrado.`
+                        : emptyPlaceholder)
                   }
                 </CommandEmpty>
                 <CommandGroup>

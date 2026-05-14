@@ -12,11 +12,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
+import { SupervisorConsentModal } from '@/components/auth/SupervisorConsentModal';
 
 const Login = () => {
   useGSAP();
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { user, login, loginAsSupervisor } = useAuth();
   const { toast } = useToast();
 
   // Estados para Funcionário (aba atual)
@@ -174,11 +175,12 @@ const Login = () => {
 
         if (data.needsConsent) {
           setNeedsConsent(true);
+        } else if (data.token && data.supervisor) {
+          // Login direto - persiste sessão completa no AuthContext + localStorage
+          loginAsSupervisor(data.supervisor, data.token);
+          navigate('/dashboard', { replace: true });
         } else {
-          // Login direto - salvar token e redirecionar
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('userType', 'SUPERVISOR');
-          navigate('/dashboard');
+          setSupervisorError('Resposta inválida do servidor. Tente novamente.');
         }
       } else {
         setSupervisorError(data.error || 'Erro na autenticação');
@@ -208,10 +210,9 @@ const Login = () => {
 
       const data = await response.json();
 
-      if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userType', 'SUPERVISOR');
-        navigate('/dashboard');
+      if (data.success && data.token && data.supervisor) {
+        loginAsSupervisor(data.supervisor, data.token);
+        navigate('/dashboard', { replace: true });
       } else {
         setSupervisorError(data.error || 'Erro ao aceitar termos');
       }
@@ -221,6 +222,13 @@ const Login = () => {
     } finally {
       setSupervisorLoading(false);
     }
+  };
+
+  const handleDeclineTerms = () => {
+    if (supervisorLoading) return;
+    setNeedsConsent(false);
+    setSupervisorData(null);
+    setSupervisorError('Você precisa aceitar os Termos de Uso para acessar o sistema.');
   };
 
   const formatCpf = (value: string) => {
@@ -368,54 +376,14 @@ const Login = () => {
               )}
 
               {/* Modal de Consentimento LGPD */}
-              {needsConsent && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                  <div className="bg-seguranca-graphite rounded-xl shadow-lg w-full max-w-2xl max-h-[80vh] overflow-hidden">
-                    <div className="p-6 border-b border-gray-600">
-                      <h3 className="text-xl font-bold text-center">Consentimento LGPD</h3>
-                      <p className="text-sm text-gray-400 text-center mt-2">
-                        {supervisorData?.name} - {supervisorData?.cpf}
-                      </p>
-                    </div>
-
-                    <div className="p-6 overflow-y-auto max-h-[50vh] bg-seguranca-black text-sm">
-                      <div className="space-y-4">
-                        <h4 className="font-semibold text-seguranca-yellow">Termos de Uso</h4>
-                        <p>
-                          Ao utilizar este sistema, você concorda com os seguintes termos:
-                        </p>
-                        <ul className="list-disc pl-5 space-y-2">
-                          <li>Uso responsável do sistema de vigilância</li>
-                          <li>Cumprimento das normas de segurança estabelecidas</li>
-                          <li>Confidencialidade das informações acessadas</li>
-                          <li>Respeito à privacidade dos funcionários e visitantes</li>
-                        </ul>
-
-                        <h4 className="font-semibold text-seguranca-yellow mt-6">Política de Privacidade</h4>
-                        <p>
-                          Seus dados pessoais são tratados de acordo com a Lei Geral de Proteção de Dados (LGPD):
-                        </p>
-                        <ul className="list-disc pl-5 space-y-2">
-                          <li>Coleta e processamento de dados com finalidade específica</li>
-                          <li>Armazenamento seguro e criptografado</li>
-                          <li>Compartilhamento apenas quando necessário</li>
-                          <li>Direito de acesso, correção e exclusão dos dados</li>
-                        </ul>
-                      </div>
-                    </div>
-
-                    <div className="p-6 border-t border-gray-600">
-                      <Button
-                        onClick={handleAcceptTerms}
-                        disabled={supervisorLoading}
-                        className="btn-primary w-full"
-                      >
-                        {supervisorLoading ? 'Processando...' : 'Aceito os Termos'}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <SupervisorConsentModal
+                open={needsConsent}
+                supervisorName={supervisorData?.name}
+                supervisorCpf={supervisorData?.cpf}
+                loading={supervisorLoading}
+                onAccept={handleAcceptTerms}
+                onDecline={handleDeclineTerms}
+              />
 
               {/* Login por CPF ou Matrícula */}
               <form onSubmit={handleSupervisorCpfLogin} className="space-y-4">

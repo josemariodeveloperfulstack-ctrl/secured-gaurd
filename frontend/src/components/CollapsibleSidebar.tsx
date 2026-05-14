@@ -597,6 +597,31 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'rh-sst-epis',
     'dp-epis',
   ]),
+  // 🟩 SUPERVISOR — APENAS módulo Operacional, supervisão e comunicação.
+  // ❌ NÃO vê: Financeiro, Fiscal, Comercial, Holerites/Folha, RH SST, Compras, Estoque, Sistema.
+  SUPERVISOR: new Set([
+    // Menu principal
+    'dashboard',
+    'area-funcionario',
+    'meus-holerites', // próprio holerite (área do funcionário)
+    'frota', // veículos do posto (uso operacional)
+    // Módulo Operacional (todos os itens)
+    'operacional-dashboard',
+    'operacional-servicos',
+    'operacional-equipamentos',
+    'operacional-controle-visitas',
+    'operacional-escalas',
+    'operacional-notificacoes',
+    'operacional-ocorrencias',
+    'operacional-atividades',
+    'operacional-troca-plantao',
+    'controle-rondas',
+    'operacional-guia-transporte',
+    'operacional-gestao-operacional',
+    // Comunicação interna
+    'chat-interno',
+    'mensagens',
+  ]),
 };
 
 // Roles que NÃO devem ver módulos Financeiro ou Fiscal
@@ -605,6 +630,72 @@ const ROLES_WITHOUT_FINANCIAL_MODULES = new Set<UserRole>([
   'DEPARTAMENTO_PESSOAL',
   'ALMOXARIFADO',
   'ESTOQUE',
+  'SUPERVISOR',
+  'VIGILANTE',
+  'OPERACIONAL',
+  'COLABORADOR',
+]);
+
+// Roles que NÃO devem ver módulo Comercial (Leads, Marketing, Empresas, Clientes, Propostas, etc.)
+const ROLES_WITHOUT_COMMERCIAL_MODULES = new Set<UserRole>([
+  'SUPERVISOR',
+  'VIGILANTE',
+  'OPERACIONAL',
+  'RH',
+  'DEPARTAMENTO_PESSOAL',
+  'COLABORADOR',
+  'ALMOXARIFADO',
+  'ESTOQUE',
+  'COMPRAS',
+  'SUPRIMENTOS',
+]);
+
+// Roles que NÃO devem ver módulo Sistema (Usuários, Grupos, Configurações, Backup)
+const ROLES_WITHOUT_SYSTEM_MODULES = new Set<UserRole>([
+  'SUPERVISOR',
+  'VIGILANTE',
+  'OPERACIONAL',
+  'RH',
+  'DEPARTAMENTO_PESSOAL',
+  'COLABORADOR',
+  'COMERCIAL',
+  'GESTOR_COMERCIAL',
+  'ASSISTENTE_COMERCIAL',
+  'ALMOXARIFADO',
+  'ESTOQUE',
+  'COMPRAS',
+  'SUPRIMENTOS',
+  'FINANCEIRO',
+  'AUDITOR',
+]);
+
+// Roles que NÃO devem ver módulo RH / SST / Departamento Pessoal
+const ROLES_WITHOUT_HR_MODULES = new Set<UserRole>([
+  'SUPERVISOR',
+  'VIGILANTE',
+  'OPERACIONAL',
+  'COLABORADOR',
+  'COMERCIAL',
+  'GESTOR_COMERCIAL',
+  'ASSISTENTE_COMERCIAL',
+  'ALMOXARIFADO',
+  'ESTOQUE',
+  'COMPRAS',
+  'SUPRIMENTOS',
+  'FINANCEIRO',
+]);
+
+// Roles que NÃO devem ver módulo Compras / Estoque / Suprimentos
+const ROLES_WITHOUT_PURCHASING_MODULES = new Set<UserRole>([
+  'SUPERVISOR',
+  'VIGILANTE',
+  'OPERACIONAL',
+  'RH',
+  'DEPARTAMENTO_PESSOAL',
+  'COLABORADOR',
+  'COMERCIAL',
+  'GESTOR_COMERCIAL',
+  'ASSISTENTE_COMERCIAL',
 ]);
 
 export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
@@ -688,6 +779,15 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     return combinedSet;
   }, [user?.roles, normalizedRole]);
 
+  // Indica se o papel principal possui whitelist explícita.
+  // Quando sim, o whitelist é a fonte da verdade e NÃO usamos fallback por permissão,
+  // evitando que itens vazem para papéis restritos (ex.: SUPERVISOR ver Relatórios
+  // Financeiros só porque tem REPORTS_READ).
+  const hasStrictWhitelist = useMemo(() => {
+    if (!normalizedRole) return false;
+    return ROLE_ALLOWED_ITEM_IDS[normalizedRole] !== undefined;
+  }, [normalizedRole]);
+
   const filterItemsForRole = useCallback(<T extends { id: string, requiredPermission?: string }>(items: T[]): T[] => {
     // SUPER_ADMIN sempre vê todos os itens
     if (normalizedRole === 'SUPER_ADMIN') {
@@ -702,12 +802,16 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
       // Se está na lista permitida pelo papel
       if (allowedItemIds.has(item.id)) return true;
 
-      // Se tem uma permissão requerida e o usuário possui essa permissão (via grupo ou customizada)
+      // Modo estrito: papéis com whitelist (ex.: SUPERVISOR) só veem o que estiver
+      // explicitamente listado. Não cair no fallback de permissão.
+      if (hasStrictWhitelist) return false;
+
+      // Modo permissivo (papéis sem whitelist explícita): usar a permissão como fallback
       if (item.requiredPermission && hasPermission(item.requiredPermission)) return true;
 
       return false;
     });
-  }, [allowedItemIds, normalizedRole, hasPermission]);
+  }, [allowedItemIds, normalizedRole, hasPermission, hasStrictWhitelist]);
 
   // Referências para controlar o scroll da própria sidebar
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -732,12 +836,30 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     return filteredFiscalItems.filter(item => shouldShowModule((item as { requiredPermission?: string }).requiredPermission));
   }, [filteredFiscalItems, shouldShowModule, normalizedRole]);
   const filteredOperacionalItems = useMemo(() => filterItemsForRole(operacionalMenuItems), [filterItemsForRole]);
-  const filteredRhItems = useMemo(() => filterItemsForRole(rhMenuItems), [filterItemsForRole]);
-  const filteredSstItems = useMemo(() => filterItemsForRole(sstMenuItems), [filterItemsForRole]);
-  const filteredDepartamentoPessoalItems = useMemo(() => filterItemsForRole(departamentoPessoalMenuItems), [filterItemsForRole]);
-  const filteredComercialItems = useMemo(() => filterItemsForRole(comercialMenuItems), [filterItemsForRole]);
-  const filteredEstoqueItems = useMemo(() => filterItemsForRole(estoqueMenuItems), [filterItemsForRole]);
-  const filteredComprasItems = useMemo(() => filterItemsForRole(comprasMenuItems), [filterItemsForRole]);
+  const filteredRhItems = useMemo(() => {
+    if (ROLES_WITHOUT_HR_MODULES.has(normalizedRole)) return [];
+    return filterItemsForRole(rhMenuItems);
+  }, [filterItemsForRole, normalizedRole]);
+  const filteredSstItems = useMemo(() => {
+    if (ROLES_WITHOUT_HR_MODULES.has(normalizedRole)) return [];
+    return filterItemsForRole(sstMenuItems);
+  }, [filterItemsForRole, normalizedRole]);
+  const filteredDepartamentoPessoalItems = useMemo(() => {
+    if (ROLES_WITHOUT_HR_MODULES.has(normalizedRole)) return [];
+    return filterItemsForRole(departamentoPessoalMenuItems);
+  }, [filterItemsForRole, normalizedRole]);
+  const filteredComercialItems = useMemo(() => {
+    if (ROLES_WITHOUT_COMMERCIAL_MODULES.has(normalizedRole)) return [];
+    return filterItemsForRole(comercialMenuItems);
+  }, [filterItemsForRole, normalizedRole]);
+  const filteredEstoqueItems = useMemo(() => {
+    if (ROLES_WITHOUT_PURCHASING_MODULES.has(normalizedRole)) return [];
+    return filterItemsForRole(estoqueMenuItems);
+  }, [filterItemsForRole, normalizedRole]);
+  const filteredComprasItems = useMemo(() => {
+    if (ROLES_WITHOUT_PURCHASING_MODULES.has(normalizedRole)) return [];
+    return filterItemsForRole(comprasMenuItems);
+  }, [filterItemsForRole, normalizedRole]);
   const filteredComunicacaoInternaItems = useMemo(
     () => filterItemsForRole(comunicacaoInternaMenuItems).filter(item => {
       // Regras por permissão para cada item de comunicação interna
@@ -752,7 +874,10 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
     [filterItemsForRole, hasPermission]
   );
   const filteredAtendimentoItems = useMemo(() => filterItemsForRole(atendimentoMenuItems), [filterItemsForRole]);
-  const filteredSistemaItems = useMemo(() => filterItemsForRole(sistemaMenuItems), [filterItemsForRole]);
+  const filteredSistemaItems = useMemo(() => {
+    if (ROLES_WITHOUT_SYSTEM_MODULES.has(normalizedRole)) return [];
+    return filterItemsForRole(sistemaMenuItems);
+  }, [filterItemsForRole, normalizedRole]);
 
   // Sempre que a rota mudar, garantir que o item ativo fique visível na sidebar
   useEffect(() => {

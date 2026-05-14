@@ -32,8 +32,18 @@ public class EmailSyncService {
         for (EmailAccount account : accounts) {
             try {
                 syncAccount(account);
+            } catch (jakarta.mail.AuthenticationFailedException authEx) {
+                // Credenciais inválidas: marca a conta como AUTH_FAILED para
+                // interromper o loop de retentativas a cada 5 minutos (que polui logs).
+                // O usuário deve reativar manualmente após atualizar a senha.
+                log.warn("Falha de autenticação IMAP para a conta {} — marcando como AUTH_FAILED. "
+                        + "Atualize a senha (ou senha de app) e reative a conta. Detalhe: {}",
+                        account.getEmail(), authEx.getMessage());
+                account.setStatus("AUTH_FAILED");
+                account.setLastSyncError("Falha de autenticação IMAP: " + authEx.getMessage());
+                emailAccountRepository.save(account);
             } catch (Exception e) {
-                log.error("Erro ao sincronizar conta: " + account.getEmail(), e);
+                log.error("Erro ao sincronizar conta: {}", account.getEmail(), e);
                 account.setLastSyncError(e.getMessage());
                 emailAccountRepository.save(account);
             }

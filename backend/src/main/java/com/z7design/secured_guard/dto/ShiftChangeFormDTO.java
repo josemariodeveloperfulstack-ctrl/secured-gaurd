@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
@@ -25,6 +26,9 @@ public class ShiftChangeFormDTO {
     @NotBlank(message = "O nome completo do solicitante é obrigatório")
     private String requesterFullName;
 
+    /** ID do funcionário solicitante — usado para registrar no histórico. */
+    private UUID requesterEmployeeId;
+
     @NotBlank(message = "O setor do solicitante é obrigatório")
     private String requesterSector;
 
@@ -35,6 +39,9 @@ public class ShiftChangeFormDTO {
 
     @NotBlank(message = "O nome completo do colega que assumirá o plantão é obrigatório")
     private String replacingFullName;
+
+    /** ID do funcionário que assumirá o plantão — usado para registrar no histórico. */
+    private UUID replacingEmployeeId;
 
     @NotBlank(message = "O setor do colega que assumirá o plantão é obrigatório")
     private String replacingSector;
@@ -58,10 +65,12 @@ public class ShiftChangeFormDTO {
         this.id = entity.getId();
         this.dateOfRequest = entity.getDateOfRequest();
         this.requesterFullName = entity.getRequesterFullName();
+        this.requesterEmployeeId = entity.getRequesterEmployeeId();
         this.requesterSector = entity.getRequesterSector();
         this.requesterDayOffDate = entity.getRequesterDayOffDate();
         this.requesterShiftDate = entity.getRequesterShiftDate();
         this.replacingFullName = entity.getReplacingFullName();
+        this.replacingEmployeeId = entity.getReplacingEmployeeId();
         this.replacingSector = entity.getReplacingSector();
         this.replacingShiftDate = entity.getReplacingShiftDate();
         this.replacingDayOffDate = entity.getReplacingDayOffDate();
@@ -77,10 +86,12 @@ public class ShiftChangeFormDTO {
         entity.setId(this.id);
         entity.setDateOfRequest(this.dateOfRequest);
         entity.setRequesterFullName(this.requesterFullName);
+        entity.setRequesterEmployeeId(this.requesterEmployeeId);
         entity.setRequesterSector(this.requesterSector);
         entity.setRequesterDayOffDate(this.requesterDayOffDate);
         entity.setRequesterShiftDate(this.requesterShiftDate);
         entity.setReplacingFullName(this.replacingFullName);
+        entity.setReplacingEmployeeId(this.replacingEmployeeId);
         entity.setReplacingSector(this.replacingSector);
         entity.setReplacingShiftDate(this.replacingShiftDate);
         entity.setReplacingDayOffDate(this.replacingDayOffDate);

@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "shift_change_forms")
@@ -27,6 +28,10 @@ public class ShiftChangeForm {
     @Column(nullable = false)
     private String requesterFullName;
 
+    /** ID do funcionário solicitante (para integração com histórico). Anulável p/ compat. */
+    @Column(name = "requester_employee_id", nullable = true)
+    private UUID requesterEmployeeId;
+
     @Column(nullable = false)
     private String requesterSector;
 
@@ -39,6 +44,10 @@ public class ShiftChangeForm {
     // Dados do Colega que Assumirá o Plantão
     @Column(nullable = false)
     private String replacingFullName;
+
+    /** ID do funcionário que assumirá o plantão (para integração com histórico). Anulável p/ compat. */
+    @Column(name = "replacing_employee_id", nullable = true)
+    private UUID replacingEmployeeId;
 
     @Column(nullable = false)
     private String replacingSector;

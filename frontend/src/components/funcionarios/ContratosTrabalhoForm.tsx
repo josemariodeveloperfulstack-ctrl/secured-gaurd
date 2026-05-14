@@ -13,13 +13,10 @@ import { employeeService, Employee, SimpleEmployee } from '@/services/employeeSe
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { SearchableSelect } from '../ui/searchable-select';
 
-import type { WorkPost } from '@/services/workPostService';
 import {
   useCompanies,
   useCostCentersActive,
-  useClients,
   useAllWorkPosts,
-  useWorkPostsByClient,
 } from '@/hooks/queries';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +34,33 @@ function resolvePdfContractKind(
   if (contractType === 'Contrato de Experiência') return 'EXPERIENCE';
   if (contractType === 'CLT - Prazo indeterminado (integral)') return 'INDEFINITE';
   return 'STANDARD';
+}
+
+/**
+ * Formata uma data ISO ("YYYY-MM-DD" ou ISO completo) como "dd/MM/yyyy"
+ * SEM aplicar conversão de timezone — necessário porque `new Date("YYYY-MM-DD")`
+ * é interpretado como UTC e em UTC-3 retorna o dia anterior (bug do -1 dia).
+ */
+function formatLocalDate(iso?: string | null): string {
+  if (!iso) return '-';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
+
+/**
+ * Soma dias a uma data ISO ("YYYY-MM-DD") sem conversão de timezone.
+ * Retorna nova string ISO "YYYY-MM-DD".
+ */
+function addDaysIsoLocal(iso: string, days: number): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setDate(d.getDate() + days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /** Valor enviado em `department` para o PDF como "SETOR DE TRABALHO" (setor + unidade + posto — não centro de custo). */
@@ -78,20 +102,15 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
   const [loading, setLoading] = useState(false);
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
 
   // Hooks de cache (TanStack Query) — substituem o loadData() manual.
   // Cache compartilhado entre formulários elimina refetch redundante.
   const { data: companies = [], isLoading: loadingCompanies } = useCompanies();
   const { data: costCenters = [], isLoading: loadingCostCenters } = useCostCentersActive();
-  const { data: clients = [], isLoading: loadingClients } = useClients();
   const { data: allWorkPosts = [], isLoading: loadingAllWorkPosts } = useAllWorkPosts();
-  const { data: workPostsByClient = [], isLoading: loadingWorkPostsByClient } = useWorkPostsByClient(selectedClientId || null);
 
   const loadingData =
-    loadingCompanies || loadingCostCenters || loadingClients || loadingAllWorkPosts;
-  const filteredWorkPosts: WorkPost[] = selectedClientId ? workPostsByClient : [];
-  const loadingWorkPosts = loadingWorkPostsByClient;
+    loadingCompanies || loadingCostCenters || loadingAllWorkPosts;
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
@@ -206,10 +225,6 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
             : (funcionario as any).escalaTrabalho || (funcionario as any).horarioTrabalho || (funcionario as any).diasTrabalho || prev.workSchedule,
         };
       });
-
-      if (matchingWorkPost?.clientId) {
-        setSelectedClientId(matchingWorkPost.clientId);
-      }
     }
   }, [funcionario, costCenters, allWorkPosts]);
 
@@ -234,20 +249,21 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     }
   }, [form.contractType, funcionario?.hireDate, form.startDate]);
 
-  // Auto-calculate end date for experience contracts
+  // Auto-calcula a Data de Término para contratos de experiência.
+  // Usa cálculo local (sem timezone) para garantir que a data exibida no card
+  // ("Data de Término Calculada") seja IDÊNTICA à do input "Data de Término".
   useEffect(() => {
-    if (form.contractType === 'Contrato de Experiência' && form.startDate && form.experienceDuration) {
-      const startDate = new Date(form.startDate);
-      const durationDays = parseInt(form.experienceDuration);
-
-      if (!isNaN(startDate.getTime()) && !isNaN(durationDays)) {
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + durationDays);
-
-        setForm(prev => ({
-          ...prev,
-          endDate: endDate.toISOString().split('T')[0]
-        }));
+    if (
+      form.contractType === 'Contrato de Experiência' &&
+      form.startDate &&
+      form.experienceDuration
+    ) {
+      const days = parseInt(form.experienceDuration, 10);
+      if (!Number.isNaN(days)) {
+        const newEnd = addDaysIsoLocal(form.startDate, days);
+        if (newEnd) {
+          setForm(prev => ({ ...prev, endDate: newEnd }));
+        }
       }
     }
   }, [form.contractType, form.startDate, form.experienceDuration]);
@@ -634,7 +650,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Admissão</Label>
                       <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
-                         {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
+                         {formatLocalDate(funcionario.hireDate)}
                       </div>
                     </div>
                   </div>
@@ -769,7 +785,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                   <p className="text-xs text-orange-600 mt-1">
                     Padrão: <strong>45 dias</strong> a partir da data de admissão
                     {funcionario?.hireDate && (
-                      <> (<strong>{new Date(funcionario.hireDate).toLocaleDateString('pt-BR')}</strong>)</>
+                      <> (<strong>{formatLocalDate(funcionario.hireDate)}</strong>)</>
                     )}.
                   </p>
                 </div>
@@ -797,7 +813,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     <div className="flex items-center gap-3 p-3 bg-white rounded-lg border-2 border-orange-400">
                       <Calendar className="h-5 w-5 text-orange-600" />
                       <span className="font-bold text-base text-gray-800">
-                        {form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : 'Calculando...'}
+                        {form.endDate ? formatLocalDate(form.endDate) : 'Calculando...'}
                       </span>
                       <Badge className="ml-auto bg-orange-600">Automático</Badge>
                     </div>
@@ -873,50 +889,25 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Cliente</Label>
-                <SearchableSelect
-                  options={clients.map(c => ({
-                    value: c.id,
-                    label: c.name,
-                    description: c.cnpj || ''
-                  }))}
-                  value={selectedClientId}
-                  onChange={(val) => {
-                    setSelectedClientId(val);
-                    setForm(prev => ({ ...prev, department: '' }));
-                  }}
-                  disabled={loadingData}
-                  placeholder="Selecione o cliente"
-                  searchPlaceholder="Buscar cliente..."
-                />
-                <p className="text-xs text-muted-foreground">
-                  Selecione o cliente para listar os setores de trabalho.
-                </p>
-              </div>
-
-              <div className="space-y-2">
+              <div className="space-y-2 lg:col-span-3">
                 <Label>Setor de Trabalho</Label>
                 <SearchableSelect
-                  options={(
-                    selectedClientId
-                      ? filteredWorkPosts
-                      : allWorkPosts
-                  ).map(wp => ({
+                  options={allWorkPosts.map(wp => ({
                     value: wp.id || wp.name,
                     label: wp.name,
                     description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || '')
                   }))}
                   value={form.department}
                   onChange={(value) => setForm(prev => ({ ...prev, department: value }))}
-                  disabled={loadingData || loadingWorkPosts}
-                  placeholder={loadingWorkPosts ? 'Carregando setores...' : (selectedClientId ? 'Selecione o setor de trabalho' : 'Selecione um cliente primeiro')}
+                  disabled={loadingData}
+                  placeholder="Selecione o setor de trabalho"
                   searchPlaceholder="Digite o nome do posto..."
                   minSearchChars={3}
                   minCharsMessage="Digite ao menos 3 caracteres para ver os postos de trabalho..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  Digite os 3 primeiros caracteres do nome do posto para ver sugestões.
+                  Pré-preenchido com o posto cadastrado para o funcionário. Digite ao menos 3
+                  caracteres para buscar outro posto, se necessário.
                 </p>
               </div>
             </div>

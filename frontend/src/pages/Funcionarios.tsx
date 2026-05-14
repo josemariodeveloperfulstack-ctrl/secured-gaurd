@@ -78,6 +78,7 @@ import { FileSpreadsheet, Upload } from 'lucide-react';
 import { EmployeeViewDetailsModal } from '@/components/funcionarios/EmployeeViewDetailsModal';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import FuncionarioEditModal from '@/components/funcionarios/FuncionarioEditModal';
+import { EmployeeQrCodeBadgeModal } from '@/components/funcionarios/EmployeeQrCodeBadgeModal';
 
 const Funcionarios: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -93,6 +94,8 @@ const Funcionarios: React.FC = () => {
   const [pageSize, setPageSize] = useState(50);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
+  const [qrCodeModalOpen, setQrCodeModalOpen] = useState(false);
+  const [employeeForQrCode, setEmployeeForQrCode] = useState<Employee | null>(null);
   useGSAP();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -433,6 +436,12 @@ const Funcionarios: React.FC = () => {
   const handleCloseModal = () => {
     setModalOpen(false);
     if (shouldOpenModal) navigate('/rh/funcionarios', { replace: true });
+  };
+
+  // Abrir modal do crachá / QR Code
+  const handleViewQrCode = (employee: Employee) => {
+    setEmployeeForQrCode(employee);
+    setQrCodeModalOpen(true);
   };
 
   // Abrir modal de edição
@@ -1456,6 +1465,7 @@ Para excluir este funcionário:
                   navigate('/rh/funcionarios?tab=dependentes', { replace: true });
                 }}
                 onViewDetails={handleViewDetails}
+                onViewQrCode={handleViewQrCode}
                 isLoading={loading}
                 isMobileSelectionMode={isMobileSelectionMode}
                 sortKey={sortKey}
@@ -1887,6 +1897,17 @@ Para excluir este funcionário:
         filterCompanies={filterCompanies}
         filterWorkPosts={filterWorkPosts}
         filterPositions={filterPositions}
+      />
+
+      {/* Modal de Crachá / QR Code (Onda 1) */}
+      <EmployeeQrCodeBadgeModal
+        open={qrCodeModalOpen}
+        onOpenChange={(open) => {
+          setQrCodeModalOpen(open);
+          if (!open) setEmployeeForQrCode(null);
+        }}
+        employeeId={employeeForQrCode?.id ?? null}
+        employeeName={employeeForQrCode?.name}
       />
     </StandardLayout>
   );

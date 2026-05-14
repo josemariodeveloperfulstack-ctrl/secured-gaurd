@@ -47,7 +47,8 @@ import {
   CheckCircle,
   FolderTree,
   Files,
-  GraduationCap
+  GraduationCap,
+  Plus
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import {
@@ -75,6 +76,93 @@ interface MenuItem {
   role?: string;
   color?: string;
 }
+
+/**
+ * RH e DEPARTAMENTO_PESSOAL — itens operacionais bloqueados.
+ */
+const RH_DP_FORBIDDEN_OPERATIONAL_IDS = new Set<string>([
+  'operacional',
+  'controle-visitas',
+  'controle-visitas-avancado',
+  'guia-transporte',
+  'servicos',
+  'rota-semanal-supervisao',
+  'equipamentos',
+  'troca-plantao',
+  'supervisao',
+  'facial-login',
+  'supervisao-visitas',
+  'supervisao-rotas',
+  'supervisao-relatorios',
+  'supervisao-biometria',
+]);
+
+/**
+ * RH e DEPARTAMENTO_PESSOAL — itens financeiros/fiscais bloqueados.
+ */
+const RH_DP_FORBIDDEN_FINANCIAL_IDS = new Set<string>([
+  'modulo-financeiro',
+  'gestao-financeira-dashboard',
+  'gestao-financeira-contas-pagar',
+  'gestao-financeira-contas-receber',
+  'gestao-financeira-fluxo-caixa',
+  'gestao-financeira-movimentacoes',
+  'gestao-financeira-conciliacao',
+  'gestao-financeira-relatorios',
+  'gestao-financeira-orcamento',
+  'gestao-financeira-centros-custo',
+  'gestao-patrimonial',
+  'modulo-fiscal',
+]);
+
+/**
+ * ADMIN / ADMINISTRADOR — itens de sistema sensíveis bloqueados.
+ */
+const ADMIN_FORBIDDEN_SYSTEM_IDS = new Set<string>([
+  'atividades',
+  'sistema',
+  'configuracoes',
+  'whatsapp-connection',
+  'backup',
+]);
+
+/**
+ * SUPERVISOR — bloqueio explícito (defesa em profundidade).
+ * Mesmo com o whitelist `ROLE_ALLOWED_ITEM_IDS.SUPERVISOR`, mantemos este conjunto
+ * para evitar regressões caso novos itens sejam adicionados ao menu ou permissões
+ * extras venham de grupos combinados.
+ */
+const SUPERVISOR_FORBIDDEN_ITEM_IDS = new Set<string>([
+  // Módulo Financeiro
+  'modulo-financeiro',
+  'gestao-financeira-dashboard',
+  'gestao-financeira-contas-pagar',
+  'gestao-financeira-contas-receber',
+  'gestao-financeira-fluxo-caixa',
+  'gestao-financeira-movimentacoes',
+  'gestao-financeira-conciliacao',
+  'gestao-financeira-relatorios',
+  'gestao-financeira-orcamento',
+  'gestao-financeira-centros-custo',
+  'gestao-patrimonial',
+  'modulo-fiscal',
+  // Módulo Comercial
+  'leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm',
+  'commercial-dashboard',
+  // Compras / Estoque / Suprimentos
+  'compras', 'compras-solicitacoes', 'compras-aprovacoes', 'compras-cotacoes', 'compras-relatorios',
+  'estoque', 'estoque-simplificado',
+  // Folha / Holerites (RH / DPE)
+  'holerites', 'documentos-unificados', 'unificados-por-setor', 'payrolls', 'envio-holerites',
+  // Administração / Sistema
+  'usuarios', 'grupos', 'sistema', 'configuracoes', 'atividades',
+  'whatsapp-connection', 'backup',
+  // Empresas / Filiais / Fornecedores
+  'empresas', 'filiais', 'clientes', 'fornecedores',
+  // RH SST (responsabilidade do RH)
+  'rh-sst', 'rh-sst-exames', 'rh-sst-epis', 'rh-sst-acidentes',
+  'rh-sst-treinamentos', 'rh-sst-inspecoes', 'rh-sst-cipa', 'rh-sst-relatorios',
+]);
 
 const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   COLABORADOR: new Set([
@@ -130,6 +218,38 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-relatorios',
     'mensagens',
     'chat-interno',
+  ]),
+  // 🟩 SUPERVISOR — APENAS módulo operacional, supervisão de visitas e comunicação.
+  // ❌ NÃO tem acesso a Financeiro, Comercial, Holerites/Folha, RH SST, Compras, Estoque, Admin.
+  SUPERVISOR: new Set([
+    // Principal / Operacional core
+    'dashboard',
+    'operacional',
+    'controle-visitas',
+    'controle-visitas-avancado',
+    'guia-transporte',
+    'postos',
+    'funcionarios',
+    'operacional-servicos',
+    'equipamentos',
+    'troca-plantao',
+    'rota-semanal-supervisao',
+    // Supervisão (Ondas 4 e 6)
+    'supervisao',
+    'supervisor-dashboard',
+    'supervisor-nova-visita',
+    'facial-login',
+    'supervisao-visitas',
+    'supervisao-rotas',
+    'supervisao-relatorios',
+    // Frota (uso operacional, ex.: veículos para a visita)
+    'frota',
+    // Relatórios operacionais + perfil + comunicação
+    'relatorios',
+    'meus-holerites',
+    'mensagens',
+    'chat-interno',
+    'suporte',
   ]),
 };
 
@@ -237,6 +357,20 @@ export function DynamicSidebar() {
     },
 
     // ===== SUPERVISÃO DENTRO DO OPERACIONAL =====
+    {
+      icon: Shield,
+      text: 'Painel do Supervisor',
+      to: '/supervisor/dashboard',
+      id: 'supervisor-dashboard',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: Plus,
+      text: 'Nova Visita (Supervisor)',
+      to: '/supervisao/visitas/nova',
+      id: 'supervisor-nova-visita',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
     {
       icon: Shield,
       text: 'Supervisão Principal',
@@ -668,7 +802,16 @@ export function DynamicSidebar() {
         ['modulo-financeiro', 'gestao-financeira-dashboard', 'gestao-financeira-contas-pagar', 'gestao-financeira-contas-receber', 'gestao-financeira-fluxo-caixa', 'gestao-financeira-movimentacoes', 'gestao-financeira-conciliacao', 'gestao-financeira-relatorios', 'gestao-financeira-orcamento', 'gestao-financeira-centros-custo', 'gestao-patrimonial'].includes(item.id)
       ),
       operacional: filteredItems.filter(item =>
-        ['servicos', 'controle-visitas-avancado', 'rota-semanal-supervisao', 'equipamentos', 'troca-plantao', 'supervisao', 'facial-login', 'supervisao-visitas', 'supervisao-rotas', 'supervisao-relatorios', 'supervisao-biometria'].includes(item.id)
+        [
+          'servicos', 'controle-visitas-avancado', 'rota-semanal-supervisao',
+          'equipamentos', 'troca-plantao',
+          // Supervisão (Onda 4 e 6) — visíveis para Supervisor e gestores
+          'supervisao', 'supervisor-dashboard', 'supervisor-nova-visita',
+          'facial-login', 'supervisao-visitas', 'supervisao-rotas', 'supervisao-relatorios',
+          'supervisao-biometria',
+          // Itens operacionais essenciais para o Supervisor
+          'funcionarios', 'postos', 'operacional-servicos',
+        ].includes(item.id)
       ),
       empresas: filteredItems.filter(item =>
         ['empresas', 'filiais', 'clientes', 'fornecedores'].includes(item.id)
@@ -767,48 +910,22 @@ export function DynamicSidebar() {
       }
 
       // Regras extras por função para esconder módulos específicos
-      // Departamento Pessoal e RH NÃO veem módulo Operacional/Supervisão
+      // Departamento Pessoal e RH NÃO veem módulo Operacional/Supervisão/Financeiro/Fiscal
       if (['DEPARTAMENTO_PESSOAL', 'RH'].includes(normalizedRole)) {
-        const forbiddenOperationalIds = new Set([
-          'operacional',
-          'controle-visitas',
-          'controle-visitas-avancado',
-          'guia-transporte',
-          'servicos',
-          'rota-semanal-supervisao',
-          'equipamentos',
-          'troca-plantao',
-          'supervisao',
-          'facial-login',
-          'supervisao-visitas',
-          'supervisao-rotas',
-          'supervisao-relatorios',
-          'supervisao-biometria',
-        ]);
-        if (forbiddenOperationalIds.has(item.id)) {
+        if (RH_DP_FORBIDDEN_OPERATIONAL_IDS.has(item.id)) {
           console.log(`🚫 ${normalizedRole} - escondendo item operacional: ${item.id}`);
           return false;
         }
-
-        // RH e Departamento Pessoal NÃO veem Módulo Financeiro nem Módulo Fiscal
-        const forbiddenFinancialIds = new Set([
-          'modulo-financeiro',
-          'gestao-financeira-dashboard',
-          'gestao-financeira-contas-pagar',
-          'gestao-financeira-contas-receber',
-          'gestao-financeira-fluxo-caixa',
-          'gestao-financeira-movimentacoes',
-          'gestao-financeira-conciliacao',
-          'gestao-financeira-relatorios',
-          'gestao-financeira-orcamento',
-          'gestao-financeira-centros-custo',
-          'gestao-patrimonial',
-          'modulo-fiscal',
-        ]);
-        if (forbiddenFinancialIds.has(item.id)) {
+        if (RH_DP_FORBIDDEN_FINANCIAL_IDS.has(item.id)) {
           console.log(`🚫 ${normalizedRole} - escondendo item financeiro/fiscal: ${item.id}`);
           return false;
         }
+      }
+
+      // 🟩 SUPERVISOR — defesa em profundidade (ver SUPERVISOR_FORBIDDEN_ITEM_IDS).
+      if (normalizedRole === 'SUPERVISOR' && SUPERVISOR_FORBIDDEN_ITEM_IDS.has(item.id)) {
+        console.log(`🚫 SUPERVISOR - escondendo item fora do módulo operacional: ${item.id}`);
+        return false;
       }
 
       // Se tem role específico, verificar se o usuário tem esse role
@@ -826,18 +943,9 @@ export function DynamicSidebar() {
         return isAllowed;
       }
 
-      // Regras para ADMIN e ADMINISTRADOR - Esconder módulos de sistema sensíveis
-      if (['ADMIN', 'ADMINISTRADOR'].includes(normalizedRole)) {
-        const forbiddenSystemIds = new Set([
-          'atividades',
-          'sistema',
-          'configuracoes',
-          'whatsapp-connection',
-          'backup'
-        ]);
-        if (forbiddenSystemIds.has(item.id)) {
-          return false;
-        }
+      // Regras para ADMIN e ADMINISTRADOR — esconder módulos de sistema sensíveis
+      if (['ADMIN', 'ADMINISTRADOR'].includes(normalizedRole) && ADMIN_FORBIDDEN_SYSTEM_IDS.has(item.id)) {
+        return false;
       }
 
       return true;

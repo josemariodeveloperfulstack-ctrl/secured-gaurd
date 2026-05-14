@@ -34,6 +34,11 @@ const COMMERCIAL_FULL_ACCESS_ROLES: UserRole[] = [
   'ASSISTENTE_COMERCIAL',
 ];
 
+// 🔒 SUPERVISOR: acesso restrito APENAS ao módulo Operacional.
+// Aplicar em rotas-raiz de Financeiro, Comercial, RH/SST, Folha, Compras, Estoque,
+// Administração e Configurações. Defesa em profundidade contra sessões cacheadas.
+const SUPERVISOR_DENIED_MODULE_ROLES: UserRole[] = ['SUPERVISOR'];
+
 // Portal Público - Carregamento imediato (página inicial)
 import PortalHome from '@/pages/PortalHome';
 import PortalVagas from '@/pages/PortalVagas';
@@ -247,6 +252,9 @@ const GestaoFuncionarios = lazy(() => import('@/pages/GestaoFuncionarios'));
 const AdmissaoFuncionarios = lazy(() => import('@/pages/AdmissaoFuncionarios'));
 
 const ControleVisitasAvancado = lazy(() => import('@/pages/ControleVisitasAvancado'));
+const SupervisorNovaVisita = lazy(() => import('@/pages/SupervisorNovaVisita'));
+const SupervisorDashboard = lazy(() => import('@/pages/SupervisorDashboard'));
+const GestorRemanejamentos = lazy(() => import('@/pages/GestorRemanejamentos'));
 const GestaoVisitasSupervisor = lazy(() => import('@/pages/GestaoVisitasSupervisor'));
 const GuiaTransporte = lazy(() => import('@/pages/GuiaTransporte'));
 const RotaSemanalSupervisao = lazy(() => import('@/pages/RotaSemanalSupervisao'));
@@ -345,7 +353,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/sistema/importar-whatsapp" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <ImportarWhatsappPDF />
                         </Suspense>
@@ -546,12 +554,12 @@ function App() {
 
                     {/* Clientes e Filiais */}
                     <Route path="/clients" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Clientes />
                       </ProtectedRoute>
                     } />
                     <Route path="/clientes" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Clientes />
                       </ProtectedRoute>
                     } />
@@ -561,19 +569,19 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/filiais" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Filiais />
                       </ProtectedRoute>
                     } />
                     <Route path="/gestao-patrimonial" element={
-                      <ProtectedRoute requiredPermissions={['PATRIMONIAL_READ']}>
+                      <ProtectedRoute requiredPermissions={['PATRIMONIAL_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <GestaoPatrimonial />
                         </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/modulo-fiscal" element={
-                      <ProtectedRoute requiredPermissions={['FISCAL_READ']}>
+                      <ProtectedRoute requiredPermissions={['FISCAL_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <ModuloFiscal />
                         </Suspense>
@@ -582,17 +590,17 @@ function App() {
 
                     {/* Contratos e Serviços */}
                     <Route path="/contracts" element={
-                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Contratos />
                       </ProtectedRoute>
                     } />
                     <Route path="/contratos" element={
-                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Contratos />
                       </ProtectedRoute>
                     } />
                     <Route path="/servicos" element={
-                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['CONTRACTS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <GestaoServicos />
                         </Suspense>
@@ -601,12 +609,12 @@ function App() {
 
                     {/* Financeiro */}
                     <Route path="/financial" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ']}>
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Financeiro />
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ']}>
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Financeiro />
                       </ProtectedRoute>
                     } />
@@ -700,7 +708,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/estoque" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_READ']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Estoque />
                       </ProtectedRoute>
                     } />
@@ -725,14 +733,14 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/comercial/marketing" element={
-                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <ComercialMarketing />
                         </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/comercial/empresas" element={
-                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']}>
+                      <ProtectedRoute requiredPermissions={['CLIENTS_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Empresas />
                       </ProtectedRoute>
                     } />
@@ -744,14 +752,14 @@ function App() {
 
                     {/* Estoque Simplificado */}
                     <Route path="/estoque-simplificado" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_READ']}>
+                      <ProtectedRoute requiredPermissions={['STOCK_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <EstoqueSimplificado />
                       </ProtectedRoute>
                     } />
 
                     {/* Compras */}
                     <Route path="/compras" element={
-                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false}>
+                      <ProtectedRoute requiredPermissions={['STOCK_MANAGE', 'STOCK_READ']} requireAllPermissions={false} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Compras />
                       </ProtectedRoute>
                     } />
@@ -854,12 +862,12 @@ function App() {
 
                     {/* RH / Departamento Pessoal */}
                     <Route path="/rh" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <RH />
                       </ProtectedRoute>
                     } />
                     <Route path="/rh/sst" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <SST />
                       </ProtectedRoute>
                     } />
@@ -1086,17 +1094,17 @@ function App() {
 
                     {/* Módulo Comercial */}
                     <Route path="/leads" element={
-                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Leads />
                       </ProtectedRoute>
                     } />
                     <Route path="/propostas" element={
-                      <ProtectedRoute requiredPermissions={['PROPOSALS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['PROPOSALS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Propostas />
                       </ProtectedRoute>
                     } />
                     <Route path="/orcamentos" element={
-                      <ProtectedRoute requiredPermissions={['QUOTES_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['QUOTES_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Orcamentos />
                       </ProtectedRoute>
                     } />
@@ -1110,14 +1118,14 @@ function App() {
 
                     {/* Grupos */}
                     <Route path="/grupos" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Grupos />
                       </ProtectedRoute>
                     } />
 
                     {/* Configurações */}
                     <Route path="/settings" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Configuracoes />
                       </ProtectedRoute>
                     } />
@@ -1148,14 +1156,14 @@ function App() {
 
                     {/* Holerites */}
                     <Route path="/payslips" element={
-                      <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']}>
+                      <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <Holerites />
                         </Suspense>
                       </ProtectedRoute>
                     } />
                     <Route path="/holerites" element={
-                      <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']}>
+                      <ProtectedRoute requiredPermissions={['PAYSLIPS_READ']} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <Holerites />
                         </Suspense>
@@ -1197,7 +1205,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/envio-holerites" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <EnvioHolerites />
                       </ProtectedRoute>
                     } />
@@ -1209,7 +1217,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/payrolls" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <Payroll />
                         </Suspense>
@@ -1218,21 +1226,21 @@ function App() {
 
                     {/* Usuarios */}
                     <Route path="/usuarios" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Usuarios />
                       </ProtectedRoute>
                     } />
 
                     {/* Roles */}
                     <Route path="/roles" element={
-                      <ProtectedRoute>
+                      <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <Roles />
                       </ProtectedRoute>
                     } />
 
                     {/* CRM Comercial */}
                     <Route path="/crm" element={
-                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES}>
+                      <ProtectedRoute requiredPermissions={['LEADS_READ']} requiredRoles={COMMERCIAL_FULL_ACCESS_ROLES} excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
                         <CrmKanban />
                       </ProtectedRoute>
                     } />
@@ -1269,6 +1277,21 @@ function App() {
                     <Route path="/supervisao/visitas" element={
                       <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
                         <ControleVisitasAvancado />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/supervisao/visitas/nova" element={
+                      <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
+                        <SupervisorNovaVisita />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/operacional/remanejamentos/aprovacoes" element={
+                      <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
+                        <GestorRemanejamentos />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/supervisor/dashboard" element={
+                      <ProtectedRoute requiredPermissions={['EMPLOYEES_READ']}>
+                        <SupervisorDashboard />
                       </ProtectedRoute>
                     } />
                     <Route path="/supervisao/rotas" element={

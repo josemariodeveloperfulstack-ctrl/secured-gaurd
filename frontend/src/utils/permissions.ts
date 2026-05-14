@@ -335,43 +335,37 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
       };
 
     case 'SUPERVISOR':
+      // ⚠️ Acesso restrito ao módulo OPERACIONAL.
+      // SUPERVISOR NÃO tem acesso a Financeiro, Comercial, Holerites/Folha, RH SST, Compras, Estoque.
       return {
         ...basePermissions,
+        // Operacional core
+        VISITS_READ: true,
+        VISITS_WRITE: true,
+        VISITS_CREATE: true,
+        ACTIVITY_REPORTS_READ: true,
+        ACTIVITY_REPORTS_WRITE: true,
+        ACTIVITY_REPORTS_CREATE: true,
+        OCCURRENCES_READ: true,
+        OCCURRENCES_WRITE: true,
+        OCCURRENCES_CREATE: true,
+        WORK_POSTS_READ: true,
+        SCHEDULES_READ: true,
+        TIME_RECORDS_READ: true,
+        // Consultas necessárias durante a visita
         EMPLOYEES_READ: true,
-        EMPLOYEES_WRITE: true,
-        CONTRACTS_READ: true,
-        CONTRACTS_WRITE: true,
-        PAYSLIPS_READ: true,
-        PAYSLIPS_WRITE: true,
+        EQUIPMENTS_READ: true,
+        TRAINING_READ: true,
+        // Relatórios operacionais
         REPORTS_READ: true,
         REPORTS_GENERATE: true,
-        LEADS_READ: true,
-        LEADS_WRITE: true,
-        LEADS_CREATE: true,
-        PROPOSALS_READ: true,
-        PROPOSALS_WRITE: true,
-        PROPOSALS_CREATE: true,
-        QUOTES_READ: true,
-        QUOTES_WRITE: true,
-        QUOTES_CREATE: true,
+        // Dashboard + perfil + comunicação
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
-
-        // Permissões de Mensagens
         MESSAGES_READ: true,
         MESSAGES_WRITE: true,
         MESSAGES_CREATE: true,
-
-        // Permissões de Suporte
-        SUPPORT_READ: true,
-
-        // Permissões de Equipamentos/Frota
-        EQUIPMENTS_READ: true,
-        EQUIPMENTS_WRITE: true,
-
-        // Permissões de Atendimento (Supervisão acompanha atendimentos)
-        ATTENDANCE_READ: true,
       };
 
     case 'RH':

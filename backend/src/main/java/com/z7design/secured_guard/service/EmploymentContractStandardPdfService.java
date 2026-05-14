@@ -230,8 +230,17 @@ public class EmploymentContractStandardPdfService {
                                 && !request.getSalaryInWords().isBlank()
                                                 ? request.getSalaryInWords().trim()
                                                 : "(informe o valor por extenso no cadastro do funcionário — campo salário por extenso)";
-                LocalDate dataContrato = request.getContractDate() != null ? request.getContractDate()
-                                : LocalDate.now();
+                // A data exibida em "CIDADE, DD/MM/AAAA" no fim do contrato deve refletir
+                // a data de ADMISSÃO do funcionário (e não a data em que o PDF foi gerado).
+                // Mantemos fallback para contractDate e, em último caso, LocalDate.now().
+                LocalDate dataContrato;
+                if (request.getAdmissionDate() != null) {
+                        dataContrato = request.getAdmissionDate();
+                } else if (request.getContractDate() != null) {
+                        dataContrato = request.getContractDate();
+                } else {
+                        dataContrato = LocalDate.now();
+                }
                 String cidade = resolveSigningCity(company, request);
                 String dataAssinatura = formatDate(dataContrato);
                 String cidadeDataExtenso = (cidade.isEmpty() ? "_______________" : cidade.toUpperCase()) + ", "

@@ -40,24 +40,37 @@ const Certificacoes: React.FC<CertificacoesProps> = ({ standalone = false }) => 
   const [selectedType, setSelectedType] = useState<CertificationType | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<CertificationStatus | 'ALL'>('ALL');
 
-  // Buscar certificações
-  const { 
-    data: certifications, 
-    isLoading: certificationsLoading, 
+  // Em modo standalone (Área do Funcionário) usamos os endpoints "/me", que retornam
+  // apenas as certificações do usuário autenticado. Em modo gerencial (RH/DP/Admin),
+  // usamos os endpoints globais.
+  const scope: 'me' | 'all' = standalone ? 'me' : 'all';
+
+  const {
+    data: certifications,
+    isLoading: certificationsLoading,
     error: certificationsError,
-    refetch: refetchCertifications 
+    refetch: refetchCertifications
   } = useQuery({
-    queryKey: ['certifications'],
-    queryFn: () => certificationService.getCertifications()
+    queryKey: ['certifications', scope],
+    queryFn: () =>
+      scope === 'me'
+        ? certificationService.getMyCertifications()
+        : certificationService.getCertifications(),
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
-  // Buscar estatísticas
-  const { 
-    data: stats, 
-    isLoading: statsLoading 
+  const {
+    data: stats,
+    isLoading: statsLoading
   } = useQuery({
-    queryKey: ['certificationStats'],
-    queryFn: () => certificationService.getCertificationStats()
+    queryKey: ['certificationStats', scope],
+    queryFn: () =>
+      scope === 'me'
+        ? certificationService.getMyCertificationStats()
+        : certificationService.getCertificationStats(),
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Filtrar certificações

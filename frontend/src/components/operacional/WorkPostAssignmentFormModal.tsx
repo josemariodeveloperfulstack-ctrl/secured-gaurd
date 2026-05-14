@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { WorkPostAssignment, CreateWorkPostAssignmentDTO } from '@/services/operationalService';
 import { Loader2, User, MapPin, Calendar, Clock, FileText } from 'lucide-react';
 import { workPostService, WorkPost } from '@/services/workPostService';
@@ -174,21 +175,24 @@ export default function WorkPostAssignmentFormModal({
                 <Label htmlFor="employeeId" className="text-seguranca-lightgray font-medium">
                   Funcionário <span className="text-seguranca-red">*</span>
                 </Label>
-                <Select
-                  value={watch('employeeId')}
-                  onValueChange={(value) => setValue('employeeId', value)}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder="Selecione o funcionário" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={employees.map((employee) => ({
+                    value: employee.id,
+                    label: employee.name,
+                  }))}
+                  value={watch('employeeId') || ''}
+                  onChange={(value) =>
+                    setValue('employeeId', value === 'all' ? '' : value, {
+                      shouldValidate: true,
+                    })
+                  }
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite ao menos 3 caracteres do nome..."
+                  emptyPlaceholder="Nenhum funcionário encontrado."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para buscar funcionários..."
+                  disabled={!!fixedEmployeeId}
+                />
                 {errors.employeeId && (
                   <p className="text-sm text-seguranca-red">{errors.employeeId.message}</p>
                 )}
@@ -211,22 +215,26 @@ export default function WorkPostAssignmentFormModal({
                 <Label htmlFor="workPostId" className="text-seguranca-lightgray font-medium">
                   Posto de Trabalho <span className="text-seguranca-red">*</span>
                 </Label>
-                <Select
-                  value={watch('workPostId')}
-                  onValueChange={(value) => setValue('workPostId', value)}
+                <SearchableSelect
+                  options={workPosts.map((post) => ({
+                    value: post.id,
+                    label: `${post.postCode} - ${post.name}`,
+                  }))}
+                  value={watch('workPostId') || ''}
+                  onChange={(value) =>
+                    setValue('workPostId', value === 'all' ? '' : value, {
+                      shouldValidate: true,
+                    })
+                  }
+                  placeholder={
+                    loadingWorkPosts ? 'Carregando...' : 'Selecione o posto de trabalho'
+                  }
+                  searchPlaceholder="Digite ao menos 3 caracteres do código ou nome..."
+                  emptyPlaceholder="Nenhum posto de trabalho encontrado."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para buscar postos de trabalho..."
                   disabled={loadingWorkPosts}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de trabalho"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {workPosts.map((post) => (
-                      <SelectItem key={post.id} value={post.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        {post.postCode} - {post.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
                 {errors.workPostId && (
                   <p className="text-sm text-seguranca-red">{errors.workPostId.message}</p>
                 )}

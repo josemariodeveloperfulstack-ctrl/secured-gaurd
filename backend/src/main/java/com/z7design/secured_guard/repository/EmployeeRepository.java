@@ -193,6 +193,13 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         @Query(value = "SELECT * FROM employees WHERE UPPER(TRIM(registration_number)) = UPPER(TRIM(:registrationNumber)) LIMIT 1", nativeQuery = true)
         Optional<Employee> findByRegistrationNumber(@Param("registrationNumber") String registrationNumber);
 
+        /**
+         * Busca funcionário pelo token opaco do QR Code (usado pelo Supervisor durante visita).
+         * O token é único e nunca null (filtra por NOT NULL para evitar colisão em registros antigos).
+         */
+        @Query("SELECT e FROM Employee e WHERE e.qrCodeToken IS NOT NULL AND e.qrCodeToken = :token")
+        Optional<Employee> findByQrCodeToken(@Param("token") String token);
+
         // Buscar por nome (exato, case insensitive)
         @Query(value = "SELECT * FROM employees WHERE UPPER(TRIM(name)) = UPPER(TRIM(:name)) LIMIT 1", nativeQuery = true)
         Optional<Employee> findByNameExact(@Param("name") String name);

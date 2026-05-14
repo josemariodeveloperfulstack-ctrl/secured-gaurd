@@ -1,7 +1,9 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.*;
+import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.UserTermsConsent;
+import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.service.SeetaFace2Service;
 import com.z7design.secured_guard.service.SupervisorService;
 import com.z7design.secured_guard.service.UserTermsConsentService;
@@ -20,7 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/supervisor-auth")
@@ -33,6 +35,7 @@ public class SupervisorAuthController {
     private final SeetaFace2Service seetaFace2Service;
     private final UserTermsConsentService consentService;
     private final JwtService jwtService;
+    private final UserRepository userRepository;
     
     @PostMapping("/login-cpf")
     @Operation(summary = "Login por CPF", description = "Autentica supervisor usando CPF")
@@ -48,43 +51,149 @@ public class SupervisorAuthController {
         
         log.info("Tentativa de login por CPF: {}", cpf);
         
+        // 1) Tenta o cadastro dedicado em 'supervisors' (comportamento original)
         try {
-            // Buscar supervisor pelo CPF
             SupervisorDTO supervisor = supervisorService.getSupervisorByCpf(cpf);
-            
-            if (!supervisor.getIsActive()) {
+
+            if (Boolean.FALSE.equals(supervisor.getIsActive())) {
                 return ResponseEntity.status(403).body(Map.of(
                     "success", false,
                     "error", "Supervisor inativo"
                 ));
             }
-            
-            // Verificar se precisa aceitar termos LGPD
-            boolean needsConsent = consentService.isConsentRequiredByCpf(cpf, UserTermsConsent.UserType.SUPERVISOR);
-            
+
+            boolean needsConsent = isConsentRequiredSafe(cpf, UserTermsConsent.UserType.SUPERVISOR);
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("supervisor", supervisor);
             response.put("needsConsent", needsConsent);
-            
+
             if (!needsConsent) {
-                // Gerar JWT token
                 String token = jwtService.generateToken(supervisor.getId().toString(), "SUPERVISOR");
                 response.put("token", token);
                 response.put("message", "Login realizado com sucesso");
             } else {
                 response.put("message", "Necessário aceitar termos de uso");
             }
-            
-            log.info("Login por CPF realizado com sucesso: {}", supervisor.getName());
+
+            log.info("Login por CPF (supervisor dedicado) realizado: {}", supervisor.getName());
             return ResponseEntity.ok(response);
-            
+
+        } catch (Exception supervisorLookupError) {
+            log.info("Supervisor não encontrado na tabela 'supervisors' para CPF '{}'. Tentando fallback em usuários do sistema.", cpf);
+        }
+
+        // 2) Fallback: usuário cadastrado em 'users' com role SUPERVISOR e CPF correspondente
+        try {
+            Optional<User> userOpt = findActiveSupervisorUser(cpf);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of(
+                    "success", false,
+                    "error", "Supervisor não encontrado ou inativo"
+                ));
+            }
+
+            User user = userOpt.get();
+            if (!user.isActive()) {
+                return ResponseEntity.status(403).body(Map.of(
+                    "success", false,
+                    "error", "Supervisor inativo"
+                ));
+            }
+
+            SupervisorDTO supervisor = SupervisorDTO.fromUser(user);
+
+            // Verificar termos LGPD pelo CPF normalizado armazenado no usuário
+            String userCpf = user.getCpf() != null ? user.getCpf() : cpf;
+            boolean needsConsent = isConsentRequiredSafe(userCpf, UserTermsConsent.UserType.SUPERVISOR);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("supervisor", supervisor);
+            response.put("needsConsent", needsConsent);
+
+            if (!needsConsent) {
+                // Para usuários do sistema, gerar token padrão (subject = username)
+                String token = jwtService.generateToken(user);
+                response.put("token", token);
+                response.put("message", "Login realizado com sucesso");
+            } else {
+                response.put("message", "Necessário aceitar termos de uso");
+            }
+
+            log.info("Login por CPF (usuário do sistema com role SUPERVISOR) realizado: {} ({})", user.getName(), user.getUsername());
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            log.error("Erro no login por CPF: {}", cpf, e);
+            log.error("Erro no fallback de login por CPF para '{}'", cpf, e);
             return ResponseEntity.status(404).body(Map.of(
                 "success", false,
                 "error", "Supervisor não encontrado ou inativo"
             ));
+        }
+    }
+
+    /**
+     * Busca um usuário do sistema com role SUPERVISOR ativo a partir de um
+     * CPF ou matrícula informado no login. Tenta múltiplas formas para
+     * tolerar tanto CPF formatado quanto apenas dígitos, e também aceita
+     * matrícula passada no mesmo campo (procurando por username).
+     */
+    private Optional<User> findActiveSupervisorUser(String rawInput) {
+        if (rawInput == null || rawInput.isBlank()) {
+            return Optional.empty();
+        }
+
+        String trimmed = rawInput.trim();
+        String digits = trimmed.replaceAll("\\D", "");
+
+        // Match exato no CPF (como digitado) — útil quando o input já vem formatado
+        Optional<User> byExact = userRepository.findByCpf(trimmed)
+                .filter(this::isUserActiveSupervisor);
+        if (byExact.isPresent()) return byExact;
+
+        // Match por dígitos (normaliza ambos os lados via REPLACE no JPQL)
+        if (!digits.isEmpty()) {
+            Optional<User> byDigits = userRepository.findActiveSupervisorByCpfDigits(digits);
+            if (byDigits.isPresent()) return byDigits;
+        }
+
+        // Aceita também matrícula/username informado no mesmo campo
+        Optional<User> byUsername = userRepository.findByUsername(trimmed)
+                .filter(this::isUserActiveSupervisor);
+        if (byUsername.isPresent()) return byUsername;
+
+        if (!digits.isEmpty() && !digits.equals(trimmed)) {
+            return userRepository.findByUsername(digits)
+                    .filter(this::isUserActiveSupervisor);
+        }
+
+        return Optional.empty();
+    }
+
+    private boolean isUserActiveSupervisor(User user) {
+        if (!user.isActive()) return false;
+        if (user.getRoles() == null || user.getRoles().isEmpty()) return false;
+        return user.getRoles().stream()
+                .filter(r -> r != null && r.getName() != null)
+                .anyMatch(r -> "SUPERVISOR".equalsIgnoreCase(r.getName()));
+    }
+
+    /**
+     * Wrapper defensivo para verificação de consentimento LGPD. Se a consulta
+     * falhar por qualquer motivo (ex.: tabela ausente em um ambiente
+     * desatualizado), assume que o consentimento NÃO é obrigatório para que o
+     * login não seja indevidamente bloqueado. O incidente é registrado em
+     * warning para acompanhamento operacional.
+     */
+    private boolean isConsentRequiredSafe(String cpf, UserTermsConsent.UserType userType) {
+        try {
+            return consentService.isConsentRequiredByCpf(cpf, userType);
+        } catch (Exception ex) {
+            log.warn("Falha ao verificar consentimento LGPD para CPF '{}' (userType={}): {}. Prosseguindo sem exigir aceite.",
+                    cpf, userType, ex.getMessage());
+            return false;
         }
     }
     
@@ -178,14 +287,13 @@ public class SupervisorAuthController {
     public ResponseEntity<Map<String, Object>> acceptTerms(
             @Parameter(description = "CPF do supervisor") @RequestParam String cpf,
             HttpServletRequest request) {
-        
+
         log.info("Aceitação de termos LGPD para supervisor: {}", cpf);
-        
+
+        // 1) Tenta primeiro o cadastro dedicado em 'supervisors'
         try {
-            // Buscar supervisor
             SupervisorDTO supervisor = supervisorService.getSupervisorByCpf(cpf);
-            
-            // Criar consentimento
+
             CreateUserTermsConsentDTO consentDTO = new CreateUserTermsConsentDTO();
             consentDTO.setUserId(supervisor.getId());
             consentDTO.setUserType(UserTermsConsent.UserType.SUPERVISOR);
@@ -193,14 +301,12 @@ public class SupervisorAuthController {
             consentDTO.setAccepted(true);
             consentDTO.setIpAddress(getClientIpAddress(request));
             consentDTO.setUserAgent(request.getHeader("User-Agent"));
-            
+
             UserTermsConsentDTO consent = consentService.createConsent(consentDTO);
-            
-            // Gerar JWT token
             String token = jwtService.generateToken(supervisor.getId().toString(), "SUPERVISOR");
-            
+
             log.info("Termos LGPD aceitos com sucesso para supervisor: {}", supervisor.getName());
-            
+
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Termos aceitos com sucesso",
@@ -208,7 +314,46 @@ public class SupervisorAuthController {
                 "supervisor", supervisor,
                 "consent", consent
             ));
-            
+
+        } catch (Exception supervisorLookupError) {
+            log.info("Supervisor não encontrado em 'supervisors' para CPF '{}'. Tentando fallback em usuários do sistema.", cpf);
+        }
+
+        // 2) Fallback: usuário do sistema com role SUPERVISOR
+        try {
+            Optional<User> userOpt = findActiveSupervisorUser(cpf);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of(
+                    "success", false,
+                    "error", "Supervisor não encontrado ou inativo"
+                ));
+            }
+
+            User user = userOpt.get();
+            SupervisorDTO supervisor = SupervisorDTO.fromUser(user);
+            String userCpf = user.getCpf() != null ? user.getCpf() : cpf;
+
+            CreateUserTermsConsentDTO consentDTO = new CreateUserTermsConsentDTO();
+            consentDTO.setUserId(user.getId());
+            consentDTO.setUserType(UserTermsConsent.UserType.SUPERVISOR);
+            consentDTO.setUserCpf(userCpf);
+            consentDTO.setAccepted(true);
+            consentDTO.setIpAddress(getClientIpAddress(request));
+            consentDTO.setUserAgent(request.getHeader("User-Agent"));
+
+            UserTermsConsentDTO consent = consentService.createConsent(consentDTO);
+            String token = jwtService.generateToken(user);
+
+            log.info("Termos LGPD aceitos (via usuário do sistema com role SUPERVISOR): {} ({})", user.getName(), user.getUsername());
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Termos aceitos com sucesso",
+                "token", token,
+                "supervisor", supervisor,
+                "consent", consent
+            ));
+
         } catch (Exception e) {
             log.error("Erro ao aceitar termos LGPD para supervisor: {}", cpf, e);
             return ResponseEntity.status(500).body(Map.of(
@@ -226,18 +371,42 @@ public class SupervisorAuthController {
     })
     public ResponseEntity<Map<String, Object>> checkTermsStatus(
             @Parameter(description = "CPF do supervisor") @PathVariable String cpf) {
-        
+
+        // 1) Cadastro dedicado em 'supervisors'
         try {
             SupervisorDTO supervisor = supervisorService.getSupervisorByCpf(cpf);
-            boolean needsConsent = consentService.isConsentRequiredByCpf(cpf, UserTermsConsent.UserType.SUPERVISOR);
-            
+            boolean needsConsent = isConsentRequiredSafe(cpf, UserTermsConsent.UserType.SUPERVISOR);
+
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "needsConsent", needsConsent,
                 "supervisor", supervisor
             ));
-            
+        } catch (Exception ignored) {
+            log.debug("Supervisor não encontrado em 'supervisors' para CPF '{}'; tentando fallback em usuários.", cpf);
+        }
+
+        // 2) Fallback: usuário do sistema com role SUPERVISOR
+        try {
+            Optional<User> userOpt = findActiveSupervisorUser(cpf);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of(
+                    "success", false,
+                    "error", "Supervisor não encontrado"
+                ));
+            }
+
+            User user = userOpt.get();
+            SupervisorDTO supervisor = SupervisorDTO.fromUser(user);
+            boolean needsConsent = isConsentRequiredSafe(cpf, UserTermsConsent.UserType.SUPERVISOR);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "needsConsent", needsConsent,
+                "supervisor", supervisor
+            ));
         } catch (Exception e) {
+            log.error("Erro ao verificar status dos termos para CPF '{}'", cpf, e);
             return ResponseEntity.status(404).body(Map.of(
                 "success", false,
                 "error", "Supervisor não encontrado"

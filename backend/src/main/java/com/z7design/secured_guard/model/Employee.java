@@ -55,6 +55,17 @@ public class Employee {
     @Column
     private String registrationNumber;
 
+    /**
+     * Token opaco gerado pelo backend e usado pelo Supervisor para identificar
+     * o funcionário via leitura de QR Code durante uma visita ao posto.
+     * O conteúdo do QR pode trazer também dados visuais (nome/cpf/cargo/posto),
+     * mas a autenticação contra o banco sempre usa este token.
+     * Fallback manual: CPF ou {@link #registrationNumber} (matrícula).
+     */
+    @Column(name = "qr_code_token", length = 64, unique = true)
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    private String qrCodeToken;
+
     @Column
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate hireDate;

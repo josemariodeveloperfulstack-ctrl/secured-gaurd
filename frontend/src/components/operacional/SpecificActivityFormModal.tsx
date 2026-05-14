@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SpecificActivity, CreateSpecificActivityDTO } from '@/services/operationalService';
 import { Loader2, User, Activity, Calendar, Clock, MapPin, FileText } from 'lucide-react';
 import { workPostService, WorkPost } from '@/services/workPostService';
@@ -185,21 +186,23 @@ export default function SpecificActivityFormModal({
                 <Label htmlFor="employeeId" className="text-seguranca-lightgray font-medium">
                   Funcionário <span className="text-seguranca-red">*</span>
                 </Label>
-                <Select
-                  value={watch('employeeId')}
-                  onValueChange={(value) => setValue('employeeId', value)}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder="Selecione o funcionário" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={employees.map((employee) => ({
+                    value: employee.id,
+                    label: employee.name,
+                  }))}
+                  value={watch('employeeId') || ''}
+                  onChange={(value) =>
+                    setValue('employeeId', value === 'all' ? '' : value, {
+                      shouldValidate: true,
+                    })
+                  }
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite ao menos 3 caracteres do nome..."
+                  emptyPlaceholder="Nenhum funcionário encontrado."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para buscar funcionários..."
+                />
                 {errors.employeeId && (
                   <p className="text-sm text-seguranca-red">{errors.employeeId.message}</p>
                 )}

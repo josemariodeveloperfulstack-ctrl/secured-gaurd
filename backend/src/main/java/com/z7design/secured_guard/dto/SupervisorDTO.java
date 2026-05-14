@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.dto;
 
 import com.z7design.secured_guard.model.Supervisor;
+import com.z7design.secured_guard.model.User;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -33,6 +34,27 @@ public class SupervisorDTO {
         dto.setUpdatedAt(supervisor.getUpdatedAt());
         dto.setHasFaceRegistered(supervisor.getFaceTemplate() != null && supervisor.getFaceTemplate().length > 0);
         dto.setFaceQualityScore(supervisor.getFaceQualityScore());
+        return dto;
+    }
+
+    /**
+     * Adapter para representar um usuário do sistema (com role SUPERVISOR)
+     * como um SupervisorDTO. Usado pelo fluxo de login da aba "Supervisor"
+     * quando o cadastro vive na tabela de usuários (e não na tabela
+     * supervisors dedicada).
+     */
+    public static SupervisorDTO fromUser(User user) {
+        SupervisorDTO dto = new SupervisorDTO();
+        dto.setId(user.getId());
+        dto.setName(user.getName());
+        dto.setCpf(user.getCpf());
+        dto.setEmail(user.getEmail());
+        dto.setPhone(user.getPhone());
+        dto.setIsActive(user.isActive());
+        dto.setCreatedAt(user.getCreatedAt());
+        dto.setUpdatedAt(user.getUpdatedAt());
+        dto.setHasFaceRegistered(false);
+        dto.setFaceQualityScore(null);
         return dto;
     }
 }

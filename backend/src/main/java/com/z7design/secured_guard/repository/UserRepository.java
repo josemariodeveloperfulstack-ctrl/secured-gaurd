@@ -47,6 +47,30 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     List<User> findSupervisors();
 
     /**
+     * Busca usuários que são Gestores Operacionais (papel responsável por
+     * aprovar/rejeitar remanejamentos solicitados pelos supervisores).
+     */
+    @Query("SELECT DISTINCT u FROM User u " +
+           "JOIN u.roles r " +
+           "WHERE u.active = true " +
+           "AND r.name IN ('GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ADMIN', 'SUPER_ADMIN')")
+    List<User> findOperationalManagers();
+
+    /**
+     * Busca um usuário supervisor ativo pelo CPF, ignorando formatação
+     * (pontos e traços) tanto na coluna quanto no parâmetro. Útil para o
+     * fluxo de login da aba "Supervisor", que aceita o CPF formatado ou
+     * apenas dígitos.
+     */
+    @Query("SELECT DISTINCT u FROM User u " +
+           "JOIN u.roles r " +
+           "WHERE u.active = true " +
+           "AND r.name = 'SUPERVISOR' " +
+           "AND u.cpf IS NOT NULL " +
+           "AND REPLACE(REPLACE(u.cpf, '.', ''), '-', '') = :cpfDigits")
+    Optional<User> findActiveSupervisorByCpfDigits(@Param("cpfDigits") String cpfDigits);
+
+    /**
      * Busca usuários por nome, email ou username
      */
     @Query("SELECT DISTINCT u FROM User u " +

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -637,28 +638,25 @@ const handleCreateDriver = (e: React.FormEvent) => {
               <Label htmlFor="veiculo" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
                 Veículo <span className="text-seguranca-red">*</span>
               </Label>
-              <Select 
-                value={formData.veiculo_id} 
-                onValueChange={(value) => handleInputChange('veiculo_id', value)}
-                onOpenChange={() => handleFieldBlur('veiculo_id')}
-              >
-                <SelectTrigger 
-                  className={`h-10 sm:h-11 border-2 transition-colors ${
-                    isFieldInvalid('veiculo_id') 
-                      ? 'border-seguranca-red bg-seguranca-black text-seguranca-lightgray' 
-                      : 'border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow'
-                  }`}
-                >
-                  <SelectValue placeholder="Selecione um veículo" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
-                  {veiculosAtivos.map((veiculo) => (
-                    <SelectItem key={veiculo.id} value={veiculo.id}>
-                      {veiculo.placa} - {veiculo.marca} {veiculo.modelo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className={isFieldInvalid('veiculo_id') ? 'ring-2 ring-seguranca-red rounded-md' : ''}>
+                <SearchableSelect
+                  options={veiculosAtivos.map((veiculo) => ({
+                    value: veiculo.id,
+                    label: `${veiculo.placa} - ${veiculo.marca} ${veiculo.modelo}`,
+                  }))}
+                  value={formData.veiculo_id}
+                  onChange={(value) => {
+                    const normalized = value === 'all' ? '' : value;
+                    handleInputChange('veiculo_id', normalized);
+                    handleFieldBlur('veiculo_id');
+                  }}
+                  placeholder="Selecione um veículo"
+                  searchPlaceholder="Digite ao menos 3 caracteres da placa ou modelo..."
+                  emptyPlaceholder="Nenhum veículo encontrado."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para buscar veículos..."
+                />
+              </div>
               {isFieldInvalid('veiculo_id') && (
                 <p className="text-sm text-seguranca-red mt-1">Veículo é obrigatório</p>
               )}
@@ -1099,46 +1097,32 @@ const handleCreateDriver = (e: React.FormEvent) => {
               <Label htmlFor="driverName" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
                 Nome do Motorista <span className="text-seguranca-red">*</span>
               </Label>
-              <Select
+              <SearchableSelect
+                options={employees.map((employee: any) => ({
+                  value: employee.id,
+                  label: employee.name,
+                }))}
                 value={newDriverData.employeeId}
-onValueChange={(value) => {
-                  const selectedEmployee = employees.find((emp: any) => emp.id === value);
+                onChange={(value) => {
+                  const normalized = value === 'all' ? '' : value;
+                  const selectedEmployee = employees.find((emp: any) => emp.id === normalized);
                   const workPostId = selectedEmployee?.workPost?.id != null
                     ? String(selectedEmployee.workPost.id)
                     : '';
                   setNewDriverData(prev => ({
                     ...prev,
-                    employeeId: value,
+                    employeeId: normalized,
                     name: selectedEmployee ? selectedEmployee.name : '',
                     workPost: workPostId
                   }));
                 }}
-              >
-                <SelectTrigger className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors">
-                  <SelectValue placeholder="Selecione o funcionário" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-graphite border-gray-600">
-                  {employeesLoading ? (
-                    <SelectItem value="loading" disabled>
-                      Carregando funcionários...
-                    </SelectItem>
-                  ) : employees.length === 0 ? (
-                    <SelectItem value="empty" disabled>
-                      Nenhum funcionário encontrado
-                    </SelectItem>
-                  ) : (
-                    employees.map((employee) => (
-                      <SelectItem 
-                        key={employee.id} 
-                        value={employee.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-black hover:text-white"
-                      >
-                        {employee.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                placeholder={employeesLoading ? 'Carregando funcionários...' : 'Selecione o funcionário'}
+                searchPlaceholder="Digite ao menos 3 caracteres do nome..."
+                emptyPlaceholder="Nenhum funcionário encontrado."
+                minSearchChars={3}
+                minCharsMessage="Digite ao menos 3 caracteres para buscar funcionários..."
+                disabled={employeesLoading}
+              />
             </div>
             
             <div className="flex flex-col">
@@ -1160,35 +1144,25 @@ onValueChange={(value) => {
               <Label htmlFor="driverWorkPost" className="text-sm sm:text-base text-seguranca-lightgray mb-2">
                 Posto de Trabalho/Setor
               </Label>
-              <Select
+              <SearchableSelect
+                options={workPosts.map((workPost: any) => ({
+                  value: workPost.id,
+                  label: workPost.postCode
+                    ? `${workPost.postCode} - ${workPost.name}`
+                    : workPost.name,
+                }))}
                 value={newDriverData.workPost}
-                onValueChange={(value) => setNewDriverData(prev => ({ ...prev, workPost: value }))}
-              >
-                <SelectTrigger className="h-10 sm:h-11 border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors">
-                  <SelectValue placeholder="Selecione o posto de trabalho" />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-graphite border-gray-600">
-                  {workPostsLoading ? (
-                    <SelectItem value="loading" disabled>
-                      Carregando postos...
-                    </SelectItem>
-                  ) : workPosts.length === 0 ? (
-                    <SelectItem value="empty" disabled>
-                      Nenhum posto encontrado
-                    </SelectItem>
-                  ) : (
-                    workPosts.map((workPost) => (
-                      <SelectItem 
-                        key={workPost.id} 
-                        value={workPost.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-black hover:text-white"
-                      >
-                        {workPost.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+                onChange={(value) => {
+                  const normalized = value === 'all' ? '' : value;
+                  setNewDriverData(prev => ({ ...prev, workPost: normalized }));
+                }}
+                placeholder={workPostsLoading ? 'Carregando postos...' : 'Selecione o posto de trabalho'}
+                searchPlaceholder="Digite ao menos 3 caracteres do código ou nome..."
+                emptyPlaceholder="Nenhum posto encontrado."
+                minSearchChars={3}
+                minCharsMessage="Digite ao menos 3 caracteres para buscar postos de trabalho..."
+                disabled={workPostsLoading}
+              />
             </div>
             
             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
