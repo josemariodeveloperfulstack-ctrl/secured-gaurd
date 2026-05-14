@@ -15,6 +15,9 @@ import java.util.UUID;
 public class DeclarationRequest {
     private UUID companyId;
 
+    /** ID do funcionário (opcional). Quando informado, persiste o PDF gerado. */
+    private UUID employeeId;
+
     // Dados do Funcionário/Pessoa
     private String personName;
     private String personCpf;

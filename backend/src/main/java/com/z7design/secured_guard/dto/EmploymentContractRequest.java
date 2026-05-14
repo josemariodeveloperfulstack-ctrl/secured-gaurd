@@ -16,6 +16,13 @@ import java.util.UUID;
 public class EmploymentContractRequest {
     private UUID companyId;
 
+    /**
+     * ID do funcionário ao qual o contrato se refere. Quando informado, o PDF
+     * gerado é persistido em {@code documentos_gerados} e fica disponível para
+     * download posterior pelo RH e pelo próprio colaborador.
+     */
+    private UUID employeeId;
+
     // Dados do Funcionário
     private String employeeName;
     private String employeeCpf;

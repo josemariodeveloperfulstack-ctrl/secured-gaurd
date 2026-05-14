@@ -3,6 +3,8 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.CreateEPIDeliveryFormDTO;
 import com.z7design.secured_guard.dto.EPIDeliveryFormDTO;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.z7design.secured_guard.service.EPIDeliveryFormService;
 import com.z7design.secured_guard.service.EPIDeliveryStandardPdfService;
 import org.springframework.http.HttpHeaders;
@@ -38,6 +40,7 @@ public class EPIDeliveryFormController {
     private final EPIDeliveryStandardPdfService epiDeliveryPdfService;
     private final com.z7design.secured_guard.repository.UserRepository userRepository;
     private final com.z7design.secured_guard.service.EPIDeliveryReportService epiDeliveryReportService;
+    private final DocumentoGeradoPersistenceService persistenceService;
 
     @Operation(summary = "Exportar relatório analítico de EPIs para Excel")
     @GetMapping("/report/export")
@@ -75,6 +78,21 @@ public class EPIDeliveryFormController {
             log.info("📊 Exportando relatório de EPIs em PDF, tipo: {}", reportType);
             byte[] report = epiDeliveryReportService.generateAnalyticalReportPdf(employeeId, companyId, sectorId, startDate, endDate, reportType);
             String fileName = "relatorio-epi-" + LocalDate.now() + ".pdf";
+
+            // Persiste apenas se for relatório de um funcionário específico.
+            if (employeeId != null) {
+                java.util.Map<String, Object> dados = new java.util.LinkedHashMap<>();
+                if (reportType != null) dados.put("reportType", reportType);
+                if (startDate != null) dados.put("startDate", startDate.toString());
+                if (endDate != null) dados.put("endDate", endDate.toString());
+                persistenceService.persistir(
+                        employeeId,
+                        TipoDocumentoGerado.EPI_DELIVERY,
+                        report,
+                        fileName,
+                        dados);
+            }
+
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
@@ -197,6 +215,19 @@ public class EPIDeliveryFormController {
             com.z7design.secured_guard.model.EPIDeliveryForm form = epiDeliveryFormService.findByIdEntity(id);
             byte[] pdf = epiDeliveryPdfService.generateEPIDeliveryPdfFromForm(form);
             String fileName = "ficha-entrega-epi-" + id + ".pdf";
+
+            UUID employeeId = form.getEmployee() != null ? form.getEmployee().getId() : null;
+            if (employeeId != null) {
+                java.util.Map<String, Object> dados = new java.util.LinkedHashMap<>();
+                dados.put("formId", id.toString());
+                persistenceService.persistir(
+                        employeeId,
+                        TipoDocumentoGerado.EPI_DELIVERY,
+                        pdf,
+                        fileName,
+                        dados);
+            }
+
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)
@@ -233,6 +264,17 @@ public class EPIDeliveryFormController {
             byte[] pdf = epiDeliveryPdfService.generateEPIDeliveryPdfFromForm(form);
 
             String fileName = "ficha-entrega-epi-" + savedForm.getId() + ".pdf";
+
+            if (dto.getEmployeeId() != null) {
+                java.util.Map<String, Object> dados = new java.util.LinkedHashMap<>();
+                dados.put("formId", savedForm.getId().toString());
+                persistenceService.persistir(
+                        dto.getEmployeeId(),
+                        TipoDocumentoGerado.EPI_DELIVERY,
+                        pdf,
+                        fileName,
+                        dados);
+            }
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
@@ -288,6 +330,18 @@ public class EPIDeliveryFormController {
             log.info("📄 Gerando PDF em branco da ficha de entrega de EPI para empresa: {}, funcionário: {}", companyId, employeeId);
             byte[] pdf = epiDeliveryPdfService.generateBlankEPIDeliveryPdf(companyId, employeeId);
             String fileName = "ficha-entrega-epi-manual.pdf";
+
+            if (employeeId != null) {
+                java.util.Map<String, Object> dados = new java.util.LinkedHashMap<>();
+                dados.put("blank", true);
+                persistenceService.persistir(
+                        employeeId,
+                        TipoDocumentoGerado.EPI_DELIVERY,
+                        pdf,
+                        fileName,
+                        dados);
+            }
+
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)

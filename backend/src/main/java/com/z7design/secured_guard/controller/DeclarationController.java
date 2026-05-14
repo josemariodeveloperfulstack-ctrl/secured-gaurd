@@ -1,7 +1,9 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.DeclarationRequest;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import com.z7design.secured_guard.service.DeclarationStandardPdfService;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/declaration")
 @RequiredArgsConstructor
@@ -20,16 +25,34 @@ import org.springframework.web.bind.annotation.RestController;
 public class DeclarationController {
 
     private final DeclarationStandardPdfService declarationService;
+    private final DocumentoGeradoPersistenceService persistenceService;
 
     @PostMapping("/generate-pdf")
     @Operation(summary = "Gerar PDF de Declaração")
     public ResponseEntity<byte[]> generatePdf(@RequestBody DeclarationRequest request) {
         byte[] pdfBytes = declarationService.generatePdf(request);
 
+        Map<String, Object> dados = new LinkedHashMap<>();
+        if (request.getTitle() != null) dados.put("title", request.getTitle());
+        if (request.getPersonName() != null) dados.put("personName", request.getPersonName());
+        if (request.getDocumentDate() != null) dados.put("documentDate", request.getDocumentDate().toString());
+
+        persistenceService.persistir(
+                request.getEmployeeId(),
+                TipoDocumentoGerado.DECLARATION,
+                pdfBytes,
+                "declaracao-" + safeSlug(request.getPersonName()) + ".pdf",
+                dados);
+
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"declaracao.pdf\"")
                 .body(pdfBytes);
+    }
+
+    private static String safeSlug(String value) {
+        if (value == null || value.isBlank()) return "documento";
+        return value.trim().toLowerCase().replaceAll("\\s+", "-");
     }
 
     @PostMapping("/preview-pdf")

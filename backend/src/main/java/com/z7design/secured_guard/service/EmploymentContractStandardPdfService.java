@@ -263,7 +263,8 @@ public class EmploymentContractStandardPdfService {
         }
 
         /**
-         * Preenche placeholders do template de experiência (inclui dias de experiência e data do termo).
+         * Preenche placeholders do template de experiência (inclui dias de experiência,
+         * datas de início/fim do período e data do termo).
          */
         private String fillExperiencePlaceholders(String template, EmploymentContractRequest request, Company company) {
                 int dias = request.getExperienceDurationDays() != null ? request.getExperienceDurationDays() : 45;
@@ -272,8 +273,16 @@ public class EmploymentContractStandardPdfService {
                 String cidadeDataTermo = (cidade.isEmpty() ? "_______________" : cidade.toUpperCase())
                                 + ", ___/___/______.";
 
+                // Datas de início e fim do período de experiência: usadas no cabeçalho
+                // do contrato (".. vigorando a partir de DATA_INICIO até DATA_FIM ..").
+                LocalDate inicio = request.getAdmissionDate();
+                String dataInicioStr = inicio != null ? formatDate(inicio) : "__/__/____";
+                String dataFimStr = inicio != null ? formatDate(inicio.plusDays(dias)) : "__/__/____";
+
                 return applyCommonLongFormPlaceholders(template, request, company)
                                 .replace("{{DIAS_EXPERIENCIA_TEXTO}}", diasExperienciaTexto)
+                                .replace("{{DATA_INICIO}}", dataInicioStr)
+                                .replace("{{DATA_FIM}}", dataFimStr)
                                 .replace("{{CIDADE_DATA_TERMO}}", cidadeDataTermo);
         }
 

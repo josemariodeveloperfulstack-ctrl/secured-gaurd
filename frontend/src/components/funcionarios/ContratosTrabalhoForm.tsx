@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import CurrencyInput from 'react-currency-input-field';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -12,10 +13,14 @@ import { employeeService, Employee, SimpleEmployee } from '@/services/employeeSe
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { SearchableSelect } from '../ui/searchable-select';
 
-import { companyService } from '@/services/companyService';
-import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
-import { clientService, Client as ClientDTO } from '@/services/clientService';
-import workPostService, { WorkPost } from '@/services/workPostService';
+import type { WorkPost } from '@/services/workPostService';
+import {
+  useCompanies,
+  useCostCentersActive,
+  useClients,
+  useAllWorkPosts,
+  useWorkPostsByClient,
+} from '@/hooks/queries';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
@@ -72,16 +77,21 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   });
 
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
-  const [companies, setCompanies] = useState<any[]>([]);
-
-  const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
-  const [clients, setClients] = useState<ClientDTO[]>([]);
-  const [allWorkPosts, setAllWorkPosts] = useState<WorkPost[]>([]);
-  const [filteredWorkPosts, setFilteredWorkPosts] = useState<WorkPost[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
+
+  // Hooks de cache (TanStack Query) — substituem o loadData() manual.
+  // Cache compartilhado entre formulários elimina refetch redundante.
+  const { data: companies = [], isLoading: loadingCompanies } = useCompanies();
+  const { data: costCenters = [], isLoading: loadingCostCenters } = useCostCentersActive();
+  const { data: clients = [], isLoading: loadingClients } = useClients();
+  const { data: allWorkPosts = [], isLoading: loadingAllWorkPosts } = useAllWorkPosts();
+  const { data: workPostsByClient = [], isLoading: loadingWorkPostsByClient } = useWorkPostsByClient(selectedClientId || null);
+
+  const loadingData =
+    loadingCompanies || loadingCostCenters || loadingClients || loadingAllWorkPosts;
+  const filteredWorkPosts: WorkPost[] = selectedClientId ? workPostsByClient : [];
+  const loadingWorkPosts = loadingWorkPostsByClient;
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
@@ -137,57 +147,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     }
   }, [form.employeeId, selectedEmployeeData]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoadingData(true);
-    try {
-      const [companiesData, costCentersData, clientsData, workPostsData] = await Promise.all([
-        companyService.getAllCompanies(),
-        costCenterService.listActive(),
-        clientService.getAllClients().catch(err => { console.warn('Erro ao carregar clientes:', err); return []; }),
-        workPostService.getAllWorkPosts().catch(err => { console.warn('Erro ao carregar postos:', err); return []; })
-      ]);
-      setCompanies(companiesData);
-      setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
-      setClients(clientsData);
-      setAllWorkPosts(Array.isArray(workPostsData) ? workPostsData : []);
-
-      console.log('📊 Centros de Custo carregados:', costCentersData);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar funcionários, empresas e centros de custos.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoadingData(false);
-    }
-  };
-
-  // Carregar postos quando o cliente mudar
-  useEffect(() => {
-    if (selectedClientId) {
-      const fetchPosts = async () => {
-        setLoadingWorkPosts(true);
-        try {
-          const posts = await workPostService.getWorkPostsByClient(selectedClientId);
-          setFilteredWorkPosts(Array.isArray(posts) ? posts : []);
-        } catch (err) {
-          console.warn('Erro ao carregar setores do cliente:', err);
-          setFilteredWorkPosts([]);
-        } finally {
-          setLoadingWorkPosts(false);
-        }
-      };
-      fetchPosts();
-    } else {
-      setFilteredWorkPosts([]);
-    }
-  }, [selectedClientId]);
+  // Os dados de empresas, centros de custo, clientes e postos agora vêm dos hooks
+  // useCompanies / useCostCentersActive / useClients / useAllWorkPosts / useWorkPostsByClient
+  // (TanStack Query) — sem useEffect imperativo, com cache compartilhado.
 
   // Pre-fill some fields when employee is selected
   useEffect(() => {
@@ -204,12 +166,41 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
       setForm(prev => {
         const salaryValue = (funcionario as any).salario;
+        // O componente `CurrencyInput` (react-currency-input-field) espera o
+        // `value` em formato RAW com ponto decimal (ex: "1500.50") e cuida
+        // sozinho da formatação visual ("R$ 1.500,50"). Por isso aqui
+        // convertemos o valor vindo do backend para esse formato raw.
+        //
+        // Aceitamos múltiplos formatos de entrada para robustez:
+        //   - number              → 1500.5
+        //   - "1500.50"           → ponto decimal (já raw)
+        //   - "1.500,50"          → pt-BR (precisa converter)
+        //   - "R$ 1.500,50"       → com prefixo (precisa limpar)
+        const parseSalaryToRaw = (v: unknown): string => {
+          if (v == null) return '';
+          if (typeof v === 'number') {
+            return Number.isFinite(v) ? String(v) : '';
+          }
+          const s = String(v).replace(/[^\d.,-]/g, '').trim();
+          if (!s) return '';
+          // Formato pt-BR com vírgula como separador decimal: "1.500,50" → 1500.50
+          if (/,\d{1,2}$/.test(s)) {
+            const raw = s.replace(/\./g, '').replace(',', '.');
+            const n = Number(raw);
+            return Number.isFinite(n) ? String(n) : '';
+          }
+          // Já está em formato raw com ponto decimal
+          const n = Number(s);
+          return Number.isFinite(n) ? String(n) : '';
+        };
+        const rawSalary = parseSalaryToRaw(salaryValue);
+
         return {
           ...prev,
           position: (funcionario as any).positionName || (funcionario as any).position?.name || prev.position,
           department: matchingWorkPost?.id || matchingCostCenter?.id || prev.department,
           startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
-          salary: salaryValue != null ? String(salaryValue).replace('.', ',') : prev.salary,
+          salary: rawSalary || prev.salary,
           workSchedule: (funcionario as any).escalaTrabalho && (funcionario as any).horarioTrabalho
             ? `${(funcionario as any).escalaTrabalho} - ${(funcionario as any).horarioTrabalho}`
             : (funcionario as any).escalaTrabalho || (funcionario as any).horarioTrabalho || (funcionario as any).diasTrabalho || prev.workSchedule,
@@ -221,6 +212,27 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       }
     }
   }, [funcionario, costCenters, allWorkPosts]);
+
+  // Default da duração de experiência: 45 dias quando "Contrato de Experiência" é selecionado
+  useEffect(() => {
+    if (form.contractType === 'Contrato de Experiência' && !form.experienceDuration) {
+      setForm(prev => ({ ...prev, experienceDuration: '45' }));
+    }
+  }, [form.contractType, form.experienceDuration]);
+
+  // Garante que a data de início use a hireDate do cadastro quando for contrato de experiência
+  useEffect(() => {
+    if (
+      form.contractType === 'Contrato de Experiência' &&
+      funcionario?.hireDate &&
+      !form.startDate
+    ) {
+      setForm(prev => ({
+        ...prev,
+        startDate: funcionario.hireDate!.split('T')[0],
+      }));
+    }
+  }, [form.contractType, funcionario?.hireDate, form.startDate]);
 
   // Auto-calculate end date for experience contracts
   useEffect(() => {
@@ -329,6 +341,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
     return {
       companyId: empresa!.id,
+      employeeId: funcionario?.id,
       employeeName: fullEmployee.name,
       employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
       employeeRg: fullEmployee.rg || '',
@@ -340,7 +353,9 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       pis: fullEmployee.pis || '',
       position: form.position,
       department: departmentName,
-      salary: form.salary ? parseFloat(form.salary.replace(/\./g, '').replace(',', '.')) : 0,
+      // form.salary é sempre armazenado em formato raw com ponto decimal
+      // ("1500.50"), pois é o contrato do CurrencyInput. Basta parseFloat.
+      salary: form.salary ? parseFloat(form.salary) || 0 : 0,
       admissionDate: form.startDate || null,
       workHoursDescription: '44 horas semanais', // Placeholder or add form field if exists
       workSchedule: form.workSchedule || 'a definir',
@@ -751,6 +766,12 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                   <p className="text-sm text-orange-700">
                     Selecione a duração do período de experiência. A data de término será calculada automaticamente.
                   </p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    Padrão: <strong>45 dias</strong> a partir da data de admissão
+                    {funcionario?.hireDate && (
+                      <> (<strong>{new Date(funcionario.hireDate).toLocaleDateString('pt-BR')}</strong>)</>
+                    )}.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-orange-700 font-semibold">Duração da Experiência *</Label>
@@ -819,15 +840,24 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
               <div className="space-y-2">
                 <Label>Salário Base (R$)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R$</span>
-                  <Input
-                    value={form.salary}
-                    onChange={(e) => setForm(prev => ({ ...prev, salary: e.target.value }))}
-                    placeholder="0,00"
-                    className="bg-background h-11 pl-10"
-                  />
-                </div>
+                <CurrencyInput
+                  id="salary-base"
+                  name="salary"
+                  // form.salary é sempre raw decimal (ex: "1500.50") — formato
+                  // esperado por este componente. A formatação visual
+                  // ("R$ 1.500,50") é aplicada automaticamente.
+                  value={form.salary || ''}
+                  placeholder="R$ 0,00"
+                  decimalsLimit={2}
+                  decimalScale={2}
+                  fixedDecimalLength={2}
+                  groupSeparator="."
+                  decimalSeparator=","
+                  prefix="R$ "
+                  allowNegativeValue={false}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, salary: value ?? '' }))}
+                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
               </div>
 
               <div className="space-y-2 lg:col-span-2">
@@ -881,8 +911,13 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                   onChange={(value) => setForm(prev => ({ ...prev, department: value }))}
                   disabled={loadingData || loadingWorkPosts}
                   placeholder={loadingWorkPosts ? 'Carregando setores...' : (selectedClientId ? 'Selecione o setor de trabalho' : 'Selecione um cliente primeiro')}
-                  searchPlaceholder="Buscar setor..."
+                  searchPlaceholder="Digite o nome do posto..."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para ver os postos de trabalho..."
                 />
+                <p className="text-xs text-muted-foreground">
+                  Digite os 3 primeiros caracteres do nome do posto para ver sugestões.
+                </p>
               </div>
             </div>
           </div>

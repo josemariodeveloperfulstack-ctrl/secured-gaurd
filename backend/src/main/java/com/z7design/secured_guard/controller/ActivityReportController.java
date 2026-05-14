@@ -3,7 +3,9 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.*;
 import com.z7design.secured_guard.model.enums.ActivityReportStatus;
 import com.z7design.secured_guard.model.enums.AbsenceStatus;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import com.z7design.secured_guard.service.ActivityReportService;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,10 +35,14 @@ public class ActivityReportController {
 
     private final ActivityReportService activityReportService;
     private final ObjectMapper objectMapper;
+    private final DocumentoGeradoPersistenceService persistenceService;
 
-    public ActivityReportController(ActivityReportService activityReportService, ObjectMapper objectMapper) {
+    public ActivityReportController(ActivityReportService activityReportService,
+                                     ObjectMapper objectMapper,
+                                     DocumentoGeradoPersistenceService persistenceService) {
         this.activityReportService = activityReportService;
         this.objectMapper = objectMapper;
+        this.persistenceService = persistenceService;
     }
 
     @GetMapping
@@ -283,7 +289,22 @@ public class ActivityReportController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(java.util.Map.of("error", "Erro ao gerar PDF", "message", "PDF gerado está vazio"));
             }
-            
+
+            // Persiste apenas quando o relatório é específico de um colaborador.
+            // Relatórios agregados por cliente/período não pertencem a um único funcionário.
+            if (employeeId != null) {
+                java.util.Map<String, Object> dados = new java.util.LinkedHashMap<>();
+                if (clientId != null) dados.put("clientId", clientId.toString());
+                if (startDate != null) dados.put("startDate", startDate.toString());
+                if (endDate != null) dados.put("endDate", endDate.toString());
+                persistenceService.persistir(
+                        employeeId,
+                        TipoDocumentoGerado.ACTIVITY_REPORT,
+                        pdfBytes,
+                        "relatorio-atividades-" + employeeId + ".pdf",
+                        dados);
+            }
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("attachment", "activity_report.pdf");

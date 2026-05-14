@@ -20,6 +20,8 @@ import {
 import { documentService } from '@/services/documentService';
 import { Document, DocumentType } from '@/types/document';
 import { useToast } from '@/hooks/use-toast';
+import { useDocumentosGeradosByEmployee } from '@/hooks/queries/useDocumentosGerados';
+import { SystemGeneratedDocumentsSection } from './SystemGeneratedDocumentsSection';
 import {
   Dialog,
   DialogContent,
@@ -52,6 +54,14 @@ export const EmployeeDocumentsTab: React.FC<EmployeeDocumentsTabProps> = ({ empl
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
+
+  // Documentos gerados pelo sistema (Contrato, Termos, OS, NPPS, Relatórios, EPI).
+  // Carregados via TanStack Query para se beneficiar do cache global e
+  // de invalidações automáticas após geração de novos documentos.
+  const {
+    data: systemDocuments,
+    isLoading: isLoadingSystemDocs,
+  } = useDocumentosGeradosByEmployee(employeeId);
 
   // Upload Form State
   const [selectedType, setSelectedType] = useState<DocumentType>('RG');
@@ -322,6 +332,15 @@ export const EmployeeDocumentsTab: React.FC<EmployeeDocumentsTabProps> = ({ empl
             </div>
           )}
         </div>
+      </div>
+
+      {/* Documentos Gerados pelo Sistema */}
+      <div className="pt-4 border-t border-gray-700">
+        <SystemGeneratedDocumentsSection
+          documents={systemDocuments}
+          isLoading={isLoadingSystemDocs}
+          variant="rh"
+        />
       </div>
 
       {/* Upload Modal */}

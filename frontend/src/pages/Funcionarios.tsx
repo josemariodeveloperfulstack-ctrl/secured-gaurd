@@ -50,6 +50,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  queryKeys,
+  useInvalidateEmployees,
+} from '@/hooks/queries';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
 import { admissionRequestService, AdmissionEmployeeIntegrationContext } from '@/services/admissionRequestService';
 import { companyService } from '@/services/companyService';
@@ -90,6 +95,8 @@ const Funcionarios: React.FC = () => {
   const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
   useGSAP();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const invalidateEmployees = useInvalidateEmployees();
   const location = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
@@ -246,16 +253,31 @@ const Funcionarios: React.FC = () => {
   }, [location.search]);
 
   // Carregar funcionários (filtros da API: busca, empresa, status e ordenação por admissão/demissão)
+  // Roteado pelo TanStack Query: lista e contagem ficam em cache compartilhado com outras telas (modal de edição).
   const loadEmployees = async (filters?: EmployeeFilters, page = 0) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Buscar lista e contagem total
+      // Buscar lista e contagem total — via queryClient.fetchQuery para reaproveitar o cache.
       const [data, count] = await Promise.all([
-        employeeService.getAllEmployees(filters, page, pageSize),
-        employeeService.getEmployeesCount() // Sempre buscar o total para o contador
+        queryClient.fetchQuery({
+          queryKey: queryKeys.employees.list(filters, page, pageSize),
+          queryFn: () => employeeService.getAllEmployees(filters, page, pageSize),
+        }),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.employees.count(),
+          queryFn: () => employeeService.getEmployeesCount(),
+          staleTime: 2 * 60 * 1000,
+        }),
       ]);
+
+      // Pré-popular cache `byId` para evitar refetch no modal de edição
+      data.forEach((emp) => {
+        if (emp?.id) {
+          queryClient.setQueryData(queryKeys.employees.byId(emp.id), emp);
+        }
+      });
 
       console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length, '| Página:', page, '| Total no sistema:', count);
       setEmployees(data);
@@ -434,9 +456,15 @@ const Funcionarios: React.FC = () => {
       setEditModalOpen(false);
       setEmployeeToEdit(null);
 
-      // Buscar dados completos do funcionário do backend
+      // Buscar dados completos do funcionário do backend (via cache do React Query).
+      // Se a lista já foi carregada recentemente, o cache `byId` foi pré-populado
+      // em loadEmployees, evitando uma segunda chamada de rede aqui.
       console.log('🔍 Buscando dados completos do funcionário:', employee.id);
-      const fullEmployeeData = await employeeService.getEmployeeById(employee.id);
+      const fullEmployeeData = await queryClient.fetchQuery({
+        queryKey: queryKeys.employees.byId(employee.id),
+        queryFn: () => employeeService.getEmployeeById(employee.id),
+        staleTime: 30 * 1000,
+      });
       console.log('🔍 Dados completos recebidos:', fullEmployeeData);
 
       // Verificar se os dados foram recebidos corretamente
@@ -484,9 +512,11 @@ const Funcionarios: React.FC = () => {
     setEmployeeToEdit(null);
   };
 
-  // Funcionário editado com sucesso
+  // Funcionário editado com sucesso — invalida o cache de funcionários (lista + detalhes)
+  // e recarrega a lista com os filtros atuais.
   const handleEmployeeEdited = () => {
-    loadEmployeesWithFilters(); // Recarregar lista
+    invalidateEmployees();
+    loadEmployeesWithFilters();
   };
 
   // Normalizar valor de filtro (vazio ou 'all' = todos)

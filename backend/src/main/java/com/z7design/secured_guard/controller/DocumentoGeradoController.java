@@ -2,6 +2,7 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.DocumentoGerado;
 import com.z7design.secured_guard.model.User;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import com.z7design.secured_guard.service.DocumentoGeradoService;
 import com.z7design.secured_guard.service.AuthenticationService;
 import org.springframework.data.domain.Page;
@@ -67,6 +68,43 @@ public class DocumentoGeradoController {
     public ResponseEntity<List<DocumentoGerado>> listarPorFuncionario(@PathVariable UUID funcionarioId) {
         try {
             List<DocumentoGerado> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId);
+            return ResponseEntity.ok(documentos);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Lista documentos gerados do usuário logado (Dashboard do Colaborador).
+     * Não exige permissão de RH: cada colaborador vê apenas seus próprios documentos.
+     */
+    @GetMapping("/meus")
+    public ResponseEntity<List<DocumentoGerado>> listarMeus() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            User usuarioAtual = authenticationService.getCurrentUser(authentication);
+            if (usuarioAtual == null) {
+                return ResponseEntity.ok(List.of());
+            }
+            List<DocumentoGerado> documentos = documentoGeradoService.listarPorUserId(usuarioAtual.getId());
+            return ResponseEntity.ok(documentos);
+        } catch (RuntimeException e) {
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
+    /**
+     * Lista documentos de um funcionário filtrados por tipo/categoria.
+     */
+    @GetMapping("/funcionario/{funcionarioId}/tipo/{tipo}")
+    public ResponseEntity<List<DocumentoGerado>> listarPorFuncionarioETipo(
+            @PathVariable UUID funcionarioId,
+            @PathVariable TipoDocumentoGerado tipo) {
+        try {
+            List<DocumentoGerado> documentos = documentoGeradoService.listarPorFuncionarioETipo(funcionarioId, tipo);
             return ResponseEntity.ok(documentos);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();

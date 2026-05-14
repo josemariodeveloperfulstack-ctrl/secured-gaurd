@@ -20,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { employeeService } from '@/services/employeeService';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/hooks/queries';
 import { UpdateEmployeeDTO } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
 import { unitService, Unit } from '@/services/unitService';
@@ -62,6 +64,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   onSuccess 
 }) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '');
   const isRHOrDPE = ['RH', 'DEPARTAMENTO_PESSOAL', 'ASSISTENCIA_RH', 'AUX_DEP', 'SUPER_ADMIN', 'ADMIN'].includes(normalizedRole);
@@ -433,10 +436,17 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
 
       try {
-        // Buscar dados completos do funcionário do backend
+        // Buscar dados completos do funcionário usando o cache do React Query.
+        // Se a página pai (Funcionarios.tsx) ou o handler de edição já buscaram
+        // este funcionário, o cache devolve instantaneamente — eliminando o
+        // fetch duplicado que existia antes (pai + modal chamavam getEmployeeById).
         console.log('🔍 Buscando dados completos do funcionário ID:', funcionario.id);
-        const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-        
+        const fullEmployee = await queryClient.fetchQuery({
+          queryKey: queryKeys.employees.byId(funcionario.id),
+          queryFn: () => employeeService.getEmployeeById(funcionario.id),
+          staleTime: 30 * 1000,
+        });
+
         if (!fullEmployee) {
           console.warn('⚠️ Funcionário não encontrado no backend');
           return;
@@ -1118,6 +1128,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
 
       await employeeService.updateEmployee(funcionario.id, employeeData);
+      // Invalida caches de listas + remove a entrada byId obsoleta para que
+      // o próximo open do modal/lista busque os dados frescos.
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.removeQueries({ queryKey: queryKeys.employees.byId(funcionario.id) });
       toast({
         title: "Sucesso",
         description: "Funcionário atualizado com sucesso!",

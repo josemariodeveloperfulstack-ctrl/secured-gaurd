@@ -23,6 +23,8 @@ import { useNavigate } from 'react-router-dom';
 import { DocumentPreviewModal } from '@/components/DocumentPreviewModal';
 import holeriteService from '@/services/holeriteService';
 import api from '@/lib/axios';
+import { useMeusDocumentos } from '@/hooks/queries/useDocumentosGerados';
+import { SystemGeneratedDocumentsSection } from '@/components/funcionarios/SystemGeneratedDocumentsSection';
 
 interface Payslip {
   id: string; // Mantendo string por compatibilidade com o estado local, mas o serviço suporta number
@@ -43,6 +45,13 @@ const DashboardColaborador: React.FC = () => {
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   // Reservado para futuras integrações (comprovantes / docs unificados)
   const [loading, setLoading] = useState(true);
+
+  // Documentos gerados pelo RH para este colaborador (Contrato, Termos, OS,
+  // NPPS, EPI, Advertências, etc.).
+  const {
+    data: meusDocumentos,
+    isLoading: isLoadingMeusDocumentos,
+  } = useMeusDocumentos();
 
   useEffect(() => {
     loadData();
@@ -341,6 +350,19 @@ const DashboardColaborador: React.FC = () => {
                 ) : (
                   <p className="text-xs text-gray-500 text-center py-2 italic font-medium">Nenhum documento novo liberado hoje.</p>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Action Card: Meus Documentos do RH (gerados pelo sistema) */}
+            <Card className="bg-seguranca-black/60 border-gray-800 rounded-3xl border-l-4 border-l-seguranca-red overflow-hidden">
+              <CardContent className="p-5">
+                <SystemGeneratedDocumentsSection
+                  documents={meusDocumentos}
+                  isLoading={isLoadingMeusDocumentos}
+                  variant="rh"
+                  title="Meus Documentos do RH"
+                  subtitle="Contratos, termos, OS, advertências e demais documentos disponibilizados pelo RH."
+                />
               </CardContent>
             </Card>
 

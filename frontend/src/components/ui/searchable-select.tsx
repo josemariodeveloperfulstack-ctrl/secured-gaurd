@@ -32,6 +32,12 @@ interface SearchableSelectProps {
   searchPlaceholder?: string;
   emptyPlaceholder?: string;
   disabled?: boolean;
+  /** Mostrar opções apenas após digitar este número de caracteres (default: 0 = mostra sempre). */
+  minSearchChars?: number;
+  /** Mensagem exibida enquanto o usuário não atingiu minSearchChars. */
+  minCharsMessage?: string;
+  /** Callback para busca server-side (debounced opcional). */
+  onSearchChange?: (query: string) => void;
 }
 
 export function SearchableSelect({
@@ -42,10 +48,42 @@ export function SearchableSelect({
   searchPlaceholder = "Buscar...",
   emptyPlaceholder = "Nenhum item encontrado.",
   disabled = false,
-}: SearchableSelectProps) {
+  minSearchChars = 0,
+  minCharsMessage,
+  onSearchChange,
+}: Readonly<SearchableSelectProps>) {
   const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
 
   const selectedOption = options.find((opt) => opt.value === value)
+
+  // Notifica busca externa (server-side) com debounce simples
+  React.useEffect(() => {
+    if (!onSearchChange) return
+    const t = setTimeout(() => onSearchChange(search), 250)
+    return () => clearTimeout(t)
+  }, [search, onSearchChange])
+
+  // Aplica o filtro mínimo de caracteres
+  const showOptions = search.length >= minSearchChars
+  const filteredOptions = React.useMemo(() => {
+    if (!showOptions) return [] as Option[]
+    if (!search) return options
+    const q = search.toLowerCase()
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        (o.description ? o.description.toLowerCase().includes(q) : false)
+    )
+  }, [options, search, showOptions])
+
+  const resolvedMinCharsMessage =
+    minCharsMessage ?? `Digite ao menos ${minSearchChars} caracteres para buscar...`
+
+  // Resetar a busca ao fechar
+  React.useEffect(() => {
+    if (!open) setSearch("")
+  }, [open])
 
   return (
     <Popover open={open} onOpenChange={setOpen} modal={true}>
@@ -63,56 +101,69 @@ export function SearchableSelect({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
+      <PopoverContent
         className="p-0 bg-seguranca-graphite border-gray-600 shadow-2xl z-[10500] w-[var(--radix-popover-trigger-width)]"
         align="start"
       >
-        <Command className="bg-seguranca-graphite text-seguranca-lightgray border-none">
+        <Command
+          className="bg-seguranca-graphite text-seguranca-lightgray border-none"
+          shouldFilter={false}
+        >
           <div className="flex items-center border-b border-gray-600 px-3 h-10">
             <SearchIcon className="mr-2 h-4 w-4 shrink-0 opacity-50 text-seguranca-yellow" />
-            <CommandInput 
-              placeholder={searchPlaceholder} 
+            <CommandInput
+              placeholder={searchPlaceholder}
+              value={search}
+              onValueChange={setSearch}
               className="flex h-full w-full bg-transparent py-3 text-sm outline-none placeholder:text-gray-500 disabled:cursor-not-allowed disabled:opacity-50 border-none focus:ring-0"
             />
           </div>
           <CommandList className="max-h-80 overflow-y-auto">
-            <CommandEmpty className="py-6 text-center text-sm text-gray-400">
-              {emptyPlaceholder}
-            </CommandEmpty>
-            <CommandGroup className="p-1">
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.value}
-                  onSelect={(currentValue) => {
-                    onChange(currentValue === value ? "all" : currentValue)
-                    setOpen(false)
-                  }}
-                  className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2.5 text-sm outline-none aria-selected:bg-seguranca-black/80 aria-selected:text-seguranca-yellow hover:bg-seguranca-black/80 transition-colors gap-3"
-                >
-                  <div className="flex items-center justify-center w-5">
-                    <Check
-                      className={cn(
-                        "h-4 w-4 text-seguranca-yellow",
-                        value === option.value ? "opacity-100" : "opacity-0"
+            {showOptions && filteredOptions.length > 0 && (
+              <CommandGroup className="p-1">
+                {filteredOptions.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={option.value}
+                    onSelect={(currentValue) => {
+                      onChange(currentValue === value ? "all" : currentValue)
+                      setOpen(false)
+                    }}
+                    className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2.5 text-sm outline-none aria-selected:bg-seguranca-black/80 aria-selected:text-seguranca-yellow hover:bg-seguranca-black/80 transition-colors gap-3"
+                  >
+                    <div className="flex items-center justify-center w-5">
+                      <Check
+                        className={cn(
+                          "h-4 w-4 text-seguranca-yellow",
+                          value === option.value ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                    </div>
+                    <div className="flex flex-col flex-1 overflow-hidden">
+                      <span className="font-medium truncate text-gray-100">{option.label}</span>
+                      {option.description && (
+                        <span className="text-[11px] text-gray-400 truncate mt-0.5">
+                          {option.description}
+                        </span>
                       )}
-                    />
-                  </div>
-                  <div className="flex flex-col flex-1 overflow-hidden">
-                    <span className="font-medium truncate text-gray-100">{option.label}</span>
-                    {option.description && (
-                      <span className="text-[11px] text-gray-400 truncate mt-0.5">
-                        {option.description}
-                      </span>
-                    )}
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {showOptions && filteredOptions.length === 0 && (
+              <CommandEmpty className="py-6 text-center text-sm text-gray-400">
+                {emptyPlaceholder}
+              </CommandEmpty>
+            )}
+            {!showOptions && (
+              <div className="py-6 text-center text-sm text-gray-400 px-4">
+                {resolvedMinCharsMessage}
+              </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
   )
 }
-
