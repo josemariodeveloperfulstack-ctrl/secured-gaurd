@@ -147,7 +147,8 @@ public class EmploymentContractStandardPdfService {
 
                 addClauseAsSection(document, "CLÁUSULA 2ª - DA REMUNERAÇÃO",
                                 "A EMPREGADORA pagará ao EMPREGADO a remuneração mensal de R$ "
-                                                + formatMoney(request.getSalary()) +
+                                                + formatMoney(request.getSalary())
+                                                + " (" + convertToWords(request.getSalary()) + ")" +
                                                 ", a ser efetuada até o 5º dia útil do mês subsequente ao vencido.");
 
                 addClauseAsSection(document, "CLÁUSULA 3ª - DA JORNADA",
@@ -198,10 +199,14 @@ public class EmploymentContractStandardPdfService {
         private String applyCommonLongFormPlaceholders(String template, EmploymentContractRequest request,
                         Company company) {
                 String salarioValor = "R$ " + formatMoney(request.getSalary());
-                String salarioExtenso = request.getSalaryInWords() != null
-                                && !request.getSalaryInWords().isBlank()
-                                                ? request.getSalaryInWords().trim()
-                                                : "(informe o valor por extenso no cadastro do funcionário — campo salário por extenso)";
+                String salarioExtenso;
+                if (request.getSalaryInWords() != null && !request.getSalaryInWords().isBlank()) {
+                        salarioExtenso = request.getSalaryInWords().trim();
+                } else if (request.getSalary() != null) {
+                        salarioExtenso = convertToWords(request.getSalary());
+                } else {
+                        salarioExtenso = "(informe o valor por extenso no cadastro do funcionário — campo salário por extenso)";
+                }
                 // A data exibida em "CIDADE, DD/MM/AAAA" no fim do contrato deve refletir
                 // a data de ADMISSÃO do funcionário (e não a data em que o PDF foi gerado).
                 // Mantemos fallback para contractDate e, em último caso, LocalDate.now().
@@ -546,5 +551,106 @@ public class EmploymentContractStandardPdfService {
                         case "STABLE_UNION", "UNIAO_ESTAVEL" -> "União Estável";
                         default -> status;
                 };
+        }
+
+        private static final String[] UNIDADES = {
+                "", "Um", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "Oito", "Nove", "Dez",
+                "Onze", "Doze", "Treze", "Quatorze", "Quinze", "Dezesseis", "Dezessete", "Dezoito", "Dezenove"
+        };
+        private static final String[] DEZENAS = {
+                "", "", "Vinte", "Trinta", "Quarenta", "Cinquenta", "Sessenta", "Setenta", "Oitenta", "Noventa"
+        };
+        private static final String[] CENTENAS = {
+                "", "Cento", "Duzentos", "Trezentos", "Quatrocentos", "Quinhentos", "Seiscentos", "Setecentos", "Oitocentos", "Novecentos"
+        };
+
+        public static String convertToWords(BigDecimal value) {
+                if (value == null || value.compareTo(BigDecimal.ZERO) == 0) {
+                        return "Zero Reais";
+                }
+
+                BigDecimal rounded = value.setScale(2, java.math.RoundingMode.HALF_UP);
+                long totalCents = rounded.multiply(new BigDecimal(100)).longValue();
+                long integerPart = totalCents / 100;
+                int centsPart = (int) (totalCents % 100);
+
+                StringBuilder sb = new StringBuilder();
+
+                if (integerPart > 0) {
+                        sb.append(integerPartToWords(integerPart));
+                        sb.append(integerPart == 1 ? " Real" : " Reais");
+                }
+
+                if (centsPart > 0) {
+                        if (integerPart > 0) {
+                                sb.append(" e ");
+                        }
+                        sb.append(centsPart);
+                        sb.append(centsPart == 1 ? " Centavo" : " Centavos");
+                }
+
+                return sb.toString().trim();
+        }
+
+        private static String integerPartToWords(long number) {
+                if (number == 0) return "";
+
+                long milhoes = number / 1000000;
+                long restoMilhoes = number % 1000000;
+
+                long milhares = restoMilhoes / 1000;
+                int unidades = (int) (restoMilhoes % 1000);
+
+                StringBuilder sb = new StringBuilder();
+
+                if (milhoes > 0) {
+                        if (milhoes == 1) {
+                                sb.append("Um Milhão");
+                        } else {
+                                sb.append(convertGroupToWords((int) milhoes)).append(" Milhões");
+                        }
+                }
+
+                if (milhares > 0) {
+                        if (sb.length() > 0) {
+                                if (milhares < 100 || milhares % 100 == 0) {
+                                        sb.append(" e ");
+                                } else {
+                                        sb.append(" ");
+                                }
+                        }
+                        if (milhares == 1) {
+                                sb.append("Hum Mil");
+                        } else {
+                                sb.append(convertGroupToWords((int) milhares)).append(" Mil");
+                        }
+                }
+
+                if (unidades > 0) {
+                        if (sb.length() > 0) {
+                                if (unidades < 100 || unidades % 100 == 0) {
+                                        sb.append(" e ");
+                                } else {
+                                        sb.append(" ");
+                                }
+                        }
+                        sb.append(convertGroupToWords(unidades));
+                }
+
+                return sb.toString();
+        }
+
+        private static String convertGroupToWords(int number) {
+                if (number == 0) return "";
+                if (number < 20) return UNIDADES[number];
+                if (number < 100) {
+                        int dezena = number / 10;
+                        int resto = number % 10;
+                        return resto == 0 ? DEZENAS[dezena] : DEZENAS[dezena] + " e " + UNIDADES[resto];
+                }
+                if (number == 100) return "Cem";
+                int centena = number / 100;
+                int resto = number % 100;
+                return resto == 0 ? CENTENAS[centena] : CENTENAS[centena] + " e " + convertGroupToWords(resto);
         }
 }
