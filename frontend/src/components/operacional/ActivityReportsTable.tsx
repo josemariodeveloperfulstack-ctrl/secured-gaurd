@@ -115,11 +115,12 @@ const ActivityReportsTable: React.FC<ActivityReportsTableProps> = ({
   };
 
   const filteredReports = reports.filter(report => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-      report.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.workPostName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      report.description.toLowerCase().includes(searchTerm.toLowerCase());
+      (report.employeeName?.toLowerCase() || '').includes(searchLower) ||
+      (report.clientName?.toLowerCase() || '').includes(searchLower) ||
+      (report.workPostName?.toLowerCase() || '').includes(searchLower) ||
+      (report.description?.toLowerCase() || '').includes(searchLower);
     
     const matchesStatus = statusFilter === 'all' || report.status === statusFilter;
     const matchesEmployee = employeeFilter === 'all' || report.employeeId === employeeFilter;

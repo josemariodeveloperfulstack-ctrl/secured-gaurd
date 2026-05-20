@@ -86,11 +86,12 @@ const TransportGuidesTable: React.FC<TransportGuidesTableProps> = ({
   };
 
   const filteredGuides = guides.filter(guide => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch = 
-      guide.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      guide.numeroArma.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      guide.cnpj.includes(searchTerm) ||
-      guide.motivo.toLowerCase().includes(searchTerm.toLowerCase());
+      (guide.empresa?.toLowerCase() || '').includes(searchLower) ||
+      (guide.numeroArma?.toLowerCase() || '').includes(searchLower) ||
+      (guide.cnpj || '').includes(searchTerm) ||
+      (guide.motivo?.toLowerCase() || '').includes(searchLower);
     
     const matchesStatus = statusFilter === 'all' || guide.status === statusFilter;
     const matchesEmpresa = empresaFilter === 'all' || guide.empresa === empresaFilter;

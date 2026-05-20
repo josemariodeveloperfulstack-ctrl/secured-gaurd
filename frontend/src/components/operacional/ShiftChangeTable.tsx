@@ -198,11 +198,12 @@ const ShiftChangeTable: React.FC<ShiftChangeTableProps> = ({ onRefresh }) => {
   };
 
   const filteredShiftChanges = shiftChanges.filter(shiftChange => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      shiftChange.requesterFullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shiftChange.replacingFullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shiftChange.requesterSector.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shiftChange.replacingSector.toLowerCase().includes(searchTerm.toLowerCase());
+      (shiftChange.requesterFullName?.toLowerCase() || '').includes(searchLower) ||
+      (shiftChange.replacingFullName?.toLowerCase() || '').includes(searchLower) ||
+      (shiftChange.requesterSector?.toLowerCase() || '').includes(searchLower) ||
+      (shiftChange.replacingSector?.toLowerCase() || '').includes(searchLower);
 
     const matchesStatus = statusFilter === 'all' || shiftChange.status === statusFilter;
 
