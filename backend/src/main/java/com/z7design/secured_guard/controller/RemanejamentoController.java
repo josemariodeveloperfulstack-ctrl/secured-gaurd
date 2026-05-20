@@ -4,6 +4,7 @@ import com.z7design.secured_guard.dto.RemanejamentoDTO;
 import com.z7design.secured_guard.model.Remanejamento;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.service.RemanejamentoService;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -87,11 +88,19 @@ public class RemanejamentoController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id, HttpServletRequest request) {
-        User usuarioAtual = getUsuarioAtual();
-        String ipUsuario = getClientIpAddress(request);
-        
-        remanejamentoService.delete(id, usuarioAtual, "Exclusão via API - IP: " + ipUsuario);
-        return ResponseEntity.noContent().build();
+        try {
+            User usuarioAtual = getUsuarioAtual();
+            String ipUsuario = getClientIpAddress(request);
+
+            remanejamentoService.delete(id, usuarioAtual, "Exclusão via API - IP: " + ipUsuario);
+            return ResponseEntity.noContent().build();
+        } catch (ResourceNotFoundException e) {
+            log.warn("Remanejamento não encontrado para exclusão: {}", id);
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            log.error("Erro ao excluir remanejamento {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @Operation(summary = "Busca todos os remanejamentos",

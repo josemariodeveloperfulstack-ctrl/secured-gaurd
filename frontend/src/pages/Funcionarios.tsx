@@ -50,6 +50,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useGSAP } from '@/hooks/use-gsap';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  queryKeys,
+  useInvalidateEmployees,
+} from '@/hooks/queries';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
 import { admissionRequestService, AdmissionEmployeeIntegrationContext } from '@/services/admissionRequestService';
 import { companyService } from '@/services/companyService';
@@ -58,6 +63,8 @@ import { positionService, Position } from '@/services/positionService';
 import { Employee } from '@/types/employee';
 import FuncionarioNovoModal from '@/components/funcionarios/FuncionarioNovoModal';
 import { EmployeeDocuments } from '@/components/funcionarios/EmployeeDocuments';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useLocation, useNavigate } from 'react-router-dom';
 import EmployeeTrainingTab from '@/components/funcionarios/EmployeeTrainingTab';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -71,6 +78,7 @@ import { FileSpreadsheet, Upload } from 'lucide-react';
 import { EmployeeViewDetailsModal } from '@/components/funcionarios/EmployeeViewDetailsModal';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import FuncionarioEditModal from '@/components/funcionarios/FuncionarioEditModal';
+import { EmployeeQrCodeBadgeModal } from '@/components/funcionarios/EmployeeQrCodeBadgeModal';
 
 const Funcionarios: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -86,8 +94,12 @@ const Funcionarios: React.FC = () => {
   const [pageSize, setPageSize] = useState(50);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [employeeToEdit, setEmployeeToEdit] = useState<Employee | null>(null);
+  const [qrCodeModalOpen, setQrCodeModalOpen] = useState(false);
+  const [employeeForQrCode, setEmployeeForQrCode] = useState<Employee | null>(null);
   useGSAP();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const invalidateEmployees = useInvalidateEmployees();
   const location = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(location.search);
@@ -244,16 +256,31 @@ const Funcionarios: React.FC = () => {
   }, [location.search]);
 
   // Carregar funcionários (filtros da API: busca, empresa, status e ordenação por admissão/demissão)
+  // Roteado pelo TanStack Query: lista e contagem ficam em cache compartilhado com outras telas (modal de edição).
   const loadEmployees = async (filters?: EmployeeFilters, page = 0) => {
     try {
       setLoading(true);
       setError(null);
 
-      // Buscar lista e contagem total
+      // Buscar lista e contagem total — via queryClient.fetchQuery para reaproveitar o cache.
       const [data, count] = await Promise.all([
-        employeeService.getAllEmployees(filters, page, pageSize),
-        employeeService.getEmployeesCount() // Sempre buscar o total para o contador
+        queryClient.fetchQuery({
+          queryKey: queryKeys.employees.list(filters, page, pageSize),
+          queryFn: () => employeeService.getAllEmployees(filters, page, pageSize),
+        }),
+        queryClient.fetchQuery({
+          queryKey: queryKeys.employees.count(),
+          queryFn: () => employeeService.getEmployeesCount(),
+          staleTime: 2 * 60 * 1000,
+        }),
       ]);
+
+      // Pré-popular cache `byId` para evitar refetch no modal de edição
+      data.forEach((emp) => {
+        if (emp?.id) {
+          queryClient.setQueryData(queryKeys.employees.byId(emp.id), emp);
+        }
+      });
 
       console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length, '| Página:', page, '| Total no sistema:', count);
       setEmployees(data);
@@ -411,6 +438,12 @@ const Funcionarios: React.FC = () => {
     if (shouldOpenModal) navigate('/rh/funcionarios', { replace: true });
   };
 
+  // Abrir modal do crachá / QR Code
+  const handleViewQrCode = (employee: Employee) => {
+    setEmployeeForQrCode(employee);
+    setQrCodeModalOpen(true);
+  };
+
   // Abrir modal de edição
   const handleEditEmployee = async (employee: Employee) => {
     console.log('🔍 handleEditEmployee chamado com:', employee);
@@ -432,9 +465,15 @@ const Funcionarios: React.FC = () => {
       setEditModalOpen(false);
       setEmployeeToEdit(null);
 
-      // Buscar dados completos do funcionário do backend
+      // Buscar dados completos do funcionário do backend (via cache do React Query).
+      // Se a lista já foi carregada recentemente, o cache `byId` foi pré-populado
+      // em loadEmployees, evitando uma segunda chamada de rede aqui.
       console.log('🔍 Buscando dados completos do funcionário:', employee.id);
-      const fullEmployeeData = await employeeService.getEmployeeById(employee.id);
+      const fullEmployeeData = await queryClient.fetchQuery({
+        queryKey: queryKeys.employees.byId(employee.id),
+        queryFn: () => employeeService.getEmployeeById(employee.id),
+        staleTime: 30 * 1000,
+      });
       console.log('🔍 Dados completos recebidos:', fullEmployeeData);
 
       // Verificar se os dados foram recebidos corretamente
@@ -482,9 +521,11 @@ const Funcionarios: React.FC = () => {
     setEmployeeToEdit(null);
   };
 
-  // Funcionário editado com sucesso
+  // Funcionário editado com sucesso — invalida o cache de funcionários (lista + detalhes)
+  // e recarrega a lista com os filtros atuais.
   const handleEmployeeEdited = () => {
-    loadEmployeesWithFilters(); // Recarregar lista
+    invalidateEmployees();
+    loadEmployeesWithFilters();
   };
 
   // Normalizar valor de filtro (vazio ou 'all' = todos)
@@ -1336,41 +1377,33 @@ Para excluir este funcionário:
 
                 <div className="flex flex-col gap-1">
                   <label htmlFor="hire-date-from" className="text-xs text-gray-400">Admissão (de)</label>
-                  <Input
-                    id="hire-date-from"
-                    type="date"
-                    value={hireDateFrom}
-                    onChange={(e) => setHireDateFrom(e.target.value)}
+                  <DatePicker
+                    date={hireDateFrom ? parseISO(hireDateFrom) : undefined}
+                    onDateChange={(date) => setHireDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="hire-date-to" className="text-xs text-gray-400">Admissão (até)</label>
-                  <Input
-                    id="hire-date-to"
-                    type="date"
-                    value={hireDateTo}
-                    onChange={(e) => setHireDateTo(e.target.value)}
+                  <DatePicker
+                    date={hireDateTo ? parseISO(hireDateTo) : undefined}
+                    onDateChange={(date) => setHireDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="termination-date-from" className="text-xs text-gray-400">Demissão (de)</label>
-                  <Input
-                    id="termination-date-from"
-                    type="date"
-                    value={terminationDateFrom}
-                    onChange={(e) => setTerminationDateFrom(e.target.value)}
+                  <DatePicker
+                    date={terminationDateFrom ? parseISO(terminationDateFrom) : undefined}
+                    onDateChange={(date) => setTerminationDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="termination-date-to" className="text-xs text-gray-400">Demissão (até)</label>
-                  <Input
-                    id="termination-date-to"
-                    type="date"
-                    value={terminationDateTo}
-                    onChange={(e) => setTerminationDateTo(e.target.value)}
+                  <DatePicker
+                    date={terminationDateTo ? parseISO(terminationDateTo) : undefined}
+                    onDateChange={(date) => setTerminationDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
                     className="h-11 bg-seguranca-black/70 border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow"
                   />
                 </div>
@@ -1432,6 +1465,7 @@ Para excluir este funcionário:
                   navigate('/rh/funcionarios?tab=dependentes', { replace: true });
                 }}
                 onViewDetails={handleViewDetails}
+                onViewQrCode={handleViewQrCode}
                 isLoading={loading}
                 isMobileSelectionMode={isMobileSelectionMode}
                 sortKey={sortKey}
@@ -1863,6 +1897,17 @@ Para excluir este funcionário:
         filterCompanies={filterCompanies}
         filterWorkPosts={filterWorkPosts}
         filterPositions={filterPositions}
+      />
+
+      {/* Modal de Crachá / QR Code (Onda 1) */}
+      <EmployeeQrCodeBadgeModal
+        open={qrCodeModalOpen}
+        onOpenChange={(open) => {
+          setQrCodeModalOpen(open);
+          if (!open) setEmployeeForQrCode(null);
+        }}
+        employeeId={employeeForQrCode?.id ?? null}
+        employeeName={employeeForQrCode?.name}
       />
     </StandardLayout>
   );

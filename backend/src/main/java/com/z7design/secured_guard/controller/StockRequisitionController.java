@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -33,14 +34,14 @@ public class StockRequisitionController {
     private final UserRepository userRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Listar requisições de estoque", description = "Todas as requisições (almoxarifado, RH, operacional)")
     public ResponseEntity<List<StockRequisitionListItemDTO>> list() {
         return ResponseEntity.ok(stockRequisitionService.listAll());
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Criar requisição", description = "Registra requisição pendente. A baixa no estoque ocorre na aprovação.")
     public ResponseEntity<?> create(@Valid @RequestBody CreateStockRequisitionRequest body, Authentication auth) {
         try {
@@ -58,7 +59,7 @@ public class StockRequisitionController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'COMPRAS', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Obter requisição por ID")
     public ResponseEntity<?> get(@PathVariable UUID id) {
         try {
@@ -68,8 +69,66 @@ public class StockRequisitionController {
         }
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'RECURSOS_HUMANOS')")
+    @Operation(summary = "Atualizar requisição pendente", description = "Somente enquanto status for PENDENTE.")
+    public ResponseEntity<?> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateStockRequisitionRequest body,
+            Authentication auth) {
+        try {
+            StockRequisitionDTO dto = stockRequisitionService.update(id, body);
+            return ResponseEntity.ok(dto);
+        } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao atualizar requisição: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/bulk-delete")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'RECURSOS_HUMANOS')")
+    @Operation(summary = "Excluir várias requisições pendentes", description = "Corpo: lista de UUID em string. Requisições não pendentes geram erro.")
+    public ResponseEntity<?> bulkDelete(@RequestBody List<String> ids) {
+        try {
+            List<UUID> uuids = ids.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(UUID::fromString)
+                    .toList();
+            stockRequisitionService.deleteMultiple(uuids);
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao excluir requisições em massa: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO', 'RH', 'DEPARTAMENTO_PESSOAL', 'OPERACIONAL', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'GERENTE', 'RECURSOS_HUMANOS')")
+    @Operation(summary = "Excluir requisição pendente")
+    public ResponseEntity<?> delete(@PathVariable UUID id) {
+        try {
+            stockRequisitionService.delete(id);
+            return ResponseEntity.noContent().build();
+        } catch (com.z7design.secured_guard.exception.ResourceNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao excluir requisição: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'GERENTE', 'GESTOR_OPERACIONAL', 'RH', 'DEPARTAMENTO_PESSOAL', 'FINANCEIRO', 'ESTOQUE', 'ALMOXARIFADO', 'RECURSOS_HUMANOS')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'GERENTE', 'GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'RH', 'DEPARTAMENTO_PESSOAL', 'FINANCEIRO', 'ESTOQUE', 'ALMOXARIFADO', 'RECURSOS_HUMANOS')")
     @Operation(summary = "Aprovar requisição", description = "Aprova e baixa o estoque (saídas). A assinatura do funcionário é registrada depois em /deliver.")
     public ResponseEntity<?> approve(@PathVariable UUID id, Authentication auth) {
         try {
@@ -118,6 +177,10 @@ public class StockRequisitionController {
 
     private UUID resolveUserId(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() != null) {
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof com.z7design.secured_guard.model.User) {
+                return ((com.z7design.secured_guard.model.User) principal).getId();
+            }
             try {
                 String username = authentication.getName();
                 return userRepository.findByUsername(username)

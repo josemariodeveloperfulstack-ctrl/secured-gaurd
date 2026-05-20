@@ -85,6 +85,31 @@ public class Equipment {
     @Column(name = "qr_code")
     private String qrCode;
     
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false)
+    @Builder.Default
+    private com.z7design.secured_guard.model.enums.EquipmentType type = com.z7design.secured_guard.model.enums.EquipmentType.COLETE;
+
+    @Column(name = "shots_quantity")
+    private Integer shotsQuantity;
+
+    @Column(name = "weapon_registration")
+    private String weaponRegistration;
+
+    @Column(name = "quantity", nullable = false)
+    @Builder.Default
+    private Integer quantity = 1;
+
+    @Column(name = "caliber")
+    private String caliber;
+
+    @Column(name = "work_post_id")
+    private UUID workPostId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_post_id", insertable = false, updatable = false)
+    private WorkPost workPost;
+
     @Column(name = "current_user_id")
     private UUID currentUserId;
     

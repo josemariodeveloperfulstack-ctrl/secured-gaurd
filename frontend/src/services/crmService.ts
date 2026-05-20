@@ -16,8 +16,18 @@ export async function updateOpportunity(id, opportunity) {
   return data;
 }
 
-export async function deleteOpportunity(id) {
-  await api.delete(`/opportunities/${id}`);
+export async function deleteOpportunity(id: string | number, reason = 'Exclusão individual') {
+  await api.delete(
+    `/api/opportunities/${encodeURIComponent(String(id))}?reason=${encodeURIComponent(reason)}`
+  );
+}
+
+export async function deleteMultipleOpportunities(
+  ids: (string | number)[],
+  reason = 'Exclusão em massa'
+) {
+  const idsAsStrings = (ids ?? []).map((id) => String(id).trim()).filter(Boolean);
+  await api.post('/api/opportunities/bulk-delete', { ids: idsAsStrings, reason });
 }
 
 // Status do Kanban
@@ -99,6 +109,6 @@ export async function fetchKanbanSummary() {
 
 // Métricas e gráficos do dashboard CRM
 export async function fetchCrmMetrics() {
-  const { data } = await api.get('/api/crm/dashboard/metrics');
+  const { data } = await api.get('/crm/dashboard/metrics');
   return data;
 } 

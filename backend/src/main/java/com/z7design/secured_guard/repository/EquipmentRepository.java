@@ -27,5 +27,16 @@ public interface EquipmentRepository extends JpaRepository<Equipment, UUID> {
     long countByIsDangerousTrue();
     List<Equipment> findByBatch(String batch);
     List<Equipment> findByModel(String model);
+    
+    // Consultas específicas para controle de tipo e postos de trabalho (Cofre vs Alocado)
+    long countByTypeAndWorkPostIdIsNull(com.z7design.secured_guard.model.enums.EquipmentType type);
+    List<Equipment> findByWorkPostIdIsNull();
+    List<Equipment> findByWorkPostId(UUID workPostId);
+    
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(e.quantity), 0) FROM Equipment e WHERE e.type = :type AND e.workPostId IS NULL")
+    long sumQuantityByTypeAndWorkPostIdIsNull(@org.springframework.data.repository.query.Param("type") com.z7design.secured_guard.model.enums.EquipmentType type);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(SUM(e.quantity), 0) FROM Equipment e WHERE e.type = :type AND e.workPostId IS NOT NULL")
+    long sumQuantityByTypeAndWorkPostIdIsNotNull(@org.springframework.data.repository.query.Param("type") com.z7design.secured_guard.model.enums.EquipmentType type);
 }
 

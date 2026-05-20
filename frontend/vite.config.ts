@@ -13,7 +13,10 @@ export default defineConfig(({ mode }) => {
     VitePWA({
       registerType: 'autoUpdate', // Atualiza automaticamente no background
       devOptions: {
-        enabled: true,
+        // Service worker desabilitado em desenvolvimento.
+        // SW em dev causava o problema de "página com dados antigos" porque
+        // servia bundles em cache mesmo após HMR/rebuilds.
+        enabled: false,
         type: 'module',
       },
       manifest: {
@@ -43,31 +46,55 @@ export default defineConfig(({ mode }) => {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
         skipWaiting: true,
         clientsClaim: true,
-        // Limpar caches antigos automaticamente
         cleanupOutdatedCaches: true,
-        // Ignorar erros de precache (arquivos 404 não quebram o service worker)
-        // O Workbox irá apenas logar o erro mas continuar funcionando
+        // Evita que o SW intercepte navegações que devem ir direto à rede.
+        navigateFallback: null,
+        navigateFallbackDenylist: [/^\/api/, /^\/ws/, /^\/email-marketing/],
         runtimeCaching: [
+          // NUNCA cachear chamadas de API — sempre buscar do backend.
           {
-            urlPattern: /^https:\/\/.*\.js$/,
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            handler: 'NetworkOnly',
+            options: {
+              cacheName: 'api-no-cache',
+            },
+          },
+          // WebSocket / SSE
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/ws'),
+            handler: 'NetworkOnly',
+            options: {
+              cacheName: 'ws-no-cache',
+            },
+          },
+          // Bundles JS: NetworkFirst com janela curta (1h) para que novas
+          // versões sejam pegas rapidamente após deploy.
+          {
+            urlPattern: /\.js$/,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'js-cache',
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 horas
+                maxEntries: 60,
+                maxAgeSeconds: 60 * 60, // 1 hora
               },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // CSS pode ser cacheado de forma mais agressiva (StaleWhileRevalidate)
+          {
+            urlPattern: /\.css$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'css-cache',
+              expiration: {
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24, // 24h
+              },
+            },
+          },
         ],
-        // Não cachear arquivos JS dinamicamente importados
-        navigateFallback: null,
-        navigateFallbackDenylist: [/^\/api/, /^\/ws/]
       },
-      // Tratar erros de precache graciosamente
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}']
       }
@@ -124,6 +151,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
           ws: true,
+        },
+        // Imagens dos e-mails de marketing (classpath static no backend)
+        '/email-marketing': {
+          target: 'http://localhost:8083',
+          changeOrigin: true,
+          secure: false,
         },
       },
     },

@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import type { CheckedState } from '@radix-ui/react-checkbox';
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -339,24 +341,32 @@ export const KmControlTable: React.FC<KmControlTableProps> = ({
   // Função para fechar modal de upload
   // (removido: funções de upload/visualização)
 
-  const isAllSelected = filteredKmControls.length > 0 && selectedKmControlIds.size === filteredKmControls.length;
+  const selectableFiltered = useMemo(
+    () => filteredKmControls.filter((c) => c?.id != null && String(c.id).trim() !== ''),
+    [filteredKmControls]
+  );
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = new Set(filteredKmControls.map(control => control.id));
+  const isAllSelected =
+    selectableFiltered.length > 0 &&
+    selectableFiltered.every((c) => selectedKmControlIds.has(String(c.id)));
+
+  const handleSelectAll = (checked: CheckedState) => {
+    if (checked === true) {
+      const allIds = new Set(selectableFiltered.map((control) => String(control.id)));
       setSelectedKmControlIds(allIds);
     } else {
       setSelectedKmControlIds(new Set());
     }
   };
 
-  const handleSelectOne = (id: string, checked: boolean) => {
-    setSelectedKmControlIds(prev => {
+  const handleSelectOne = (id: string, checked: CheckedState) => {
+    if (!id || String(id).trim() === '') return;
+    setSelectedKmControlIds((prev) => {
       const newSet = new Set(prev);
-      if (checked) {
-        newSet.add(id);
+      if (checked === true) {
+        newSet.add(String(id));
       } else {
-        newSet.delete(id);
+        newSet.delete(String(id));
       }
       return newSet;
     });
@@ -370,23 +380,49 @@ export const KmControlTable: React.FC<KmControlTableProps> = ({
     }
 
     try {
-      const deletePromises = Array.from(selectedKmControlIds).map(id => kmControlService.deleteKmControl(id));
-      await Promise.all(deletePromises);
+      const ids = [...selectedKmControlIds].map((id) => String(id).trim()).filter(Boolean);
+      const { deletedCount, requestedCount } = await kmControlService.bulkDeleteKmControls(ids);
 
-      toast({
-        title: "Sucesso",
-        description: `${selectedKmControlIds.size} registros de KM excluídos com sucesso!`,
-        variant: "default"
-      });
+      if (deletedCount === 0 && requestedCount > 0) {
+        toast({
+          title: 'Nada foi excluído',
+          description: 'Os registros selecionados não foram encontrados (podem já ter sido removidos).',
+          variant: 'destructive',
+        });
+      } else if (deletedCount < requestedCount) {
+        toast({
+          title: 'Exclusão parcial',
+          description: `${deletedCount} de ${requestedCount} registro(s) excluído(s). Atualize a lista e tente novamente nos restantes, se necessário.`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Sucesso',
+          description: `${deletedCount} registro(s) de KM excluído(s) com sucesso.`,
+          variant: 'default',
+        });
+      }
 
       setSelectedKmControlIds(new Set());
       onRefresh();
     } catch (error: unknown) {
       console.error('❌ Erro ao excluir controles de KM selecionados:', error);
+      let description = 'Erro ao excluir controles de KM selecionados';
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data;
+        if (data && typeof data === 'object' && 'error' in data) {
+          const apiErr = String((data as { error?: string }).error || '').trim();
+          description = apiErr || error.message || description;
+        } else {
+          description = error.message || description;
+        }
+      } else if (error instanceof Error) {
+        description = error.message;
+      }
       toast({
-        title: "Erro",
-        description: error.response?.data?.message || error.message || "Erro ao excluir controles de KM selecionados",
-        variant: "destructive"
+        title: 'Erro',
+        description,
+        variant: 'destructive',
       });
     }
   };
@@ -584,7 +620,13 @@ export const KmControlTable: React.FC<KmControlTableProps> = ({
                   <TableHead className="text-seguranca-lightgray font-semibold px-4 py-3">Data</TableHead>
                   <TableHead className="text-seguranca-lightgray font-semibold px-4 py-3">
                     <Checkbox
-                      checked={isAllSelected}
+                      checked={
+                        isAllSelected
+                          ? true
+                          : selectedKmControlIds.size > 0
+                            ? 'indeterminate'
+                            : false
+                      }
                       onCheckedChange={handleSelectAll}
                       aria-label="Selecionar todos"
                       className="mr-2"
@@ -613,7 +655,7 @@ export const KmControlTable: React.FC<KmControlTableProps> = ({
                   </TableRow>
                 ) : (
                   filteredKmControls.map((control) => (
-                    <TableRow key={control.id} className="border-gray-600 hover:bg-gray-700/50 transition-colors">
+                    <TableRow key={control.id || `${control.date}-${control.supervisor}-${control.vehiclePlate}`} className="border-gray-600 hover:bg-gray-700/50 transition-colors">
                       <TableCell className="text-seguranca-lightgray px-4 py-3">
                         <div className="flex items-center space-x-2">
                           <Calendar className="h-4 w-4 text-gray-500" />
@@ -624,8 +666,9 @@ export const KmControlTable: React.FC<KmControlTableProps> = ({
                       </TableCell>
                       <TableCell className="text-seguranca-lightgray px-4 py-3">
                         <Checkbox
-                          checked={selectedKmControlIds.has(control.id)}
-                          onCheckedChange={(checked: boolean) => handleSelectOne(control.id, checked)}
+                          checked={Boolean(control.id) && selectedKmControlIds.has(String(control.id))}
+                          onCheckedChange={(c) => handleSelectOne(String(control.id), c)}
+                          disabled={!control.id}
                           aria-label={`Selecionar ${control.supervisor}`}
                           className="mr-2"
                         />

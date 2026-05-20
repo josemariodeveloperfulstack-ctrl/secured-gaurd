@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
 import { Badge } from '../ui/badge';
-import { FileText, Download, Eye, User, Building, Calendar, MapPin, CreditCard, Loader2, CheckCircle2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { FileText, Download, Eye, User, Building, Calendar, MapPin, CreditCard, Loader2, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { employeeService, SimpleEmployee } from '@/services/employeeService';
 
 import { companyService } from '@/services/companyService';
@@ -28,10 +29,16 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
     valorVale: '',
-    tipoVale: '',
+    tipoVale: 'Vale Transporte',
     dataInicio: '',
     dataFim: '',
     observacoes: '',
+    optingVoucher: 'true', // 'true' for SIM, 'false' for NÃO
+    idaLinha: '',
+    idaTarifa: '',
+    voltaLinha: '',
+    voltaTarifa: '',
+    employeeWorkSector: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -73,6 +80,14 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
               unitName: emp.unit?.name,
               address: emp.address
             } as SimpleEmployee);
+            
+            // Auto-preencher data de início, posto de trabalho e empresa
+            setForm(prev => ({
+              ...prev,
+              dataInicio: emp.hireDate || prev.dataInicio,
+              employeeWorkSector: emp.workPostName || emp.unitName || emp.unit?.name || emp.workPost?.name || '',
+              empresaId: emp.companyId || (emp.company as any)?.id || prev.empresaId
+            }));
           }
         } catch (error) {
           console.error("Erro ao carregar dados iniciais do funcionário:", error);
@@ -80,7 +95,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       };
       fetchEmployee();
     }
-  }, [form.funcionarioId, selectedEmployeeData]);
+  }, [form.funcionarioId]);
 
 
   // Carregar dados do backend (empresas)
@@ -122,7 +137,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       return;
     }
 
-    if (!form.tipoVale || !form.valorVale || !form.dataInicio) {
+    if (!form.tipoVale || !form.dataInicio) {
       toast({
         title: 'Atenção',
         description: 'Preencha todos os campos obrigatórios para visualizar o termo!',
@@ -159,9 +174,16 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
         voucherValue: form.valorVale,
         startDate: form.dataInicio,
         endDate: form.dataFim || null,
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        city: empresa.city || '',
         documentDate: new Date().toISOString().split('T')[0],
-        observations: form.observacoes || ''
+        observations: form.observacoes || '',
+        optingVoucher: form.optingVoucher === 'true',
+        idaLinha: form.idaLinha,
+        idaTarifa: form.idaTarifa,
+        voltaLinha: form.voltaLinha,
+        voltaTarifa: form.voltaTarifa,
+        employeeUnit: (fullEmployee as any).unit?.name || '',
+        employeeWorkSector: form.employeeWorkSector
       };
 
 
@@ -190,8 +212,8 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     }
   };
 
-  const handleGerarPDF = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGerarPDF = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!funcionario || !empresa) {
       toast({
         title: 'Atenção',
@@ -201,7 +223,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       return;
     }
 
-    if (!form.tipoVale || !form.valorVale || !form.dataInicio) {
+    if (!form.tipoVale || !form.dataInicio) {
       toast({
         title: 'Atenção',
         description: 'Preencha todos os campos obrigatórios!',
@@ -229,15 +251,21 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
         employeeCpf: fullEmployee.cpf || (fullEmployee as any).document || '',
         employeePosition: (fullEmployee as any).positionName || (fullEmployee as any).position?.name || '',
         hireDate: fullEmployee.hireDate || '',
-
         employeeAddress: addressValue,
         voucherType: form.tipoVale,
         voucherValue: form.valorVale,
         startDate: form.dataInicio,
         endDate: form.dataFim || null,
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        city: empresa.city || '',
         documentDate: new Date().toISOString().split('T')[0],
-        observations: form.observacoes || ''
+        observations: form.observacoes || '',
+        optingVoucher: form.optingVoucher === 'true',
+        idaLinha: form.idaLinha,
+        idaTarifa: form.idaTarifa,
+        voltaLinha: form.voltaLinha,
+        voltaTarifa: form.voltaTarifa,
+        employeeUnit: (fullEmployee as any).unit?.name || '',
+        employeeWorkSector: form.employeeWorkSector
       };
 
       // Gerar PDF
@@ -260,9 +288,6 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
         title: 'Sucesso',
         description: 'Termo de Vale-Transporte gerado com sucesso!',
       });
-
-      // TODO: Integrar com /api/documentos-gerados/gerar para salvar no banco
-      // Isso requer ter um modelo de documento cadastrado no banco
 
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
@@ -298,277 +323,292 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-8">
 
-          {/* Seleção Principal */}
-          <div className="bg-muted/30 p-6 rounded-xl border space-y-6">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-              <User className="h-4 w-4" />
-              <span>Identificação</span>
-            </div>
-
+        <CardContent className="pt-6">
+          <div className="space-y-6">
+            {/* Seleção de Funcionário e Empresa */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label className="text-base font-semibold">
-                  Funcionário
-                  <span className="block text-[11px] font-normal text-muted-foreground/80">
-                    Selecione o colaborador para quem será gerado o termo.
-                  </span>
+                <Label htmlFor="funcionarioId" className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  Funcionário <span className="text-destructive">*</span>
                 </Label>
                 <EmployeeCombobox
-                  value={form.funcionarioId}
-                  onChange={(value) => setForm(prev => ({ ...prev, funcionarioId: value }))}
                   onEmployeeSelect={(emp) => {
-                    setSelectedEmployeeData(emp);
-                    setForm(prev => ({
-                      ...prev,
-                      funcionarioId: emp.id,
+                    setSelectedEmployeeData({
+                      id: emp.id,
+                      name: emp.name,
+                      cpf: emp.cpf,
+                      hireDate: emp.hireDate,
+                      positionName: emp.positionName
+                    } as any);
+                    
+                    // Auto-preencher data de início, posto de trabalho e empresa
+                    setForm(prev => ({ 
+                      ...prev, 
+                      dataInicio: emp.hireDate || prev.dataInicio,
+                      employeeWorkSector: emp.workPostName || emp.unitName || emp.unit?.name || emp.workPost?.name || '',
                       empresaId: emp.companyId || prev.empresaId
                     }));
                   }}
-                  disabled={loadingData}
-                  placeholder={loadingData ? "Carregando..." : "Selecione o funcionário"}
+                  value={form.funcionarioId}
+                  onChange={(id) => {
+                    setForm(prev => ({ ...prev, funcionarioId: id }));
+                  }}
+                  initialDisplayName={funcionario?.name}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-base font-semibold">
-                  Empresa
-                  <span className="block text-[11px] font-normal text-muted-foreground/80">
-                    Escolha a empresa empregadora que constará no documento.
-                  </span>
+                <Label htmlFor="empresaId" className="flex items-center gap-2">
+                  <Building className="h-4 w-4 text-muted-foreground" />
+                  Empresa <span className="text-destructive">*</span>
                 </Label>
                 <CompanyCombobox
                   value={form.empresaId}
-                  onChange={(value) => setForm(prev => ({ ...prev, empresaId: value }))}
+                  onChange={(id) => setForm(prev => ({ ...prev, empresaId: id }))}
                   companies={companies}
-                  disabled={loadingData}
-                  placeholder={loadingData ? "Carregando..." : "Selecione a empresa"}
                 />
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Detalhes do Funcionário */}
+            {/* Dados do Funcionário Selecionado */}
             {funcionario && (
-              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2 font-medium">
-                    <User className="h-4 w-4 text-primary" />
-                    Dados do Funcionário
-                  </div>
+              <div className="bg-muted/50 rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 border border-dashed">
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">CPF</p>
+                  <p className="text-sm font-medium">{formatCPF(funcionario.cpf || funcionario.document || '')}</p>
                 </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nome Completo</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.name}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">CPF</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.cpf || (funcionario as any).document ? formatCPF(funcionario.cpf || (funcionario as any).document || '') : '-'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admissão</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Matrícula</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {funcionario.registrationNumber || '-'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {typeof funcionario.address === 'string'
-                        ? funcionario.address
-                        : (funcionario.address as any)?.street
-                          ? `${(funcionario.address as any).street}, ${(funcionario.address as any).number || ''}`
-                          : '-'}
-                    </div>
-                  </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Cargo</p>
+                  <p className="text-sm font-medium">{funcionario.positionName || 'Não informado'}</p>
                 </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Data de Admissão</p>
+                  <p className="text-sm font-medium">{funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : 'Não informada'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Posto de Trabalho</p>
+                  <Input 
+                    className="h-7 text-sm font-medium bg-transparent border-none p-0 focus-visible:ring-0"
+                    value={form.employeeWorkSector}
+                    onChange={(e) => setForm(prev => ({ ...prev, employeeWorkSector: e.target.value }))}
+                    placeholder="Clique para editar"
+                  />
+                </div>
+                {empresa && (
+                  <div className="space-y-1 md:col-span-2 lg:col-span-4">
+                    <p className="text-xs text-muted-foreground uppercase font-semibold">Endereço da Empresa</p>
+                    <p className="text-sm font-medium">{empresa.address || 'Endereço não cadastrado'}</p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Detalhes da Empresa */}
-            {empresa && (
-              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-100">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <div className="flex items-center gap-2 font-medium">
-                    <Building className="h-4 w-4 text-primary" />
-                    Dados da Empresa
-                  </div>
+            <Separator />
+
+            {/* Opção pelo Benefício */}
+            <div className="space-y-4">
+              <Label className="text-base font-semibold">Opção pelo Benefício</Label>
+              <RadioGroup 
+                value={form.optingVoucher} 
+                onValueChange={(val) => setForm(prev => ({ ...prev, optingVoucher: val }))}
+                className="flex flex-col sm:flex-row gap-4"
+              >
+                <div className="flex items-center space-x-2 bg-background border rounded-md p-3 flex-1 cursor-pointer hover:border-primary transition-colors">
+                  <RadioGroupItem value="true" id="opt-sim" />
+                  <Label htmlFor="opt-sim" className="flex-1 cursor-pointer font-medium">SIM, desejo receber o Vale-Transporte</Label>
                 </div>
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {empresa.name}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.cnpj ? formatCNPJ(empresa.cnpj) : '-'}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sigla</Label>
-                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors">
-                        {empresa.sigla || '-'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {empresa.endereco || '-'}
-                    </div>
-                  </div>
+                <div className="flex items-center space-x-2 bg-background border rounded-md p-3 flex-1 cursor-pointer hover:border-primary transition-colors">
+                  <RadioGroupItem value="false" id="opt-nao" />
+                  <Label htmlFor="opt-nao" className="flex-1 cursor-pointer font-medium">NÃO, não desejo receber o benefício</Label>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {(funcionario || empresa) && <Separator />}
-
-          {/* Configuração do Vale */}
-          <div className="space-y-6">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <CreditCard className="h-4 w-4" />
-              <span>Detalhes do Benefício</span>
+              </RadioGroup>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="space-y-2 lg:col-span-1">
-                <Label>Tipo de Vale</Label>
-                <Select value={form.tipoVale} onValueChange={(value) => setForm(prev => ({ ...prev, tipoVale: value }))}>
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tiposVale.map(tipo => (
-                      <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Detalhes do Transporte - Visível apenas se for optante */}
+            {form.optingVoucher === 'true' && (
+              <div className="space-y-6 animate-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Card Trajeto de IDA */}
+                  <div className="relative overflow-hidden space-y-4 p-5 border rounded-xl bg-gradient-to-br from-blue-50/50 to-white dark:from-blue-950/10 dark:to-background shadow-sm hover:shadow-md transition-all duration-300 border-blue-100 dark:border-blue-900/40 group">
+                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+                      <ArrowRight className="h-12 w-12 text-blue-600" />
+                    </div>
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm tracking-tight uppercase">
+                      <div className="p-1.5 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                      Trajeto de IDA
+                    </div>
+                    <p className="text-[10px] text-muted-foreground -mt-3 ml-9">Residência → Trabalho</p>
 
-              <div className="space-y-2 lg:col-span-1">
-                <Label>Valor do Vale</Label>
-                <Input
-                  value={form.valorVale}
-                  onChange={(e) => setForm(prev => ({ ...prev, valorVale: e.target.value }))}
-                  placeholder="Ex: R$ 250,00"
-                  className="bg-background"
-                />
-              </div>
+                    <div className="grid grid-cols-1 gap-4 pt-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="idaLinha" className="text-xs font-bold ml-1 text-blue-900 dark:text-blue-300">Linha / Empresa</Label>
+                        <Input
+                          id="idaLinha"
+                          placeholder="Ex: 123 Centro / Viação X"
+                          className="bg-background/80 border-blue-200/50 dark:border-blue-800/40 focus-visible:ring-blue-500 transition-all"
+                          value={form.idaLinha}
+                          onChange={(e) => setForm(prev => ({ ...prev, idaLinha: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="idaTarifa" className="text-xs font-bold ml-1 text-blue-900 dark:text-blue-300">Tarifa Unitária</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">R$</span>
+                          <Input
+                            id="idaTarifa"
+                            type="text"
+                            placeholder="0,00"
+                            className="pl-9 bg-background/80 border-blue-200/50 dark:border-blue-800/40 focus-visible:ring-blue-500"
+                            value={form.idaTarifa}
+                            onChange={(e) => setForm(prev => ({ ...prev, idaTarifa: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="space-y-2 lg:col-span-1">
-                <Label>Data de Início</Label>
+                  {/* Card Trajeto de VOLTA */}
+                  <div className="relative overflow-hidden space-y-4 p-5 border rounded-xl bg-gradient-to-br from-green-50/50 to-white dark:from-green-950/10 dark:to-background shadow-sm hover:shadow-md transition-all duration-300 border-green-100 dark:border-green-900/40 group">
+                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+                      <ArrowLeft className="h-12 w-12 text-green-600" />
+                    </div>
+
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-bold text-sm tracking-tight uppercase">
+                      <div className="p-1.5 bg-green-100 dark:bg-green-900/50 rounded-lg">
+                        <ArrowLeft className="h-4 w-4" />
+                      </div>
+                      Trajeto de VOLTA
+                    </div>
+                    <p className="text-[10px] text-muted-foreground -mt-3 ml-9">Trabalho → Residência</p>
+
+                    <div className="grid grid-cols-1 gap-4 pt-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="voltaLinha" className="text-xs font-bold ml-1 text-green-900 dark:text-green-300">Linha / Empresa</Label>
+                        <Input
+                          id="voltaLinha"
+                          placeholder="Ex: 123 Centro / Viação X"
+                          className="bg-background/80 border-green-200/50 dark:border-green-800/40 focus-visible:ring-green-500 transition-all"
+                          value={form.voltaLinha}
+                          onChange={(e) => setForm(prev => ({ ...prev, voltaLinha: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="voltaTarifa" className="text-xs font-bold ml-1 text-green-900 dark:text-green-300">Tarifa Unitária</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">R$</span>
+                          <Input
+                            id="voltaTarifa"
+                            type="text"
+                            placeholder="0,00"
+                            className="pl-9 bg-background/80 border-green-200/50 dark:border-green-800/40 focus-visible:ring-green-500"
+                            value={form.voltaTarifa}
+                            onChange={(e) => setForm(prev => ({ ...prev, voltaTarifa: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="tipoVale">Tipo do Benefício</Label>
+                    <Select
+                      value={form.tipoVale}
+                      onValueChange={(val) => setForm(prev => ({ ...prev, tipoVale: val }))}
+                    >
+                      <SelectTrigger id="tipoVale">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tiposVale.map((tipo) => (
+                          <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="valorVale">Valor Total Diário (Opcional)</Label>
+                    <Input
+                      id="valorVale"
+                      type="text"
+                      placeholder="Ex: 11,00"
+                      value={form.valorVale}
+                      onChange={(e) => setForm(prev => ({ ...prev, valorVale: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="dataInicio" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Data de Início do Benefício <span className="text-destructive">*</span>
+                </Label>
                 <Input
+                  id="dataInicio"
                   type="date"
                   value={form.dataInicio}
                   onChange={(e) => setForm(prev => ({ ...prev, dataInicio: e.target.value }))}
-                  className="bg-background"
                 />
+                <p className="text-[10px] text-muted-foreground">Preenchido automaticamente com a data de admissão.</p>
               </div>
 
-              <div className="space-y-2 lg:col-span-1">
-                <Label>Data de Término</Label>
+              <div className="space-y-2">
+                <Label htmlFor="dataFim" className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  Data de Fim (Opcional)
+                </Label>
                 <Input
+                  id="dataFim"
                   type="date"
                   value={form.dataFim}
                   onChange={(e) => setForm(prev => ({ ...prev, dataFim: e.target.value }))}
-                  className="bg-background"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Observações Adicionais</Label>
+              <Label htmlFor="observacoes">Observações Adicionais</Label>
               <Textarea
+                id="observacoes"
+                placeholder="Alguma observação específica para este termo..."
                 value={form.observacoes}
                 onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
-                placeholder="Insira aqui observações relevantes sobre a concessão do benefício..."
-                rows={3}
-                className="bg-background resize-none"
+                className="resize-none h-20"
               />
             </div>
-          </div>
 
-          <Separator />
+            <Separator />
 
-          {/* Ações */}
-          <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
-            <Button
-              onClick={handlePreview}
-              variant="outline"
-              className="flex items-center gap-2 w-full sm:w-auto h-11"
-              disabled={loading || loadingData || !funcionario || !empresa || !form.tipoVale || !form.valorVale || !form.dataInicio}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Gerando Preview...
-                </>
-              ) : (
-                <>
-                  <Eye className="h-4 w-4" />
-                  Visualizar Termo
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={handleGerarPDF}
-              className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
-              disabled={loading || loadingData || !funcionario || !empresa}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Gerando PDF...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4" />
-                  Gerar e Baixar
-                </>
-              )}
-            </Button>
+            {/* Ações */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePreview}
+                disabled={loading || !funcionario || !empresa}
+                className="flex-1 sm:flex-none gap-2"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                Visualizar Termo
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleGerarPDF()}
+                disabled={loading || !funcionario || !empresa}
+                className="flex-1 sm:flex-none gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Gerar e Baixar Termo (PDF)
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

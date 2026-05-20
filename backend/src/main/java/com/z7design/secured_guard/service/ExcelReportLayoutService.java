@@ -29,7 +29,7 @@ public class ExcelReportLayoutService {
 
     private final CompanyRepository companyRepository;
 
-    @Value("${app.upload.dir:uploads}")
+    @Value("${app.upload.base-dir:${app.upload.dir:uploads}}")
     private String uploadDir;
 
     // Cores do gradiente (amarelo → laranja → vermelho)

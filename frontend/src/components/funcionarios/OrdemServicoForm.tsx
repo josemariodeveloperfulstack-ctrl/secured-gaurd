@@ -376,7 +376,7 @@ const OrdemServicoForm = () => {
         descriptionOfActivities: ordem.observacoes, // Using observations as activities for standard models
         startDate: ordem.dataInicio,
         endDate: ordem.dataFim,
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        city: empresa.city || '',
         documentDate: new Date().toISOString().split('T')[0]
       };
 
@@ -439,7 +439,7 @@ const OrdemServicoForm = () => {
                 <CardTitle>Ordens de Serviço Cadastradas</CardTitle>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={resetForm}>
+                    <Button type="button" onClick={resetForm}>
                       <Plus className="h-4 w-4 mr-2" />
                       Nova Ordem de Serviço
                     </Button>
@@ -467,6 +467,7 @@ const OrdemServicoForm = () => {
                       {/* Botão de fechar mais visível */}
                       <div className="flex justify-end">
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => setIsDialogOpen(false)}
@@ -658,13 +659,12 @@ const OrdemServicoForm = () => {
                         />
                       </div>
 
-                      {/* Ações */}
                       <div className="flex gap-2 pt-4 border-t">
-                        <Button onClick={selectedOrdem ? handleUpdate : handleCreate} disabled={loading} className="flex-1">
+                        <Button type="button" onClick={selectedOrdem ? handleUpdate : handleCreate} disabled={loading} className="flex-1">
                           <Save className="h-4 w-4 mr-2" />
                           {loading ? (selectedOrdem ? 'Salvando...' : 'Criando...') : (selectedOrdem ? 'Salvar Alterações' : 'Criar Ordem de Serviço')}
                         </Button>
-                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
+                        <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">
                           <X className="h-4 w-4 mr-2" />
                           Cancelar
                         </Button>
@@ -700,18 +700,18 @@ const OrdemServicoForm = () => {
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => handleView(ordem)}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => handleView(ordem)}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleEdit(ordem)}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => handleEdit(ordem)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleGerarPDF(ordem)}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => handleGerarPDF(ordem)}>
                               <Download className="h-4 w-4" />
                             </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm">
+                                <Button type="button" variant="outline" size="sm">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </AlertDialogTrigger>

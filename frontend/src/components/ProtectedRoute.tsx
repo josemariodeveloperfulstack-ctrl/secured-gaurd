@@ -7,14 +7,19 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredPermissions?: (keyof UserPermissions)[];
   requiredRoles?: UserRole[]; // Permite acesso se usuário tiver qualquer um dos roles
+  excludedRoles?: UserRole[]; // Bloqueia roles específicos mesmo que tenham as permissões (ex.: SUPERVISOR fora do Financeiro/Comercial)
   requireAllPermissions?: boolean;
   allowWithoutFirstAccess?: boolean; // Permite acesso mesmo sem completar primeiro acesso (para a própria página de primeiro acesso)
 }
+
+const normalizeRole = (role: string | undefined): UserRole =>
+  ((role ?? '').replace(/^ROLE_/, '')) as UserRole;
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredPermissions,
   requiredRoles,
+  excludedRoles,
   requireAllPermissions = true,
   allowWithoutFirstAccess = false,
 }) => {
@@ -34,7 +39,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     console.log('🔒 ProtectedRoute: isLoading =', isLoading);
     return <Navigate to="/login" replace />;
   }
-  
+
   console.log('🔒 ProtectedRoute: Usuário autenticado:', user.name, 'Role:', user.role);
 
   // Verificar se o usuário precisa completar o primeiro acesso
@@ -48,10 +53,26 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
+  const currentRole = normalizeRole(user.role);
+
+  // 🔒 Bloqueio explícito por role (avaliado ANTES de qualquer outra verificação positiva)
+  // Caso de uso: SUPERVISOR não pode acessar Financeiro / Comercial mesmo que alguma
+  // permissão antiga ainda esteja marcada como true em sessões cacheadas.
+  if (excludedRoles && excludedRoles.length > 0) {
+    const isBlocked = excludedRoles.some(
+      (r) => currentRole === r || currentRole === normalizeRole(r as string),
+    );
+    if (isBlocked) {
+      console.log(`🔒 ProtectedRoute: Role ${currentRole} está explicitamente bloqueado nesta rota`);
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
   // Verificar roles alternativos (ex: COMERCIAL para CRM)
   if (requiredRoles && requiredRoles.length > 0) {
-    const userRole = (user.role ?? '').replace(/^ROLE_/, '') as UserRole;
-    const hasRole = requiredRoles.some((r) => userRole === r || userRole === (r as string).replace(/^ROLE_/, ''));
+    const hasRole = requiredRoles.some(
+      (r) => currentRole === r || currentRole === normalizeRole(r as string),
+    );
     if (hasRole) {
       return <>{children}</>;
     }

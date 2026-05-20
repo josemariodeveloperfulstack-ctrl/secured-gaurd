@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/hooks/use-toast';
 import MeasurementCompleteTable from '@/components/financeiro/MeasurementCompleteTable';
 import MeasurementSimpleTable from '@/components/financeiro/MeasurementSimpleTable';
@@ -878,6 +879,9 @@ const MedicoesTab: React.FC = () => {
         {/* Tab Completa */}
         <TabsContent value="completa" className="mt-6">
           <MeasurementCompleteTable
+            bulletins={bulletins}
+            loading={loading}
+            onRefresh={carregarDados}
             onView={handleVisualizarBoletim}
             onEdit={handleEditarBoletim}
             onDelete={(bulletin) => handleExcluirBoletim(bulletin.id)}
@@ -889,6 +893,9 @@ const MedicoesTab: React.FC = () => {
         {/* Tab Simplificada */}
         <TabsContent value="simplificada" className="mt-6">
           <MeasurementSimpleTable
+            bulletins={bulletins}
+            loading={loading}
+            onRefresh={carregarDados}
             onView={handleVisualizarBoletim}
             onEdit={handleEditarBoletim}
             onDelete={(bulletin) => handleExcluirBoletim(bulletin.id)}
@@ -1035,21 +1042,21 @@ const MedicoesTab: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-seguranca-lightgray font-medium">Data Início do Período <span className="text-seguranca-red">*</span></Label>
-                    <Input
-                      type="date"
-                      value={formData.periodStart}
-                      onChange={(e) => setFormData({...formData, periodStart: e.target.value})}
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                     <DatePicker
+                      date={formData.periodStart ? new Date(formData.periodStart + 'T00:00:00') : undefined}
+                      onDateChange={(date) => setFormData({...formData, periodStart: date ? format(date, 'yyyy-MM-dd') : ''})}
+                      placeholder="dd/mm/aaaa"
+                      className="w-full"
                     />
                   </div>
                   
                   <div className="space-y-2">
                     <Label className="text-seguranca-lightgray font-medium">Data Fim do Período <span className="text-seguranca-red">*</span></Label>
-                    <Input
-                      type="date"
-                      value={formData.periodEnd}
-                      onChange={(e) => setFormData({...formData, periodEnd: e.target.value})}
-                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                     <DatePicker
+                      date={formData.periodEnd ? new Date(formData.periodEnd + 'T00:00:00') : undefined}
+                      onDateChange={(date) => setFormData({...formData, periodEnd: date ? format(date, 'yyyy-MM-dd') : ''})}
+                      placeholder="dd/mm/aaaa"
+                      className="w-full"
                     />
                   </div>
                 </div>

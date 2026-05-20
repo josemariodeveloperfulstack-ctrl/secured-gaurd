@@ -13,9 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PurchaseRequestReportFilters } from '@/services/purchaseRequestService';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { ptBR } from 'date-fns/locale';
+import { DatePicker } from '@/components/ui/date-picker';
 import { formatDateForBackend } from '@/utils/dateUtils';
 import { Calendar, Filter, DollarSign, FileDown, Loader2 } from 'lucide-react';
 
@@ -97,13 +95,10 @@ export function PurchaseRequestReportModal({
                     Data Inicial
                   </Label>
                   <DatePicker
-                    selected={startDate}
-                    onChange={(date) => setStartDate(date)}
-                    dateFormat="dd/MM/yyyy"
-                    locale={ptBR}
-                    placeholderText="dd/mm/aaaa"
-                    className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-graphite !text-seguranca-lightgray !placeholder:text-gray-400 font-medium h-11"
-                    id="startDate"
+                    date={startDate || undefined}
+                    onDateChange={(date) => setStartDate(date || null)}
+                    placeholder="dd/mm/aaaa"
+                    className="h-11"
                   />
                 </div>
 
@@ -112,13 +107,10 @@ export function PurchaseRequestReportModal({
                     Data Final
                   </Label>
                   <DatePicker
-                    selected={endDate}
-                    onChange={(date) => setEndDate(date)}
-                    dateFormat="dd/MM/yyyy"
-                    locale={ptBR}
-                    placeholderText="dd/mm/aaaa"
-                    className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-graphite !text-seguranca-lightgray !placeholder:text-gray-400 font-medium h-11"
-                    id="endDate"
+                    date={endDate || undefined}
+                    onDateChange={(date) => setEndDate(date || null)}
+                    placeholder="dd/mm/aaaa"
+                    className="h-11"
                   />
                 </div>
               </div>

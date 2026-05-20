@@ -16,7 +16,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "personal_protective_equipment")
 public class PersonalProtectiveEquipment {
-
+    // Force recompile
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

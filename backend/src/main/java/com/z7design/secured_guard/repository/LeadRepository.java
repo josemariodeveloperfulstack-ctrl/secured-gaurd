@@ -17,6 +17,9 @@ import java.util.UUID;
 @Repository
 public interface LeadRepository extends JpaRepository<Lead, UUID> {
     
+    @Query("SELECT l FROM Lead l WHERE l.isDeleted = false")
+    List<Lead> findAllActive();
+    
     // Buscar leads por status
     List<Lead> findByStatus(LeadStatus status);
     
@@ -28,6 +31,10 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     
     // Buscar leads por email
     List<Lead> findByEmailContainingIgnoreCase(String email);
+
+    // Buscar primeiro Lead por email exato (ignorando case)
+    @Query("SELECT l FROM Lead l WHERE lower(l.email) = lower(:email) ORDER BY l.createdAt DESC")
+    java.util.Optional<Lead> findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(@Param("email") String email);
     
     // Buscar leads por nome
     List<Lead> findByNameContainingIgnoreCase(String name);
@@ -52,12 +59,12 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     // Buscar leads criados após uma data
     List<Lead> findByCreatedAtAfter(LocalDateTime since);
     
-    // Contar leads por status
-    @Query("SELECT l.status, COUNT(l) FROM Lead l GROUP BY l.status")
-    List<Object[]> countByStatus();
-    
-    // Contar leads por status específico
-    long countByStatus(LeadStatus status);
+    /** Contagem por status (agregação). Nome distinto de {@link #countByStatus(LeadStatus)} para evitar ambiguidade no Spring Data JPA. */
+    @Query("SELECT l.status, COUNT(l) FROM Lead l WHERE l.isDeleted = false GROUP BY l.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.status = :status AND l.isDeleted = false")
+    long countByStatus(@Param("status") LeadStatus status);
     
     // Contar leads por fonte
     long countBySource(LeadSource source);
@@ -111,6 +118,15 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     // Contar todos os leads dentro de um período (sem filtro de usuário)
     @Query("SELECT COUNT(l) FROM Lead l WHERE l.createdAt BETWEEN :startDate AND :endDate")
     long countByPeriod(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    /** Intervalo meio-aberto [start, end) — alinhado a filtros por mês no dashboard CRM. */
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.isDeleted = false AND l.createdAt >= :start AND l.createdAt < :end")
+    long countByCreatedAtRange(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.isDeleted = false AND l.status = :status AND l.createdAt >= :start AND l.createdAt < :end")
+    long countByStatusAndCreatedAtRange(@Param("status") LeadStatus status,
+                                        @Param("start") LocalDateTime start,
+                                        @Param("end") LocalDateTime end);
 
     // Buscar leads por responsável dentro de um período
     @Query("SELECT l FROM Lead l WHERE l.assignedTo.id = :userId AND l.createdAt BETWEEN :startDate AND :endDate")

@@ -48,8 +48,10 @@ class KmControlService {
           ? new Date(item.updatedAt[0], item.updatedAt[1] - 1, item.updatedAt[2]).toISOString()
           : item.updatedAt
       }));
-      
-      console.log('🔧 KmControlService: Dados processados:', processedData[0]);
+
+      if (processedData.length > 0) {
+        console.log('🔧 KmControlService: Dados processados (primeiro):', processedData[0]);
+      }
       return processedData;
     } catch (error) {
       console.error('❌ Erro ao buscar registros de controle de KM:', error);
@@ -152,11 +154,29 @@ class KmControlService {
    */
   async deleteKmControl(id: string): Promise<void> {
     try {
-      await axios.delete(`/frota/km-controls/${id}`);
+      await axios.delete(`/api/frota/km-controls/${encodeURIComponent(id)}`);
     } catch (error) {
       console.error('❌ Erro ao deletar registro de controle de KM:', error);
       throw error;
     }
+  }
+
+  /**
+   * Excluir vários registros numa única requisição (transação no servidor).
+   */
+  async bulkDeleteKmControls(ids: string[]): Promise<{ deletedCount: number; requestedCount: number }> {
+    const cleaned = [...new Set(ids.map((x) => String(x).trim()).filter(Boolean))];
+    if (cleaned.length === 0) {
+      return { deletedCount: 0, requestedCount: 0 };
+    }
+    const response = await axios.post<{ deletedCount: number; requestedCount: number }>(
+      '/api/frota/km-controls/bulk-delete',
+      cleaned
+    );
+    return {
+      deletedCount: response.data?.deletedCount ?? 0,
+      requestedCount: response.data?.requestedCount ?? cleaned.length,
+    };
   }
 
   /**

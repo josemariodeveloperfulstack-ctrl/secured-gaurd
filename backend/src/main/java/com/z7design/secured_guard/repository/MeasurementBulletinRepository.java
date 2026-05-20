@@ -5,6 +5,7 @@ import com.z7design.secured_guard.model.enums.MeasurementStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -88,4 +89,14 @@ public interface MeasurementBulletinRepository extends JpaRepository<Measurement
     // Carrega os itens também para calcular o subtotal
     @Query("SELECT DISTINCT mb FROM MeasurementBulletin mb LEFT JOIN FETCH mb.items")
     List<MeasurementBulletin> findAllSimple();
+
+    /**
+     * Exclusão só em SQL nativo: evita que o Hibernate agende deletes em filhos
+     * (ex.: calculation_memories em batch) quando há várias linhas por boletim ou
+     * após CASCADE o contador de linhas não bate com o esperado.
+     * O PostgreSQL remove measurement_items e calculation_memories por ON DELETE CASCADE.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "DELETE FROM measurement_bulletins WHERE id = :id", nativeQuery = true)
+    int deleteBulletinNative(@Param("id") UUID id);
 }

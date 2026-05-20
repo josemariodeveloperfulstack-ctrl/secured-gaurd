@@ -2,6 +2,7 @@ package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -30,12 +31,19 @@ public class DocumentoGerado {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     
-    @NotNull(message = "Modelo é obrigatório")
+    // Modelo é opcional: documentos gerados a partir de templates fixos do
+    // sistema (Contrato, Termos, OS, etc.) não possuem ModeloDocumento.
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "modelo_id", nullable = false)
+    @JoinColumn(name = "modelo_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private ModeloDocumento modelo;
-    
+
+    // Categoria do documento gerado (preenchido para documentos do sistema
+    // sem ModeloDocumento dinâmico).
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo", length = 60)
+    private TipoDocumentoGerado tipo;
+
     @NotNull(message = "Funcionário é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "funcionario_id", nullable = false)

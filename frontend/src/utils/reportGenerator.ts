@@ -30,6 +30,8 @@ export interface ReportFilters {
   fornecedor?: string;
   categoria?: string;
   centroCusto?: string;
+  /** PDF contas a receber: RECEBIDOS | A_VENCER | VENCIDOS | INADIMPLENCIA | GERAL = período por emissão */
+  contasReceberSegment?: string;
 }
 
 export class ReportGenerator {

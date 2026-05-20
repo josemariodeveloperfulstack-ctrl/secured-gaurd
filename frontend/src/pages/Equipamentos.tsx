@@ -145,10 +145,10 @@ const Equipamentos: React.FC = () => {
     }
   };
 
-  // Carregar dados iniciais
+  // Carregar dados iniciais e sempre que filtros ou paginação mudarem
   useEffect(() => {
     loadData();
-  }, []);
+  }, [filters, pagination.page, pagination.size]);
 
   const loadData = async () => {
     try {
@@ -179,28 +179,9 @@ const Equipamentos: React.FC = () => {
     }
   };
 
-  const handleSearch = async () => {
-    const newFilters = { ...filters, searchTerm };
-    setFilters(newFilters);
+  const handleSearch = () => {
+    setFilters(prev => ({ ...prev, searchTerm }));
     setPagination(prev => ({ ...prev, page: 0 }));
-    
-    try {
-      const response = await equipmentService.getAll(newFilters, 0, pagination.size);
-      setEquipments(response.content);
-      setPagination(prev => ({
-        ...prev,
-        page: 0,
-        totalElements: response.totalElements,
-        totalPages: response.totalPages
-      }));
-    } catch (err) {
-      console.error('Erro na busca:', err);
-      toast({
-        title: "Erro",
-        description: "Erro ao realizar busca",
-        variant: "destructive",
-      });
-    }
   };
 
   const dashboardCards: DashboardCard[] = summary ? [

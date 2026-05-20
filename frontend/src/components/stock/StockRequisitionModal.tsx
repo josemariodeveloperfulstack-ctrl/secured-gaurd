@@ -43,6 +43,7 @@ import {
   Loader2,
   Building2,
   UserCheck,
+  Edit,
 } from 'lucide-react';
 
 function formatRequesterContext(u: User | null): string {
@@ -88,6 +89,8 @@ interface StockRequisitionModalProps {
   prefill: StockRequisitionPrefill | null;
   /** Abre direto no detalhe (ex.: a partir da lista no Estoque) */
   initialRequisitionId?: string | null;
+  /** Com `initialRequisitionId`: `edit` abre o formulário de alteração quando a requisição estiver pendente */
+  initialOpenMode?: 'view' | 'edit';
   /** Chamado após criar, aprovar ou entregar (atualizar listagens) */
   onRecorded?: () => void;
 }
@@ -112,6 +115,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
   onOpenChange,
   prefill,
   initialRequisitionId = null,
+  initialOpenMode = 'view',
   onRecorded,
 }) => {
   const { toast } = useToast();
@@ -136,28 +140,66 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
   const [physicalAck, setPhysicalAck] = useState('');
   const [deliverLoading, setDeliverLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  /** Edição de requisição pendente (formulário igual ao de criação) */
+  const [editMode, setEditMode] = useState(false);
+  const [editingRequisitionId, setEditingRequisitionId] = useState<string | null>(null);
+
+  const hydrateFromDetail = useCallback((d: StockRequisitionDTO) => {
+    setEmployeeId(d.employeeId);
+    setEmployeeQuery(d.employeeName || '');
+    setWorkSectorDisplay(d.employeeWorkSector || '—');
+    setLastPickedEmployeeName(d.employeeName || '');
+    setMovementReason(d.movementReason);
+    setNotes(d.notes || '');
+    setLines(
+      (d.lines || []).map((l, i) => ({
+        key: l.id || `ln-${i}`,
+        stockItemId: l.stockItemId,
+        quantity: Math.max(1, l.quantity || 1),
+      }))
+    );
+    if ((d.lines || []).length === 0) {
+      setLines([{ key: '0', stockItemId: '', quantity: 1 }]);
+    }
+  }, []);
 
   const loadItems = useCallback(async () => {
     try {
       setItemsLoading(true);
       const data = await stockService.getAllItems();
       setItems(data || []);
-    } catch {
+    } catch (e: unknown) {
+      console.error('Erro ao carregar itens de estoque:', e);
       setItems([]);
+      toast({
+        title: 'Itens de estoque',
+        description: 'Não foi possível carregar a lista de itens do almoxarifado. Verifique a conexão ou tente fechar e abrir o formulário.',
+        variant: 'destructive',
+      });
     } finally {
       setItemsLoading(false);
     }
-  }, []);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!open) {
+      setEditMode(false);
+      setEditingRequisitionId(null);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    loadItems();
+
+    void loadItems();
     setDigitalCaptured(null);
     setPhysicalAck('');
     setDeliverSigType(SignatureType.DIGITAL);
 
     if (initialRequisitionId) {
       setDetail(null);
+      setEditMode(false);
+      setEditingRequisitionId(null);
       setEmployeeQuery('');
       setWorkSectorDisplay('');
       setLastPickedEmployeeName('');
@@ -166,7 +208,14 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
         try {
           setDetailLoading(true);
           const d = await stockService.getStockRequisition(initialRequisitionId);
-          setDetail(d);
+          if (initialOpenMode === 'edit' && d.status === StockRequisitionStatus.PENDING) {
+            hydrateFromDetail(d);
+            setEditingRequisitionId(d.id);
+            setEditMode(true);
+            setDetail(null);
+          } else {
+            setDetail(d);
+          }
         } catch (e: any) {
           toast({
             title: 'Erro ao carregar requisição',
@@ -220,10 +269,12 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     setMovementReason(MovementReason.ENTREGA_INICIAL);
     setNotes('');
     // eslint-disable-next-line react-hooks/exhaustive-deps -- toast estável; evitar reexecuções desnecessárias
-  }, [open, initialRequisitionId, prefill, loadItems]);
+  }, [open, initialRequisitionId, initialOpenMode, prefill, loadItems, hydrateFromDetail]);
 
   useEffect(() => {
-    if (!open || initialRequisitionId || detail) return;
+    if (!open) return;
+    const blockingDetailView = Boolean(initialRequisitionId && detail && !editMode);
+    if (blockingDetailView || detailLoading) return;
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     const q = employeeQuery.trim();
     if (q.length < 3) {
@@ -248,7 +299,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     return () => {
       if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     };
-  }, [employeeQuery, open, initialRequisitionId, detail]);
+  }, [employeeQuery, open, initialRequisitionId, detail, editMode, detailLoading]);
 
   const onEmployeeInputChange = (v: string) => {
     setEmployeeQuery(v);
@@ -280,7 +331,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   };
 
-  const handleCreate = async () => {
+  const handleSaveRequisition = async () => {
     if (!employeeId) {
       toast({ title: 'Funcionário obrigatório', variant: 'destructive' });
       return;
@@ -290,20 +341,31 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
       toast({ title: 'Inclua ao menos um item', variant: 'destructive' });
       return;
     }
+    const payload = {
+      employeeId,
+      movementReason,
+      notes: notes || undefined,
+      lines: validLines.map((l) => ({ stockItemId: l.stockItemId, quantity: l.quantity })),
+    };
+    const updateId = editingRequisitionId ?? (editMode && detail?.status === StockRequisitionStatus.PENDING ? detail.id : null);
     try {
       setSaving(true);
-      const dto = await stockService.createStockRequisition({
-        employeeId,
-        movementReason,
-        notes: notes || undefined,
-        lines: validLines.map((l) => ({ stockItemId: l.stockItemId, quantity: l.quantity })),
-      });
-      setDetail(dto);
-      onRecorded?.();
-      toast({ title: 'Requisição criada', description: `Nº ${dto.requisitionNumber}` });
+      if (updateId) {
+        const dto = await stockService.updateStockRequisition(updateId, payload);
+        setDetail(dto);
+        setEditMode(false);
+        setEditingRequisitionId(null);
+        onRecorded?.();
+        toast({ title: 'Requisição atualizada', description: `Nº ${dto.requisitionNumber}` });
+      } else {
+        const dto = await stockService.createStockRequisition(payload);
+        setDetail(dto);
+        onRecorded?.();
+        toast({ title: 'Requisição criada', description: `Nº ${dto.requisitionNumber}` });
+      }
     } catch (e: any) {
       toast({
-        title: 'Erro ao criar requisição',
+        title: updateId ? 'Erro ao atualizar requisição' : 'Erro ao criar requisição',
         description: e?.response?.data?.error || e?.message || 'Tente novamente.',
         variant: 'destructive',
       });
@@ -375,9 +437,14 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
     }
   };
 
-  const showForm = !initialRequisitionId && !detail && !detailLoading;
-  const showDetail = Boolean(detail) && !detailLoading;
-  const showLoadError = Boolean(initialRequisitionId) && !detailLoading && !detail;
+  const showCreateLikeForm =
+    !detailLoading &&
+    ((!initialRequisitionId && !detail) ||
+      (editMode &&
+        (Boolean(editingRequisitionId) || detail?.status === StockRequisitionStatus.PENDING)));
+
+  const showDetail = Boolean(detail) && !detailLoading && !editMode;
+  const showLoadError = Boolean(initialRequisitionId) && !detailLoading && !detail && !editMode;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -388,7 +455,9 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
               <ClipboardList className="h-5 w-5 text-seguranca-red" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-bold text-white">Gerar requisição</DialogTitle>
+              <DialogTitle className="text-xl font-bold text-white">
+                {editMode ? 'Editar requisição' : 'Gerar requisição'}
+              </DialogTitle>
               <DialogDescription className="text-gray-400 text-sm">
                 Itens, motivo, aprovação, PDF e entrega com assinatura (digital ou física).
               </DialogDescription>
@@ -409,7 +478,7 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
           </p>
         )}
 
-        {showForm ? (
+        {showCreateLikeForm ? (
           <div className="space-y-4 pt-2">
             <div className="rounded-lg border border-gray-600/40 bg-seguranca-black/25 p-3 space-y-2 text-sm">
               <div className="flex items-start gap-2 text-gray-300">
@@ -487,7 +556,14 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
                   ))}
                 </ul>
               )}
-              {employeeQuery.trim().length >= 3 && !employeeSearchLoading && employeeSuggestions.length === 0 && (
+              {employeeQuery.trim().length >= 3 &&
+                !employeeSearchLoading &&
+                employeeSuggestions.length === 0 &&
+                !(
+                  employeeId &&
+                  lastPickedEmployeeName &&
+                  employeeQuery.trim() === lastPickedEmployeeName.trim()
+                ) && (
                 <p className="text-xs text-amber-200/80">Nenhum funcionário encontrado para este termo.</p>
               )}
             </div>
@@ -593,12 +669,38 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
               <Button type="button" variant="outline" className="border-gray-600" onClick={() => onOpenChange(false)}>
                 Fechar
               </Button>
+              {editMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-gray-600"
+                  onClick={() => {
+                    setEditMode(false);
+                    setEditingRequisitionId(null);
+                    if (initialRequisitionId) {
+                      void (async () => {
+                        try {
+                          setDetailLoading(true);
+                          const d = await stockService.getStockRequisition(initialRequisitionId);
+                          setDetail(d);
+                        } catch {
+                          setDetail(null);
+                        } finally {
+                          setDetailLoading(false);
+                        }
+                      })();
+                    }
+                  }}
+                >
+                  Cancelar edição
+                </Button>
+              )}
               <Button
                 className="bg-seguranca-red hover:bg-seguranca-darkred"
-                onClick={handleCreate}
+                onClick={handleSaveRequisition}
                 disabled={saving}
               >
-                {saving ? 'Salvando...' : 'Salvar requisição'}
+                {saving ? 'Salvando...' : editMode ? 'Salvar alterações' : 'Salvar requisição'}
               </Button>
             </div>
           </div>
@@ -690,8 +792,8 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
               <p className="text-sm text-gray-400 mb-2">Itens</p>
               <ul className="text-sm space-y-1 border border-gray-600/30 rounded-md p-2 max-h-40 overflow-y-auto">
                 {detail!.lines.map((l) => (
-                  <li key={l.id || l.stockItemId} className="flex justify-between gap-2">
-                    <span className="truncate">{l.stockItemFullName || l.stockItemCode}</span>
+                  <li key={l.id || l.stockItemId} className="flex justify-between gap-2 min-w-0">
+                    <span className="truncate min-w-0 flex-1">{l.stockItemFullName || l.stockItemCode}</span>
                     <span className="text-seguranca-yellow shrink-0">×{l.quantity}</span>
                   </li>
                 ))}
@@ -699,6 +801,21 @@ const StockRequisitionModal: React.FC<StockRequisitionModalProps> = ({
             </div>
 
             <div className="flex flex-wrap gap-2">
+              {detail!.status === StockRequisitionStatus.PENDING && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-seguranca-yellow/50 text-seguranca-yellow gap-2"
+                  onClick={() => {
+                    hydrateFromDetail(detail!);
+                    setEditingRequisitionId(detail!.id);
+                    setEditMode(true);
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                  Editar
+                </Button>
+              )}
               {detail!.status === StockRequisitionStatus.PENDING && (
                 <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleApprove} disabled={saving}>
                   Aprovar requisição

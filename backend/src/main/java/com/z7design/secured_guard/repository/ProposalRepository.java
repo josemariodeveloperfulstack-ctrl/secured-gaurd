@@ -20,9 +20,15 @@ import java.util.UUID;
 public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
 
     /** Busca proposta por ID com itens carregados (evita LazyInitializationException no mapToDTO). DISTINCT evita múltiplas linhas por item. */
-    @Query("SELECT DISTINCT p FROM Proposal p LEFT JOIN FETCH p.items WHERE p.id = :id")
+    @Query("SELECT DISTINCT p FROM Proposal p LEFT JOIN FETCH p.items WHERE p.id = :id AND p.isDeleted = false")
     Optional<Proposal> findByIdWithItems(@Param("id") UUID id);
     
+    @Query("SELECT p FROM Proposal p WHERE p.isDeleted = false")
+    List<Proposal> findAllActive();
+
+    @Query("SELECT p FROM Proposal p WHERE p.isDeleted = false")
+    Page<Proposal> findAllActive(Pageable pageable);
+
     // Buscar propostas por status
     List<Proposal> findByStatus(ProposalStatus status);
     
@@ -66,12 +72,11 @@ public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
     @Query("SELECT p FROM Proposal p WHERE p.createdAt BETWEEN :startDate AND :endDate")
     List<Proposal> findByCreatedAtBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
     
-    // Contar propostas por status
-    @Query("SELECT p.status, COUNT(p) FROM Proposal p GROUP BY p.status")
-    List<Object[]> countByStatus();
-    
-    // Contar propostas por status específico
-    long countByStatus(ProposalStatus status);
+    @Query("SELECT p.status, COUNT(p) FROM Proposal p WHERE p.isDeleted = false GROUP BY p.status")
+    List<Object[]> countGroupedByStatus();
+
+    @Query("SELECT COUNT(p) FROM Proposal p WHERE p.status = :status AND p.isDeleted = false")
+    long countByStatus(@Param("status") ProposalStatus status);
     
     // Buscar propostas com valor total acima de um valor
     @Query("SELECT p FROM Proposal p WHERE p.totalValue >= :minValue")
@@ -96,7 +101,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, UUID> {
     List<Object[]> sumTotalValueByStatus();
     
     // Calcular valor total das propostas por status específico
-    @Query("SELECT SUM(p.totalValue) FROM Proposal p WHERE p.status = :status")
+    @Query("SELECT COALESCE(SUM(p.totalValue), 0) FROM Proposal p WHERE p.status = :status")
     BigDecimal getTotalValueByStatus(@Param("status") ProposalStatus status);
     
     // Buscar propostas por texto (busca em título, descrição, número)

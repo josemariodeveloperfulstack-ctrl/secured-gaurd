@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Plus, 
@@ -23,11 +23,20 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
-  Star
+  Star,
+  Trash2
 } from 'lucide-react';
 import KanbanCard from './KanbanCard';
 import styles from './KanbanBoard.module.css';
-import { fetchOpportunities, fetchKanbanStatuses, createOpportunity, updateOpportunity, createKanbanStatus } from '@/services/crmService';
+import { 
+  fetchOpportunities, 
+  fetchKanbanStatuses, 
+  createOpportunity, 
+  updateOpportunity, 
+  createKanbanStatus,
+  deleteOpportunity,
+  deleteMultipleOpportunities
+} from '@/services/crmService';
 import { userService } from '@/services/userService';
 import leadService from '@/services/leadService';
 import { useToast } from '@/hooks/use-toast';
@@ -41,7 +50,7 @@ interface KanbanStatus {
 }
 
 interface Lead {
-  id: number;
+  id: string | number | null;
   name: string;
   company: string;
   email: string;
@@ -53,10 +62,10 @@ interface Lead {
 }
 
 interface Opportunity {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
-  statusId: number;
+  statusId: string | number;
   lead: Lead;
   value: number;
   probability: number;
@@ -252,11 +261,120 @@ export default function KanbanBoard() {
   });
   const [users, setUsers] = useState<any[]>([]);
   const [leads, setLeads] = useState<any[]>([]);
+  /** Backend devolve IDs UUID nos status Kanban; usado para validar criação de oportunidades. */
+  const [hasValidStatuses, setHasValidStatuses] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
-  const [hasValidStatuses, setHasValidStatuses] = useState(false);
+  const [selectedOppIds, setSelectedOppIds] = useState<string[]>([]);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'bulk' | 'single' | 'all'>('bulk');
+  const [deleteReason, setDeleteReason] = useState('Exclusão em massa via sistema');
+  const [deleteSingleId, setDeleteSingleId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const isOpportunityUuid = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  const toggleSelect = (id: string | number) => {
+    const key = String(id);
+    setSelectedOppIds(prev =>
+      prev.includes(key) ? prev.filter(i => i !== key) : [...prev, key]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedOppIds(filteredOpportunities.map(opp => String(opp.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedOppIds([]);
+  };
+
+  const openBulkDeleteDialog = () => {
+    if (selectedOppIds.length === 0) return;
+    const valid = selectedOppIds.filter(isOpportunityUuid);
+    if (valid.length === 0) {
+      toast({
+        title: 'Exclusão indisponível',
+        description:
+          'Os cartões selecionados não têm ID de oportunidade válido (ex.: dados de exemplo offline). Recarregue o Kanban com o servidor ou selecione oportunidades reais.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setDeleteMode('bulk');
+    setDeleteReason('Exclusão em massa via sistema');
+    setDeleteSingleId(null);
+    setDeleteModalOpen(true);
+  };
+
+  const openSingleDeleteDialog = (id: string | number) => {
+    const sid = String(id);
+    if (!isOpportunityUuid(sid)) {
+      toast({
+        title: 'Exclusão indisponível',
+        description: 'Este cartão não possui um ID de oportunidade válido no servidor.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setDeleteMode('single');
+    setDeleteSingleId(sid);
+    setDeleteReason('Exclusão individual');
+    setDeleteModalOpen(true);
+  };
+
+  const openDeleteAllDialog = () => {
+    setDeleteMode('all');
+    setDeleteSingleId(null);
+    setDeleteReason('Limpeza total do CRM');
+    setDeleteModalOpen(true);
+  };
+
+  const executeDeleteFromModal = async () => {
+    const reason = deleteReason.trim() || 'Exclusão via sistema';
+    try {
+      setLoading(true);
+      if (deleteMode === 'bulk') {
+        const valid = selectedOppIds.filter(isOpportunityUuid);
+        if (valid.length === 0) {
+          toast({ title: 'Nada a excluir', description: 'Nenhum ID válido selecionado.', variant: 'destructive' });
+          return;
+        }
+        await deleteMultipleOpportunities(valid, reason);
+        toast({
+          title: 'Sucesso',
+          description: `${valid.length} oportunidade(s) excluída(s).`,
+        });
+        setSelectedOppIds([]);
+      } else if (deleteMode === 'single' && deleteSingleId) {
+        await deleteOpportunity(deleteSingleId, reason);
+        toast({ title: 'Sucesso', description: 'Oportunidade excluída com sucesso.' });
+        setSelectedOppIds(prev => prev.filter(i => i !== deleteSingleId));
+      } else if (deleteMode === 'all') {
+        await leadService.deleteAllLeads(reason);
+        toast({ title: 'Sucesso', description: 'Todos os leads e oportunidades foram excluídos.' });
+        setSelectedOppIds([]);
+      }
+      setDeleteModalOpen(false);
+      await loadData();
+    } catch (err: any) {
+      console.error('Erro na exclusão:', err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Não foi possível concluir a exclusão.';
+      toast({
+        title: 'Erro',
+        description: msg,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Carregar dados do backend
   useEffect(() => {
@@ -318,14 +436,20 @@ export default function KanbanBoard() {
         await loadUsersAndLeads();
       }
       
-      // Carregar status e oportunidades em paralelo
-      const [statusesData, opportunitiesData] = await Promise.all([
-        fetchKanbanStatuses(),
-        fetchOpportunities()
-      ]);
+      // 1. Carregar status
+      let statusesData = [];
+      try {
+        statusesData = await fetchKanbanStatuses();
+      } catch (statusErr: any) {
+        console.error('Erro ao buscar status do Kanban:', statusErr);
+        // Se falhar com 404 ou 400, tentaremos criar padrões abaixo
+        if (statusErr.response?.status !== 404 && statusErr.response?.status !== 400) {
+          throw statusErr; // Re-throw if it's a critical error (500, etc)
+        }
+      }
 
       // Mapear status do backend (adicionar cores padrão se não existirem)
-      const mappedStatuses = statusesData.map((status: any, index: number) => ({
+      let mappedStatuses = (statusesData || []).map((status: any, index: number) => ({
         id: status.id,
         name: status.name,
         orderIndex: status.orderIndex || index + 1,
@@ -335,9 +459,8 @@ export default function KanbanBoard() {
 
       // Se não houver status no backend, criar status padrão automaticamente
       if (mappedStatuses.length === 0) {
-        console.warn('Nenhum status encontrado no backend. Criando status padrão...');
+        console.warn('Nenhum status encontrado no backend ou erro na busca. Tentando obter ou criar status padrão...');
         try {
-          // Criar status padrão
           const defaultStatuses = [
             { name: 'Novos Leads', orderIndex: 1 },
             { name: 'Em Contato', orderIndex: 2 },
@@ -349,6 +472,7 @@ export default function KanbanBoard() {
           const createdStatuses = [];
           for (const statusData of defaultStatuses) {
             try {
+              // Tentar criar - se já existir, o backend deve lidar ou nós tratamos o erro aqui
               const created = await createKanbanStatus(statusData);
               createdStatuses.push({
                 id: created.id,
@@ -357,63 +481,53 @@ export default function KanbanBoard() {
                 color: mockStatuses[statusData.orderIndex - 1]?.color || '#3B82F6',
                 bgColor: mockStatuses[statusData.orderIndex - 1]?.bgColor || '#DBEAFE'
               });
-            } catch (err) {
-              console.error(`Erro ao criar status ${statusData.name}:`, err);
+            } catch (err: any) {
+              // Se o erro for "já existe" (409 ou 500 com mensagem específica), ignorar
+              if (err.response?.status === 409 || (err.response?.data?.message && err.response.data.message.includes('already exists'))) {
+                console.log(`Status ${statusData.name} já existe.`);
+              } else {
+                console.error(`Erro ao criar status ${statusData.name}:`, err);
+              }
             }
           }
           
-          if (createdStatuses.length > 0) {
-            setStatuses(createdStatuses);
-            setHasValidStatuses(true);
-            toast({
-              title: "Sucesso",
-              description: `${createdStatuses.length} status padrão foram criados automaticamente.`,
-              variant: "default"
-            });
+          // Se falhou ao criar mas alguns já existiam, precisamos recarregar para pegar os IDs corretos
+          if (createdStatuses.length === 0) {
+            statusesData = await fetchKanbanStatuses();
+            mappedStatuses = statusesData.map((status: any, index: number) => ({
+              id: status.id,
+              name: status.name,
+              orderIndex: status.orderIndex || index + 1,
+              color: mockStatuses[index]?.color || '#3B82F6',
+              bgColor: mockStatuses[index]?.bgColor || '#DBEAFE'
+            })).sort((a, b) => a.orderIndex - b.orderIndex);
           } else {
-            setStatuses(mockStatuses);
-            setHasValidStatuses(false);
-            toast({
-              title: "Aviso",
-              description: "Não foi possível criar status padrão. Por favor, crie manualmente antes de adicionar oportunidades.",
-              variant: "default"
-            });
+            mappedStatuses = createdStatuses;
           }
         } catch (err) {
-          console.error('Erro ao criar status padrão:', err);
-          setStatuses(mockStatuses);
-          setHasValidStatuses(false);
-          toast({
-            title: "Aviso",
-            description: "Nenhum status do Kanban encontrado no backend. Por favor, crie status antes de adicionar oportunidades.",
-            variant: "default"
-          });
+          console.error('Erro ao gerenciar status padrão:', err);
         }
-      } else {
-        // Verificar se todos os status têm UUIDs válidos
-        const validStatuses = mappedStatuses.filter(s => {
-          const idStr = String(s.id);
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          return uuidRegex.test(idStr);
-        });
-        
-        setStatuses(mappedStatuses);
-        setHasValidStatuses(validStatuses.length > 0);
       }
 
-      // Criar mapa de usuários para buscar nomes
+      if (mappedStatuses.length > 0) {
+        setStatuses(mappedStatuses);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        setHasValidStatuses(mappedStatuses.some(s => uuidRegex.test(String(s.id))));
+      } else {
+        setStatuses(mockStatuses);
+        setHasValidStatuses(false);
+      }
+
+      // 2. Carregar oportunidades
+      const opportunitiesData = await fetchOpportunities();
       const usersMap = new Map(users.map(u => [u.id, u.name]));
       
-      // Mapear oportunidades do backend
-      const mappedOpportunities = opportunitiesData.map((opp: any) => {
-        // Buscar nome do responsável usando o ID ou o nome que vem do backend
+      const mappedOpportunities = (opportunitiesData || []).map((opp: any) => {
         let assignedToName = opp.assignedToName || 'Não atribuído';
         if (!assignedToName || assignedToName === 'Não atribuído') {
           if (opp.assignedToId) {
             const userName = usersMap.get(opp.assignedToId);
-            if (userName) {
-              assignedToName = userName;
-            }
+            if (userName) assignedToName = userName;
           }
         }
         
@@ -429,11 +543,10 @@ export default function KanbanBoard() {
           closeDate: opp.closeDate || '',
           assignedToId: opp.assignedToId,
           assignedTo: assignedToName,
-          probability: 50, // Valor padrão, pode ser calculado depois
+          probability: 50,
           priority: 'MEDIUM' as const,
           lastContact: opp.updatedAt || opp.createdAt || '',
           tags: [],
-          // Incluir lead se vier do backend (agora vem no formato OpportunityResponse com lead completo)
           lead: opp.lead ? {
             id: opp.lead.id || null,
             name: opp.lead.name || 'Sem nome',
@@ -461,120 +574,8 @@ export default function KanbanBoard() {
       setOpportunities(mappedOpportunities);
       setFilteredOpportunities(mappedOpportunities);
     } catch (err: any) {
-      console.error('Erro ao carregar dados do Kanban:', err);
+      console.error('Erro crítico ao carregar dados do Kanban:', err);
       setError(err.message || 'Erro ao carregar dados');
-      
-      // Se o erro for porque não há status, tentar criar status padrão
-      if (err.response?.status === 404 || err.response?.status === 400 || err.message?.includes('status')) {
-        try {
-          console.log('Tentando criar status padrão devido ao erro...');
-          const defaultStatuses = [
-            { name: 'Novos Leads', orderIndex: 1 },
-            { name: 'Em Contato', orderIndex: 2 },
-            { name: 'Proposta Enviada', orderIndex: 3 },
-            { name: 'Em Negociação', orderIndex: 4 },
-            { name: 'Fechado', orderIndex: 5 }
-          ];
-          
-          const createdStatuses = [];
-          for (const statusData of defaultStatuses) {
-            try {
-              const created = await createKanbanStatus(statusData);
-              createdStatuses.push({
-                id: created.id,
-                name: created.name,
-                orderIndex: created.orderIndex || statusData.orderIndex,
-                color: mockStatuses[statusData.orderIndex - 1]?.color || '#3B82F6',
-                bgColor: mockStatuses[statusData.orderIndex - 1]?.bgColor || '#DBEAFE'
-              });
-            } catch (createErr) {
-              console.error(`Erro ao criar status ${statusData.name}:`, createErr);
-            }
-          }
-          
-          if (createdStatuses.length > 0) {
-            setStatuses(createdStatuses);
-            setHasValidStatuses(true);
-            toast({
-              title: "Status Criados",
-              description: `${createdStatuses.length} status padrão foram criados automaticamente.`,
-              variant: "default"
-            });
-            // Recarregar oportunidades após criar status
-            try {
-              // Garantir que usuários estão carregados antes de mapear
-              if (users.length === 0) {
-                await loadUsersAndLeads();
-              }
-              
-              const opportunitiesData = await fetchOpportunities();
-              const usersMap = new Map(users.map(u => [u.id, u.name]));
-              
-              const mappedOpportunities = opportunitiesData.map((opp: any) => {
-                // Buscar nome do responsável usando o ID ou o nome que vem do backend
-                let assignedToName = opp.assignedToName || 'Não atribuído';
-                if (!assignedToName || assignedToName === 'Não atribuído') {
-                  if (opp.assignedToId) {
-                    const userName = usersMap.get(opp.assignedToId);
-                    if (userName) {
-                      assignedToName = userName;
-                    }
-                  }
-                }
-                
-                return {
-                  id: opp.id,
-                  title: opp.title,
-                  description: opp.description || '',
-                  statusId: opp.statusId,
-                  leadId: opp.lead?.id || opp.leadId || null,
-                  value: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
-                  estimatedValue: opp.estimatedValue ? Number(opp.estimatedValue) : 0,
-                  expectedCloseDate: opp.closeDate || '',
-                  closeDate: opp.closeDate || '',
-                  assignedToId: opp.assignedToId,
-                  assignedTo: assignedToName,
-                  probability: 50,
-                  priority: 'MEDIUM' as const,
-                  lastContact: opp.updatedAt || opp.createdAt || '',
-                  tags: [],
-                  // Criar objeto lead padrão para evitar erros
-                  lead: opp.lead ? {
-                    id: opp.lead.id || opp.leadId || 0,
-                    name: opp.lead.name || 'Sem nome',
-                    company: opp.lead.company || opp.lead.companyName || '',
-                    email: opp.lead.email || '',
-                    phone: opp.lead.phone || '',
-                    status: opp.lead.status || 'NEW' as const,
-                    source: opp.lead.source || 'Não informado',
-                    value: opp.lead.value || opp.estimatedValue || 0,
-                    createdAt: opp.lead.createdAt || opp.createdAt || ''
-                  } : {
-                    id: opp.leadId || 0,
-                    name: 'Lead não encontrado',
-                    company: '',
-                    email: '',
-                    phone: '',
-                    status: 'NEW' as const,
-                    source: 'Não informado',
-                    value: 0,
-                    createdAt: opp.createdAt || ''
-                  }
-                };
-              });
-              setOpportunities(mappedOpportunities);
-              setFilteredOpportunities(mappedOpportunities);
-            } catch (oppErr) {
-              console.error('Erro ao carregar oportunidades após criar status:', oppErr);
-            }
-            return; // Sair aqui para não definir hasValidStatuses como false
-          }
-        } catch (createErr) {
-          console.error('Erro ao criar status padrão:', createErr);
-        }
-      }
-      
-      // Em caso de erro, usar dados mockados como fallback
       setStatuses(mockStatuses);
       setOpportunities(mockOpportunities || []);
       setFilteredOpportunities(mockOpportunities || []);
@@ -917,7 +918,11 @@ export default function KanbanBoard() {
               <div>
                 <p className="text-sm text-gray-400">Média de Valor</p>
                 <p className="text-2xl font-bold text-seguranca-yellow">
-                  {formatCurrency(opportunities.reduce((sum, opp) => sum + opp.value, 0) / opportunities.length)}
+                  {formatCurrency(
+                    opportunities.length > 0
+                      ? opportunities.reduce((sum, opp) => sum + opp.value, 0) / opportunities.length
+                      : 0
+                  )}
                 </p>
               </div>
               <Star className="h-8 w-8 text-seguranca-yellow" />
@@ -970,8 +975,47 @@ export default function KanbanBoard() {
               onClick={() => { setSearchTerm(''); setSelectedStatus(null); setSelectedPriority('all'); }}
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
             >
-              Limpar
+              Limpar Filtros
             </Button>
+
+            <div className="flex gap-2 ml-auto">
+              {selectedOppIds.length > 0 ? (
+                <>
+                  <Button 
+                    variant="destructive" 
+                    onClick={openBulkDeleteDialog}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Excluir Selecionados ({selectedOppIds.length})
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={deselectAll}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                  >
+                    Desmarcar Tudo
+                  </Button>
+                </>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  onClick={selectAll}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+                >
+                  Selecionar Todos
+                </Button>
+              )}
+
+              <Button 
+                variant="destructive" 
+                onClick={openDeleteAllDialog}
+                className="bg-red-900/50 hover:bg-red-900 text-white border-red-800"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Limpar Tudo
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1007,13 +1051,16 @@ export default function KanbanBoard() {
               <div className="space-y-3">
                 {statusOpportunities.map(opp => (
                   <KanbanCard
-                    key={opp.id}
+                    key={String(opp.id)}
                     opportunity={opp}
                     onEdit={openEditModal}
                     onDragStart={() => {}}
                     getPriorityColor={getPriorityColor}
                     getLeadStatusColor={getLeadStatusColor}
                     getLeadStatusText={getLeadStatusText}
+                    selected={selectedOppIds.includes(String(opp.id))}
+                    onSelect={toggleSelect}
+                    onDelete={openSingleDeleteDialog}
                     formatCurrency={formatCurrency}
                     formatDate={formatDate}
                   />
@@ -1034,6 +1081,58 @@ export default function KanbanBoard() {
           );
         })}
       </div>
+
+      {/* Confirmação de exclusão (tema CRM) */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md border border-gray-600 bg-seguranca-graphite p-6 text-seguranca-lightgray shadow-2xl [&>button]:text-seguranca-lightgray">
+          <DialogHeader className="text-center sm:text-center space-y-2">
+            <DialogTitle className="text-xl text-seguranca-lightgray">
+              {deleteMode === 'all'
+                ? 'Excluir todos os dados do CRM?'
+                : deleteMode === 'bulk'
+                  ? `Excluir ${selectedOppIds.filter(isOpportunityUuid).length} oportunidade(s)?`
+                  : 'Excluir esta oportunidade?'}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400 text-center">
+              {deleteMode === 'all'
+                ? 'Esta ação remove permanentemente todos os leads e oportunidades. Informe o motivo para o registro de auditoria.'
+                : 'Informe o motivo da exclusão (obrigatório para auditoria).'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-left">
+            <Label htmlFor="delete-reason" className="text-seguranca-lightgray">
+              Motivo da exclusão
+            </Label>
+            <Textarea
+              id="delete-reason"
+              value={deleteReason}
+              onChange={e => setDeleteReason(e.target.value)}
+              rows={3}
+              className="bg-seguranca-black border-gray-600 text-seguranca-lightgray resize-none"
+              placeholder="Descreva o motivo..."
+            />
+          </div>
+          <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-center gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
+              onClick={() => setDeleteModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => void executeDeleteFromModal()}
+              disabled={loading}
+            >
+              {deleteMode === 'all' ? 'Confirmar limpeza total' : 'Confirmar exclusão'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Oportunidade */}
       <Dialog open={showModal} onOpenChange={setShowModal}>

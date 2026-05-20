@@ -131,7 +131,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                         value: 0.0
                     }
                 ],
-                city: selectedEmp.address && typeof selectedEmp.address === 'string' ? selectedEmp.address.split(',')[0] : '',
+                city: selectedEmp.city || '',
                 documentDate: form.dataEntrega
             };
 

@@ -9,7 +9,9 @@ export type ContaAReceber = ContaAReceberForm & {
   pendingAmount?: number; // Valor pendente
   overdueDays?: number; // Dias em atraso
   invoiceNumber?: string; // Número da fatura
-  measurementNumber?: string; // Número da medição
+  measurementNumber?: string; // Número da medição (texto livre)
+  measurementId?: string; // FK do boletim de medição
+  measurementInfo?: string; // Texto amigável devolvido pelo backend
   dueDate?: Date; // Data de vencimento
   client?: {
     id: string;
@@ -37,7 +39,7 @@ export interface CreateContaAReceberRequest {
   overdueDays?: number; // Dias em atraso
   lateFee?: number; // Taxa de atraso
   latePenalty?: number; // Multa de atraso
-  centroCusto?: string; // Centro de custo
+  workPostId?: string; // ID do posto de trabalho
 }
 
 export interface UpdateContaAReceberRequest extends Partial<CreateContaAReceberRequest> {
@@ -146,6 +148,52 @@ function mapBackendTypeToFrontend(backendTypeOrCategory: string | undefined): 'F
   }
 }
 
+/** Normaliza uma linha da API de contas a receber (lista paginada ou /all). */
+function mapAccountsReceivableListItem(account: any): ContaAReceber | null {
+  if (!account || !account.id) return null;
+  return {
+    id: account.id,
+    numeroFatura: account.invoiceNumber,
+    dataEmissao: parseDateFromBackend(account.issueDate),
+    vencimento: parseDateFromBackend(account.dueDate) || new Date(),
+    cliente: account.clientName || account.client?.name || 'Não informado',
+    clienteId: account.clientId || account.client?.id,
+    empresa: account.unitSigla || account.unitName || 'Não informado',
+    empresaId: account.unitId,
+    descricao: account.description || '',
+    tipo: mapBackendTypeToFrontend(account.type || account.category),
+    valor: parseFloat(account.amount || 0),
+    amount: parseFloat(account.amount || 0),
+    amountPaid: parseFloat(account.amountPaid || 0),
+    pendingAmount: parseFloat(
+      account.pendingAmount ||
+        (parseFloat(account.amount || 0) - parseFloat(account.amountPaid || 0)) ||
+        0
+    ),
+    overdueDays: account.overdueDays || 0,
+    codigoBarras: account.barcode,
+    status: mapBackendStatusToFrontend(account.status),
+    baixa: account.baixa || false,
+    dataPagamento: parseDateFromBackend(account.paymentDate),
+    observacoes: account.notes,
+    categoria: account.category,
+    workPostId: account.workPostId || account.workPost?.id,
+    workPostName: account.workPostName || account.workPost?.name,
+    paymentMethod: account.paymentMethod || 'PIX',
+    invoiceNumber: account.invoiceNumber,
+    measurementNumber: account.measurementNumber,
+    measurementId: account.measurementId,
+    measurementInfo: account.measurementInfo,
+    dueDate: parseDateFromBackend(account.dueDate) || new Date(),
+    client: account.client
+      ? {
+          id: account.client.id,
+          name: account.client.name || account.clientName || 'Não informado',
+        }
+      : undefined,
+  };
+}
+
 export const contasAReceberService = {
   // ===== CONTAS A RECEBER =====
   
@@ -160,7 +208,10 @@ export const contasAReceberService = {
     if (filters.endDate) params.append('endDate', filters.endDate);
     if (filters.searchTerm) params.append('searchTerm', filters.searchTerm);
     if (filters.page !== undefined) params.append('page', filters.page.toString());
+    else params.append('page', '0');
+    // Spring Data default size é 20 — sem isto a UI parece "não apagar" ou duplicar lógica ao misturar página truncada com estado local
     if (filters.size !== undefined) params.append('size', filters.size.toString());
+    else params.append('size', '5000');
     if (filters.sortBy) params.append('sortBy', filters.sortBy);
     if (filters.sortDir) params.append('sortDir', filters.sortDir);
 
@@ -174,40 +225,45 @@ export const contasAReceberService = {
     
     console.log('🔍 DEBUG: Accounts processados:', accounts);
     
-    return accounts
-      .filter((account: any) => account && account.id) // Filtrar itens inválidos
-      .map((account: any): ContaAReceber => ({
-        id: account.id,
-        numeroFatura: account.invoiceNumber,
-        dataEmissao: parseDateFromBackend(account.issueDate),
-        vencimento: parseDateFromBackend(account.dueDate) || new Date(),
-        cliente: account.clientName || account.client?.name || 'Não informado',
-        clienteId: account.clientId || account.client?.id,
-        empresa: account.unitSigla || account.unitName || 'Não informado',
-        empresaId: account.unitId,
-        descricao: account.description || '',
-        tipo: mapBackendTypeToFrontend(account.type || account.category),
-        valor: parseFloat(account.amount || 0),
-        amount: parseFloat(account.amount || 0), // Campo adicional para compatibilidade
-        amountPaid: parseFloat(account.amountPaid || 0), // Valor pago
-        pendingAmount: parseFloat(account.pendingAmount || (parseFloat(account.amount || 0) - parseFloat(account.amountPaid || 0)) || 0), // Valor pendente
-        overdueDays: account.overdueDays || 0, // Dias em atraso
-        codigoBarras: account.barcode,
-        status: mapBackendStatusToFrontend(account.status),
-        baixa: account.baixa || false,
-        dataPagamento: parseDateFromBackend(account.paymentDate),
-        observacoes: account.notes,
-        categoria: account.category,
-        centroCusto: account.centroCusto,
-        paymentMethod: account.paymentMethod || 'PIX', // Incluir paymentMethod do backend
-        invoiceNumber: account.invoiceNumber, // Número da fatura
-        measurementNumber: account.measurementNumber, // Número da medição
-        dueDate: parseDateFromBackend(account.dueDate) || new Date(), // Data de vencimento
-        client: account.client ? {
-          id: account.client.id,
-          name: account.client.name || account.clientName || 'Não informado'
-        } : undefined
-      }));
+    const mapped = accounts
+      .map(mapAccountsReceivableListItem)
+      .filter((c): c is ContaAReceber => c != null);
+    const byId = new Map<string, ContaAReceber>();
+    for (const c of mapped) {
+      if (c.id) byId.set(String(c.id), c);
+    }
+    return Array.from(byId.values());
+  },
+
+  /**
+   * Lista completa para relatórios.
+   * Preferência: GET /all. Se falhar ou vier vazio por erro de rota, pagina até juntar todos (mesmo fluxo da tela de contas).
+   */
+  async getAllContasAReceber(): Promise<ContaAReceber[]> {
+    try {
+      const response = await api.get('/api/accounts-receivable/all');
+      const accounts = Array.isArray(response.data) ? response.data : [];
+      const mapped = accounts
+        .map(mapAccountsReceivableListItem)
+        .filter((c): c is ContaAReceber => c != null);
+      if (mapped.length > 0) {
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('getAllContasAReceber: /all indisponível ou vazio, usando paginação:', err);
+    }
+
+    const pageSize = 500;
+    let page = 0;
+    const aggregated: ContaAReceber[] = [];
+    for (let guard = 0; guard < 1000; guard++) {
+      const batch = await this.getContasAReceber({ page, size: pageSize });
+      if (!batch.length) break;
+      aggregated.push(...batch);
+      if (batch.length < pageSize) break;
+      page += 1;
+    }
+    return aggregated;
   },
 
   // Buscar conta por ID
@@ -239,7 +295,8 @@ export const contasAReceberService = {
       dataPagamento: parseDateFromBackend(account.paymentDate),
       observacoes: account.notes,
       categoria: account.category || 'INVOICE', // Garantir categoria
-      centroCusto: account.centroCusto || undefined,
+      workPostId: account.workPostId || account.workPost?.id,
+      workPostName: account.workPostName || account.workPost?.name,
       paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
     };
   },
@@ -276,12 +333,20 @@ export const contasAReceberService = {
       paymentMethod: paymentMethod,
       status: mapFrontendStatusToBackend(conta.status) || 'PENDING',
       notes: conta.observacoes,
-      centroCusto: conta.centroCusto || undefined
+      workPostId: conta.workPostId || undefined
     };
 
     // Adicionar invoiceNumber apenas se fornecido
     if (conta.numeroFatura && conta.numeroFatura.trim()) {
       requestData.invoiceNumber = conta.numeroFatura;
+    }
+
+    // Vincular boletim de medição (FK) e/ou número livre da medição
+    if (conta.measurementId) {
+      requestData.measurementId = String(conta.measurementId);
+    }
+    if (conta.measurementNumber && String(conta.measurementNumber).trim()) {
+      requestData.measurementNumber = String(conta.measurementNumber).trim();
     }
 
     console.log('Dados da requisição:', requestData);
@@ -315,7 +380,9 @@ export const contasAReceberService = {
       paymentDate: conta.dataPagamento ? formatDateForBackend(conta.dataPagamento) : (contaExistente.dataPagamento ? formatDateForBackend(contaExistente.dataPagamento) : undefined),
       barcode: conta.codigoBarras !== undefined ? conta.codigoBarras : contaExistente.codigoBarras,
       notes: conta.observacoes !== undefined ? conta.observacoes : contaExistente.observacoes,
-      centroCusto: conta.centroCusto !== undefined ? conta.centroCusto : contaExistente.centroCusto,
+      workPostId: conta.workPostId !== undefined ? conta.workPostId : contaExistente.workPostId,
+      measurementId: conta.measurementId !== undefined ? (conta.measurementId || undefined) : contaExistente.measurementId,
+      measurementNumber: conta.measurementNumber !== undefined ? (conta.measurementNumber || undefined) : contaExistente.measurementNumber,
       overdueDays: Number(contaExistente.overdueDays || 0),
       lateFee: Number(contaExistente.lateFee || 0),
       latePenalty: Number(contaExistente.latePenalty || 0)
@@ -422,8 +489,8 @@ export const contasAReceberService = {
     if (requestData.amountPaid !== undefined && requestData.amountPaid !== null) {
       cleanRequestData.amountPaid = Number(requestData.amountPaid);
     }
-    if (requestData.centroCusto && String(requestData.centroCusto).trim()) {
-      cleanRequestData.centroCusto = String(requestData.centroCusto).trim();
+    if (requestData.workPostId) {
+      cleanRequestData.workPostId = String(requestData.workPostId);
     }
     if (requestData.barcode && String(requestData.barcode).trim()) {
       cleanRequestData.barcode = String(requestData.barcode).trim();
@@ -433,6 +500,9 @@ export const contasAReceberService = {
     }
     if (requestData.measurementNumber && String(requestData.measurementNumber).trim()) {
       cleanRequestData.measurementNumber = String(requestData.measurementNumber).trim();
+    }
+    if (requestData.measurementId) {
+      cleanRequestData.measurementId = String(requestData.measurementId);
     }
     if (requestData.overdueDays !== undefined && requestData.overdueDays !== null) {
       cleanRequestData.overdueDays = Number(requestData.overdueDays);
@@ -468,6 +538,21 @@ export const contasAReceberService = {
   // Excluir conta
   async deleteContaAReceber(id: string): Promise<void> {
     await api.delete(`/api/accounts-receivable/${id}`);
+  },
+
+  /** Exclui várias contas (mesmo endpoint usado pelo relatório). Corpo: lista de UUIDs em string. */
+  async deleteContasReceberBulk(ids: string[]): Promise<void> {
+    const unique = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
+    if (unique.length === 0) return;
+    await api.delete('/api/accounts-receivable/bulk-delete', { data: unique });
+  },
+
+  /** Marca a conta como totalmente paga (usa data de pagamento no backend). Formato: YYYY-MM-DD */
+  async markContaAReceberAsPaid(id: string, paymentDate: string): Promise<ContaAReceber> {
+    const response = await api.put(`/api/accounts-receivable/${id}/mark-paid`, null, {
+      params: { paymentDate }
+    });
+    return this.getContaAReceberById(response.data.id);
   },
 
   async getCategories(): Promise<string[]> {
@@ -674,7 +759,8 @@ export const contasAReceberService = {
       dataPagamento: parseDateFromBackend(account.paymentDate),
       observacoes: account.notes,
       categoria: account.category,
-      centroCusto: account.centroCusto,
+      workPostId: account.workPostId || account.workPost?.id,
+      workPostName: account.workPostName || account.workPost?.name,
       createdAt: parseDateFromBackend(account.createdAt)
     };
   }

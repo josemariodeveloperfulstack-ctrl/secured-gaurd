@@ -16,7 +16,7 @@ public class RemanejamentoHistorico {
     private Remanejamento remanejamento;
 
     @ManyToOne
-    @JoinColumn(name = "employee_id", nullable = false)
+    @JoinColumn(name = "employee_id", nullable = true)
     private Employee employee;
 
     @Enumerated(EnumType.STRING)
@@ -68,10 +68,12 @@ public class RemanejamentoHistorico {
     public RemanejamentoHistorico(Remanejamento remanejamento, AcaoHistorico acao, User usuarioQueExecutou) {
         this.remanejamento = remanejamento;
         this.employee = remanejamento.getEmployee();
-        this.tipo = remanejamento.getTipo();
+        this.tipo = remanejamento.getTipo() != null ? remanejamento.getTipo() : RemanejamentoTipo.OUTROS;
         this.origem = remanejamento.getOrigem();
         this.destino = remanejamento.getDestino();
-        this.dataRemanejamento = remanejamento.getDataRemanejamento().atStartOfDay();
+        this.dataRemanejamento = remanejamento.getDataRemanejamento() != null
+                ? remanejamento.getDataRemanejamento().atStartOfDay()
+                : LocalDateTime.now();
         this.observacao = remanejamento.getObservacao();
         this.acao = acao;
         this.usuarioQueExecutou = usuarioQueExecutou;

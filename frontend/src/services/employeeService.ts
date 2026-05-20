@@ -21,9 +21,15 @@ export interface Employee {
   email?: string;
   cnhNumber?: string;
   ctps?: string;
+  ctpsSeries?: string;
   cbo?: string;
   pis?: string;
+  nationality?: string;
+  maritalStatus?: string;
   salario?: number;
+  diasTrabalho?: string;
+  horarioTrabalho?: string;
+  escalaTrabalho?: string;
   createdAt?: string;
   updatedAt?: string;
   rg?: string;
@@ -36,7 +42,7 @@ export interface Employee {
   ageTurning?: number;
   position?: { id?: string; name?: string };
   unit?: { id?: string; name?: string };
-  company?: { id?: string; sigla?: string };
+  company?: { id?: string; name?: string; sigla?: string };
   department?: { id?: string; name?: string };
 }
 
@@ -65,6 +71,12 @@ export interface SimpleEmployee {
   unitName?: string;
   departmentName?: string;
   workPostName?: string;
+  workPostId?: string;
+  salario?: number;
+  diasTrabalho?: string;
+  horarioTrabalho?: string;
+  escalaTrabalho?: string;
+  status?: string;
 }
 
 export interface EmployeeFilters {
@@ -231,14 +243,41 @@ export const employeeService = {
           name: emp.name,
           email: emp.email,
           phone: emp.phone,
-          document: emp.document
+          document: emp.document,
+          workPostId: emp.workPostId || emp.workPost?.id,
+          workPostName: emp.workPostName || emp.workPost?.name,
+          status: emp.status
         }));
       }
 
-      return [];
+      return data.map((emp: any) => ({
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        phone: emp.phone,
+        document: emp.document,
+        workPostId: emp.workPostId || emp.workPost?.id,
+        workPostName: emp.workPostName || emp.workPost?.name,
+        status: emp.status
+      }));
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
       return [];
+    }
+  },
+
+  /**
+   * Exportar histórico de movimentações (funcionário) para PDF
+   */
+  async exportEmployeeHistoryPDF(employeeId: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/api/employees/${employeeId}/generate-history-pdf`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar PDF de histórico do funcionário:', error);
+      throw error;
     }
   },
 
@@ -408,7 +447,12 @@ export const employeeService = {
   async searchSimpleEmployees(query: string): Promise<SimpleEmployee[]> {
     try {
       const response = await api.get(`/api/employees/search/simple?q=${encodeURIComponent(query)}`);
-      return response.data;
+      const raw = response.data;
+      if (Array.isArray(raw)) return raw;
+      if (raw && typeof raw === 'object' && Array.isArray((raw as { content?: unknown }).content)) {
+        return (raw as { content: SimpleEmployee[] }).content;
+      }
+      return [];
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);
       return [];

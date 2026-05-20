@@ -15,6 +15,9 @@ import java.util.UUID;
 public class OperationalServiceOrderRequest {
     private UUID companyId;
 
+    /** ID do funcionário (opcional). Quando informado, persiste o PDF gerado. */
+    private UUID employeeId;
+
     // Dados do Funcionário (Executante)
     private String employeeName;
     private String employeeCpf;
@@ -40,4 +43,11 @@ public class OperationalServiceOrderRequest {
     // Dados Gerais
     private String city;
     private LocalDate documentDate;
+
+    // Segurança e Medicina do Trabalho (NR-01)
+    private String activities;
+    private String risks;
+    private String preventiveMeasures;
+    private String uniform;
+    private String mandatoryTrainings;
 }

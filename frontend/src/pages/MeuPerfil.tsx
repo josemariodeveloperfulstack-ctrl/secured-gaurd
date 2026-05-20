@@ -39,7 +39,11 @@ interface UserProfile {
   updatedAt: string;
 }
 
-const MeuPerfil = () => {
+interface MeuPerfilProps {
+  standalone?: boolean;
+}
+
+const MeuPerfil: React.FC<MeuPerfilProps> = ({ standalone = false }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -117,7 +121,7 @@ const MeuPerfil = () => {
 
   if (loading) {
     return (
-      <StandardLayout>
+      <StandardLayout isSubPage={standalone}>
         <div className="flex items-center justify-center h-96">
           <Loader2 className="h-8 w-8 animate-spin text-seguranca-yellow" />
           <span className="ml-2 text-seguranca-lightgray">Carregando perfil...</span>
@@ -128,7 +132,7 @@ const MeuPerfil = () => {
 
   if (!profile) {
     return (
-      <StandardLayout>
+      <StandardLayout isSubPage={standalone}>
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
@@ -140,7 +144,7 @@ const MeuPerfil = () => {
   }
 
   return (
-    <StandardLayout>
+    <StandardLayout isSubPage={standalone}>
       <div className="space-y-6">
         {/* Header - Padrão SST */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

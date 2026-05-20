@@ -32,18 +32,16 @@ import './EquipamentosTable.css';
 import AssignEquipmentModal from '../equipamentos/AssignEquipmentModal';
 import UnassignEquipmentModal from '../equipamentos/UnassignEquipmentModal';
 
-interface Equipment {
-  id: string;
-  serialNumber: string;
-  model?: string;
-  status: 'IN_STOCK' | 'IN_USE' | 'IN_MAINTENANCE' | 'DISABLED';
-  currentUserName?: string;
-  currentUserId?: string;
-  validityDate?: string;
-  daysToExpiry?: number;
-  protectionLevel?: 'I' | 'II' | 'IIIA' | 'III' | 'IV';
-  isDangerous: boolean;
-}
+import {
+  Equipment,
+  EquipmentType,
+  EquipmentStatus,
+  EquipmentSize,
+  ProtectionLevel,
+  EQUIPMENT_STATUS_LABELS,
+  PROTECTION_LEVEL_LABELS,
+  EQUIPMENT_TYPE_LABELS
+} from '@/types/equipment';
 
 interface EquipamentosTableHybridProps {
   equipments: Equipment[];
@@ -59,33 +57,31 @@ interface EquipamentosTableHybridProps {
   onReport?: () => void;
 }
 
-const EQUIPMENT_STATUS_LABELS = {
-  IN_STOCK: 'Em estoque',
-  IN_USE: 'Em uso',
-  IN_MAINTENANCE: 'Em manutenção',
-  DISABLED: 'Desabilitado'
-};
-
-const PROTECTION_LEVEL_LABELS = {
-  I: 'Nível I',
-  II: 'Nível II',
-  IIIA: 'Nível IIIA',
-  III: 'Nível III',
-  IV: 'Nível IV'
-};
-
 const getStatusBadgeColor = (status: string) => {
   switch (status) {
-    case 'IN_STOCK':
-      return 'bg-blue-100 text-blue-800';
-    case 'IN_USE':
-      return 'bg-green-100 text-green-800';
-    case 'IN_MAINTENANCE':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'DISABLED':
-      return 'bg-gray-100 text-gray-800';
+    case 'EM_ESTOQUE':
+      return 'bg-blue-50 text-blue-700 border border-blue-200';
+    case 'EM_USO':
+      return 'bg-green-50 text-green-700 border border-green-200';
+    case 'EM_MANUTENCAO':
+      return 'bg-amber-50 text-amber-700 border border-amber-200';
+    case 'BAIXADO':
+      return 'bg-rose-50 text-rose-700 border border-rose-200';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-slate-50 text-slate-700 border border-slate-200';
+  }
+};
+
+const getTypeBadgeColor = (type?: EquipmentType) => {
+  switch (type) {
+    case EquipmentType.ARMA:
+      return 'bg-red-50 text-red-700 border border-red-200';
+    case EquipmentType.COLETE:
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+    case EquipmentType.MUNICAO:
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+    default:
+      return 'bg-slate-50 text-slate-700 border border-slate-200';
   }
 };
 
@@ -208,21 +204,56 @@ const EquipamentosTableHybrid: React.FC<EquipamentosTableHybridProps> = ({
             <table className="equipment-table w-full">
               <thead className="border-b bg-gray-50">
                 <tr className="text-left">
-                  <th className="p-4 font-medium text-gray-700">Nº Série</th>
-                  <th className="p-4 font-medium text-gray-700">Modelo</th>
+                  <th className="p-4 font-medium text-gray-700">Tipo</th>
+                  <th className="p-4 font-medium text-gray-700">Nº Série / Lote</th>
+                  <th className="p-4 font-medium text-gray-700">Especificações / Detalhes</th>
+                  <th className="p-4 font-medium text-gray-700">🏢 Localização</th>
                   <th className="p-4 font-medium text-gray-700">Status</th>
                   <th className="p-4 font-medium text-gray-700">Usuário</th>
                   <th className="p-4 font-medium text-gray-700">Validade</th>
-                  <th className="p-4 font-medium text-gray-700">Nível</th>
-                  <th className="p-4 font-medium text-gray-700">Perigoso</th>
                   <th className="p-4 font-medium text-gray-700">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {equipments.map((equipment) => (
                   <tr key={equipment.id} className="border-b hover:bg-gray-50 transition-colors">
+                    <td className="p-4">
+                      <Badge className={getTypeBadgeColor(equipment.type)}>
+                        {EQUIPMENT_TYPE_LABELS[equipment.type || EquipmentType.COLETE]}
+                      </Badge>
+                    </td>
                     <td className="p-4 font-mono text-sm font-medium">{equipment.serialNumber}</td>
-                    <td className="p-4 text-sm">{equipment.model || '-'}</td>
+                    <td className="p-4 text-sm">
+                      {equipment.type === EquipmentType.ARMA ? (
+                        <div>
+                          <span className="font-semibold text-slate-700">{equipment.model || '-'}</span>
+                          <div className="text-xs text-slate-500">
+                            Registro: {equipment.weaponRegistration || '-'} • {equipment.shotsQuantity ? `${equipment.shotsQuantity} Tiros` : '-'}
+                          </div>
+                        </div>
+                      ) : equipment.type === EquipmentType.MUNICAO ? (
+                        <div>
+                          <span className="font-semibold text-slate-700">{equipment.model || 'Munição'}</span>
+                          <div className="text-xs text-slate-500">
+                            Calibre: {equipment.caliber || '-'} • Quantidade: {equipment.quantity || '0'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="font-semibold text-slate-700">{equipment.model || 'Colete'}</span>
+                          <div className="text-xs text-slate-500">
+                            Tam: {equipment.size || '-'} • CA: {equipment.caNumber || '-'} • Lote: {equipment.batch || '-'}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-4 text-sm">
+                      {equipment.workPostName ? (
+                        <span className="text-blue-600 font-semibold">{equipment.workPostName}</span>
+                      ) : (
+                        <span className="text-slate-500 italic">🏢 Cofre da Empresa</span>
+                      )}
+                    </td>
                     <td className="p-4">
                       <Badge className={getStatusBadgeColor(equipment.status)}>
                         {EQUIPMENT_STATUS_LABELS[equipment.status]}
@@ -246,40 +277,12 @@ const EquipamentosTableHybrid: React.FC<EquipamentosTableHybridProps> = ({
                               : '-'
                             }
                           </div>
-                          {equipment.daysToExpiry !== undefined && equipment.daysToExpiry !== null && (
-                            <div className={cn("text-xs", getDaysToExpiryColor(equipment.daysToExpiry))}>
-                              {equipment.daysToExpiry < 0 
-                                ? `Vencido há ${Math.abs(equipment.daysToExpiry)} dias`
-                                : `${equipment.daysToExpiry} dias restantes`
-                              }
+                          {equipment.type === EquipmentType.ARMA && equipment.weaponRegistrationValidity && (
+                            <div className="text-[10px] text-amber-600 font-medium">
+                              Reg: {formatDate(equipment.weaponRegistrationValidity)}
                             </div>
                           )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="p-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-muted-foreground" />
-                        <span>
-                          {equipment.protectionLevel 
-                            ? PROTECTION_LEVEL_LABELS[equipment.protectionLevel]
-                            : '-'
-                          }
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className={cn(
-                          "h-4 w-4",
-                          equipment.isDangerous ? "text-destructive" : "text-muted-foreground"
-                        )} />
-                        <Badge 
-                          variant={equipment.isDangerous ? "destructive" : "secondary"} 
-                          className="text-xs font-medium"
-                        >
-                          {equipment.isDangerous ? 'Sim' : 'Não'}
-                        </Badge>
                       </div>
                     </td>
                     <td className="p-4">
@@ -360,10 +363,15 @@ const EquipamentosTableHybrid: React.FC<EquipamentosTableHybridProps> = ({
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-lg font-semibold truncate">
-                    {equipment.serialNumber}
-                  </CardTitle>
-                  <p className="text-sm text-gray-600 truncate">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge className={getTypeBadgeColor(equipment.type)}>
+                      {EQUIPMENT_TYPE_LABELS[equipment.type || EquipmentType.COLETE]}
+                    </Badge>
+                    <CardTitle className="text-sm font-semibold truncate font-mono">
+                      {equipment.serialNumber}
+                    </CardTitle>
+                  </div>
+                  <p className="text-sm text-gray-700 font-medium truncate">
                     {equipment.model || 'Sem modelo'}
                   </p>
                 </div>
@@ -398,16 +406,12 @@ const EquipamentosTableHybrid: React.FC<EquipamentosTableHybridProps> = ({
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Nível:</span>
-                  <span className="font-medium">
-                    {equipment.protectionLevel 
-                      ? PROTECTION_LEVEL_LABELS[equipment.protectionLevel]
-                      : '-'
-                    }
+                  <span className="text-muted-foreground">Localização:</span>
+                  <span className="font-semibold text-blue-600 truncate">
+                    {equipment.workPostName || 'Cofre'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 col-span-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Validade:</span>
                   <span className={cn(
@@ -420,79 +424,75 @@ const EquipamentosTableHybrid: React.FC<EquipamentosTableHybridProps> = ({
                     }
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className={cn(
-                    "h-4 w-4",
-                    equipment.isDangerous ? "text-destructive" : "text-muted-foreground"
-                  )} />
-                  <span className="text-muted-foreground">Perigoso:</span>
-                  <Badge 
-                    variant={equipment.isDangerous ? "destructive" : "secondary"} 
-                    className="text-xs font-medium"
-                  >
-                    {equipment.isDangerous ? 'Sim' : 'Não'}
-                  </Badge>
-                </div>
               </div>
-
-              {/* Informações de validade detalhadas */}
-              {equipment.daysToExpiry !== undefined && equipment.daysToExpiry !== null && (
-                <div className="mt-3 p-2 bg-gray-50 rounded-lg">
-                  <span className={cn(
-                    "text-sm font-medium",
-                    getDaysToExpiryColor(equipment.daysToExpiry)
-                  )}>
-                    {equipment.daysToExpiry < 0 
-                      ? `Vencido há ${Math.abs(equipment.daysToExpiry)} dias`
-                      : `${equipment.daysToExpiry} dias restantes`
-                    }
-                  </span>
-                </div>
-              )}
 
               {/* Detalhes expandidos */}
               {isExpanded(equipment.id) && (
                 <div className="mt-4 pt-4 border-t">
                   <div className="space-y-3">
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Informações Detalhadas</h4>
-                      <div className="grid grid-cols-1 gap-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Número de Série:</span>
-                          <span className="font-mono font-medium">{equipment.serialNumber}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Modelo:</span>
-                          <span className="font-medium">{equipment.model || '-'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Status:</span>
-                          <Badge className={getStatusBadgeColor(equipment.status)}>
-                            {EQUIPMENT_STATUS_LABELS[equipment.status]}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Usuário Atual:</span>
-                          <span className="font-medium">{equipment.currentUserName || 'Não atribuído'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Nível de Proteção:</span>
-                          <span className="font-medium">
-                            {equipment.protectionLevel 
-                              ? PROTECTION_LEVEL_LABELS[equipment.protectionLevel]
-                              : '-'
-                            }
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Equipamento Perigoso:</span>
-                          <Badge 
-                            variant={equipment.isDangerous ? "destructive" : "secondary"}
-                            className="font-medium"
-                          >
-                            {equipment.isDangerous ? 'Sim' : 'Não'}
-                          </Badge>
-                        </div>
+                      <h4 className="text-sm font-medium mb-2 text-slate-800">Especificações por Tipo</h4>
+                      <div className="grid grid-cols-1 gap-2 text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        {equipment.type === EquipmentType.ARMA && (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Nº Registro:</span>
+                              <span className="font-medium">{equipment.weaponRegistration || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Validade Reg:</span>
+                              <span className="font-medium">
+                                {equipment.weaponRegistrationValidity ? formatDate(equipment.weaponRegistrationValidity) : '-'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Qtda. Tiros:</span>
+                              <span className="font-medium">{equipment.shotsQuantity || '-'}</span>
+                            </div>
+                          </>
+                        )}
+                        {equipment.type === EquipmentType.COLETE && (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Nível de Proteção:</span>
+                              <span className="font-medium">
+                                {equipment.protectionLevel ? PROTECTION_LEVEL_LABELS[equipment.protectionLevel] : '-'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Tamanho:</span>
+                              <span className="font-medium">{equipment.size || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Certificado (CA):</span>
+                              <span className="font-medium">{equipment.caNumber || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Placa Balística:</span>
+                              <span className="font-medium">{equipment.ballisticPlate || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Lote:</span>
+                              <span className="font-medium">{equipment.batch || '-'}</span>
+                            </div>
+                          </>
+                        )}
+                        {equipment.type === EquipmentType.MUNICAO && (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Calibre:</span>
+                              <span className="font-medium">{equipment.caliber || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Quantidade total:</span>
+                              <span className="font-medium">{equipment.quantity || '0'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Lote:</span>
+                              <span className="font-medium">{equipment.batch || '-'}</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

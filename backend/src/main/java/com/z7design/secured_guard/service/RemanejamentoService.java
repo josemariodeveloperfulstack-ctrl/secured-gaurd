@@ -8,6 +8,7 @@ import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.dto.RemanejamentoDTO;
+import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.*;
 import com.z7design.secured_guard.model.enums.EmployeeChangeCategory;
 import com.z7design.secured_guard.repository.EmployeeRepository;
@@ -126,9 +127,14 @@ public class RemanejamentoService {
      * Exclui um remanejamento e registra no histórico
      */
     public void delete(UUID id, User usuarioQueExecutou, String motivoAlteracao) {
+        if (!remanejamentoRepository.existsById(id)) {
+            log.warn("Remanejamento não encontrado para exclusão com ID: {}. Retornando com sucesso (operação idempotente).", id);
+            return;
+        }
+
         Optional<Remanejamento> existingOpt = remanejamentoRepository.findById(id);
         if (existingOpt.isEmpty()) {
-            throw new RuntimeException("Remanejamento não encontrado");
+            return;
         }
 
         Remanejamento existing = existingOpt.get();
@@ -139,18 +145,17 @@ public class RemanejamentoService {
             log.info("Removido vínculo remanejamento_id de {} escala(s) antes de excluir remanejamento {}", cleared, id);
         }
 
-        // Registrar no histórico antes de deletar
+        // Auditoria de exclusão (ainda com FK ao remanejamento)
         historicoService.registrarAcao(
                 existing,
                 AcaoHistorico.EXCLUSAO,
                 usuarioQueExecutou,
                 motivoAlteracao != null ? motivoAlteracao : "Exclusão de remanejamento");
 
-        // Nullificar referências no histórico para evitar 409 Conflict na exclusão
-        List<RemanejamentoHistorico> historicos = historicoRepository.findByRemanejamentoIdOrderByDataExecucaoDesc(id);
-        for (RemanejamentoHistorico h : historicos) {
-            h.setRemanejamento(null);
-            historicoRepository.save(h);
+        // Libera FK remanejamento_id em todos os históricos (incluindo a linha EXCLUSAO acima) num único UPDATE
+        int detached = historicoRepository.clearRemanejamentoReference(id);
+        if (detached > 0) {
+            log.debug("FK remanejamento_id anulada em {} registro(s) de remanejamentos_historico para {}", detached, id);
         }
 
         remanejamentoRepository.deleteById(id);

@@ -6,6 +6,8 @@ import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.z7design.secured_guard.model.enums.VacationStatus;
@@ -41,7 +43,8 @@ public class Vacation {
     private UUID id;
     
     @NotNull(message = "Employee is required")
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "employee_id", nullable = false)
     @JsonBackReference
     private Employee employee;
@@ -74,7 +77,8 @@ public class Vacation {
     @Builder.Default
     private VacationType vacationType = VacationType.NORMAL;
     
-    @ManyToOne
+    @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "approved_by")
     private User approvedBy;
     

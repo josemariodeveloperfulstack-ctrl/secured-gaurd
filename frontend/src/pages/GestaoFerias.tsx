@@ -24,7 +24,8 @@ import {
 import { operacionalService } from '@/services/operacionalService';
 import { FeriasOperacional, CreateFeriasOperacionalDTO, FuncionarioOperacional } from '@/types/operacional';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import { ptBR } from 'date-fns/locale';
 
 const GestaoFerias: React.FC = () => {
@@ -256,24 +257,18 @@ const GestaoFerias: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="dataInicio" className="text-seguranca-lightgray">Data de Início *</Label>
-                    <Input
-                      id="dataInicio"
-                      type="date"
-                      value={formData.dataInicio}
-                      onChange={(e) => setFormData({ ...formData, dataInicio: e.target.value })}
-                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                      required
+                    <DatePicker
+                      date={formData.dataInicio ? parseISO(formData.dataInicio) : undefined}
+                      onDateChange={(date) => setFormData({ ...formData, dataInicio: date ? format(date, 'yyyy-MM-dd') : '' })}
+                      className="w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     />
                   </div>
                   <div>
                     <Label htmlFor="dataFim" className="text-seguranca-lightgray">Data de Fim *</Label>
-                    <Input
-                      id="dataFim"
-                      type="date"
-                      value={formData.dataFim}
-                      onChange={(e) => setFormData({ ...formData, dataFim: e.target.value })}
-                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                      required
+                    <DatePicker
+                      date={formData.dataFim ? parseISO(formData.dataFim) : undefined}
+                      onDateChange={(date) => setFormData({ ...formData, dataFim: date ? format(date, 'yyyy-MM-dd') : '' })}
+                      className="w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray"
                     />
                   </div>
                 </div>

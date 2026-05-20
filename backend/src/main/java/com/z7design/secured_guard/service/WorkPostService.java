@@ -362,10 +362,19 @@ public class WorkPostService {
     }
     
     public void deleteWorkPost(UUID id) {
-        if (!workPostRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + id);
+        WorkPost workPost = workPostRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + id));
+        try {
+            workPostRepository.delete(workPost);
+            workPostRepository.flush(); // Força a execução imediata no banco para capturar falha de chave estrangeira
+            log.info("✅ Posto de trabalho {} deletado fisicamente com sucesso.", id);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            log.warn("⚠️ Posto {} possui vínculos históricos e não pode ser deletado fisicamente. Aplicando soft-delete (INATIVO)...", id);
+            workPost.setStatus(WorkPostStatus.INATIVO);
+            workPost.setUpdatedAt(LocalDateTime.now());
+            workPostRepository.saveAndFlush(workPost);
+            log.info("✅ Soft-delete executado com sucesso: Posto {} agora está INATIVO.", id);
         }
-        workPostRepository.deleteById(id);
     }
     
     public WorkPost updateStatus(UUID id, WorkPostStatus status) {

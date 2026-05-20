@@ -170,6 +170,7 @@ public class StockPhysicalInventoryImportService {
         }
 
         return PhysicalInventoryImportResultDTO.builder()
+                .importMode("SUMMARY")
                 .requisitionNumber(requisitionNumber)
                 .importedAt(LocalDateTime.now())
                 .fileName(originalName)

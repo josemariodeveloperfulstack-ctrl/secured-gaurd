@@ -2,6 +2,8 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.ServiceOrderRequest;
 import com.z7design.secured_guard.enums.DocumentType;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.z7design.secured_guard.service.ServiceOrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,6 +13,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/service-orders")
 @RequiredArgsConstructor
@@ -18,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class ServiceOrderController {
 
     private final ServiceOrderService serviceOrderService;
+    private final DocumentoGeradoPersistenceService persistenceService;
 
     @PostMapping("/{type}/generate-pdf")
     @Operation(summary = "Gerar PDF de Ordem de Serviço")
@@ -28,11 +34,31 @@ public class ServiceOrderController {
         DocumentType type = DocumentType.valueOf(typeStr.toUpperCase());
         byte[] pdfBytes = serviceOrderService.generatePdf(type, request);
 
+        Map<String, Object> dados = new LinkedHashMap<>();
+        dados.put("type", typeStr.toLowerCase());
+        if (request.getEmployeeName() != null) dados.put("employeeName", request.getEmployeeName());
+        if (request.getEmployeePosition() != null) dados.put("employeePosition", request.getEmployeePosition());
+        if (request.getSector() != null) dados.put("sector", request.getSector());
+        if (request.getRevision() != null) dados.put("revision", request.getRevision());
+        if (request.getDocumentDate() != null) dados.put("documentDate", request.getDocumentDate().toString());
+
+        persistenceService.persistir(
+                request.getEmployeeId(),
+                TipoDocumentoGerado.SERVICE_ORDER,
+                pdfBytes,
+                "os-" + typeStr.toLowerCase() + "-" + safeSlug(request.getEmployeeName()) + ".pdf",
+                dados);
+
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"os-" + typeStr.toLowerCase() + ".pdf\"")
                 .body(pdfBytes);
+    }
+
+    private static String safeSlug(String value) {
+        if (value == null || value.isBlank()) return "documento";
+        return value.trim().toLowerCase().replaceAll("\\s+", "-");
     }
 
     @PostMapping("/{type}/preview-pdf")

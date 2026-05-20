@@ -13,6 +13,7 @@ import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.EmployeeCertification;
 import com.z7design.secured_guard.model.Training;
 import com.z7design.secured_guard.dto.EmployeeCertificationResponse;
+import com.z7design.secured_guard.dto.CertificationStatsResponse;
 import com.z7design.secured_guard.model.enums.CertificationStatus;
 import com.z7design.secured_guard.repository.EmployeeCertificationRepository;
 import com.z7design.secured_guard.repository.EmployeeRepository;
@@ -162,12 +163,18 @@ public class EmployeeCertificationService {
 
     @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findByEmployeeId(UUID employeeId) {
-        return convertToResponse(certificationRepository.findByEmployeeId(employeeId));
+        UUID actualEmployeeId = employeeRepository.findByUserId(employeeId)
+            .map(e -> e.getId())
+            .orElse(employeeId);
+        return convertToResponse(certificationRepository.findByEmployeeId(actualEmployeeId));
     }
 
     @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findByEmployeeIdAndStatus(UUID employeeId, CertificationStatus status) {
-        return convertToResponse(certificationRepository.findByEmployeeIdAndStatus(employeeId, status));
+        UUID actualEmployeeId = employeeRepository.findByUserId(employeeId)
+            .map(e -> e.getId())
+            .orElse(employeeId);
+        return convertToResponse(certificationRepository.findByEmployeeIdAndStatus(actualEmployeeId, status));
     }
 
     @Transactional(readOnly = true)
@@ -215,6 +222,56 @@ public class EmployeeCertificationService {
     @Transactional(readOnly = true)
     public List<EmployeeCertificationResponse> findByStatus(CertificationStatus status) {
         return convertToResponse(certificationRepository.findByStatus(status));
+    }
+
+    @Transactional(readOnly = true)
+    public CertificationStatsResponse getStats() {
+        return computeStats(certificationRepository.findAll());
+    }
+
+    /**
+     * Estatísticas restritas a um único funcionário. Aceita ID do User ou do Employee
+     * (mesma resolução usada em {@link #findByEmployeeId(UUID)}).
+     */
+    @Transactional(readOnly = true)
+    public CertificationStatsResponse getStatsByEmployee(UUID employeeOrUserId) {
+        UUID actualEmployeeId = employeeRepository.findByUserId(employeeOrUserId)
+                .map(e -> e.getId())
+                .orElse(employeeOrUserId);
+        return computeStats(certificationRepository.findByEmployeeId(actualEmployeeId));
+    }
+
+    private CertificationStatsResponse computeStats(List<EmployeeCertification> all) {
+        LocalDate now = LocalDate.now();
+        LocalDate expiringThreshold = now.plusDays(30);
+
+        long total = all.size();
+        long active = all.stream().filter(c -> c.getStatus() == CertificationStatus.ACTIVE).count();
+        long expired = all.stream().filter(c -> c.getStatus() == CertificationStatus.EXPIRED
+                || (c.getExpirationDate() != null && c.getExpirationDate().isBefore(now))).count();
+        long pending = 0; // PENDING status not available in enum
+        long cancelled = all.stream().filter(c -> c.getStatus() == CertificationStatus.CANCELLED).count();
+        long expiringSoon = all.stream().filter(c -> c.getExpirationDate() != null
+                && c.getExpirationDate().isAfter(now)
+                && c.getExpirationDate().isBefore(expiringThreshold)).count();
+
+        java.util.Map<String, Long> byOrganization = all.stream()
+                .filter(c -> c.getTraining() != null && c.getTraining().getProvider() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        c -> c.getTraining().getProvider(),
+                        java.util.stream.Collectors.counting()));
+
+        return CertificationStatsResponse.builder()
+                .total(total)
+                .active(active)
+                .expired(expired)
+                .pending(pending)
+                .cancelled(cancelled)
+                .expiringSoon(expiringSoon)
+                .totalCost(0.0) // No cost field in model
+                .byType(java.util.Map.of()) // No type field in model
+                .byOrganization(byOrganization)
+                .build();
     }
 
     private void validateCertification(EmployeeCertification certification) {

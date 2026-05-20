@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { notificationService } from '@/services/notificationService';
 import leadService, { Lead, CreateLeadRequest, UpdateLeadRequest } from '@/services/leadService';
@@ -53,6 +54,8 @@ import {
   Tag
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { format, parseISO } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const Leads = () => {
   const { user } = useAuth();
@@ -68,6 +71,7 @@ const Leads = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string | number>>(new Set());
 
   // Form state
   const [formData, setFormData] = useState<CreateLeadRequest>({
@@ -271,6 +275,10 @@ const Leads = () => {
         title: "Sucesso",
         description: "Lead excluído com sucesso!",
       });
+      // Remover das seleções se estiver lá
+      const newSelected = new Set(selectedLeadIds);
+      newSelected.delete(leadId);
+      setSelectedLeadIds(newSelected);
       await loadLeads();
     } catch (error: any) {
       console.error('Erro ao excluir lead:', error);
@@ -279,6 +287,77 @@ const Leads = () => {
         description: error.response?.data?.message || "Não foi possível excluir o lead.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleDeleteAllLeads = async () => {
+    if (!confirm('⚠️ ATENÇÃO: Esta ação irá excluir PERMANENTEMENTE TODOS os leads do sistema. Deseja continuar?')) return;
+    
+    try {
+      setIsSubmitting(true);
+      await leadService.deleteAllLeads();
+      toast({
+        title: "Sucesso",
+        description: "Todos os leads foram excluídos com sucesso!",
+      });
+      setSelectedLeadIds(new Set());
+      await loadLeads();
+    } catch (error: any) {
+      console.error('Erro ao excluir todos os leads:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível excluir todos os leads.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle bulk delete
+  const handleDeleteSelectedLeads = async () => {
+    if (selectedLeadIds.size === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir os ${selectedLeadIds.size} leads selecionados?`)) return;
+    
+    try {
+      setIsSubmitting(true);
+      await leadService.deleteLeadsBulk(Array.from(selectedLeadIds));
+      toast({
+        title: "Sucesso",
+        description: `${selectedLeadIds.size} leads excluídos com sucesso!`,
+      });
+      setSelectedLeadIds(new Set());
+      await loadLeads();
+    } catch (error: any) {
+      console.error('Erro ao excluir leads:', error);
+      toast({
+        title: "Erro",
+        description: error.response?.data?.message || "Não foi possível excluir os leads selecionados.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle toggle selection
+  const toggleSelectLead = (id: string | number) => {
+    const newSelected = new Set(selectedLeadIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedLeadIds(newSelected);
+  };
+
+  // Handle toggle select all
+  const toggleSelectAllLeads = () => {
+    if (selectedLeadIds.size === filteredLeads.length && filteredLeads.length > 0) {
+      setSelectedLeadIds(new Set());
+    } else {
+      const allIds = filteredLeads.map(l => l.id);
+      setSelectedLeadIds(new Set(allIds));
     }
   };
 
@@ -399,9 +478,30 @@ const Leads = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {selectedLeadIds.size > 0 && (
+              <Button
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+                onClick={handleDeleteSelectedLeads}
+                disabled={isSubmitting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir Selecionados ({selectedLeadIds.size})
+              </Button>
+            )}
+            <Button
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700"
+              onClick={handleDeleteAllLeads}
+              disabled={isSubmitting || leads.length === 0}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Limpar Todos
+            </Button>
             <Button
               className="bg-seguranca-red hover:bg-seguranca-darkred"
               onClick={() => setIsCreateModalOpen(true)}
+              disabled={isSubmitting}
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Lead
@@ -571,6 +671,13 @@ const Leads = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-gray-600">
+                      <TableHead className="w-[50px]">
+                        <Checkbox 
+                          checked={selectedLeadIds.size === filteredLeads.length && filteredLeads.length > 0}
+                          onCheckedChange={toggleSelectAllLeads}
+                          className="border-gray-400 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                        />
+                      </TableHead>
                       <TableHead className="text-seguranca-lightgray">Nome</TableHead>
                       <TableHead className="text-seguranca-lightgray">Empresa</TableHead>
                       <TableHead className="text-seguranca-lightgray">Status</TableHead>
@@ -583,6 +690,13 @@ const Leads = () => {
                   <TableBody>
                     {filteredLeads.map((lead) => (
                       <TableRow key={lead.id} className="border-gray-600">
+                        <TableCell>
+                          <Checkbox 
+                            checked={selectedLeadIds.has(lead.id)}
+                            onCheckedChange={() => toggleSelectLead(lead.id)}
+                            className="border-gray-400 data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                          />
+                        </TableCell>
                         <TableCell className="text-seguranca-lightgray">
                           <div>
                             <div className="font-medium">{lead.name}</div>
@@ -916,12 +1030,10 @@ const Leads = () => {
                         <Calendar className="h-4 w-4" />
                         Próximo Follow-up
                       </Label>
-                      <Input
-                        id="edit-nextFollowUp"
-                        type="date"
-                        value={formData.nextFollowUp || ''}
-                        onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
-                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      <DatePicker
+                        date={formData.nextFollowUp ? parseISO(formData.nextFollowUp) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, nextFollowUp: date ? format(date, 'yyyy-MM-dd') : undefined })}
+                        className="w-full bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-11"
                       />
                     </div>
                   </div>
@@ -1173,12 +1285,10 @@ const Leads = () => {
                         <Calendar className="h-4 w-4" />
                         Próximo Follow-up
                       </Label>
-                      <Input
-                        id="nextFollowUp"
-                        type="date"
-                        value={formData.nextFollowUp || ''}
-                        onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value || undefined })}
-                        className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                      <DatePicker
+                        date={formData.nextFollowUp ? parseISO(formData.nextFollowUp) : undefined}
+                        onDateChange={(date) => setFormData({ ...formData, nextFollowUp: date ? format(date, 'yyyy-MM-dd') : undefined })}
+                        className="w-full bg-seguranca-graphite border-gray-600 text-seguranca-lightgray h-11"
                       />
                     </div>
                   </div>

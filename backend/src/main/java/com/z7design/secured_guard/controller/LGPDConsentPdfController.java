@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.LGPDConsentRequest;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.z7design.secured_guard.service.LGPDConsentStandardPdfService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/lgpd-consent")
@@ -20,9 +24,12 @@ public class LGPDConsentPdfController {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LGPDConsentPdfController.class);
     private final LGPDConsentStandardPdfService lgpdConsentPdfService;
+    private final DocumentoGeradoPersistenceService persistenceService;
 
-    public LGPDConsentPdfController(LGPDConsentStandardPdfService lgpdConsentPdfService) {
+    public LGPDConsentPdfController(LGPDConsentStandardPdfService lgpdConsentPdfService,
+                                    DocumentoGeradoPersistenceService persistenceService) {
         this.lgpdConsentPdfService = lgpdConsentPdfService;
+        this.persistenceService = persistenceService;
     }
 
     @PostMapping("/generate-pdf")
@@ -36,6 +43,16 @@ public class LGPDConsentPdfController {
 
         byte[] pdfBytes = lgpdConsentPdfService.generatePdf(request);
         String filename = "termo-lgpd-" + LocalDate.now() + ".pdf";
+
+        Map<String, Object> dados = new LinkedHashMap<>();
+        if (request.getConsentDate() != null) dados.put("consentDate", request.getConsentDate().toString());
+
+        persistenceService.persistir(
+                request.getEmployeeId(),
+                TipoDocumentoGerado.LGPD_CONSENT,
+                pdfBytes,
+                filename,
+                dados);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

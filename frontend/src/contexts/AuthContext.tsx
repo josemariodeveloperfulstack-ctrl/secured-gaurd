@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import api from '@/lib/axios';
-import { User, AuthContextType, UserGroupData, UserRole } from '@/types/user';
+import { User, AuthContextType, UserGroupData, UserRole, SupervisorSessionPayload } from '@/types/user';
 import { generatePermissions, generatePermissionsFromGroups, combinePermissions } from '@/utils/permissions';
 import { groupService } from '@/services/groupService';
 import { getApiUrl } from '@/config/environment';
@@ -51,6 +51,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
     if (groupNames.includes('GRUPO_GESTOR')) {
       return 'GESTOR';
+    }
+    if (groupNames.includes('GRUPO_GESTOR_SUPERVISAO')) {
+      return 'GESTAO_SUPERVISAO';
     }
 
     // Se cair aqui, mantém como colaborador
@@ -286,6 +289,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         'ASSISTENCIA_RH',
         'DEPARTAMENTO_PESSOAL',
         'GESTOR',
+        'GESTOR_OPERACIONAL',
+        'GESTAO_SUPERVISAO',
         'SUPERVISOR',
         'FINANCEIRO',
         'COMERCIAL',
@@ -517,10 +522,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
+  /**
+   * Inicializa a sessão de um supervisor autenticado via /api/supervisor-auth.
+   * Persiste token + usuário no localStorage no MESMO formato usado pelo login
+   * padrão, garantindo que o bootstrap do AuthContext e o ProtectedRoute
+   * reconheçam a sessão após o redirect para /dashboard.
+   */
+  const loginAsSupervisor = (
+    supervisor: SupervisorSessionPayload,
+    token: string,
+  ): User => {
+    const role: UserRole = 'SUPERVISOR';
+    const permissions = generatePermissions(role);
+
+    const supervisorUser: User = {
+      id: supervisor.id,
+      name: supervisor.name || 'Supervisor',
+      email: supervisor.email || '',
+      username: supervisor.cpf || supervisor.id,
+      role,
+      roles: [role],
+      groups: [],
+      permissions,
+      phone: supervisor.phone,
+      firstAccessCompleted: true,
+      lgpdAccepted: true,
+      active: supervisor.isActive !== false,
+    };
+
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(supervisorUser));
+    localStorage.setItem('userType', 'SUPERVISOR');
+
+    setUser(supervisorUser);
+    setRefreshToken(token);
+    setIsLoading(false);
+
+    return supervisorUser;
+  };
+
   const value: AuthContextType = {
     user,
     profile,
     login,
+    loginAsSupervisor,
     logout,
     signOut,
     isLoading,

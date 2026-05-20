@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Bell, MessageSquare, Check, RefreshCw, Filter, X, ArrowLeft, Clock, User, AlertCircle, Info, CheckCircle, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, MessageSquare, Check, RefreshCw, Filter, X, ArrowLeft, Clock, User as UserIcon, AlertCircle, Info, CheckCircle, ChevronRight, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -8,6 +9,26 @@ import { useNotificationBell } from '@/hooks/useNotificationBell';
 import MessageItem from '@/components/MessageItem';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import '@/styles/notifications.css';
+import { useAuth } from '@/contexts/AuthContext';
+import type { User } from '@/types/user';
+
+const COMMERCIAL_LEAD_INBOX_ROLES = new Set([
+  'SUPER_ADMIN',
+  'ADMIN',
+  'COMERCIAL',
+  'GESTOR_COMERCIAL',
+  'ASSISTENTE_COMERCIAL',
+]);
+
+function userCanOpenLeadEmailInbox(user: User | null): boolean {
+  if (!user) return false;
+  if (COMMERCIAL_LEAD_INBOX_ROLES.has(user.role)) return true;
+  for (const r of user.roles ?? []) {
+    const name = typeof r === 'string' ? r : r?.name;
+    if (name && COMMERCIAL_LEAD_INBOX_ROLES.has(name)) return true;
+  }
+  return false;
+}
 
 export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,6 +36,9 @@ export const NotificationBell: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const hasLoadedRef = useRef(false);
   const dragControls = useDragControls();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const showLeadEmailInbox = userCanOpenLeadEmailInbox(user);
 
   const {
     systemMessages,
@@ -70,6 +94,13 @@ export const NotificationBell: React.FC = () => {
 
   const handleBack = () => {
     setActiveMessageId(null);
+  };
+
+  const goToLeadEmailReplies = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsOpen(false);
+    navigate('/comercial/marketing?caixa=respostas');
   };
 
   // Close when clicking outside
@@ -256,7 +287,7 @@ export const NotificationBell: React.FC = () => {
                         <div className="p-3 bg-white/5 border border-gray-800 rounded">
                           <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Remetente</p>
                           <div className="flex items-center gap-2">
-                            <User className="h-3 w-3 text-seguranca-yellow" />
+                            <UserIcon className="h-3 w-3 text-seguranca-yellow" />
                             <span className="text-sm font-medium">{activeMessage.sender.name}</span>
                           </div>
                         </div>
@@ -295,6 +326,18 @@ export const NotificationBell: React.FC = () => {
                           <Badge className="bg-seguranca-yellow text-seguranca-black text-[9px] font-black cursor-pointer">TODAS</Badge>
                           <Badge variant="outline" className="text-gray-500 border-gray-800 text-[9px] font-black cursor-pointer hover:text-seguranca-yellow">URGENTES</Badge>
                           <Badge variant="outline" className="text-gray-500 border-gray-800 text-[9px] font-black cursor-pointer hover:text-seguranca-yellow">OUTROS</Badge>
+                          {showLeadEmailInbox && (
+                            <Badge
+                              variant="outline"
+                              className="flex shrink-0 items-center gap-0.5 border-gray-800 text-[9px] font-black text-gray-500 cursor-pointer hover:border-seguranca-yellow/50 hover:text-seguranca-yellow"
+                              onClick={goToLeadEmailReplies}
+                              title="Gestão de e-mails respondidos pelos leads (Marketing → Campanhas → Respondidos)"
+                              role="link"
+                            >
+                              <Mail className="h-3 w-3" />
+                              E-MAILS
+                            </Badge>
+                          )}
                         </div>
                         <Filter className="h-3 w-3 text-gray-600 mr-2" />
                       </div>

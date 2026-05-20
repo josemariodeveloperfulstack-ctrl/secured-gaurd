@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, User } from "lucide-react"
+import { Check, ChevronsUpDown, User, AlertTriangle } from "lucide-react"
 import { useDebounce } from "@/hooks/use-debounce"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { employeeService, SimpleEmployee } from "@/services/employeeService"
 
 interface EmployeeComboboxProps {
@@ -33,6 +39,11 @@ interface EmployeeComboboxProps {
   initialDisplayName?: string;
   /** Callback disparado quando um funcionário é selecionado, retornando o objeto completo */
   onEmployeeSelect?: (employee: SimpleEmployee) => void;
+  /**
+   * Filtro local por cargo do funcionário. Aceita uma string ou lista de strings;
+   * a busca é case-insensitive e considera "contém". Útil para listar apenas supervisores, etc.
+   */
+  positionFilter?: string | string[];
 }
 
 export function EmployeeCombobox({ 
@@ -44,7 +55,8 @@ export function EmployeeCombobox({
   disabled = false,
   minChars = 3,
   initialDisplayName,
-  onEmployeeSelect
+  onEmployeeSelect,
+  positionFilter
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -53,12 +65,29 @@ export function EmployeeCombobox({
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const [selectedEmployee, setSelectedEmployee] = React.useState<SimpleEmployee | null>(null)
 
+  // Normaliza positionFilter em array de tokens (lowercase)
+  const positionTokens = React.useMemo(() => {
+    if (!positionFilter) return [] as string[];
+    const list = Array.isArray(positionFilter) ? positionFilter : [positionFilter];
+    return list
+      .map(s => (s ?? '').toString().trim().toLowerCase())
+      .filter(s => s.length > 0);
+  }, [positionFilter])
+
+  const matchesPositionFilter = React.useCallback((emp: SimpleEmployee): boolean => {
+    if (positionTokens.length === 0) return true;
+    const pos = (emp.positionName ?? '').toLowerCase();
+    return positionTokens.some(t => pos.includes(t));
+  }, [positionTokens])
+
   // Buscar funcionários quando o usuário digitar (a partir de minChars caracteres)
   React.useEffect(() => {
     if (debouncedSearchTerm.trim().length >= minChars) {
       setLoading(true)
       employeeService.searchSimpleEmployees(debouncedSearchTerm.trim())
-        .then(setEmployees)
+        .then(result => {
+          setEmployees(result.filter(matchesPositionFilter))
+        })
         .catch(error => {
           console.error('Erro ao buscar funcionários:', error)
           setEmployees([])
@@ -67,7 +96,7 @@ export function EmployeeCombobox({
     } else {
       setEmployees([])
     }
-  }, [debouncedSearchTerm, minChars])
+  }, [debouncedSearchTerm, minChars, matchesPositionFilter])
 
   // Garantir que o funcionário selecionado apareça na lista mesmo se não estiver carregado
   React.useEffect(() => {
@@ -75,11 +104,17 @@ export function EmployeeCombobox({
       setSelectedEmployee(null)
       return
     }
+
+    if (selectedEmployee?.id === value) {
+      return
+    }
+
     const alreadyLoaded = employees.find(e => e.id === value)
     if (alreadyLoaded) {
       setSelectedEmployee(alreadyLoaded)
       return
     }
+
     // Buscar individualmente e adicionar à lista para exibir no botão
     employeeService.getEmployeeById(value)
       .then(emp => {
@@ -98,13 +133,78 @@ export function EmployeeCombobox({
             companySigla: emp.company?.sigla,
             positionName: emp.position?.name,
             unitName: emp.unit?.name,
+            departmentName: emp.department?.name,
+            workPostId: emp.workPostId || emp.workPost?.id,
+            workPostName: emp.workPostName || emp.workPost?.name,
+            salario: emp.salario,
+            diasTrabalho: emp.diasTrabalho,
+            horarioTrabalho: emp.horarioTrabalho,
+            escalaTrabalho: emp.escalaTrabalho,
+            status: emp.status,
           };
-          setEmployees(prev => [...prev, simple])
+          setEmployees(prev => {
+            if (prev.some(e => e.id === simple.id)) return prev;
+            return [...prev, simple];
+          })
           setSelectedEmployee(simple)
         }
       })
       .catch(err => console.error('Erro ao carregar funcionário selecionado:', err))
-  }, [value, employees])
+  }, [value]) // Fix infinite loop by depending ONLY on value
+
+  // Localized status labels translations
+  const getStatusLabel = React.useCallback((status?: string): string => {
+    if (!status) return "";
+    switch (status.toUpperCase()) {
+      case "ACTIVE":
+        return "Ativo";
+      case "VACATION":
+        return "Férias";
+      case "TERMINATED":
+        return "Demitido";
+      case "SUSPENDED":
+        return "Suspenso";
+      case "LEAVE":
+        return "Licença";
+      default:
+        return "Inativo";
+    }
+  }, [])
+
+  const isInactive = React.useCallback((status?: string): boolean => {
+    if (!status) return false;
+    const s = status.toUpperCase();
+    return s !== "ACTIVE" && s !== "VACATION";
+  }, [])
+
+  const getStatusBadge = React.useCallback((status?: string) => {
+    if (!status) return null;
+    const s = status.toUpperCase();
+    if (s === "ACTIVE") return null;
+
+    let colorClass = "bg-amber-500/10 border-amber-500/20 text-amber-500";
+    let label = "Inativo";
+
+    if (s === "VACATION") {
+      colorClass = "bg-blue-500/10 border-blue-500/20 text-blue-400";
+      label = "Férias";
+    } else if (s === "TERMINATED") {
+      colorClass = "bg-red-500/10 border-red-500/20 text-red-500";
+      label = "Demitido";
+    } else if (s === "SUSPENDED") {
+      colorClass = "bg-orange-500/10 border-orange-500/20 text-orange-500";
+      label = "Suspenso";
+    } else if (s === "LEAVE") {
+      colorClass = "bg-yellow-500/10 border-yellow-500/20 text-yellow-500";
+      label = "Licença";
+    }
+
+    return (
+      <span className={cn("px-1.5 py-0.5 text-[10px] font-semibold rounded border", colorClass)}>
+        {label}
+      </span>
+    );
+  }, [])
 
   // Converter funcionários para opções do combobox
   const options = employees.map(emp => ({
@@ -120,6 +220,9 @@ export function EmployeeCombobox({
       ? initialDisplayName
       : null
 
+  const isSelectedInactive = effectiveSelected && isInactive(effectiveSelected.status);
+  const selectedStatusLabel = effectiveSelected ? getStatusLabel(effectiveSelected.status) : "";
+
   return (
     <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
@@ -131,14 +234,31 @@ export function EmployeeCombobox({
           className="w-full justify-between border-2 border-gray-600 bg-seguranca-black text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50"
         >
           {displayLabel ? (
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span className="truncate">{displayLabel}</span>
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <User className="h-4 w-4 shrink-0" />
+              <span className="truncate text-left">{displayLabel}</span>
+              {isSelectedInactive && (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="inline-flex items-center gap-1 text-amber-500 cursor-help shrink-0">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="text-[10px] font-semibold uppercase bg-amber-500/10 border border-amber-500/20 px-1 py-0.25 rounded">
+                          {selectedStatusLabel}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray">
+                      Atenção: Este funcionário está inativo ({selectedStatusLabel}).
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span>{placeholder}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <User className="h-4 w-4 shrink-0" />
+              <span className="truncate">{placeholder}</span>
             </div>
           )}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -167,7 +287,9 @@ export function EmployeeCombobox({
                 <CommandEmpty className="text-seguranca-lightgray">
                   {searchTerm.trim().length < minChars
                     ? `Digite pelo menos ${minChars} caracteres para buscar...`
-                    : emptyPlaceholder
+                    : (positionTokens.length > 0
+                        ? `Nenhum funcionário com cargo "${positionTokens.join('/')}" encontrado.`
+                        : emptyPlaceholder)
                   }
                 </CommandEmpty>
                 <CommandGroup>
@@ -192,8 +314,11 @@ export function EmployeeCombobox({
                           value === option.value ? "opacity-100" : "opacity-0"
                         )}
                       />
-                      <div className="flex flex-col">
-                        <span className="font-medium">{option.employee.name}</span>
+                      <div className="flex flex-col flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{option.employee.name}</span>
+                          {getStatusBadge(option.employee.status)}
+                        </div>
                         <span className="text-sm text-gray-400">
                           {option.employee.positionName && `${option.employee.positionName}`}
                           {option.employee.companySigla && ` • ${option.employee.companySigla}`}

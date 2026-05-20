@@ -5,12 +5,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import com.z7design.secured_guard.model.KanbanStatus;
 import com.z7design.secured_guard.model.Task;
 import com.z7design.secured_guard.model.InteractionHistory;
 
+import org.hibernate.annotations.SQLRestriction;
+
 @Entity
 @Table(name = "opportunities")
+@SQLRestriction("is_deleted = false")
 public class Opportunity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,18 +28,22 @@ public class Opportunity {
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "client_id")
     private Client client;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "lead_id")
     private Lead lead;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "status_id", nullable = false)
     private KanbanStatus status;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "assigned_to_id")
     private User assignedTo;
 
@@ -156,4 +165,50 @@ public class Opportunity {
     }
 
     // ...
+    @Column(name = "is_deleted")
+    private boolean isDeleted = false;
+    
+    @Column(name = "deletion_reason", columnDefinition = "TEXT")
+    private String deletionReason;
+    
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "deleted_by_id")
+    private User deletedBy;
+
+    // Getters and Setters for deletion fields
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    public String getDeletionReason() {
+        return deletionReason;
+    }
+
+    public void setDeletionReason(String deletionReason) {
+        this.deletionReason = deletionReason;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public User getDeletedBy() {
+        return deletedBy;
+    }
+
+    public void setDeletedBy(User deletedBy) {
+        this.deletedBy = deletedBy;
+    }
 } 

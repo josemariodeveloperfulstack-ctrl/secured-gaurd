@@ -52,6 +52,11 @@ export const unitService = {
     }
   },
 
+  /** Alias compatível com código legado / bundles antigos (`getUnits`). */
+  getUnits(): Promise<Unit[]> {
+    return this.getAllUnits();
+  },
+
   // Buscar apenas unidades ativas
   async getActiveUnits(): Promise<Unit[]> {
     try {

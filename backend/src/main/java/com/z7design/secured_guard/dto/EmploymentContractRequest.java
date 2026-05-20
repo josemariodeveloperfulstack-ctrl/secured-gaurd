@@ -16,6 +16,13 @@ import java.util.UUID;
 public class EmploymentContractRequest {
     private UUID companyId;
 
+    /**
+     * ID do funcionário ao qual o contrato se refere. Quando informado, o PDF
+     * gerado é persistido em {@code documentos_gerados} e fica disponível para
+     * download posterior pelo RH e pelo próprio colaborador.
+     */
+    private UUID employeeId;
+
     // Dados do Funcionário
     private String employeeName;
     private String employeeCpf;
@@ -43,9 +50,14 @@ public class EmploymentContractRequest {
      */
     private String contractKind;
 
-    /** Dias do período de experiência: 45, 60 ou 90 (usado quando contractKind = EXPERIENCE). */
+    /** Dias do período de experiência: 30, 45, 60 ou 90 (usado quando contractKind = EXPERIENCE). */
     private Integer experienceDurationDays;
 
     /** Salário por extenso (ex.: cadastro do funcionário). Opcional; se vazio, usa texto orientativo no PDF. */
     private String salaryInWords;
+
+    // Novos campos para enriquecer o PDF
+    private String nationality;
+    private String maritalStatus;
+    private String pis;
 }

@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Calendar } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { format, parseISO } from 'date-fns';
 import { financialService } from '@/services/financialService';
 
 interface Fatura {
@@ -106,15 +108,12 @@ export const ConfirmarPagamentoModal: React.FC<ConfirmarPagamentoModalProps> = (
             <label className="text-sm font-medium text-seguranca-lightgray">
               Data do Pagamento
             </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-              <Input
-                type="date"
-                value={dataPagamento}
-                onChange={(e) => setDataPagamento(e.target.value)}
-                className="form-input pl-10"
-              />
-            </div>
+            <DatePicker
+              date={dataPagamento ? parseISO(dataPagamento) : undefined}
+              onDateChange={(date) => setDataPagamento(date ? format(date, 'yyyy-MM-dd') : '')}
+              placeholder="dd/mm/aaaa"
+              className="w-full"
+            />
           </div>
 
           <div className="space-y-2">

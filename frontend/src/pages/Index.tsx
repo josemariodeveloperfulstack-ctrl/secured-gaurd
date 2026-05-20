@@ -484,31 +484,36 @@ const Index: React.FC = () => {
                     }}
                   />
 
-                  <DashboardCard
-                    title="Usuários"
-                    value="🟥"
-                    description="Gerencie usuários e permissões do sistema"
-                    icon={UserCog}
-                    iconColor="text-seguranca-yellow"
-                    action={{
-                      label: "Gerenciar Usuários",
-                      onClick: () => navigate('/usuarios'),
-                      variant: 'default'
-                    }}
-                  />
+                  {/* Usuários e Grupos - Visível para SUPER_ADMIN, ADMIN e ADMINISTRADOR */}
+                  {(user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.role === 'ADMINISTRADOR' || user.role === 'ROLE_ADMIN' || user.role === 'ROLE_ADMINISTRADOR') && (
+                    <>
+                      <DashboardCard
+                        title="Usuários"
+                        value={user.role === 'SUPER_ADMIN' ? "🟥" : "Acesso"}
+                        description="Gerencie usuários e permissões do sistema"
+                        icon={UserCog}
+                        iconColor="text-seguranca-yellow"
+                        action={{
+                          label: "Gerenciar Usuários",
+                          onClick: () => navigate('/usuarios'),
+                          variant: 'default'
+                        }}
+                      />
 
-                  <DashboardCard
-                    title="Grupos"
-                    value="🟥"
-                    description="Configure grupos e permissões"
-                    icon={UserCheck}
-                    iconColor="text-seguranca-yellow"
-                    action={{
-                      label: "Gerenciar Grupos",
-                      onClick: () => navigate('/grupos'),
-                      variant: 'default'
-                    }}
-                  />
+                      <DashboardCard
+                        title="Grupos"
+                        value={user.role === 'SUPER_ADMIN' ? "🟥" : "Acesso"}
+                        description="Configure grupos e permissões"
+                        icon={UserCheck}
+                        iconColor="text-seguranca-yellow"
+                        action={{
+                          label: "Gerenciar Grupos",
+                          onClick: () => navigate('/grupos'),
+                          variant: 'default'
+                        }}
+                      />
+                    </>
+                  )}
 
                   <DashboardCard
                     title="Sistema"
@@ -1377,23 +1382,27 @@ const Index: React.FC = () => {
                     Editar Perfil
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
-                    onClick={() => navigate('/configuracoes')}
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Configurações
-                  </Button>
+                  {user.role === 'SUPER_ADMIN' && (
+                    <Button
+                      variant="outline"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
+                      onClick={() => navigate('/configuracoes')}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Configurações
+                    </Button>
+                  )}
 
-                  <Button
-                    variant="outline"
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
-                    onClick={() => navigate('/usuarios')}
-                  >
-                    <Users className="h-4 w-4 mr-2" />
-                    Gerenciar Usuários
-                  </Button>
+                  {(user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.role === 'ADMINISTRADOR' || user.role === 'ROLE_ADMIN' || user.role === 'ROLE_ADMINISTRADOR') && (
+                    <Button
+                      variant="outline"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:bg-gray-700 hover:text-white"
+                      onClick={() => navigate('/usuarios')}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Gerenciar Usuários
+                    </Button>
+                  )}
 
                   <Button
                     variant="outline"

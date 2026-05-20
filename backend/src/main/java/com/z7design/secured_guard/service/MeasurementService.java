@@ -412,8 +412,10 @@ public class MeasurementService {
                         
                         existingBulletin.addItem(item);
                     } catch (Exception e) {
-                        log.error("Erro ao adicionar item ao boletim: {}", e.getMessage(), e);
-                        throw new RuntimeException("Erro ao processar item: " + e.getMessage(), e);
+                        log.error("Erro ao converter/adicionar item {} ao boletim {}: {}", 
+                                itemDto.getDescription(), id, e.getMessage(), e);
+                        throw new com.z7design.secured_guard.exception.BusinessException(
+                            "Erro ao processar item '" + itemDto.getDescription() + "': " + e.getMessage());
                     }
                 }
             }
@@ -449,15 +451,25 @@ public class MeasurementService {
         return MeasurementBulletinDTO.fromEntity(bulletin);
     }
 
+    /**
+     * Exclui um boletim de medição.
+     *
+     * <p>DELETE é idempotente: apagar um boletim que já não existe é tratado
+     * como sucesso silencioso (evita 404 quando o usuário deixa a tela aberta
+     * e o registro já foi apagado em outra aba). As contas a receber vinculadas
+     * têm {@code measurement_id} setado para NULL automaticamente pelo banco
+     * (ON DELETE SET NULL), e {@code measurement_items}/{@code calculation_memories}
+     * são removidos via CASCADE.
+     */
     public void deleteBulletin(UUID id) {
         log.info("Excluindo boletim de medição: {}", id);
-        
-        if (!bulletinRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Boletim de medição não encontrado: " + id);
+
+        int removed = bulletinRepository.deleteBulletinNative(id);
+        if (removed == 0) {
+            log.warn("Boletim de medição {} não existe — DELETE idempotente (no-op).", id);
+            return;
         }
-        
-        bulletinRepository.deleteById(id);
-        log.info("Boletim excluído com sucesso: {}", id);
+        log.info("Boletim excluído com sucesso: {} (linhas em measurement_bulletins: {})", id, removed);
     }
 
     // ===== MEMÓRIA DE CÁLCULO =====

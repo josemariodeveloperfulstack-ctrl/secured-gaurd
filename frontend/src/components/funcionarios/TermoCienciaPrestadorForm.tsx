@@ -480,6 +480,7 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
             <Button
+              type="button"
               onClick={handlePreview}
               variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
@@ -498,6 +499,7 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
               )}
             </Button>
             <Button
+              type="button"
               onClick={handleGerarPDF}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || !funcionario || !empresa}

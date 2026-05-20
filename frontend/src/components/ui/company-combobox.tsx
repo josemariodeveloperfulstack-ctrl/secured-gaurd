@@ -39,7 +39,7 @@ interface CompanyComboboxProps {
 export function CompanyCombobox({ 
   value,
   onChange,
-  companies,
+  companies = [],
   placeholder = "Selecione a empresa",
   searchPlaceholder = "Buscar empresa...",
   emptyPlaceholder = "Nenhuma empresa encontrada.",

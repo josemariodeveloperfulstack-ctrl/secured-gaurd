@@ -20,7 +20,8 @@ import {
   Bell,
   Loader2,
   Layers,
-  ClipboardList
+  ClipboardList,
+  HardHat
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { stockService } from '@/services/stockService';
@@ -30,10 +31,11 @@ import StockMovementsTable from '@/components/stock/StockMovementsTable';
 import StockAlertsPanel from '@/components/stock/StockAlertsPanel';
 import StockItemModal from '@/components/stock/StockItemModal';
 import StockMovementModal from '@/components/stock/StockMovementModal';
-import QrCodeScanner from '@/components/stock/QrCodeScanner';
+import StockInventoryScanner from '@/components/stock/StockInventoryScanner';
 import StockReportsContent from '@/components/stock/StockReportsContent';
 import ShelfManagement from '@/components/stock/ShelfManagement';
 import StockRequisitionsPanel from '@/components/stock/StockRequisitionsPanel';
+import { FichasEntregaEPIContent } from '@/components/epi/FichasEntregaEPIContent';
 
 const EstoqueSimplificado: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -51,18 +53,24 @@ const EstoqueSimplificado: React.FC = () => {
   // Estados para modais
   const [showItemModal, setShowItemModal] = useState(false);
   const [showMovementModal, setShowMovementModal] = useState(false);
-  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [showInventoryScanner, setShowInventoryScanner] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
 
   // Carregar dados iniciais
   useEffect(() => {
-    loadInitialData();
+    void loadInitialData(true);
   }, []);
 
-  const loadInitialData = async () => {
+  /**
+   * @param fullPageLoad — se true, usa `loading` e ocupa o ecrã inteiro (apenas 1.ª carga).
+   *   Refreshes (import, botão Atualizar) usam false para não desmontar a aba Itens e evitar dados desatualizados na tabela.
+   */
+  const loadInitialData = async (fullPageLoad: boolean): Promise<boolean> => {
     try {
-      setLoading(true);
-      
+      if (fullPageLoad) {
+        setLoading(true);
+      }
+
       const [report, items, movements, alerts, requisitions] = await Promise.all([
         stockService.getStockReport(),
         stockService.getAllItems(),
@@ -70,39 +78,47 @@ const EstoqueSimplificado: React.FC = () => {
         stockService.getActiveAlerts(),
         stockService.listStockRequisitions().catch(() => [] as StockRequisitionListItem[]),
       ]);
-      
+
       setStockReport(report);
       setStockItems(Array.isArray(items) ? items : []);
       setRecentMovements(movements);
       setActiveAlerts(Array.isArray(alerts) ? alerts : []);
       setStockRequisitions(Array.isArray(requisitions) ? requisitions : []);
-      
+
+      return true;
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os dados do estoque.",
-        variant: "destructive"
-      });
+      if (fullPageLoad) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os dados do estoque.",
+          variant: "destructive"
+        });
+      }
+      return false;
     } finally {
-      setLoading(false);
+      if (fullPageLoad) {
+        setLoading(false);
+      }
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await loadInitialData();
-      toast({
-        title: "Sucesso",
-        description: "Dados atualizados com sucesso.",
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar dados.",
-        variant: "destructive"
-      });
+      const ok = await loadInitialData(false);
+      if (ok) {
+        toast({
+          title: "Sucesso",
+          description: "Dados atualizados com sucesso.",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Não foi possível atualizar os dados do estoque.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setRefreshing(false);
     }
@@ -318,11 +334,11 @@ const EstoqueSimplificado: React.FC = () => {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowQrScanner(true)}
+              onClick={() => setShowInventoryScanner(true)}
               className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black"
             >
               <QrCode size={16} className="mr-2" />
-              QR Code
+              Sincronizar QR
             </Button>
             
             <Button
@@ -368,6 +384,10 @@ const EstoqueSimplificado: React.FC = () => {
               <ClipboardList className="h-4 w-4 mr-2" />
               Requisições ({stockRequisitions.length})
             </TabsTrigger>
+            <TabsTrigger value="fichas-epi" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
+              <HardHat className="h-4 w-4 mr-2" />
+              Fichas de EPI
+            </TabsTrigger>
             <TabsTrigger value="alerts" className="data-[state='active']:bg-seguranca-black data-[state='active']:text-seguranca-yellow">
               <Bell className="h-4 w-4 mr-2" />
               Alertas ({Array.isArray(activeAlerts) ? activeAlerts.length : 0})
@@ -410,6 +430,10 @@ const EstoqueSimplificado: React.FC = () => {
             />
           </TabsContent>
 
+          <TabsContent value="fichas-epi" className="mt-6">
+            <FichasEntregaEPIContent />
+          </TabsContent>
+
           <TabsContent value="alerts" className="mt-6">
             <StockAlertsPanel
               alerts={Array.isArray(activeAlerts) ? activeAlerts : []}
@@ -441,10 +465,10 @@ const EstoqueSimplificado: React.FC = () => {
           onSave={handleRefresh}
         />
 
-        <QrCodeScanner
-          open={showQrScanner}
-          onOpenChange={setShowQrScanner}
-          onScan={handleQrCodeScan}
+        <StockInventoryScanner
+          open={showInventoryScanner}
+          onOpenChange={setShowInventoryScanner}
+          onSyncComplete={handleRefresh}
         />
       </div>
     </StandardLayout>

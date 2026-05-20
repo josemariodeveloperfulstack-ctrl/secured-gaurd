@@ -21,9 +21,9 @@ import {
 import { FinancialTransaction, Invoice } from '@/services/financialService';
 import { unitService, Unit } from '@/services/unitService';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { format, startOfDay, endOfDay, isWithinInterval, isBefore, isAfter } from 'date-fns';
+import { DatePickerWithRange } from '@/components/ui/date-range-picker';
+import { DateRange } from 'react-day-picker';
+import { format, startOfDay, endOfDay, isWithinInterval, isBefore, isAfter, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { useToast } from '@/hooks/use-toast';
 
@@ -134,10 +134,8 @@ interface FiltrosRelatorio {
   tipo: string;
   status: string;
   tipoDespesa: string;
-  dataInicio: Date | null;
-  dataFim: Date | null;
-  vencimentoInicio: Date | null;
-  vencimentoFim: Date | null;
+  rangeLancamento: DateRange | undefined;
+  rangeVencimento: DateRange | undefined;
   centroCusto: string;
   departamento: string;
   fornecedor: string;
@@ -159,10 +157,11 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
     tipo: 'all',
     status: 'all',
     tipoDespesa: 'all',
-    dataInicio: null,
-    dataFim: null,
-    vencimentoInicio: null,
-    vencimentoFim: null,
+    rangeLancamento: {
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date())
+    },
+    rangeVencimento: undefined,
     centroCusto: '',
     departamento: 'all',
     fornecedor: 'all',
@@ -229,19 +228,24 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       dados = dados.filter((item) => statusMatchesFilter(String(item.status), filtros.status));
     }
 
-    // Filtro por tipo de despesa (só faz sentido para despesas; receitas não têm expenseType)
-    if (filtros.tipoDespesa !== 'all' && filtros.tipo !== 'INCOME') {
-      dados = dados.filter((item) => item.expenseType === filtros.tipoDespesa);
+    // Filtro por tipo de despesa (receitas não têm expenseType; não podem ser excluídas quando tipo = todos)
+    if (filtros.tipoDespesa !== 'all') {
+      dados = dados.filter(
+        (item) =>
+          item.type === 'INCOME' ||
+          item.expenseType === filtros.tipoDespesa
+      );
     }
 
     // Datas: intervalo parcial (só início ou só fim) e, se ambos os grupos estão preenchidos,
     // usar OU entre “data de lançamento” e “data de vencimento” (evita lista vazia por combinação impossível).
-    const hasLanc = Boolean(filtros.dataInicio || filtros.dataFim);
-    const hasVenc = Boolean(filtros.vencimentoInicio || filtros.vencimentoFim);
+    const hasLanc = Boolean(filtros.rangeLancamento?.from || filtros.rangeLancamento?.to);
+    const hasVenc = Boolean(filtros.rangeVencimento?.from || filtros.rangeVencimento?.to);
+    
     const predLanc = (item: FinancialTransaction) =>
-      matchesDateBounds(item, filtros.dataInicio, filtros.dataFim, (i) => i.date);
+      matchesDateBounds(item, filtros.rangeLancamento?.from || null, filtros.rangeLancamento?.to || null, (i) => i.date);
     const predVenc = (item: FinancialTransaction) =>
-      matchesDateBounds(item, filtros.vencimentoInicio, filtros.vencimentoFim, (i) => i.dueDate);
+      matchesDateBounds(item, filtros.rangeVencimento?.from || null, filtros.rangeVencimento?.to || null, (i) => i.dueDate);
 
     if (hasLanc && hasVenc) {
       dados = dados.filter((item) => predLanc(item) || predVenc(item));
@@ -264,9 +268,15 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       );
     }
 
-    // Filtro por fornecedor (receitas normalmente não têm fornecedor)
+    // Filtro por fornecedor (receitas não têm fornecedor; com tipo "Todos" não pode esconder receitas)
     if (filtros.fornecedor !== 'all' && filtros.tipo !== 'INCOME') {
-      dados = dados.filter((item) => item.supplier?.id === filtros.fornecedor);
+      if (filtros.tipo === 'EXPENSE') {
+        dados = dados.filter((item) => item.supplier?.id === filtros.fornecedor);
+      } else {
+        dados = dados.filter(
+          (item) => item.type === 'INCOME' || item.supplier?.id === filtros.fornecedor
+        );
+      }
     }
 
     // Filtro por valor mínimo / máximo (aceita formato brasileiro no campo)
@@ -275,7 +285,8 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       dados = dados.filter((item) => Number(item.amount) >= vmin);
     }
 
-    const vmax = parseMoneyInput(filtros.valorMax);
+    const valorMaxStr = filtros.valorMax != null ? String(filtros.valorMax).trim() : '';
+    const vmax = valorMaxStr ? parseMoneyInput(filtros.valorMax) : null;
     if (vmax !== null) {
       dados = dados.filter((item) => {
         const a = Number(item.amount);
@@ -335,10 +346,11 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
       tipo: 'all',
       status: 'all',
       tipoDespesa: 'all',
-      dataInicio: null,
-      dataFim: null,
-      vencimentoInicio: null,
-      vencimentoFim: null,
+      rangeLancamento: {
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date())
+      },
+      rangeVencimento: undefined,
       centroCusto: '',
       departamento: 'all',
       fornecedor: 'all',
@@ -349,11 +361,16 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
     refreshData();
   };
 
+  /** Evita quebra entre R$ e sinal negativo do Intl (`R$ -`) em cards estreitos. */
   const formatarMoeda = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+    const fmt = new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    const abs = fmt.format(Math.abs(valor));
+    return valor < 0 ? `\u2212${abs}` : abs;
   };
 
   const formatarData = (data: string) => {
@@ -386,8 +403,8 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
-      if (filtros.dataInicio) queryParams.append('startDate', format(filtros.dataInicio, 'yyyy-MM-dd'));
-      if (filtros.dataFim) queryParams.append('endDate', format(filtros.dataFim, 'yyyy-MM-dd'));
+      if (filtros.rangeLancamento?.from) queryParams.append('startDate', format(filtros.rangeLancamento.from, 'yyyy-MM-dd'));
+      if (filtros.rangeLancamento?.to) queryParams.append('endDate', format(filtros.rangeLancamento.to, 'yyyy-MM-dd'));
 
       let endpoint = '';
       if (filtros.tipo === 'INCOME') {
@@ -561,55 +578,23 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
               />
             </div>
 
-            {/* Data de Lançamento Início */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Lançamento (Início)</label>
-              <DatePicker
-                selected={filtros.dataInicio}
-                onChange={(date) => handleFiltroChange('dataInicio', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
+            {/* Período de Lançamento */}
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Período de Lançamento</label>
+              <DatePickerWithRange
+                date={filtros.rangeLancamento}
+                onDateChange={(range) => handleFiltroChange('rangeLancamento', range)}
+                className="form-input"
               />
             </div>
 
-            {/* Data de Lançamento Fim */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Lançamento (Fim)</label>
-              <DatePicker
-                selected={filtros.dataFim}
-                onChange={(date) => handleFiltroChange('dataFim', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-              />
-            </div>
-
-            {/* Data de Vencimento Início */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Vencimento (Início)</label>
-              <DatePicker
-                selected={filtros.vencimentoInicio}
-                onChange={(date) => handleFiltroChange('vencimentoInicio', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-              />
-            </div>
-
-            {/* Data de Vencimento Fim */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-seguranca-lightgray">Data Vencimento (Fim)</label>
-              <DatePicker
-                selected={filtros.vencimentoFim}
-                onChange={(date) => handleFiltroChange('vencimentoFim', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
+            {/* Período de Vencimento */}
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-sm font-medium text-seguranca-lightgray">Período de Vencimento</label>
+              <DatePickerWithRange
+                date={filtros.rangeVencimento}
+                onDateChange={(range) => handleFiltroChange('rangeVencimento', range)}
+                className="form-input"
               />
             </div>
 
@@ -654,78 +639,93 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
         </CardContent>
       </Card>
 
-      {/* Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <Card className="bg-seguranca-graphite border-gray-600">
+      {/* Estatísticas: no máx. 3 colunas para caber valores longos sem quebrar o sinal */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-400">Total</p>
-                <p className="text-2xl font-bold text-seguranca-lightgray">{estatisticas.total}</p>
+                <p className="text-xl sm:text-2xl font-bold tabular-nums text-seguranca-lightgray whitespace-nowrap">
+                  {estatisticas.total}
+                </p>
               </div>
-              <FileText className="h-8 w-8 text-blue-500" />
+              <FileText className="h-8 w-8 text-blue-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1 overflow-x-auto">
                 <p className="text-sm text-gray-400">Receitas</p>
-                <p className="text-2xl font-bold text-green-500">{formatarMoeda(estatisticas.receitas)}</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold tabular-nums text-green-500 whitespace-nowrap">
+                  {formatarMoeda(estatisticas.receitas)}
+                </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
+              <TrendingUp className="h-8 w-8 text-green-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1 overflow-x-auto">
                 <p className="text-sm text-gray-400">Despesas</p>
-                <p className="text-2xl font-bold text-red-500">{formatarMoeda(estatisticas.despesas)}</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold tabular-nums text-red-500 whitespace-nowrap">
+                  {formatarMoeda(estatisticas.despesas)}
+                </p>
               </div>
-              <TrendingDown className="h-8 w-8 text-red-500" />
+              <TrendingDown className="h-8 w-8 text-red-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1 overflow-x-auto">
                 <p className="text-sm text-gray-400">Saldo</p>
-                <p className={`text-2xl font-bold ${estatisticas.saldo >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <p
+                  className={`text-lg sm:text-xl lg:text-2xl font-bold tabular-nums whitespace-nowrap ${
+                    estatisticas.saldo >= 0 ? 'text-green-500' : 'text-red-500'
+                  }`}
+                  title={formatarMoeda(estatisticas.saldo)}
+                >
                   {formatarMoeda(estatisticas.saldo)}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-yellow-500" />
+              <DollarSign className="h-8 w-8 text-yellow-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-400">Pendentes</p>
-                <p className="text-2xl font-bold text-yellow-500">{estatisticas.pendentes}</p>
+                <p className="text-xl sm:text-2xl font-bold tabular-nums text-yellow-500 whitespace-nowrap">
+                  {estatisticas.pendentes}
+                </p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-yellow-500" />
+              <AlertTriangle className="h-8 w-8 text-yellow-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-seguranca-graphite border-gray-600">
+        <Card className="bg-seguranca-graphite border-gray-600 min-w-0">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-400">Vencidas</p>
-                <p className="text-2xl font-bold text-red-500">{estatisticas.vencidas}</p>
+                <p className="text-xl sm:text-2xl font-bold tabular-nums text-red-500 whitespace-nowrap">
+                  {estatisticas.vencidas}
+                </p>
               </div>
-              <Calendar className="h-8 w-8 text-red-500" />
+              <Calendar className="h-8 w-8 text-red-500 shrink-0" />
             </div>
           </CardContent>
         </Card>
@@ -751,41 +751,54 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto rounded-md border border-gray-700/60 -mx-1">
+            <Table className="min-w-[72rem] w-full text-sm">
               <TableHeader>
                 <TableRow className="border-gray-600">
-                  <TableHead className="text-seguranca-lightgray">Descrição</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Tipo</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Valor</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Status</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Data Lançamento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Data Vencimento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Categoria</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Departamento</TableHead>
-                  <TableHead className="text-seguranca-lightgray">Centro de Custo</TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[180px] max-w-[280px]">
+                    Descrição
+                  </TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Tipo</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Valor</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Status</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Data Lançamento</TableHead>
+                  <TableHead className="text-seguranca-lightgray whitespace-nowrap">Data Vencimento</TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[120px] max-w-[180px]">Categoria</TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[120px] max-w-[200px]">
+                    Departamento
+                  </TableHead>
+                  <TableHead className="text-seguranca-lightgray min-w-[120px] max-w-[200px]">
+                    Centro de Custo
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {dadosFiltrados.map((item) => (
                   <TableRow key={item.id} className="border-gray-600 hover:bg-seguranca-black">
-                    <TableCell className="text-seguranca-lightgray">
-                      <div>
-                        <div className="font-medium">{item.description}</div>
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[280px] min-w-[180px]">
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="font-medium truncate" title={item.description || ''}>
+                          {item.description}
+                        </div>
                         {item.reference && (
-                          <div className="text-sm text-gray-400">Ref: {item.reference}</div>
+                          <div className="text-xs text-gray-400 truncate" title={`Ref: ${item.reference}`}>
+                            Ref: {item.reference}
+                          </div>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
                       <Badge className={`${getTipoColor(item.type)} bg-transparent border`}>
                         {item.type === 'INCOME' ? 'Receita' : 'Despesa'}
                       </Badge>
                     </TableCell>
-                    <TableCell className={`font-bold ${getTipoColor(item.type)}`}>
+                    <TableCell
+                      className={`font-bold tabular-nums whitespace-nowrap align-top ${getTipoColor(item.type)}`}
+                      title={formatarMoeda(Number(item.amount) || 0)}
+                    >
                       {formatarMoeda(Number(item.amount) || 0)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap align-top">
                       <Badge className={`${getStatusColor(item.status)} text-white`}>
                         {item.status === 'PENDING' || item.status === 'PENDENTE' ? 'Pendente' :
                           item.status === 'CONFIRMED' ? 'Confirmado' :
@@ -794,20 +807,26 @@ export const FinanceiroRelatorios: React.FC<FinanceiroRelatoriosProps> = ({
                                 item.status === 'PENDENTE_ERRO' ? 'Atrasado' : item.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
+                    <TableCell className="text-seguranca-lightgray whitespace-nowrap align-top">
                       {item.date ? formatarData(item.date) : '-'}
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
+                    <TableCell className="text-seguranca-lightgray whitespace-nowrap align-top">
                       {item.dueDate ? formatarData(item.dueDate) : '-'}
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
-                      {item.category || '-'}
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[180px] min-w-[120px]">
+                      <span className="line-clamp-2 break-words" title={item.category || ''}>
+                        {item.category || '-'}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
-                      {item.unit?.name || '-'}
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[200px] min-w-[120px]">
+                      <span className="truncate block max-w-full" title={item.unit?.name || ''}>
+                        {item.unit?.name || '-'}
+                      </span>
                     </TableCell>
-                    <TableCell className="text-seguranca-lightgray">
-                      {item.costCenter || '-'}
+                    <TableCell className="text-seguranca-lightgray align-top max-w-[200px] min-w-[120px]">
+                      <span className="truncate block max-w-full" title={item.costCenter || ''}>
+                        {item.costCenter || '-'}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}

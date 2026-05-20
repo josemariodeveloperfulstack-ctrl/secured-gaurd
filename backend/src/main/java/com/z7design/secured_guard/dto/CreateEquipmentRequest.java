@@ -44,6 +44,14 @@ public class CreateEquipmentRequest {
     @Size(max = 100, message = "Placa balística não pode exceder 100 caracteres")
     private String ballisticPlate;
     
+    // Novos campos para controle de tipo
+    private com.z7design.secured_guard.model.enums.EquipmentType type;
+    private Integer shotsQuantity;
+    private String weaponRegistration;
+    private Integer quantity;
+    private String caliber;
+    private UUID workPostId;
+    
     @NotNull(message = "Data de fabricação é obrigatória")
     private LocalDate manufacturingDate;
     

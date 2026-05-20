@@ -21,9 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { pagamentosService, Pagamento, CreatePagamentoRequest, UpdatePagamentoRequest } from '@/services/pagamentosService';
 import { Supplier, contasAPagarService } from '@/services/contasAPagarService';
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
+import { DatePicker } from '@/components/ui/date-picker';
 import { formatCurrency as formatCurrencyBRL } from '@/utils/formatters';
 
 interface PagamentoFormModalProps {
@@ -372,11 +370,10 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-seguranca-yellow"><CalendarDays className="h-4 w-4" />Data de Vencimento *</Label>
               <DatePicker
-                selected={formData.dataVencimento}
-                onChange={(date: Date | null) => handleInputChange('dataVencimento', date || undefined)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white !text-black !placeholder:text-gray-500 font-medium"
-                {...DEFAULT_DATE_PICKER_PROPS}
-                required
+                date={formData.dataVencimento}
+                onDateChange={(date) => handleInputChange('dataVencimento', date)}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
           </div>
@@ -472,11 +469,10 @@ export const PagamentoFormModal: React.FC<PagamentoFormModalProps> = ({
               <div className="space-y-2">
               <Label className="flex items-center gap-2 text-seguranca-yellow"><CalendarDays className="h-4 w-4" />Data do Agendamento *</Label>
                 <DatePicker
-                  selected={formData.dataAgendamento}
-                  onChange={(date: Date | null) => handleInputChange('dataAgendamento', date || undefined)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white !text-black !placeholder:text-gray-500 font-medium"
-                  {...DEFAULT_DATE_PICKER_PROPS}
-                  required
+                  date={formData.dataAgendamento}
+                  onDateChange={(date) => handleInputChange('dataAgendamento', date)}
+                  placeholder="dd/mm/aaaa"
+                  className="w-full"
                 />
 
                 <Alert>

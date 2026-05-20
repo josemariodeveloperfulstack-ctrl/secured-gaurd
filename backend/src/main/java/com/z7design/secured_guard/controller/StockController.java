@@ -3,6 +3,8 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.StockItemDTO;
 import com.z7design.secured_guard.dto.StockMovementDTO;
 import com.z7design.secured_guard.dto.StockAlertDTO;
+import com.z7design.secured_guard.dto.StockDashboardDTO;
+import com.z7design.secured_guard.dto.StockMovementChartDTO;
 import com.z7design.secured_guard.dto.PhysicalInventoryImportResultDTO;
 import com.z7design.secured_guard.dto.InventoryRequisitionSummaryDTO;
 import com.z7design.secured_guard.model.enums.StockCategory;
@@ -11,6 +13,8 @@ import com.z7design.secured_guard.model.enums.MovementReason;
 import com.z7design.secured_guard.service.StockService;
 import com.z7design.secured_guard.service.StockReportService;
 import com.z7design.secured_guard.service.StockPhysicalInventoryImportService;
+import com.z7design.secured_guard.service.StockItemInventoryImportService;
+import com.z7design.secured_guard.service.StockDashboardService;
 import com.z7design.secured_guard.repository.UserRepository;
 import java.io.IOException;
 
@@ -48,6 +52,8 @@ public class StockController {
     private final StockService stockService;
     private final StockReportService stockReportService;
     private final StockPhysicalInventoryImportService stockPhysicalInventoryImportService;
+    private final StockItemInventoryImportService stockItemInventoryImportService;
+    private final StockDashboardService stockDashboardService;
     private final UserRepository userRepository;
 
     // ===== ITENS DE ESTOQUE =====
@@ -108,6 +114,31 @@ public class StockController {
         log.info("GET /api/stock/items/qr/{} - Buscando item por QR Code", qrCode);
         StockItemDTO item = stockService.getItemByQrCode(qrCode);
         return ResponseEntity.ok(item);
+    }
+
+    @PatchMapping("/items/qr/{qrCode}/inventory-adjust")
+    @Operation(summary = "Ajustar inventário via QR Code", description = "Ajusta a quantidade física de um item via leitura de QR Code")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    public ResponseEntity<StockMovementDTO> adjustInventoryViaQrCode(
+            @Parameter(description = "QR Code do item") @PathVariable String qrCode,
+            @RequestBody Map<String, Integer> payload,
+            Authentication authentication) {
+
+        Integer physicalQuantity = payload.get("physicalQuantity");
+        if (physicalQuantity == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        log.info("PATCH /api/stock/items/qr/{}/inventory-adjust - Ajustando quantidade física para {}", qrCode, physicalQuantity);
+        UUID userId = resolveStockUserId(authentication);
+        StockMovementDTO movement = stockService.adjustInventoryViaQrCode(qrCode, physicalQuantity, userId);
+        
+        if (movement == null) {
+            // Se não houve alteração (quantidade igual), podemos retornar 204 ou o estado atual do item
+            return ResponseEntity.noContent().build();
+        }
+        
+        return ResponseEntity.ok(movement);
     }
 
     @PostMapping("/items")
@@ -216,7 +247,7 @@ public class StockController {
 
     @PostMapping(value = "/import/physical-inventory", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
-    @Operation(summary = "Importar inventário físico", description = "Lê a aba de resumo (ex.: Resumo Estoque), ajusta quantidades e gera movimentações com o mesmo número de requisição REQ-INV-*.")
+    @Operation(summary = "Importar inventário físico (resumo por categoria)", description = "Lê a aba de resumo (ex.: Resumo Estoque), ajusta quantidades e gera movimentações com o mesmo número de requisição REQ-INV-*.")
     public ResponseEntity<?> importPhysicalInventory(
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
@@ -228,6 +259,28 @@ public class StockController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("Erro ao importar inventário físico: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Falha ao processar planilha: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping(value = "/import/item-inventory", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'ESTOQUE', 'ALMOXARIFADO')")
+    @Operation(summary = "Importar inventário por item (planilha detalhada)",
+            description = "Zera o estoque de todos os itens ativos, depois importa cada linha. Lê todas as abas detalhadas (ignora aba \"Resumo Estoque\"). "
+                    + "Formatos: (1) linha a linha — Código ou Tamanho + Estoque/Quantidade; opcional Item, Categoria, Mín, Valor unit., Prateleira/Localização; "
+                    + "(2) matriz Calçados — coluna Tamanho e várias colunas de modelos (código ABA-MODELO-TAMANHO por célula); "
+                    + "(3) aba Descartes — colunas Item + Quantidade (nome com prefixo [Descarte]). REQ-INV-ITEM-*.")
+    public ResponseEntity<?> importItemInventory(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        try {
+            UUID userId = resolveStockUserId(authentication);
+            PhysicalInventoryImportResultDTO result = stockItemInventoryImportService.importWorkbook(file, userId);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao importar inventário por item: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Falha ao processar planilha: " + e.getMessage()));
         }
     }
@@ -324,6 +377,16 @@ public class StockController {
         log.info("GET /api/stock/report - Gerando relatório de estoque");
         Map<String, Object> report = stockService.getStockReport();
         return ResponseEntity.ok(report);
+    }
+
+    @GetMapping("/dashboard")
+    @Operation(summary = "Dashboard de estoque", description = "Retorna dados analíticos para gráficos e indicadores")
+    public ResponseEntity<StockDashboardDTO> getStockDashboard(
+            @RequestParam("companyId") UUID companyId,
+            @RequestParam(value = "start", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(value = "end", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+        log.info("GET /api/stock/dashboard - Buscando dados analíticos");
+        return ResponseEntity.ok(stockDashboardService.getDashboardData(companyId, start, end));
     }
 
     @GetMapping("/reports/item/{itemId}")
@@ -485,6 +548,54 @@ public class StockController {
                 .header("Content-Type", "application/pdf")
                 .header("Content-Disposition", "attachment; filename=movimentacoes-estoque.pdf")
                 .body(pdf);
+    }
+
+    @GetMapping("/reports/consolidated/pdf")
+    @Operation(summary = "PDF consolidado de estoque",
+            description = "Baixo estoque (atual), movimentações no período, requisições criadas no período e quantidade por localização")
+    public ResponseEntity<byte[]> getConsolidatedStockReportPDF(
+            @RequestParam("companyId") UUID companyId,
+            @RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam("end") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end)
+            throws IOException {
+        log.info("GET /api/stock/reports/consolidated/pdf - Gerando relatório consolidado");
+        byte[] pdf = stockReportService.generateConsolidatedStockPDFReport(companyId, start, end);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=relatorio-estoque-consolidado.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/physical-inventory/pdf")
+    @Operation(summary = "Gerar Planilha de Conferência Física")
+    public ResponseEntity<byte[]> getPhysicalInventoryWorksheetPDF(@RequestParam("companyId") UUID companyId) throws IOException {
+        log.info("GET /api/stock/reports/physical-inventory/pdf - Gerando planilha de conferência");
+        byte[] pdf = stockReportService.generatePhysicalInventoryWorksheetPDF(companyId);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=planilha-conferencia-estoque.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/consolidated-requisitions/pdf")
+    @Operation(summary = "Gerar Relatório de Requisições Consolidadas")
+    public ResponseEntity<byte[]> getConsolidatedRequisitionsPDF(
+            @RequestParam("companyId") UUID companyId,
+            @RequestParam("start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam("end") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end)
+            throws IOException {
+        log.info("GET /api/stock/reports/consolidated-requisitions/pdf - Gerando relatório de requisições");
+        byte[] pdf = stockReportService.generateConsolidatedRequisitionsPDF(companyId, start, end);
+        return ResponseEntity.ok()
+                .header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=requisicoes-consolidadas.pdf")
+                .body(pdf);
+    }
+
+    @GetMapping("/reports/location-summary")
+    @Operation(summary = "Resumo de quantidade por localização (prateleira/andar)")
+    public ResponseEntity<List<Map<String, Object>>> getLocationStockSummary() {
+        return ResponseEntity.ok(stockService.getLocationStockSummary());
     }
 
     // ===== ASSINATURAS E REQUISIÇÕES =====

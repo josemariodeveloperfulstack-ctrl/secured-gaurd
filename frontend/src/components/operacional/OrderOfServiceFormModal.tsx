@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { OrderOfService, CreateOrderOfServiceRequest } from '@/services/orderOfServiceService';
-import { employeeService } from '@/services/employeeService';
+import { employeeService, type Employee } from '@/services/employeeService';
 import { positionService, type Position } from '@/services/positionService';
 import { companyService } from '@/services/companyService';
 import clientService, { type Client } from '@/services/clientService';
 import unitService from '@/services/unitService';
 import { workPostService, type WorkPost } from '@/services/workPostService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Briefcase, AlertCircle, X, Clock, User, ExternalLink } from 'lucide-react';
+import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Briefcase, AlertCircle, X, Clock, User, ExternalLink, Loader2 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ptBR } from 'date-fns/locale';
@@ -53,15 +53,20 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [employees, setEmployees] = useState<{ id: string; name: string; document?: string; position?: string }[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [companies, setCompanies] = useState<{ id: string; name: string; sigla?: string }[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  // Derived filtered lists for future search implementation if needed
-  // For now using simple selects as requested but with better UI
+  // Busca de Funcionário (3+ caracteres)
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [employeeSearchResults, setEmployeeSearchResults] = useState<Employee[]>([]);
+  const [employeeSearching, setEmployeeSearching] = useState(false);
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState('');
+  const employeeSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const employeeDropdownRef = useRef<HTMLDivElement>(null);
 
   // Reset form when modal opens/closes or order changes
   useEffect(() => {
@@ -84,6 +89,7 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
         });
         setStartDate(order.startDate ? new Date(order.startDate) : null);
         setEndDate(order.endDate ? new Date(order.endDate) : null);
+        setSelectedEmployeeName(order.employeeName || '');
       } else {
         setFormData({
           employeeId: '',
@@ -100,8 +106,12 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
         });
         setStartDate(null);
         setEndDate(null);
+        setSelectedEmployeeName('');
       }
       setErrors({});
+      setEmployeeSearchTerm('');
+      setEmployeeSearchResults([]);
+      setShowEmployeeDropdown(false);
     }
   }, [isOpen, mode, order]);
 
@@ -126,19 +136,12 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
 
   const loadData = async () => {
     try {
-      const [emps, poss, comps, cls] = await Promise.all([
-        employeeService.getAllEmployees(),
+      const [poss, comps, cls] = await Promise.all([
         positionService.getPositions(),
         companyService.getAllCompanies(),
         clientService.getAllClients()
       ]);
-      
-      setEmployees((emps as any[]).map((e: any) => ({ 
-        id: e.id, 
-        name: e.name, 
-        document: e.document || e.cpf,
-        position: e.position?.name
-      })));
+
       setPositions(poss as Position[]);
       setCompanies((comps as any[]).map((c: any) => ({ id: c.id, name: c.name, sigla: c.sigla })));
       setClients(cls as Client[]);
@@ -157,6 +160,61 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
       setWorkPosts([]);
     }
   };
+
+  // Busca de funcionários por digitação (a partir de 3 caracteres) com debounce
+  useEffect(() => {
+    const term = employeeSearchTerm.trim();
+    if (term.length < 3) {
+      setEmployeeSearchResults([]);
+      setShowEmployeeDropdown(term.length > 0);
+      return;
+    }
+    if (employeeSearchDebounceRef.current) clearTimeout(employeeSearchDebounceRef.current);
+    employeeSearchDebounceRef.current = setTimeout(async () => {
+      setEmployeeSearching(true);
+      setShowEmployeeDropdown(true);
+      try {
+        const list = await employeeService.searchEmployees(term);
+        setEmployeeSearchResults(Array.isArray(list) ? list : []);
+      } catch {
+        setEmployeeSearchResults([]);
+      } finally {
+        setEmployeeSearching(false);
+      }
+    }, 300);
+    return () => {
+      if (employeeSearchDebounceRef.current) clearTimeout(employeeSearchDebounceRef.current);
+    };
+  }, [employeeSearchTerm]);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(e.target as Node)) {
+        setShowEmployeeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectEmployee = useCallback((emp: Employee) => {
+    const cpf = emp.document || emp.cpf || '';
+    const positionName = emp.position?.name || '';
+
+    setFormData(prev => ({
+      ...prev,
+      employeeId: emp.id,
+      employeeName: emp.name,
+      employeeCpf: cpf,
+      role: positionName || prev.role,
+    }));
+    setSelectedEmployeeName(emp.name);
+    setEmployeeSearchTerm('');
+    setEmployeeSearchResults([]);
+    setShowEmployeeDropdown(false);
+    setErrors(prev => ({ ...prev, employeeName: '', employeeCpf: '', role: positionName ? '' : prev.role }));
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -244,41 +302,75 @@ const OrderOfServiceFormModal: React.FC<OrderOfServiceFormModalProps> = ({
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Nome do Funcionário */}
-              <div className="space-y-2">
+              {/* Nome do Funcionário - busca após 3 caracteres */}
+              <div className="space-y-2" ref={employeeDropdownRef}>
                 <Label className="text-xs sm:text-sm text-seguranca-lightgray">Funcionário *</Label>
-                <Select
-                  value={formData.employeeId}
-                  onValueChange={(value) => {
-                    const employee = employees.find(e => e.id === value);
-                    handleInputChange('employeeId', value);
-                    handleInputChange('employeeName', employee?.name || '');
-                    handleInputChange('employeeCpf', employee?.document || '');
-                    
-                    if (employee?.position) {
-                      handleInputChange('role', employee.position);
-                    }
-                  }}
-                  required
-                >
-                  <SelectTrigger className="h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:ring-seguranca-yellow">
-                    <SelectValue placeholder="Selecione o funcionário" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
-                    {employees.map((employee) => (
-                      <SelectItem 
-                        key={employee.id} 
-                        value={employee.id}
-                        className="focus:bg-gray-700 focus:text-white"
-                      >
-                        <div className="flex flex-col text-left">
-                          <span className="font-medium">{employee.name}</span>
-                          {employee.document && <span className="text-xs text-gray-500">{employee.document}</span>}
+                <div className="relative">
+                  <Input
+                    value={formData.employeeId ? selectedEmployeeName : employeeSearchTerm}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setEmployeeSearchTerm(v);
+                      if (formData.employeeId) {
+                        setFormData(prev => ({ ...prev, employeeId: '', employeeName: '', employeeCpf: '' }));
+                        setSelectedEmployeeName('');
+                      }
+                      if (v.trim().length >= 3) setShowEmployeeDropdown(true);
+                      else setEmployeeSearchResults([]);
+                    }}
+                    onFocus={() => {
+                      if (employeeSearchResults.length > 0 || employeeSearchTerm.trim().length >= 3) setShowEmployeeDropdown(true);
+                    }}
+                    placeholder="Digite pelo menos 3 caracteres para buscar"
+                    className={`h-10 sm:h-11 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow pr-9 ${errors.employeeName ? 'border-red-500' : ''}`}
+                    autoComplete="off"
+                  />
+                  {formData.employeeId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, employeeId: '', employeeName: '', employeeCpf: '' }));
+                        setSelectedEmployeeName('');
+                        setEmployeeSearchTerm('');
+                        setEmployeeSearchResults([]);
+                        setErrors(prev => ({ ...prev, employeeName: '' }));
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-1"
+                      title="Limpar"
+                    >
+                      ×
+                    </button>
+                  )}
+                  {showEmployeeDropdown && (
+                    <div className="absolute z-50 w-full mt-1 py-1 bg-seguranca-black border border-gray-600 rounded-md shadow-lg max-h-[220px] overflow-y-auto">
+                      {employeeSearching ? (
+                        <div className="px-3 py-4 text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" /> Buscando...
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      ) : employeeSearchTerm.trim().length < 3 ? (
+                        <div className="px-3 py-3 text-gray-400 text-sm">Digite pelo menos 3 caracteres para listar os funcionários</div>
+                      ) : employeeSearchResults.length === 0 ? (
+                        <div className="px-3 py-3 text-gray-400 text-sm">Nenhum funcionário encontrado</div>
+                      ) : (
+                        employeeSearchResults.map((emp) => (
+                          <button
+                            key={emp.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-seguranca-lightgray hover:bg-seguranca-yellow/20 transition-colors text-sm"
+                            onClick={() => handleSelectEmployee(emp)}
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-medium">{emp.name}</span>
+                              {(emp.document || emp.cpf) && (
+                                <span className="text-xs text-gray-500">{emp.document || emp.cpf}</span>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
                 {errors.employeeName && (
                   <div className="flex items-center gap-2 text-red-400 text-sm">
                     <AlertCircle className="h-4 w-4" />

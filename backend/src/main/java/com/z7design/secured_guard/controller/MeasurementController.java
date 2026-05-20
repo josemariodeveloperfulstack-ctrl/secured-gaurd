@@ -61,7 +61,7 @@ public class MeasurementController {
         return ResponseEntity.ok(result);
     }
     
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Buscar boletim por ID", description = "Retorna um boletim específico pelo seu ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Boletim encontrado"),
@@ -125,7 +125,7 @@ public class MeasurementController {
         return ResponseEntity.status(201).body(saved);
     }
     
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Atualizar boletim", description = "Atualiza os dados de um boletim existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Boletim atualizado com sucesso"),
@@ -181,7 +181,7 @@ public class MeasurementController {
         return ResponseEntity.ok(result);
     }
     
-    @PatchMapping("/{id}/validate")
+    @PatchMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/validate")
     @Operation(summary = "Validar boletim", description = "Valida um boletim de medição")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Boletim validado com sucesso"),
@@ -207,7 +207,7 @@ public class MeasurementController {
         return ResponseEntity.ok(report);
     }
     
-    @PostMapping("/{id}/calculation-memory")
+    @PostMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/calculation-memory")
     @Operation(summary = "Salvar memória de cálculo", description = "Salva a memória de cálculo de um boletim")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Memória salva com sucesso"),
@@ -238,7 +238,7 @@ public class MeasurementController {
         }
     }
 
-    @GetMapping("/{id}/pdf")
+    @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/pdf")
     @Operation(summary = "Gerar PDF do boletim", description = "Gera PDF de um boletim específico")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "PDF gerado com sucesso"),
@@ -261,7 +261,7 @@ public class MeasurementController {
         }
     }
     
-    @GetMapping("/{id}/excel")
+    @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/excel")
     @Operation(summary = "Gerar Excel do boletim", description = "Gera arquivo Excel de um boletim específico")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Excel gerado com sucesso"),
@@ -327,7 +327,7 @@ public class MeasurementController {
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Excluir boletim", description = "Exclui um boletim do sistema")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Boletim excluído com sucesso"),

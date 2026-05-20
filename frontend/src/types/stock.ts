@@ -78,6 +78,7 @@ export interface StockMovement {
 
 export interface PhysicalInventoryImportLineResult {
   categoryLabel: string;
+  itemName?: string;
   stockItemCode?: string;
   previousQuantity?: number;
   targetQuantity?: number;
@@ -88,6 +89,8 @@ export interface PhysicalInventoryImportLineResult {
 }
 
 export interface PhysicalInventoryImportResult {
+  /** SUMMARY = aba resumo por categoria; DETAIL = linhas por item (inventário no cadastro). */
+  importMode?: string;
   requisitionNumber: string;
   importedAt: string;
   fileName: string;
@@ -201,6 +204,20 @@ export enum StockRequisitionStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export const StockRequisitionStatusLabels: Record<StockRequisitionStatus, string> = {
+  [StockRequisitionStatus.PENDING]: 'Pendente',
+  [StockRequisitionStatus.APPROVED]: 'Aprovada',
+  [StockRequisitionStatus.DELIVERED]: 'Entregue',
+  [StockRequisitionStatus.CANCELLED]: 'Cancelada'
+};
+
+/** Resumo agregado por prateleira/andar (GET /api/stock/reports/location-summary) */
+export interface LocationStockSummaryRow {
+  shelfIdentification?: string;
+  floor?: string | null;
+  totalQuantity?: number;
+}
+
 export interface StockRequisitionLineDTO {
   id?: string;
   stockItemId: string;
@@ -288,6 +305,8 @@ export interface StockReport {
   lowStockCount: number;
   outOfStockCount: number;
   totalValue: number;
+  /** Soma de quantidades atuais (unidades físicas em estoque) */
+  totalQuantity?: number;
   itemsByCategory: Record<string, number>;
   activeAlerts: number;
   criticalAlerts: number;
@@ -322,3 +341,21 @@ export const MovementReasonLabels: Record<MovementReason, string> = {
   [MovementReason.PERDA]: 'Perda',
   [MovementReason.AJUSTE_SAIDA]: 'Ajuste de Estoque - Saída'
 };
+
+export interface StockMovementChartDTO {
+  label: string;
+  entries: number;
+  exits: number;
+}
+
+export interface StockDashboardDTO {
+  totalItems: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  totalQuantity: number;
+  totalValue: number;
+  generatedRequisitionsCount: number;
+  consolidatedRequisitionsCount: number;
+  movementsChart: StockMovementChartDTO[];
+  stockStatusDistribution: Record<string, number>;
+}

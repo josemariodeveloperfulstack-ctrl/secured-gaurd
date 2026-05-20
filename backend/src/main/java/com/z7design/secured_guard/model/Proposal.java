@@ -15,8 +15,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hibernate.annotations.SQLRestriction;
+
 @Entity
 @Table(name = "proposals")
+@SQLRestriction("is_deleted = false")
 public class Proposal {
 
     @Id
@@ -82,6 +85,20 @@ public class Proposal {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    // Campos para Soft Delete
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @Column(name = "deletion_reason", columnDefinition = "TEXT")
+    private String deletionReason;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deleted_by_id")
+    private User deletedBy;
 
     // Constructors
     public Proposal() {
@@ -318,5 +335,58 @@ public class Proposal {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public boolean isDeleted() {
+        return isDeleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        isDeleted = deleted;
+    }
+
+    public String getDeletionReason() {
+        return deletionReason;
+    }
+
+    public void setDeletionReason(String deletionReason) {
+        this.deletionReason = deletionReason;
+    }
+
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(LocalDateTime deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public User getDeletedBy() {
+        if (deletedBy == null) {
+            return null;
+        }
+
+        try {
+            if (deletedBy instanceof HibernateProxy) {
+                HibernateProxy proxy = (HibernateProxy) deletedBy;
+                try {
+                    proxy.getHibernateLazyInitializer().initialize();
+                } catch (jakarta.persistence.EntityNotFoundException e) {
+                    this.deletedBy = null;
+                    return null;
+                }
+            }
+            deletedBy.getId();
+            return deletedBy;
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            this.deletedBy = null;
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public void setDeletedBy(User deletedBy) {
+        this.deletedBy = deletedBy;
     }
 }

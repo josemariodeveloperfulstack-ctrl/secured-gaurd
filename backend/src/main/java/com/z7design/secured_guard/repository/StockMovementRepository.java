@@ -85,4 +85,10 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     List<Object[]> summarizePhysicalInventoryRequisitions(
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT CAST(movement_date AS DATE) as date, movement_type, COUNT(*) as count " +
+           "FROM stock_movements WHERE movement_date BETWEEN :startDate AND :endDate " +
+           "GROUP BY CAST(movement_date AS DATE), movement_type " +
+           "ORDER BY CAST(movement_date AS DATE) ASC", nativeQuery = true)
+    List<Object[]> countMovementsByDay(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 }

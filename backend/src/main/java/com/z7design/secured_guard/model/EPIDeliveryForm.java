@@ -2,6 +2,7 @@ package com.z7design.secured_guard.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -10,6 +11,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,12 +39,14 @@ public class EPIDeliveryForm {
 
     @NotNull(message = "Funcionário é obrigatório")
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "employee_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "unit", "position", "user"})
     private Employee employee;
 
     @NotNull(message = "Empresa é obrigatória")
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "company_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Company company;
@@ -51,9 +56,18 @@ public class EPIDeliveryForm {
     private LocalDate deliveryDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "responsible_employee_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "unit", "position", "user"})
     private Employee responsibleEmployee;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_type", length = 30)
+    @Builder.Default
+    private EPIDeliveryType deliveryType = EPIDeliveryType.PRIMEIRA_ENTREGA;
+
+    @Column(name = "employee_work_sector")
+    private String employeeWorkSector;
 
     @Column(columnDefinition = "TEXT")
     private String observations;
@@ -62,9 +76,24 @@ public class EPIDeliveryForm {
     private String pdfUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "created_by_user_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User createdBy;
+
+    @Column(name = "signature_base64", columnDefinition = "TEXT")
+    private String signatureBase64;
+
+    @Column(name = "signature_type", length = 50)
+    private String signatureType = "ON_SCREEN";
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 30)
+    @Builder.Default
+    private com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status = com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus.DRAFT;
+
+    @Column(name = "stock_requisition_id")
+    private UUID stockRequisitionId;
 
     @OneToMany(mappedBy = "deliveryForm", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference

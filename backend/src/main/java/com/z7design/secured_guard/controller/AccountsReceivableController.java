@@ -57,7 +57,8 @@ public class AccountsReceivableController {
         return ResponseEntity.ok(accountsReceivableService.getAllAccountsReceivable());
     }
     
-    @GetMapping("/{id}")
+    /** Regex de UUID evita que segmentos literais como "all" caiam em /{id} e quebrem GET /all. */
+    @GetMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Buscar conta a receber por ID", description = "Retorna uma conta a receber específica pelo seu ID")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Conta a receber encontrada"),
@@ -82,7 +83,7 @@ public class AccountsReceivableController {
         return ResponseEntity.status(201).body(saved);
     }
     
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Atualizar conta a receber", description = "Atualiza os dados de uma conta a receber existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Conta a receber atualizada com sucesso"),
@@ -96,7 +97,7 @@ public class AccountsReceivableController {
         return ResponseEntity.ok(updated);
     }
     
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}")
     @Operation(summary = "Excluir conta a receber", description = "Exclui uma conta a receber do sistema")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Conta a receber excluída com sucesso"),
@@ -177,7 +178,7 @@ public class AccountsReceivableController {
         return ResponseEntity.ok(accountsReceivableService.searchPaymentMethods(term));
     }
     
-    @PutMapping("/{id}/mark-paid")
+    @PutMapping("/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/mark-paid")
     @Operation(summary = "Marcar conta como paga", description = "Marca uma conta a receber como paga")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Conta a receber marcada como paga com sucesso"),
@@ -234,13 +235,15 @@ public class AccountsReceivableController {
             @RequestParam(value = "paymentMethodFilter", required = false) String paymentMethodFilter,
             @RequestParam(value = "amountMin", required = false) BigDecimal amountMin,
             @RequestParam(value = "amountMax", required = false) BigDecimal amountMax,
-            @RequestParam(value = "selectedIds", required = false) List<String> selectedIds) {
+            @RequestParam(value = "unitFilter", required = false) String unitFilter,
+            @RequestParam(value = "selectedIds", required = false) List<String> selectedIds,
+            @RequestParam(value = "reportSegment", required = false) String reportSegment) {
         log.info("GET /api/accounts-receivable/reports/pdf - Gerando relatório PDF com filtros");
         
         try {
             byte[] reportBytes = paymentReportService.generateAccountsReceivableReportPDF(
                     startDate, endDate, clientFilter, statusFilter, categoryFilter, 
-                    paymentMethodFilter, amountMin, amountMax, selectedIds);
+                    paymentMethodFilter, amountMin, amountMax, unitFilter, selectedIds, reportSegment);
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);

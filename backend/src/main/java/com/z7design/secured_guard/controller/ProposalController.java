@@ -127,9 +127,32 @@ public class ProposalController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Excluir proposta", description = "Exclui uma proposta do sistema")
-    public ResponseEntity<Void> deleteProposal(@PathVariable String id) {
-        proposalService.delete(UUID.fromString(id));
+    @Operation(summary = "Excluir proposta", description = "Exclui uma proposta do sistema de forma lógica")
+    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
+    public ResponseEntity<Void> deleteProposal(@PathVariable String id, @RequestParam String reason) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = proposalService.findUserByUsername(username);
+        proposalService.delete(UUID.fromString(id), reason, user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/bulk")
+    @Operation(summary = "Excluir múltiplas propostas", description = "Exclui propostas do sistema de forma lógica")
+    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
+    public ResponseEntity<Void> deleteProposalsBulk(@RequestBody com.z7design.secured_guard.dto.DeletionRequestDTO request) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = proposalService.findUserByUsername(username);
+        proposalService.deleteBulk(request.getIds(), request.getReason(), user);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/all")
+    @Operation(summary = "Excluir todas as propostas", description = "Exclui todas as propostas ativas de forma lógica")
+    @PreAuthorize("hasAnyAuthority('PROPOSALS_READ', 'PROPOSALS_WRITE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
+    public ResponseEntity<Void> deleteAllProposals(@RequestParam String reason) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = proposalService.findUserByUsername(username);
+        proposalService.deleteAll(reason, user);
         return ResponseEntity.noContent().build();
     }
 

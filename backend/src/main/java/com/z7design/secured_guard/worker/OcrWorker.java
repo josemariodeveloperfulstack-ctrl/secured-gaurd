@@ -7,9 +7,11 @@ import com.z7design.secured_guard.repository.DocumentPageRepository;
 import com.z7design.secured_guard.repository.DocumentProcessingJobRepository;
 import com.z7design.secured_guard.service.GeminiOcrService;
 import com.z7design.secured_guard.service.MinIOService;
+import com.z7design.secured_guard.service.RedisAvailabilityProbe;
 import com.z7design.secured_guard.service.TesseractService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
@@ -56,6 +58,7 @@ public class OcrWorker {
     private final GeminiOcrService geminiOcrService;
     private final MinIOService minIOService;
     private final TesseractService tesseractService;
+    private final RedisAvailabilityProbe redisAvailabilityProbe;
     
     private static final String STREAM_PAGES = "stream:pages";
     private static final String STREAM_PARSED = "stream:parsed";
@@ -80,6 +83,8 @@ public class OcrWorker {
         try {
             redisTemplate.opsForStream().createGroup(STREAM_PAGES, ReadOffset.from("0"), CONSUMER_GROUP);
             log.info("✅ OCR WORKER: Consumer group '{}' criado/verificado", CONSUMER_GROUP);
+        } catch (RedisConnectionFailureException e) {
+            log.warn("⚠️ OCR WORKER: Redis indisponível na inicialização - consumer group será criado quando o Redis voltar");
         } catch (Exception e) {
             log.info("ℹ️ OCR WORKER: Consumer group '{}' já existe ou erro: {}", CONSUMER_GROUP, e.getMessage());
         }
@@ -89,6 +94,9 @@ public class OcrWorker {
     
     @Scheduled(fixedDelay = 200) // Processa a cada 200ms para maior throughput
     public void processPages() {
+        if (!redisAvailabilityProbe.isAvailable()) {
+            return;
+        }
         try {
             // Ler mais páginas por vez para arquivos grandes (até 50 páginas por ciclo)
             @SuppressWarnings("unchecked")
@@ -110,6 +118,8 @@ public class OcrWorker {
                 // Processar assincronamente para não bloquear
                 processPageAsync(record);
             }
+        } catch (RedisConnectionFailureException e) {
+            log.warn("OcrWorker: Redis indisponível - {}", e.getMessage());
         } catch (Exception e) {
             log.error("Erro no OcrWorker", e);
         }

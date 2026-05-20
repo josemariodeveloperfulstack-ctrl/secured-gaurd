@@ -142,6 +142,13 @@
             <version>1.10.0</version>
         </dependency>
 
+        <!-- SendGrid API (campanhas transacionais + Event Webhook) -->
+        <dependency>
+            <groupId>com.sendgrid</groupId>
+            <artifactId>sendgrid-java</artifactId>
+            <version>4.10.3</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -408,7 +415,7 @@
                 <artifactId>flyway-maven-plugin</artifactId>
                 <version>9.22.3</version>
                 <configuration>
-                    <url>jdbc:postgresql://localhost:5433/secured_guard_dev</url>
+                    <url>jdbc:postgresql://localhost:5432/secured_guard</url>
                     <user>postgres</user>
                     <password>1234567</password>
                     <cleanDisabled>false</cleanDisabled>

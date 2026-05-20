@@ -888,6 +888,7 @@ const ModelosDocumentosForm: React.FC<ModelosDocumentosFormProps> = ({ hideHeade
 
                     <div className="grid grid-cols-2 gap-2 mt-auto">
                       <Button
+                        type="button"
                         size="sm"
                         variant="outline"
                         onClick={() => handlePreviewDocument(model)}
@@ -897,6 +898,7 @@ const ModelosDocumentosForm: React.FC<ModelosDocumentosFormProps> = ({ hideHeade
                         Ver
                       </Button>
                       <Button
+                        type="button"
                         size="sm"
                         onClick={() => handleGenerateDocument(model)}
                         disabled={!model.hasGenerator}

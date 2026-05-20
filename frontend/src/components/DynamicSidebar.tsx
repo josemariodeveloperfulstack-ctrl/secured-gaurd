@@ -41,12 +41,14 @@ import {
   Wallet,
   ArrowUpDown,
   Target,
+  Megaphone,
   Package,
   ShoppingCart,
   CheckCircle,
   FolderTree,
   Files,
-  GraduationCap
+  GraduationCap,
+  Plus
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import {
@@ -74,6 +76,93 @@ interface MenuItem {
   role?: string;
   color?: string;
 }
+
+/**
+ * RH e DEPARTAMENTO_PESSOAL — itens operacionais bloqueados.
+ */
+const RH_DP_FORBIDDEN_OPERATIONAL_IDS = new Set<string>([
+  'operacional',
+  'controle-visitas',
+  'controle-visitas-avancado',
+  'guia-transporte',
+  'servicos',
+  'rota-semanal-supervisao',
+  'equipamentos',
+  'troca-plantao',
+  'supervisao',
+  'facial-login',
+  'supervisao-visitas',
+  'supervisao-rotas',
+  'supervisao-relatorios',
+  'supervisao-biometria',
+]);
+
+/**
+ * RH e DEPARTAMENTO_PESSOAL — itens financeiros/fiscais bloqueados.
+ */
+const RH_DP_FORBIDDEN_FINANCIAL_IDS = new Set<string>([
+  'modulo-financeiro',
+  'gestao-financeira-dashboard',
+  'gestao-financeira-contas-pagar',
+  'gestao-financeira-contas-receber',
+  'gestao-financeira-fluxo-caixa',
+  'gestao-financeira-movimentacoes',
+  'gestao-financeira-conciliacao',
+  'gestao-financeira-relatorios',
+  'gestao-financeira-orcamento',
+  'gestao-financeira-centros-custo',
+  'gestao-patrimonial',
+  'modulo-fiscal',
+]);
+
+/**
+ * ADMIN / ADMINISTRADOR — itens de sistema sensíveis bloqueados.
+ */
+const ADMIN_FORBIDDEN_SYSTEM_IDS = new Set<string>([
+  'atividades',
+  'sistema',
+  'configuracoes',
+  'whatsapp-connection',
+  'backup',
+]);
+
+/**
+ * SUPERVISOR — bloqueio explícito (defesa em profundidade).
+ * Mesmo com o whitelist `ROLE_ALLOWED_ITEM_IDS.SUPERVISOR`, mantemos este conjunto
+ * para evitar regressões caso novos itens sejam adicionados ao menu ou permissões
+ * extras venham de grupos combinados.
+ */
+const SUPERVISOR_FORBIDDEN_ITEM_IDS = new Set<string>([
+  // Módulo Financeiro
+  'modulo-financeiro',
+  'gestao-financeira-dashboard',
+  'gestao-financeira-contas-pagar',
+  'gestao-financeira-contas-receber',
+  'gestao-financeira-fluxo-caixa',
+  'gestao-financeira-movimentacoes',
+  'gestao-financeira-conciliacao',
+  'gestao-financeira-relatorios',
+  'gestao-financeira-orcamento',
+  'gestao-financeira-centros-custo',
+  'gestao-patrimonial',
+  'modulo-fiscal',
+  // Módulo Comercial
+  'leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm',
+  'commercial-dashboard',
+  // Compras / Estoque / Suprimentos
+  'compras', 'compras-solicitacoes', 'compras-aprovacoes', 'compras-cotacoes', 'compras-relatorios',
+  'estoque', 'estoque-simplificado',
+  // Folha / Holerites (RH / DPE)
+  'holerites', 'documentos-unificados', 'unificados-por-setor', 'payrolls', 'envio-holerites',
+  // Administração / Sistema
+  'usuarios', 'grupos', 'sistema', 'configuracoes', 'atividades',
+  'whatsapp-connection', 'backup',
+  // Empresas / Filiais / Fornecedores
+  'empresas', 'filiais', 'clientes', 'fornecedores',
+  // RH SST (responsabilidade do RH)
+  'rh-sst', 'rh-sst-exames', 'rh-sst-epis', 'rh-sst-acidentes',
+  'rh-sst-treinamentos', 'rh-sst-inspecoes', 'rh-sst-cipa', 'rh-sst-relatorios',
+]);
 
 const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   COLABORADOR: new Set([
@@ -130,6 +219,38 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'mensagens',
     'chat-interno',
   ]),
+  // 🟩 SUPERVISOR — APENAS módulo operacional, supervisão de visitas e comunicação.
+  // ❌ NÃO tem acesso a Financeiro, Comercial, Holerites/Folha, RH SST, Compras, Estoque, Admin.
+  SUPERVISOR: new Set([
+    // Principal / Operacional core
+    'dashboard',
+    'operacional',
+    'controle-visitas',
+    'controle-visitas-avancado',
+    'guia-transporte',
+    'postos',
+    'funcionarios',
+    'operacional-servicos',
+    'equipamentos',
+    'troca-plantao',
+    'rota-semanal-supervisao',
+    // Supervisão (Ondas 4 e 6)
+    'supervisao',
+    'supervisor-dashboard',
+    'supervisor-nova-visita',
+    'facial-login',
+    'supervisao-visitas',
+    'supervisao-rotas',
+    'supervisao-relatorios',
+    // Frota (uso operacional, ex.: veículos para a visita)
+    'frota',
+    // Relatórios operacionais + perfil + comunicação
+    'relatorios',
+    'meus-holerites',
+    'mensagens',
+    'chat-interno',
+    'suporte',
+  ]),
 };
 
 export function DynamicSidebar() {
@@ -176,6 +297,13 @@ export function DynamicSidebar() {
       to: '/contratos',
       id: 'contratos',
       requiredPermission: 'CONTRACTS_READ'
+    },
+    {
+      icon: Megaphone,
+      text: 'Marketing',
+      to: '/comercial/marketing',
+      id: 'marketing',
+      requiredPermission: 'LEADS_READ'
     },
 
     {
@@ -229,6 +357,20 @@ export function DynamicSidebar() {
     },
 
     // ===== SUPERVISÃO DENTRO DO OPERACIONAL =====
+    {
+      icon: Shield,
+      text: 'Painel do Supervisor',
+      to: '/supervisor/dashboard',
+      id: 'supervisor-dashboard',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
+    {
+      icon: Plus,
+      text: 'Nova Visita (Supervisor)',
+      to: '/supervisao/visitas/nova',
+      id: 'supervisor-nova-visita',
+      requiredPermission: 'EMPLOYEES_READ'
+    },
     {
       icon: Shield,
       text: 'Supervisão Principal',
@@ -660,13 +802,22 @@ export function DynamicSidebar() {
         ['modulo-financeiro', 'gestao-financeira-dashboard', 'gestao-financeira-contas-pagar', 'gestao-financeira-contas-receber', 'gestao-financeira-fluxo-caixa', 'gestao-financeira-movimentacoes', 'gestao-financeira-conciliacao', 'gestao-financeira-relatorios', 'gestao-financeira-orcamento', 'gestao-financeira-centros-custo', 'gestao-patrimonial'].includes(item.id)
       ),
       operacional: filteredItems.filter(item =>
-        ['servicos', 'controle-visitas-avancado', 'rota-semanal-supervisao', 'equipamentos', 'troca-plantao', 'supervisao', 'facial-login', 'supervisao-visitas', 'supervisao-rotas', 'supervisao-relatorios', 'supervisao-biometria'].includes(item.id)
+        [
+          'servicos', 'controle-visitas-avancado', 'rota-semanal-supervisao',
+          'equipamentos', 'troca-plantao',
+          // Supervisão (Onda 4 e 6) — visíveis para Supervisor e gestores
+          'supervisao', 'supervisor-dashboard', 'supervisor-nova-visita',
+          'facial-login', 'supervisao-visitas', 'supervisao-rotas', 'supervisao-relatorios',
+          'supervisao-biometria',
+          // Itens operacionais essenciais para o Supervisor
+          'funcionarios', 'postos', 'operacional-servicos',
+        ].includes(item.id)
       ),
       empresas: filteredItems.filter(item =>
         ['empresas', 'filiais', 'clientes', 'fornecedores'].includes(item.id)
       ),
       comercial: filteredItems.filter(item =>
-        ['leads', 'propostas', 'orcamentos', 'contratos', 'crm'].includes(item.id)
+        ['leads', 'marketing', 'propostas', 'orcamentos', 'contratos', 'crm'].includes(item.id)
       ),
       compras: filteredItems.filter(item =>
         ['compras', 'compras-solicitacoes', 'compras-aprovacoes', 'compras-cotacoes', 'compras-relatorios'].includes(item.id)
@@ -759,48 +910,22 @@ export function DynamicSidebar() {
       }
 
       // Regras extras por função para esconder módulos específicos
-      // Departamento Pessoal e RH NÃO veem módulo Operacional/Supervisão
+      // Departamento Pessoal e RH NÃO veem módulo Operacional/Supervisão/Financeiro/Fiscal
       if (['DEPARTAMENTO_PESSOAL', 'RH'].includes(normalizedRole)) {
-        const forbiddenOperationalIds = new Set([
-          'operacional',
-          'controle-visitas',
-          'controle-visitas-avancado',
-          'guia-transporte',
-          'servicos',
-          'rota-semanal-supervisao',
-          'equipamentos',
-          'troca-plantao',
-          'supervisao',
-          'facial-login',
-          'supervisao-visitas',
-          'supervisao-rotas',
-          'supervisao-relatorios',
-          'supervisao-biometria',
-        ]);
-        if (forbiddenOperationalIds.has(item.id)) {
+        if (RH_DP_FORBIDDEN_OPERATIONAL_IDS.has(item.id)) {
           console.log(`🚫 ${normalizedRole} - escondendo item operacional: ${item.id}`);
           return false;
         }
-
-        // RH e Departamento Pessoal NÃO veem Módulo Financeiro nem Módulo Fiscal
-        const forbiddenFinancialIds = new Set([
-          'modulo-financeiro',
-          'gestao-financeira-dashboard',
-          'gestao-financeira-contas-pagar',
-          'gestao-financeira-contas-receber',
-          'gestao-financeira-fluxo-caixa',
-          'gestao-financeira-movimentacoes',
-          'gestao-financeira-conciliacao',
-          'gestao-financeira-relatorios',
-          'gestao-financeira-orcamento',
-          'gestao-financeira-centros-custo',
-          'gestao-patrimonial',
-          'modulo-fiscal',
-        ]);
-        if (forbiddenFinancialIds.has(item.id)) {
+        if (RH_DP_FORBIDDEN_FINANCIAL_IDS.has(item.id)) {
           console.log(`🚫 ${normalizedRole} - escondendo item financeiro/fiscal: ${item.id}`);
           return false;
         }
+      }
+
+      // 🟩 SUPERVISOR — defesa em profundidade (ver SUPERVISOR_FORBIDDEN_ITEM_IDS).
+      if (normalizedRole === 'SUPERVISOR' && SUPERVISOR_FORBIDDEN_ITEM_IDS.has(item.id)) {
+        console.log(`🚫 SUPERVISOR - escondendo item fora do módulo operacional: ${item.id}`);
+        return false;
       }
 
       // Se tem role específico, verificar se o usuário tem esse role
@@ -816,6 +941,11 @@ export function DynamicSidebar() {
 
 
         return isAllowed;
+      }
+
+      // Regras para ADMIN e ADMINISTRADOR — esconder módulos de sistema sensíveis
+      if (['ADMIN', 'ADMINISTRADOR'].includes(normalizedRole) && ADMIN_FORBIDDEN_SYSTEM_IDS.has(item.id)) {
+        return false;
       }
 
       return true;
@@ -842,6 +972,7 @@ export function DynamicSidebar() {
       'SUPER_ADMIN': 'Super Administrador',
       'ADMIN': 'Administrador',
       'SUPERVISOR': 'Supervisor',
+      'GESTAO_SUPERVISAO': 'Gestão de Supervisão',
       'RH': 'Recursos Humanos',
       'FINANCEIRO': 'Financeiro',
       'TI_SUPORTE': 'TI / Suporte',
@@ -857,6 +988,7 @@ export function DynamicSidebar() {
       'SUPER_ADMIN': 'bg-red-100 text-red-800',
       'ADMIN': 'bg-blue-100 text-blue-800',
       'SUPERVISOR': 'bg-green-100 text-green-800',
+      'GESTAO_SUPERVISAO': 'bg-teal-100 text-teal-800',
       'RH': 'bg-yellow-100 text-yellow-800',
       'FINANCEIRO': 'bg-orange-100 text-orange-800',
       'TI_SUPORTE': 'bg-purple-100 text-purple-800',
@@ -949,121 +1081,7 @@ export function DynamicSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Módulo Sistema - FORÇADO para SUPER_ADMIN - MOVIDO PARA CIMA */}
-        {console.log('🔍 Tentando renderizar seção Sistema...')}
-        {console.log('🔍 Usuário atual na sidebar:', user)}
-        {console.log('🔍 É SUPER_ADMIN?', user?.role === 'SUPER_ADMIN')}
-        {true && (
-          <SidebarGroup>
-            {/* Debug visual simples */}
-            <div className="p-2 text-xs text-red-500 bg-red-900/50 rounded mb-2">
-              🔥 DEBUG: Seção Sistema sendo renderizada!
-            </div>
-            <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
-              <Settings size={16} className="mr-2 text-seguranca-yellow" />
-              Sistema
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="space-y-1">
-                {/* Itens fixos para SUPER_ADMIN */}
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'usuarios'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'usuarios'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/usuarios" className="flex items-center w-full">
-                      <Users size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Usuários</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'grupos'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'grupos'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/grupos" className="flex items-center w-full">
-                      <Database size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Grupos</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'atividades'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'atividades'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/atividades" className="flex items-center w-full">
-                      <Activity size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Gestão de Atividades</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'sistema'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'sistema'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/sistema" className="flex items-center w-full">
-                      <Activity size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Sistema</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={getActiveId() === 'configuracoes'}
-                    className={`
-                      flex items-center p-3 rounded-lg transition-colors
-                      ${getActiveId() === 'configuracoes'
-                        ? 'bg-seguranca-black text-seguranca-yellow'
-                        : 'text-seguranca-lightgray hover:bg-seguranca-black hover:text-seguranca-yellow'
-                      }
-                    `}
-                  >
-                    <ScrollPreservingLink to="/configuracoes" className="flex items-center w-full">
-                      <Settings size={20} className="text-seguranca-yellow flex-shrink-0" />
-                      <span className="ml-3 truncate">Configurações</span>
-                    </ScrollPreservingLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         {/* Módulo RH */}
         {menuGroups.rh.length > 0 && (
@@ -1474,8 +1492,8 @@ export function DynamicSidebar() {
         )}
 
 
-        {/* Módulo Sistema - Versão original (comentada para debug) */}
-        {false && menuGroups.sistema.length > 0 && (
+        {/* Módulo Sistema */}
+        {menuGroups.sistema.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-seguranca-lightgray px-2 py-2">
               <Settings size={16} className="mr-2 text-seguranca-yellow" />
@@ -1508,32 +1526,7 @@ export function DynamicSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Debug temporário para SUPER_ADMIN */}
-        {user?.role === 'SUPER_ADMIN' && (
-          <div className="p-2 text-xs text-yellow-400 bg-yellow-900/20 rounded">
-            DEBUG SUPER_ADMIN: Sistema tem {menuGroups.sistema.length} itens
-            <br />
-            Itens: {menuGroups.sistema.map(item => item.text).join(', ')}
-          </div>
-        )}
 
-        {/* Debug sempre visível */}
-        <div className="p-2 text-xs text-red-400 bg-red-900/20 rounded">
-          DEBUG GERAL:
-          <br />
-          User: {user ? user.name : 'null'}
-          <br />
-          Role: {user ? user.role : 'null'}
-          <br />
-          Is SUPER_ADMIN: {user?.role === 'SUPER_ADMIN' ? 'SIM' : 'NÃO'}
-          <br />
-          Sistema length: {menuGroups.sistema.length}
-        </div>
-
-        {/* Teste simples */}
-        <div className="p-2 text-xs text-blue-400 bg-blue-900/20 rounded">
-          TESTE SIMPLES: Se você vê isso, a sidebar está funcionando
-        </div>
 
       </SidebarContent>
 

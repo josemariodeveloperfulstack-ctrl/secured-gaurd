@@ -69,10 +69,10 @@ const OrderOfServiceTable: React.FC<OrderOfServiceTableProps> = ({
   const filteredOrders = safeOrders.filter(order => {
     const searchTermLower = searchTerm.toLowerCase();
     const matchesSearch =
-      order.employeeName.toLowerCase().includes(searchTermLower) ||
-      order.client.toLowerCase().includes(searchTermLower) ||
-      order.workplace.toLowerCase().includes(searchTermLower) ||
-      order.role.toLowerCase().includes(searchTermLower);
+      (order.employeeName?.toLowerCase() || '').includes(searchTermLower) ||
+      (order.client?.toLowerCase() || '').includes(searchTermLower) ||
+      (order.workplace?.toLowerCase() || '').includes(searchTermLower) ||
+      (order.role?.toLowerCase() || '').includes(searchTermLower);
 
     const matchesStatus = statusFilter === 'all' ||
       (statusFilter === 'signed' && order.signed) ||

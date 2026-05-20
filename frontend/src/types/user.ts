@@ -1,4 +1,4 @@
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'GESTOR_OPERACIONAL' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'GESTOR_COMERCIAL' | 'ASSISTENTE_COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO' | 'ANALISTA_SUPRIMENTOS' | 'ESTOQUE' | 'SUPRIMENTOS' | 'COMPRAS' | 'ALMOXARIFADO';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPERVISOR' | 'RH' | 'ASSISTENCIA_RH' | 'DEPARTAMENTO_PESSOAL' | 'FINANCEIRO' | 'OPERACIONAL' | 'GESTOR_OPERACIONAL' | 'GESTAO_SUPERVISAO' | 'VIGILANTE' | 'AUXI_ADMINISTRATIVO' | 'AUX_DEP' | 'TI_SUPORTE' | 'AUDITOR' | 'COLABORADOR' | 'GESTOR' | 'COMERCIAL' | 'GESTOR_COMERCIAL' | 'ASSISTENTE_COMERCIAL' | 'ASSISTENTE_ADMINISTRATIVO' | 'ANALISTA_SUPRIMENTOS' | 'ESTOQUE' | 'SUPRIMENTOS' | 'COMPRAS' | 'ALMOXARIFADO';
 
 export type UserGroup = 'GRUPO_SUPER_ADMIN' | 'GRUPO_ADMIN' | 'GRUPO_GESTOR' | 'GRUPO_RH' | 'GRUPO_DPE' | 'GRUPO_SUPERVISOR' | 'GRUPO_COLABORADORES' | 'GRUPO_OPERACIONAL' | 'GRUPO_VIGILANTES' | 'GRUPO_VIGIAS' | 'GRUPO_FINANCEIRO' | 'GRUPO_TI_SUPORTE' | 'GRUPO_AUDITOR' | 'GRUPO_AUXILIARES' | 'GRUPO_COMERCIAL' | 'GRUPO_ASSISTENTE_ADMINISTRATIVO' | 'GRUPO_ANALISTA_SUPRIMENTOS' | 'GRUPO_SUPRIMENTOS' | 'GRUPO_COMPRAS' | 'GRUPO_ESTOQUE' | 'GRUPO_ASSISTENTE_COMERCIAL' | 'GRUPO_GESTOR_COMERCIAL' | 'GRUPO_GESTOR_SUPERVISAO' | 'GRUPO_GESTOR_FINANCEIRO' | 'GRUPO_GESTOR_RH' | 'GRUPO_GESTOR_DPE';
 
@@ -219,10 +219,20 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface SupervisorSessionPayload {
+  id: string;
+  name?: string;
+  email?: string;
+  cpf?: string;
+  phone?: string;
+  isActive?: boolean;
+}
+
 export interface AuthContextType {
   user: User | null;
   profile?: any;
   login: (email: string, password: string) => Promise<void>;
+  loginAsSupervisor: (supervisor: SupervisorSessionPayload, token: string) => User;
   logout: () => void;
   signOut: () => void;
   isLoading: boolean;
@@ -396,6 +406,7 @@ export const MENU_CONFIG: Record<UserRole, MenuItem[]> = {
   ],
   GESTOR: [],
   GESTOR_OPERACIONAL: [],
+  GESTAO_SUPERVISAO: [],
   ESTOQUE: [
     { label: 'Dashboard', path: '/dashboard', icon: 'BarChart3', color: '🟨' },
     { label: 'Estoque', path: '/estoque', icon: 'Package', color: '🟨' },

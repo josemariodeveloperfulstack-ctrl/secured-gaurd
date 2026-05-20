@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Loader2 } from 'lucide-react';
 import api from '@/lib/axios';
 import { useToast } from '@/hooks/use-toast';
-import { workPostService, WorkPost } from '@/services/workPostService';
 import { clientService } from '@/services/clientService';
-import { employeeService } from '@/services/employeeService';
 import { Client } from '@/types/client';
-import { Employee } from '@/types/employee';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { WorkPostCombobox } from '@/components/ui/work-post-combobox';
+import type { SimpleEmployee } from '@/services/employeeService';
+import { workPostService } from '@/services/workPostService';
 
 interface NewVisitModalProps {
   open?: boolean;
@@ -40,12 +41,14 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
   const [loadingData, setLoadingData] = useState(false);
   const { toast } = useToast();
   
-  // Estados para dados do banco
-  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
+  // Estados para dados leves (clientes carregados eagerly; funcionários e postos sob demanda)
   const [clients, setClients] = useState<Client[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [supervisors, setSupervisors] = useState<Employee[]>([]);
-  
+
+  // Nomes dos funcionários selecionados (para usar no payload e exibição)
+  const [assignedEmployeeName, setAssignedEmployeeName] = useState<string>('');
+  const [supervisorEmployeeName, setSupervisorEmployeeName] = useState<string>('');
+  const [workPostName, setWorkPostName] = useState<string>('');
+
   const [formData, setFormData] = useState({
     title: '',
     workPostId: '',
@@ -64,31 +67,27 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
     }
   }, [open]);
 
+  // Resolver o nome do posto sempre que o ID mudar (para usar como "location" no payload)
+  useEffect(() => {
+    let cancelled = false;
+    if (!formData.workPostId) {
+      setWorkPostName('');
+      return;
+    }
+    workPostService.getWorkPostById(formData.workPostId)
+      .then(wp => { if (!cancelled && wp) setWorkPostName(wp.name); })
+      .catch(() => { if (!cancelled) setWorkPostName(''); });
+    return () => { cancelled = true; };
+  }, [formData.workPostId]);
+
   const loadFormData = async () => {
     setLoadingData(true);
     try {
-      const [postsData, clientsData, employeesData] = await Promise.all([
-        workPostService.getAllWorkPosts(),
-        clientService.getAllClients(),
-        employeeService.getAllEmployees()
-      ]);
-
-      setWorkPosts(postsData || []);
+      // Apenas clientes são carregados eagerly. Funcionários e postos usam busca on-demand.
+      const clientsData = await clientService.getAllClients();
       setClients(clientsData || []);
-      setEmployees(employeesData || []);
-      
-      // Filtrar apenas funcionários com cargo de Supervisor
-      const supervisorsData = (employeesData || []).filter(emp => 
-        emp.position?.name?.toLowerCase().includes('supervisor')
-      );
-      
-      setSupervisors(supervisorsData);
 
-      console.log('✅ Dados carregados:', {
-        postos: postsData?.length,
-        clientes: clientsData?.length,
-        funcionarios: employeesData?.length
-      });
+      console.log('✅ Clientes carregados:', clientsData?.length);
     } catch (error) {
       console.error('❌ Erro ao carregar dados do formulário:', error);
       toast({
@@ -110,21 +109,13 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
       const scheduledDateTime = new Date(formData.scheduledAt);
       const visitDate = scheduledDateTime.toISOString().split('T')[0]; // yyyy-MM-dd
       const scheduledTime = scheduledDateTime.toTimeString().split(' ')[0].substring(0, 5); // HH:mm
-      
-      // Buscar nome do funcionário responsável
-      const assignedEmployee = employees.find(emp => emp.id === formData.assignedToId);
-      const assignedTo = assignedEmployee ? assignedEmployee.name : '';
-      
-      // Buscar nome do posto de trabalho para usar como location se necessário
-      const workPost = workPosts.find(wp => wp.id === formData.workPostId);
-      const location = workPost ? workPost.name : '';
-      
+
       const visitData = {
         title: formData.title || undefined,
         workPostId: formData.workPostId || undefined,
         supervisorId: formData.supervisorId || undefined,
-        assignedTo: assignedTo,
-        location: location,
+        assignedTo: assignedEmployeeName || '',
+        location: workPostName || '',
         visitDate: visitDate,
         scheduledAt: scheduledTime,
         observations: formData.description || undefined,
@@ -155,6 +146,9 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
         description: '',
         priority: 'MEDIUM'
       });
+      setAssignedEmployeeName('');
+      setSupervisorEmployeeName('');
+      setWorkPostName('');
       
       // Notificar componente pai
       onVisitCreated?.();
@@ -209,26 +203,17 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <Label htmlFor="workPostId" className="text-gray-300 text-sm sm:text-base">Setor / Posto de Trabalho *</Label>
-                  <Select 
-                    value={formData.workPostId} 
-                    onValueChange={(value) => setFormData({ ...formData, workPostId: value })}
-                  >
-                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white mt-1">
-                      <SelectValue placeholder="Selecione o posto" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-700 border-gray-600 max-h-[300px]">
-                      {workPosts.map((post) => (
-                        <SelectItem key={post.id} value={post.id} className="text-white hover:bg-gray-600">
-                          {post.name} {post.postCode ? `(${post.postCode})` : ''}
-                        </SelectItem>
-                      ))}
-                      {workPosts.length === 0 && (
-                        <SelectItem value="none" disabled className="text-gray-400">
-                          Nenhum posto cadastrado
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <div className="mt-1">
+                    <WorkPostCombobox
+                      value={formData.workPostId}
+                      onChange={(value) => {
+                        setFormData({ ...formData, workPostId: value });
+                        if (!value) setWorkPostName('');
+                      }}
+                      placeholder="Digite para buscar pelo nome ou código..."
+                      searchPlaceholder="Digite para buscar..."
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -259,49 +244,38 @@ const NewVisitModal: React.FC<NewVisitModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <Label htmlFor="assignedToId" className="text-gray-300 text-sm sm:text-base">Funcionário Responsável *</Label>
-                  <Select 
-                    value={formData.assignedToId} 
-                    onValueChange={(value) => setFormData({ ...formData, assignedToId: value })}
-                  >
-                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white mt-1">
-                      <SelectValue placeholder="Selecione o funcionário" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-700 border-gray-600 max-h-[300px]">
-                      {employees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id} className="text-white hover:bg-gray-600">
-                          {emp.name} {emp.registrationNumber ? `(${emp.registrationNumber})` : ''}
-                        </SelectItem>
-                      ))}
-                      {employees.length === 0 && (
-                        <SelectItem value="none" disabled className="text-gray-400">
-                          Nenhum funcionário cadastrado
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <div className="mt-1">
+                    <EmployeeCombobox
+                      value={formData.assignedToId}
+                      onChange={(value) => {
+                        setFormData({ ...formData, assignedToId: value });
+                        if (!value) setAssignedEmployeeName('');
+                      }}
+                      onEmployeeSelect={(emp: SimpleEmployee) => setAssignedEmployeeName(emp.name)}
+                      placeholder="Selecione o funcionário"
+                      searchPlaceholder="Digite pelo menos 3 caracteres..."
+                      initialDisplayName={assignedEmployeeName}
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <Label htmlFor="supervisorId" className="text-gray-300">Supervisor *</Label>
-                  <Select 
-                    value={formData.supervisorId} 
-                    onValueChange={(value) => setFormData({ ...formData, supervisorId: value })}
-                  >
-                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white mt-1">
-                      <SelectValue placeholder="Selecione o supervisor" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-700 border-gray-600 max-h-[300px]">
-                      {supervisors.length > 0 ? supervisors.map((sup) => (
-                        <SelectItem key={sup.id} value={sup.id} className="text-white hover:bg-gray-600">
-                          {sup.name}
-                        </SelectItem>
-                      )) : (
-                        <SelectItem value="none" disabled className="text-gray-400">
-                          Nenhum supervisor encontrado
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <div className="mt-1">
+                    <EmployeeCombobox
+                      value={formData.supervisorId}
+                      onChange={(value) => {
+                        setFormData({ ...formData, supervisorId: value });
+                        if (!value) setSupervisorEmployeeName('');
+                      }}
+                      onEmployeeSelect={(emp: SimpleEmployee) => setSupervisorEmployeeName(emp.name)}
+                      placeholder="Selecione o supervisor"
+                      searchPlaceholder="Digite pelo menos 3 caracteres..."
+                      emptyPlaceholder="Nenhum supervisor encontrado."
+                      positionFilter="supervisor"
+                      initialDisplayName={supervisorEmployeeName}
+                    />
+                  </div>
                 </div>
               </div>
 

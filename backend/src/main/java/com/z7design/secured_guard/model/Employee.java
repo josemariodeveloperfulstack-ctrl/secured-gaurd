@@ -39,7 +39,8 @@ public class Employee {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = true)
+    /** Vários employees podem partilhar o mesmo user_id em dados legados; OneToOne quebrava o Hibernate 6 (ASSERT em duplicados). */
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "user_id")
     @com.fasterxml.jackson.annotation.JsonIgnore
@@ -53,6 +54,17 @@ public class Employee {
 
     @Column
     private String registrationNumber;
+
+    /**
+     * Token opaco gerado pelo backend e usado pelo Supervisor para identificar
+     * o funcionário via leitura de QR Code durante uma visita ao posto.
+     * O conteúdo do QR pode trazer também dados visuais (nome/cpf/cargo/posto),
+     * mas a autenticação contra o banco sempre usa este token.
+     * Fallback manual: CPF ou {@link #registrationNumber} (matrícula).
+     */
+    @Column(name = "qr_code_token", length = 64, unique = true)
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    private String qrCodeToken;
 
     @Column
     @JsonFormat(pattern = "yyyy-MM-dd")

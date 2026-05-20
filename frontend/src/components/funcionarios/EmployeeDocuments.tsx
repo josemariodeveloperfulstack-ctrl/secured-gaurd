@@ -6,7 +6,8 @@ import { FileText, Plus, Trash2, Download, Eye, Upload, Calendar, Hash, User, Lo
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { documentService, Document, DocumentType } from '@/services/documentService';
+import { documentService } from '@/services/documentService';
+import type { Document, DocumentType } from '@/types/document';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

@@ -24,7 +24,11 @@ import { ptBR } from 'date-fns/locale';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import timeRecordService, { TimeRecord } from '@/services/timeRecordService';
 
-const MeuPonto: React.FC = () => {
+interface MeuPontoProps {
+    standalone?: boolean;
+}
+
+const MeuPonto: React.FC<MeuPontoProps> = ({ standalone = false }) => {
     const { user } = useAuth();
     const { toast } = useToast();
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -69,8 +73,8 @@ const MeuPonto: React.FC = () => {
         if (!employeeId) return;
         try {
             const [todayRes, nextRes] = await Promise.all([
-                timeRecordService.getTodayRecords(employeeId),
-                timeRecordService.getNextRecordType(employeeId)
+                timeRecordService.getTodayRecords(employeeId).catch(() => ({ success: false, data: [] })),
+                timeRecordService.getNextRecordType(employeeId).catch(() => ({ success: false, nextRecordType: 'ENTRADA' }))
             ]);
             if (todayRes?.success && Array.isArray(todayRes.data)) {
                 setRegistrosHoje(todayRes.data);
@@ -219,7 +223,7 @@ const MeuPonto: React.FC = () => {
     };
 
     return (
-        <StandardLayout>
+        <StandardLayout isSubPage={standalone}>
             <div className="max-w-md mx-auto px-4 py-8 pb-24 space-y-6">
                 {/* Header com Relógio Digital */}
                 <div className="text-center space-y-2">

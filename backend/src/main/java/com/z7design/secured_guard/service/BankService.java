@@ -133,6 +133,11 @@ public class BankService {
     public void deleteBank(UUID id) {
         log.info("Removendo banco: {}", id);
         
+        if (!bankRepository.existsById(id)) {
+            log.warn("Banco não encontrado para remoção com ID: {}. Retornando com sucesso (operação idempotente).", id);
+            return;
+        }
+        
         Bank bank = bankRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Banco não encontrado com ID: " + id));
         

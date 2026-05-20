@@ -20,21 +20,88 @@ import {
   StockRequisitionDTO,
   CreateStockRequisitionPayload,
   DeliverStockRequisitionPayload,
-  StockRequisitionListItem
+  StockRequisitionListItem,
+  LocationStockSummaryRow
 } from '@/types/stock';
+
+function parseNumberField(v: unknown): number {
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  if (typeof v === 'string') {
+    const n = Number(v.replace(',', '.'));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+/** Normaliza campos numéricos e nomes alternativos vindos do JSON (evita estoque "0" na UI por campo errado). */
+export function normalizeStockItem(raw: Record<string, unknown>): StockItem {
+  const cur = raw.currentQuantity ?? raw.current_quantity;
+  const min = raw.minimumQuantity ?? raw.minimum_quantity;
+  const low = raw.isLowStock ?? raw.is_low_stock;
+  const fn = raw.fullName ?? raw.full_name;
+  const uc = raw.unitCost ?? raw.unit_cost;
+  const base = raw as unknown as StockItem;
+  const nameStr = typeof raw.name === 'string' ? raw.name : '';
+  const fullNameStr =
+    typeof fn === 'string' && fn.trim() !== ''
+      ? fn
+      : typeof base.fullName === 'string' && base.fullName
+        ? base.fullName
+        : nameStr;
+  let locations = base.locations;
+  const locRaw = raw.locations;
+  if (Array.isArray(locRaw) && locRaw.length > 0) {
+    locations = locRaw.map((row) => {
+      const r = row as Record<string, unknown>;
+      return {
+        id: String(r.id ?? ''),
+        shelfId: String(r.shelfId ?? r.shelf_id ?? ''),
+        shelfIdentification: String(r.shelfIdentification ?? r.shelf_identification ?? ''),
+        floor: String(r.floor ?? ''),
+        quantity: parseNumberField(r.quantity)
+      };
+    });
+  }
+  return {
+    ...base,
+    currentQuantity: typeof cur === 'number' && !Number.isNaN(cur) ? cur : Number(cur) || 0,
+    minimumQuantity: typeof min === 'number' && !Number.isNaN(min) ? min : Number(min) || 0,
+    isLowStock: Boolean(low),
+    fullName: fullNameStr,
+    unitCost: parseNumberField(uc),
+    locations
+  };
+}
+
+function normalizeStockReportPayload(raw: Record<string, unknown>): StockReport {
+  const low = raw.lowStockItems ?? raw.low_stock_items;
+  const out = raw.outOfStockItems ?? raw.out_of_stock_items;
+  const ibc = raw.itemsByCategory ?? raw.items_by_category;
+  return {
+    totalItems: parseNumberField(raw.totalItems ?? raw.total_items),
+    lowStockCount: parseNumberField(raw.lowStockCount ?? raw.low_stock_count),
+    outOfStockCount: parseNumberField(raw.outOfStockCount ?? raw.out_of_stock_count),
+    totalValue: parseNumberField(raw.totalValue ?? raw.total_value),
+    totalQuantity: parseNumberField(raw.totalQuantity ?? raw.total_quantity),
+    itemsByCategory:
+      ibc && typeof ibc === 'object' && !Array.isArray(ibc) ? (ibc as Record<string, number>) : {},
+    activeAlerts: parseNumberField(raw.activeAlerts ?? raw.active_alerts),
+    criticalAlerts: parseNumberField(raw.criticalAlerts ?? raw.critical_alerts),
+    lowStockItems: Array.isArray(low) ? low.map((row) => normalizeStockItem(row as Record<string, unknown>)) : [],
+    outOfStockItems: Array.isArray(out) ? out.map((row) => normalizeStockItem(row as Record<string, unknown>)) : []
+  };
+}
 
 export const stockService = {
   // ===== ITENS DE ESTOQUE =====
 
   async getAllItems(): Promise<StockItem[]> {
-    try {
-      const response = await api.get('/api/stock/items');
-      return response.data || [];
-    } catch (error) {
-      console.error('Erro ao buscar itens de estoque:', error);
-      // Return empty array instead of throwing error to prevent component crash
+    const response = await api.get<StockItem[]>('/api/stock/items');
+    const data = response.data;
+    if (!Array.isArray(data)) {
       return [];
     }
+    return data.map((row) => normalizeStockItem(row as unknown as Record<string, unknown>));
   },
 
   async searchItems(filters: StockFilters, page = 0, size = 20): Promise<{ content: StockItem[], totalElements: number }> {
@@ -50,8 +117,17 @@ export const stockService = {
       params.append('page', page.toString());
       params.append('size', size.toString());
 
-      const response = await api.get(`/api/stock/items/search?${params.toString()}`);
-      return response.data;
+      const response = await api.get<{ content: StockItem[]; totalElements: number }>(
+        `/api/stock/items/search?${params.toString()}`
+      );
+      const body = response.data;
+      if (!body?.content) {
+        return { content: [], totalElements: 0 };
+      }
+      return {
+        ...body,
+        content: body.content.map((row) => normalizeStockItem(row as unknown as Record<string, unknown>)),
+      };
     } catch (error) {
       console.error('Erro ao buscar itens com filtros:', error);
       throw new Error('Falha ao buscar itens');
@@ -81,10 +157,22 @@ export const stockService = {
   async getItemByQrCode(qrCode: string): Promise<StockItem> {
     try {
       const response = await api.get(`/api/stock/items/qr/${qrCode}`);
-      return response.data;
+      return normalizeStockItem(response.data as unknown as Record<string, unknown>);
     } catch (error) {
       console.error('Erro ao buscar item por QR Code:', error);
       throw new Error('Falha ao buscar item por QR Code');
+    }
+  },
+
+  async adjustInventoryViaQrCode(qrCode: string, physicalQuantity: number): Promise<any> {
+    try {
+      const response = await api.patch(`/api/stock/items/qr/${qrCode}/inventory-adjust`, {
+        physicalQuantity
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao ajustar inventário via QR Code:', error);
+      throw new Error(error?.response?.data?.message || 'Falha ao ajustar inventário');
     }
   },
 
@@ -206,10 +294,21 @@ export const stockService = {
   async importPhysicalInventory(file: File): Promise<PhysicalInventoryImportResult> {
     const form = new FormData();
     form.append('file', file);
+    // Não definir Content-Type manualmente: o browser/axios precisa incluir o boundary no multipart.
     const response = await api.post<PhysicalInventoryImportResult>(
       '/api/stock/import/physical-inventory',
-      form,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      form
+    );
+    return response.data;
+  },
+
+  /** Inventário por item: zera estoque de todos os itens ativos e aplica cada linha da planilha (código, item, categoria, estoque…). */
+  async importItemInventory(file: File): Promise<PhysicalInventoryImportResult> {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post<PhysicalInventoryImportResult>(
+      '/api/stock/import/item-inventory',
+      form
     );
     return response.data;
   },
@@ -354,7 +453,7 @@ export const stockService = {
   async getStockReport(): Promise<StockReport> {
     try {
       const response = await api.get('/api/stock/report');
-      return response.data;
+      return normalizeStockReportPayload(response.data as Record<string, unknown>);
     } catch (error) {
       console.error('Erro ao gerar relatório de estoque:', error);
       throw new Error('Falha ao gerar relatório');
@@ -490,6 +589,87 @@ export const stockService = {
     }
   },
 
+  async downloadConsolidatedStockPDF(companyId: string, startDate: string, endDate: string): Promise<void> {
+    try {
+      const isoStart = this.convertDateToISO(startDate, true);
+      const isoEnd = this.convertDateToISO(endDate, false);
+      if (!isoStart || !isoEnd) {
+        throw new Error('Período inválido');
+      }
+      const params = new URLSearchParams({
+        companyId,
+        start: isoStart,
+        end: isoEnd
+      });
+      const response = await api.get(`/api/stock/reports/consolidated/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'relatorio-estoque-consolidado.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF consolidado de estoque:', error);
+      throw new Error('Falha ao baixar relatório consolidado');
+    }
+  },
+
+  async downloadPhysicalInventoryPDF(companyId: string): Promise<void> {
+    try {
+      const response = await api.get(`/api/stock/reports/physical-inventory/pdf?companyId=${companyId}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'planilha-conferencia-estoque.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF de conferência física:', error);
+      throw new Error('Falha ao baixar planilha de conferência');
+    }
+  },
+
+  async downloadConsolidatedRequisitionsPDF(companyId: string, startDate: string, endDate: string): Promise<void> {
+    try {
+      const isoStart = this.convertDateToISO(startDate, true);
+      const isoEnd = this.convertDateToISO(endDate, false);
+      if (!isoStart || !isoEnd) {
+        throw new Error('Período inválido');
+      }
+      const params = new URLSearchParams({
+        companyId,
+        start: isoStart,
+        end: isoEnd
+      });
+      const response = await api.get(`/api/stock/reports/consolidated-requisitions/pdf?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      this.handleFileDownload(response.data, 'requisicoes-consolidadas.pdf');
+    } catch (error) {
+      console.error('Erro ao baixar PDF de requisições consolidadas:', error);
+      throw new Error('Falha ao baixar relatório de requisições');
+    }
+  },
+
+  async getStockDashboard(companyId: string, start?: string, end?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      params.append('companyId', companyId);
+      if (start) params.append('start', start);
+      if (end) params.append('end', end);
+
+      const response = await api.get(`/api/stock/dashboard?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar dashboard de estoque:', error);
+      throw new Error('Falha ao buscar dados do dashboard');
+    }
+  },
+
+  async getLocationStockSummary(): Promise<LocationStockSummaryRow[]> {
+    try {
+      const response = await api.get<LocationStockSummaryRow[]>('/api/stock/reports/location-summary');
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error('Erro ao buscar resumo por localização:', error);
+      return [];
+    }
+  },
+
   // ===== PRATELEIRAS =====
 
   async getAllShelves(): Promise<StorageShelf[]> {
@@ -565,6 +745,21 @@ export const stockService = {
   async createStockRequisition(payload: CreateStockRequisitionPayload): Promise<StockRequisitionDTO> {
     const response = await api.post('/api/stock/requisitions', payload);
     return response.data;
+  },
+
+  async updateStockRequisition(id: string, payload: CreateStockRequisitionPayload): Promise<StockRequisitionDTO> {
+    const response = await api.put(`/api/stock/requisitions/${id}`, payload);
+    return response.data;
+  },
+
+  async deleteStockRequisition(id: string): Promise<void> {
+    await api.delete(`/api/stock/requisitions/${id}`);
+  },
+
+  async deleteStockRequisitionsBulk(ids: string[]): Promise<void> {
+    const unique = [...new Set(ids.map((x) => String(x).trim()).filter(Boolean))];
+    if (unique.length === 0) return;
+    await api.delete('/api/stock/requisitions/bulk-delete', { data: unique });
   },
 
   async getStockRequisition(id: string): Promise<StockRequisitionDTO> {

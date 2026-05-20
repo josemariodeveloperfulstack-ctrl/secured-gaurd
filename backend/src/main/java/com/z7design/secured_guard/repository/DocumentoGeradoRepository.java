@@ -3,6 +3,7 @@ package com.z7design.secured_guard.repository;
 import com.z7design.secured_guard.model.DocumentoGerado;
 import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.model.ModeloDocumento;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -132,4 +133,16 @@ public interface DocumentoGeradoRepository extends JpaRepository<DocumentoGerado
     @Modifying
     @Query("DELETE FROM DocumentoGerado dg WHERE dg.funcionario.id = :funcionarioId")
     int deleteByFuncionarioId(@Param("funcionarioId") UUID funcionarioId);
+
+    /**
+     * Busca documentos por funcionário e categoria/tipo do documento gerado.
+     */
+    List<DocumentoGerado> findByFuncionarioAndTipoOrderByDataCriacaoDesc(Employee funcionario, TipoDocumentoGerado tipo);
+
+    /**
+     * Busca documentos de um funcionário a partir do User vinculado.
+     * Usado pelo endpoint /meus para o Dashboard do Colaborador.
+     */
+    @Query("SELECT dg FROM DocumentoGerado dg WHERE dg.funcionario.user.id = :userId ORDER BY dg.dataCriacao DESC")
+    List<DocumentoGerado> findByFuncionarioUserIdOrderByDataCriacaoDesc(@Param("userId") UUID userId);
 }

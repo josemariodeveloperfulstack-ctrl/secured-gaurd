@@ -16,6 +16,9 @@ import java.util.UUID;
 public class ServiceOrderRequest {
     private UUID companyId;
 
+    /** ID do funcionário (opcional). Quando informado, persiste o PDF gerado. */
+    private UUID employeeId;
+
     // Dados do Funcionário
     private String employeeName;
     private String employeeCpf;

@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag } from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { ptBR } from 'date-fns/locale';
-import { formatDateForBackend, parseDateFromBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
+import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, Ruler, MapPin } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 import { contasAReceberService, Client } from '@/services/contasAReceberService';
+import { measurementService } from '@/services/measurementService';
+import { workPostService } from '@/services/workPostService';
+import type { WorkPost } from '@/services/workPostService';
+import { ClientSearchCombobox } from '@/components/ui/client-search-combobox';
+import { Switch } from '@/components/ui/switch';
+import type { MeasurementBulletin } from '@/types/measurement';
+import { cn } from '@/lib/utils';
 
 export interface ContaAReceber {
   id?: string;
@@ -31,8 +36,12 @@ export interface ContaAReceber {
   observacoes?: string;
   comprovante?: File;
   categoria?: string | undefined;
-  centroCusto?: string | undefined;
+  workPostId?: string | undefined;
+  workPostName?: string | undefined;
   paymentMethod?: string; // PaymentMethod enum: PIX, BOLETO, TRANSFER, CASH, CARD
+  measurementId?: string; // FK para o Boletim de Medição (opcional)
+  measurementNumber?: string; // Texto livre da medição (ex.: número, contrato)
+  measurementInfo?: string; // Texto amigável devolvido pelo backend
   createdAt?: Date;
 }
 
@@ -55,6 +64,12 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useState<Client[]>([]);
   const [empresas, setEmpresas] = useState<any[]>([]);
+  const [medicoes, setMedicoes] = useState<MeasurementBulletin[]>([]);
+  const [medicoesLoading, setMedicoesLoading] = useState(false);
+  
+  const [clientWorkPosts, setClientWorkPosts] = useState<WorkPost[]>([]);
+  const [workPostsLoading, setWorkPostsLoading] = useState(false);
+  const [autoInvoiceNumber, setAutoInvoiceNumber] = useState(false);
   
   const [formData, setFormData] = useState<ContaAReceber>({
     numeroFatura: '',
@@ -72,14 +87,160 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
     dataPagamento: undefined,
     observacoes: '',
     categoria: 'INVOICE', // Valor padrão - enum ReceivableCategory
-    centroCusto: undefined,
-    paymentMethod: 'PIX' // Valor padrão - enum PaymentMethod
+    workPostId: undefined,
+    workPostName: undefined,
+    paymentMethod: 'PIX', // Valor padrão - enum PaymentMethod
+    measurementId: undefined,
+    measurementNumber: ''
   });
 
   const [categories, setCategories] = useState<string[]>([]);
-  const [costCenters, setCostCenters] = useState<string[]>([]);
   const [newCategoryModalOpen, setNewCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Limpa termos corporativos e acentos, e gera sigla amigável do cliente (3 a 5 letras em maiúsculas)
+  const obterSiglaCliente = (nome: string): string => {
+    if (!nome) return '';
+    const limpo = nome
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .replace(/\b(LTDA|S\.?A\.?|ME|EPP|EIRELI|LIMITADA|SA|INC|CORP|GROUP|GRUPO)\b/gi, '') // Remove termos corporativos
+      .replace(/[^A-Z0-9\s]/g, '') // Remove caracteres especiais
+      .trim();
+
+    const palavras = limpo.split(/\s+/).filter(p => p.length > 0);
+    if (palavras.length >= 3) {
+      return palavras.slice(0, 4).map(p => p[0]).join('');
+    } else if (palavras.length === 2) {
+      return (palavras[0].substring(0, 2) + palavras[1].substring(0, 2)).substring(0, 4);
+    } else if (palavras.length === 1) {
+      return palabras[0].substring(0, 4);
+    }
+    return 'FAT';
+  };
+
+  // Busca faturas do cliente na API, encontra o maior sequencial no padrão prefixo e soma 1
+  const gerarNumeroFaturaAutomatica = async (clientId: string, clientName: string, dataEmissao: Date) => {
+    if (!clientId || !clientName) return;
+    try {
+      const sigla = obterSiglaCliente(clientName);
+      const ano = (dataEmissao || new Date()).getFullYear();
+      const prefixo = `${sigla}-${ano}`;
+
+      console.log(` Generating auto invoice number for ${clientName} (${clientId}) with prefix ${prefixo}...`);
+      const faturas = await contasAReceberService.getContasAReceber({ clienteId: clientId });
+      
+      let maxSequencial = 0;
+      if (Array.isArray(faturas)) {
+        faturas.forEach(f => {
+          const num = f.numeroFatura || '';
+          if (num.toUpperCase().startsWith(prefixo.toUpperCase())) {
+            const partes = num.split('-');
+            if (partes.length === 3) {
+              const seq = parseInt(partes[2], 10);
+              if (!isNaN(seq) && seq > maxSequencial) {
+                maxSequencial = seq;
+              }
+            }
+          }
+        });
+      }
+
+      const novoSequencial = String(maxSequencial + 1).padStart(3, '0');
+      const novoNumero = `${prefixo}-${novoSequencial}`;
+      
+      console.log(`✅ Calculated auto invoice number: ${novoNumero}`);
+      setFormData(prev => ({
+        ...prev,
+        numeroFatura: novoNumero
+      }));
+    } catch (error) {
+      console.error('Erro ao gerar número da fatura automática:', error);
+    }
+  };
+
+  // Carrega os postos de trabalho ativos do cliente selecionado
+  const carregarPostosDoCliente = async (clientId: string, selectedPostId?: string) => {
+    if (!clientId) {
+      setClientWorkPosts([]);
+      return;
+    }
+    setWorkPostsLoading(true);
+    try {
+      const posts = await workPostService.getWorkPostsByClient(clientId);
+      const ativos = (posts || []).filter((post: WorkPost) => {
+        const status = post.status ? String(post.status).toUpperCase() : 'ATIVO';
+        return status === 'ATIVO' || status === 'ACTIVE';
+      });
+      
+      setClientWorkPosts(ativos);
+      console.log(`🔍 Postos ativos encontrados para o cliente:`, ativos);
+
+      // Autopreenchimento (Opção A):
+      // Se houver exatamente 1 posto ativo, seleciona-o automaticamente no formData
+      if (ativos.length === 1 && !selectedPostId) {
+        console.log(`🎯 Apenas 1 posto ativo encontrado. Autopreenchendo posto: ${ativos[0].name}`);
+        setFormData(prev => ({
+          ...prev,
+          workPostId: ativos[0].id,
+          workPostName: ativos[0].name
+        }));
+      } else if (selectedPostId) {
+        // Se houver um posto específico selecionado (ex: modo edição)
+        const post = ativos.find(p => p.id === selectedPostId);
+        if (post) {
+          setFormData(prev => ({
+            ...prev,
+            workPostId: post.id,
+            workPostName: post.name
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar postos de trabalho do cliente:', error);
+      setClientWorkPosts([]);
+    } finally {
+      setWorkPostsLoading(false);
+    }
+  };
+
+  // Manipula mudança de cliente
+  const handleClienteChange = (clientId: string) => {
+    const clienteObj = clientes.find(c => c.id === clientId);
+    const nomeCliente = clienteObj?.name || '';
+
+    setFormData(prev => ({
+      ...prev,
+      clienteId: clientId,
+      cliente: nomeCliente,
+      workPostId: undefined, // Limpa o posto de trabalho anterior
+      workPostName: undefined
+    }));
+
+    if (clientId) {
+      carregarPostosDoCliente(clientId);
+    } else {
+      setClientWorkPosts([]);
+    }
+  };
+
+  // Efeito reativo para gerar a fatura automática
+  useEffect(() => {
+    if (autoInvoiceNumber && formData.clienteId && formData.cliente) {
+      gerarNumeroFaturaAutomatica(formData.clienteId, formData.cliente, formData.dataEmissao || new Date());
+    }
+  }, [autoInvoiceNumber, formData.clienteId, formData.cliente, formData.dataEmissao]);
+
+  // Efeito reativo para carregar postos de trabalho no carregamento e ao alterar o cliente
+  useEffect(() => {
+    if (open && formData.clienteId) {
+      // Se estiver editando e possuir workPostId inicial, passa para preservá-lo
+      carregarPostosDoCliente(formData.clienteId, formData.workPostId);
+    } else if (open && !formData.clienteId) {
+      setClientWorkPosts([]);
+    }
+  }, [open, formData.clienteId]);
 
   // Carregar dados quando o modal abrir
   useEffect(() => {
@@ -115,30 +276,17 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           ]);
         });
 
-      // Não precisamos mais carregar categorias via API, usando valores fixos do enum
-      // setCategories(['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER']);
-
-      // Carregar centros de custo
-      contasAReceberService.getCostCenters()
+      // Carregar boletins de medição (para vincular a Conta a Receber)
+      setMedicoesLoading(true);
+      measurementService.getBulletins()
         .then(data => {
-          const centrosArray = Array.isArray(data) ? data : [];
-          setCostCenters(centrosArray);
+          setMedicoes(Array.isArray(data) ? data : []);
         })
         .catch(error => {
-          console.error('Erro ao carregar centros de custo:', error);
-          setCostCenters([
-            'Administrativo',
-            'Operacional',
-            'Comercial',
-            'Financeiro',
-            'Recursos Humanos',
-            'Tecnologia da Informação',
-            'Marketing',
-            'Vendas',
-            'Produção',
-            'Logística'
-          ]);
-        });
+          console.error('Erro ao carregar boletins de medição:', error);
+          setMedicoes([]);
+        })
+        .finally(() => setMedicoesLoading(false));
     }
   }, [open]);
 
@@ -189,8 +337,11 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           dataPagamento: initialData.dataPagamento ? (initialData.dataPagamento instanceof Date ? initialData.dataPagamento : new Date(initialData.dataPagamento)) : undefined,
           observacoes: initialData.observacoes || '',
           categoria: categoriaMapeada,
-          centroCusto: initialData.centroCusto ? String(initialData.centroCusto).trim() : undefined,
-          paymentMethod: initialData.paymentMethod || 'PIX'
+          workPostId: initialData.workPostId || undefined,
+          workPostName: initialData.workPostName || undefined,
+          paymentMethod: initialData.paymentMethod || 'PIX',
+          measurementId: initialData.measurementId || undefined,
+          measurementNumber: initialData.measurementNumber || ''
         });
         
         console.log('✅ FormData preenchido:', {
@@ -203,17 +354,19 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           valor,
           vencimento,
           categoria: categoriaMapeada,
-          centroCusto: initialData.centroCusto,
+          workPostId: initialData.workPostId,
+          workPostName: initialData.workPostName,
           paymentMethod: initialData.paymentMethod
         });
         console.log('📋 initialData completo:', initialData);
-        console.log('📋 Campos de empresa e centro de custo:', {
+        console.log('📋 Campos de empresa e posto de trabalho:', {
           empresaId: initialData.empresaId,
           unitId: initialData.unitId,
           empresa: initialData.empresa,
           unitSigla: initialData.unitSigla,
           unitName: initialData.unitName,
-          centroCusto: initialData.centroCusto
+          workPostId: initialData.workPostId,
+          workPostName: initialData.workPostName
         });
       } else {
         // Resetar formulário para modo de criação
@@ -233,9 +386,13 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           dataPagamento: undefined,
           observacoes: '',
           categoria: undefined,
-          centroCusto: undefined,
-          paymentMethod: 'PIX'
+          workPostId: undefined,
+          workPostName: undefined,
+          paymentMethod: 'PIX',
+          measurementId: undefined,
+          measurementNumber: ''
         });
+        setAutoInvoiceNumber(false);
       }
     }
   }, [editMode, initialData, open]);
@@ -330,42 +487,8 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
           console.log('✅ Categoria atualizada:', catStr);
         }
       }
-      
-      // Atualizar centro de custo se disponível
-      if (initialData.centroCusto && costCenters.length > 0) {
-        const centroEncontrado = costCenters.find(c => 
-          c === initialData.centroCusto ||
-          c.toLowerCase() === String(initialData.centroCusto).toLowerCase()
-        );
-        if (centroEncontrado) {
-          setFormData(prev => ({
-            ...prev,
-            centroCusto: centroEncontrado
-          }));
-          console.log('✅ Centro de custo atualizado:', centroEncontrado);
-        } else {
-          console.log('⚠️ Centro de custo não encontrado na lista. Valor:', initialData.centroCusto, 'Lista:', costCenters);
-          // Mesmo que não esteja na lista, manter o valor se existir
-          if (initialData.centroCusto && String(initialData.centroCusto).trim()) {
-            setFormData(prev => ({
-              ...prev,
-              centroCusto: String(initialData.centroCusto).trim()
-            }));
-            console.log('✅ Centro de custo mantido (não está na lista):', initialData.centroCusto);
-          }
-        }
-      } else if (initialData.centroCusto && String(initialData.centroCusto).trim()) {
-        // Se não houver lista de centros de custo, mas houver valor, manter
-        setFormData(prev => ({
-          ...prev,
-          centroCusto: String(initialData.centroCusto).trim()
-        }));
-        console.log('✅ Centro de custo mantido (sem lista):', initialData.centroCusto);
-      } else {
-        console.log('⚠️ Nenhum centro de custo encontrado em initialData');
-      }
     }
-  }, [open, editMode, initialData, clientes, empresas, costCenters]);
+  }, [open, editMode, initialData, clientes, empresas]);
 
   const handleInputChange = (field: keyof ContaAReceber, value: any) => {
     setFormData(prev => ({
@@ -373,6 +496,55 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
       [field]: value
     }));
   };
+
+  // Texto exibido para um boletim no Select (contrato + período + NF)
+  const formatMedicaoLabel = (m: MeasurementBulletin): string => {
+    const partes: string[] = [];
+    if (m.contractNumber) partes.push(m.contractNumber);
+    else if (m.nfNumber) partes.push(`NF ${m.nfNumber}`);
+    else partes.push(`Medição ${String(m.id).substring(0, 8)}`);
+
+    if (m.periodStart && m.periodEnd) {
+      const fmt = (d: string) => {
+        try {
+          return new Date(d).toLocaleDateString('pt-BR');
+        } catch {
+          return d;
+        }
+      };
+      partes.push(`${fmt(m.periodStart)} a ${fmt(m.periodEnd)}`);
+    }
+    if (m.clientName) partes.push(m.clientName);
+    return partes.join(' — ');
+  };
+
+  // Quando muda a medição, derivamos automaticamente o measurementNumber (texto) caso esteja vazio.
+  const handleMedicaoChange = (medicaoId: string) => {
+    if (medicaoId === 'NENHUMA') {
+      setFormData(prev => ({ ...prev, measurementId: undefined, measurementNumber: '' }));
+      return;
+    }
+    const m = medicoes.find(x => String(x.id) === medicaoId);
+    if (!m) {
+      setFormData(prev => ({ ...prev, measurementId: medicaoId }));
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      measurementId: medicaoId,
+      // Preenche o texto sugerido — usuário pode sobrescrever
+      measurementNumber: m.nfNumber || m.contractNumber || prev.measurementNumber || ''
+    }));
+  };
+
+  // Filtra medições do cliente selecionado (se houver) — não esconde as demais, apenas lista as "do cliente" primeiro
+  const medicoesOrdenadas = useMemo(() => {
+    if (!formData.clienteId) return medicoes;
+    const clienteIdStr = String(formData.clienteId);
+    const doCliente = medicoes.filter(m => String(m.clientId ?? m.client?.id ?? '') === clienteIdStr);
+    const outras = medicoes.filter(m => String(m.clientId ?? m.client?.id ?? '') !== clienteIdStr);
+    return [...doCliente, ...outras];
+  }, [medicoes, formData.clienteId]);
 
   const handleCreateCategory = () => {
     const categoryName = newCategoryName.trim();
@@ -435,7 +607,10 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white">
+      <DialogContent 
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        className="max-w-4xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white"
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-green-500 flex items-center gap-2">
             <Plus size={20} />
@@ -456,15 +631,26 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Número da Fatura */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
-                  <FileText size={14} />
-                  Número da Fatura
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                    <FileText size={14} />
+                    Número da Fatura
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-seguranca-lightgray font-semibold">Automática</span>
+                    <Switch
+                      checked={autoInvoiceNumber}
+                      onCheckedChange={setAutoInvoiceNumber}
+                      className="data-[state=checked]:bg-seguranca-yellow data-[state=unchecked]:bg-gray-600"
+                    />
+                  </div>
+                </div>
                 <Input
                   value={formData.numeroFatura}
                   onChange={(e) => handleInputChange('numeroFatura', e.target.value)}
-                  placeholder="Ex: FAT-2024-001"
-                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                  placeholder={autoInvoiceNumber ? "Gerando número automaticamente..." : "Ex: FAT-2024-001"}
+                  disabled={autoInvoiceNumber}
+                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -499,13 +685,10 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   Data de Emissão *
                 </label>
                 <DatePicker
-                  selected={formData.dataEmissao}
-                  onChange={(date: Date | null) => handleInputChange('dataEmissao', date)}
-                  dateFormat="dd/MM/yyyy"
-                  locale={ptBR}
-                  placeholderText="dd/mm/aaaa"
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white [&_input]:placeholder-gray-500"
-                  required
+                  date={formData.dataEmissao}
+                  onDateChange={(date) => handleInputChange('dataEmissao', date)}
+                  placeholder="dd/mm/aaaa"
+                  className="w-full"
                 />
               </div>
 
@@ -516,14 +699,91 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   Data de Vencimento *
                 </label>
                 <DatePicker
-                  selected={formData.vencimento}
-                  onChange={(date: Date | null) => handleInputChange('vencimento', date)}
-                  dateFormat="dd/MM/yyyy"
-                  locale={ptBR}
-                  placeholderText="dd/mm/aaaa"
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-white text-black font-medium [&_input]:text-black [&_input]:bg-white [&_input]:placeholder-gray-500"
-                  required
+                  date={formData.vencimento}
+                  onDateChange={(date) => handleInputChange('vencimento', date)}
+                  placeholder="dd/mm/aaaa"
+                  className="w-full"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Medição vinculada (opcional) */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-seguranca-yellow flex items-center gap-2">
+              <Ruler size={18} />
+              Medição Vinculada
+              <span className="text-xs font-normal text-seguranca-lightgray ml-2">(opcional)</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Boletim de Medição */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <Ruler size={14} />
+                  Boletim de Medição
+                </label>
+                <Select
+                  value={formData.measurementId ? String(formData.measurementId) : 'NENHUMA'}
+                  onValueChange={handleMedicaoChange}
+                  disabled={medicoesLoading}
+                >
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue
+                      placeholder={
+                        medicoesLoading
+                          ? 'Carregando medições...'
+                          : 'Selecione um boletim de medição'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600 max-h-72">
+                    <SelectItem
+                      value="NENHUMA"
+                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                    >
+                      Nenhum (sem vínculo)
+                    </SelectItem>
+                    {medicoesOrdenadas.length === 0 && !medicoesLoading && (
+                      <SelectItem
+                        value="__empty__"
+                        disabled
+                        className="text-gray-500"
+                      >
+                        Nenhuma medição cadastrada
+                      </SelectItem>
+                    )}
+                    {medicoesOrdenadas.map(m => (
+                      <SelectItem
+                        key={String(m.id)}
+                        value={String(m.id)}
+                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
+                      >
+                        {formatMedicaoLabel(m)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-seguranca-lightgray">
+                  Selecione o boletim de medição que originou esta conta. Aparece na coluna
+                  "Medição" da listagem.
+                </p>
+              </div>
+
+              {/* Número/identificação da medição (texto livre — preenchido automaticamente quando há vínculo) */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <FileText size={14} />
+                  Número da Medição
+                </label>
+                <Input
+                  value={formData.measurementNumber || ''}
+                  onChange={(e) => handleInputChange('measurementNumber', e.target.value)}
+                  placeholder="Ex.: NF-27917 ou CTC-CBM 148/295/2025"
+                  className="border-gray-600 bg-white text-black placeholder:text-gray-500 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                />
+                <p className="text-xs text-seguranca-lightgray">
+                  Texto livre para casos em que não há um boletim cadastrado.
+                </p>
               </div>
             </div>
           </div>
@@ -541,32 +801,12 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                   <Users size={14} />
                   Cliente *
                 </label>
-                <Select
-                  value={formData.clienteId}
-                  onValueChange={(value) => {
-                    const cliente = clientes.find(c => c.id === value);
-                    handleInputChange('clienteId', value);
-                    handleInputChange('cliente', cliente?.name || '');
-                  }}
-                  required
-                >
-                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                    <SelectValue placeholder="Selecione um cliente" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {clientes && Array.isArray(clientes) ? clientes
-                      .filter(cliente => cliente && cliente.id && cliente.name)
-                      .map((cliente) => (
-                        <SelectItem
-                          key={cliente.id}
-                          value={cliente.id}
-                          className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                        >
-                          {cliente.name}
-                        </SelectItem>
-                      )) : null}
-                  </SelectContent>
-                </Select>
+                <ClientSearchCombobox
+                  value={formData.clienteId || ''}
+                  onChange={handleClienteChange}
+                  initialDisplayName={formData.cliente}
+                  className="w-full bg-white text-black border-gray-600 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                />
               </div>
 
               {/* Empresa */}
@@ -605,6 +845,83 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     )}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Posto de Trabalho */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
+                  <MapPin size={14} />
+                  Posto de Trabalho
+                </label>
+                <Select
+                  value={formData.workPostId || 'NENHUM'}
+                  onValueChange={(value) => {
+                    if (value === 'NENHUM') {
+                      setFormData(prev => ({ ...prev, workPostId: undefined, workPostName: undefined }));
+                    } else {
+                      const post = clientWorkPosts.find(p => p.id === value);
+                      setFormData(prev => ({
+                        ...prev,
+                        workPostId: value,
+                        workPostName: post?.name || undefined
+                      }));
+                    }
+                  }}
+                  disabled={workPostsLoading || !formData.clienteId}
+                >
+                  <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                    <SelectValue placeholder={
+                      !formData.clienteId 
+                        ? "Selecione um cliente primeiro" 
+                        : workPostsLoading 
+                          ? "Carregando postos..." 
+                          : "Selecione um posto de trabalho"
+                    }>
+                      {formData.workPostName || 'Nenhum posto de trabalho'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value="NENHUM" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Nenhum posto de trabalho</SelectItem>
+                    {clientWorkPosts.map((post) => (
+                      <SelectItem key={post.id} value={post.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                        {post.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Quick Tags de clique único */}
+                {clientWorkPosts.length > 1 && (
+                  <div className="mt-2 space-y-1">
+                    <span className="text-xs font-semibold text-seguranca-yellow">Seleção Rápida de Posto:</span>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {clientWorkPosts.map((post) => {
+                        const isSelected = formData.workPostId === post.id;
+                        return (
+                          <button
+                            key={post.id}
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                workPostId: post.id,
+                                workPostName: post.name
+                              }));
+                            }}
+                            className={cn(
+                              "text-xs px-3 py-1.5 rounded-full border transition-all duration-200 shadow-sm",
+                              isSelected 
+                                ? "bg-seguranca-yellow border-seguranca-yellow text-seguranca-black font-semibold"
+                                : "bg-seguranca-graphite border-gray-600 text-seguranca-lightgray hover:border-seguranca-yellow hover:text-white"
+                            )}
+                          >
+                            {post.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -673,7 +990,7 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
               <Tag size={18} />
               Classificação
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
               {/* Categoria */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
@@ -710,7 +1027,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                       >
                         Nenhuma categoria
                       </SelectItem>
-                      {/* Categorias padrão do enum */}
                       {[
                         { value: 'INVOICE', label: 'Fatura' },
                         { value: 'NOTE', label: 'Nota Fiscal' },
@@ -727,7 +1043,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                           {cat.label}
                         </SelectItem>
                       ))}
-                      {/* Categorias customizadas */}
                       {categories.filter(cat => !['INVOICE', 'NOTE', 'ADVANCE', 'SERVICE', 'PRODUCT', 'OTHER'].includes(cat)).map((category) => (
                         <SelectItem 
                           key={category} 
@@ -749,18 +1064,6 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     <Plus size={16} />
                   </Button>
                 </div>
-                {categories.length === 0 && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    Nenhuma categoria cadastrada.{' '}
-                    <button 
-                      type="button" 
-                      className="text-seguranca-yellow underline hover:text-seguranca-yellow/80"
-                      onClick={() => setNewCategoryModalOpen(true)}
-                    >
-                      Cadastrar categoria
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Forma de Pagamento */}
@@ -778,56 +1081,34 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
                     <SelectValue placeholder="Selecione a forma de pagamento" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem value="PIX" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      PIX
-                    </SelectItem>
-                    <SelectItem value="BOLETO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Boleto
-                    </SelectItem>
-                    <SelectItem value="TRANSFER" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Transferência
-                    </SelectItem>
-                    <SelectItem value="CASH" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Dinheiro
-                    </SelectItem>
-                    <SelectItem value="CARD" className="text-seguranca-lightgray hover:bg-seguranca-graphite">
-                      Cartão
-                    </SelectItem>
+                    <SelectItem value="PIX" className="text-seguranca-lightgray hover:bg-seguranca-graphite">PIX</SelectItem>
+                    <SelectItem value="BOLETO" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Boleto</SelectItem>
+                    <SelectItem value="TRANSFER" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Transferência</SelectItem>
+                    <SelectItem value="CASH" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Dinheiro</SelectItem>
+                    <SelectItem value="CARD" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cartão</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Centro de Custo */}
+              {/* Status */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray flex items-center gap-2">
                   <Tag size={14} />
-                  Centro de Custo
+                  Status *
                 </label>
                 <Select
-                  value={formData.centroCusto && formData.centroCusto !== 'NENHUM' ? formData.centroCusto : 'NENHUM'}
-                  onValueChange={(value) => handleInputChange('centroCusto', value === 'NENHUM' ? undefined : value)}
+                  value={formData.status}
+                  onValueChange={(value: any) => handleInputChange('status', value)}
+                  required
                 >
                   <SelectTrigger className="border-gray-600 bg-white text-black focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                    <SelectValue placeholder="Selecione um centro de custo">
-                      {formData.centroCusto && formData.centroCusto !== 'NENHUM' ? formData.centroCusto : 'Nenhum centro de custo'}
-                    </SelectValue>
+                    <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-black border-gray-600">
-                    <SelectItem
-                      value="NENHUM"
-                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                    >
-                      Nenhum centro de custo
-                    </SelectItem>
-                    {costCenters.map((center) => (
-                      <SelectItem
-                        key={center}
-                        value={center}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {center}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="ABERTA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pendente / Aberta</SelectItem>
+                    <SelectItem value="RECEBIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Pago / Recebida</SelectItem>
+                    <SelectItem value="VENCIDA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Vencido</SelectItem>
+                    <SelectItem value="CANCELADA" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -891,7 +1172,10 @@ export const ContasAReceberFormModal: React.FC<ContasAReceberFormModalProps> = (
 
         {/* Modal de Nova Categoria */}
         <Dialog open={newCategoryModalOpen} onOpenChange={setNewCategoryModalOpen}>
-          <DialogContent className="sm:max-w-[400px] bg-seguranca-graphite border-gray-600 text-white">
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="sm:max-w-[400px] bg-seguranca-graphite border-gray-600 text-white"
+          >
             <DialogHeader>
               <DialogTitle className="text-seguranca-yellow">Nova Categoria</DialogTitle>
               <DialogDescription className="text-gray-300">

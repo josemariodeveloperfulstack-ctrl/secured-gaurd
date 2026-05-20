@@ -67,6 +67,16 @@ export const quoteService = {
   async deleteQuote(id: number | string): Promise<void> {
     await api.delete(`/api/quotes/${id}`);
   },
+  
+  // Excluir orçamentos em massa
+  async deleteQuotesBulk(ids: (number | string)[]): Promise<void> {
+    await api.delete('/api/quotes/bulk', { data: ids });
+  },
+  
+  // Excluir todos os orçamentos
+  async deleteAllQuotes(): Promise<void> {
+    await api.delete('/api/quotes/all');
+  },
 
   // Buscar orçamentos por cliente
   async getQuotesByClient(clientId: number): Promise<Quote[]> {

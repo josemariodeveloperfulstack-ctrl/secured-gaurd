@@ -140,17 +140,23 @@ public class BankReconciliationService {
     public void deleteBankFile(UUID id) {
         log.info("Removendo arquivo bancário: {}", id);
         
-        BankFile file = bankFileRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Arquivo bancário não encontrado com ID: " + id));
+        if (!bankFileRepository.existsById(id)) {
+            log.warn("Arquivo bancário com ID {} não existe. Ignorando exclusão (idempotente).", id);
+            return;
+        }
         
-        // Remover transações associadas
-        List<BankTransaction> transactions = bankTransactionRepository.findByBankFileId(id);
-        bankTransactionRepository.deleteAll(transactions);
-        
-        // Remover arquivo
-        bankFileRepository.delete(file);
-        
-        log.info("Arquivo bancário removido com sucesso: {}", id);
+        BankFile file = bankFileRepository.findById(id).orElse(null);
+        if (file != null) {
+            // Remover transações associadas
+            List<BankTransaction> transactions = bankTransactionRepository.findByBankFileId(id);
+            if (transactions != null && !transactions.isEmpty()) {
+                bankTransactionRepository.deleteAll(transactions);
+            }
+            
+            // Remover arquivo
+            bankFileRepository.delete(file);
+            log.info("Arquivo bancário removido com sucesso: {}", id);
+        }
     }
     
     // ===== BANK TRANSACTIONS =====

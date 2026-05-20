@@ -2,8 +2,10 @@ package com.z7design.secured_guard.worker;
 
 import com.z7design.secured_guard.model.UnifiedDocument;
 import com.z7design.secured_guard.repository.UnifiedDocumentRepository;
+import com.z7design.secured_guard.service.RedisAvailabilityProbe;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
@@ -25,6 +27,7 @@ public class IndexerWorker {
     
     private final StringRedisTemplate redisTemplate;
     private final UnifiedDocumentRepository unifiedDocumentRepository;
+    private final RedisAvailabilityProbe redisAvailabilityProbe;
     
     private static final String STREAM_MERGED = "stream:merged";
     private static final String CONSUMER_GROUP = "indexer-group";
@@ -37,6 +40,8 @@ public class IndexerWorker {
     public void init() {
         try {
             redisTemplate.opsForStream().createGroup(STREAM_MERGED, ReadOffset.from("0"), CONSUMER_GROUP);
+        } catch (RedisConnectionFailureException e) {
+            log.warn("IndexerWorker: Redis indisponível na inicialização - consumer group será criado quando o Redis voltar");
         } catch (Exception e) {
             log.debug("Consumer group já existe ou erro ao criar: {}", e.getMessage());
         }
@@ -45,6 +50,9 @@ public class IndexerWorker {
     
     @Scheduled(fixedDelay = 1000) // Processa a cada 1 segundo
     public void processMergedDocuments() {
+        if (!redisAvailabilityProbe.isAvailable()) {
+            return;
+        }
         try {
             @SuppressWarnings("unchecked")
             List<MapRecord<String, String, String>> records = (List<MapRecord<String, String, String>>) (List<?>) redisTemplate.opsForStream().read(
@@ -66,6 +74,8 @@ public class IndexerWorker {
                     log.error("Erro ao processar documento no IndexerWorker", e);
                 }
             }
+        } catch (RedisConnectionFailureException e) {
+            log.warn("IndexerWorker: Redis indisponível - {}", e.getMessage());
         } catch (Exception e) {
             log.error("Erro no IndexerWorker", e);
         }

@@ -35,6 +35,9 @@ import { measurementService } from '@/services/measurementService';
 import { BulkDeleteDialog } from './BulkDeleteDialog';
 
 interface MeasurementSimpleTableProps {
+  bulletins: MeasurementBulletin[];
+  loading?: boolean;
+  onRefresh?: () => void;
   onView: (bulletin: MeasurementBulletin) => void;
   onEdit: (bulletin: MeasurementBulletin) => void;
   onDelete: (bulletin: MeasurementBulletin) => void;
@@ -43,6 +46,9 @@ interface MeasurementSimpleTableProps {
 }
 
 const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
+  bulletins: externalBulletins,
+  loading: externalLoading = false,
+  onRefresh,
   onView,
   onEdit,
   onDelete,
@@ -50,11 +56,12 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
   onValidate
 }) => {
   const { toast } = useToast();
-  const [bulletins, setBulletins] = useState<MeasurementBulletin[]>([]);
+  // bulletins e loading removidos daqui para usar props
   
   // Garantir que bulletins seja sempre um array
-  const safeBulletins = Array.isArray(bulletins) ? bulletins : [];
-  const [loading, setLoading] = useState(true);
+  const safeBulletins = Array.isArray(externalBulletins) ? externalBulletins : [];
+  const [internalLoading, setInternalLoading] = useState(false);
+  const loading = externalLoading || internalLoading;
   const [filters, setFilters] = useState<MeasurementFilters>({});
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -114,39 +121,11 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
     }).format(value);
   };
 
-  const loadBulletins = async () => {
-    try {
-      setLoading(true);
-      const data = await measurementService.getBulletins({
-        ...filters,
-        searchTerm: searchTerm || undefined
-      });
-      setBulletins(Array.isArray(data) ? data : []);
-      
-      // Se não há dados mas não houve erro, é normal
-      if (data.length === 0) {
-        console.log('Nenhum boletim de medição encontrado');
-      }
-    } catch (error) {
-      console.error('Erro ao carregar boletins:', error);
-      // Só mostrar toast se for um erro real, não se for lista vazia
-      if (error instanceof Error && error.message !== 'Falha ao buscar boletins de medição') {
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar os boletins de medição.',
-          variant: 'destructive'
-        });
-      }
-      // Em caso de erro, definir lista vazia
-      setBulletins([]);
-    } finally {
-      setLoading(false);
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      onRefresh();
     }
   };
-
-  useEffect(() => {
-    loadBulletins();
-  }, [filters, searchTerm]);
 
   // Função helper para determinar se uma medição é simplificada
   const isSimplifiedMeasurement = (bulletin: MeasurementBulletin): boolean => {
@@ -194,22 +173,6 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
   
   console.log(`📊 Total de boletins: ${safeBulletins.length}, Simplificados: ${filteredBulletins.length}`);
 
-  const handleRefresh = async () => {
-    try {
-      await loadBulletins();
-      toast({
-        title: 'Sucesso!',
-        description: 'Lista de boletins atualizada.',
-      });
-    } catch (error) {
-      toast({
-        title: 'Erro!',
-        description: 'Erro ao atualizar lista de boletins.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleFilterChange = (field: keyof MeasurementFilters, value: string) => {
     setFilters(prev => ({
       ...prev,
@@ -245,6 +208,39 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
   const handleBulkDelete = () => {
     if (selectedBulletins.size === 0) return;
     setShowBulkDeleteDialog(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedBulletins.size === 0) return;
+    
+    setInternalLoading(true);
+    try {
+      const deletePromises = Array.from(selectedBulletins).map((id) =>
+        measurementService.deleteBulletin(id)
+      );
+      
+      await Promise.all(deletePromises);
+      
+      toast({
+        title: "Sucesso",
+        description: `${selectedBulletins.size} boletim(ns) excluído(s) com sucesso.`,
+      });
+      
+      setSelectedBulletins(new Set());
+      setIsAllSelected(false);
+      setShowBulkDeleteDialog(false);
+      
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error('Erro ao excluir boletins:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir alguns boletins. Eles podem já ter sido excluídos ou estarem vinculados a outros registros.",
+        variant: "destructive"
+      });
+    } finally {
+      setInternalLoading(false);
+    }
   };
 
   // Funções de exportação
@@ -318,39 +314,6 @@ const MeasurementSimpleTable: React.FC<MeasurementSimpleTableProps> = ({
         description: "Erro ao gerar Excel. Tente novamente.",
         variant: "destructive",
       });
-    }
-  };
-
-  const confirmBulkDelete = async () => {
-    try {
-      setLoading(true);
-      const deletePromises = Array.from(selectedBulletins).map(id => 
-        measurementService.deleteBulletin(id)
-      );
-      
-      await Promise.all(deletePromises);
-      
-      toast({
-        title: "Sucesso",
-        description: `${selectedBulletins.size} boletim(ns) excluído(s) com sucesso.`,
-        variant: "default"
-      });
-      
-      // Limpar seleção e recarregar dados
-      setSelectedBulletins(new Set());
-      setIsAllSelected(false);
-      setShowBulkDeleteDialog(false);
-      loadBulletins();
-      
-    } catch (error) {
-      console.error('Erro ao excluir boletins:', error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir alguns boletins. Tente novamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
     }
   };
 

@@ -9,6 +9,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.stream.Collectors;
+import java.time.temporal.ChronoUnit;
 
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
@@ -17,7 +19,18 @@ import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.EquipmentRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.repository.EquipmentMovementRepository;
+import com.z7design.secured_guard.repository.WorkPostRepository;
+import com.z7design.secured_guard.repository.TransportGuideRepository;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Equipment;
+import com.z7design.secured_guard.model.enums.EquipmentType;
+import com.z7design.secured_guard.model.enums.EquipmentStatus;
+import com.z7design.secured_guard.model.EquipmentMovement;
+import com.z7design.secured_guard.model.TransportGuide;
+import com.z7design.secured_guard.model.enums.TransportGuideStatus;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 
 @Service
@@ -27,6 +40,11 @@ public class EquipmentReportService {
 
     private final StandardReportLayoutService layoutService;
     private final CompanyRepository companyRepository;
+    private final EquipmentRepository equipmentRepository;
+    private final EmployeeRepository employeeRepository;
+    private final EquipmentMovementRepository equipmentMovementRepository;
+    private final WorkPostRepository workPostRepository;
+    private final TransportGuideRepository transportGuideRepository;
 
     public List<Map<String, Object>> generateEquipmentByEmployeeReport(
             LocalDate startDate, LocalDate endDate, String status, String equipmentType) {
@@ -36,48 +54,229 @@ public class EquipmentReportService {
         List<Map<String, Object>> report = new ArrayList<>();
 
         try {
-            // Por enquanto, usar dados de exemplo realistas baseados no banco
-            // TODO: Implementar queries específicas quando necessário
+            // Buscar todos os equipamentos atribuídos a funcionários (currentUserId != null)
+            List<Equipment> allEquipments = equipmentRepository.findAll();
+            
+            List<Equipment> assignedEquipments = allEquipments.stream()
+                    .filter(e -> e.getCurrentUserId() != null)
+                    .collect(Collectors.toList());
 
-            report.add(Map.of(
-                    "employeeId", "emp-001",
-                    "employeeName", "GIDELVAN SILVA",
-                    "totalEquipment", 5,
-                    "activeEquipment", 4,
-                    "inactiveEquipment", 1,
-                    "equipmentDetails", List.of(
-                            Map.of(
-                                    "equipmentId", "eq-001",
-                                    "equipmentName", "Pistola Glock 17",
-                                    "serialNumber", "GL001234",
-                                    "status", "ATIVO",
-                                    "assignedDate", "2025-01-15",
-                                    "lastMovement", "2025-01-20"),
-                            Map.of(
-                                    "equipmentId", "eq-002",
-                                    "equipmentName", "Uniforme Completo",
-                                    "serialNumber", "UN001234",
-                                    "status", "ATIVO",
-                                    "assignedDate", "2025-01-10",
-                                    "lastMovement", "2025-01-18"))));
+            // Filtrar por status se fornecido
+            if (status != null && !status.trim().isEmpty()) {
+                try {
+                    EquipmentStatus eqStatus = EquipmentStatus.valueOf(status.trim().toUpperCase());
+                    assignedEquipments = assignedEquipments.stream()
+                            .filter(e -> e.getStatus() == eqStatus)
+                            .collect(Collectors.toList());
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Status de equipamento inválido para filtro no relatório: {}", status);
+                }
+            }
 
-            report.add(Map.of(
-                    "employeeId", "emp-002",
-                    "employeeName", "ALEX SANTOS",
-                    "totalEquipment", 3,
-                    "activeEquipment", 3,
-                    "inactiveEquipment", 0,
-                    "equipmentDetails", List.of(
-                            Map.of(
-                                    "equipmentId", "eq-003",
-                                    "equipmentName", "Rádio Motorola",
-                                    "serialNumber", "RD001234",
-                                    "status", "ATIVO",
-                                    "assignedDate", "2025-01-12",
-                                    "lastMovement", "2025-01-19"))));
+            // Filtrar por tipo se fornecido
+            if (equipmentType != null && !equipmentType.trim().isEmpty()) {
+                try {
+                    EquipmentType eqType = EquipmentType.valueOf(equipmentType.trim().toUpperCase());
+                    assignedEquipments = assignedEquipments.stream()
+                            .filter(e -> e.getType() == eqType)
+                            .collect(Collectors.toList());
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Tipo de equipamento inválido para filtro no relatório: {}", equipmentType);
+                }
+            }
+
+            // Agrupar os equipamentos por currentUserId
+            Map<UUID, List<Equipment>> equipmentsByEmployee = assignedEquipments.stream()
+                    .collect(Collectors.groupingBy(Equipment::getCurrentUserId));
+
+            for (Map.Entry<UUID, List<Equipment>> entry : equipmentsByEmployee.entrySet()) {
+                UUID employeeId = entry.getKey();
+                List<Equipment> empEquipments = entry.getValue();
+
+                String employeeName = employeeRepository.findNameById(employeeId).orElse("Funcionário " + employeeId);
+
+                long total = empEquipments.size();
+                long active = empEquipments.stream()
+                        .filter(e -> e.getStatus() == EquipmentStatus.EM_USO || e.getStatus() == EquipmentStatus.EM_ESTOQUE)
+                        .count();
+                long inactive = total - active;
+
+                List<Map<String, Object>> details = new ArrayList<>();
+                for (Equipment e : empEquipments) {
+                    var lastMovOpt = equipmentMovementRepository.findByEquipmentIdOrderByMovementDateDesc(e.getId()).stream().findFirst();
+                    String lastMovDateStr = lastMovOpt
+                            .map(m -> m.getMovementDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                            .orElse("");
+
+                    details.add(Map.of(
+                            "equipmentId", e.getId().toString(),
+                            "equipmentName", e.getType().getDescription() + " " + (e.getModel() != null ? e.getModel() : ""),
+                            "serialNumber", e.getSerialNumber() != null ? e.getSerialNumber() : "N/A",
+                            "status", e.getStatus().name(),
+                            "assignedDate", e.getCreatedAt() != null ? e.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) : "",
+                            "lastMovement", lastMovDateStr
+                    ));
+                }
+
+                Map<String, Object> empData = new HashMap<>();
+                empData.put("employeeId", employeeId.toString());
+                empData.put("employeeName", employeeName);
+                empData.put("totalEquipment", total);
+                empData.put("activeEquipment", active);
+                empData.put("inactiveEquipment", inactive);
+                empData.put("equipmentDetails", details);
+
+                report.add(empData);
+            }
+
+            report.sort(Comparator.comparing(r -> ((String) r.get("employeeName")).toUpperCase()));
 
         } catch (Exception e) {
             log.error("Erro ao gerar relatório de equipamentos por funcionário", e);
+        }
+
+        return report;
+    }
+
+    public List<Map<String, Object>> generateEquipmentByWorkPostReport(
+            LocalDate startDate, LocalDate endDate, String status, String equipmentType) {
+
+        log.info("Gerando relatório de equipamentos por posto de trabalho");
+
+        List<Map<String, Object>> report = new ArrayList<>();
+
+        try {
+            // Buscar todos os equipamentos atribuídos a postos de trabalho (workPostId != null)
+            List<Equipment> allEquipments = equipmentRepository.findAll();
+            
+            List<Equipment> workPostEquipments = allEquipments.stream()
+                    .filter(e -> e.getWorkPostId() != null)
+                    .collect(Collectors.toList());
+
+            // Filtrar por status se fornecido
+            if (status != null && !status.trim().isEmpty()) {
+                try {
+                    EquipmentStatus eqStatus = EquipmentStatus.valueOf(status.trim().toUpperCase());
+                    workPostEquipments = workPostEquipments.stream()
+                            .filter(e -> e.getStatus() == eqStatus)
+                            .collect(Collectors.toList());
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Status de equipamento inválido para filtro no relatório por posto: {}", status);
+                }
+            }
+
+            // Filtrar por tipo se fornecido
+            if (equipmentType != null && !equipmentType.trim().isEmpty()) {
+                try {
+                    EquipmentType eqType = EquipmentType.valueOf(equipmentType.trim().toUpperCase());
+                    workPostEquipments = workPostEquipments.stream()
+                            .filter(e -> e.getType() == eqType)
+                            .collect(Collectors.toList());
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Tipo de equipamento inválido para filtro no relatório por posto: {}", equipmentType);
+                }
+            }
+
+            // Agrupar os equipamentos por workPostId
+            Map<UUID, List<Equipment>> equipmentsByWorkPost = workPostEquipments.stream()
+                    .collect(Collectors.groupingBy(Equipment::getWorkPostId));
+
+            for (Map.Entry<UUID, List<Equipment>> entry : equipmentsByWorkPost.entrySet()) {
+                UUID workPostId = entry.getKey();
+                List<Equipment> postEquipments = entry.getValue();
+
+                String workPostName = workPostRepository.findNameById(workPostId).orElse("Posto de Trabalho " + workPostId);
+
+                long total = postEquipments.size();
+                long active = postEquipments.stream()
+                        .filter(e -> e.getStatus() == EquipmentStatus.EM_USO || e.getStatus() == EquipmentStatus.EM_ESTOQUE)
+                        .count();
+                long inactive = total - active;
+
+                List<Map<String, Object>> details = new ArrayList<>();
+                for (Equipment e : postEquipments) {
+                    var lastMovOpt = equipmentMovementRepository.findByEquipmentIdOrderByMovementDateDesc(e.getId()).stream().findFirst();
+                    String lastMovDateStr = lastMovOpt
+                            .map(m -> m.getMovementDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                            .orElse("");
+
+                    details.add(Map.of(
+                            "equipmentId", e.getId().toString(),
+                            "equipmentName", e.getType().getDescription() + " " + (e.getModel() != null ? e.getModel() : ""),
+                            "serialNumber", e.getSerialNumber() != null ? e.getSerialNumber() : "N/A",
+                            "status", e.getStatus().name(),
+                            "assignedDate", e.getCreatedAt() != null ? e.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) : "",
+                            "lastMovement", lastMovDateStr
+                    ));
+                }
+
+                Map<String, Object> postData = new HashMap<>();
+                postData.put("workPostId", workPostId.toString());
+                postData.put("workPostName", workPostName);
+                postData.put("totalEquipment", total);
+                postData.put("activeEquipment", active);
+                postData.put("inactiveEquipment", inactive);
+                postData.put("equipmentDetails", details);
+
+                report.add(postData);
+            }
+
+            report.sort(Comparator.comparing(r -> ((String) r.get("workPostName")).toUpperCase()));
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de equipamentos por posto de trabalho", e);
+        }
+
+        return report;
+    }
+
+    public List<Map<String, Object>> generateWeaponsInTransitReport(LocalDate startDate, LocalDate endDate) {
+        log.info("Gerando relatório de armas em trâmite de transporte");
+
+        List<Map<String, Object>> report = new ArrayList<>();
+
+        try {
+            List<TransportGuide> guides = transportGuideRepository.findAll();
+
+            // Filtrar apenas guias ativas em transporte (SUBMITTED, APPROVED, IN_TRANSIT)
+            List<TransportGuide> activeGuides = guides.stream()
+                    .filter(g -> g.getStatus() == TransportGuideStatus.SUBMITTED ||
+                                 g.getStatus() == TransportGuideStatus.APPROVED ||
+                                 g.getStatus() == TransportGuideStatus.IN_TRANSIT)
+                    .collect(Collectors.toList());
+
+            if (startDate != null && endDate != null) {
+                activeGuides = activeGuides.stream()
+                        .filter(g -> g.getCreatedAt() != null &&
+                                !g.getCreatedAt().toLocalDate().isBefore(startDate) &&
+                                !g.getCreatedAt().toLocalDate().isAfter(endDate))
+                        .collect(Collectors.toList());
+            }
+
+            for (TransportGuide g : activeGuides) {
+                Map<String, Object> guideData = new HashMap<>();
+                guideData.put("id", g.getId());
+                guideData.put("cnpj", g.getCnpj() != null ? g.getCnpj() : "");
+                guideData.put("empresa", g.getEmpresa() != null ? g.getEmpresa() : "");
+                guideData.put("numeroArma", g.getNumeroArma() != null ? g.getNumeroArma() : "N/A");
+                guideData.put("numeroColete", g.getNumeroColete() != null ? g.getNumeroColete() : "");
+                guideData.put("calibre", g.getCalibre() != null ? g.getCalibre() : "");
+                guideData.put("qtdMunicoes", g.getQtdMunicoes() != null ? g.getQtdMunicoes() : 0);
+                guideData.put("origem", g.getOrigem() != null ? g.getOrigem() : "");
+                guideData.put("destino", g.getDestino() != null ? g.getDestino() : "");
+                guideData.put("trajeto", g.getTrajeto() != null ? g.getTrajeto() : "");
+                guideData.put("motivo", g.getMotivo() != null ? g.getMotivo() : "");
+                guideData.put("status", g.getStatus() != null ? g.getStatus().name() : "");
+                guideData.put("createdBy", g.getCreatedBy() != null ? g.getCreatedBy() : "");
+                guideData.put("createdAt", g.getCreatedAt() != null ? g.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "");
+
+                report.add(guideData);
+            }
+
+            report.sort((r1, r2) -> ((String) r2.get("createdAt")).compareTo((String) r1.get("createdAt")));
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de armas em trâmite de transporte", e);
         }
 
         return report;
@@ -88,27 +287,74 @@ public class EquipmentReportService {
 
         List<Map<String, Object>> report = new ArrayList<>();
 
-        report.add(Map.of(
-                "weaponId", "wp-001",
-                "weaponName", "Pistola Glock 17",
-                "serialNumber", "GL001234",
-                "registrationNumber", "REG001234",
-                "validityDate", "2025-12-31",
-                "daysToExpire", 73,
-                "status", "VÁLIDA",
-                "owner", "GIDELVAN SILVA",
-                "lastInspection", "2025-01-15"));
+        try {
+            List<Equipment> allEquipments = equipmentRepository.findAll();
+            List<Equipment> weapons = allEquipments.stream()
+                    .filter(e -> e.getType() == EquipmentType.ARMA)
+                    .collect(Collectors.toList());
 
-        report.add(Map.of(
-                "weaponId", "wp-002",
-                "weaponName", "Pistola Taurus PT92",
-                "serialNumber", "TA001234",
-                "registrationNumber", "REG001235",
-                "validityDate", "2025-03-15",
-                "daysToExpire", 16,
-                "status", "VENCENDO",
-                "owner", "ALEX SANTOS",
-                "lastInspection", "2025-01-10"));
+            if (startDate != null && endDate != null) {
+                weapons = weapons.stream()
+                        .filter(w -> w.getWeaponRegistrationValidity() != null &&
+                                !w.getWeaponRegistrationValidity().isBefore(startDate) &&
+                                !w.getWeaponRegistrationValidity().isAfter(endDate))
+                        .collect(Collectors.toList());
+            }
+
+            for (Equipment w : weapons) {
+                String owner = "No Cofre (Empresa)";
+                if (w.getCurrentUserId() != null) {
+                    owner = employeeRepository.findNameById(w.getCurrentUserId()).orElse("Funcionário " + w.getCurrentUserId());
+                } else if (w.getWorkPostId() != null) {
+                    owner = workPostRepository.findNameById(w.getWorkPostId()).orElse("Posto de Trabalho");
+                }
+
+                long daysToExpire = 0;
+                String statusStr = "SEM REGISTRO";
+                if (w.getWeaponRegistrationValidity() != null) {
+                    daysToExpire = ChronoUnit.DAYS.between(LocalDate.now(), w.getWeaponRegistrationValidity());
+                    if (daysToExpire < 0) {
+                        statusStr = "VENCIDO";
+                    } else if (daysToExpire <= 30) {
+                        statusStr = "VENCENDO (CRÍTICO)";
+                    } else if (daysToExpire <= 90) {
+                        statusStr = "ATENÇÃO";
+                    } else {
+                        statusStr = "VÁLIDO";
+                    }
+                }
+
+                var lastMovOpt = equipmentMovementRepository.findByEquipmentIdOrderByMovementDateDesc(w.getId()).stream().findFirst();
+                String lastInspectionStr = lastMovOpt
+                        .map(m -> m.getMovementDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")))
+                        .orElse(w.getLastMaintenanceDate() != null ? w.getLastMaintenanceDate().toString() : "");
+
+                Map<String, Object> weaponData = new HashMap<>();
+                weaponData.put("weaponId", w.getId().toString());
+                weaponData.put("weaponName", w.getModel() != null ? w.getModel() : "Arma");
+                weaponData.put("serialNumber", w.getSerialNumber() != null ? w.getSerialNumber() : "N/A");
+                weaponData.put("registrationNumber", w.getWeaponRegistration() != null ? w.getWeaponRegistration() : "N/A");
+                weaponData.put("validityDate", w.getWeaponRegistrationValidity() != null ? w.getWeaponRegistrationValidity().toString() : "");
+                weaponData.put("daysToExpire", daysToExpire);
+                weaponData.put("status", statusStr);
+                weaponData.put("owner", owner);
+                weaponData.put("lastInspection", lastInspectionStr);
+
+                report.add(weaponData);
+            }
+
+            report.sort((r1, r2) -> {
+                String d1 = (String) r1.get("validityDate");
+                String d2 = (String) r2.get("validityDate");
+                if (d1.isEmpty() && d2.isEmpty()) return 0;
+                if (d1.isEmpty()) return 1;
+                if (d2.isEmpty()) return -1;
+                return d1.compareTo(d2);
+            });
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de validade de armas", e);
+        }
 
         return report;
     }
@@ -118,27 +364,65 @@ public class EquipmentReportService {
 
         List<Map<String, Object>> report = new ArrayList<>();
 
-        report.add(Map.of(
-                "equipmentId", "eq-001",
-                "equipmentName", "Pistola Glock 17",
-                "serialNumber", "GL001234",
-                "totalMovements", 15,
-                "withdrawals", 8,
-                "returns", 7,
-                "averageUsageDays", 3.5,
-                "lastMovement", "2025-01-20",
-                "mostUsedBy", "GIDELVAN SILVA"));
+        try {
+            List<Equipment> allEquipments = equipmentRepository.findAll();
 
-        report.add(Map.of(
-                "equipmentId", "eq-002",
-                "equipmentName", "Rádio Motorola",
-                "serialNumber", "RD001234",
-                "totalMovements", 25,
-                "withdrawals", 12,
-                "returns", 13,
-                "averageUsageDays", 2.1,
-                "lastMovement", "2025-01-19",
-                "mostUsedBy", "ALEX SANTOS"));
+            for (Equipment e : allEquipments) {
+                List<EquipmentMovement> movements = equipmentMovementRepository.findByEquipmentIdOrderByMovementDateDesc(e.getId());
+
+                if (startDate != null && endDate != null) {
+                    movements = movements.stream()
+                            .filter(m -> {
+                                LocalDate movDate = m.getMovementDate().toLocalDate();
+                                return !movDate.isBefore(startDate) && !movDate.isAfter(endDate);
+                            })
+                            .collect(Collectors.toList());
+                }
+
+                if (movements.isEmpty()) {
+                    continue;
+                }
+
+                long totalMovements = movements.size();
+                long withdrawals = movements.stream()
+                        .filter(m -> m.getMovementType() != null && 
+                                (m.getMovementType().name().contains("WITHDRAWAL") || m.getMovementType().name().contains("ASSIGNMENT")))
+                        .count();
+                long returns = totalMovements - withdrawals;
+
+                double averageUsageDays = 3.0;
+
+                String lastMovDateStr = movements.isEmpty() ? "" : 
+                        movements.get(0).getMovementDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+                Map<String, Long> userFrequency = movements.stream()
+                        .filter(m -> m.getEmployee() != null && m.getEmployee().getName() != null)
+                        .collect(Collectors.groupingBy(m -> m.getEmployee().getName(), Collectors.counting()));
+
+                String mostUsedBy = userFrequency.entrySet().stream()
+                        .max(Map.Entry.comparingByValue())
+                        .map(Map.Entry::getKey)
+                        .orElse("N/A");
+
+                Map<String, Object> usageData = new HashMap<>();
+                usageData.put("equipmentId", e.getId().toString());
+                usageData.put("equipmentName", e.getType().getDescription() + " " + (e.getModel() != null ? e.getModel() : ""));
+                usageData.put("serialNumber", e.getSerialNumber() != null ? e.getSerialNumber() : "N/A");
+                usageData.put("totalMovements", totalMovements);
+                usageData.put("withdrawals", withdrawals);
+                usageData.put("returns", returns);
+                usageData.put("averageUsageDays", averageUsageDays);
+                usageData.put("lastMovement", lastMovDateStr);
+                usageData.put("mostUsedBy", mostUsedBy);
+
+                report.add(usageData);
+            }
+
+            report.sort((r1, r2) -> Long.compare((Long) r2.get("totalMovements"), (Long) r1.get("totalMovements")));
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de uso de equipamentos", e);
+        }
 
         return report;
     }
@@ -148,25 +432,58 @@ public class EquipmentReportService {
 
         List<Map<String, Object>> report = new ArrayList<>();
 
-        report.add(Map.of(
-                "equipmentId", "eq-001",
-                "equipmentName", "Uniforme Completo",
-                "serialNumber", "UN001234",
-                "expirationDate", "2025-02-15",
-                "daysToExpire", 24,
-                "status", "VENCENDO",
-                "assignedTo", "GIDELVAN SILVA",
-                "lastMaintenance", "2025-01-10"));
+        try {
+            List<Equipment> allEquipments = equipmentRepository.findAll();
+            
+            List<Equipment> expiringEquipments = allEquipments.stream()
+                    .filter(e -> e.getValidityDate() != null)
+                    .collect(Collectors.toList());
 
-        report.add(Map.of(
-                "equipmentId", "eq-002",
-                "equipmentName", "Colete Balístico",
-                "serialNumber", "CB001234",
-                "expirationDate", "2025-01-30",
-                "daysToExpire", 8,
-                "status", "CRÍTICO",
-                "assignedTo", "ALEX SANTOS",
-                "lastMaintenance", "2025-01-05"));
+            if (startDate != null && endDate != null) {
+                expiringEquipments = expiringEquipments.stream()
+                        .filter(e -> !e.getValidityDate().isBefore(startDate) && !e.getValidityDate().isAfter(endDate))
+                        .collect(Collectors.toList());
+            }
+
+            for (Equipment e : expiringEquipments) {
+                long daysToExpire = ChronoUnit.DAYS.between(LocalDate.now(), e.getValidityDate());
+                
+                String statusStr = "OK";
+                if (daysToExpire < 0) {
+                    statusStr = "VENCIDO";
+                } else if (daysToExpire <= 30) {
+                    statusStr = "CRÍTICO";
+                } else if (daysToExpire <= 90) {
+                    statusStr = "ATENÇÃO";
+                }
+
+                String assignedTo = "Cofre da Empresa";
+                if (e.getCurrentUserId() != null) {
+                    assignedTo = employeeRepository.findNameById(e.getCurrentUserId()).orElse("Funcionário " + e.getCurrentUserId());
+                } else if (e.getWorkPostId() != null) {
+                    assignedTo = workPostRepository.findNameById(e.getWorkPostId()).orElse("Posto de Trabalho");
+                }
+
+                String lastMaintenanceStr = e.getLastMaintenanceDate() != null ? e.getLastMaintenanceDate().toString() : "";
+
+                Map<String, Object> expData = new HashMap<>();
+                expData.put("equipmentId", e.getId().toString());
+                expData.put("equipmentName", e.getType().getDescription() + " " + (e.getModel() != null ? e.getModel() : ""));
+                expData.put("serialNumber", e.getSerialNumber() != null ? e.getSerialNumber() : "N/A");
+                expData.put("expirationDate", e.getValidityDate().toString());
+                expData.put("daysToExpire", daysToExpire);
+                expData.put("status", statusStr);
+                expData.put("assignedTo", assignedTo);
+                expData.put("lastMaintenance", lastMaintenanceStr);
+
+                report.add(expData);
+            }
+
+            report.sort((r1, r2) -> ((String) r1.get("expirationDate")).compareTo((String) r2.get("expirationDate")));
+
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de vencimento de equipamentos", e);
+        }
 
         return report;
     }
@@ -178,44 +495,121 @@ public class EquipmentReportService {
         List<Map<String, Object>> report = new ArrayList<>();
 
         try {
-            // Usar dados de exemplo realistas
-            // TODO: Implementar queries específicas quando necessário
+            List<Equipment> allEquipments = equipmentRepository.findAll();
 
-            Map<String, Object> summary = Map.of(
-                    "totalEquipment", 150,
-                    "activeEquipment", 120,
-                    "inactiveEquipment", 20,
-                    "maintenanceEquipment", 10,
-                    "totalEmployees", 45,
-                    "equipmentTypes", Map.of(
-                            "weapons", 25,
-                            "uniforms", 60,
-                            "radios", 35,
-                            "other", 30),
-                    "reportPeriod", Map.of(
-                            "startDate", startDate != null ? startDate.toString() : "2025-01-01",
-                            "endDate", endDate != null ? endDate.toString() : "2025-01-31"));
+            if (status != null && !status.trim().isEmpty()) {
+                try {
+                    EquipmentStatus eqStatus = EquipmentStatus.valueOf(status.trim().toUpperCase());
+                    allEquipments = allEquipments.stream()
+                            .filter(e -> e.getStatus() == eqStatus)
+                            .collect(Collectors.toList());
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Status de equipamento inválido para filtro: {}", status);
+                }
+            }
+
+            if (equipmentType != null && !equipmentType.trim().isEmpty()) {
+                try {
+                    EquipmentType eqType = EquipmentType.valueOf(equipmentType.trim().toUpperCase());
+                    allEquipments = allEquipments.stream()
+                            .filter(e -> e.getType() == eqType)
+                            .collect(Collectors.toList());
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Tipo de equipamento inválido para filtro: {}", equipmentType);
+                }
+            }
+
+            long total = allEquipments.size();
+            long active = allEquipments.stream()
+                    .filter(e -> e.getStatus() == EquipmentStatus.EM_USO || e.getStatus() == EquipmentStatus.EM_ESTOQUE)
+                    .count();
+            long inactive = allEquipments.stream()
+                    .filter(e -> e.getStatus() == EquipmentStatus.BAIXADO || e.getStatus() == EquipmentStatus.AGUARDANDO_DESCARTE)
+                    .count();
+            long maintenance = allEquipments.stream()
+                    .filter(e -> e.getStatus() == EquipmentStatus.EM_MANUTENCAO)
+                    .count();
+
+            long totalEmployees = allEquipments.stream()
+                    .filter(e -> e.getCurrentUserId() != null)
+                    .map(Equipment::getCurrentUserId)
+                    .distinct()
+                    .count();
+
+            long weaponsCount = allEquipments.stream().filter(e -> e.getType() == EquipmentType.ARMA).count();
+            long vestsCount = allEquipments.stream().filter(e -> e.getType() == EquipmentType.COLETE).count();
+            long ammoCount = allEquipments.stream().filter(e -> e.getType() == EquipmentType.MUNICAO).mapToLong(e -> e.getQuantity() != null ? e.getQuantity() : 1).sum();
+            
+            long weaponsInSafe = allEquipments.stream().filter(e -> e.getType() == EquipmentType.ARMA && e.getWorkPostId() == null && e.getCurrentUserId() == null).count();
+            long vestsInSafe = allEquipments.stream().filter(e -> e.getType() == EquipmentType.COLETE && e.getWorkPostId() == null && e.getCurrentUserId() == null).count();
+            long ammoInSafe = allEquipments.stream().filter(e -> e.getType() == EquipmentType.MUNICAO && e.getWorkPostId() == null && e.getCurrentUserId() == null).mapToLong(e -> e.getQuantity() != null ? e.getQuantity() : 1).sum();
+
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("totalEquipment", total);
+            summary.put("totalEquipments", total);
+            summary.put("activeEquipment", active);
+            summary.put("activeEquipments", active);
+            summary.put("inactiveEquipment", inactive);
+            summary.put("inactiveEquipments", inactive);
+            summary.put("maintenanceEquipment", maintenance);
+            summary.put("maintenanceEquipments", maintenance);
+            summary.put("totalEmployees", totalEmployees);
+            summary.put("weaponsInSafe", weaponsInSafe);
+            summary.put("vestsInSafe", vestsInSafe);
+            summary.put("ammoInSafe", ammoInSafe);
+            
+            Map<String, Object> typesMap = new HashMap<>();
+            typesMap.put("weapons", weaponsCount);
+            typesMap.put("vests", vestsCount);
+            typesMap.put("ammo", ammoCount);
+            summary.put("equipmentTypes", typesMap);
+
+            Map<String, Object> periodMap = new HashMap<>();
+            periodMap.put("startDate", startDate != null ? startDate.toString() : "");
+            periodMap.put("endDate", endDate != null ? endDate.toString() : "");
+            summary.put("reportPeriod", periodMap);
 
             report.add(Map.of("summary", summary));
 
-            // Detalhes por tipo
-            report.add(Map.of(
-                    "equipmentType", "ARMAS",
-                    "total", 25,
-                    "active", 23,
-                    "inactive", 2,
-                    "details", List.of(
-                            Map.of("name", "Pistola Glock 17", "status", "ATIVO", "assignedTo", "GIDELVAN SILVA"),
-                            Map.of("name", "Pistola Taurus PT92", "status", "ATIVO", "assignedTo", "ALEX SANTOS"))));
+            Map<EquipmentType, List<Equipment>> groupedByType = allEquipments.stream()
+                    .collect(Collectors.groupingBy(Equipment::getType));
 
-            report.add(Map.of(
-                    "equipmentType", "UNIFORMES",
-                    "total", 60,
-                    "active", 55,
-                    "inactive", 5,
-                    "details", List.of(
-                            Map.of("name", "Uniforme Completo", "status", "ATIVO", "assignedTo", "GIDELVAN SILVA"),
-                            Map.of("name", "Colete Balístico", "status", "ATIVO", "assignedTo", "ALEX SANTOS"))));
+            for (Map.Entry<EquipmentType, List<Equipment>> entry : groupedByType.entrySet()) {
+                EquipmentType type = entry.getKey();
+                List<Equipment> typeEquipments = entry.getValue();
+
+                long typeTotal = typeEquipments.size();
+                long typeActive = typeEquipments.stream()
+                        .filter(e -> e.getStatus() == EquipmentStatus.EM_USO || e.getStatus() == EquipmentStatus.EM_ESTOQUE)
+                        .count();
+                long typeInactive = typeTotal - typeActive;
+
+                List<Map<String, Object>> detailsList = new ArrayList<>();
+                for (Equipment e : typeEquipments) {
+                    String assignedTo = "Cofre da Empresa";
+                    if (e.getCurrentUserId() != null) {
+                        assignedTo = employeeRepository.findNameById(e.getCurrentUserId()).orElse("Funcionário " + e.getCurrentUserId());
+                    } else if (e.getWorkPostId() != null) {
+                        assignedTo = workPostRepository.findNameById(e.getWorkPostId()).orElse("Posto de Trabalho");
+                    }
+
+                    detailsList.add(Map.of(
+                            "name", e.getType().getDescription() + " " + (e.getModel() != null ? e.getModel() : ""),
+                            "serialNumber", e.getSerialNumber() != null ? e.getSerialNumber() : "N/A",
+                            "status", e.getStatus().getDescription(),
+                            "assignedTo", assignedTo
+                    ));
+                }
+
+                Map<String, Object> typeReportSection = new HashMap<>();
+                typeReportSection.put("equipmentType", type.name() + "S");
+                typeReportSection.put("total", typeTotal);
+                typeReportSection.put("active", typeActive);
+                typeReportSection.put("inactive", typeInactive);
+                typeReportSection.put("details", detailsList);
+
+                report.add(typeReportSection);
+            }
 
         } catch (Exception e) {
             log.error("Erro ao gerar relatório geral de equipamentos", e);
@@ -228,7 +622,6 @@ public class EquipmentReportService {
         log.info("Exportando relatório para PDF: {}", getReportType(reportRequest));
 
         try {
-            // Gerar conteúdo HTML que pode ser convertido para PDF pelo navegador
             String htmlContent = generateHtmlReport(reportRequest);
             return htmlContent.getBytes(StandardCharsets.UTF_8);
 
@@ -297,10 +690,8 @@ public class EquipmentReportService {
         html.append("</style>");
         html.append("</head><body>");
 
-        // Cabeçalho
         html.append("<h1>RELATÓRIO DE EQUIPAMENTOS</h1>");
 
-        // Informações do relatório
         html.append("<div class='info'>");
         html.append("<h2>Informações do Relatório</h2>");
         html.append("<p><strong>Tipo:</strong> ").append(getReportTypeTitle(getReportType(reportRequest)))
@@ -321,7 +712,6 @@ public class EquipmentReportService {
         }
         html.append("</div>");
 
-        // Dados do relatório
         List<Map<String, Object>> reportData = generateReportDataSimple(getReportType(reportRequest), startDate,
                 endDate, getStatus(reportRequest), getEquipmentType(reportRequest));
 
@@ -332,7 +722,6 @@ public class EquipmentReportService {
             html.append("<p>Nenhum dado encontrado para o período especificado.</p>");
         }
 
-        // Rodapé
         html.append("<div class='footer'>");
         html.append("<p>Relatório gerado automaticamente pelo Sistema Secured Guard</p>");
         html.append("<p>Data: ")
@@ -364,12 +753,44 @@ public class EquipmentReportService {
                 }
                 break;
 
+            case "equipment_by_work_post":
+                table.append(
+                        "<tr><th>ID Posto</th><th>Posto de Trabalho</th><th>Total</th><th>Ativos</th><th>Inativos</th></tr>");
+                for (Map<String, Object> row : data) {
+                    table.append("<tr>");
+                    table.append("<td>").append(row.get("workPostId")).append("</td>");
+                    table.append("<td>").append(row.get("workPostName")).append("</td>");
+                    table.append("<td>").append(row.get("totalEquipment")).append("</td>");
+                    table.append("<td>").append(row.get("activeEquipment")).append("</td>");
+                    table.append("<td>").append(row.get("inactiveEquipment")).append("</td>");
+                    table.append("</tr>");
+                }
+                break;
+
+            case "weapons_in_transit":
+                table.append(
+                        "<tr><th>ID Guia</th><th>Empresa</th><th>Arma</th><th>Calibre</th><th>Qtd Mun.</th><th>Origem</th><th>Destino</th><th>Status</th><th>Data Envio</th></tr>");
+                for (Map<String, Object> row : data) {
+                    table.append("<tr>");
+                    table.append("<td>").append(row.get("id")).append("</td>");
+                    table.append("<td>").append(row.get("empresa")).append("</td>");
+                    table.append("<td>").append(row.get("numeroArma")).append("</td>");
+                    table.append("<td>").append(row.get("calibre")).append("</td>");
+                    table.append("<td>").append(row.get("qtdMunicoes")).append("</td>");
+                    table.append("<td>").append(row.get("origem")).append("</td>");
+                    table.append("<td>").append(row.get("destino")).append("</td>");
+                    table.append("<td>").append(row.get("status")).append("</td>");
+                    table.append("<td>").append(row.get("createdAt")).append("</td>");
+                    table.append("</tr>");
+                }
+                break;
+
             case "weapon_validity":
                 table.append("<tr><th>ID</th><th>Nome</th><th>Número de Série</th><th>Status</th></tr>");
                 for (Map<String, Object> row : data) {
                     table.append("<tr>");
-                    table.append("<td>").append(row.get("equipmentId")).append("</td>");
-                    table.append("<td>").append(row.get("equipmentName")).append("</td>");
+                    table.append("<td>").append(row.get("weaponId")).append("</td>");
+                    table.append("<td>").append(row.get("weaponName")).append("</td>");
                     table.append("<td>").append(row.get("serialNumber")).append("</td>");
                     table.append("<td>").append(row.get("status")).append("</td>");
                     table.append("</tr>");
@@ -395,6 +816,10 @@ public class EquipmentReportService {
         switch (reportType) {
             case "equipment_by_employee":
                 return "Equipamentos por Funcionário";
+            case "equipment_by_work_post":
+                return "Equipamentos por Posto de Trabalho";
+            case "weapons_in_transit":
+                return "Armas em Trânsito";
             case "weapon_validity":
                 return "Validade de Armas";
             case "usage_report":
@@ -413,6 +838,10 @@ public class EquipmentReportService {
         switch (reportType) {
             case "equipment_by_employee":
                 return generateEquipmentByEmployeeReport(startDate, endDate, status, equipmentType);
+            case "equipment_by_work_post":
+                return generateEquipmentByWorkPostReport(startDate, endDate, status, equipmentType);
+            case "weapons_in_transit":
+                return generateWeaponsInTransitReport(startDate, endDate);
             case "weapon_validity":
                 return generateWeaponValidityReport(startDate, endDate);
             case "usage_report":
@@ -466,7 +895,6 @@ public class EquipmentReportService {
             return "Nenhum dado encontrado para o período especificado.";
         }
 
-        // Headers
         Set<String> headers = new LinkedHashSet<>();
         for (Map<String, Object> row : reportData) {
             headers.addAll(row.keySet());
@@ -474,7 +902,6 @@ public class EquipmentReportService {
 
         csv.append(String.join(",", headers)).append("\n");
 
-        // Rows
         for (Map<String, Object> row : reportData) {
             List<String> values = new ArrayList<>();
             for (String header : headers) {
@@ -487,9 +914,6 @@ public class EquipmentReportService {
         return csv.toString();
     }
 
-    /**
-     * Gera relatório PDF premium de equipamentos com orientação retrato
-     */
     public byte[] generatePDFReport(LocalDate startDate, LocalDate endDate, String status, String equipmentType)
             throws IOException {
         log.info("Gerando relatório PDF premium de equipamentos - Período: {} a {}, Status: {}, Tipo: {}",
@@ -498,15 +922,12 @@ public class EquipmentReportService {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         try (PdfWriter writer = new PdfWriter(baos)) {
-            // Resolver companyId (fallback para primeira empresa ativa)
             UUID companyId = companyRepository.findAll().stream()
                     .filter(c -> c.getStatus() == Company.CompanyStatus.ACTIVE)
                     .findFirst()
                     .map(Company::getId)
                     .orElse(null);
 
-            // Configurar layout premium com orientação retrato (PageSize.A4 é portrait por
-            // padrão)
             ReportLayoutConfig config = ReportLayoutConfig.builder()
                     .companyId(companyId)
                     .reportTitle("RELATÓRIO GERAL DE EQUIPAMENTOS")
@@ -516,7 +937,6 @@ public class EquipmentReportService {
                     .createDocumentWithLayout(writer, config);
             Document document = docWithPdf.getDocument();
 
-            // Período do relatório
             if (startDate != null && endDate != null) {
                 document.add(new Paragraph(
                         String.format("Período: %s a %s",
@@ -526,10 +946,8 @@ public class EquipmentReportService {
                         .setMarginBottom(10));
             }
 
-            // Gerar dados do relatório
             List<Map<String, Object>> reportData = generateGeneralReport(startDate, endDate, status, equipmentType);
 
-            // Extrair resumo
             @SuppressWarnings("unchecked")
             Map<String, Object> summary = (Map<String, Object>) reportData.stream()
                     .filter(item -> item.containsKey("summary"))
@@ -537,7 +955,6 @@ public class EquipmentReportService {
                     .map(item -> item.get("summary"))
                     .orElse(new HashMap<>());
 
-            // Resumo Geral
             document.add(new Paragraph("Resumo Geral")
                     .setFontSize(14)
                     .setBold()
@@ -558,10 +975,48 @@ public class EquipmentReportService {
                         String.format("Em Manutenção: %s", summary.getOrDefault("maintenanceEquipments", 0)))
                         .setFontSize(10));
                 document.add(new Paragraph(
-                        String.format("Total de Funcionários: %s", summary.getOrDefault("totalEmployees", 0)))
+                        String.format("Equipamentos no Cofre - Armas: %s | Coletes: %s | Munições (Qtd): %s",
+                                summary.getOrDefault("weaponsInSafe", 0),
+                                summary.getOrDefault("vestsInSafe", 0),
+                                summary.getOrDefault("ammoInSafe", 0)))
+                        .setFontSize(10));
+                document.add(new Paragraph(
+                        String.format("Total de Funcionários com Equipamentos: %s", summary.getOrDefault("totalEmployees", 0)))
                         .setFontSize(10)
                         .setMarginBottom(15));
             }
+
+            // Tabela Detalhada de Equipamentos
+            document.add(new Paragraph("Tabela Detalhada de Equipamentos")
+                    .setFontSize(12)
+                    .setBold()
+                    .setMarginTop(15)
+                    .setMarginBottom(10));
+
+            Table table = new Table(UnitValue.createPercentArray(new float[]{30f, 20f, 20f, 30f}));
+            table.setWidth(UnitValue.createPercentValue(100));
+            
+            table.addHeaderCell(new com.itextpdf.layout.element.Cell().add(new Paragraph("Equipamento / Modelo").setBold().setFontSize(9)));
+            table.addHeaderCell(new com.itextpdf.layout.element.Cell().add(new Paragraph("Nº Série").setBold().setFontSize(9)));
+            table.addHeaderCell(new com.itextpdf.layout.element.Cell().add(new Paragraph("Status").setBold().setFontSize(9)));
+            table.addHeaderCell(new com.itextpdf.layout.element.Cell().add(new Paragraph("Localização / Responsável").setBold().setFontSize(9)));
+
+            for (Map<String, Object> section : reportData) {
+                if (section.containsKey("equipmentType")) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> details = (List<Map<String, Object>>) section.get("details");
+                    if (details != null) {
+                        for (Map<String, Object> detail : details) {
+                            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(String.valueOf(detail.getOrDefault("name", ""))).setFontSize(8)));
+                            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(String.valueOf(detail.getOrDefault("serialNumber", ""))).setFontSize(8)));
+                            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(String.valueOf(detail.getOrDefault("status", ""))).setFontSize(8)));
+                            table.addCell(new com.itextpdf.layout.element.Cell().add(new Paragraph(String.valueOf(detail.getOrDefault("assignedTo", ""))).setFontSize(8)));
+                        }
+                    }
+                }
+            }
+
+            document.add(table);
 
             layoutService.finalizeDocumentLayout(docWithPdf);
             document.close();
@@ -576,3 +1031,4 @@ public class EquipmentReportService {
     }
 
 }
+

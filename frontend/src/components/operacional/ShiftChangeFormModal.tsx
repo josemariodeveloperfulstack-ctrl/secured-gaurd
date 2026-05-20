@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Clock, Building2 } from 'lucide-react';
+import { User, Clock } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { formatDateForBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
 import { ShiftChangeFormDTO } from '@/services/shiftChangeService';
-import { employeeService, Employee } from '@/services/employeeService';
-import { workPostService, WorkPost } from '@/services/workPostService';
+import type { SimpleEmployee } from '@/services/employeeService';
+import { EmployeeCombobox } from '@/components/ui/employee-combobox';
+import { WorkPostCombobox } from '@/components/ui/work-post-combobox';
+import { workPostService } from '@/services/workPostService';
 
 
 interface ShiftChangeFormModalProps {
@@ -46,10 +47,11 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
-  const [loadingEmployees, setLoadingEmployees] = useState(false);
-  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
+  // Nomes exibidos para edição (mostrados nos comboboxes até que carreguem o item)
+  const [requesterDisplayName, setRequesterDisplayName] = useState<string>('');
+  const [replacingDisplayName, setReplacingDisplayName] = useState<string>('');
+  // ID interno do "Aprovado por" — usado apenas pelo combobox; o payload continua com o NOME do aprovador
+  const [approvedById, setApprovedById] = useState<string>('');
 
   const shiftTimeOptions = [
     { value: 'SHIFT_6H_18H', label: '6h às 18h' },
@@ -64,46 +66,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
     { value: 'REJECTED', label: 'Rejeitado' },
   ];
 
-  // Carregar funcionários
-  const loadEmployees = async () => {
-    setLoadingEmployees(true);
-    try {
-      const employeesData = await employeeService.getAllEmployees();
-      setEmployees(employeesData);
-    } catch (error) {
-      console.error('Erro ao carregar funcionários:', error);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
-
-  // Carregar postos de trabalho
-  const loadWorkPosts = async () => {
-    setLoadingWorkPosts(true);
-    try {
-      const workPostsData = await workPostService.getWorkPosts();
-      setWorkPosts(workPostsData);
-    } catch (error) {
-      console.error('Erro ao carregar postos de trabalho:', error);
-      // Fallback para dados de exemplo em caso de erro
-      const fallbackData = [
-        { id: '1', name: 'Posto Central', postCode: 'PC001', status: 'ATIVO' },
-        { id: '2', name: 'Posto Norte', postCode: 'PN002', status: 'ATIVO' },
-        { id: '3', name: 'Posto Sul', postCode: 'PS003', status: 'ATIVO' }
-      ];
-      setWorkPosts(fallbackData);
-    } finally {
-      setLoadingWorkPosts(false);
-    }
-  };
-
-  // Carregar dados quando o modal abrir
+  // Resetar/Inicializar formulário ao abrir o modal
   useEffect(() => {
     if (open) {
-      // Carregar funcionários e postos de trabalho
-      loadEmployees();
-      loadWorkPosts();
-
       if (!shiftChange) {
         // Reset form for new entry
         setFormData({
@@ -124,40 +89,79 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
           status: undefined,
           approvedBy: undefined,
         });
+        setRequesterDisplayName('');
+        setReplacingDisplayName('');
+        setApprovedById('');
       }
       setErrors({});
     }
   }, [shiftChange, open]);
 
-  // Preencher formulário quando os dados estiverem carregados
+  // Preencher formulário em modo edição (carregamento sob demanda dos comboboxes)
   useEffect(() => {
-    if (shiftChange && employees.length > 0 && workPosts.length > 0) {
-      // Encontrar IDs correspondentes aos nomes
-      const requesterEmployee = employees.find(emp => emp.name === shiftChange.requesterFullName);
-      const replacingEmployee = employees.find(emp => emp.name === shiftChange.replacingFullName);
-      const requesterWorkPost = workPosts.find(wp => wp.name === shiftChange.requesterSector);
-      const replacingWorkPost = workPosts.find(wp => wp.name === shiftChange.replacingSector);
-
+    if (shiftChange) {
       setFormData({
         dateOfRequest: shiftChange.dateOfRequest ? new Date(shiftChange.dateOfRequest) : new Date(),
         requesterFullName: shiftChange.requesterFullName || '',
-        requesterEmployeeId: requesterEmployee?.id || '',
+        requesterEmployeeId: shiftChange.requesterEmployeeId || '',
         requesterSector: shiftChange.requesterSector || '',
-        requesterWorkPostId: requesterWorkPost?.id || '',
+        requesterWorkPostId: '', // resolvido pelo useEffect abaixo a partir do nome do setor
         requesterDayOffDate: shiftChange.requesterDayOffDate ? new Date(shiftChange.requesterDayOffDate) : null,
         requesterShiftDate: shiftChange.requesterShiftDate ? new Date(shiftChange.requesterShiftDate) : null,
         replacingFullName: shiftChange.replacingFullName || '',
-        replacingEmployeeId: replacingEmployee?.id || '',
+        replacingEmployeeId: shiftChange.replacingEmployeeId || '',
         replacingSector: shiftChange.replacingSector || '',
-        replacingWorkPostId: replacingWorkPost?.id || '',
+        replacingWorkPostId: '',
         replacingShiftDate: shiftChange.replacingShiftDate ? new Date(shiftChange.replacingShiftDate) : null,
         replacingDayOffDate: shiftChange.replacingDayOffDate ? new Date(shiftChange.replacingDayOffDate) : null,
         shiftTime: shiftChange.shiftTime || '',
         status: shiftChange.status,
         approvedBy: shiftChange.approvedBy || undefined,
       });
+      setRequesterDisplayName(shiftChange.requesterFullName || '');
+      setReplacingDisplayName(shiftChange.replacingFullName || '');
     }
-  }, [shiftChange, employees, workPosts]);
+  }, [shiftChange]);
+
+  // Sincronizar IDs <-> nomes dos postos de trabalho (solicitante e colega).
+  // Em edição: vem só o nome (setor), resolvemos o ID.
+  // Em criação/edição via combobox: vem só o ID, resolvemos o nome.
+  useEffect(() => {
+    let cancelled = false;
+    const requesterNeedsName = formData.requesterWorkPostId && !formData.requesterSector;
+    const replacingNeedsName = formData.replacingWorkPostId && !formData.replacingSector;
+    const requesterNeedsId = formData.requesterSector && !formData.requesterWorkPostId;
+    const replacingNeedsId = formData.replacingSector && !formData.replacingWorkPostId;
+
+    if (requesterNeedsName) {
+      workPostService.getWorkPostById(formData.requesterWorkPostId)
+        .then(wp => { if (!cancelled && wp) setFormData(prev => ({ ...prev, requesterSector: wp.name })); })
+        .catch(() => { /* silencioso */ });
+    }
+    if (replacingNeedsName) {
+      workPostService.getWorkPostById(formData.replacingWorkPostId)
+        .then(wp => { if (!cancelled && wp) setFormData(prev => ({ ...prev, replacingSector: wp.name })); })
+        .catch(() => { /* silencioso */ });
+    }
+    if (requesterNeedsId || replacingNeedsId) {
+      workPostService.getAllWorkPosts()
+        .then(posts => {
+          if (cancelled) return;
+          const findByName = (n: string): string => {
+            if (!n) return '';
+            const match = posts.find(wp => wp.name.toLowerCase() === n.toLowerCase());
+            return match?.id ?? '';
+          };
+          setFormData(prev => ({
+            ...prev,
+            requesterWorkPostId: prev.requesterWorkPostId || findByName(prev.requesterSector),
+            replacingWorkPostId: prev.replacingWorkPostId || findByName(prev.replacingSector),
+          }));
+        })
+        .catch(() => { /* silencioso */ });
+    }
+    return () => { cancelled = true; };
+  }, [formData.requesterWorkPostId, formData.replacingWorkPostId, formData.requesterSector, formData.replacingSector]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -188,8 +192,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // Remover campos auxiliares que o backend não precisa
-      const { requesterEmployeeId, requesterWorkPostId, replacingEmployeeId, replacingWorkPostId, ...restFormData } = formData;
+      // Mantém os IDs dos funcionários (necessários para integrar com o histórico)
+      // e descarta apenas os IDs dos postos de trabalho, que o backend não persiste.
+      const { requesterWorkPostId, replacingWorkPostId, ...restFormData } = formData;
 
       const submitData = {
         ...restFormData,
@@ -198,6 +203,9 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
         requesterShiftDate: formData.requesterShiftDate ? formatDateForBackend(formData.requesterShiftDate) : null,
         replacingShiftDate: formData.replacingShiftDate ? formatDateForBackend(formData.replacingShiftDate) : null,
         replacingDayOffDate: formData.replacingDayOffDate ? formatDateForBackend(formData.replacingDayOffDate) : null,
+        // IDs dos funcionários para integração com histórico (podem ser nulos em fluxos legados)
+        requesterEmployeeId: formData.requesterEmployeeId || null,
+        replacingEmployeeId: formData.replacingEmployeeId || null,
         // Inclui o status se estiver editando, caso contrário deixa undefined
         status: formData.status || undefined,
         approvedBy: formData.approvedBy || undefined,
@@ -257,31 +265,30 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Nome Completo *</label>
-                <Select
+                <EmployeeCombobox
                   value={formData.requesterEmployeeId}
-                  onValueChange={(value) => {
-                    const employee = employees.find(emp => emp.id === value);
-                    if (employee) {
-                      handleInputChange('requesterEmployeeId', value);
-                      handleInputChange('requesterFullName', employee.name);
+                  onChange={(value) => {
+                    handleInputChange('requesterEmployeeId', value);
+                    if (!value) {
+                      handleInputChange('requesterFullName', '');
+                      setRequesterDisplayName('');
                     }
                   }}
-                >
-                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
-                    <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {employees.map((employee, index) => (
-                      <SelectItem
-                        key={employee.id || `requester-employee-${index}-${employee.name}`}
-                        value={employee.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onEmployeeSelect={(emp: SimpleEmployee) => {
+                    handleInputChange('requesterFullName', emp.name);
+                    setRequesterDisplayName(emp.name);
+                    // Auto-preencher o setor se o funcionário tiver posto de trabalho
+                    if (emp.workPostId) {
+                      handleInputChange('requesterWorkPostId', emp.workPostId);
+                    }
+                    if (emp.workPostName) {
+                      handleInputChange('requesterSector', emp.workPostName);
+                    }
+                  }}
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite pelo menos 3 caracteres..."
+                  initialDisplayName={requesterDisplayName}
+                />
                 {errors.requesterFullName && (
                   <span className="text-red-400 text-sm">{errors.requesterFullName}</span>
                 )}
@@ -289,31 +296,15 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Setor *</label>
-                <Select
+                <WorkPostCombobox
                   value={formData.requesterWorkPostId}
-                  onValueChange={(value) => {
-                    const workPost = workPosts.find(wp => wp.id === value);
-                    if (workPost) {
-                      handleInputChange('requesterWorkPostId', value);
-                      handleInputChange('requesterSector', workPost.name);
-                    }
+                  onChange={(value) => {
+                    handleInputChange('requesterWorkPostId', value);
+                    if (!value) handleInputChange('requesterSector', '');
                   }}
-                >
-                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
-                    <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de trabalho"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {workPosts.map((workPost) => (
-                      <SelectItem
-                        key={workPost.id}
-                        value={workPost.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {workPost.name} {workPost.postCode && `(${workPost.postCode})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione o posto de trabalho"
+                  searchPlaceholder="Digite para buscar..."
+                />
                 {errors.requesterSector && (
                   <span className="text-red-400 text-sm">{errors.requesterSector}</span>
                 )}
@@ -358,31 +349,29 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Nome Completo *</label>
-                <Select
+                <EmployeeCombobox
                   value={formData.replacingEmployeeId}
-                  onValueChange={(value) => {
-                    const employee = employees.find(emp => emp.id === value);
-                    if (employee) {
-                      handleInputChange('replacingEmployeeId', value);
-                      handleInputChange('replacingFullName', employee.name);
+                  onChange={(value) => {
+                    handleInputChange('replacingEmployeeId', value);
+                    if (!value) {
+                      handleInputChange('replacingFullName', '');
+                      setReplacingDisplayName('');
                     }
                   }}
-                >
-                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
-                    <SelectValue placeholder={loadingEmployees ? "Carregando..." : "Selecione o funcionário"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {employees.map((employee, index) => (
-                      <SelectItem
-                        key={employee.id || `replacing-employee-${index}-${employee.name}`}
-                        value={employee.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onEmployeeSelect={(emp: SimpleEmployee) => {
+                    handleInputChange('replacingFullName', emp.name);
+                    setReplacingDisplayName(emp.name);
+                    if (emp.workPostId) {
+                      handleInputChange('replacingWorkPostId', emp.workPostId);
+                    }
+                    if (emp.workPostName) {
+                      handleInputChange('replacingSector', emp.workPostName);
+                    }
+                  }}
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite pelo menos 3 caracteres..."
+                  initialDisplayName={replacingDisplayName}
+                />
                 {errors.replacingFullName && (
                   <span className="text-red-400 text-sm">{errors.replacingFullName}</span>
                 )}
@@ -390,31 +379,15 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-seguranca-lightgray">Setor *</label>
-                <Select
+                <WorkPostCombobox
                   value={formData.replacingWorkPostId}
-                  onValueChange={(value) => {
-                    const workPost = workPosts.find(wp => wp.id === value);
-                    if (workPost) {
-                      handleInputChange('replacingWorkPostId', value);
-                      handleInputChange('replacingSector', workPost.name);
-                    }
+                  onChange={(value) => {
+                    handleInputChange('replacingWorkPostId', value);
+                    if (!value) handleInputChange('replacingSector', '');
                   }}
-                >
-                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11">
-                    <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de trabalho"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-black border-gray-600">
-                    {workPosts.map((workPost) => (
-                      <SelectItem
-                        key={workPost.id}
-                        value={workPost.id}
-                        className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                      >
-                        {workPost.name} {workPost.postCode && `(${workPost.postCode})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Selecione o posto de trabalho"
+                  searchPlaceholder="Digite para buscar..."
+                />
                 {errors.replacingSector && (
                   <span className="text-red-400 text-sm">{errors.replacingSector}</span>
                 )}
@@ -502,26 +475,21 @@ const ShiftChangeFormModal: React.FC<ShiftChangeFormModalProps> = ({
               <label className="text-sm font-medium text-seguranca-lightgray">
                 Aprovado por:
               </label>
-              <Select
-                value={formData.approvedBy || ''}
-                onValueChange={(value) => handleInputChange('approvedBy', value)}
+              <EmployeeCombobox
+                value={approvedById}
+                onChange={(value) => {
+                  setApprovedById(value);
+                  if (!value) handleInputChange('approvedBy', '');
+                }}
+                onEmployeeSelect={(emp: SimpleEmployee) => {
+                  setApprovedById(emp.id);
+                  handleInputChange('approvedBy', emp.name);
+                }}
+                placeholder={formData.status === 'APPROVED' || shiftChange ? "Selecione o aprovador" : "Status deve ser Aprovado"}
+                searchPlaceholder="Digite pelo menos 3 caracteres..."
                 disabled={formData.status !== 'APPROVED' && !shiftChange}
-              >
-                <SelectTrigger className={`bg-seguranca-black border-gray-600 text-seguranca-lightgray h-11 ${formData.status !== 'APPROVED' && !shiftChange ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <SelectValue placeholder={loadingEmployees ? "Carregando..." : formData.status === 'APPROVED' || shiftChange ? "Selecione o aprovador" : "Status deve ser Aprovado"} />
-                </SelectTrigger>
-                <SelectContent className="bg-seguranca-black border-gray-600">
-                  {employees.map((employee, index) => (
-                    <SelectItem
-                      key={employee.id || `approved-by-${index}-${employee.name}`}
-                      value={employee.name}
-                      className="text-seguranca-lightgray hover:bg-seguranca-graphite"
-                    >
-                      {employee.name} {employee.registrationNumber && `(${employee.registrationNumber})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                initialDisplayName={formData.approvedBy || ''}
+              />
               {formData.status !== 'APPROVED' && !shiftChange && (
                 <p className="text-xs text-gray-500">Selecione "Aprovado" no status para habilitar este campo</p>
               )}

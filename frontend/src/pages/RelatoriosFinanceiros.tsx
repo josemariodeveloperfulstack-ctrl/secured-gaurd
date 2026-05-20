@@ -64,19 +64,30 @@ export function FinanceiroRelatoriosComDados() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   const load = useCallback(async () => {
-    try {
-      const [t, i, ar] = await Promise.all([
-        financialService.getTransactions(),
-        financialService.getAllInvoices(),
-        contasAReceberService.getContasAReceber().catch(() => [] as ContaAReceber[]),
-      ]);
-      const incomeFromReceivables = contasReceberToIncomeTransactions(Array.isArray(ar) ? ar : []);
-      setTransactions([...(Array.isArray(t) ? t : []), ...incomeFromReceivables]);
-      setInvoices(Array.isArray(i) ? i : []);
-    } catch {
-      setTransactions([]);
-      setInvoices([]);
-    }
+    const [t, i, ar] = await Promise.all([
+      financialService.getTransactions().catch((err) => {
+        console.error('Relatórios: falha ao carregar transações financeiras', err);
+        return [] as FinancialTransaction[];
+      }),
+      financialService.getAllInvoices().catch((err) => {
+        console.error('Relatórios: falha ao carregar faturas (invoices/all)', err);
+        return [] as Invoice[];
+      }),
+      contasAReceberService.getAllContasAReceber().catch((err) => {
+        console.error('Relatórios: falha ao carregar contas a receber (all)', err);
+        return [] as ContaAReceber[];
+      }),
+    ]);
+    const incomeFromReceivables = contasReceberToIncomeTransactions(Array.isArray(ar) ? ar : []);
+    const tx = Array.isArray(t) ? t : [];
+    const inv = Array.isArray(i) ? i : [];
+    console.info('[Relatórios financeiros] registros carregados', {
+      transacoes: tx.length,
+      faturasDespesas: inv.length,
+      contasReceber: incomeFromReceivables.length,
+    });
+    setTransactions([...tx, ...incomeFromReceivables]);
+    setInvoices(inv);
   }, []);
 
   useEffect(() => {

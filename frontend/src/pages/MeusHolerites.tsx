@@ -29,7 +29,11 @@ const monthNames: Record<number, string> = {
 
 const formatMonth = (month: number) => monthNames[month] ?? `Mês ${month}`;
 
-const MeusHoleritesContent: React.FC = () => {
+interface MeusHoleritesContentProps {
+  standalone?: boolean;
+}
+
+const MeusHoleritesContent: React.FC<MeusHoleritesContentProps> = ({ standalone = false }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [holerites, setHolerites] = useState<Holerite[]>([]);
@@ -223,9 +227,10 @@ const MeusHoleritesContent: React.FC = () => {
   };
 
   return (
-    <StandardLayout
-      title="Meus Documentos"
-      subtitle="Visualize e gerencie apenas os seus holerites, comprovantes e espelho de ponto, organizados por ano e mês"
+    <StandardLayout 
+      isSubPage={standalone}
+      title={standalone ? undefined : "Meus Documentos"}
+      subtitle={standalone ? undefined : "Visualize e gerencie apenas os seus holerites, comprovantes e espelho de ponto, organizados por ano e mês"}
     >
       {/* Seção de Espelho de Ponto do Mês */}
       <Card className="mb-8 bg-seguranca-graphite border-gray-700">
@@ -411,7 +416,11 @@ const MeusHoleritesContent: React.FC = () => {
   );
 };
 
-const MeusHolerites: React.FC = () => {
+interface MeusHoleritesProps {
+  standalone?: boolean;
+}
+
+const MeusHolerites: React.FC<MeusHoleritesProps> = ({ standalone = false }) => {
   const { user } = useAuth();
 
   if (!user) {
@@ -420,7 +429,7 @@ const MeusHolerites: React.FC = () => {
 
   // Sempre mostrar a tela "Meus Documentos" (holerites e comprovantes do usuário logado).
   // Não redirecionar para Gestão de Holerites; essa é outra tela (/holerites).
-  return <MeusHoleritesContent />;
+  return <MeusHoleritesContent standalone={standalone} />;
 };
 
 export default MeusHolerites;

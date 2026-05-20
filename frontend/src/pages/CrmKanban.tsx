@@ -43,9 +43,10 @@ export default function CrmKanban() {
       setMetrics(data);
     } catch (error: any) {
       console.error('Erro ao carregar métricas do CRM:', error);
+      const serverMsg = error?.response?.data?.message;
       toast({
         title: "Erro",
-        description: "Não foi possível carregar as métricas do CRM.",
+        description: serverMsg || "Não foi possível carregar as métricas do CRM.",
         variant: "destructive"
       });
       // Usar valores padrão em caso de erro

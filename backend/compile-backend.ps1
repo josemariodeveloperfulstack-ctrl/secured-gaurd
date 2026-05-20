@@ -20,5 +20,5 @@ try {
     Set-Location -Path ".."
 }
 
-Write-Host "Pressione qualquer tecla para continuar..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "Pressione qualquer tecla para finalizar..."
+$null = [System.Console]::ReadKey($true)

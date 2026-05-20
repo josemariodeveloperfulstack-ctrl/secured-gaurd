@@ -16,20 +16,37 @@ import java.util.UUID;
 public class TransportVoucherRequest {
     private UUID companyId;
 
+    /** ID do funcionário (opcional). Quando informado, persiste o PDF gerado. */
+    private UUID employeeId;
+
     // Dados do Funcionário
     private String employeeName;
     private String employeeCpf;
     private String employeeAddress;
+    private String employeePosition;
+    private String hireDate;
+    private String employeeUnit;
+    private String employeeWorkSector;
+
 
     // Opção (true = Optante, false = Não Optante)
     private boolean optIn;
+    
+    // Novos campos para layout específico
+    private Boolean optingVoucher; // true para SIM, false para NÃO
+    private String idaLinha;
+    private String idaTarifa;
+    private String voltaLinha;
+    private String voltaTarifa;
 
-    // Detalhes do Transporte (apenas se optIn = true)
+    // Detalhes do Transporte (mantido para compatibilidade se necessário)
     private List<TransportRoute> routes;
 
     // Dados Gerais
     private String city;
+    private String startDate; // Data de Início informada no form
     private LocalDate documentDate;
+    private String observations;
 
     @Data
     @NoArgsConstructor

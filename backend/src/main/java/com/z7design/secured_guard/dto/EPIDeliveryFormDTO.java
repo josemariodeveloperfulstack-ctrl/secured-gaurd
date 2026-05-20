@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.dto;
 
 import com.z7design.secured_guard.model.EPIDeliveryForm;
+import com.z7design.secured_guard.model.enums.EPIDeliveryType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,14 +23,51 @@ public class EPIDeliveryFormDTO {
         private String pdfUrl;
         private UUID createdById;
         private String createdByName;
+        private EPIDeliveryType deliveryType;
+        private String employeeWorkSector;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private List<EPIDeliveryFormItemDTO> items;
+        private String signatureBase64;
+        private String signatureType;
+        private com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status;
+        private UUID stockRequisitionId;
 
         public EPIDeliveryFormDTO() {
         }
 
         // Manual Getters and Setters
+        public String getSignatureBase64() {
+                return signatureBase64;
+        }
+
+        public void setSignatureBase64(String signatureBase64) {
+                this.signatureBase64 = signatureBase64;
+        }
+
+        public String getSignatureType() {
+                return signatureType;
+        }
+
+        public void setSignatureType(String signatureType) {
+                this.signatureType = signatureType;
+        }
+
+        public com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus getStatus() {
+                return status;
+        }
+
+        public void setStatus(com.z7design.secured_guard.model.enums.EPIDeliveryFormStatus status) {
+                this.status = status;
+        }
+
+        public UUID getStockRequisitionId() {
+                return stockRequisitionId;
+        }
+
+        public void setStockRequisitionId(UUID stockRequisitionId) {
+                this.stockRequisitionId = stockRequisitionId;
+        }
         public UUID getId() {
                 return id;
         }
@@ -166,6 +204,22 @@ public class EPIDeliveryFormDTO {
                 this.items = items;
         }
 
+        public EPIDeliveryType getDeliveryType() {
+                return deliveryType;
+        }
+
+        public void setDeliveryType(EPIDeliveryType deliveryType) {
+                this.deliveryType = deliveryType;
+        }
+
+        public String getEmployeeWorkSector() {
+                return employeeWorkSector;
+        }
+
+        public void setEmployeeWorkSector(String employeeWorkSector) {
+                this.employeeWorkSector = employeeWorkSector;
+        }
+
         public static EPIDeliveryFormDTO fromEntity(EPIDeliveryForm form) {
                 EPIDeliveryFormDTO dto = new EPIDeliveryFormDTO();
                 dto.setId(form.getId());
@@ -186,12 +240,19 @@ public class EPIDeliveryFormDTO {
                 }
                 dto.setObservations(form.getObservations());
                 dto.setPdfUrl(form.getPdfUrl());
+                dto.setDeliveryType(form.getDeliveryType());
+                dto.setEmployeeWorkSector(form.getEmployeeWorkSector());
                 if (form.getCreatedBy() != null) {
                         dto.setCreatedById(form.getCreatedBy().getId());
                         dto.setCreatedByName(form.getCreatedBy().getName());
                 }
                 dto.setCreatedAt(form.getCreatedAt());
                 dto.setUpdatedAt(form.getUpdatedAt());
+                dto.setSignatureBase64(form.getSignatureBase64());
+                dto.setSignatureType(form.getSignatureType());
+                dto.setStatus(form.getStatus());
+                dto.setStockRequisitionId(form.getStockRequisitionId());
+
                 if (form.getItems() != null) {
                         dto.setItems(form.getItems().stream()
                                         .map(item -> {
@@ -205,6 +266,7 @@ public class EPIDeliveryFormDTO {
                                                 itemDto.setUniformType(item.getUniformType());
                                                 itemDto.setUniformPiece(item.getUniformPiece());
                                                 itemDto.setObservations(item.getObservations());
+                                                itemDto.setStockItemId(item.getStockItemId());
                                                 return itemDto;
                                         })
                                         .collect(Collectors.toList()));

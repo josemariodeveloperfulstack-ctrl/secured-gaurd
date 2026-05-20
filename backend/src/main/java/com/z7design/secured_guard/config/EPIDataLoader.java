@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 
 @Configuration
 public class EPIDataLoader {
-
+        // Force recompile
         private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EPIDataLoader.class);
         private final PersonalProtectiveEquipmentRepository epiRepository;
 

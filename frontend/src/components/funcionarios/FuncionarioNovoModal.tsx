@@ -37,10 +37,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { validateCPF, formatCpfForInput, formatTituloEleitorForInput } from '@/utils/validation';
 import CurrencyInput from 'react-currency-input-field';
 import DocumentosGerarTab from './DocumentosGerarTab';
+import { EmployeeDocumentsTab } from './EmployeeDocumentsTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
 import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
 import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
+import { DatePicker } from '@/components/ui/date-picker';
+import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -2010,9 +2013,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-                <TabsList className={`grid w-full ${showHistoryTab ? 'grid-cols-4' : 'grid-cols-3'} bg-seguranca-graphite border border-gray-600`}>
+                <TabsList className={`grid w-full ${showHistoryTab ? 'grid-cols-5' : 'grid-cols-4'} bg-seguranca-graphite border border-gray-600`}>
                   <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
                   <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
+                  <TabsTrigger value="documentos">Documentos</TabsTrigger>
                   <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
                   {showHistoryTab && (
                     <TabsTrigger value="historico" className="flex items-center gap-1.5">
@@ -2275,13 +2279,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             <span className="truncate">Data de Nascimento</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="birthDate"
-                            type="date"
-                            value={form.birthDate}
-                            onChange={handleChange}
-                            required
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          <DatePicker
+                            date={parseDateFromBackend(form.birthDate) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, birthDate: formatDateForBackend(date) || '' }))}
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -2514,17 +2515,15 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                             />
                           </div>
-                          <div>
+                           <div>
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                               <span className="truncate">Data de Expedição</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="tituloEleitorDataExpedicao"
-                              type="date"
-                              value={form.tituloEleitorDataExpedicao || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.tituloEleitorDataExpedicao) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, tituloEleitorDataExpedicao: formatDateForBackend(date) || '' }))}
+                              className="w-full"
                             />
                           </div>
                           <div>
@@ -2532,12 +2531,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <span className="truncate">Validade</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="tituloEleitorValidade"
-                              type="date"
-                              value={form.tituloEleitorValidade || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.tituloEleitorValidade) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, tituloEleitorValidade: formatDateForBackend(date) || '' }))}
+                              className="w-full"
                             />
                           </div>
                         </div>
@@ -2617,12 +2614,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <span className="truncate">Validade da CNH</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="cnhExpirationDate"
-                              type="date"
-                              value={form.cnhExpirationDate || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.cnhExpirationDate) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, cnhExpirationDate: formatDateForBackend(date) || '' }))}
+                              className="w-full"
                             />
                           </div>
 
@@ -2658,12 +2653,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <span className="truncate">Data de Emissão da CTPS</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="ctpsIssueDate"
-                              type="date"
-                              value={form.ctpsIssueDate || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.ctpsIssueDate) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, ctpsIssueDate: formatDateForBackend(date) || '' }))}
+                              className="w-full"
                             />
                           </div>
 
@@ -2699,12 +2692,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <span className="truncate">Data de Emissão do CIN</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="cinDataEmissao"
-                              type="date"
-                              value={form.cinDataEmissao || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.cinDataEmissao) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, cinDataEmissao: formatDateForBackend(date) || '' }))}
+                              className="w-full"
                             />
                           </div>
                         </div>
@@ -2765,13 +2756,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                                 <span className="truncate">Data de Nascimento do Cônjuge</span>
                                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                               </Label>
-                              <Input
-                                name="spouseBirthDate"
-                                type="date"
-                                value={form.spouseBirthDate || ''}
-                                onChange={handleChange}
-                                required
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                              <DatePicker
+                                date={parseDateFromBackend(form.spouseBirthDate) || undefined}
+                                onDateChange={(date) => setForm(prev => ({ ...prev, spouseBirthDate: formatDateForBackend(date) || '' }))}
+                                className="w-full"
                               />
                             </div>
                             <div>
@@ -3104,22 +3092,18 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
-                          <Input
-                            name="exameMedicoData"
-                            type="date"
-                            value={form.exameMedicoData || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                          <DatePicker
+                            date={parseDateFromBackend(form.exameMedicoData) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoData: formatDateForBackend(date) || '' }))}
+                            className="w-full"
                           />
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
-                          <Input
-                            name="exameMedicoVencimento"
-                            type="date"
-                            value={form.exameMedicoVencimento || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoVencimento: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                          <DatePicker
+                            date={parseDateFromBackend(form.exameMedicoVencimento) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoVencimento: formatDateForBackend(date) || '' }))}
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -3281,12 +3265,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                         </div>
                         <div>
                           <Label className="text-sm font-medium text-gray-200">Validade</Label>
-                          <Input
-                            name="rneValidade"
-                            type="date"
-                            value={form.rneValidade || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                          <DatePicker
+                            date={parseDateFromBackend(form.rneValidade) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, rneValidade: formatDateForBackend(date) || '' }))}
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -3346,12 +3328,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             </div>
                             <div>
                               <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
-                              <Input
-                                name="ricDataEmissao"
-                                type="date"
-                                value={form.ricDataEmissao || ''}
-                                onChange={(e) => setForm(prev => ({ ...prev, ricDataEmissao: e.target.value }))}
-                                className="text-xs sm:text-sm h-9 sm:h-10"
+                              <DatePicker
+                                date={parseDateFromBackend(form.ricDataEmissao) || undefined}
+                                onDateChange={(date) => setForm(prev => ({ ...prev, ricDataEmissao: formatDateForBackend(date) || '' }))}
+                                className="w-full"
                               />
                             </div>
                           </div>
@@ -3411,13 +3391,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             <span className="truncate">Data de Admissão</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                          <Input
-                            name="hireDate"
-                            type="date"
-                            value={form.hireDate}
-                            onChange={handleChange}
-                            required
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          <DatePicker
+                            date={parseDateFromBackend(form.hireDate) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, hireDate: formatDateForBackend(date) || '' }))}
+                            className="w-full"
                           />
                         </div>
                         <div>
@@ -3425,12 +3402,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                             <span className="truncate">Data de Demissão</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                          <Input
-                            name="dataRescisao"
-                            type="date"
-                            value={form.dataRescisao || ''}
-                            onChange={handleChange}
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                          <DatePicker
+                            date={parseDateFromBackend(form.dataRescisao) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, dataRescisao: formatDateForBackend(date) || '' }))}
+                            className="w-full"
                           />
                         </div>
                         {form.dataRescisao && (
@@ -4153,6 +4128,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                   </Card>
 
                 </TabsContent>
+                <TabsContent value="documentos" className="space-y-4 sm:space-y-6">
+                   {employeeIdValue ? (
+                     <EmployeeDocumentsTab employeeId={employeeIdValue} />
+                   ) : (
+                     <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                       <div className="p-12 text-center space-y-4">
+                         <div className="p-4 bg-seguranca-yellow/20 rounded-full w-fit mx-auto">
+                           <AlertCircle className="h-10 w-10 text-seguranca-yellow" />
+                         </div>
+                         <h3 className="text-xl font-bold text-white">Salve o cadastro primeiro</h3>
+                         <p className="text-gray-400 max-w-sm mx-auto">
+                           É necessário salvar o cadastro básico do funcionário antes de iniciar a importação de documentos.
+                         </p>
+                       </div>
+                     </Card>
+                   )}
+                </TabsContent>
                 <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
                     <div className="p-4 sm:p-6 space-y-4">
@@ -4467,11 +4459,10 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                 <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
                   Data de início no novo setor <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  type="date"
-                  value={remanejamentoForm.dataInicio}
-                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: e.target.value }))}
-                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                <DatePicker
+                  date={parseDateFromBackend(remanejamentoForm.dataInicio) || undefined}
+                  onDateChange={(date) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: formatDateForBackend(date) || '' }))}
+                  className="w-full"
                 />
               </div>
               <div>

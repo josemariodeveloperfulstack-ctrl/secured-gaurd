@@ -66,10 +66,14 @@ public class SecurityConfig {
                                                  .requestMatchers("/api/messages/unread/count").authenticated()
                                                  // Endpoints públicos
                                                  .requestMatchers("/api/auth/**").permitAll()
+                                                .requestMatchers("/api/security-settings/**").hasAuthority("ROLE_SUPER_ADMIN")
+                                                .requestMatchers("/api/backup/**").hasAuthority("ROLE_SUPER_ADMIN")
                                                 .requestMatchers("/api/files/**").permitAll()
                                                 .requestMatchers("/api/test/**").permitAll()
                                                 .requestMatchers("/api/health").permitAll()
+                                                .requestMatchers("/api/webhooks/sendgrid/**").permitAll()
                                                  .requestMatchers("/api/public/**").permitAll()
+                                                .requestMatchers("/api/v1/public/**").permitAll()
                                                  .requestMatchers("/api/diagnostic/**").permitAll()
                                                  .requestMatchers("/api/debug/**").permitAll()
                                                  .requestMatchers("/api/users/public/**").permitAll()
@@ -109,12 +113,9 @@ public class SecurityConfig {
                                                 }).permitAll()
                                                 .requestMatchers("/ws/**").authenticated()
                                                 .requestMatchers("/ws").authenticated()
-                                                .requestMatchers("/api/email/test").authenticated()
-                                                .requestMatchers("/api/email/config").authenticated()
-                                                // Endpoints públicos do portal (vagas, etc)
-                                                .requestMatchers("/api/public/**").permitAll()
-                                                // WhatsApp controller - público para pareamento/health em dev
-                                                .requestMatchers("/api/whatsapp/**").permitAll()
+                                                .requestMatchers("/api/email/test", "/api/email/config").hasAuthority("ROLE_SUPER_ADMIN")
+                                                // WhatsApp controller - restrito a SUPER_ADMIN
+                                                .requestMatchers("/api/whatsapp/**").hasAuthority("ROLE_SUPER_ADMIN")
                                                 .requestMatchers("/api/payslips/test-download/**").permitAll()
                                                 .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
                                                 .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()
@@ -191,47 +192,49 @@ public class SecurityConfig {
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO")
                                                 .requestMatchers("/api/epis/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO")
                                                 .requestMatchers("/api/epi-control/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "SUPER_ADMIN",
                                                                 "ADMIN", "GESTOR",
-                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN",
+                                                                "SUPERVISOR", "OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN",
                                                                 "ROLE_ADMIN", "ROLE_GESTOR",
-                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL")
+                                                                "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO")
                                                 // Endpoints da frota - requerem permissões operacionais
                                                 .requestMatchers("/api/frota/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de fuel-records
                                                 .requestMatchers("/api/fuel-records/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de veículos
                                                 .requestMatchers("/api/vehicles/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR")
                                                 // Endpoints de work-posts
                                                 .requestMatchers("/api/work-posts/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
-                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_RH")
+                                                                "ROLE_RH",
+                                                                "COMERCIAL", "ROLE_COMERCIAL",
+                                                                "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 // Endpoints de solicitações de admissão/demissão
                                                 .requestMatchers("/api/admission-requests/**")
                                                 .hasAnyAuthority("RH", "DEPARTAMENTO_PESSOAL", "SUPER_ADMIN", "ADMIN",
@@ -281,7 +284,8 @@ public class SecurityConfig {
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_OPERATIONAL_SUPERVISOR",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS",
-                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO")
+                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO",
+                                                                "ROLE_RH", "RH", "ROLE_DEPARTAMENTO_PESSOAL", "DEPARTAMENTO_PESSOAL")
                                                 // Endpoints de requisições de compras - requerem permissões financeiras
                                                 // ou administrativas
                                                 .requestMatchers("/api/purchase-requests", "/api/purchase-requests/**")
@@ -334,6 +338,13 @@ public class SecurityConfig {
                                                                 "PROPOSALS_CREATE", "PROPOSALS_DELETE",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
+                                                // Campanhas de e-mail (SendGrid) — mesmo perfil comercial/admin
+                                                .requestMatchers("/api/v1/email-campaigns/**")
+                                                .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
+                                                                "LEADS_DELETE",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL",
+                                                                "ROLE_ASSISTENTE_COMERCIAL")
                                                 // Endpoints financeiros - requerem permissões específicas
                                                 .requestMatchers("/api/financial/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
@@ -346,7 +357,7 @@ public class SecurityConfig {
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de suppliers (fornecedores) - requerem permissões
                                                 // administrativas
                                                 // ou financeiras
@@ -381,7 +392,7 @@ public class SecurityConfig {
                                                                 "SUPER_ADMIN", "ADMIN", "FINANCEIRO",
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
-                                                                "ROLE_ANALISTA_SUPRIMENTOS")
+                                                                "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de bank-reconciliation (conciliação bancária) - requerem
                                                 // permissões
                                                 // específicas
@@ -514,6 +525,7 @@ public class SecurityConfig {
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                                "GESTAO_SUPERVISAO", "ROLE_GESTAO_SUPERVISAO",
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de funcionários, unidades, empresas e cargos - requerem
                                                 // permissões de RH, admin ou financeiro (empresas usadas em Contas a Pagar)
@@ -525,16 +537,17 @@ public class SecurityConfig {
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
+                                                                "GESTAO_SUPERVISAO", "ROLE_GESTAO_SUPERVISAO",
                                                                 "FINANCEIRO", "ROLE_FINANCEIRO", "GESTOR", "ROLE_GESTOR",
                                                                 "COMERCIAL", "ROLE_COMERCIAL",
+                                                                "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de clientes - temporariamente públicos para debug
                                                 .requestMatchers("/api/clients/**").permitAll()
-                                                // Endpoints de documentos - temporariamente públicos para debug
-                                                .requestMatchers("/api/documents/**").permitAll()
-                                                // Endpoints de certificações de funcionários - temporariamente públicos
-                                                .requestMatchers("/api/employee-certifications/**").permitAll()
+                                                // Endpoints de documentos e certificações - restritos a RH e Admins
+                                                .requestMatchers("/api/documents/**", "/api/employee-certifications/**")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "RH", "ADMIN", "SUPER_ADMIN")
                                                 // Endpoints de multas - requerem apenas autenticação (temporário para
                                                 // desenvolvimento)
                                                 .requestMatchers("/api/fines/**").authenticated()
@@ -544,7 +557,10 @@ public class SecurityConfig {
                                                 // Endpoints operacionais - temporariamente públicos para teste de
                                                 // integração
                                                 .requestMatchers("/api/schedules/**").permitAll()
-                                                .requestMatchers("/api/activity-reports/**").permitAll()
+                                                .requestMatchers("/api/activity-logs/**")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_GESTAO_SUPERVISAO", "ROLE_GESTOR_OPERACIONAL", "ROLE_SUPERVISOR")
+                                                .requestMatchers("/api/activity-reports/**")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_GESTAO_SUPERVISAO", "ROLE_GESTOR_OPERACIONAL", "ROLE_SUPERVISOR")
                                                 .requestMatchers("/api/orders-of-service/**").permitAll()
                                                 .requestMatchers("/api/operational/**").permitAll()
                                                 .requestMatchers("/api/occurrences/**").permitAll()
@@ -604,7 +620,8 @@ public class SecurityConfig {
                                                                 "STOCK_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "SUPER_ADMIN", "ADMIN",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
-                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO")
+                                                                "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO",
+                                                                "ROLE_RH", "RH", "ROLE_DEPARTAMENTO_PESSOAL", "DEPARTAMENTO_PESSOAL")
                                                 // Endpoints de modelos de documentos - temporariamente público para
                                                 // teste
                                                 .requestMatchers("/api/modelos-documentos/**").permitAll()
@@ -653,6 +670,8 @@ public class SecurityConfig {
                                                 // Endpoints de folha de ponto (time-sheets) - qualquer autenticado
                                                 // (dados por funcionário/CPF no serviço)
                                                 .requestMatchers("/api/time-sheets/**").authenticated()
+                                                // Imagens dos templates de e-mail marketing (clientes de correio não enviam JWT)
+                                                .requestMatchers("/email-marketing/**").permitAll()
                                                 // Todo o resto requer autenticação
                                 .anyRequest().authenticated())
                 .exceptionHandling(exception -> exception

@@ -150,7 +150,8 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
         companyId: empresa.id,
         personName: funcionario.name,
         personCpf: funcionario.cpf || funcionario.document || '',
-        personPosition: (funcionario as any).position?.name || '',
+        personPosition: funcionario.positionName || (funcionario as any).position?.name || '',
+        sector: funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPostName || (funcionario as any).workPost?.name || '',
         title: form.tipoDeclaracao === 'CIPA_TRANSPES' ? 'Declaração CIPA' : 'Declaração para Fins Escolares',
         content: form.observacoes || (form.tipoDeclaracao === 'CIPA_TRANSPES'
           ? `Declaramos para os devidos fins que o colaborador supra citado participou do treinamento de CIPA.`
@@ -187,7 +188,8 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
         companyId: empresa.id,
         personName: funcionario.name,
         personCpf: funcionario.cpf || funcionario.document || '',
-        personPosition: (funcionario as any).position?.name || '',
+        personPosition: funcionario.positionName || (funcionario as any).position?.name || '',
+        sector: funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPostName || (funcionario as any).workPost?.name || '',
         title: form.tipoDeclaracao === 'CIPA_TRANSPES' ? 'Declaração CIPA' : 'Declaração para Fins Escolares',
         content: form.observacoes || (form.tipoDeclaracao === 'CIPA_TRANSPES'
           ? `Declaramos para os devidos fins que o colaborador supra citado participou do treinamento de CIPA.`
@@ -374,7 +376,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground uppercase tracking-wider">Cargo</Label>
                       <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                        {(funcionario as any).position?.name || '-'}
+                        {funcionario.positionName || (funcionario as any).position?.name || '-'}
                       </div>
                     </div>
                   </div>
@@ -397,7 +399,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
                         <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                          {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
+                          {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPostName || (funcionario as any).workPost?.name || '-'}
                         </div>
                       </div>
                     )}
@@ -534,6 +536,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
             <Button
+              type="button"
               onClick={handlePreview}
               variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
@@ -552,6 +555,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
               )}
             </Button>
             <Button
+              type="button"
               onClick={handleGerarPDF}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || !funcionario || !empresa}

@@ -30,230 +30,193 @@ import java.util.Locale;
 @Slf4j
 public class TransportVoucherStandardPdfService {
 
-        private final StandardReportLayoutService pdfLayoutService;
-        private final ExcelReportLayoutService excelLayoutService;
-        private final CompanyRepository companyRepository;
+    private final StandardReportLayoutService pdfLayoutService;
+    private final ExcelReportLayoutService excelLayoutService;
+    private final CompanyRepository companyRepository;
 
-        private static final String REPORT_TITLE = "Termo de Opção de Vale-Transporte";
+    private static final String REPORT_TITLE = "DECLARAÇÃO E TERMO DE COMPROMISSO\nPARA ADQUIRIR OU NÃO O VALE-TRANSPORTE";
 
-        public byte[] generatePdf(TransportVoucherRequest request) {
-                try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-                        PdfWriter writer = new PdfWriter(outputStream);
+    public byte[] generatePdf(TransportVoucherRequest request) {
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            PdfWriter writer = new PdfWriter(outputStream);
 
-                        ReportLayoutConfig config = ReportLayoutConfig.builder()
-                                        .companyId(request.getCompanyId())
-                                        .reportTitle(REPORT_TITLE)
-                                        .includeEmailInFooter(true)
-                                        .build();
+            ReportLayoutConfig config = ReportLayoutConfig.builder()
+                    .companyId(request.getCompanyId())
+                    .reportTitle(REPORT_TITLE)
+                    .includeEmailInFooter(true)
+                    .topMargin(110f) // Aumentado em 20f (de 90f)
+                    .build();
 
-                        DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
-                        Document document = docWithPdf.getDocument();
-                        Company company = docWithPdf.getCompany();
+            DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
+            Document document = docWithPdf.getDocument();
+            Company company = docWithPdf.getCompany();
 
-                        addContent(document, request, company);
+            addContent(document, request, company);
 
-                        document.close();
-                        return outputStream.toByteArray();
-                } catch (Exception e) {
-                        log.error("Erro ao gerar PDF do Vale-Transporte", e);
-                        throw new RuntimeException("Erro ao gerar PDF do Vale-Transporte", e);
-                }
+            document.close();
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao gerar PDF do Vale-Transporte", e);
+            throw new RuntimeException("Erro ao gerar PDF do Vale-Transporte", e);
         }
+    }
 
-        public byte[] generateExcel(TransportVoucherRequest request) {
-                try (Workbook workbook = new XSSFWorkbook()) {
-                        Sheet sheet = workbook.createSheet("Vale-Transporte");
-                        Company company = companyRepository.findById(request.getCompanyId())
-                                        .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
+    public byte[] generateExcel(TransportVoucherRequest request) {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Vale-Transporte");
+            Company company = companyRepository.findById(request.getCompanyId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
 
-                        int startRow = excelLayoutService.addHeader(sheet, workbook, company, REPORT_TITLE);
+            int startRow = excelLayoutService.addHeader(sheet, workbook, company, REPORT_TITLE);
 
-                        // Adicionar dados principais
-                        Row row = sheet.createRow(startRow);
-                        row.createCell(0).setCellValue("Funcionário:");
-                        row.createCell(1).setCellValue(request.getEmployeeName());
+            // Adicionar dados principais
+            Row row = sheet.createRow(startRow);
+            row.createCell(0).setCellValue("Funcionário:");
+            row.createCell(1).setCellValue(request.getEmployeeName());
 
-                        row = sheet.createRow(startRow + 1);
-                        row.createCell(0).setCellValue("CPF:");
-                        row.createCell(1).setCellValue(request.getEmployeeCpf());
+            row = sheet.createRow(startRow + 1);
+            row.createCell(0).setCellValue("CPF:");
+            row.createCell(1).setCellValue(request.getEmployeeCpf());
 
-                        row = sheet.createRow(startRow + 2);
-                        row.createCell(0).setCellValue("Opção:");
-                        row.createCell(1).setCellValue(request.isOptIn() ? "OPTANTE" : "NÃO OPTANTE");
+            row = sheet.createRow(startRow + 2);
+            row.createCell(0).setCellValue("Opção:");
+            row.createCell(1).setCellValue(Boolean.TRUE.equals(request.getOptingVoucher()) ? "OPTANTE" : "NÃO OPTANTE");
 
-                        // Se optante, listar rotas
-                        int currentRow = startRow + 4;
-                        if (request.isOptIn() && request.getRoutes() != null && !request.getRoutes().isEmpty()) {
-                                Row headerRow = sheet.createRow(currentRow++);
-                                headerRow.createCell(0).setCellValue("Tipo");
-                                headerRow.createCell(1).setCellValue("Linha");
-                                headerRow.createCell(2).setCellValue("Valor");
-                                headerRow.createCell(3).setCellValue("Qtd");
+            // Se optante, listar rotas
+            int currentRow = startRow + 4;
+            if (Boolean.TRUE.equals(request.getOptingVoucher())) {
+                Row headerRow = sheet.createRow(currentRow++);
+                headerRow.createCell(0).setCellValue("Trajeto");
+                headerRow.createCell(1).setCellValue("Linha");
+                headerRow.createCell(2).setCellValue("Tarifa");
 
-                                for (TransportVoucherRequest.TransportRoute route : request.getRoutes()) {
-                                        Row r = sheet.createRow(currentRow++);
-                                        r.createCell(0).setCellValue(route.getType());
-                                        r.createCell(1).setCellValue(route.getLine());
-                                        r.createCell(2).setCellValue(route.getValue());
-                                        r.createCell(3).setCellValue(route.getQuantityDaily());
-                                }
-                        }
+                Row ida = sheet.createRow(currentRow++);
+                ida.createCell(0).setCellValue("Ida");
+                ida.createCell(1).setCellValue(request.getIdaLinha());
+                ida.createCell(2).setCellValue(request.getIdaTarifa());
 
-                        sheet.autoSizeColumn(0);
-                        sheet.autoSizeColumn(1);
+                Row volta = sheet.createRow(currentRow++);
+                volta.createCell(0).setCellValue("Volta");
+                volta.createCell(1).setCellValue(request.getVoltaLinha());
+                volta.createCell(2).setCellValue(request.getVoltaTarifa());
+            }
 
-                        excelLayoutService.addFooter(sheet, workbook, company);
+            sheet.autoSizeColumn(0);
+            sheet.autoSizeColumn(1);
 
-                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                        workbook.write(outputStream);
-                        return outputStream.toByteArray();
-                } catch (Exception e) {
-                        log.error("Erro ao gerar Excel do Vale-Transporte", e);
-                        throw new RuntimeException("Erro ao gerar Excel do Vale-Transporte", e);
-                }
+            excelLayoutService.addFooter(sheet, workbook, company);
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            log.error("Erro ao gerar Excel do Vale-Transporte", e);
+            throw new RuntimeException("Erro ao gerar Excel do Vale-Transporte", e);
         }
+    }
 
-        private void addContent(Document document, TransportVoucherRequest request, Company company) {
-                // Seção: Identificação do Funcionário
-                document.add(createSectionHeader("IDENTIFICAÇÃO DO FUNCIONÁRIO"));
-                Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-                employeeTable.addCell(createLabelValueCell("NOME:", request.getEmployeeName()));
-                employeeTable.addCell(createLabelValueCell("CPF:", request.getEmployeeCpf()));
-                employeeTable.addCell(createLabelValueCell("ENDEREÇO:", request.getEmployeeAddress()));
-                document.add(employeeTable);
+    private void addContent(Document document, TransportVoucherRequest request, Company company) {
+        // Texto Introdutório
+        document.add(new Paragraph("O vale-transporte é um direito do trabalhador, faça sua opção se quer adquiri-lo ou não, assinalando com um X.")
+                .setFontSize(11f)
+                .setMarginTop(10f)
+                .setMarginBottom(10f));
 
-                // Seção: Opção pelo Benefício
-                document.add(createSectionHeader("OPÇÃO PELO BENEFÍCIO"));
-                if (request.isOptIn()) {
-                        addOptInContent(document, request);
-                } else {
-                        addOptOutContent(document);
-                }
+        // Opções SIM/NÃO
+        String simX = Boolean.TRUE.equals(request.getOptingVoucher()) ? "X" : " ";
+        String naoX = Boolean.FALSE.equals(request.getOptingVoucher()) ? "X" : " ";
+        document.add(new Paragraph("( " + simX + " ) SIM  ( " + naoX + " ) NÃO;")
+                .setFontSize(11f)
+                .setBold()
+                .setMarginBottom(15f));
 
-                // Seção: Termos e Compromissos
-                document.add(createSectionHeader("TERMOS E COMPROMISSOS"));
-                Paragraph terms = new Paragraph()
-                                .setFontSize(10f)
-                                .setTextAlignment(TextAlignment.JUSTIFIED)
-                                .setMarginBottom(10f);
+        // Corpo da Declaração
+        Paragraph body = new Paragraph()
+                .setFontSize(11f)
+                .setTextAlignment(TextAlignment.JUSTIFIED)
+                .setMultipliedLeading(1.5f);
 
-                terms.add(new Text(
-                                "Eu, acima identificado, declaro ter recebido as informações sobre o benefício do Vale-Transporte (Lei nº 7.418/85) e comprometo-me a:\n\n")
-                                .setFontSize(10f));
-                terms.add("1. Utilizar o Vale-Transporte exclusivamente para o meu efetivo deslocamento residência-trabalho e vice-versa.\n");
-                terms.add("2. Renovar anualmente ou sempre que houver alteração de endereço ou meio de transporte, minhas informações cadastrais.\n");
-                terms.add("3. Autorizar o desconto em folha de pagamento de até 6% do meu salário básico, conforme legislação vigente.\n\n");
-                terms.add(new Text(
-                                "A falsa declaração ou o uso indevido do Vale-Transporte constituem falta grave, passível de demissão por justa causa.")
-                                .setBold());
-                document.add(terms);
+        body.add("Eu, ");
+        body.add(new Text(request.getEmployeeName().toUpperCase()).setBold().setUnderline());
+        body.add(", empregado(a) da ");
+        body.add(new Text(company.getName().toUpperCase()).setBold());
+        body.add(" desejo adquirir vale-transporte, declaro que estou morando na ");
+        
+        String address = request.getEmployeeAddress() != null ? request.getEmployeeAddress() : "";
+        body.add(new Text(address).setBold());
+        
+        body.add(", e uso __________ vales transportes para o meu deslocamento residência-trabalho e vice-versa.");
+        document.add(body);
 
-                // Assinaturas
-                addSignatures(document, request, company);
+        // Seção de Linhas e Tarifas (Tabela estruturada)
+        Table routeTable = new Table(UnitValue.createPercentArray(new float[]{20, 60, 20}))
+                .useAllAvailableWidth()
+                .setMarginTop(10f)
+                .setMarginBottom(10f);
+
+        routeTable.addHeaderCell(new Cell().add(new Paragraph("Trajeto").setBold().setFontSize(9f)));
+        routeTable.addHeaderCell(new Cell().add(new Paragraph("Linha").setBold().setFontSize(9f)));
+        routeTable.addHeaderCell(new Cell().add(new Paragraph("Tarifa (R$)").setBold().setFontSize(9f)));
+
+        routeTable.addCell(new Cell().add(new Paragraph("Ida").setFontSize(9f)));
+        routeTable.addCell(new Cell().add(new Paragraph(request.getIdaLinha() != null && !request.getIdaLinha().isEmpty() ? request.getIdaLinha() : " ").setFontSize(9f)));
+        routeTable.addCell(new Cell().add(new Paragraph(request.getIdaTarifa() != null && !request.getIdaTarifa().isEmpty() ? request.getIdaTarifa() : " ").setFontSize(9f)));
+
+        routeTable.addCell(new Cell().add(new Paragraph("Volta").setFontSize(9f)));
+        routeTable.addCell(new Cell().add(new Paragraph(request.getVoltaLinha() != null && !request.getVoltaLinha().isEmpty() ? request.getVoltaLinha() : " ").setFontSize(9f)));
+        routeTable.addCell(new Cell().add(new Paragraph(request.getVoltaTarifa() != null && !request.getVoltaTarifa().isEmpty() ? request.getVoltaTarifa() : " ").setFontSize(9f)));
+
+        document.add(routeTable);
+
+        // Termos de Compromisso
+        document.add(new Paragraph("\nAssumo o compromisso de utilizar o vale-transporte exclusivamente para o meu efetivo deslocamento residência-trabalho e vice-versa; e afirmo ter conhecimento do artigo 7°, § 3° do Decreto n° 95.247/87, de que constitui falta grave o seu uso indevido ou que essa declaração seja falsa.")
+                .setFontSize(10.5f)
+                .setTextAlignment(TextAlignment.JUSTIFIED)
+                .setMarginTop(15f));
+
+        document.add(new Paragraph("Comprometo-me a atualizar anualmente as informações, ou a qualquer tempo quando ocorrer mudança residencial ou meio(s) de transporte(s).")
+                .setFontSize(10.5f)
+                .setMarginTop(10f));
+
+        document.add(new Paragraph("Autorizo a empresa a descontar mensalmente, até 6% de meu salário-base, o valor destinado a cobrir o fornecimento de vale-transporte por mim utilizado.")
+                .setFontSize(10.5f)
+                .setMarginTop(10f));
+
+        document.add(new Paragraph("Por ser a expressão da verdade, firmo a presente declaração e termo de compromisso.")
+                .setFontSize(10.5f)
+                .setMarginTop(15f));
+
+        // Assinaturas e Data
+        addSignatures(document, request, company);
+    }
+
+    private void addSignatures(Document document, TransportVoucherRequest request, Company company) {
+        String city = request.getCity();
+        
+        // Se a cidade informada parecer um endereço (contém Rua ou vírgula), buscar a cidade real da empresa
+        if (city == null || city.isEmpty() || city.toLowerCase().contains("rua") || city.contains(",")) {
+            city = com.z7design.secured_guard.util.CompanyDataFormatter.resolveContractSigningCity(company);
         }
+        
+        if (city == null || city.isEmpty()) city = "Contagem"; // Fallback para Contagem
+        
+        LocalDate docDate = request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now();
+        String dateStr = formatDateExtended(docDate);
 
-        private Cell createLabelValueCell(String label, String value) {
-                Paragraph p = new Paragraph();
-                p.add(new Text(label).setBold().setFontSize(9f));
-                p.add(new Text(" " + (value != null && !value.isEmpty() ? value : "-")).setFontSize(10f));
-                return new Cell().add(p).setPadding(5f);
-        }
+        document.add(new Paragraph("\n" + city + ", " + dateStr)
+                .setFontSize(11f)
+                .setMarginTop(25f)
+                .setMarginBottom(40f));
 
-        private Paragraph createSectionHeader(String title) {
-                return new Paragraph(title)
-                                .setBold()
-                                .setFontSize(11f)
-                                .setFontColor(com.itextpdf.kernel.colors.DeviceRgb.RED)
-                                .setMarginTop(15f)
-                                .setMarginBottom(5f)
-                                .setBorderLeft(
-                                                new com.itextpdf.layout.borders.SolidBorder(
-                                                                com.itextpdf.kernel.colors.DeviceRgb.RED, 3f))
-                                .setPaddingLeft(5f);
-        }
+        document.add(new Paragraph("______________________________________________________")
+                .setTextAlignment(TextAlignment.LEFT));
+        document.add(new Paragraph(request.getEmployeeName().toUpperCase())
+                .setBold()
+                .setFontSize(10f)
+                .setMarginTop(-5f));
+    }
 
-        private void addSignatures(Document document, TransportVoucherRequest request, Company company) {
-                String city = request.getCity() != null ? request.getCity()
-                                : (company.getCity() != null ? company.getCity() : "_______________");
-                String date = formatDateExtended(
-                                request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now());
-
-                Paragraph dateLoc = new Paragraph(city + ", " + date)
-                                .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginTop(30f)
-                                .setMarginBottom(40f)
-                                .setFontSize(10f);
-                document.add(dateLoc);
-
-                Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-
-                Cell cell = new Cell()
-                                .add(new Paragraph("_________________________________")
-                                                .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(request.getEmployeeName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Assinatura do Funcionário").setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f))
-                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                sigTable.addCell(cell);
-                document.add(sigTable);
-        }
-
-        private void addOptInContent(Document document, TransportVoucherRequest request) {
-                document.add(new Paragraph(
-                                "( X ) OPTAR pelo recebimento do Vale-Transporte, informando abaixo os meios de transporte que utilizarei:")
-                                .setFontSize(10f)
-                                .setMarginBottom(10f));
-
-                if (request.getRoutes() != null && !request.getRoutes().isEmpty()) {
-                        Table table = new Table(UnitValue.createPercentArray(new float[] { 20, 40, 20, 20 }))
-                                        .useAllAvailableWidth();
-
-                        table.addHeaderCell(new Cell().add(new Paragraph("Tipo").setBold().setFontSize(9f)));
-                        table.addHeaderCell(new Cell().add(new Paragraph("Linha / Empresa").setBold().setFontSize(9f)));
-                        table.addHeaderCell(new Cell().add(new Paragraph("Tarifa (R$)").setBold().setFontSize(9f)));
-                        table.addHeaderCell(new Cell().add(new Paragraph("Qtd/Dia").setBold().setFontSize(9f)));
-
-                        for (TransportVoucherRequest.TransportRoute route : request.getRoutes()) {
-                                table.addCell(new Cell()
-                                                .add(new Paragraph(route.getType() != null ? route.getType() : "-")
-                                                                .setFontSize(9f)));
-                                table.addCell(new Cell().add(new Paragraph((route.getLine() != null ? route.getLine()
-                                                : "") + " / " + (route.getCompany() != null ? route.getCompany() : ""))
-                                                .setFontSize(9f)));
-                                table.addCell(new Cell().add(new Paragraph(String.format("%.2f",
-                                                route.getValue() != null ? route.getValue() : 0.0)).setFontSize(9f)));
-                                table.addCell(new Cell().add(new Paragraph(String.valueOf(route.getQuantityDaily()))
-                                                .setFontSize(9f)));
-                        }
-                        document.add(table);
-                } else {
-                        document.add(new Paragraph("(Nenhuma rota informada)")
-                                        .setItalic()
-                                        .setFontSize(10f)
-                                        .setMarginBottom(10f));
-                }
-        }
-
-        private void addOptOutContent(Document document) {
-                document.add(new Paragraph("( X ) NÃO OPTAR pelo recebimento do Vale-Transporte, declarando que:")
-                                .setFontSize(10f)
-                                .setMarginBottom(10f));
-
-                com.itextpdf.layout.element.List list = new com.itextpdf.layout.element.List()
-                                .setSymbolIndent(12)
-                                .setListSymbol("•")
-                                .setFontSize(10f);
-                list.add("Utilizo meios próprios de locomoção para o trabalho; ou");
-                list.add("Resido próximo ao local de trabalho, não necessitando de transporte público.");
-                document.add(list);
-        }
-
-        private String formatDateExtended(LocalDate date) {
-                return date.format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy", new Locale("pt", "BR")));
-        }
+    private String formatDateExtended(LocalDate date) {
+        return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", new Locale("pt", "BR")));
+    }
 }

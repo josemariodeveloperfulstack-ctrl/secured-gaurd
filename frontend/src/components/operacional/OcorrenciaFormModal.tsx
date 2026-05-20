@@ -243,14 +243,40 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
     setEmployeeSearchResults([]);
     setShowEmployeeDropdown(false);
     setErrors(prev => ({ ...prev, employeeId: '' }));
+
     try {
       const full = await employeeService.getEmployeeById(emp.id);
       const workPostId = full?.workPostId ?? full?.workPost?.id;
-      const workPostName = full?.workPost?.name ?? (workPostId ? workPosts.find(p => p.id === workPostId)?.name : undefined);
-      if (workPostId && workPostName) {
-        setFormData(prev => ({ ...prev, locationId: workPostId, location: workPostName }));
-        setErrors(prev => ({ ...prev, location: '' }));
+      if (!workPostId) return;
+
+      // 1) Nome diretamente do funcionário (quando o backend traz aninhado)
+      let workPostName: string | undefined = full?.workPost?.name;
+
+      // 2) Fallback: tentar na lista já carregada
+      if (!workPostName) {
+        workPostName = workPosts.find(p => p.id === workPostId)?.name;
       }
+
+      // 3) Fallback final: buscar diretamente no serviço e fazer upsert na lista local
+      if (!workPostName) {
+        try {
+          const wp = await workPostService.getWorkPostById(workPostId);
+          if (wp?.name) {
+            workPostName = wp.name;
+            setWorkPosts(prev => (prev.some(p => p.id === wp.id) ? prev : [...prev, wp]));
+          }
+        } catch {
+          /* silencioso */
+        }
+      }
+
+      // Preenche o locationId mesmo sem nome (o Select resolverá o nome quando os postos terminarem de carregar)
+      setFormData(prev => ({
+        ...prev,
+        locationId: workPostId,
+        location: workPostName ?? prev.location ?? '',
+      }));
+      setErrors(prev => ({ ...prev, location: '' }));
     } catch {
       // Ignorar; usuário pode selecionar posto manualmente
     }
@@ -741,12 +767,11 @@ const OcorrenciaFormModal: React.FC<OcorrenciaFormModalProps> = ({
                 >
                   <SelectTrigger className={`bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11 ${errors.location ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder={loadingWorkPosts ? 'Carregando...' : 'Selecione o posto de trabalho'}>
-                      {formData.locationId && !loadingWorkPosts && workPosts.length > 0 && (
-                        workPosts.find(post => post.id === formData.locationId)?.name || 
-                        formData.location || 
-                        ocorrencia?.location || 
-                        ''
-                      )}
+                      {formData.locationId &&
+                        (workPosts.find(post => post.id === formData.locationId)?.name ||
+                          formData.location ||
+                          ocorrencia?.location ||
+                          '')}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[300px]">

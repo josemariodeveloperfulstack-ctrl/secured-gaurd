@@ -54,7 +54,8 @@ public class StandardReportLayoutService {
 
     private final CompanyRepository companyRepository;
 
-    @Value("${app.upload.dir:uploads}")
+    /** Mesmo root que {@link WebConfig} e {@code FileUploadController} ({@code app.upload.base-dir}). */
+    @Value("${app.upload.base-dir:${app.upload.dir:uploads}}")
     private String uploadDir;
 
     /** URL pública do front (e-mails, links). Não usar para /api/uploads no servidor — ver {@link #resolveBackendInternalBaseUrl()}. */
@@ -343,9 +344,8 @@ public class StandardReportLayoutService {
                     .setTextAlignment(TextAlignment.CENTER)
                     .setFontColor(new DeviceRgb(0, 0, 0)) // Texto preto (fora da barra gradiente)
                     .setMultipliedLeading(1.1f)
-                    .setMarginTop(55f) // Margin top de 55pt
-                    .setMarginBottom(config.getReportSubTitle() != null ? 5f : 45f); // Se tiver subtítulo, margin
-                                                                                     // bottom menor
+                    .setMarginTop(20f) // Margin top reduzida para 20pt conforme solicitado
+                    .setMarginBottom(config.getReportSubTitle() != null ? 5f : 30f); // Margin bottom ajustada
             canvas.add(title.setFixedPosition(0, titleY, pageWidth));
 
             // Subtítulo do relatório
@@ -381,10 +381,10 @@ public class StandardReportLayoutService {
             Paragraph companyNameFooter = new Paragraph(company.getName())
                     .setFontSize(9)
                     .setBold()
-                    .setTextAlignment(TextAlignment.CENTER)
+                    .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(companyNameFooter.setFixedPosition(0, yPosition + 30f, pageWidth));
+            canvas.add(companyNameFooter.setFixedPosition(12f, yPosition + 30f, pageWidth));
         }
 
         // Segunda linha: Endereço completo
@@ -392,10 +392,10 @@ public class StandardReportLayoutService {
         if (!address.isEmpty()) {
             Paragraph addressFooter = new Paragraph(address)
                     .setFontSize(8)
-                    .setTextAlignment(TextAlignment.CENTER)
+                    .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(addressFooter.setFixedPosition(0, yPosition + 20f, pageWidth));
+            canvas.add(addressFooter.setFixedPosition(12f, yPosition + 20f, pageWidth));
         }
 
         // Terceira linha: CNPJ
@@ -403,10 +403,10 @@ public class StandardReportLayoutService {
         if (!cnpjText.isEmpty()) {
             Paragraph cnpjFooter = new Paragraph(cnpjText)
                     .setFontSize(8)
-                    .setTextAlignment(TextAlignment.CENTER)
+                    .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(cnpjFooter.setFixedPosition(0, yPosition + 10f, pageWidth));
+            canvas.add(cnpjFooter.setFixedPosition(12f, yPosition + 10f, pageWidth));
         }
 
         // Bloco direito: usuário e data da geração (acima da numeração), alinhado à direita
@@ -660,7 +660,8 @@ public class StandardReportLayoutService {
                         }
                     } else {
                         try {
-                            imageData = ImageDataFactory.create(logoPath);
+                            byte[] logoBytes = Files.readAllBytes(Paths.get(logoPath));
+                            imageData = ImageDataFactory.create(logoBytes);
                         } catch (OutOfMemoryError e) {
                             log.error(
                                     "❌ Erro de memória ao carregar logo do caminho {}: imagem muito grande. Tamanho do arquivo: {} bytes",
@@ -702,6 +703,11 @@ public class StandardReportLayoutService {
                         company.getName(), e.getMessage());
                 return null;
             }
+            if (isCausedByFileNotFoundException(e)) {
+                log.warn("⚠️ Logo da empresa {} não disponível (arquivo não encontrado no disco nem via HTTP)",
+                        company.getName());
+                return null;
+            }
             log.warn("Erro ao carregar logo da empresa {}: {}", company.getName(), e.getMessage());
             log.debug("Detalhe", e);
             return null;
@@ -711,6 +717,15 @@ public class StandardReportLayoutService {
     private static boolean isCausedByConnectException(Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
             if (t instanceof java.net.ConnectException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isCausedByFileNotFoundException(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof java.io.FileNotFoundException) {
                 return true;
             }
         }

@@ -4,6 +4,7 @@ package com.z7design.secured_guard.model.enums;
  * Categorias de EPIs (Equipamentos de Proteção Individual)
  */
 public enum EPICategory {
+    // Force recompile to fix ClassNotFoundException
     CABECA("Cabeça"),
     OLHOS("Olhos"),
     AUDITIVO("Auditivo"),

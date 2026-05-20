@@ -6,8 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, TrendingUp, Upload } from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { DatePicker } from '@/components/ui/date-picker';
 import { financialService, FinancialTransaction } from '@/services/financialService';
 import { unitService, Unit } from '@/services/unitService';
 import { format } from 'date-fns';
@@ -316,26 +315,20 @@ export const ContaReceberModal: React.FC<ContaReceberModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Data de Vencimento *</label>
-              <DatePicker
-                selected={formData.dataVencimento}
-                onChange={(date: Date) => handleInputChange('dataVencimento', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-                required
+               <DatePicker
+                date={formData.dataVencimento || undefined}
+                onDateChange={(date) => handleInputChange('dataVencimento', date)}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-seguranca-lightgray">Data do Lançamento *</label>
-              <DatePicker
-                selected={formData.dataLancamento}
-                onChange={(date: Date) => handleInputChange('dataLancamento', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                className="form-input w-full"
-                placeholderText="dd/mm/aaaa"
-                required
+               <DatePicker
+                date={formData.dataLancamento}
+                onDateChange={(date) => handleInputChange('dataLancamento', date || new Date())}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
           </div>

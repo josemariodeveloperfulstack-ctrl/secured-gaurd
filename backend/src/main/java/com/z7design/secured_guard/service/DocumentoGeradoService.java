@@ -153,6 +153,30 @@ public class DocumentoGeradoService {
     }
 
     /**
+     * Lista documentos gerados de um funcionário a partir do User vinculado.
+     * Usado pelo endpoint /meus para o Dashboard do Colaborador.
+     */
+    @Transactional(readOnly = true)
+    public List<DocumentoGerado> listarPorUserId(UUID userId) {
+        if (userId == null) {
+            return java.util.Collections.emptyList();
+        }
+        return documentoGeradoRepository.findByFuncionarioUserIdOrderByDataCriacaoDesc(userId);
+    }
+
+    /**
+     * Lista documentos de um funcionário filtrados por tipo/categoria.
+     */
+    @Transactional(readOnly = true)
+    public List<DocumentoGerado> listarPorFuncionarioETipo(UUID funcionarioId,
+            com.z7design.secured_guard.model.enums.TipoDocumentoGerado tipo) {
+        Employee funcionario = employeeRepository.findById(funcionarioId)
+                .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
+
+        return documentoGeradoRepository.findByFuncionarioAndTipoOrderByDataCriacaoDesc(funcionario, tipo);
+    }
+
+    /**
      * Lista documentos por modelo
      */
     @Transactional(readOnly = true)

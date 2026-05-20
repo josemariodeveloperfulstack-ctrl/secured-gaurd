@@ -109,6 +109,20 @@ public class QuoteController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/bulk")
+    @Operation(summary = "Excluir orçamentos em massa", description = "Exclui múltiplos orçamentos do sistema")
+    public ResponseEntity<Void> deleteQuotesBulk(@RequestBody List<UUID> ids) {
+        quoteService.deleteBulk(ids);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/all")
+    @Operation(summary = "Excluir todos os orçamentos", description = "Exclui todos os orçamentos do sistema")
+    public ResponseEntity<Void> deleteAllQuotes() {
+        quoteService.deleteAll();
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/status/{status}")
     @Operation(summary = "Buscar orçamentos por status", description = "Retorna orçamentos filtrados por status")
     public ResponseEntity<List<QuoteDTO>> getQuotesByStatus(@PathVariable String status) {

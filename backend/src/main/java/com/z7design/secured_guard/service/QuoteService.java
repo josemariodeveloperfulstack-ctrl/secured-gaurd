@@ -230,6 +230,14 @@ public class QuoteService {
         quoteRepository.delete(quote);
     }
 
+    public void deleteBulk(List<UUID> ids) {
+        quoteRepository.deleteAllById(ids);
+    }
+
+    public void deleteAll() {
+        quoteRepository.deleteAllInBatch();
+    }
+
     @Transactional(readOnly = true)
     public List<Quote> findByStatus(QuoteStatus status) {
         List<Quote> quotes = quoteRepository.findByStatus(status);

@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.TransportVoucherRequest;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import com.z7design.secured_guard.service.TransportVoucherStandardPdfService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/transport-voucher")
 @RequiredArgsConstructor
@@ -20,16 +25,34 @@ import org.springframework.web.bind.annotation.RestController;
 public class TransportVoucherController {
 
     private final TransportVoucherStandardPdfService voucherService;
+    private final DocumentoGeradoPersistenceService persistenceService;
 
     @PostMapping("/generate-pdf")
     @Operation(summary = "Gerar PDF do Termo de Vale-Transporte")
     public ResponseEntity<byte[]> generatePdf(@RequestBody TransportVoucherRequest request) {
         byte[] pdfBytes = voucherService.generatePdf(request);
 
+        Map<String, Object> dados = new LinkedHashMap<>();
+        if (request.getEmployeeName() != null) dados.put("employeeName", request.getEmployeeName());
+        dados.put("optIn", request.isOptIn());
+        if (request.getDocumentDate() != null) dados.put("documentDate", request.getDocumentDate().toString());
+
+        persistenceService.persistir(
+                request.getEmployeeId(),
+                TipoDocumentoGerado.TRANSPORT_VOUCHER,
+                pdfBytes,
+                "vale-transporte-" + safeSlug(request.getEmployeeName()) + ".pdf",
+                dados);
+
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"vale-transporte.pdf\"")
                 .body(pdfBytes);
+    }
+
+    private static String safeSlug(String value) {
+        if (value == null || value.isBlank()) return "documento";
+        return value.trim().toLowerCase().replaceAll("\\s+", "-");
     }
 
     @PostMapping("/preview-pdf")

@@ -15,6 +15,9 @@ import java.util.UUID;
 public class ServiceProviderAwarenessRequest {
     private UUID companyId;
 
+    /** ID do funcionário (opcional). Quando informado, persiste o PDF gerado. */
+    private UUID employeeId;
+
     // Dados do Prestador
     private String providerName; // Nome da empresa ou pessoa
     private String providerCnpjCpf;

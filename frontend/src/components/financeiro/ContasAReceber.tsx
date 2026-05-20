@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '@/components/ui/date-picker';
 import { DatePickerWithRange } from '@/components/ui/date-range-picker';
 import {
   DollarSign,
@@ -27,6 +34,7 @@ import {
   Mail,
   Phone,
   FileText,
+  ChevronDown,
   Download,
   Send,
   Eye,
@@ -34,15 +42,31 @@ import {
   Trash2,
   CreditCard,
   BarChart3,
-  PieChart
+  PieChart,
+  FileDown,
+  Check,
+  RefreshCw,
+  ListChecks
 } from 'lucide-react';
 import { ContasAReceberGuard } from './FinanceiroPermissionGuard';
 import { ContasAReceberFormModal } from './ContasAReceberFormModal';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth } from 'date-fns';
+import { format, addDays, isAfter, isBefore, startOfMonth, endOfMonth, startOfDay, endOfDay, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale/pt-BR';
 import { DateRange } from 'react-day-picker';
 import { contasAReceberService, Cliente, ContaAReceber } from '@/services/contasAReceberService';
+import { unitService } from '@/services/unitService';
 
 interface HistoricoCobranca {
   id: string;
@@ -67,17 +91,113 @@ function isStatusCancelada(s: string | undefined) {
   return s === 'CANCELADA' || s === 'CANCELLED';
 }
 
+function mapBackendStatusToFrontend(s: string | undefined): 'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA' {
+  if (isStatusRecebida(s)) return 'RECEBIDA';
+  if (isStatusCancelada(s)) return 'CANCELADA';
+  if (isStatusVencida(s)) return 'VENCIDA';
+  return 'ABERTA';
+}
+
+/** Dias até o vencimento (0 = hoje) para considerar "vencendo" em amarelo */
+const DIAS_ALERTA_VENCIMENTO = 7;
+
+const statusPillClass =
+  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ring-offset-background';
+
+/**
+ * Cores: pago → verde; vencendo (até N dias) → amarelo; vencida → vermelho.
+ * Pendente distante e cancelado usam tons neutros.
+ */
+function getContaReceberStatusVisual(conta: ContaAReceber): { label: string; className: string } {
+  if (isStatusCancelada(conta.status)) {
+    return {
+      label: 'Cancelado',
+      className: 'border-gray-600 bg-gray-800/90 text-gray-300'
+    };
+  }
+  if (isStatusRecebida(conta.status)) {
+    return {
+      label: 'Pago',
+      className: 'border-transparent bg-green-600 text-white shadow-sm hover:bg-green-600/90'
+    };
+  }
+
+  let due: Date;
+  try {
+    due = startOfDay(new Date(conta.dueDate || conta.vencimento));
+    if (Number.isNaN(due.getTime())) {
+      due = startOfDay(new Date());
+    }
+  } catch {
+    due = startOfDay(new Date());
+  }
+  const today = startOfDay(new Date());
+  const daysUntil = differenceInCalendarDays(due, today);
+
+  const emAtraso =
+    isStatusVencida(conta.status) || (conta.overdueDays ?? 0) > 0 || daysUntil < 0;
+
+  if (emAtraso) {
+    return {
+      label: 'Vencido',
+      className: 'border-transparent bg-red-600 text-white shadow-sm hover:bg-red-600/90'
+    };
+  }
+
+  if (daysUntil >= 0 && daysUntil <= DIAS_ALERTA_VENCIMENTO) {
+    return {
+      label: daysUntil === 0 ? 'Vence hoje' : 'Vencendo',
+      className: 'border-transparent bg-amber-500 text-black shadow-sm hover:bg-amber-500/90'
+    };
+  }
+
+  return {
+    label: 'Pendente',
+    className: 'border-gray-600 bg-gray-700/90 text-seguranca-lightgray hover:bg-gray-700'
+  };
+}
+
 export const ContasAReceber: React.FC = () => {
+  const { user } = useAuth();
   const [contas, setContas] = useState<ContaAReceber[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
+  const [effectiveSearch, setEffectiveSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'cliente' | 'medicao' | 'valor' | 'vencimento' | 'status' | null>(null);
+  const [sortDir, setSortDir] = useState<'ASC' | 'DESC' | null>(null);
+
+  useEffect(() => {
+    if (searchTerm.trim().length >= 3) {
+      setEffectiveSearch(searchTerm);
+    } else {
+      setEffectiveSearch('');
+    }
+  }, [searchTerm]);
+
+  const handleSort = (field: 'cliente' | 'medicao' | 'valor' | 'vencimento' | 'status') => {
+    if (sortBy !== field) {
+      setSortBy(field);
+      setSortDir('DESC');
+    } else {
+      if (sortDir === 'DESC') {
+        setSortDir('ASC');
+      } else {
+        setSortDir(null);
+        setSortBy(null);
+      }
+    }
+  };
+
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterCliente, setFilterCliente] = useState('all');
-  // Sem período por padrão: filtrar só pelo calendário em "Filtros Avançados" evita lista vazia
-  // quando os vencimentos estão fora do mês atual.
+  const [filterUnit, setFilterUnit] = useState('all');
+  const [filterAmountMin, setFilterAmountMin] = useState('');
+  const [filterAmountMax, setFilterAmountMax] = useState('');
+  const [units, setUnits] = useState<any[]>([]);
+  /** Sem período por defeito: antes filtrava só o mês actual e a lista parecia vazia quando os vencimentos eram outros meses. Use "Filtros Avançados" para restringir por vencimento. */
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Estados do modal
@@ -94,7 +214,29 @@ export const ContasAReceber: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contaToDelete, setContaToDelete] = useState<ContaAReceber | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  /** Modo seleção: mostra checkboxes na lista para escolher quais contas excluir em massa */
+  const [receivableSelectionMode, setReceivableSelectionMode] = useState(false);
+  const [selectedReceivableIds, setSelectedReceivableIds] = useState<string[]>([]);
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [contaParaMarcarPaga, setContaParaMarcarPaga] = useState<ContaAReceber | null>(null);
+  
+  // Novos estados para alteração de status
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [newStatus, setNewStatus] = useState<'ABERTA' | 'RECEBIDA' | 'VENCIDA' | 'CANCELADA'>('ABERTA');
+  const [selectedPaymentDate, setSelectedPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  
+  // Relatórios estados
+  const [showReportPeriodModal, setShowReportPeriodModal] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState<Date>(startOfMonth(new Date()));
+  const [reportEndDate, setReportEndDate] = useState<Date>(endOfMonth(new Date()));
+  const [reportSegment, setReportSegment] = useState<string>('GERAL');
+  
   const { toast } = useToast();
+
+  const canEditReceivable = Boolean(user?.permissions?.FINANCIAL_RECEIVABLE_WRITE);
 
   // Funções de cobrança e gestão
 
@@ -116,8 +258,8 @@ export const ContasAReceber: React.FC = () => {
     setEditMode(false);
   };
 
-  const handleFormSuccess = () => {
-    loadContas();
+  const handleFormSuccess = async () => {
+    await loadContas();
     handleCloseFormModal();
   };
   const handleCobrancaAutomatica = async (contaId: string, tipo: 'email' | 'whatsapp' | 'telefone') => {
@@ -191,29 +333,45 @@ export const ContasAReceber: React.FC = () => {
     }
   };
 
-  const handleExportPDF = async () => {
-    if (filteredContas.length === 0) {
-      toast({
-        title: 'Aviso',
-        description: 'Não há contas para exportar com os filtros aplicados.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
+  const downloadContasReceberPdf = async (opts: {
+    segment?: string | null;
+    includePeriod?: boolean;
+    filePrefix: string;
+    successDescription: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
     setExportLoading(true);
     try {
-      // Formatar datas para o backend
-      const startDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : format(startOfMonth(new Date()), 'yyyy-MM-dd');
-      const endDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : format(endOfMonth(new Date()), 'yyyy-MM-dd');
+      const params = new URLSearchParams();
+      if (opts.includePeriod) {
+        const startDate = opts.startDate || (dateRange?.from
+          ? format(dateRange.from, 'yyyy-MM-dd')
+          : format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+        const endDate = opts.endDate || (dateRange?.to
+          ? format(dateRange.to, 'yyyy-MM-dd')
+          : format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+        params.set('startDate', startDate);
+        params.set('endDate', endDate);
+      }
+      
+      if (filterStatus !== 'all') params.set('statusFilter', filterStatus);
+      if (filterCliente !== 'all') params.set('clientFilter', filterCliente);
+      if (filterUnit !== 'all') params.set('unitFilter', filterUnit);
+      if (filterCategoria !== 'all') params.set('categoryFilter', filterCategoria);
+      if (filterAmountMin) params.set('amountMin', filterAmountMin);
+      if (filterAmountMax) params.set('amountMax', filterAmountMax);
+      
+      if (opts.segment) {
+        params.set('reportSegment', opts.segment);
+      }
 
-      // Endpoint para Contas a Receber
-      const url = `/api/reports/accounts-receivable/pdf?startDate=${startDate}&endDate=${endDate}`;
+      const qs = params.toString();
+      const url = `/api/accounts-receivable/reports/pdf${qs ? `?${qs}` : ''}`;
 
-      // Chamar endpoint do backend
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
 
@@ -223,7 +381,7 @@ export const ContasAReceber: React.FC = () => {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `relatorio-contas-a-receber-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      link.setAttribute('download', `${opts.filePrefix}-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -231,10 +389,10 @@ export const ContasAReceber: React.FC = () => {
 
       toast({
         title: 'Sucesso',
-        description: 'Relatório PDF gerado pelo servidor com sucesso'
+        description: opts.successDescription
       });
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
+      console.error('Erro ao exportar PDF de contas a receber:', error);
       toast({
         title: 'Erro',
         description: 'Erro ao gerar relatório no servidor. Tente novamente.',
@@ -245,24 +403,29 @@ export const ContasAReceber: React.FC = () => {
     }
   };
 
-  const handleExportInadimplencia = async () => {
+  const downloadSingleAccountPdf = async (conta: ContaAReceber) => {
+    if (!conta.id) return;
     setExportLoading(true);
     try {
-      const url = `/api/reports/accounts-receivable/pdf?status=OVERDUE`;
+      const params = new URLSearchParams();
+      params.set('selectedIds', conta.id);
+      
+      const qs = params.toString();
+      const url = `/api/accounts-receivable/reports/pdf?${qs}`;
 
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
 
-      if (!response.ok) throw new Error('Falha ao gerar relatório de inadimplência');
+      if (!response.ok) throw new Error('Falha ao gerar PDF');
 
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `relatorio-inadimplencia-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      link.setAttribute('download', `fatura-${conta.invoiceNumber || conta.id}.pdf`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -270,17 +433,50 @@ export const ContasAReceber: React.FC = () => {
 
       toast({
         title: 'Sucesso',
-        description: 'Relatório de inadimplência gerado com layout padrão'
+        description: 'PDF da conta gerado com sucesso.'
       });
     } catch (error) {
-      console.error('Erro ao exportar inadimplência:', error);
+      console.error('Erro ao gerar PDF individual:', error);
       toast({
         title: 'Erro',
-        description: 'Erro ao gerar relatório de inadimplência no servidor.',
+        description: 'Erro ao gerar o PDF. Tente novamente.',
         variant: 'destructive'
       });
     } finally {
       setExportLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!selectedConta?.id) return;
+    
+    setUpdatingStatus(true);
+    try {
+      if (newStatus === 'RECEBIDA') {
+        // Se for marcar como paga, usa o método específico que aceita a data
+        await contasAReceberService.markContaAReceberAsPaid(selectedConta.id, selectedPaymentDate);
+      } else {
+        // Para outros status, usa o update genérico
+        await contasAReceberService.updateContaAReceber(selectedConta.id, {
+          status: newStatus
+        });
+      }
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Status da conta atualizado com sucesso!'
+      });
+      await loadContas();
+      setShowStatusModal(false);
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o status. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -291,6 +487,30 @@ export const ContasAReceber: React.FC = () => {
 
   const handleEditConta = (conta: ContaAReceber) => {
     handleOpenFormModal(conta);
+  };
+
+  const handleMarkPaidFromStatus = async (conta: ContaAReceber) => {
+    if (!conta.id) return;
+    setMarkingPaidId(conta.id);
+    try {
+      const hoje = format(new Date(), 'yyyy-MM-dd');
+      await contasAReceberService.markContaAReceberAsPaid(conta.id, hoje);
+      toast({
+        title: 'Conta atualizada',
+        description: 'Marcada como paga com a data de hoje.'
+      });
+      await loadContas();
+      setContaParaMarcarPaga(null);
+    } catch (error) {
+      console.error('Erro ao marcar como pago:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível marcar como pago. Verifique sua permissão ou tente pelo formulário de edição.',
+        variant: 'destructive'
+      });
+    } finally {
+      setMarkingPaidId(null);
+    }
   };
 
   const handleDeleteClick = (conta: ContaAReceber) => {
@@ -308,9 +528,13 @@ export const ContasAReceber: React.FC = () => {
         title: 'Sucesso',
         description: 'Conta a receber excluída com sucesso!'
       });
-      loadContas();
+      await loadContas();
       setShowDeleteConfirm(false);
       setContaToDelete(null);
+      if (contaToDelete.id) {
+        const removed = String(contaToDelete.id);
+        setSelectedReceivableIds((prev) => prev.filter((id) => id !== removed));
+      }
     } catch (error) {
       console.error('Erro ao deletar conta:', error);
       toast({
@@ -323,23 +547,23 @@ export const ContasAReceber: React.FC = () => {
     }
   };
 
-  const calcularEstatisticas = () => {
-    const total = contas.length;
-    const valorTotal = contas.reduce((sum, c) => sum + (c?.amount || c?.valor || 0), 0);
-    const valorPago = contas.reduce((sum, c) => sum + (c?.amountPaid || 0), 0);
-    const valorPendente = contas.reduce((sum, c) => sum + (c?.pendingAmount || 0), 0);
-    const vencidas = contas.filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA').length;
-    const valorVencido = contas
+  const calcularEstatisticas = (listaParaCalcular: ContaAReceber[]) => {
+    const total = listaParaCalcular.length;
+    const valorTotal = listaParaCalcular.reduce((sum, c) => sum + (c?.amount || c?.valor || 0), 0);
+    const valorPago = listaParaCalcular.reduce((sum, c) => sum + (c?.amountPaid || 0), 0);
+    const valorPendente = listaParaCalcular.reduce((sum, c) => sum + (c?.pendingAmount || 0), 0);
+    const vencidas = listaParaCalcular.filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA').length;
+    const valorVencido = listaParaCalcular
       .filter(c => c?.status === 'OVERDUE' || c?.status === 'VENCIDA')
       .reduce((sum, c) => sum + (c?.pendingAmount || c?.amount || c?.valor || 0), 0);
 
-    const contasComAtraso = contas.filter(c => (c?.overdueDays || 0) > 0);
+    const contasComAtraso = listaParaCalcular.filter(c => (c?.overdueDays || 0) > 0);
     const mediaAtraso = contasComAtraso.length > 0
       ? contasComAtraso.reduce((sum, c) => sum + (c?.overdueDays || 0), 0) / contasComAtraso.length
       : 0;
 
     // Distribuição por status (somatório de valores por status)
-    const porStatus: Record<string, number> = contas.reduce((acc, conta) => {
+    const porStatus: Record<string, number> = listaParaCalcular.reduce((acc, conta) => {
       if (!conta) return acc;
       const key = conta.status || 'UNKNOWN';
       const valor = typeof conta.amount === 'number' ? conta.amount : (conta.valor || 0);
@@ -361,13 +585,14 @@ export const ContasAReceber: React.FC = () => {
   };
 
   // Função para carregar contas e clientes
-  const loadContas = async () => {
+  const loadContas = async (keepScroll = true) => {
+    const scrollY = keepScroll ? window.scrollY || document.documentElement.scrollTop : 0;
     try {
       setLoading(true);
       console.log('Carregando dados de Contas a Receber...');
 
-      // Carregar contas a receber
-      const contasData = await contasAReceberService.getContasAReceber();
+      // Lista completa (/all) — evita paginação implícita size=20 que faz exclusões parecerem falhar ou "duplicar" linhas na mesma página
+      const contasData = await contasAReceberService.getAllContasAReceber();
       console.log('Contas carregadas:', contasData);
       setContas(contasData);
 
@@ -375,6 +600,14 @@ export const ContasAReceber: React.FC = () => {
       const clientesData = await contasAReceberService.getClientes();
       console.log('Clientes carregados:', clientesData);
       setClientes(clientesData);
+
+      // Carregar filiais (empresas)
+      try {
+        const unitsData = await unitService.getAllUnits();
+        setUnits(unitsData);
+      } catch (err) {
+        console.error('Erro ao carregar filiais:', err);
+      }
 
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -385,28 +618,33 @@ export const ContasAReceber: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      if (keepScroll) {
+        setTimeout(() => {
+          window.scrollTo({ top: scrollY, behavior: 'instant' });
+        }, 50);
+      }
     }
   };
 
   // Carregar dados reais da API
   useEffect(() => {
-    loadContas();
+    loadContas(false);
   }, []);
 
-  const stats = calcularEstatisticas();
-
-  // Filtros aplicados
+  // Filtros aplicados com busca dinâmica e ordenação
   const filteredContas = contas.filter(conta => {
     if (!conta) return false;
 
-    const q = searchTerm.toLowerCase();
+    const q = effectiveSearch.toLowerCase();
     const matchesSearch =
-      (conta.client?.name?.toLowerCase().includes(q) || false) ||
-      (typeof conta.cliente === 'string' && conta.cliente.toLowerCase().includes(q)) ||
-      (conta.invoiceNumber?.toLowerCase().includes(q) || false) ||
-      (conta.numeroFatura?.toLowerCase().includes(q) || false) ||
-      (conta.description?.toLowerCase().includes(q) || false) ||
-      (conta.descricao?.toLowerCase().includes(q) || false);
+      !q ? true : (
+        (conta.client?.name?.toLowerCase().includes(q) || false) ||
+        (typeof conta.cliente === 'string' && conta.cliente.toLowerCase().includes(q)) ||
+        (conta.invoiceNumber?.toLowerCase().includes(q) || false) ||
+        (conta.numeroFatura?.toLowerCase().includes(q) || false) ||
+        (conta.description?.toLowerCase().includes(q) || false) ||
+        (conta.descricao?.toLowerCase().includes(q) || false)
+      );
     const matchesStatus =
       filterStatus === 'all' ||
       (filterStatus === 'ABERTA' && isStatusAberta(conta.status)) ||
@@ -415,21 +653,146 @@ export const ContasAReceber: React.FC = () => {
       (filterStatus === 'CANCELADA' && isStatusCancelada(conta.status));
     const matchesCategoria = filterCategoria === 'all' || conta.categoria === filterCategoria;
     const matchesCliente = filterCliente === 'all' || conta.client?.id === filterCliente;
+    const matchesUnit = filterUnit === 'all' || conta.unit?.id === filterUnit || conta.empresaId === filterUnit;
 
-    // Filtro por data
+    // Filtro por data de vencimento (só quando o utilizador define período em Filtros Avançados)
     let matchesDate = true;
     if (dateRange?.from && dateRange?.to) {
       try {
-        const contaDate = new Date(conta.dueDate);
-        if (isNaN(contaDate.getTime())) return false;
-        matchesDate = contaDate >= dateRange.from && contaDate <= dateRange.to;
+        const raw = conta.dueDate ?? conta.vencimento;
+        const contaDate = startOfDay(new Date(raw as Date | string));
+        if (Number.isNaN(contaDate.getTime())) return false;
+        const from = startOfDay(dateRange.from);
+        const to = endOfDay(dateRange.to);
+        matchesDate = contaDate >= from && contaDate <= to;
       } catch {
         matchesDate = false;
       }
     }
 
-    return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesDate;
+    return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesUnit && matchesDate;
+  }).sort((a, b) => {
+    if (!sortBy || !sortDir) return 0;
+    
+    let comparison = 0;
+    switch (sortBy) {
+      case 'cliente': {
+        const nameA = (a.client?.name || a.cliente || '').toLowerCase();
+        const nameB = (b.client?.name || b.cliente || '').toLowerCase();
+        comparison = nameA.localeCompare(nameB, 'pt-BR');
+        break;
+      }
+      case 'medicao': {
+        const medA = (a.measurementInfo || a.measurementNumber || '').toLowerCase();
+        const medB = (b.measurementInfo || b.measurementNumber || '').toLowerCase();
+        comparison = medA.localeCompare(medB, 'pt-BR');
+        break;
+      }
+      case 'valor': {
+        const valA = a.amount || a.valor || 0;
+        const valB = b.amount || b.valor || 0;
+        comparison = valA - valB;
+        break;
+      }
+      case 'vencimento': {
+        const dateA = new Date(a.dueDate || a.vencimento).getTime();
+        const dateB = new Date(b.dueDate || b.vencimento).getTime();
+        comparison = dateA - dateB;
+        break;
+      }
+      case 'status': {
+        const statusA = (a.status || '').toLowerCase();
+        const statusB = (b.status || '').toLowerCase();
+        comparison = statusA.localeCompare(statusB, 'pt-BR');
+        break;
+      }
+      default:
+        comparison = 0;
+    }
+    
+    return sortDir === 'ASC' ? comparison : -comparison;
   });
+
+  const stats = calcularEstatisticas(filteredContas);
+
+  const idsContasFiltradasComId = React.useMemo(() => {
+    const ids: string[] = [];
+    for (const c of filteredContas) {
+      const id = c?.id != null ? String(c.id).trim() : '';
+      if (id) ids.push(id);
+    }
+    return ids;
+  }, [filteredContas]);
+
+  const selectedReceivableSet = React.useMemo(() => new Set(selectedReceivableIds), [selectedReceivableIds]);
+
+  const idsSelecionadosParaExclusao = React.useMemo(() => {
+    const allowed = new Set(idsContasFiltradasComId);
+    return selectedReceivableIds.filter((id) => allowed.has(id));
+  }, [idsContasFiltradasComId, selectedReceivableIds]);
+
+  const allFilteredReceivablesSelected =
+    idsContasFiltradasComId.length > 0 && idsContasFiltradasComId.every((id) => selectedReceivableSet.has(id));
+
+  const someFilteredReceivablesSelected =
+    !allFilteredReceivablesSelected &&
+    idsContasFiltradasComId.some((id) => selectedReceivableSet.has(id));
+
+  const headerReceivableCheckboxState: boolean | 'indeterminate' = allFilteredReceivablesSelected
+    ? true
+    : someFilteredReceivablesSelected
+      ? 'indeterminate'
+      : false;
+
+  const toggleReceivableRowSelect = (rawId: string | undefined) => {
+    const id = rawId != null ? String(rawId).trim() : '';
+    if (!id) return;
+    setSelectedReceivableIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const toggleSelectAllFilteredReceivables = () => {
+    if (allFilteredReceivablesSelected) {
+      const drop = new Set(idsContasFiltradasComId);
+      setSelectedReceivableIds((prev) => prev.filter((x) => !drop.has(x)));
+    } else {
+      setSelectedReceivableIds((prev) => [...new Set([...prev, ...idsContasFiltradasComId])]);
+    }
+  };
+
+  const setReceivableSelectionModeAndClear = (on: boolean) => {
+    setReceivableSelectionMode(on);
+    if (!on) {
+      setSelectedReceivableIds([]);
+      setShowBulkDeleteConfirm(false);
+    }
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (idsSelecionadosParaExclusao.length === 0) return;
+    setBulkDeleting(true);
+    try {
+      await contasAReceberService.deleteContasReceberBulk(idsSelecionadosParaExclusao);
+      toast({
+        title: 'Sucesso',
+        description:
+          idsSelecionadosParaExclusao.length === 1
+            ? '1 conta a receber excluída.'
+            : `${idsSelecionadosParaExclusao.length} contas a receber excluídas.`
+      });
+      await loadContas();
+      setSelectedReceivableIds([]);
+      setShowBulkDeleteConfirm(false);
+    } catch (error) {
+      console.error('Erro ao excluir contas em massa:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir as contas selecionadas. Tente novamente.',
+        variant: 'destructive'
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   return (
     <ContasAReceberGuard requiredPermission="VIEW_ACCOUNTS_RECEIVABLE">
@@ -441,15 +804,101 @@ export const ContasAReceber: React.FC = () => {
             <p className="text-gray-400">Gerencie suas contas a receber e controle de inadimplência</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-            <Button
-              variant="outline"
-              onClick={handleExportInadimplencia}
-              disabled={exportLoading}
-              className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Relatório Inadimplência
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={exportLoading}
+                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Gerar Relatórios
+                  <ChevronDown className="w-4 h-4 ml-2 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="min-w-[14rem] border-gray-600 bg-seguranca-black text-seguranca-lightgray"
+              >
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() => {
+                    setReportSegment('GERAL');
+                    setShowReportPeriodModal(true);
+                  }}
+                >
+                  Geral por Período
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() => {
+                    setReportSegment('RECEBIDOS');
+                    setShowReportPeriodModal(true);
+                  }}
+                >
+                  Recebidos por Período
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() => {
+                    setReportSegment('A_VENCER');
+                    setShowReportPeriodModal(true);
+                  }}
+                >
+                  A vencer por Período
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() => {
+                    setReportSegment('VENCIDOS');
+                    setShowReportPeriodModal(true);
+                  }}
+                >
+                  Vencidos por Período
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer focus:bg-seguranca-graphite focus:text-seguranca-yellow"
+                  onClick={() => {
+                    setReportSegment('INADIMPLENCIA');
+                    setShowReportPeriodModal(true);
+                  }}
+                >
+                  Inadimplência por Período
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {canEditReceivable && (
+              <>
+                <Button
+                  type="button"
+                  variant={receivableSelectionMode ? 'secondary' : 'outline'}
+                  onClick={() => setReceivableSelectionModeAndClear(!receivableSelectionMode)}
+                  className={
+                    receivableSelectionMode
+                      ? 'flex items-center gap-2 border-seguranca-yellow/60 bg-seguranca-yellow/10 text-seguranca-yellow hover:bg-seguranca-yellow/20'
+                      : 'flex items-center gap-2 border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow'
+                  }
+                >
+                  <ListChecks className="w-4 h-4" />
+                  {receivableSelectionMode ? 'Cancelar seleção' : 'Seleção para excluir'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!receivableSelectionMode || idsSelecionadosParaExclusao.length === 0 || bulkDeleting}
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="flex items-center gap-2 border-red-700/80 text-red-400 hover:bg-red-950/40 hover:text-red-300 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Excluir selecionadas
+                  {receivableSelectionMode && idsSelecionadosParaExclusao.length > 0 ? (
+                    <span className="ml-1 rounded-full bg-red-900/80 px-2 py-0.5 text-xs font-semibold text-white">
+                      {idsSelecionadosParaExclusao.length}
+                    </span>
+                  ) : null}
+                </Button>
+              </>
+            )}
             <Button
               onClick={() => handleOpenFormModal()}
               className="flex items-center gap-2 bg-seguranca-red text-white hover:bg-seguranca-red/90"
@@ -523,17 +972,37 @@ export const ContasAReceber: React.FC = () => {
             {/* Filtros Avançados */}
             {showAdvancedFilters && (
               <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-seguranca-lightgray">Período</label>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Período de Vencimento</label>
                     <DatePickerWithRange
                       date={dateRange}
                       onDateChange={setDateRange}
+                      placeholder="Selecione o período"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-seguranca-lightgray">Cliente</label>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Empresa</label>
+                    <Select value={filterUnit} onValueChange={setFilterUnit}>
+                      <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                        <SelectValue placeholder="Selecionar empresa" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="all" className="text-seguranca-lightgray hover:bg-seguranca-graphite">Todas as Empresas</SelectItem>
+                        {units && Array.isArray(units) ? units
+                          .filter(unit => unit && unit.id && unit.name)
+                          .map(unit => (
+                            <SelectItem key={unit.id} value={unit.id} className="text-seguranca-lightgray hover:bg-seguranca-graphite">
+                              {unit.name}
+                            </SelectItem>
+                          )) : null}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Cliente</label>
                     <Select value={filterCliente} onValueChange={setFilterCliente}>
                       <SelectTrigger className="border-gray-600 bg-seguranca-black text-seguranca-lightgray focus:border-seguranca-yellow focus:ring-seguranca-yellow">
                         <SelectValue placeholder="Selecionar cliente" />
@@ -551,22 +1020,47 @@ export const ContasAReceber: React.FC = () => {
                     </Select>
                   </div>
 
-                  <div className="flex items-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSearchTerm('');
-                        setFilterStatus('all');
-                        setFilterCategoria('all');
-                        setFilterCliente('all');
-                        setDateRange(undefined);
-                      }}
-                      className="w-full border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Limpar Filtros
-                    </Button>
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Valor Mínimo</label>
+                    <Input
+                      type="number"
+                      placeholder="R$ 0,00"
+                      value={filterAmountMin}
+                      onChange={(e) => setFilterAmountMin(e.target.value)}
+                      className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    />
                   </div>
+
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Valor Máximo</label>
+                    <Input
+                      type="number"
+                      placeholder="R$ 0,00"
+                      value={filterAmountMax}
+                      onChange={(e) => setFilterAmountMax(e.target.value)}
+                      className="border-gray-600 bg-seguranca-black text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterStatus('all');
+                      setFilterCategoria('all');
+                      setFilterCliente('all');
+                      setFilterUnit('all');
+                      setFilterAmountMin('');
+                      setFilterAmountMax('');
+                      setDateRange(undefined);
+                    }}
+                    className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Limpar Filtros
+                  </Button>
                 </div>
 
                 <div className="text-sm text-gray-400">
@@ -776,7 +1270,9 @@ export const ContasAReceber: React.FC = () => {
                       {contas
                         .sort((a, b) => (b?.amount || b?.valor || 0) - (a?.amount || a?.valor || 0))
                         .slice(0, 5)
-                        .map((conta, index) => (
+                        .map((conta, index) => {
+                          const statusVisual = getContaReceberStatusVisual(conta);
+                          return (
                           <div key={conta.id} className="flex items-center justify-between p-3 bg-seguranca-black/50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-seguranca-yellow/20 rounded-full flex items-center justify-center">
@@ -791,19 +1287,19 @@ export const ContasAReceber: React.FC = () => {
                               <p className="font-semibold text-seguranca-yellow">
                                 R$ {((conta?.amount || conta?.valor || 0) as number).toLocaleString('pt-BR')}
                               </p>
-                              <Badge
-                                variant="outline"
-                                className={`text-xs ${isStatusVencida(conta.status) ? 'border-seguranca-red text-seguranca-red' :
-                                    isStatusRecebida(conta.status) ? 'border-seguranca-yellow text-seguranca-yellow' :
-                                      isStatusAberta(conta.status) ? 'border-seguranca-lightgray text-seguranca-lightgray' :
-                                        'border-gray-500 text-gray-400'
-                                  }`}
+                              <span
+                                className={cn(
+                                  statusPillClass,
+                                  'text-xs',
+                                  statusVisual.className
+                                )}
                               >
-                                {isStatusRecebida(conta.status) ? 'Recebida' : isStatusVencida(conta.status) ? 'Vencida' : isStatusAberta(conta.status) ? 'Aberta' : isStatusCancelada(conta.status) ? 'Cancelada' : conta.status}
-                              </Badge>
+                                {statusVisual.label}
+                              </span>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   </CardContent>
                 </Card>
@@ -859,22 +1355,83 @@ export const ContasAReceber: React.FC = () => {
                   <table className="w-full">
                     <thead className="bg-seguranca-graphite border-b border-gray-700">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Cliente / Fatura
+                        {canEditReceivable && receivableSelectionMode ? (
+                          <th className="w-12 px-2 py-3 text-center text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
+                            <Checkbox
+                              checked={headerReceivableCheckboxState}
+                              onCheckedChange={() => toggleSelectAllFilteredReceivables()}
+                              disabled={idsContasFiltradasComId.length === 0}
+                              aria-label="Selecionar todas as contas visíveis na lista"
+                              className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                            />
+                          </th>
+                        ) : null}
+                        <th
+                          onClick={() => handleSort('cliente')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Cliente / Fatura</span>
+                            {sortBy === 'cliente' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Medição
+                        <th
+                          onClick={() => handleSort('medicao')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Medição</span>
+                            {sortBy === 'medicao' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Valor
+                        <th
+                          onClick={() => handleSort('valor')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Valor</span>
+                            {sortBy === 'valor' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Vencimento
+                        <th
+                          onClick={() => handleSort('vencimento')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Vencimento</span>
+                            {sortBy === 'vencimento' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Status
+                        <th
+                          onClick={() => handleSort('status')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Status</span>
+                            {sortBy === 'status' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider select-none">
                           Ações
                         </th>
                       </tr>
@@ -882,6 +1439,22 @@ export const ContasAReceber: React.FC = () => {
                     <tbody className="bg-seguranca-black divide-y divide-gray-700">
                       {filteredContas.map((conta) => (
                         <tr key={conta.id} className="hover:bg-seguranca-graphite/50">
+                          {canEditReceivable && receivableSelectionMode ? (
+                            <td className="w-12 px-2 py-4 text-center align-middle">
+                              {conta.id ? (
+                                <Checkbox
+                                  checked={selectedReceivableSet.has(String(conta.id))}
+                                  onCheckedChange={() => toggleReceivableRowSelect(conta.id)}
+                                  aria-label="Selecionar conta para exclusão em massa"
+                                  className="data-[state=checked]:bg-seguranca-red data-[state=checked]:border-seguranca-red"
+                                />
+                              ) : (
+                                <span className="text-xs text-gray-600" title="Sem ID">
+                                  —
+                                </span>
+                              )}
+                            </td>
+                          ) : null}
                           <td className="px-4 py-4">
                             <div>
                               <div className="font-medium text-seguranca-lightgray">{conta.client?.name || conta.cliente || '-'}</div>
@@ -892,9 +1465,21 @@ export const ContasAReceber: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <div className="text-sm text-seguranca-lightgray">
-                              {conta.measurementNumber || '-'}
-                            </div>
+                            {conta.measurementInfo || conta.measurementNumber ? (
+                              <div className="space-y-0.5">
+                                <div className="text-sm font-medium text-seguranca-lightgray">
+                                  {conta.measurementInfo || conta.measurementNumber}
+                                </div>
+                                {conta.measurementInfo && conta.measurementNumber &&
+                                  conta.measurementInfo !== conta.measurementNumber && (
+                                    <div className="text-xs text-gray-400">
+                                      Ref.: {conta.measurementNumber}
+                                    </div>
+                                  )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-500">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-4">
                             <div>
@@ -926,16 +1511,35 @@ export const ContasAReceber: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <Badge
-                              variant={isStatusRecebida(conta.status) ? 'default' :
-                                isStatusVencida(conta.status) ? 'destructive' :
-                                  isStatusAberta(conta.status) ? 'secondary' : 'outline'}
-                            >
-                              {isStatusRecebida(conta.status) ? 'Pago' :
-                                isStatusVencida(conta.status) ? 'Vencido' :
-                                  isStatusAberta(conta.status) ? 'Pendente' :
-                                    isStatusCancelada(conta.status) ? 'Cancelado' : conta.status}
-                            </Badge>
+                            {(() => {
+                              const visual = getContaReceberStatusVisual(conta);
+                              const podeAtalhoStatus =
+                                canEditReceivable &&
+                                !isStatusRecebida(conta.status) &&
+                                !isStatusCancelada(conta.status);
+                              if (podeAtalhoStatus) {
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={markingPaidId === conta.id}
+                                    title="Clique para marcar como pago (com confirmação)"
+                                    onClick={() => setContaParaMarcarPaga(conta)}
+                                    className={cn(
+                                      statusPillClass,
+                                      visual.className,
+                                      'cursor-pointer disabled:opacity-60'
+                                    )}
+                                  >
+                                    {markingPaidId === conta.id ? 'Salvando…' : visual.label}
+                                  </button>
+                                );
+                              }
+                              return (
+                                <span className={cn(statusPillClass, visual.className)}>
+                                  {visual.label}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center space-x-2">
@@ -957,20 +1561,29 @@ export const ContasAReceber: React.FC = () => {
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
-                              {(isStatusAberta(conta.status) || isStatusVencida(conta.status)) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
-                                  onClick={() => {
-                                    setSelectedConta(conta);
-                                    setShowCobrancaModal(true);
-                                  }}
-                                  title="Enviar cobrança"
-                                >
-                                  <Send className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                                onClick={() => {
+                                  setSelectedConta(conta);
+                                  setNewStatus(mapBackendStatusToFrontend(conta.status) as any);
+                                  setShowStatusModal(true);
+                                }}
+                                title="Alterar status"
+                              >
+                                <DollarSign className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow"
+                                onClick={() => downloadSingleAccountPdf(conta)}
+                                title="Gerar PDF"
+                                disabled={exportLoading}
+                              >
+                                <FileDown className="w-4 h-4" />
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -993,49 +1606,74 @@ export const ContasAReceber: React.FC = () => {
 
         </Tabs>
 
-        {/* Modal de Cobrança */}
-        <Dialog open={showCobrancaModal} onOpenChange={setShowCobrancaModal}>
-          <DialogContent className="max-w-md">
+        {/* Modal de Alteração de Status */}
+        <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="max-w-md bg-seguranca-graphite border-gray-600 text-white"
+          >
             <DialogHeader>
-              <DialogTitle>Enviar Cobrança</DialogTitle>
-              <DialogDescription>
-                Enviar cobrança para {selectedConta?.client?.name || selectedConta?.cliente || 'cliente'}
+              <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
+                <Check className="w-5 h-5" />
+                Alterar Status da Cobrança
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                Atualize o status da conta para {selectedConta?.client?.name || selectedConta?.cliente || 'o cliente'}.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-seguranca-lightgray">Tipo de Cobrança</label>
-                <Select value={cobrancaTipo} onValueChange={setCobrancaTipo}>
-                  <SelectTrigger>
+                <Label className="text-seguranca-lightgray">Novo Status</Label>
+                <Select value={newStatus} onValueChange={(val: any) => setNewStatus(val)}>
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">E-mail</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="sms">SMS</SelectItem>
+                  <SelectContent className="bg-seguranca-black border-gray-600 text-white">
+                    <SelectItem value="ABERTA">Pendente / Aberta</SelectItem>
+                    <SelectItem value="RECEBIDA">Pago / Recebida</SelectItem>
+                    <SelectItem value="VENCIDA">Vencido</SelectItem>
+                    <SelectItem value="CANCELADA">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div>
-                <Label>Mensagem Personalizada</Label>
-                <Textarea
-                  value={cobrancaTexto}
-                  onChange={(e) => setCobrancaTexto(e.target.value)}
-                  placeholder="Digite uma mensagem personalizada (opcional)"
-                  rows={4}
-                />
-              </div>
+              {newStatus === 'RECEBIDA' && (
+                <div className="space-y-2">
+                  <Label className="text-seguranca-lightgray">Data do Recebimento</Label>
+                   <DatePicker
+                    date={selectedPaymentDate ? new Date(selectedPaymentDate) : new Date()}
+                    onDateChange={(date) => setSelectedPaymentDate(date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))}
+                    className="w-full"
+                  />
+                </div>
+              )}
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCobrancaModal(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowStatusModal(false)}
+                className="border-gray-600 text-white hover:bg-seguranca-black"
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleCobrancaPersonalizada}>
-                <Send className="w-4 h-4 mr-2" />
-                Enviar Cobrança
+              <Button 
+                onClick={handleUpdateStatus}
+                disabled={updatingStatus}
+                className="bg-seguranca-yellow hover:bg-seguranca-yellow/90 text-black"
+              >
+                {updatingStatus ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Confirmar Alteração
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1052,7 +1690,10 @@ export const ContasAReceber: React.FC = () => {
 
         {/* Modal de Visualização */}
         <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white">
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white"
+          >
             <DialogHeader>
               <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
                 <Eye size={20} />
@@ -1106,15 +1747,15 @@ export const ContasAReceber: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-seguranca-lightgray">Status</Label>
-                    <Badge
-                      variant={selectedConta.status === 'PAID' || selectedConta.status === 'RECEBIDA' ? 'default' :
-                        selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'destructive' :
-                          selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'secondary' : 'outline'}
+                    <span
+                      className={cn(
+                        statusPillClass,
+                        'mt-1',
+                        getContaReceberStatusVisual(selectedConta).className
+                      )}
                     >
-                      {selectedConta.status === 'PAID' || selectedConta.status === 'RECEBIDA' ? 'Pago' :
-                        selectedConta.status === 'OVERDUE' || selectedConta.status === 'VENCIDA' ? 'Vencido' :
-                          selectedConta.status === 'PENDING' || selectedConta.status === 'ABERTA' ? 'Pendente' : 'Cancelado'}
-                    </Badge>
+                      {getContaReceberStatusVisual(selectedConta).label}
+                    </span>
                   </div>
                   <div>
                     <Label className="text-seguranca-lightgray">Forma de Pagamento</Label>
@@ -1159,9 +1800,131 @@ export const ContasAReceber: React.FC = () => {
           </DialogContent>
         </Dialog>
 
+        <AlertDialog
+          open={!!contaParaMarcarPaga}
+          onOpenChange={(open) => {
+            if (!open && !markingPaidId) {
+              setContaParaMarcarPaga(null);
+            }
+          }}
+        >
+          <AlertDialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[440px]"
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-seguranca-yellow">
+                Marcar como pago?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-300">
+                A conta será registrada como <strong>totalmente paga</strong>, com data de pagamento{' '}
+                <strong>hoje</strong> ({format(new Date(), 'dd/MM/yyyy', { locale: ptBR })}).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {contaParaMarcarPaga && (
+              <div className="space-y-1 text-sm text-seguranca-lightgray border border-gray-600/50 rounded-md p-3 bg-seguranca-black/40">
+                <p>
+                  <span className="text-gray-400">Cliente:</span>{' '}
+                  {contaParaMarcarPaga.client?.name || contaParaMarcarPaga.cliente || '—'}
+                </p>
+                <p>
+                  <span className="text-gray-400">Valor:</span>{' '}
+                  R${' '}
+                  {((contaParaMarcarPaga.amount || contaParaMarcarPaga.valor || 0) as number).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
+                </p>
+                {(contaParaMarcarPaga.invoiceNumber || contaParaMarcarPaga.numeroFatura) && (
+                  <p>
+                    <span className="text-gray-400">Fatura:</span>{' '}
+                    {contaParaMarcarPaga.invoiceNumber || contaParaMarcarPaga.numeroFatura}
+                  </p>
+                )}
+              </div>
+            )}
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel
+                disabled={!!markingPaidId}
+                className="border-gray-600 bg-transparent text-white hover:bg-seguranca-black hover:text-white"
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <Button
+                disabled={!!markingPaidId}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  if (contaParaMarcarPaga) {
+                    void handleMarkPaidFromStatus(contaParaMarcarPaga);
+                  }
+                }}
+              >
+                {markingPaidId ? (
+                  <>
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Salvando…
+                  </>
+                ) : (
+                  'Confirmar pagamento'
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={showBulkDeleteConfirm}
+          onOpenChange={(open) => {
+            if (!bulkDeleting) setShowBulkDeleteConfirm(open);
+          }}
+        >
+          <AlertDialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[480px]"
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-seguranca-red">
+                Excluir contas selecionadas?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-300">
+                Serão excluídas <strong>{idsSelecionadosParaExclusao.length}</strong> conta(s) que marcou na lista. A
+                exclusão individual (ícone na linha) continua disponível. Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel
+                disabled={bulkDeleting}
+                className="border-gray-600 bg-transparent text-white hover:bg-seguranca-black hover:text-white"
+              >
+                Cancelar
+              </AlertDialogCancel>
+              <Button
+                type="button"
+                disabled={bulkDeleting || idsSelecionadosParaExclusao.length === 0}
+                className="bg-seguranca-red hover:bg-red-700 text-white"
+                onClick={() => void handleConfirmBulkDelete()}
+              >
+                {bulkDeleting ? (
+                  <>
+                    <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Excluindo…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir selecionadas
+                  </>
+                )}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Modal de Confirmação de Exclusão */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <DialogContent className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white">
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white"
+          >
             <DialogHeader>
               <DialogTitle className="text-seguranca-red">Confirmar Exclusão</DialogTitle>
               <DialogDescription className="text-gray-300">
@@ -1209,6 +1972,118 @@ export const ContasAReceber: React.FC = () => {
                   <>
                     <Trash2 className="w-4 h-4 mr-2" />
                     Excluir
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Modal de Seleção de Período para Relatório */}
+        <Dialog open={showReportPeriodModal} onOpenChange={setShowReportPeriodModal}>
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white shadow-2xl"
+          >
+            <DialogHeader>
+              <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Configurar Relatório
+              </DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Personalize o período e o escopo do relatório PDF.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-6 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="report-segment" className="text-seguranca-lightgray font-medium">Tipo de Relatório</Label>
+                <Select value={reportSegment} onValueChange={setReportSegment}>
+                  <SelectTrigger className="bg-seguranca-black border-gray-600 text-white focus:ring-seguranca-yellow">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-seguranca-black border-gray-600">
+                    <SelectItem value="GERAL" className="text-white hover:bg-seguranca-graphite">Geral (Todas as Contas)</SelectItem>
+                    <SelectItem value="RECEBIDOS" className="text-white hover:bg-seguranca-graphite">Somente Recebidos</SelectItem>
+                    <SelectItem value="A_VENCER" className="text-white hover:bg-seguranca-graphite">Somente A Vencer</SelectItem>
+                    <SelectItem value="VENCIDOS" className="text-white hover:bg-seguranca-graphite">Somente Vencidos</SelectItem>
+                    <SelectItem value="INADIMPLENCIA" className="text-white hover:bg-seguranca-graphite">Taxa de Inadimplência</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="report-startDate" className="text-seguranca-lightgray font-medium text-xs uppercase tracking-wider">Início (Vencimento)</Label>
+                  <DatePicker
+                    date={reportStartDate}
+                    onDateChange={(date) => date && setReportStartDate(date)}
+                    className="w-full bg-seguranca-black border-gray-600 text-white"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="report-endDate" className="text-seguranca-lightgray font-medium text-xs uppercase tracking-wider">Fim (Vencimento)</Label>
+                  <DatePicker
+                    date={reportEndDate}
+                    onDateChange={(date) => date && setReportEndDate(date)}
+                    className="w-full bg-seguranca-black border-gray-600 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-seguranca-black/50 border border-gray-700 rounded-lg">
+                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Dica Operacional</p>
+                <p className="text-xs text-gray-400">
+                  O relatório considerará a data de <strong>vencimento</strong> das contas dentro do intervalo selecionado.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowReportPeriodModal(false)}
+                className="border-gray-600 text-white hover:bg-seguranca-black hover:text-seguranca-yellow"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => {
+                  const prefixMap: Record<string, string> = {
+                    'GERAL': 'relatorio-contas-geral',
+                    'RECEBIDOS': 'relatorio-contas-recebidas',
+                    'A_VENCER': 'relatorio-contas-a-vencer',
+                    'VENCIDOS': 'relatorio-contas-vencidas',
+                    'INADIMPLENCIA': 'relatorio-inadimplencia'
+                  };
+                  const descMap: Record<string, string> = {
+                    'GERAL': 'Relatório geral gerado com sucesso.',
+                    'RECEBIDOS': 'Relatório de contas recebidas gerado com sucesso.',
+                    'A_VENCER': 'Relatório de contas a vencer gerado com sucesso.',
+                    'VENCIDOS': 'Relatório de contas vencidas gerado com sucesso.',
+                    'INADIMPLENCIA': 'Relatório de inadimplência gerado com sucesso.'
+                  };
+
+                  void downloadContasReceberPdf({
+                    segment: reportSegment === 'GERAL' ? null : reportSegment,
+                    includePeriod: true,
+                    filePrefix: prefixMap[reportSegment] || 'relatorio-contas',
+                    successDescription: descMap[reportSegment] || 'Relatório gerado com sucesso.',
+                    startDate: format(reportStartDate, 'yyyy-MM-dd'),
+                    endDate: format(reportEndDate, 'yyyy-MM-dd')
+                  });
+                  setShowReportPeriodModal(false);
+                }}
+                disabled={exportLoading}
+                className="bg-seguranca-yellow text-black hover:bg-seguranca-yellow/90 font-bold shadow-[0_0_15px_rgba(234,179,8,0.3)]"
+              >
+                {exportLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Gerar PDF Premium
                   </>
                 )}
               </Button>

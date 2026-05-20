@@ -13,6 +13,9 @@ public interface OpportunityRepository extends JpaRepository<Opportunity, java.u
     long countByStatus(KanbanStatus status);
     
     @EntityGraph(attributePaths = {"lead", "status", "assignedTo", "client"})
-    @Query("SELECT o FROM Opportunity o")
-    List<Opportunity> findAllWithRelationships();
+    @Query("SELECT o FROM Opportunity o WHERE o.isDeleted = false")
+    List<Opportunity> findAllActiveWithRelationships();
+
+    @Query("SELECT o FROM Opportunity o WHERE o.isDeleted = false")
+    List<Opportunity> findAllActive();
 } 

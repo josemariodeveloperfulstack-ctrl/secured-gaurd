@@ -1,4 +1,4 @@
--- Criar tabela de supervisores
+-- Criar tabela de supervisores (consolidada a partir de create_supervisors_table.sql)
 CREATE TABLE IF NOT EXISTS supervisors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
@@ -14,13 +14,11 @@ CREATE TABLE IF NOT EXISTS supervisors (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Criar índices para melhor performance
 CREATE INDEX IF NOT EXISTS idx_supervisors_cpf ON supervisors(cpf);
 CREATE INDEX IF NOT EXISTS idx_supervisors_email ON supervisors(email);
 CREATE INDEX IF NOT EXISTS idx_supervisors_active ON supervisors(is_active);
 CREATE INDEX IF NOT EXISTS idx_supervisors_created_at ON supervisors(created_at);
 
--- Criar trigger para atualizar updated_at automaticamente
 CREATE OR REPLACE FUNCTION update_supervisors_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -29,6 +27,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_supervisors_updated_at ON supervisors;
 CREATE TRIGGER trigger_update_supervisors_updated_at
     BEFORE UPDATE ON supervisors
     FOR EACH ROW

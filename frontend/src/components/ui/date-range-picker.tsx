@@ -26,45 +26,58 @@ export function DatePickerWithRange({
   disabled = false,
   className
 }: DatePickerWithRangeProps) {
+  const [open, setOpen] = React.useState(false);
+
+  const handleSelect = (range: DateRange | undefined) => {
+    onDateChange?.(range);
+    if (range?.from && range?.to) {
+      setOpen(false);
+    }
+  };
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal",
-            !date && "text-muted-foreground",
+            "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow hover:border-seguranca-yellow/50 transition-all duration-200 rounded-lg h-10",
+            !date && "text-gray-500",
             className
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
+          <CalendarIcon className="mr-2 h-4 w-4 text-seguranca-yellow opacity-70" />
           {date?.from ? (
             date.to ? (
-              <>
-                {format(date.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
+              <span className="truncate">
+                {format(date.from, "dd/MM/yyyy", { locale: ptBR })} –{" "}
                 {format(date.to, "dd/MM/yyyy", { locale: ptBR })}
-              </>
+              </span>
             ) : (
               format(date.from, "dd/MM/yyyy", { locale: ptBR })
             )
           ) : (
-            <span>{placeholder}</span>
+            <span className="text-gray-500">{placeholder}</span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent
+        className="w-auto p-0 bg-seguranca-black border border-gray-700 shadow-2xl shadow-black/50 z-[10100] rounded-lg"
+        align="start"
+        sideOffset={8}
+      >
         <Calendar
           initialFocus
           mode="range"
           defaultMonth={date?.from}
           selected={date}
-          onSelect={onDateChange}
+          onSelect={handleSelect}
           numberOfMonths={2}
           locale={ptBR}
+          className="rounded-lg"
         />
       </PopoverContent>
     </Popover>
   );
 }
-

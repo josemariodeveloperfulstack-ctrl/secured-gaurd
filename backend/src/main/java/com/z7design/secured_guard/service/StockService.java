@@ -39,6 +39,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+
 
 import com.z7design.secured_guard.model.StorageShelf;
 import jakarta.persistence.criteria.Predicate;
@@ -66,9 +69,13 @@ public class StockService {
     private final StockRequisitionPdfService stockRequisitionPdfService;
     private final EmailService emailService;
     private final PersonalProtectiveEquipmentRepository epiRepository;
-    private final EPIDeliveryFormService epiDeliveryFormService;
+
+    @Autowired
+    @Lazy
+    private EPIDeliveryFormService epiDeliveryFormService;
 
     // ===== GESTÃO DE ITENS =====
+
 
     public List<StockItemDTO> getAllItems() {
         log.info("Buscando todos os itens de estoque");
@@ -118,7 +125,15 @@ public class StockService {
         log.info("Buscando item por QR Code: {}", qrCode);
         StockItem item = stockItemRepository.findByQrCode(qrCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado com QR Code: " + qrCode));
-        return StockItemDTO.fromEntity(item);
+        StockItemDTO dto = StockItemDTO.fromEntity(item);
+        
+        // Buscar localizações para exibir no scanner
+        List<StockItemLocation> locations = stockItemLocationRepository.findByStockItem(item);
+        dto.setLocations(locations.stream()
+                .map(com.z7design.secured_guard.dto.StockItemLocationDTO::fromEntity)
+                .collect(Collectors.toList()));
+                
+        return dto;
     }
 
     public StockItemDTO createItem(StockItemDTO dto) {
@@ -293,8 +308,14 @@ public class StockService {
         if (dto.getMovementType() == MovementType.SAIDA && employee != null) {
             recordEmployeeStockHistory(movement, employee, user);
             
-            // Se for EPI, registrar entrega de EPI também
-            if (item.getCategory() == StockCategory.EPI) {
+            // Se for EPI/Uniforme e NÃO for uma movimentação originada pela própria ficha de EPI, registrar entrega
+            boolean isFromEPIForm = dto.getNotes() != null && dto.getNotes().contains("Baixa automática via Ficha de EPI");
+            boolean skipEpiAuto = Boolean.TRUE.equals(dto.getSkipEpiDeliveryFormAutoRecord());
+            boolean isEligibleForEPIForm = item.getCategory() == StockCategory.EPI || 
+                                         item.getCategory().name().startsWith("UNIFORME") ||
+                                         item.getCategory() == StockCategory.CALCADOS;
+            
+            if (isEligibleForEPIForm && !isFromEPIForm && !skipEpiAuto) {
                 try {
                     recordEPIDelivery(movement, employee, user);
                 } catch (Exception e) {
@@ -347,6 +368,7 @@ public class StockService {
         com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO itemDto = new com.z7design.secured_guard.dto.EPIDeliveryFormItemDTO();
         itemDto.setEpiName(movement.getStockItem().getFullName());
         itemDto.setQuantity(movement.getQuantity());
+        itemDto.setStockItemId(movement.getStockItem().getId());
         
         epiDto.setItems(List.of(itemDto));
         
@@ -613,7 +635,21 @@ public class StockService {
         Long totalItems = (long) allItems.size();
         Long lowStockCount = (long) lowStockItems.size();
         Long outOfStockCount = (long) outOfStockItems.size();
-        Double totalValue = stockItemRepository.getTotalStockValue();
+        Double totalValueFromQuery = stockItemRepository.getTotalStockValue();
+        java.math.BigDecimal totalValueComputed = allItems.stream()
+                .map(i -> {
+                    int q = i.getCurrentQuantity() != null ? i.getCurrentQuantity() : 0;
+                    java.math.BigDecimal u = i.getUnitCost();
+                    return u != null ? u.multiply(java.math.BigDecimal.valueOf(q)) : java.math.BigDecimal.ZERO;
+                })
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+        double totalValue = totalValueFromQuery != null && totalValueFromQuery > 0
+                ? totalValueFromQuery
+                : totalValueComputed.doubleValue();
+
+        long totalQuantity = allItems.stream()
+                .mapToInt(i -> i.getCurrentQuantity() != null ? i.getCurrentQuantity() : 0)
+                .sum();
 
         Map<StockCategory, Long> itemsByCategory = allItems.stream()
                 .collect(Collectors.groupingBy(StockItem::getCategory, Collectors.counting()));
@@ -625,7 +661,8 @@ public class StockService {
                 "totalItems", totalItems,
                 "lowStockCount", lowStockCount,
                 "outOfStockCount", outOfStockCount,
-                "totalValue", totalValue != null ? totalValue : 0.0,
+                "totalValue", totalValue,
+                "totalQuantity", totalQuantity,
                 "itemsByCategory", itemsByCategory,
                 "activeAlerts", activeAlerts,
                 "criticalAlerts", criticalAlerts,
@@ -1256,5 +1293,67 @@ public class StockService {
                 .stream()
                 .map(StockMovementDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    public StockMovementDTO adjustInventoryViaQrCode(String qrCode, Integer physicalQuantity, UUID userId) {
+        log.info("Ajustando inventário via QR Code: {}, Quantidade física: {}", qrCode, physicalQuantity);
+        
+        StockItem item = stockItemRepository.findByQrCode(qrCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado com QR Code: " + qrCode));
+                
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + userId));
+                
+        int currentQuantity = item.getCurrentQuantity() != null ? item.getCurrentQuantity() : 0;
+        int diff = physicalQuantity - currentQuantity;
+        
+        if (diff == 0) {
+            log.info("Nenhuma diferença detectada para o item: {}. Quantidade permanece {}", item.getName(), currentQuantity);
+            return null; 
+        }
+        
+        StockMovement movement = new StockMovement();
+        movement.setStockItem(item);
+        movement.setUser(user);
+        movement.setMovementDate(LocalDateTime.now());
+        movement.setPreviousQuantity(currentQuantity);
+        movement.setNewQuantity(physicalQuantity);
+        movement.setQuantity(Math.abs(diff));
+        movement.setQrCodeUsed(qrCode);
+        movement.setNotes("Ajuste de inventário via leitura de QR Code");
+        
+        if (diff > 0) {
+            movement.setMovementType(MovementType.ENTRADA);
+            movement.setReason(MovementReason.AJUSTE_ENTRADA);
+        } else {
+            movement.setMovementType(MovementType.SAIDA);
+            movement.setReason(MovementReason.AJUSTE_SAIDA);
+        }
+        
+        movement = stockMovementRepository.save(movement);
+        
+        item.setCurrentQuantity(physicalQuantity);
+        stockItemRepository.save(item);
+        
+        checkAndCreateLowStockAlert(item);
+        
+        return StockMovementDTO.fromEntity(movement);
+    }
+
+    /**
+     * Quantidade agregada por prateleira e andar (itens ativos).
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getLocationStockSummary() {
+        List<Object[]> rows = stockItemLocationRepository.aggregateQuantityByShelfAndFloor();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object[] row : rows) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("shelfIdentification", row[0] != null ? row[0].toString() : "");
+            m.put("floor", row[1] != null ? row[1].toString() : "");
+            m.put("totalQuantity", row[2] instanceof Number ? ((Number) row[2]).longValue() : 0L);
+            out.add(m);
+        }
+        return out;
     }
 }

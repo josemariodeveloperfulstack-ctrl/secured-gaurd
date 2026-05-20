@@ -33,7 +33,7 @@ public class LGPDConsentStandardPdfService {
         private final ExcelReportLayoutService excelLayoutService;
         private final CompanyRepository companyRepository;
 
-        private static final String REPORT_TITLE = "Termo de Consentimento - LGPD";
+        private static final String REPORT_TITLE = "";
 
         public byte[] generatePdf(LGPDConsentRequest request) {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -111,101 +111,153 @@ public class LGPDConsentStandardPdfService {
         }
 
         private void addContent(Document document, LGPDConsentRequest request, Company company) {
-                // Seção: Identificação do Funcionário
-                document.add(createSectionHeader("IDENTIFICAÇÃO DO FUNCIONÁRIO"));
-                Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-                employeeTable.addCell(createLabelValueCell("NOME:", request.getEmployeeName()));
-                employeeTable.addCell(createLabelValueCell("CPF:", request.getEmployeeCpf()));
-                employeeTable.addCell(createLabelValueCell("RG:", request.getEmployeeRg()));
-                employeeTable.addCell(createLabelValueCell("CARGO:", request.getEmployeePosition()));
-                document.add(employeeTable);
+                // Título Centralizado
+                document.add(new Paragraph("TERMO DE PROTEÇÃO DE DADOS - LGPD")
+                                .setBold()
+                                .setFontSize(12f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                                .setMarginBottom(15f));
 
-                // Texto Introdutório
-                document.add(createSectionHeader("CONSENTIMENTO PARA TRATAMENTO DE DADOS"));
+                // Texto de Introdução - Colaborador e Empresa
                 Paragraph intro = new Paragraph()
-                                .setFontSize(10f)
+                                .setFontSize(9f)
                                 .setTextAlignment(TextAlignment.JUSTIFIED)
-                                .setMarginBottom(10f);
+                                .setMarginBottom(10f)
+                                .setMultipliedLeading(1.2f);
 
-                intro.add("Pelo presente instrumento, eu, acima identificado, declaro que concordo e autorizo a empresa ");
-                intro.add(new Text(company != null ? company.getName() : "________________").setBold());
-                intro.add(" a realizar o tratamento dos meus dados pessoais, sensíveis ou não, para as finalidades relacionadas ao meu contrato de trabalho, em conformidade com a Lei nº 13.709/2018 (Lei Geral de Proteção de Dados - LGPD).");
+                // Dados do Colaborador
+                intro.add(new Text(request.getEmployeeName().toUpperCase()).setBold());
+                intro.add(", inscrito(a) no CPF nº ");
+                intro.add(new Text(request.getEmployeeCpf() != null ? request.getEmployeeCpf() : "________________").setBold());
+                intro.add(" e portador(a) do RG nº ");
+                String rgFull = (request.getEmployeeRg() != null ? request.getEmployeeRg() : "________________") + 
+                                (request.getEmployeeRgOrgao() != null ? " " + request.getEmployeeRgOrgao() : "");
+                intro.add(new Text(rgFull).setBold());
+                intro.add(", com endereço na ");
+                String address = (request.getEmployeeAddress() != null ? request.getEmployeeAddress() : "________________") +
+                                (request.getEmployeeNumber() != null ? ", " + request.getEmployeeNumber() : "") +
+                                (request.getEmployeeComplement() != null ? ", " + request.getEmployeeComplement() : "") +
+                                (request.getEmployeeNeighborhood() != null ? ", bairro " + request.getEmployeeNeighborhood() : "");
+                intro.add(new Text(address).setBold());
+                intro.add(", na cidade de ");
+                intro.add(new Text(request.getEmployeeCity() != null ? request.getEmployeeCity() : "________________").setBold());
+                intro.add(", Estado de ");
+                intro.add(new Text(request.getEmployeeState() != null ? request.getEmployeeState() : "____").setBold());
+                intro.add(", doravante denominado ");
+                intro.add(new Text("'COLABORADOR(A)'").setBold());
+                intro.add(".\n");
+
+                // Dados da Empresa
+                if (company != null) {
+                        intro.add(new Text(company.getName().toUpperCase()).setBold());
+                        intro.add(", inscrito no CNPJ sob o nº ");
+                        intro.add(new Text(company.getCnpj() != null ? company.getCnpj() : "________________").setBold());
+                        intro.add(", com sede na Rua: ");
+                        String compAddr = (company.getAddress() != null ? company.getAddress() : "________________") +
+                                        (company.getZipCode() != null ? ", CEP: " + company.getZipCode() : "") +
+                                        (company.getEnderecoNumero() != null ? " nº " + company.getEnderecoNumero() : "") +
+                                        (company.getEnderecoBairro() != null ? ", bairro " + company.getEnderecoBairro() : "");
+                        intro.add(new Text(compAddr).setBold());
+                        intro.add(", na cidade de ");
+                        intro.add(new Text(company.getCity() != null ? company.getCity() : "________________").setBold());
+                        intro.add(", Estado de ");
+                        intro.add(new Text(company.getState() != null ? company.getState() : "____").setBold());
+                        intro.add(", doravante denominado ");
+                        intro.add(new Text("'EMPRESA'").setBold());
+                        intro.add(".");
+                } else {
+                        intro.add("PROMOVER TERCEIRIZAÇÃO & SERVIÇOS LTDA, inscrito no CNPJ sob o nº 36.698.521/0001-01, doravante denominada 'EMPRESA'.");
+                }
                 document.add(intro);
 
                 // Cláusulas
-                addClauseAsSection(document, "1. FINALIDADE DO TRATAMENTO",
-                                "Os dados pessoais serão utilizados para fins de registro de empregados, cumprimento de obrigações legais (eSocial, CAGED, RAIS), concessão de benefícios, controle de ponto, pagamento de salários e outras rotinas trabalhistas.");
+                addClause(document, "CLÁUSULA PRIMEIRA – DO OBJETO",
+                                "Em razão do exercício da minha função, reconheço o acesso a informações de propriedade da EMPRESA e de seus Clientes e me comprometo a:\n\n" +
+                                "a) manter sigilo absoluto, tanto escrito como verbal, de todos os dados, informações e materiais com que tiver contato no desempenho do trabalho para o qual fui contratado;\n" +
+                                "b) não revelar, reproduzir, utilizar ou dar conhecimento, em hipótese alguma, a terceiros, de dados, informações ou materiais revelados pela EMPRESA ou elaborados por mim ou com a minha participação;\n" +
+                                "c) não utilizar qualquer dado, informação ou material revelado pela EMPRESA ou elaborado por mim ou com a minha participação, em redes privadas ou sociais;\n" +
+                                "d) reconhecer que todos os materiais, sejam modelos de documentos, contratos, regulamentos, formulários etc, pertencem à EMPRESA, ainda que elaborados por mim ou com a minha participação.");
 
-                addClauseAsSection(document, "2. COMPARTILHAMENTO DE DADOS",
-                                "A empresa poderá compartilhar os dados com órgãos públicos, contabilidade externa, instituições financeiras para pagamento, operadoras de benefícios e outros terceiros estritamente necessários para a execução do contrato.");
+                addClause(document, "CLÁUSULA SEGUNDA – DAS INFORMAÇÕES CONFIDENCIAIS",
+                                "Para os fins deste Termo, serão consideradas confidenciais todas as informações transmitidas por meio escrito, eletrônico, verbal ou quaisquer outros e de qualquer natureza, incluindo, mas não se limitando a: cadastro de clientes, empresas prestadoras e tomadoras de serviços, informações de crédito, certidões e documentos pessoais, contratos e documentos de crédito e débito, softwares, mídias, planos de negócios, propostas comerciais, processos, tabelas, projetos, dentre outros.");
 
-                addClauseAsSection(document, "3. SEGURANÇA E DIREITOS",
-                                "A empresa adotará medidas de segurança para proteger os dados. O titular tem direito a confirmação da existência de tratamento, acesso, correção e demais direitos previstos no Art. 18 da LGPD.");
+                Paragraph parUnico = new Paragraph()
+                                .setFontSize(8f)
+                                .setBold()
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(10f);
+                parUnico.add("PARÁGRAFO ÚNICO: ");
+                parUnico.add(new Text("Em caso de dúvida sobre a confidencialidade do dado, informação ou documento, o COLABORADOR deverá mantê-lo em absoluto sigilo, até que a EMPRESA se manifeste expressamente a respeito.").setBold());
+                document.add(parUnico);
+
+                addClause(document, "CLÁUSULA TERCEIRA – DO USO DAS INFORMAÇÕES CONFIDENCIAIS",
+                                "O COLABORADOR(A) se compromete a utilizar as informações confidenciais apenas no âmbito da execução e desenvolvimento dos serviços e produtos de sua responsabilidade, sendo vedado o acesso e tratamento para fins estranhos à sua função.");
+
+                addParagraph(document, "PARÁGRAFO PRIMEIRO",
+                                "O COLABORADOR(A) deverá dispensar às informações confidenciais da EMPRESA o mesmo zelo e cuidado com que trata os seus próprios dados pessoais, e deverá mantê-las em local seguro, com acesso limitado apenas a pessoas envolvidas ou autorizadas.");
+
+                addParagraph(document, "PARÁGRAFO SEGUNDO",
+                                "Em caso de qualquer falha na segurança das informações confidenciais, o COLABORADOR(A) deverá comunicar imediatamente a EMPRESA. A pronta comunicação não exclui sua responsabilidade pela proteção dos dados sigilosos.");
+
+                addClause(document, "CLÁUSULA QUARTA – DAS EXCEÇÕES À CONFIDENCIALIDADE",
+                                "Não serão consideradas confidenciais as informações que:\n\n" +
+                                "a) Sejam ou venham a se tornar públicas, desde que tal publicidade não tenha sido, de qualquer forma, ocasionada pelo(a) COLABORADOR(A);\n" +
+                                "b) Tenham sido legitimamente recebidas de terceiros, desde que não derivadas de violação de dever de confidencialidade;\n" +
+                                "c) Sejam expressas ou tacitamente identificadas pela EMPRESA como não sendo sigilosas.");
+
+                addClause(document, "CLÁUSULA QUINTA – DA QUEBRA DA CONFIDENCIALIDADE",
+                                "A PARTE que violar as obrigações previstas neste Termo deverá indenizar e ressarcir a outra PARTE pelas perdas, lucros cessantes, danos diretos e indiretos, inclusive emergentes, e quaisquer prejuízos patrimoniais e/ou morais que surjam em decorrência deste descumprimento.");
+
+                addParagraph(document, "PARÁGRAFO PRIMEIRO",
+                                "O descumprimento de quaisquer das cláusulas do presente termo importará em falha gravíssima ao contrato de prestação de serviços celebrado entre as PARTES e poderá acarretar a sua imediata rescisão, além da responsabilização administrativa, civil e criminal dos que, comprovadamente, estiverem envolvidos no descumprimento ou violação.");
+
+                addClause(document, "CLÁUSULA SEXTA – DA VIGÊNCIA",
+                                "Mantido entre as PARTES, e se estenderá por um período de 5 (cinco) anos após o término do vínculo entre as PARTES.");
 
                 // Assinaturas
                 addSignatures(document, request, company);
         }
 
-        private void addClauseAsSection(Document document, String title, String content) {
-                document.add(new Paragraph(title).setBold().setFontSize(9f).setMarginTop(8f).setMarginBottom(2f));
-                document.add(new Paragraph(content).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED)
-                                .setMarginBottom(5f));
+        private void addClause(Document document, String title, String content) {
+                document.add(new Paragraph(title).setBold().setFontSize(9f).setMarginTop(5f).setMarginBottom(2f));
+                document.add(new Paragraph(content).setFontSize(8f).setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(8f).setMultipliedLeading(1.1f));
         }
 
-        private Cell createLabelValueCell(String label, String value) {
-                Paragraph p = new Paragraph();
-                p.add(new Text(label).setBold().setFontSize(9f));
-                p.add(new Text(" " + (value != null && !value.isEmpty() ? value : "-")).setFontSize(10f));
-                return new Cell().add(p).setPadding(5f);
+        private void addParagraph(Document document, String title, String content) {
+                Paragraph p = new Paragraph().setFontSize(8f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(8f);
+                p.add(new Text(title + ": ").setBold());
+                p.add(content);
+                document.add(p);
         }
 
-        private Paragraph createSectionHeader(String title) {
-                return new Paragraph(title)
-                                .setBold()
-                                .setFontSize(11f)
-                                .setFontColor(com.itextpdf.kernel.colors.DeviceRgb.RED)
-                                .setMarginTop(15f)
-                                .setMarginBottom(5f)
-                                .setBorderLeft(
-                                                new com.itextpdf.layout.borders.SolidBorder(
-                                                                com.itextpdf.kernel.colors.DeviceRgb.RED, 3f))
-                                .setPaddingLeft(5f);
-        }
 
         private void addSignatures(Document document, LGPDConsentRequest request, Company company) {
-                String city = request.getCity() != null ? request.getCity()
+                String city = request.getCity() != null && !request.getCity().isEmpty() ? request.getCity()
                                 : (company != null && company.getCity() != null ? company.getCity()
-                                                : "_______________");
-                String date = request.getDate() != null
-                                ? request.getDate()
-                                                .format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
-                                                                new Locale("pt", "BR")))
-                                : LocalDate.now().format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'de' yyyy",
-                                                new Locale("pt", "BR")));
+                                                : "Contagem");
+                
+                LocalDate dateObj = request.getDate() != null ? request.getDate() : LocalDate.now();
+                String dateStr = dateObj.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
 
-                Paragraph dateLoc = new Paragraph(city + ", " + date)
-                                .setTextAlignment(TextAlignment.RIGHT)
-                                .setMarginTop(30f)
-                                .setMarginBottom(40f)
-                                .setFontSize(10f);
+                Paragraph dateLoc = new Paragraph(city + ", " + dateStr)
+                                .setTextAlignment(TextAlignment.LEFT)
+                                .setMarginTop(20f)
+                                .setMarginBottom(25f)
+                                .setFontSize(9f);
                 document.add(dateLoc);
 
-                Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
+                // Linha para Empresa
+                document.add(new Paragraph("__________________________________________________________________")
+                                .setMarginTop(15f).setMarginBottom(0f).setTextAlignment(TextAlignment.LEFT));
+                document.add(new Paragraph(company != null ? company.getName().toUpperCase() : "EMPRESA")
+                                .setFontSize(8f).setBold().setMarginBottom(15f).setTextAlignment(TextAlignment.LEFT));
 
-                Cell cell = new Cell()
-                                .add(new Paragraph("_________________________________")
-                                                .setTextAlignment(TextAlignment.CENTER))
-                                .add(new Paragraph(request.getEmployeeName().toUpperCase())
-                                                .setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f).setBold())
-                                .add(new Paragraph("Assinatura do Funcionário").setTextAlignment(TextAlignment.CENTER)
-                                                .setFontSize(8f))
-                                .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER);
-
-                sigTable.addCell(cell);
-                document.add(sigTable);
+                // Linha para Funcionário
+                document.add(new Paragraph("__________________________________________________________________")
+                                .setMarginTop(15f).setMarginBottom(0f).setTextAlignment(TextAlignment.LEFT));
+                document.add(new Paragraph(request.getEmployeeName().toUpperCase())
+                                .setFontSize(8f).setBold().setMarginBottom(0f).setTextAlignment(TextAlignment.LEFT));
         }
 
 }

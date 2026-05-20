@@ -374,7 +374,7 @@ const Escalas = () => {
   const handleDeleteClick = useCallback((escala: Schedule) => {
     console.log('🗑️ handleDeleteClick INICIADO - escala recebida:', escala);
     console.log('🗑️ handleDeleteClick - ID da escala:', escala.id);
-    console.log('🗑️ handleDeleteClick - Nome do funcionário:', escala.employee?.name);
+    console.log('🗑️ handleDeleteClick - Nome do funcionário:', (escala as any).employeeName || escala.employee?.name);
     try {
       setEscalaToDelete(escala);
       console.log('🗑️ handleDeleteClick - escalaToDelete definido');
@@ -399,7 +399,7 @@ const Escalas = () => {
       await scheduleService.deleteSchedule(escalaToDelete.id);
       toast({ 
         title: 'Excluída com sucesso!', 
-        description: `A escala de ${escalaToDelete.employee?.name || 'funcionário'} foi removida.` 
+        description: `A escala de ${(escalaToDelete as any).employeeName || escalaToDelete.employee?.name || 'funcionário'} foi removida.` 
       });
       setDeleteDialogOpen(false);
       setEscalaToDelete(null);
@@ -936,6 +936,8 @@ const Escalas = () => {
               
               const mappedData = {
                 employeeId: String(employeeId || ''),
+                employeeName: String(modalState.escala.employee?.name || (modalState.escala as any).employeeName || ''),
+                employeeStatus: String(modalState.escala.employee?.status || (modalState.escala as any).employeeStatus || ''),
                 locationId: String(locationId || ''),
                 workPostId: String(workPostId || ''),
                 scheduleDate: scheduleDate,
@@ -1000,7 +1002,7 @@ const Escalas = () => {
               <AlertDialogDescription className="text-gray-400">
                 Tem certeza que deseja excluir a escala de{' '}
                 <span className="font-semibold text-white">
-                  {escalaToDelete?.employee?.name || 'funcionário'}
+                  {(escalaToDelete as any)?.employeeName || escalaToDelete?.employee?.name || 'funcionário'}
                 </span>
                 {' '}para o dia{' '}
                 <span className="font-semibold text-white">

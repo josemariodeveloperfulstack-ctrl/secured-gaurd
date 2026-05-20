@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { format, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Calculator, FileText, Save, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { measurementService } from '@/services/measurementService';
+import { DatePicker } from '@/components/ui/date-picker';
 import { clientService } from '@/services/clientService';
 import { contractService, Contract } from '@/services/contractService';
 import { unitService } from '@/services/unitService';
@@ -706,26 +708,22 @@ export const MeasurementBulletinModal: React.FC<MeasurementBulletinModalProps> =
                   <Label htmlFor="periodStart" className="text-seguranca-lightgray font-medium">
                     Data Início do Período <span className="text-seguranca-red">*</span>
                   </Label>
-                  <Input
-                    id="periodStart"
-                    type="date"
-                    value={formData.periodStart}
-                    onChange={(e) => setFormData(prev => ({ ...prev, periodStart: e.target.value }))}
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                    required
+                   <DatePicker
+                    date={formData.periodStart ? parseISO(formData.periodStart) : undefined}
+                    onDateChange={(date) => setFormData(prev => ({ ...prev, periodStart: date ? format(date, 'yyyy-MM-dd') : '' }))}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="periodEnd" className="text-seguranca-lightgray font-medium">
                     Data Fim do Período <span className="text-seguranca-red">*</span>
                   </Label>
-                  <Input
-                    id="periodEnd"
-                    type="date"
-                    value={formData.periodEnd}
-                    onChange={(e) => setFormData(prev => ({ ...prev, periodEnd: e.target.value }))}
-                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
-                    required
+                   <DatePicker
+                    date={formData.periodEnd ? parseISO(formData.periodEnd) : undefined}
+                    onDateChange={(date) => setFormData(prev => ({ ...prev, periodEnd: date ? format(date, 'yyyy-MM-dd') : '' }))}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
                   />
                 </div>
               </div>

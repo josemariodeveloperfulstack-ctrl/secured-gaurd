@@ -8,10 +8,12 @@ import {
   Menu,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CalendarClock
 } from 'lucide-react';
 import { getRoleDisplayName, getRoleColor } from '@/utils/permissions';
 import { CollapsibleSidebar } from './CollapsibleSidebar';
+import { useNavigate } from 'react-router-dom';
 import { useSidebar } from '@/hooks/useSidebar';
 import { Breadcrumb } from './Breadcrumb';
 import { NotificationBell } from './NotificationBell';
@@ -23,16 +25,19 @@ interface MainLayoutProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+  noPadding?: boolean;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({
   children,
   title,
-  subtitle
+  subtitle,
+  noPadding = false
 }) => {
   const { user, logout } = useAuth();
   const { collapsed, isMobile, toggleSidebar } = useSidebar();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleProfileClick = () => {
     setIsProfileModalOpen(true);
@@ -102,6 +107,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               {/* Ícone de Notificações */}
               <NotificationBell />
 
+              {/* Ícone de Agendamento */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/webmail')}
+                title="Agendamento & E-mails"
+                className="relative text-seguranca-lightgray hover:text-seguranca-yellow hover:bg-seguranca-graphite p-1 md:p-2"
+              >
+                <CalendarClock className="h-5 w-5" />
+              </Button>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -116,12 +132,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         </header>
 
         {/* Conteúdo da página */}
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 overflow-visible">
+        <main className={`flex-1 ${noPadding ? 'p-0' : 'p-4 md:p-6'} pb-20 md:pb-6 overflow-visible flex flex-col`}>
           {/* Breadcrumb */}
-          <Breadcrumb />
+          {!noPadding && <Breadcrumb />}
 
           {/* Título da página (se fornecido) */}
-          {(title || subtitle) && (
+          {!noPadding && (title || subtitle) && (
             <div className="mb-6">
               {title && (
                 <h1 className="text-2xl md:text-3xl font-bold text-seguranca-lightgray mb-2">
@@ -137,8 +153,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           )}
 
           {/* Conteúdo principal */}
-          <div className="bg-seguranca-black rounded-lg border border-gray-700 p-2 sm:p-4 md:p-6 w-full overflow-x-auto overflow-y-visible">
-            <div className="min-w-0 w-full">
+          <div className={`flex-1 ${noPadding ? '' : 'bg-seguranca-black rounded-lg border border-gray-700 p-2 sm:p-4 md:p-6 shadow-xl'} w-full overflow-hidden flex flex-col`}>
+            <div className="min-w-0 w-full h-full flex flex-col">
               {children}
             </div>
           </div>

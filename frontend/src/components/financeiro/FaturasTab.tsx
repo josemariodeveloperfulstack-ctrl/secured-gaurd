@@ -37,9 +37,10 @@ import {
   CreditCard,
   Receipt
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import api from '@/lib/axios';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface Invoice {
   id: string;
@@ -76,8 +77,8 @@ interface FormData {
   amount: string;
   type: 'FIXA' | 'VARIAVEL';
   status: 'PENDENTE' | 'PAGA' | 'VENCIDA' | 'CANCELADA';
-  dueDate: string;
-  issueDate: string;
+  dueDate: Date | undefined;
+  issueDate: Date | undefined;
   category?: string;
   centroCusto?: string;
   notes?: string;
@@ -126,8 +127,8 @@ const FaturasTab: React.FC = () => {
     amount: '0,00',
     type: 'VARIAVEL',
     status: 'PENDENTE',
-    dueDate: '',
-    issueDate: '',
+    dueDate: undefined,
+    issueDate: undefined,
     category: '',
     centroCusto: '',
     notes: ''
@@ -189,7 +190,9 @@ const FaturasTab: React.FC = () => {
       // Converter o valor de string para number antes de enviar
       const dataToSend = {
         ...formData,
-        amount: parseFloat(formData.amount?.replace(',', '.') || '0')
+        amount: parseFloat(formData.amount?.replace(',', '.') || '0'),
+        issueDate: formData.issueDate ? format(formData.issueDate, 'yyyy-MM-dd') : undefined,
+        dueDate: formData.dueDate ? format(formData.dueDate, 'yyyy-MM-dd') : undefined
       };
 
       if (editingInvoice) {
@@ -216,8 +219,8 @@ const FaturasTab: React.FC = () => {
         amount: '0,00',
         type: 'VARIAVEL',
         status: 'PENDENTE',
-        dueDate: '',
-        issueDate: '',
+        dueDate: undefined,
+        issueDate: undefined,
         category: '',
         centroCusto: '',
         notes: ''
@@ -280,8 +283,8 @@ const FaturasTab: React.FC = () => {
       amount: invoice.amount ? invoice.amount.toFixed(2).replace('.', ',') : '0,00',
       type: invoice.type,
       status: invoice.status,
-      dueDate: invoice.dueDate,
-      issueDate: invoice.issueDate,
+      dueDate: invoice.dueDate ? parseISO(invoice.dueDate) : undefined,
+      issueDate: invoice.issueDate ? parseISO(invoice.issueDate) : undefined,
       category: invoice.category || '',
       centroCusto: invoice.centroCusto || '',
       notes: invoice.notes || ''
@@ -302,8 +305,8 @@ const FaturasTab: React.FC = () => {
       amount: '0,00',
       type: 'VARIAVEL',
       status: 'PENDENTE',
-      dueDate: '',
-      issueDate: '',
+      dueDate: undefined,
+      issueDate: undefined,
       category: '',
       centroCusto: '',
       notes: ''
@@ -694,21 +697,21 @@ const FaturasTab: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Data de Emissão *</label>
-                <Input
-                  type="date"
-                  value={formData.issueDate}
-                  onChange={(e) => setFormData({...formData, issueDate: e.target.value})}
-                  className="bg-seguranca-black border-gray-600 text-white"
+                <DatePicker
+                  date={formData.issueDate}
+                  onDateChange={(date) => setFormData({...formData, issueDate: date})}
+                  placeholder="dd/mm/aaaa"
+                  className="bg-seguranca-black border-gray-600"
                 />
               </div>
               
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Data de Vencimento *</label>
-                <Input
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
-                  className="bg-seguranca-black border-gray-600 text-white"
+                <DatePicker
+                  date={formData.dueDate}
+                  onDateChange={(date) => setFormData({...formData, dueDate: date})}
+                  placeholder="dd/mm/aaaa"
+                  className="bg-seguranca-black border-gray-600"
                 />
               </div>
             </div>

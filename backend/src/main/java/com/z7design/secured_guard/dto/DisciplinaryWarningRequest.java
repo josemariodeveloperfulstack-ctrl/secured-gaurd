@@ -16,10 +16,14 @@ import java.util.UUID;
 public class DisciplinaryWarningRequest {
     private UUID companyId;
 
+    /** ID do funcionário (opcional). Quando informado, persiste o PDF gerado. */
+    private UUID employeeId;
+
     // Dados do Funcionário
     private String employeeName;
     private String employeeCpf;
     private String employeePosition; // Cargo
+    private String sector; // Setor/Posto de Trabalho
 
     // Dados da Infração
     private String reason; // Motivo da advertência

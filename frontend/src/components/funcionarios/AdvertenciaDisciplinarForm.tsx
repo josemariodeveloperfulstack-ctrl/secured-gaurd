@@ -11,6 +11,7 @@ import { FileText, Download, Eye, User, Building, Calendar, AlertTriangle, Check
 import { employeeService } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
 import { documentService } from '@/services/documentService';
+import { useToast } from '../ui/use-toast';
 import api from '@/lib/axios';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { Company } from '@/types/company';
@@ -32,6 +33,7 @@ interface AdvertenciaDisciplinarFormProps {
 }
 
 const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({ employeeId, companyId }) => {
+  const { toast } = useToast();
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
@@ -76,6 +78,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
               hireDate: emp.hireDate,
               positionName: emp.position?.name,
               unitName: emp.unit?.name,
+              workPostName: emp.workPostName || emp.workPost?.name,
               address: emp.address
             } as SimpleEmployee);
           }
@@ -135,7 +138,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
 
   const handlePreview = async () => {
     if (!funcionario || !empresa) {
-      alert('Selecione funcionário e empresa!');
+      toast({ title: 'Atenção', description: 'Selecione funcionário e empresa!', variant: 'destructive' });
       return;
     }
 
@@ -145,12 +148,13 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
         companyId: empresa.id,
         employeeName: funcionario.name,
         employeeCpf: (funcionario as any).document || funcionario.cpf || '',
-        employeePosition: (funcionario as any).position?.name || '',
+        employeePosition: funcionario.positionName || (funcionario as any).position?.name || '',
+        sector: funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPostName || (funcionario as any).workPost?.name || '',
         reason: form.motivo,
         description: form.observacoes,
         infractionDate: form.dataFaltas ? new Date().toISOString() : null, // Backend needs LocalDateTime
         infractionLocation: 'Nas dependências da empresa',
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        city: empresa.city || '',
         documentDate: form.dataEmissao
       };
 
@@ -163,7 +167,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
       setShowModal(true);
     } catch (err) {
       console.error('Erro ao gerar preview:', err);
-      alert('Erro ao gerar preview. Tente novamente.');
+      toast({ title: 'Erro', description: 'Erro ao gerar preview. Tente novamente.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -172,7 +176,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
   const handleGerarPDF = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!funcionario || !empresa) {
-      alert('Selecione funcionário e empresa!');
+      toast({ title: 'Atenção', description: 'Selecione funcionário e empresa!', variant: 'destructive' });
       return;
     }
 
@@ -182,12 +186,13 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
         companyId: empresa.id,
         employeeName: funcionario.name,
         employeeCpf: (funcionario as any).document || funcionario.cpf || '',
-        employeePosition: (funcionario as any).position?.name || '',
+        employeePosition: funcionario.positionName || (funcionario as any).position?.name || '',
+        sector: funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPostName || (funcionario as any).workPost?.name || '',
         reason: form.motivo,
         description: form.observacoes,
         infractionDate: form.dataFaltas ? new Date().toISOString() : null,
         infractionLocation: 'Nas dependências da empresa',
-        city: empresa.address && typeof empresa.address === 'string' ? empresa.address.split(',')[0] : '',
+        city: empresa.city || '',
         documentDate: form.dataEmissao
       };
 
@@ -204,10 +209,10 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      alert('Advertência gerada com sucesso!');
+      toast({ title: 'Sucesso', description: 'Advertência gerada com sucesso!' });
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
-      alert('Erro ao gerar PDF. Tente novamente.');
+      toast({ title: 'Erro', description: 'Erro ao gerar PDF. Tente novamente.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -394,7 +399,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">Posto de Trabalho / Setor</Label>
                     <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPost?.name || '-'}
+                      {funcionario.unitName || (funcionario as any).unit?.name || (funcionario as any).workPostName || (funcionario as any).workPost?.name || '-'}
                     </div>
                   </div>
                   <div className="space-y-1.5">

@@ -30,6 +30,15 @@ public class EquipmentDTO {
     private EquipmentUsage usageType;
     private String ballisticPlate;
     
+    // Novos campos para controle de tipo
+    private com.z7design.secured_guard.model.enums.EquipmentType type;
+    private Integer shotsQuantity;
+    private String weaponRegistration;
+    private Integer quantity;
+    private String caliber;
+    private UUID workPostId;
+    private String workPostName;
+    
     // Datas
     private LocalDate manufacturingDate;
     private LocalDate validityDate;

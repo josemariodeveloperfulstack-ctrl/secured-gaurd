@@ -38,9 +38,43 @@ public class OpportunityService {
     private UserRepository userRepository;
 
     @Transactional(readOnly = true)
+    public List<Opportunity> findAllActive() {
+        try {
+            List<Opportunity> opportunities = opportunityRepository.findAllActiveWithRelationships();
+            // Inicializar objetos necessários dentro da transação para evitar LazyInitializationException
+            for (Opportunity opportunity : opportunities) {
+                initializeRelationships(opportunity);
+            }
+            return opportunities;
+        } catch (Exception e) {
+            // Fallback para método padrão
+            return opportunityRepository.findAllActive();
+        }
+    }
+
+    private void initializeRelationships(Opportunity opportunity) {
+        if (opportunity.getLead() != null) {
+            opportunity.getLead().getId();
+            opportunity.getLead().getName();
+        }
+        if (opportunity.getStatus() != null) {
+            opportunity.getStatus().getId();
+            opportunity.getStatus().getName();
+        }
+        if (opportunity.getAssignedTo() != null) {
+            opportunity.getAssignedTo().getId();
+            opportunity.getAssignedTo().getName();
+        }
+        if (opportunity.getClient() != null) {
+            opportunity.getClient().getId();
+            opportunity.getClient().getName();
+        }
+    }
+
+    @Transactional(readOnly = true)
     public List<Opportunity> findAll() {
         try {
-            List<Opportunity> opportunities = opportunityRepository.findAllWithRelationships();
+            List<Opportunity> opportunities = opportunityRepository.findAllActiveWithRelationships();
             // Inicializar objetos necessários dentro da transação para evitar LazyInitializationException
             for (Opportunity opportunity : opportunities) {
                 if (opportunity.getLead() != null) {
@@ -201,7 +235,43 @@ public class OpportunityService {
         return opportunityRepository.save(existing);
     }
 
-    public void delete(UUID id) {
-        opportunityRepository.deleteById(id);
+    public User findUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + username));
+    }
+
+    public void delete(UUID id, String reason, User user) {
+        Opportunity opportunity = findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada com ID: " + id));
+        
+        opportunity.setDeleted(true);
+        opportunity.setDeletionReason(reason);
+        opportunity.setDeletedAt(java.time.LocalDateTime.now());
+        opportunity.setDeletedBy(user);
+        
+        opportunityRepository.save(opportunity);
+    }
+    @Transactional
+    public void deleteAll(String reason, User user) {
+        List<Opportunity> allOpportunities = opportunityRepository.findAllActive();
+        for (Opportunity opportunity : allOpportunities) {
+            opportunity.setDeleted(true);
+            opportunity.setDeletionReason(reason);
+            opportunity.setDeletedAt(java.time.LocalDateTime.now());
+            opportunity.setDeletedBy(user);
+        }
+        opportunityRepository.saveAll(allOpportunities);
+    }
+
+    @Transactional
+    public void deleteBulk(List<UUID> ids, String reason, User user) {
+        List<Opportunity> opportunities = opportunityRepository.findAllById(ids);
+        for (Opportunity opportunity : opportunities) {
+            opportunity.setDeleted(true);
+            opportunity.setDeletionReason(reason);
+            opportunity.setDeletedAt(java.time.LocalDateTime.now());
+            opportunity.setDeletedBy(user);
+        }
+        opportunityRepository.saveAll(opportunities);
     }
 } 

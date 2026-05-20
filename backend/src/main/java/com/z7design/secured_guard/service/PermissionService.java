@@ -40,15 +40,26 @@ public class PermissionService {
             Permission.ATTENDANCE_READ, Permission.ATTENDANCE_WRITE, Permission.ATTENDANCE_MANAGE
         )));
 
-        // 🟩 SUPERVISOR - Coordena operações de equipes
+        // 🟩 SUPERVISOR — APENAS módulo operacional (visitas, escalas, postos, equipe em campo)
+        // ❌ NÃO tem acesso a Financeiro, Comercial, Holerites/Folha, RH SST, Compras, Estoque.
         rolePermissions.put(UserRole.SUPERVISOR, new HashSet<>(Arrays.asList(
-            Permission.EMPLOYEES_READ, Permission.EMPLOYEES_WRITE,
-            Permission.CONTRACTS_READ, Permission.CONTRACTS_WRITE,
-            Permission.PAYSLIPS_READ, Permission.PAYSLIPS_WRITE,
-            Permission.EQUIPMENTS_READ, Permission.EQUIPMENTS_WRITE, Permission.EQUIPMENTS_ASSIGN,
+            // Operacional core
+            Permission.VISITS_READ, Permission.VISITS_WRITE, Permission.VISITS_CREATE,
+            Permission.ACTIVITY_REPORTS_READ, Permission.ACTIVITY_REPORTS_WRITE, Permission.ACTIVITY_REPORTS_CREATE,
+            Permission.OCCURRENCES_READ, Permission.OCCURRENCES_WRITE, Permission.OCCURRENCES_CREATE,
+            Permission.WORK_POSTS_READ,
+            Permission.SCHEDULES_READ,
+            Permission.TIME_RECORDS_READ,
+            // Consultas necessárias durante a visita
+            Permission.EMPLOYEES_READ,
+            Permission.EQUIPMENTS_READ,
+            Permission.TRAINING_READ,
+            // Relatórios operacionais
             Permission.REPORTS_READ, Permission.REPORTS_GENERATE,
+            // Dashboard + perfil + comunicação
             Permission.DASHBOARD_READ,
-            Permission.PROFILE_READ, Permission.PROFILE_WRITE
+            Permission.PROFILE_READ, Permission.PROFILE_WRITE,
+            Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
         )));
 
         // 🟨 RH - Gerencia informações contratuais e pessoais
@@ -156,6 +167,7 @@ public class PermissionService {
             Permission.PROPOSALS_READ, Permission.PROPOSALS_WRITE, Permission.PROPOSALS_CREATE, Permission.PROPOSALS_DELETE,
             Permission.QUOTES_READ, Permission.QUOTES_WRITE, Permission.QUOTES_CREATE, Permission.QUOTES_DELETE,
             Permission.CONTRACTS_READ, Permission.CONTRACTS_WRITE, Permission.CONTRACTS_CREATE, Permission.CONTRACTS_DELETE,
+            Permission.WORK_POSTS_READ, Permission.WORK_POSTS_WRITE,
             Permission.DASHBOARD_READ, Permission.REPORTS_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE,
             Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
@@ -163,6 +175,34 @@ public class PermissionService {
         rolePermissions.put(UserRole.COMERCIAL, new HashSet<>(commercialFull));
         rolePermissions.put(UserRole.GESTOR_COMERCIAL, new HashSet<>(commercialFull));
         rolePermissions.put(UserRole.ASSISTENTE_COMERCIAL, new HashSet<>(commercialFull));
+
+        // Módulo operacional completo (sem financeiro): gestor operacional e gestão de supervisão
+        Set<Permission> operationalModuleFull = new HashSet<>(Arrays.asList(
+                Permission.EMPLOYEES_READ, Permission.EMPLOYEES_WRITE, Permission.EMPLOYEE_HISTORY_READ,
+                Permission.CONTRACTS_READ,
+                Permission.EQUIPMENTS_READ, Permission.EQUIPMENTS_WRITE, Permission.EQUIPMENTS_ASSIGN,
+                Permission.EQUIPMENTS_CREATE,
+                Permission.REPORTS_READ, Permission.REPORTS_GENERATE,
+                Permission.DASHBOARD_READ,
+                Permission.PROFILE_READ, Permission.PROFILE_WRITE,
+                Permission.VISITS_READ, Permission.VISITS_WRITE, Permission.VISITS_CREATE, Permission.VISITS_DELETE,
+                Permission.ACTIVITY_REPORTS_READ, Permission.ACTIVITY_REPORTS_WRITE, Permission.ACTIVITY_REPORTS_CREATE,
+                Permission.WORK_POSTS_READ, Permission.WORK_POSTS_WRITE,
+                Permission.SCHEDULES_READ, Permission.SCHEDULES_WRITE, Permission.SCHEDULES_CREATE,
+                Permission.WORK_SCHEDULES_READ, Permission.WORK_SCHEDULES_WRITE, Permission.WORK_SCHEDULES_CREATE,
+                Permission.PAYSLIPS_READ,
+                Permission.PAYROLL_READ,
+                Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE,
+                Permission.ATTENDANCE_READ, Permission.ATTENDANCE_WRITE, Permission.ATTENDANCE_MANAGE,
+                Permission.TIME_RECORDS_READ, Permission.TIME_RECORDS_WRITE, Permission.TIME_RECORDS_CREATE,
+                Permission.TIME_RECORDS_DELETE,
+                Permission.OCCURRENCES_READ, Permission.OCCURRENCES_WRITE, Permission.OCCURRENCES_CREATE,
+                Permission.SERVICE_ORDERS_READ, Permission.SERVICE_ORDERS_WRITE, Permission.SERVICE_ORDERS_CREATE,
+                Permission.SPECIFIC_ACTIVITIES_READ, Permission.SPECIFIC_ACTIVITIES_WRITE,
+                Permission.SPECIFIC_ACTIVITIES_CREATE,
+                Permission.DOCUMENTS_READ, Permission.DOCUMENTS_WRITE));
+        rolePermissions.put(UserRole.GESTOR_OPERACIONAL, new HashSet<>(operationalModuleFull));
+        rolePermissions.put(UserRole.GESTAO_SUPERVISAO, new HashSet<>(operationalModuleFull));
     }
 
     public Set<Permission> getPermissionsForRole(UserRole role) {

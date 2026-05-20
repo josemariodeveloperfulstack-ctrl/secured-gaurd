@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import CurrencyInput from 'react-currency-input-field';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -12,8 +13,11 @@ import { employeeService, Employee, SimpleEmployee } from '@/services/employeeSe
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { SearchableSelect } from '../ui/searchable-select';
 
-import { companyService } from '@/services/companyService';
-import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
+import {
+  useCompanies,
+  useCostCentersActive,
+  useAllWorkPosts,
+} from '@/hooks/queries';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
@@ -30,6 +34,33 @@ function resolvePdfContractKind(
   if (contractType === 'Contrato de Experiência') return 'EXPERIENCE';
   if (contractType === 'CLT - Prazo indeterminado (integral)') return 'INDEFINITE';
   return 'STANDARD';
+}
+
+/**
+ * Formata uma data ISO ("YYYY-MM-DD" ou ISO completo) como "dd/MM/yyyy"
+ * SEM aplicar conversão de timezone — necessário porque `new Date("YYYY-MM-DD")`
+ * é interpretado como UTC e em UTC-3 retorna o dia anterior (bug do -1 dia).
+ */
+function formatLocalDate(iso?: string | null): string {
+  if (!iso) return '-';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
+
+/**
+ * Soma dias a uma data ISO ("YYYY-MM-DD") sem conversão de timezone.
+ * Retorna nova string ISO "YYYY-MM-DD".
+ */
+function addDaysIsoLocal(iso: string, days: number): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  d.setDate(d.getDate() + days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /** Valor enviado em `department` para o PDF como "SETOR DE TRABALHO" (setor + unidade + posto — não centro de custo). */
@@ -70,11 +101,16 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   });
 
   const [loading, setLoading] = useState(false);
-  const [loadingData, setLoadingData] = useState(false);
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
-  const [companies, setCompanies] = useState<any[]>([]);
 
-  const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
+  // Hooks de cache (TanStack Query) — substituem o loadData() manual.
+  // Cache compartilhado entre formulários elimina refetch redundante.
+  const { data: companies = [], isLoading: loadingCompanies } = useCompanies();
+  const { data: costCenters = [], isLoading: loadingCostCenters } = useCostCentersActive();
+  const { data: allWorkPosts = [], isLoading: loadingAllWorkPosts } = useAllWorkPosts();
+
+  const loadingData =
+    loadingCompanies || loadingCostCenters || loadingAllWorkPosts;
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
@@ -106,8 +142,21 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               hireDate: emp.hireDate,
               positionName: emp.position?.name,
               unitName: emp.unit?.name,
-              address: emp.address
+              address: emp.address,
+              workPostId: emp.workPostId || emp.workPost?.id,
+              workPostName: emp.workPostName || emp.workPost?.name,
+              salario: emp.salario,
+              diasTrabalho: emp.diasTrabalho,
+              horarioTrabalho: emp.horarioTrabalho,
+              escalaTrabalho: emp.escalaTrabalho,
+              companyId: emp.company?.id || (emp as any).companyId
             } as SimpleEmployee);
+
+            // Também atualizar o form.companyId se ele estiver vazio
+            setForm(prev => ({
+              ...prev,
+              companyId: prev.companyId || emp.company?.id || (emp as any).companyId || ''
+            }));
           }
         } catch (error) {
           console.error("Erro ao carregar dados iniciais do funcionário:", error);
@@ -117,69 +166,104 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     }
   }, [form.employeeId, selectedEmployeeData]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoadingData(true);
-    try {
-      const [companiesData, costCentersData] = await Promise.all([
-        companyService.getAllCompanies(),
-        costCenterService.listActive()
-      ]);
-      setCompanies(companiesData);
-      setCostCenters(Array.isArray(costCentersData) ? costCentersData : []);
-
-      console.log('📊 Centros de Custo carregados:', costCentersData);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível carregar funcionários, empresas e centros de custos.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoadingData(false);
-    }
-  };
+  // Os dados de empresas, centros de custo, clientes e postos agora vêm dos hooks
+  // useCompanies / useCostCentersActive / useClients / useAllWorkPosts / useWorkPostsByClient
+  // (TanStack Query) — sem useEffect imperativo, com cache compartilhado.
 
   // Pre-fill some fields when employee is selected
   useEffect(() => {
-    if (funcionario) {
+    if (funcionario && allWorkPosts.length > 0) {
       // Try to find cost center by unit name
       const unitName = (funcionario as any).unit?.name;
       const matchingCostCenter = unitName
         ? costCenters.find(cc => cc.name.toLowerCase() === unitName.toLowerCase())
         : null;
 
+      // Buscar posto de trabalho associado ao funcionário
+      const workPostId = (funcionario as any).workPostId || (funcionario as any).workPost?.id;
+      const matchingWorkPost = workPostId ? allWorkPosts.find(wp => wp.id === workPostId) : null;
+
       setForm(prev => {
         const salaryValue = (funcionario as any).salario;
+        // O componente `CurrencyInput` (react-currency-input-field) espera o
+        // `value` em formato RAW com ponto decimal (ex: "1500.50") e cuida
+        // sozinho da formatação visual ("R$ 1.500,50"). Por isso aqui
+        // convertemos o valor vindo do backend para esse formato raw.
+        //
+        // Aceitamos múltiplos formatos de entrada para robustez:
+        //   - number              → 1500.5
+        //   - "1500.50"           → ponto decimal (já raw)
+        //   - "1.500,50"          → pt-BR (precisa converter)
+        //   - "R$ 1.500,50"       → com prefixo (precisa limpar)
+        const parseSalaryToRaw = (v: unknown): string => {
+          if (v == null) return '';
+          if (typeof v === 'number') {
+            return Number.isFinite(v) ? String(v) : '';
+          }
+          const s = String(v).replace(/[^\d.,-]/g, '').trim();
+          if (!s) return '';
+          // Formato pt-BR com vírgula como separador decimal: "1.500,50" → 1500.50
+          if (/,\d{1,2}$/.test(s)) {
+            const raw = s.replace(/\./g, '').replace(',', '.');
+            const n = Number(raw);
+            return Number.isFinite(n) ? String(n) : '';
+          }
+          // Já está em formato raw com ponto decimal
+          const n = Number(s);
+          return Number.isFinite(n) ? String(n) : '';
+        };
+        const rawSalary = parseSalaryToRaw(salaryValue);
+
         return {
           ...prev,
           position: (funcionario as any).positionName || (funcionario as any).position?.name || prev.position,
-          department: matchingCostCenter?.id || prev.department,
+          department: matchingWorkPost?.id || matchingCostCenter?.id || prev.department,
           startDate: funcionario.hireDate ? funcionario.hireDate.split('T')[0] : prev.startDate,
-          salary: salaryValue != null ? String(salaryValue).replace('.', ',') : prev.salary,
+          salary: rawSalary || prev.salary,
+          workSchedule: (funcionario as any).escalaTrabalho && (funcionario as any).horarioTrabalho
+            ? `${(funcionario as any).escalaTrabalho} - ${(funcionario as any).horarioTrabalho}`
+            : (funcionario as any).escalaTrabalho || (funcionario as any).horarioTrabalho || (funcionario as any).diasTrabalho || prev.workSchedule,
         };
       });
     }
-  }, [funcionario, costCenters]);
+  }, [funcionario, costCenters, allWorkPosts]);
 
-  // Auto-calculate end date for experience contracts
+  // Default da duração de experiência: 45 dias quando "Contrato de Experiência" é selecionado
   useEffect(() => {
-    if (form.contractType === 'Contrato de Experiência' && form.startDate && form.experienceDuration) {
-      const startDate = new Date(form.startDate);
-      const durationDays = parseInt(form.experienceDuration);
+    if (form.contractType === 'Contrato de Experiência' && !form.experienceDuration) {
+      setForm(prev => ({ ...prev, experienceDuration: '45' }));
+    }
+  }, [form.contractType, form.experienceDuration]);
 
-      if (!isNaN(startDate.getTime()) && !isNaN(durationDays)) {
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + durationDays);
+  // Garante que a data de início use a hireDate do cadastro quando for contrato de experiência
+  useEffect(() => {
+    if (
+      form.contractType === 'Contrato de Experiência' &&
+      funcionario?.hireDate &&
+      !form.startDate
+    ) {
+      setForm(prev => ({
+        ...prev,
+        startDate: funcionario.hireDate!.split('T')[0],
+      }));
+    }
+  }, [form.contractType, funcionario?.hireDate, form.startDate]);
 
-        setForm(prev => ({
-          ...prev,
-          endDate: endDate.toISOString().split('T')[0]
-        }));
+  // Auto-calcula a Data de Término para contratos de experiência.
+  // Usa cálculo local (sem timezone) para garantir que a data exibida no card
+  // ("Data de Término Calculada") seja IDÊNTICA à do input "Data de Término".
+  useEffect(() => {
+    if (
+      form.contractType === 'Contrato de Experiência' &&
+      form.startDate &&
+      form.experienceDuration
+    ) {
+      const days = parseInt(form.experienceDuration, 10);
+      if (!Number.isNaN(days)) {
+        const newEnd = addDaysIsoLocal(form.startDate, days);
+        if (newEnd) {
+          setForm(prev => ({ ...prev, endDate: newEnd }));
+        }
       }
     }
   }, [form.contractType, form.startDate, form.experienceDuration]);
@@ -197,6 +281,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
   ];
 
   const experienceDurations = [
+    { value: '30', label: '30 dias' },
     { value: '45', label: '45 dias' },
     { value: '60', label: '60 dias' },
     { value: '90', label: '90 dias' },
@@ -243,7 +328,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     if (form.contractType === 'Contrato de Experiência' && !form.experienceDuration) {
       toast({
         title: 'Atenção',
-        description: 'Selecione a duração do período de experiência (45, 60 ou 90 dias)!',
+        description: 'Selecione a duração do período de experiência (30, 45, 60 ou 90 dias)!',
         variant: 'destructive'
       });
       return false;
@@ -264,17 +349,29 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     const isExperiencia = pdfKind === 'EXPERIENCE';
     const cidadeContrato = resolveCompanySigningCity(empresa as { city?: string; address?: string });
 
+    // Resolve o nome do posto de trabalho selecionado no formulário
+    const selectedWorkPost = allWorkPosts.find(wp => wp.id === form.department);
+    const departmentName = selectedWorkPost 
+      ? selectedWorkPost.name 
+      : buildSetorLocalTrabalhoContrato(fullEmployee);
+
     return {
       companyId: empresa!.id,
+      employeeId: funcionario?.id,
       employeeName: fullEmployee.name,
       employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
       employeeRg: fullEmployee.rg || '',
       employeeAddress: addressValue,
       employeeCtps: (fullEmployee as any).ctps || '',
       employeeCtpsSeries: (fullEmployee as any).ctpsSeries || '',
+      nationality: fullEmployee.nationality || '',
+      maritalStatus: fullEmployee.maritalStatus || '',
+      pis: fullEmployee.pis || '',
       position: form.position,
-      department: buildSetorLocalTrabalhoContrato(fullEmployee),
-      salary: form.salary ? parseFloat(form.salary.replace(/\./g, '').replace(',', '.')) : 0,
+      department: departmentName,
+      // form.salary é sempre armazenado em formato raw com ponto decimal
+      // ("1500.50"), pois é o contrato do CurrencyInput. Basta parseFloat.
+      salary: form.salary ? parseFloat(form.salary) || 0 : 0,
       admissionDate: form.startDate || null,
       workHoursDescription: '44 horas semanais', // Placeholder or add form field if exists
       workSchedule: form.workSchedule || 'a definir',
@@ -288,8 +385,8 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
     };
   };
 
-  const handleGenerateContract = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateContract = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!validateForm()) return;
 
     setLoading(true);
@@ -402,28 +499,54 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     onChange={(value) => setForm(prev => ({ ...prev, employeeId: value }))}
                     disabled={loadingData}
                     onEmployeeSelect={(emp) => {
-                      setSelectedEmployeeData(emp);
+                      setSelectedEmployeeData({
+                        ...emp,
+                        workPostId: emp.workPostId,
+                        workPostName: emp.workPostName
+                      });
                       if (emp.companyId) {
                         setForm(prev => ({ ...prev, companyId: emp.companyId! }));
                       }
                     }}
                   />
                   {funcionario && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
-                      <User className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs font-semibold text-foreground">
-                        {funcionario.name}
-                      </span>
-                      {(funcionario.cpf || (funcionario as any).document) && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · CPF: {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
-                        </span>
-                      )}
-                      {(funcionario as any).position?.name && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · Cargo: {(funcionario as any).position?.name}
-                        </span>
-                      )}
+                    <div className="mt-2.5 rounded-xl bg-seguranca-black/40 p-3.5 border border-seguranca-yellow/10 shadow-inner group transition-all hover:border-seguranca-yellow/30">
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-seguranca-yellow/10 border border-seguranca-yellow/20">
+                            <User className="h-4 w-4 text-seguranca-yellow" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-seguranca-lightgray truncate leading-tight" title={funcionario.name}>
+                              {funcionario.name}
+                            </span>
+                            {(funcionario as any).positionName && (
+                              <span className="text-[11px] font-medium text-seguranca-yellow/80 mt-0.5 uppercase tracking-wider">
+                                {(funcionario as any).positionName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2.5 border-t border-white/5">
+                          {(funcionario.cpf || (funcionario as any).document) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">CPF</span>
+                              <span className="text-[11px] font-mono text-seguranca-lightgray/70">
+                                {formatCPF(funcionario.cpf || (funcionario as any).document || '')}
+                              </span>
+                            </div>
+                          )}
+                          {(funcionario as any).registrationNumber && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">Matrícula</span>
+                              <span className="text-[11px] font-mono text-seguranca-lightgray/70">
+                                {(funcionario as any).registrationNumber}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -448,21 +571,35 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     searchPlaceholder="Buscar empresa..."
                   />
                   {empresa && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60">
-                      <Building className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs font-semibold text-foreground">
-                        {empresa.sigla || empresa.tradeName || empresa.name}
-                      </span>
-                      {empresa.name && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · Razão Social: {empresa.name}
-                        </span>
-                      )}
-                      {empresa.cnpj && (
-                        <span className="text-[11px] text-muted-foreground">
-                          · CNPJ: {formatCNPJ(empresa.cnpj)}
-                        </span>
-                      )}
+                    <div className="mt-2.5 rounded-xl bg-seguranca-black/40 p-3.5 border border-seguranca-yellow/10 shadow-inner group transition-all hover:border-seguranca-yellow/30">
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-seguranca-yellow/10 border border-seguranca-yellow/20">
+                            <Building className="h-4 w-4 text-seguranca-yellow" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold text-seguranca-lightgray truncate leading-tight" title={empresa.sigla || empresa.tradeName || empresa.name}>
+                              {empresa.sigla || empresa.tradeName || empresa.name}
+                            </span>
+                            {empresa.name && (
+                              <span className="text-[11px] font-medium text-seguranca-yellow/80 mt-0.5 uppercase tracking-wider truncate" title={empresa.name}>
+                                {empresa.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2.5 border-t border-white/5">
+                          {empresa.cnpj && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-white/30 uppercase tracking-tighter">CNPJ</span>
+                              <span className="text-[11px] font-mono text-seguranca-lightgray/70">
+                                {formatCNPJ(empresa.cnpj)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -513,7 +650,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Admissão</Label>
                       <div className="min-h-[2.5rem] px-3 py-2 rounded-lg bg-muted/50 text-sm font-medium text-foreground border border-border/40">
-                         {funcionario.hireDate ? new Date(funcionario.hireDate).toLocaleDateString('pt-BR') : '-'}
+                         {formatLocalDate(funcionario.hireDate)}
                       </div>
                     </div>
                   </div>
@@ -645,6 +782,12 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                   <p className="text-sm text-orange-700">
                     Selecione a duração do período de experiência. A data de término será calculada automaticamente.
                   </p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    Padrão: <strong>45 dias</strong> a partir da data de admissão
+                    {funcionario?.hireDate && (
+                      <> (<strong>{formatLocalDate(funcionario.hireDate)}</strong>)</>
+                    )}.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-orange-700 font-semibold">Duração da Experiência *</Label>
@@ -652,7 +795,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     value={form.experienceDuration}
                     onValueChange={(value) => setForm(prev => ({ ...prev, experienceDuration: value }))}
                   >
-                    <SelectTrigger className="bg-white h-12 border-orange-400 focus:border-orange-600 text-base font-semibold">
+                    <SelectTrigger className="bg-white h-12 border-orange-400 focus:border-orange-600 text-base font-semibold text-gray-800">
                       <SelectValue placeholder="Selecione o período" />
                     </SelectTrigger>
                     <SelectContent>
@@ -669,8 +812,8 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                     <Label className="text-orange-700 font-semibold">Data de Término Calculada</Label>
                     <div className="flex items-center gap-3 p-3 bg-white rounded-lg border-2 border-orange-400">
                       <Calendar className="h-5 w-5 text-orange-600" />
-                      <span className="font-bold text-base">
-                        {form.endDate ? new Date(form.endDate).toLocaleDateString('pt-BR') : 'Calculando...'}
+                      <span className="font-bold text-base text-gray-800">
+                        {form.endDate ? formatLocalDate(form.endDate) : 'Calculando...'}
                       </span>
                       <Badge className="ml-auto bg-orange-600">Automático</Badge>
                     </div>
@@ -713,15 +856,24 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
 
               <div className="space-y-2">
                 <Label>Salário Base (R$)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R$</span>
-                  <Input
-                    value={form.salary}
-                    onChange={(e) => setForm(prev => ({ ...prev, salary: e.target.value }))}
-                    placeholder="0,00"
-                    className="bg-background h-11 pl-10"
-                  />
-                </div>
+                <CurrencyInput
+                  id="salary-base"
+                  name="salary"
+                  // form.salary é sempre raw decimal (ex: "1500.50") — formato
+                  // esperado por este componente. A formatação visual
+                  // ("R$ 1.500,50") é aplicada automaticamente.
+                  value={form.salary || ''}
+                  placeholder="R$ 0,00"
+                  decimalsLimit={2}
+                  decimalScale={2}
+                  fixedDecimalLength={2}
+                  groupSeparator="."
+                  decimalSeparator=","
+                  prefix="R$ "
+                  allowNegativeValue={false}
+                  onValueChange={(value) => setForm(prev => ({ ...prev, salary: value ?? '' }))}
+                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
               </div>
 
               <div className="space-y-2 lg:col-span-2">
@@ -737,23 +889,25 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Departamento (Centro de Custo)</Label>
+              <div className="space-y-2 lg:col-span-3">
+                <Label>Setor de Trabalho</Label>
                 <SearchableSelect
-                  options={costCenters.map(cc => ({
-                    value: cc.id || cc.name,
-                    label: cc.name,
-                    description: cc.code ? `Código: ${cc.code}` : undefined
+                  options={allWorkPosts.map(wp => ({
+                    value: wp.id || wp.name,
+                    label: wp.name,
+                    description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || '')
                   }))}
                   value={form.department}
                   onChange={(value) => setForm(prev => ({ ...prev, department: value }))}
                   disabled={loadingData}
-                  placeholder="Selecione o departamento"
-                  searchPlaceholder="Buscar departamento..."
+                  placeholder="Selecione o setor de trabalho"
+                  searchPlaceholder="Digite o nome do posto..."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para ver os postos de trabalho..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  No PDF do contrato, o campo <span className="font-medium text-foreground">Setor de trabalho</span> usa o
-                  setor, a unidade e o posto de trabalho cadastrados no funcionário — não este centro de custo.
+                  Pré-preenchido com o posto cadastrado para o funcionário. Digite ao menos 3
+                  caracteres para buscar outro posto, se necessário.
                 </p>
               </div>
             </div>
@@ -806,6 +960,7 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
           {/* Ações */}
           <div className="flex flex-col-reverse sm:flex-row gap-4 justify-end pt-2">
             <Button
+              type="button"
               onClick={handlePreviewContract}
               variant="outline"
               className="flex items-center gap-2 w-full sm:w-auto h-11"
@@ -824,7 +979,8 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
               )}
             </Button>
             <Button
-              onClick={handleGenerateContract}
+              type="button"
+              onClick={() => handleGenerateContract()}
               className="flex items-center gap-2 w-full sm:w-auto h-11 shadow-md hover:shadow-lg transition-all"
               disabled={loading || loadingData || !funcionario || !empresa}
             >

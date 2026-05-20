@@ -7,10 +7,14 @@ export interface ShiftChangeFormDTO {
     id?: number;
     dateOfRequest: string;
     requesterFullName: string;
+    /** ID do funcionário solicitante (usado para registrar no histórico). */
+    requesterEmployeeId?: string | null;
     requesterSector: string;
     requesterDayOffDate?: string | null;
     requesterShiftDate: string;
     replacingFullName: string;
+    /** ID do funcionário que assumirá o plantão (usado para registrar no histórico). */
+    replacingEmployeeId?: string | null;
     replacingSector: string;
     replacingShiftDate: string;
     replacingDayOffDate?: string | null;

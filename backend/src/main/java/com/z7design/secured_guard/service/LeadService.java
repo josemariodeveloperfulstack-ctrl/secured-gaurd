@@ -141,6 +141,33 @@ public class LeadService {
     }
 
     @Transactional(readOnly = true)
+    public List<Lead> findAllActive() {
+        List<Lead> leads = leadRepository.findAllActive();
+        // Inicializar relacionamentos lazy dentro da transação
+        for (Lead lead : leads) {
+            initializeLeadRelationships(lead);
+            // Forçar serialização do assignedTo acessando seus campos ANTES da serialização JSON
+            if (lead.getAssignedTo() != null) {
+                try {
+                    User assignedUser = lead.getAssignedTo();
+                    // Acessar todos os campos necessários para forçar inicialização completa
+                    UUID id = assignedUser.getId();
+                    String name = assignedUser.getName();
+                    String username = assignedUser.getUsername();
+                    assignedUser.getEmail();
+                    // Popular assignedToName para facilitar serialização
+                    lead.setAssignedToName(name != null ? name : username);
+                } catch (Exception e) {
+                    log.warn("❌ Erro ao acessar assignedTo do lead {}: {}", lead.getId(), e.getMessage());
+                    lead.setAssignedTo(null);
+                    lead.setAssignedToName(null);
+                }
+            }
+        }
+        return leads;
+    }
+
+    @Transactional(readOnly = true)
     public List<Lead> findAll() {
         List<Lead> leads = leadRepository.findAll();
         // Inicializar relacionamentos lazy dentro da transação
@@ -409,9 +436,46 @@ public class LeadService {
         return leadRepository.save(lead);
     }
 
-    public void delete(UUID id) {
+    public void delete(UUID id, String reason, User user) {
         Lead lead = findById(id);
-        leadRepository.delete(lead);
+        lead.setDeleted(true);
+        lead.setDeletionReason(reason);
+        lead.setDeletedAt(java.time.LocalDateTime.now());
+        lead.setDeletedBy(user);
+        leadRepository.save(lead);
+    }
+
+    @Transactional
+    public void deleteAll(String reason, User user) {
+        log.info("🗑️ Excluindo todos os leads do sistema (soft delete)...");
+        List<Lead> allLeads = leadRepository.findAllActive();
+        for (Lead lead : allLeads) {
+            lead.setDeleted(true);
+            lead.setDeletionReason(reason);
+            lead.setDeletedAt(java.time.LocalDateTime.now());
+            lead.setDeletedBy(user);
+        }
+        leadRepository.saveAll(allLeads);
+        log.info("✅ Todos os leads foram excluídos com sucesso.");
+    }
+
+    @Transactional
+    public void deleteBulk(List<UUID> ids, String reason, User user) {
+        log.info("🗑️ Excluindo {} leads em massa (soft delete)...", ids.size());
+        List<Lead> leads = leadRepository.findAllById(ids);
+        for (Lead lead : leads) {
+            lead.setDeleted(true);
+            lead.setDeletionReason(reason);
+            lead.setDeletedAt(java.time.LocalDateTime.now());
+            lead.setDeletedBy(user);
+        }
+        leadRepository.saveAll(leads);
+        log.info("✅ Leads excluídos com sucesso.");
+    }
+
+    public User findUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + username));
     }
 
     @Transactional(readOnly = true)
@@ -489,5 +553,15 @@ public class LeadService {
             initializeLeadRelationships(lead);
         }
         return leads;
+    }
+
+    @Transactional(readOnly = true)
+    public long countByCreatedAtRange(LocalDateTime startInclusive, LocalDateTime endExclusive) {
+        return leadRepository.countByCreatedAtRange(startInclusive, endExclusive);
+    }
+
+    @Transactional(readOnly = true)
+    public long countByStatusAndCreatedAtRange(LeadStatus status, LocalDateTime startInclusive, LocalDateTime endExclusive) {
+        return leadRepository.countByStatusAndCreatedAtRange(status, startInclusive, endExclusive);
     }
 } 

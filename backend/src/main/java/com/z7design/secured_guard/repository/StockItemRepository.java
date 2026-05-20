@@ -5,6 +5,7 @@ import com.z7design.secured_guard.model.enums.StockCategory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -78,8 +79,8 @@ public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
     @Query("SELECT si.category, COUNT(si), SUM(si.currentQuantity) FROM StockItem si WHERE si.active = true GROUP BY si.category")
     List<Object[]> getStatisticsByCategory();
 
-    // Valor total do estoque
-    @Query("SELECT SUM(si.currentQuantity * si.unitCost) FROM StockItem si WHERE si.active = true AND si.unitCost IS NOT NULL")
+    // Valor total do estoque (custos nulos tratados como zero para não anular o somatório)
+    @Query("SELECT COALESCE(SUM(COALESCE(si.currentQuantity, 0) * COALESCE(si.unitCost, 0)), 0) FROM StockItem si WHERE si.active = true")
     Double getTotalStockValue();
 
     // Contar itens por categoria
@@ -90,4 +91,8 @@ public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
 
     // Verificar se código existe
     boolean existsByCode(String code);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE StockItem s SET s.currentQuantity = 0 WHERE s.active = true")
+    int resetCurrentQuantityAllActive();
 }

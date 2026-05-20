@@ -26,23 +26,23 @@ MAX_ATTEMPTS=25
 ATTEMPT=1
 HEALTH_CHECK_URL="https://ci.z7botsolutions.com.br/api/health"
 INTERNAL_HEALTH_CHECK="http://localhost:8081/api/health"
+# Por omissão o script só termina com sucesso se o health PÚBLICO (Cloudflare) passar.
+# Apenas para debugging: CI_HEALTH_ALLOW_PARTIAL_SUCCESS=1 permite exit 0 só com interno OK (não use em produção).
 
 # Função para log com timestamp
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
 }
 
-# Função para verificar Traefik
+# Função para verificar Traefik (container exato "traefik", não substring noutro nome)
 check_traefik() {
     log "🔍 Verificando status do Traefik..."
-    local traefik_status=$(docker ps --filter 'name=traefik' --format '{{.Status}}' 2>&1 || echo "")
-    if echo "$traefik_status" | grep -q "Up" 2>/dev/null; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^traefik$'; then
         log "✅ Traefik está rodando"
         return 0
-    else
-        log "❌ Traefik NÃO está rodando! Isso causa HTTP 521 do Cloudflare."
-        return 1
     fi
+    log "❌ Traefik NÃO está rodando! Isso causa HTTP 521 do Cloudflare."
+    return 1
 }
 
 # Função para verificar se backend está pronto
@@ -138,11 +138,11 @@ check_external_health() {
             return 1
         fi
     elif [ "$http_code" = "521" ]; then
-        log "❌ HTTP 521: Cloudflare não consegue conectar ao servidor de origem"
-        log "💡 Possíveis causas:"
-        log "   1. Traefik não está rodando"
-        log "   2. Firewall bloqueando conexões do Cloudflare"
-        log "   3. Nginx não está respondendo"
+        log "❌ HTTP 521: Cloudflare não consegue conectar ao servidor de origem (origem offline / recusa TCP)."
+        log "💡 Causas frequentes neste projeto:"
+        log "   1. Traefik parado — ver docker logs traefik; se viu 'address already in use' na 80, outro serviço usa a porta."
+        log "   2. Porta 80 ocupada (nginx do sistema, outro container): sudo ss -tlnp | grep ':80'"
+        log "   3. Firewall bloqueando IPs da Cloudflare na 80/443"
         return 1
     elif [ "$http_code" = "301" ] || [ "$http_code" = "302" ] || [ "$http_code" = "307" ] || [ "$http_code" = "308" ]; then
         log "⚠️ HTTP $http_code: Redirecionamento detectado"
@@ -203,6 +203,10 @@ collect_diagnostics() {
     curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
     echo "Nginx (localhost:8082):"
     curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8082/api/health || echo "Nginx não responde"
+    echo ""
+    echo "🔌 Porta 80 no host (Traefik precisa disto livre para Cloudflare deixar de responder 521):"
+    (command -v ss >/dev/null && ss -tlnp 2>/dev/null | grep -E ':80\s' || true) || echo "   (instale iproute2 / use: sudo ss -tlnp | grep ':80')"
+    docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null | grep -E ':80->|:::80->' || echo "   (nenhum container mapeando :80)"
     
     echo ""
     echo "📋 Logs do backend (últimas 30 linhas):"
@@ -227,9 +231,20 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
     # Verificar Traefik a cada 3 tentativas (script roda na VPS, executar localmente)
     if [ $((ATTEMPT % 3)) -eq 0 ]; then
         if ! check_traefik; then
-            log "💡 Tentando iniciar Traefik..."
-            (cd /var/www/secured_guard && docker-compose -f docker-compose.traefik.yml up -d 2>&1) || true
+            log "💡 Tentando Traefik: compose down + rm container falho + up -d..."
+            (
+              cd /var/www/secured_guard || exit 0
+              if [ -f ci/scripts/free-host-ports-for-traefik.sh ]; then
+                bash ci/scripts/free-host-ports-for-traefik.sh 2>/dev/null || true
+              fi
+              docker-compose -f docker-compose.traefik.yml down 2>/dev/null || true
+              docker rm -f traefik 2>/dev/null || true
+              docker-compose -f docker-compose.traefik.yml up -d 2>&1
+            ) || true
             sleep 15
+            if ! check_traefik; then
+                log "⚠️ Traefik ainda não subiu. Verifique conflito na porta 80: sudo ss -tlnp | grep ':80'"
+            fi
         fi
     fi
     
@@ -243,9 +258,9 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             exit 0
         else
             log "⚠️ Aplicação funciona internamente mas não externamente"
-            log "💡 Pode ser problema de Cloudflare ou Traefik"
-            if [ $ATTEMPT -ge 15 ]; then
-                log "✅ Considerando sucesso parcial - aplicação está operacional internamente"
+            log "💡 HTTP 521 = origem inacessível na 80/443 — em geral Traefik parado (porta 80 ocupada no host)."
+            if [ "${CI_HEALTH_ALLOW_PARTIAL_SUCCESS:-0}" = "1" ] && [ $ATTEMPT -ge 15 ]; then
+                log "⚠️ CI_HEALTH_ALLOW_PARTIAL_SUCCESS=1 — saindo com sucesso apesar do externo falhar."
                 exit 0
             fi
         fi

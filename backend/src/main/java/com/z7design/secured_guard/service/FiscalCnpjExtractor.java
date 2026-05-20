@@ -193,4 +193,267 @@ public final class FiscalCnpjExtractor {
         }
         return null;
     }
+
+    /**
+     * Analisa o texto do PDF e extrai o nome do Cliente (Tomador), Mês e Ano de Emissão.
+     * Retorna um DTO FiscalInvoiceAnalysisDTO.
+     */
+    public static com.z7design.secured_guard.dto.FiscalInvoiceAnalysisDTO analyzePdf(InputStream pdfInput) {
+        String clientName = "";
+        Integer month = java.time.LocalDate.now().getMonthValue();
+        Integer year = java.time.LocalDate.now().getYear();
+
+        try {
+            byte[] bytes = pdfInput.readAllBytes();
+            try (PDDocument document = PDDocument.load(new ByteArrayInputStream(bytes))) {
+                String fullText = new PDFTextStripper().getText(document);
+                if (fullText != null && !fullText.isBlank()) {
+                    // 1. Extração do Cliente (Tomador dos Serviços)
+                    clientName = extractClientName(fullText);
+
+                    // 2. Extração da Data (Mês e Ano)
+                    java.time.LocalDate date = extractEmissionDate(fullText);
+                    if (date != null) {
+                        month = date.getMonthValue();
+                        year = date.getYear();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Falha ao analisar PDF para extração de dados: {}", e.getMessage());
+        }
+
+        // Sanitização final do nome do cliente
+        // Retorna string vazia se não foi possível identificar — o frontend deixará o campo em branco
+        if (clientName == null || clientName.trim().isBlank()) {
+            clientName = "";
+        } else {
+            clientName = clientName.trim();
+        }
+
+        return new com.z7design.secured_guard.dto.FiscalInvoiceAnalysisDTO(clientName, month, year);
+    }
+
+    private static String extractClientName(String text) {
+        String[] lines = text.split("\\r?\\n");
+        
+        // Rótulos que indicam a seção do Tomador / Destinatário
+        String[] tomadorLabels = {
+            "TOMADOR DO(S) SERVIÇO(S)",
+            "TOMADOR DOS SERVIÇOS",
+            "TOMADOR DE SERVIÇO",
+            "TOMADOR DE SERVIÇOS",
+            "DADOS DO TOMADOR",
+            "DADOS DO DESTINATÁRIO",
+            "TOMADOR",
+            "DESTINATÁRIO",
+            "DESTINATARIO / REMETENTE",
+            "DESTINATARIO/REMETENTE"
+        };
+
+        // Rótulos que indicam diretamente o Nome / Razão Social
+        String[] nameLabels = {
+            "Razão Social / Nome:",
+            "Razão Social/Nome:",
+            "Nome/Razão Social:",
+            "Nome / Razão Social:",
+            "Razão Social:",
+            "Nome:",
+            "Razao Social / Nome:",
+            "Razao Social/Nome:",
+            "Razao Social:"
+        };
+
+        // 1. Primeiro passo: Tentar achar a seção do Tomador
+        int tomadorIndex = -1;
+        for (int i = 0; i < lines.length; i++) {
+            String lineUpper = lines[i].toUpperCase().trim();
+            for (String label : tomadorLabels) {
+                if (lineUpper.contains(label)) {
+                    tomadorIndex = i;
+                    break;
+                }
+            }
+            if (tomadorIndex != -1) break;
+        }
+
+        // Se achou a seção do Tomador, analisa as próximas 7 linhas
+        if (tomadorIndex != -1) {
+            int maxLine = Math.min(lines.length, tomadorIndex + 8);
+            
+            // A. Procurar por rótulos específicos de Razão Social/Nome nas linhas subsequentes
+            for (int i = tomadorIndex + 1; i < maxLine; i++) {
+                String line = lines[i];
+                for (String label : nameLabels) {
+                    if (line.toLowerCase().contains(label.toLowerCase())) {
+                        int startIdx = line.toLowerCase().indexOf(label.toLowerCase()) + label.length();
+                        String extracted = line.substring(startIdx).trim();
+                        if (isValidClientName(extracted)) {
+                            return cleanClientName(extracted);
+                        }
+                    }
+                }
+            }
+
+            // B. Se não achou rótulos de nome específicos, pegar a primeira linha no bloco do tomador
+            // que pareça um nome próprio / razão social legítimo, pulando CNPJ, CPF, Endereço, etc.
+            for (int i = tomadorIndex + 1; i < maxLine; i++) {
+                String line = lines[i].trim();
+                if (isValidClientName(line) 
+                        && !containsFiscalOrAddressKeywords(line)
+                        && line.replaceAll("[^a-zA-Z]", "").length() > 5) {
+                    return cleanClientName(line);
+                }
+            }
+        }
+
+        // 2. Fallback global: Se não achou seção do tomador, busca por "Razão Social:" ou "Nome:" em todo o documento
+        for (String line : lines) {
+            for (String label : nameLabels) {
+                if (line.toLowerCase().contains(label.toLowerCase())) {
+                    int startIdx = line.toLowerCase().indexOf(label.toLowerCase()) + label.length();
+                    String extracted = line.substring(startIdx).trim();
+                    if (isValidClientName(extracted) && !containsFiscalOrAddressKeywords(extracted)) {
+                        return cleanClientName(extracted);
+                    }
+                }
+            }
+        }
+
+        return "";
+    }
+
+    private static boolean isValidClientName(String name) {
+        if (name == null) return false;
+        name = name.trim();
+        if (name.length() < 3) return false;
+        
+        // Não deve ser puramente números ou códigos
+        if (name.matches("^\\d+$") || name.matches("^[\\d\\.\\-/]+$")) return false;
+        
+        // Evitar nomes que correspondam a rótulos fiscais conhecidos
+        String upper = name.toUpperCase();
+        if (upper.startsWith("CNPJ") || upper.startsWith("CPF") || upper.startsWith("INSCRIÇÃO") || upper.startsWith("ENDEREÇO")) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static boolean containsFiscalOrAddressKeywords(String line) {
+        String upper = line.toUpperCase();
+        return upper.contains("CNPJ:") || upper.contains("CPF:") || upper.contains("TELEFONE:")
+                || upper.contains("EMAIL:") || upper.contains("INSCRIÇÃO") || upper.contains("MUNICIPIO")
+                || upper.contains("ENDEREÇO") || upper.contains("BARRACÃO") || upper.contains("AVENIDA")
+                || upper.contains("RUA ") || upper.contains("LOGRADOURO") || upper.contains("INSCR. ESTADUAL")
+                || upper.contains("PREFEITURA") || upper.contains("NOTA FISCAL") || upper.contains("SECRETARIA");
+    }
+
+    private static String cleanClientName(String name) {
+        // Remove pontuações desnecessárias e limpa espaços extras
+        String cleaned = name.replaceAll("[-;:_\\|]+", " ").trim();
+        // Se houver múltiplos espaços, colapsa para apenas um
+        cleaned = cleaned.replaceAll("\\s+", " ");
+        // Se a linha tiver dados depois do CNPJ separados por tab/espaços duplos, pega apenas o nome anterior
+        if (cleaned.contains("   ")) {
+            cleaned = cleaned.split("   ")[0].trim();
+        }
+        return cleaned;
+    }
+
+    private static LocalDate extractEmissionDate(String text) {
+        String[] lines = text.split("\\r?\\n");
+        
+        // Palavras-chave associadas à data de emissão ou competência
+        String[] dateKeywords = {
+            "DATA DE EMISSÃO",
+            "DATA EMISSÃO",
+            "DATA DA EMISSÃO",
+            "EMISSÃO:",
+            "EMISSÃO",
+            "COMPETÊNCIA:",
+            "COMPETÊNCIA",
+            "COMPETENCIA",
+            "DATA/HORA EMISSÃO",
+            "DATA E HORA DA EMISSÃO"
+        };
+
+        // Regex para buscar data no formato dd/MM/yyyy ou MM/yyyy
+        Pattern fullDatePattern = Pattern.compile("\\b(\\d{2})/(\\d{2})/(\\d{4})\\b");
+        Pattern monthYearPattern = Pattern.compile("\\b(\\d{2})/(\\d{4})\\b");
+
+        // 1. Procurar nas linhas que contêm as palavras-chave
+        for (String line : lines) {
+            String lineUpper = line.toUpperCase();
+            boolean hasKeyword = false;
+            for (String kw : dateKeywords) {
+                if (lineUpper.contains(kw)) {
+                    hasKeyword = true;
+                    break;
+                }
+            }
+
+            if (hasKeyword) {
+                // Tenta achar data completa dd/MM/yyyy
+                Matcher mFull = fullDatePattern.matcher(line);
+                if (mFull.find()) {
+                    try {
+                        int day = Integer.parseInt(mFull.group(1));
+                        int month = Integer.parseInt(mFull.group(2));
+                        int year = Integer.parseInt(mFull.group(3));
+                        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+                            return LocalDate.of(year, month, day);
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                // Tenta achar data MM/yyyy
+                Matcher mMY = monthYearPattern.matcher(line);
+                if (mMY.find()) {
+                    try {
+                        int month = Integer.parseInt(mMY.group(1));
+                        int year = Integer.parseInt(mMY.group(2));
+                        if (month >= 1 && month <= 12) {
+                            return LocalDate.of(year, month, 1);
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        // 2. Fallback global: Buscar qualquer data no formato dd/MM/yyyy nas primeiras 30 linhas (cabeçalho)
+        int checkLimit = Math.min(lines.length, 30);
+        for (int i = 0; i < checkLimit; i++) {
+            String line = lines[i];
+            Matcher mFull = fullDatePattern.matcher(line);
+            if (mFull.find()) {
+                try {
+                    int day = Integer.parseInt(mFull.group(1));
+                    int month = Integer.parseInt(mFull.group(2));
+                    int year = Integer.parseInt(mFull.group(3));
+                    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+                        return LocalDate.of(year, month, day);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        // 3. Fallback secundário global: Qualquer MM/yyyy no cabeçalho
+        for (int i = 0; i < checkLimit; i++) {
+            String line = lines[i];
+            Matcher mMY = monthYearPattern.matcher(line);
+            if (mMY.find()) {
+                try {
+                    int month = Integer.parseInt(mMY.group(1));
+                    int year = Integer.parseInt(mMY.group(2));
+                    if (month >= 1 && month <= 12) {
+                        return LocalDate.of(year, month, 1);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        return null;
+    }
 }
+

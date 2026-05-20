@@ -15,6 +15,10 @@ import java.util.UUID;
 @AllArgsConstructor
 public class EquipmentResponsibilityRequest {
     private UUID companyId;
+
+    /** ID do funcionário (opcional). Quando informado, persiste o PDF gerado. */
+    private UUID employeeId;
+
     private String reportTitle; // Título customizado (ex: TERMO DE RESPONSABILIDADE APARELHO CELULAR)
 
     // Dados do Funcionário

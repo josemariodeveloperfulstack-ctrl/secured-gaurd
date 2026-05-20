@@ -13,7 +13,9 @@ import {
   TrendingUp,
   AlertTriangle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  MapPin,
+  Truck
 } from 'lucide-react';
 
 interface ReportData {
@@ -35,6 +37,10 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
     switch (reportType) {
       case 'equipment_by_employee':
         return <Users className="w-6 h-6 text-blue-400" />;
+      case 'equipment_by_work_post':
+        return <MapPin className="w-6 h-6 text-amber-400" />;
+      case 'weapons_in_transit':
+        return <Truck className="w-6 h-6 text-orange-400" />;
       case 'weapon_validity':
         return <Shield className="w-6 h-6 text-red-400" />;
       case 'usage_report':
@@ -42,7 +48,7 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
       case 'expiration_report':
         return <Clock className="w-6 h-6 text-orange-400" />;
       case 'general_report':
-        return <FileText className="w-6 h-6 text-purple-400" />;
+        return <FileText className="w-6 h-6 text-slate-400" />;
       default:
         return <FileText className="w-6 h-6 text-gray-400" />;
     }
@@ -52,6 +58,10 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
     switch (reportType) {
       case 'equipment_by_employee':
         return 'Equipamentos por Funcionário';
+      case 'equipment_by_work_post':
+        return 'Equipamentos por Posto de Trabalho';
+      case 'weapons_in_transit':
+        return 'Armas em Trânsito';
       case 'weapon_validity':
         return 'Validade de Armas';
       case 'usage_report':
@@ -251,10 +261,144 @@ const ReportViewer: React.FC<ReportViewerProps> = ({ reportData, onClose, onExpo
   };
 
 
+  const renderEquipmentByWorkPostReport = () => {
+    return (
+      <div className="space-y-6">
+        {data.map((post: any, index: number) => (
+          <Card key={index} className="bg-seguranca-black border-gray-600">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3 text-seguranca-lightgray">
+                <MapPin className="w-5 h-5 text-amber-400" />
+                {post.workPostName}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="text-center p-3 bg-amber-500/10 rounded-lg">
+                  <div className="text-2xl font-bold text-amber-400">{post.totalEquipment}</div>
+                  <div className="text-sm text-gray-400">Total</div>
+                </div>
+                <div className="text-center p-3 bg-green-500/10 rounded-lg">
+                  <div className="text-2xl font-bold text-green-400">{post.activeEquipment}</div>
+                  <div className="text-sm text-gray-400">Ativos</div>
+                </div>
+                <div className="text-center p-3 bg-red-500/10 rounded-lg">
+                  <div className="text-2xl font-bold text-red-400">{post.inactiveEquipment}</div>
+                  <div className="text-sm text-gray-400">Inativos</div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="font-semibold text-gray-300 mb-3">Equipamentos no Posto:</h4>
+                {post.equipmentDetails?.map((equipment: any, eqIndex: number) => (
+                  <div key={eqIndex} className="flex items-center justify-between p-3 bg-seguranca-graphite rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center">
+                        <Shield className="w-4 h-4 text-amber-400" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-seguranca-lightgray">{equipment.equipmentName}</div>
+                        <div className="text-sm text-gray-400">S/N: {equipment.serialNumber}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(equipment.status)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  const renderWeaponsInTransitReport = () => {
+    const getTransitStatusBadge = (status: string) => {
+      switch (status?.toUpperCase()) {
+        case 'SUBMITTED':
+          return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Enviada</Badge>;
+        case 'APPROVED':
+          return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Aprovada</Badge>;
+        case 'IN_TRANSIT':
+          return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">Em Trânsito</Badge>;
+        default:
+          return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">{status}</Badge>;
+      }
+    };
+
+    return (
+      <div className="space-y-4">
+        {data.map((guide: any, index: number) => (
+          <Card key={index} className="bg-seguranca-black border-gray-600">
+            <CardContent className="p-5">
+              <div className="flex flex-col md:flex-row justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Truck className="w-5 h-5 text-orange-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-seguranca-lightgray text-lg">Guia #{guide.id}</span>
+                      {getTransitStatusBadge(guide.status)}
+                    </div>
+                    <div className="text-sm text-gray-400 mt-1">Empresa: {guide.empresa}</div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 mt-3">
+                      <div><span className="text-gray-400 text-sm">Arma/Série:</span> <strong className="text-seguranca-lightgray text-sm">{guide.numeroArma}</strong></div>
+                      <div><span className="text-gray-400 text-sm">Calibre:</span> <strong className="text-seguranca-lightgray text-sm">{guide.calibre}</strong></div>
+                      <div><span className="text-gray-400 text-sm">Qtd. Munições:</span> <strong className="text-seguranca-lightgray text-sm">{guide.qtdMunicoes}</strong></div>
+                      {guide.numeroColete && (
+                        <div><span className="text-gray-400 text-sm">Colete:</span> <strong className="text-seguranca-lightgray text-sm">{guide.numeroColete}</strong></div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 p-3 bg-seguranca-graphite rounded-lg border border-gray-700/50">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <div className="text-gray-400 font-medium">Origem</div>
+                          <div className="text-seguranca-lightgray font-semibold mt-0.5">{guide.origem}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400 font-medium">Destino</div>
+                          <div className="text-seguranca-lightgray font-semibold mt-0.5">{guide.destino}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-400 font-medium">Trajeto</div>
+                          <div className="text-seguranca-lightgray font-semibold mt-0.5">{guide.trajeto}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-left md:text-right flex flex-col justify-between flex-shrink-0">
+                  <div>
+                    <div className="text-sm text-gray-400">Criada por</div>
+                    <div className="font-semibold text-seguranca-lightgray text-sm">{guide.createdBy}</div>
+                  </div>
+                  <div className="mt-3 md:mt-0">
+                    <div className="text-xs text-gray-400">Data de Envio</div>
+                    <div className="font-medium text-seguranca-lightgray text-xs">{guide.createdAt}</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
   const renderContent = () => {
     switch (type) {
       case 'equipment_by_employee':
         return renderEquipmentByEmployeeReport();
+      case 'equipment_by_work_post':
+        return renderEquipmentByWorkPostReport();
+      case 'weapons_in_transit':
+        return renderWeaponsInTransitReport();
       case 'weapon_validity':
         return renderWeaponValidityReport();
       case 'general_report':

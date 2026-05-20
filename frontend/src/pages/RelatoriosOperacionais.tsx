@@ -24,8 +24,9 @@ import {
 import { operacionalService } from '@/services/operacionalService';
 import { RelatorioOperacional } from '@/types/operacional';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { DatePicker } from '@/components/ui/date-picker';
 import { reportLayoutService } from '@/services/reportLayoutService';
 import { StandardReportTemplate } from '../reporting/StandardReportTemplate';
 import { RelatorioOperacional as IRelatorioOperacional } from '@/types/operacional';
@@ -206,13 +207,11 @@ const RelatoriosOperacionais: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="periodo" className="text-seguranca-lightgray">Período</Label>
-                <Input
-                  id="periodo"
-                  type="date"
-                  value={periodoRelatorio}
-                  onChange={(e) => setPeriodoRelatorio(e.target.value)}
-                  className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  required
+                <DatePicker
+                  date={periodoRelatorio ? parseISO(periodoRelatorio) : undefined}
+                  onDateChange={(date) => setPeriodoRelatorio(date ? format(date, 'yyyy-MM-dd') : '')}
+                  className="w-full bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  placeholder="Selecione a data"
                 />
               </div>
               <div className="flex items-end">

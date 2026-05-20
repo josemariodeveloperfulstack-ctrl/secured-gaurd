@@ -58,7 +58,7 @@ services:
   # BACKEND API CI
   # ========================================
   backend-ci:
-    image: ghcr.io/zemarioramos/secured-guard-backend:ci
+    image: ghcr.io/zmarioramos/secured-guard-backend:ci
     container_name: secured-guard-backend-ci
     env_file:
       - .env
@@ -76,19 +76,16 @@ services:
       UPLOAD_DIR: /var/www/secured_guard/ci/uploads
       LOGGING_FILE_PATH: /var/www/secured_guard/ci/logs/application.log
       # Email Configuration
-      # IMPORTANTE: Se houver arquivo .env, ele pode sobrescrever essas variáveis
-      # Usando IP direto (186.209.113.105) ao invés de domínio para evitar problemas de IPv6/DNS
-      # O domínio mail.z7design.com.br resolve para IPv6 e dá timeout, mas o IP funciona
-      # Forçar uso do IP mesmo se .env tiver o domínio
-      MAIL_HOST: 186.209.113.105
-      MAIL_PORT: ${MAIL_PORT:-465}
-      MAIL_USERNAME: ${MAIL_USERNAME:-securedguard@z7design.com.br}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-D8rKeqSFZfaS$(y7}
-      MAIL_STARTTLS_ENABLE: ${MAIL_STARTTLS_ENABLE:-false}
-      MAIL_STARTTLS_REQUIRED: ${MAIL_STARTTLS_REQUIRED:-false}
-      MAIL_SSL_ENABLE: ${MAIL_SSL_ENABLE:-true}
+      # Permitindo que as configurações venham do .env ou Github Secrets para o Google Workspace
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-planejamento@promovervigilancia.com.br}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-""}
+      MAIL_STARTTLS_ENABLE: ${MAIL_STARTTLS_ENABLE:-true}
+      MAIL_STARTTLS_REQUIRED: ${MAIL_STARTTLS_REQUIRED:-true}
+      MAIL_SSL_ENABLE: ${MAIL_SSL_ENABLE:-false}
       MAIL_SOCKET_FACTORY: ${MAIL_SOCKET_FACTORY:-javax.net.ssl.SSLSocketFactory}
-      MAIL_SOCKET_FACTORY_PORT: ${MAIL_SOCKET_FACTORY_PORT:-465}
+      MAIL_SOCKET_FACTORY_PORT: ${MAIL_SOCKET_FACTORY_PORT:-587}
       MAIL_CONNECTION_TIMEOUT: ${MAIL_CONNECTION_TIMEOUT:-10000}
       MAIL_TIMEOUT: ${MAIL_TIMEOUT:-10000}
       MAIL_WRITE_TIMEOUT: ${MAIL_WRITE_TIMEOUT:-10000}
@@ -127,7 +124,7 @@ services:
   # WHATSAPP SERVICE (Baileys)
   # ========================================
   whatsapp-service-ci:
-    image: ghcr.io/zemarioramos/secured-guard-whatsapp:ci
+    image: ghcr.io/zmarioramos/secured-guard-whatsapp:ci
     container_name: secured-guard-whatsapp-ci
     environment:
       PORT: 3333
@@ -214,7 +211,7 @@ services:
     #     VITE_API_URL: https://ci.z7botsolutions.com.br/api
     #     VITE_WS_URL: wss://ci.z7botsolutions.com.br/ws
     #     VITE_ENVIRONMENT: ci
-    image: ghcr.io/zemarioramos/secured-guard-frontend:ci
+    image: ghcr.io/zmarioramos/secured-guard-frontend:ci
     container_name: secured-guard-frontend-ci
     ports:
       - "3000:80"

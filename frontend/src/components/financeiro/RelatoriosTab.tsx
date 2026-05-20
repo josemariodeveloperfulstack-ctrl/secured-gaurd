@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -77,7 +78,8 @@ const RelatoriosTab: React.FC = () => {
     startDate: subDays(new Date(), 30),
     endDate: new Date(),
     status: 'TODOS',
-    tipo: 'TODOS'
+    tipo: 'TODOS',
+    contasReceberSegment: 'GERAL'
   });
 
   // Estado para filtros aplicados a uma empresa específica
@@ -477,6 +479,13 @@ const RelatoriosTab: React.FC = () => {
           const queryParams = new URLSearchParams();
           if (filters.startDate) queryParams.append('startDate', format(filters.startDate, 'yyyy-MM-dd'));
           if (filters.endDate) queryParams.append('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+          if (
+            selectedReport === ReportType.CONTAS_RECEBER &&
+            filters.contasReceberSegment &&
+            filters.contasReceberSegment !== 'GERAL'
+          ) {
+            queryParams.append('segment', filters.contasReceberSegment.trim());
+          }
 
           switch (selectedReport) {
             case ReportType.CONTAS_PAGAR:
@@ -565,6 +574,13 @@ const RelatoriosTab: React.FC = () => {
       const queryParams = new URLSearchParams();
       if (filters.startDate) queryParams.append('startDate', format(filters.startDate, 'yyyy-MM-dd'));
       if (filters.endDate) queryParams.append('endDate', format(filters.endDate, 'yyyy-MM-dd'));
+      if (
+        selectedReport === ReportType.CONTAS_RECEBER &&
+        filters.contasReceberSegment &&
+        filters.contasReceberSegment !== 'GERAL'
+      ) {
+        queryParams.append('segment', filters.contasReceberSegment.trim());
+      }
 
       let endpoint = '';
       switch (selectedReport) {
@@ -1133,7 +1149,7 @@ const RelatoriosTab: React.FC = () => {
 
       {/* Modal de Configuração */}
       <Dialog open={showConfigModal} onOpenChange={setShowConfigModal}>
-        <DialogContent className="sm:max-w-[600px] bg-seguranca-black text-seguranca-lightgray border-gray-700">
+        <DialogContent className="sm:max-w-[600px] w-[95vw] max-h-[90vh] overflow-y-auto bg-seguranca-black text-seguranca-lightgray border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-seguranca-yellow flex items-center gap-2 text-xl">
               <Settings size={24} />
@@ -1151,23 +1167,23 @@ const RelatoriosTab: React.FC = () => {
                 <Calendar className="text-blue-500" />
                 Período do Relatório
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Data Início</label>
-                  <Input
-                    type="date"
-                    value={filters.startDate ? format(filters.startDate, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, startDate: new Date(e.target.value) }))}
-                    className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                   <DatePicker
+                    date={filters.startDate}
+                    onDateChange={(date) => setFilters(prev => ({ ...prev, startDate: date }))}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Data Fim</label>
-                  <Input
-                    type="date"
-                    value={filters.endDate ? format(filters.endDate, 'yyyy-MM-dd') : ''}
-                    onChange={(e) => setFilters(prev => ({ ...prev, endDate: new Date(e.target.value) }))}
-                    className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow"
+                   <DatePicker
+                    date={filters.endDate}
+                    onDateChange={(date) => setFilters(prev => ({ ...prev, endDate: date }))}
+                    placeholder="dd/mm/aaaa"
+                    className="w-full"
                   />
                 </div>
               </div>
@@ -1179,7 +1195,7 @@ const RelatoriosTab: React.FC = () => {
                 <Filter className="text-blue-500" />
                 Filtros Adicionais
               </h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">Status</label>
                   <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
@@ -1211,6 +1227,40 @@ const RelatoriosTab: React.FC = () => {
                   </Select>
                 </div>
               </div>
+              {selectedReport === ReportType.CONTAS_RECEBER ? (
+                <div className="mt-4">
+                  <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">
+                    Escopo do relatório (PDF)
+                  </label>
+                  <Select
+                    value={filters.contasReceberSegment || 'GERAL'}
+                    onValueChange={(value) =>
+                      setFilters((prev) => ({ ...prev, contasReceberSegment: value }))
+                    }
+                  >
+                    <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                      <SelectValue placeholder="Geral (período por emissão)" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-seguranca-black border-gray-600">
+                      <SelectItem value="GERAL" className="text-white hover:bg-seguranca-graphite">
+                        Geral (período por emissão)
+                      </SelectItem>
+                      <SelectItem value="RECEBIDOS" className="text-white hover:bg-seguranca-graphite">
+                        Recebidos
+                      </SelectItem>
+                      <SelectItem value="A_VENCER" className="text-white hover:bg-seguranca-graphite">
+                        A vencer
+                      </SelectItem>
+                      <SelectItem value="VENCIDOS" className="text-white hover:bg-seguranca-graphite">
+                        Vencidos
+                      </SelectItem>
+                      <SelectItem value="INADIMPLENCIA" className="text-white hover:bg-seguranca-graphite">
+                        Inadimplência
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
             </div>
 
             {/* Formato do Relatório */}
@@ -1241,24 +1291,35 @@ const RelatoriosTab: React.FC = () => {
                 <p>• Período: {filters.startDate ? format(filters.startDate, 'dd/MM/yyyy') : 'Não definido'} - {filters.endDate ? format(filters.endDate, 'dd/MM/yyyy') : 'Não definido'}</p>
                 <p>• Status: {filters.status}</p>
                 <p>• Tipo: {filters.tipo}</p>
+                {selectedReport === ReportType.CONTAS_RECEBER &&
+                filters.contasReceberSegment &&
+                filters.contasReceberSegment !== 'GERAL' ? (
+                  <p>
+                    • Escopo contas a receber (PDF):{' '}
+                    {filters.contasReceberSegment === 'RECEBIDOS' && 'Recebidos'}
+                    {filters.contasReceberSegment === 'A_VENCER' && 'A vencer'}
+                    {filters.contasReceberSegment === 'VENCIDOS' && 'Vencidos'}
+                    {filters.contasReceberSegment === 'INADIMPLENCIA' && 'Inadimplência'}
+                  </p>
+                ) : null}
                 <p>• Formato: {selectedFormat}</p>
               </div>
             </div>
 
             {/* Botões */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-600">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-600">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setShowConfigModal(false)}
-                className="text-seguranca-lightgray border-gray-600 hover:bg-seguranca-graphite"
+                className="w-full sm:w-auto text-seguranca-lightgray border-gray-600 hover:bg-seguranca-graphite order-2 sm:order-1"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleConfirmarGeracao}
                 disabled={loading}
-                className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90 font-medium"
+                className="w-full sm:w-auto bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90 font-medium order-1 sm:order-2"
               >
                 {loading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-black mr-2"></div>

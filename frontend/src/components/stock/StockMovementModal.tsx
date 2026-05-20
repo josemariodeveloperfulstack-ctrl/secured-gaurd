@@ -60,7 +60,8 @@ import {
   Smartphone,
   Mail,
   Download,
-  ClipboardList
+  ClipboardList,
+  FileSignature
 } from 'lucide-react';
 import SignaturePad from '@/components/SignaturePad';
 import StockRequisitionModal, { StockRequisitionPrefill } from '@/components/stock/StockRequisitionModal';
@@ -341,6 +342,25 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
         variant: 'destructive'
       });
       return;
+    }
+
+    if (formData.movementType === MovementType.ENTRADA) {
+      if (!formData.documentNumber || !formData.documentNumber.trim()) {
+        toast({
+          title: 'Erro',
+          description: 'O número da Nota Fiscal (Documento) é obrigatório para entradas.',
+          variant: 'destructive'
+        });
+        return;
+      }
+      if (!formData.supplier || !formData.supplier.trim()) {
+        toast({
+          title: 'Erro',
+          description: 'O Fornecedor é obrigatório para entradas.',
+          variant: 'destructive'
+        });
+        return;
+      }
     }
 
     if (formData.movementType === MovementType.SAIDA && 
@@ -798,7 +818,7 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
                   <div className="space-y-2">
                     <Label htmlFor="documentNumber" className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
                       <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
-                      Número do Documento
+                      Número da Nota Fiscal *
                     </Label>
                     <Input
                       id="documentNumber"
@@ -812,7 +832,7 @@ const StockMovementModal: React.FC<StockMovementModalProps> = ({
                   <div className="space-y-2">
                     <Label htmlFor="supplier" className="text-gray-300 flex items-center gap-2 text-sm sm:text-base">
                       <Building2 className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-red flex-shrink-0" />
-                      Fornecedor
+                      Fornecedor *
                     </Label>
                     {suppliers.length === 0 ? (
                       <div className="space-y-2">

@@ -119,23 +119,43 @@ WHERE permission_id IN (SELECT id FROM permissions WHERE name = 'VIEW_PAYSLIP')
 AND NOT EXISTS (SELECT 1 FROM role_permissions rp2 WHERE rp2.role_id = role_permissions.role_id AND rp2.permission_id = (SELECT id FROM permissions WHERE name = 'PAYSLIPS_READ'));
 
 -- 3. Merging user_group_permissions
-UPDATE user_group_permissions SET permission = 'CLIENTS_READ' WHERE permission = 'VIEW_CLIENTS';
-UPDATE user_group_permissions SET permission = 'CLIENTS_WRITE' WHERE permission = 'MANAGE_CLIENTS';
-UPDATE user_group_permissions SET permission = 'EMPLOYEES_READ' WHERE permission = 'VIEW_EMPLOYEES';
-UPDATE user_group_permissions SET permission = 'EMPLOYEES_WRITE' WHERE permission = 'MANAGE_EMPLOYEES';
-UPDATE user_group_permissions SET permission = 'CONTRACTS_READ' WHERE permission = 'VIEW_CONTRACTS';
-UPDATE user_group_permissions SET permission = 'CONTRACTS_WRITE' WHERE permission = 'MANAGE_CONTRACTS';
-UPDATE user_group_permissions SET permission = 'FINANCIAL_READ' WHERE permission = 'VIEW_FINANCIAL';
-UPDATE user_group_permissions SET permission = 'FINANCIAL_WRITE' WHERE permission = 'MANAGE_FINANCIAL';
-UPDATE user_group_permissions SET permission = 'EQUIPMENTS_READ' WHERE permission IN ('VIEW_FLEET', 'FLEET_READ');
-UPDATE user_group_permissions SET permission = 'EQUIPMENTS_WRITE' WHERE permission IN ('MANAGE_FLEET', 'FLEET_WRITE');
-UPDATE user_group_permissions SET permission = 'REPORTS_READ' WHERE permission = 'VIEW_REPORTS';
-UPDATE user_group_permissions SET permission = 'SYSTEM_CONFIG' WHERE permission IN ('MANAGE_SYSTEM', 'SETTINGS_WRITE');
-UPDATE user_group_permissions SET permission = 'PROFILE_READ' WHERE permission = 'VIEW_PROFILE';
-UPDATE user_group_permissions SET permission = 'PROFILE_WRITE' WHERE permission = 'EDIT_PROFILE';
-UPDATE user_group_permissions SET permission = 'DOCUMENTS_READ' WHERE permission = 'VIEW_DOCUMENTS';
-UPDATE user_group_permissions SET permission = 'DOCUMENTS_WRITE' WHERE permission = 'MANAGE_DOCUMENTS';
-UPDATE user_group_permissions SET permission = 'PAYSLIPS_READ' WHERE permission = 'VIEW_PAYSLIP';
+DO $$
+DECLARE
+    mapping RECORD;
+BEGIN
+    FOR mapping IN SELECT * FROM (VALUES 
+        ('VIEW_CLIENTS', 'CLIENTS_READ'),
+        ('MANAGE_CLIENTS', 'CLIENTS_WRITE'),
+        ('VIEW_EMPLOYEES', 'EMPLOYEES_READ'),
+        ('MANAGE_EMPLOYEES', 'EMPLOYEES_WRITE'),
+        ('VIEW_CONTRACTS', 'CONTRACTS_READ'),
+        ('MANAGE_CONTRACTS', 'CONTRACTS_WRITE'),
+        ('VIEW_FINANCIAL', 'FINANCIAL_READ'),
+        ('MANAGE_FINANCIAL', 'FINANCIAL_WRITE'),
+        ('VIEW_FLEET', 'EQUIPMENTS_READ'),
+        ('FLEET_READ', 'EQUIPMENTS_READ'),
+        ('MANAGE_FLEET', 'EQUIPMENTS_WRITE'),
+        ('FLEET_WRITE', 'EQUIPMENTS_WRITE'),
+        ('VIEW_REPORTS', 'REPORTS_READ'),
+        ('MANAGE_SYSTEM', 'SYSTEM_CONFIG'),
+        ('SETTINGS_WRITE', 'SYSTEM_CONFIG'),
+        ('VIEW_PROFILE', 'PROFILE_READ'),
+        ('EDIT_PROFILE', 'PROFILE_WRITE'),
+        ('VIEW_DOCUMENTS', 'DOCUMENTS_READ'),
+        ('MANAGE_DOCUMENTS', 'DOCUMENTS_WRITE'),
+        ('VIEW_PAYSLIP', 'PAYSLIPS_READ')
+    ) as t(old_p, new_p)
+    LOOP
+        -- Remove registros que já possuem a nova permissão para evitar conflito de UNIQUE CONSTRAINT no UPDATE
+        DELETE FROM user_group_permissions 
+        WHERE permission = mapping.new_p 
+        AND group_id IN (SELECT group_id FROM user_group_permissions WHERE permission = mapping.old_p);
+        
+        -- Agora o UPDATE pode ser feito sem erro de duplicata
+        UPDATE user_group_permissions SET permission = mapping.new_p WHERE permission = mapping.old_p;
+    END LOOP;
+END $$;
+
 
 -- 4. Merging user_custom_permissions
 UPDATE user_custom_permissions SET permission_key = 'CLIENTS_READ' WHERE permission_key = 'VIEW_CLIENTS'

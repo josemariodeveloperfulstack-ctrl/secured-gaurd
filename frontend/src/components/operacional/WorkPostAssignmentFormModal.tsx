@@ -22,9 +22,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { WorkPostAssignment, CreateWorkPostAssignmentDTO } from '@/services/operationalService';
 import { Loader2, User, MapPin, Calendar, Clock, FileText } from 'lucide-react';
 import { workPostService, WorkPost } from '@/services/workPostService';
+import { employeeService } from '@/services/employeeService';
 
 const assignmentSchema = z.object({
   employeeId: z.string().min(1, 'Funcionário é obrigatório'),
@@ -115,10 +117,59 @@ export default function WorkPostAssignmentFormModal({
       };
       if (fixedEmployeeId) {
         defaultValues.employeeId = fixedEmployeeId;
+        // Auto-carregar o posto do funcionário fixado se for novo
+        employeeService.getEmployeeById(fixedEmployeeId)
+          .then((emp) => {
+            if (emp) {
+              const wpId = emp.workPostId || emp.workPost?.id;
+              if (wpId) {
+                setValue('workPostId', String(wpId), { shouldValidate: true });
+              }
+            }
+          })
+          .catch((err) => console.error('Erro ao carregar posto do funcionário fixo:', err));
       }
       reset(defaultValues);
     }
   }, [assignment, setValue, reset, fixedEmployeeId]);
+
+  const handleEmployeeChange = async (employeeId: string) => {
+    const val = employeeId === 'all' ? '' : employeeId;
+    setValue('employeeId', val, { shouldValidate: true });
+    
+    if (val) {
+      try {
+        const emp = await employeeService.getEmployeeById(val);
+        if (emp) {
+          const wpId = emp.workPostId || emp.workPost?.id;
+          if (wpId) {
+            const wpIdStr = String(wpId);
+            setValue('workPostId', wpIdStr, { shouldValidate: true });
+            
+            // Tentar preencher turno e horários com base no posto
+            const post = workPosts.find(p => String(p.id) === wpIdStr);
+            if (post) {
+              if (post.type === '12H_NOTURNO' || post.type === 'NIGHT') {
+                setValue('shift', 'NIGHT');
+              } else if (post.type === 'MIXED') {
+                setValue('shift', 'MIXED');
+              } else {
+                setValue('shift', 'DAY');
+              }
+              if (post.shiftStart) {
+                setValue('startTime', post.shiftStart.substring(0, 5));
+              }
+              if (post.shiftEnd) {
+                setValue('endTime', post.shiftEnd.substring(0, 5));
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar posto do funcionário selecionado:', error);
+      }
+    }
+  };
 
   const handleFormSubmit = async (data: AssignmentFormData) => {
     setIsSubmitting(true);
@@ -174,21 +225,22 @@ export default function WorkPostAssignmentFormModal({
                 <Label htmlFor="employeeId" className="text-seguranca-lightgray font-medium">
                   Funcionário <span className="text-seguranca-red">*</span>
                 </Label>
-                <Select
-                  value={watch('employeeId')}
-                  onValueChange={(value) => setValue('employeeId', value)}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder="Selecione o funcionário" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {employees.map((employee) => (
-                      <SelectItem key={employee.id} value={employee.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        {employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={(employees || [])
+                    .filter((employee) => employee && employee.id)
+                    .map((employee) => ({
+                      value: employee.id,
+                      label: employee.name || '',
+                    }))}
+                  value={watch('employeeId') || ''}
+                  onChange={handleEmployeeChange}
+                  placeholder="Selecione o funcionário"
+                  searchPlaceholder="Digite ao menos 3 caracteres do nome..."
+                  emptyPlaceholder="Nenhum funcionário encontrado."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para buscar funcionários..."
+                  disabled={!!fixedEmployeeId}
+                />
                 {errors.employeeId && (
                   <p className="text-sm text-seguranca-red">{errors.employeeId.message}</p>
                 )}
@@ -211,22 +263,28 @@ export default function WorkPostAssignmentFormModal({
                 <Label htmlFor="workPostId" className="text-seguranca-lightgray font-medium">
                   Posto de Trabalho <span className="text-seguranca-red">*</span>
                 </Label>
-                <Select
-                  value={watch('workPostId')}
-                  onValueChange={(value) => setValue('workPostId', value)}
+                <SearchableSelect
+                  options={(workPosts || [])
+                    .filter((post) => post && post.id)
+                    .map((post) => ({
+                      value: post.id,
+                      label: `${post.postCode || ''} - ${post.name || ''}`,
+                    }))}
+                  value={watch('workPostId') || ''}
+                  onChange={(value) =>
+                    setValue('workPostId', value === 'all' ? '' : value, {
+                      shouldValidate: true,
+                    })
+                  }
+                  placeholder={
+                    loadingWorkPosts ? 'Carregando...' : 'Selecione o posto de trabalho'
+                  }
+                  searchPlaceholder="Digite ao menos 3 caracteres do código ou nome..."
+                  emptyPlaceholder="Nenhum posto de trabalho encontrado."
+                  minSearchChars={3}
+                  minCharsMessage="Digite ao menos 3 caracteres para buscar postos de trabalho..."
                   disabled={loadingWorkPosts}
-                >
-                  <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                    <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de trabalho"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-seguranca-graphite border-gray-600">
-                    {workPosts.map((post) => (
-                      <SelectItem key={post.id} value={post.id} className="text-seguranca-lightgray hover:bg-seguranca-red/20">
-                        {post.postCode} - {post.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
                 {errors.workPostId && (
                   <p className="text-sm text-seguranca-red">{errors.workPostId.message}</p>
                 )}

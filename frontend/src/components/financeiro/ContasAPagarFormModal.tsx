@@ -7,10 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { CalendarDays, DollarSign, FileText, Upload, Plus, Users, Building2, Tag, CheckCircle } from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { ptBR } from 'date-fns/locale';
-import { formatDateForBackend, parseDateFromBackend, DEFAULT_DATE_PICKER_PROPS } from '@/utils/dateUtils';
+import { DatePicker } from '@/components/ui/date-picker';
+import { formatDateForBackend, parseDateFromBackend } from '@/utils/dateUtils';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
 import SupplierFormModal from '@/components/estoque/SupplierFormModal';
 
@@ -396,14 +394,11 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 <CalendarDays size={14} />
                 Data de Emissão *
               </label>
-              <DatePicker
-                selected={formData.dataEmissao}
-                onChange={(date) => handleInputChange('dataEmissao', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                placeholderText="dd/mm/aaaa"
-                className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-black !text-seguranca-lightgray !placeholder:text-gray-400 font-medium"
-                required
+               <DatePicker
+                date={formData.dataEmissao}
+                onDateChange={(date) => handleInputChange('dataEmissao', date)}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
 
@@ -413,14 +408,11 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                 <CalendarDays size={14} />
                 Data de Vencimento *
               </label>
-              <DatePicker
-                selected={formData.vencimento}
-                onChange={(date) => handleInputChange('vencimento', date)}
-                dateFormat="dd/MM/yyyy"
-                locale={ptBR}
-                placeholderText="dd/mm/aaaa"
-                className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-black !text-seguranca-lightgray !placeholder:text-gray-400 font-medium"
-                required
+               <DatePicker
+                date={formData.vencimento}
+                onDateChange={(date) => handleInputChange('vencimento', date)}
+                placeholder="dd/mm/aaaa"
+                className="w-full"
               />
             </div>
 
@@ -679,13 +671,11 @@ export const ContasAPagarFormModal: React.FC<ContasAPagarFormModalProps> = ({
                   <CalendarDays size={14} />
                   Data do Pagamento
                 </label>
-                <DatePicker
-                  selected={paymentConfirmDate}
-                  onChange={(date) => setPaymentConfirmDate(date)}
-                  dateFormat="dd/MM/yyyy"
-                  locale={ptBR}
-                  placeholderText="dd/mm/aaaa"
-                  className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-black !text-seguranca-lightgray !placeholder:text-gray-400 font-medium"
+                 <DatePicker
+                  date={paymentConfirmDate || undefined}
+                  onDateChange={(date) => setPaymentConfirmDate(date || null)}
+                  placeholder="dd/mm/aaaa"
+                  className="w-full"
                 />
                 <p className="text-xs text-gray-400">Defina a data e confirme para marcar como paga.</p>
               </div>

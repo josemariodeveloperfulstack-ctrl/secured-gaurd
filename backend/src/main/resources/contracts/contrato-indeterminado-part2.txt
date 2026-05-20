@@ -34,15 +34,4 @@ E por estarem de pleno acordo, as partes contratantes assinam o presente Contrat
 
 {{CIDADE_DATA_EXTENSO}}.
 
-_____________________________________________
-{{EMPREGADOR_NOME}}
-
-_____________________________________________
-{{EMPREGADO_NOME}}
-
-_____________________________________________
-Responsável legal (caso menor de idade)
-
-Testemunha _______________________________
-
-Testemunha _______________________________
+{{ASSINATURAS_DUAS_COLUNAS}}

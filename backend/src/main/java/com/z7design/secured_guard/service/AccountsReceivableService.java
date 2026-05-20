@@ -3,10 +3,14 @@ package com.z7design.secured_guard.service;
 import com.z7design.secured_guard.dto.AccountsReceivableDTO;
 import com.z7design.secured_guard.model.AccountsReceivable;
 import com.z7design.secured_guard.model.Client;
+import com.z7design.secured_guard.model.MeasurementBulletin;
 import com.z7design.secured_guard.model.enums.ReceivableStatus;
+import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.repository.AccountsReceivableRepository;
 import com.z7design.secured_guard.repository.ClientRepository;
+import com.z7design.secured_guard.repository.MeasurementBulletinRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
+import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +35,8 @@ public class AccountsReceivableService {
     private final AccountsReceivableRepository accountsReceivableRepository;
     private final ClientRepository clientRepository;
     private final UnitRepository unitRepository;
+    private final MeasurementBulletinRepository measurementBulletinRepository;
+    private final WorkPostRepository workPostRepository;
     
     /**
      * Buscar todas as contas a receber com paginação
@@ -79,12 +85,7 @@ public class AccountsReceivableService {
         AccountsReceivable account = new AccountsReceivable();
         account.setClient(client);
         account.setInvoiceNumber(dto.getInvoiceNumber());
-        // Se measurementId for enviado, preferir preencher measurementNumber com o id (ou buscar número posteriormente)
-        if (dto.getMeasurementId() != null && (dto.getMeasurementNumber() == null || dto.getMeasurementNumber().isBlank())) {
-            account.setMeasurementNumber(dto.getMeasurementId().toString());
-        } else {
-            account.setMeasurementNumber(dto.getMeasurementNumber());
-        }
+        applyMeasurement(account, dto);
         account.setDescription(dto.getDescription());
         account.setAmount(dto.getAmount());
         account.setAmountPaid(dto.getAmountPaid() != null ? dto.getAmountPaid() : BigDecimal.ZERO);
@@ -115,8 +116,11 @@ public class AccountsReceivableService {
             account.setUnit(unitRepository.findById(dto.getUnitId()).orElse(null));
         }
         
-        // Definir centro de custo se fornecido
-        account.setCentroCusto(dto.getCentroCusto());
+        // Definir posto de trabalho se fornecido
+        if (dto.getWorkPostId() != null) {
+            account.setWorkPost(workPostRepository.findById(dto.getWorkPostId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + dto.getWorkPostId())));
+        }
         
         // Calcular dias em atraso
         account.calculateOverdueDays();
@@ -147,11 +151,7 @@ public class AccountsReceivableService {
         
         // Atualizar campos
         account.setInvoiceNumber(dto.getInvoiceNumber());
-        if (dto.getMeasurementId() != null && (dto.getMeasurementNumber() == null || dto.getMeasurementNumber().isBlank())) {
-            account.setMeasurementNumber(dto.getMeasurementId().toString());
-        } else {
-            account.setMeasurementNumber(dto.getMeasurementNumber());
-        }
+        applyMeasurement(account, dto);
         account.setDescription(dto.getDescription());
         account.setAmount(dto.getAmount());
         account.setAmountPaid(dto.getAmountPaid() != null ? dto.getAmountPaid() : BigDecimal.ZERO);
@@ -187,11 +187,12 @@ public class AccountsReceivableService {
             account.setUnit(null);
         }
         
-        // Atualizar centro de custo se fornecido
-        if (dto.getCentroCusto() != null) {
-            account.setCentroCusto(dto.getCentroCusto());
+        // Atualizar posto de trabalho se fornecido
+        if (dto.getWorkPostId() != null) {
+            account.setWorkPost(workPostRepository.findById(dto.getWorkPostId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + dto.getWorkPostId())));
         } else {
-            account.setCentroCusto(null);
+            account.setWorkPost(null);
         }
         
         // Calcular dias em atraso
@@ -205,16 +206,55 @@ public class AccountsReceivableService {
     }
     
     /**
-     * Excluir conta a receber
+     * Resolve a vinculação com o Boletim de Medição.
+     *
+     * <p>Quando o cliente envia {@code measurementId}, carregamos o boletim e
+     * preenchemos também o {@code measurementNumber} com um texto amigável
+     * derivado do contrato/NF (mantém compatibilidade com filtros legados que
+     * usam apenas o texto). Se vier apenas {@code measurementNumber}, deixamos
+     * o vínculo nulo e gravamos só o texto livre.
+     */
+    private void applyMeasurement(AccountsReceivable account, AccountsReceivableDTO dto) {
+        if (dto.getMeasurementId() != null) {
+            MeasurementBulletin bulletin = measurementBulletinRepository.findById(dto.getMeasurementId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Boletim de medição não encontrado com ID: " + dto.getMeasurementId()));
+            account.setMeasurement(bulletin);
+            // Se o cliente enviou um número específico, respeitamos; senão derivamos do boletim
+            if (dto.getMeasurementNumber() != null && !dto.getMeasurementNumber().isBlank()) {
+                account.setMeasurementNumber(dto.getMeasurementNumber().trim());
+            } else if (bulletin.getNfNumber() != null && !bulletin.getNfNumber().isBlank()) {
+                account.setMeasurementNumber(bulletin.getNfNumber().trim());
+            } else if (bulletin.getContractNumber() != null && !bulletin.getContractNumber().isBlank()) {
+                account.setMeasurementNumber(bulletin.getContractNumber().trim());
+            } else {
+                account.setMeasurementNumber(null);
+            }
+        } else {
+            account.setMeasurement(null);
+            String number = dto.getMeasurementNumber();
+            account.setMeasurementNumber(number != null && !number.isBlank() ? number.trim() : null);
+        }
+    }
+
+    /**
+     * Excluir conta a receber.
+     *
+     * <p>DELETE é idempotente por convenção REST: deletar um registro que já
+     * não existe é sucesso silencioso. Caso contrário, telas que ficam abertas
+     * por horas (e cujo cache mostra contas já apagadas em outra janela ou
+     * por outro usuário) recebem 404 ao clicar em excluir, o que confunde o
+     * usuário final. O front recarrega a lista logo após e a UI fica consistente.
      */
     public void deleteAccountsReceivable(UUID id) {
         log.info("Excluindo conta a receber: {}", id);
-        
-        if (!accountsReceivableRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Conta a receber não encontrada com ID: " + id);
+
+        if (accountsReceivableRepository.countByReceivableId(id) == 0) {
+            log.warn("Conta a receber {} já não existe no banco — tratando DELETE como idempotente (no-op).", id);
+            return;
         }
-        
-        accountsReceivableRepository.deleteById(id);
+
+        accountsReceivableRepository.deleteByIds(List.of(id));
         log.info("Conta a receber excluída com sucesso: {}", id);
     }
     

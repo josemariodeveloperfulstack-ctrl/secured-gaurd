@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   MoreHorizontal, Edit, Trash2, Eye, User, Mail, Phone, MapPin,
-  Calendar, Building, FileText, UserPlus, AlertCircle, UserMinus, Briefcase
+  Calendar, Building, FileText, UserPlus, AlertCircle, UserMinus, Briefcase, QrCode
 } from 'lucide-react';
 import { Employee } from '@/types/employee';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -27,6 +27,8 @@ interface FuncionariosTableProps {
   onViewDocuments: (employee: Employee) => void;
   onViewDependents: (employee: Employee) => void;
   onViewDetails: (employee: Employee) => void;
+  /** Abre o modal de crachá/QR Code do funcionário. Opcional para compatibilidade. */
+  onViewQrCode?: (employee: Employee) => void;
   isLoading?: boolean;
   isMobileSelectionMode?: boolean;
   sortKey?: 'name' | 'position' | 'company' | 'workPost' | 'hireDate' | 'terminationDate' | 'status' | 'escalaTrabalho' | 'horarioTrabalho';
@@ -47,6 +49,7 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
   onViewDocuments,
   onViewDependents,
   onViewDetails,
+  onViewQrCode,
   isLoading = false,
   isMobileSelectionMode = false,
   sortKey = 'name',
@@ -411,6 +414,15 @@ export const FuncionariosTable: React.FC<FuncionariosTableProps> = ({
                           <FileText className="mr-2 h-4 w-4" />
                           Ver Documentos
                         </DropdownMenuItem>
+                        {onViewQrCode && (
+                          <DropdownMenuItem
+                            onClick={() => onViewQrCode(employee)}
+                            className="text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 cursor-pointer"
+                          >
+                            <QrCode className="mr-2 h-4 w-4" />
+                            Crachá / QR Code
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => onViewDependents(employee)}
                           className="text-green-400 hover:bg-green-500/20 hover:text-green-300 cursor-pointer"

@@ -15,16 +15,41 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
 
+const EMPTY_CRM_METRICS = {
+  totalLeads: 0,
+  activeOpportunities: 0,
+  totalOpportunities: 0,
+  totalProposals: 0,
+  totalQuotes: 0,
+  conversionRate: 0,
+  estimatedRevenue: 0,
+  totalValue: 0,
+  monthlyCount: {} as Record<string, number>,
+  statusHistory: {} as Record<string, Record<string, number>>,
+};
+
 export default function CrmDashboard() {
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await fetchCrmMetrics();
-      setMetrics(data);
-      setLoading(false);
+      setLoadError(null);
+      try {
+        const data = await fetchCrmMetrics();
+        setMetrics(data);
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } } };
+        const msg =
+          err?.response?.data?.message ||
+          (e instanceof Error ? e.message : 'Não foi possível carregar as métricas.');
+        setLoadError(msg);
+        setMetrics({ ...EMPTY_CRM_METRICS });
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
@@ -50,12 +75,16 @@ export default function CrmDashboard() {
     ],
   };
 
-  // Gráfico: Evolução de status
+  // Gráfico: Evolução de status (statusHistory: mês -> { STATUS: count })
   const statusLabels = monthlyLabels;
-  const statusDatasets = Object.entries(metrics.statusHistory).map(([status, history]: any, idx) => ({
-    label: status,
-    data: statusLabels.map((label: string) => history[label] || 0),
-    borderColor: ['#ffd600', '#10b981', '#3b82f6', '#ef4444', '#a3a3a3'][idx % 5],
+  const statusKeys = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL_SENT', 'NEGOTIATION', 'WON', 'LOST'];
+  const statusDatasets = statusKeys.map((statusKey, idx) => ({
+    label: statusKey,
+    data: statusLabels.map((monthLabel: string) => {
+      const byMonth = metrics.statusHistory?.[monthLabel];
+      return byMonth && typeof byMonth[statusKey] === 'number' ? byMonth[statusKey] : 0;
+    }),
+    borderColor: ['#ffd600', '#10b981', '#3b82f6', '#8b5cf6', '#f97316', '#22c55e', '#ef4444'][idx % 7],
     backgroundColor: 'transparent',
     tension: 0.3,
   }));
@@ -67,6 +96,20 @@ export default function CrmDashboard() {
   return (
     <div style={{ padding: 12, maxWidth: 1200, margin: '0 auto' }}>
       <h2 style={{ marginBottom: 24, fontSize: 22 }}>Dashboard CRM</h2>
+      {loadError && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 8,
+            background: '#fef2f2',
+            color: '#991b1b',
+            border: '1px solid #fecaca',
+          }}
+        >
+          {loadError}
+        </div>
+      )}
       {/* Cards de Métricas */}
       <div
         style={{

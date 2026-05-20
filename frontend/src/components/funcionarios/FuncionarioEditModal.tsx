@@ -1,6 +1,8 @@
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
+import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import { DependentFormModal } from '@/components/dependentes/DependentFormModal';
@@ -20,6 +22,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { employeeService } from '@/services/employeeService';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/hooks/queries';
 import { UpdateEmployeeDTO } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
 import { unitService, Unit } from '@/services/unitService';
@@ -33,12 +37,14 @@ import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import { useToast } from '@/hooks/use-toast';
 import workPostService, { WorkPost } from '@/services/workPostService';
 import departmentService, { Department } from '@/services/departmentService';
+import { clientService, Client as ClientDTO } from '@/services/clientService';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { doctorService } from '@/services/doctorService';
 import { Doctor } from '@/types/doctor';
 import { formatTituloEleitorForInput, validateCPF, formatCpfForInput } from '@/utils/validation';
 import DocumentosGerarTab from './DocumentosGerarTab';
+import { EmployeeDocumentsTab } from './EmployeeDocumentsTab';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
 import { History, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
@@ -60,6 +66,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   onSuccess 
 }) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '');
   const isRHOrDPE = ['RH', 'DEPARTAMENTO_PESSOAL', 'ASSISTENCIA_RH', 'AUX_DEP', 'SUPER_ADMIN', 'ADMIN'].includes(normalizedRole);
@@ -119,7 +126,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     grauInstrucao: '',
     matriculaEsocial: '',
     cbo: '',
-    salario: 0,
+    salario: '' as any,
     salarioPorExtenso: '',
     periodoPagamento: '',
     horarioTrabalho: '',
@@ -187,6 +194,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [loadingData, setLoadingData] = useState(false);
   const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [clients, setClients] = useState<ClientDTO[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [filteredWorkPosts, setFilteredWorkPosts] = useState<WorkPost[]>([]);
+  const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
   
   // Estados para busca e filtros
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -427,10 +438,17 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
 
       try {
-        // Buscar dados completos do funcionário do backend
+        // Buscar dados completos do funcionário usando o cache do React Query.
+        // Se a página pai (Funcionarios.tsx) ou o handler de edição já buscaram
+        // este funcionário, o cache devolve instantaneamente — eliminando o
+        // fetch duplicado que existia antes (pai + modal chamavam getEmployeeById).
         console.log('🔍 Buscando dados completos do funcionário ID:', funcionario.id);
-        const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-        
+        const fullEmployee = await queryClient.fetchQuery({
+          queryKey: queryKeys.employees.byId(funcionario.id),
+          queryFn: () => employeeService.getEmployeeById(funcionario.id),
+          staleTime: 30 * 1000,
+        });
+
         if (!fullEmployee) {
           console.warn('⚠️ Funcionário não encontrado no backend');
           return;
@@ -504,16 +522,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         let enderecoEstado = (employeeData as any).enderecoEstado || '';
         let enderecoCep = (employeeData as any).enderecoCep || '';
         
-        // Se endereço vier como objeto address com campos separados
-        if (employeeData.address && typeof employeeData.address === 'object' && !addressValue) {
+        // Se endereço vier como objeto address com campos separados, preencher campos vazios
+        if (employeeData.address && typeof employeeData.address === 'object') {
           const addr = employeeData.address as any;
-          enderecoRua = addr.street || enderecoRua;
-          enderecoNumero = addr.number || enderecoNumero;
-          enderecoComplemento = addr.complement || enderecoComplemento;
-          enderecoBairro = addr.neighborhood || enderecoBairro;
-          enderecoCidade = addr.city || enderecoCidade;
-          enderecoEstado = addr.state || enderecoEstado;
-          enderecoCep = addr.zipCode || enderecoCep;
+          if (!enderecoRua && addr.street) enderecoRua = addr.street;
+          if (!enderecoNumero && addr.number) enderecoNumero = addr.number;
+          if (!enderecoComplemento && addr.complement) enderecoComplemento = addr.complement;
+          if (!enderecoBairro && addr.neighborhood) enderecoBairro = addr.neighborhood;
+          if (!enderecoCidade && addr.city) enderecoCidade = addr.city;
+          if (!enderecoEstado && addr.state) enderecoEstado = addr.state;
+          if (!enderecoCep && addr.zipCode) enderecoCep = addr.zipCode;
         }
         
         const formToSet = {
@@ -565,9 +583,9 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           spouseEmail: employeeData.spouseEmail || '',
           
           // Campos da ficha de registro
-          empresaNome: employeeData.empresaNome || '',
-          empresaEndereco: employeeData.empresaEndereco || '',
-          empresaCnpj: employeeData.empresaCnpj || '',
+          empresaNome: employeeData.empresaNome || (companies.find(c => String(c.id) === String(employeeData.company?.id || (employeeData as any).companyId))?.name || ''),
+          empresaEndereco: employeeData.empresaEndereco || (companies.find(c => String(c.id) === String(employeeData.company?.id || (employeeData as any).companyId))?.address || ''),
+          empresaCnpj: employeeData.empresaCnpj || (companies.find(c => String(c.id) === String(employeeData.company?.id || (employeeData as any).companyId))?.cnpj || ''),
           tituloEleitor: employeeData.tituloEleitor || '',
           tituloEleitorZona: employeeData.tituloEleitorZona || '',
           tituloEleitorSecao: employeeData.tituloEleitorSecao || '',
@@ -584,7 +602,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           grauInstrucao: employeeData.grauInstrucao || '',
           matriculaEsocial: employeeData.matriculaEsocial || '',
           cbo: employeeData.cbo || '',
-          salario: employeeData.salario || 0,
+          salario: employeeData.salario
+            ? (typeof employeeData.salario === 'number'
+              ? String(employeeData.salario)
+              : employeeData.salario)
+            : '' as any,
           salarioPorExtenso: employeeData.salarioPorExtenso || '',
           periodoPagamento: employeeData.periodoPagamento || '',
           horarioTrabalho: employeeData.horarioTrabalho || '',
@@ -860,7 +882,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setLoadingData(true);
     try {
       console.log('📥 Carregando dados dos selects...');
-      const [positionsData, unitsData, usersData, companiesData, workPostsData, departmentsData] = await Promise.all([
+      const [positionsData, unitsData, usersData, companiesData, workPostsData, departmentsData, clientsData] = await Promise.all([
         positionService.getPositions().catch(err => { console.warn('⚠️ Erro ao carregar cargos:', err); return []; }),
         unitService.getAllUnits().catch(err => { console.warn('⚠️ Erro ao carregar unidades:', err); return []; }),
         userService.getAllUsers().catch(err => { console.warn('⚠️ Erro ao carregar usuários:', err); return []; }),
@@ -872,14 +894,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           return []; 
         }),
         workPostService.getAllWorkPosts().catch(err => { console.warn('⚠️ Erro ao carregar postos de trabalho:', err); return []; }),
-        departmentService.listActive().catch(err => { console.warn('⚠️ Erro ao carregar departamentos:', err); return []; })
+        departmentService.listActive().catch(err => { console.warn('⚠️ Erro ao carregar departamentos:', err); return []; }),
+        clientService.getAllClients().catch(err => { console.warn('⚠️ Erro ao carregar clientes:', err); return []; })
       ]);
       
       console.log('✅ Dados carregados:', {
         positions: positionsData.length,
         units: unitsData.length,
         users: usersData.length,
-        companies: companiesData.length
+        companies: companiesData.length,
+        clients: clientsData.length
       });
       
       if (companiesData.length === 0) {
@@ -895,6 +919,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       setCompanies(companiesData);
       setWorkPosts(workPostsData);
       setDepartments(departmentsData);
+      setClients(clientsData);
       
       // Carregar médicos
       await loadDoctors();
@@ -1098,13 +1123,24 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       const { remanejamentoDataInicio, ...formRest } = form as any;
       const employeeData: any = {
         ...formRest,
-        salario: form.salario ? parseFloat(String(form.salario).replace(/\./g, '').replace(',', '.')) : 0
+        salario: (() => {
+          if (!form.salario) return 0;
+          const s = String(form.salario);
+          if (s.includes(',')) {
+            return parseFloat(s.replace(/\./g, '').replace(',', '.'));
+          }
+          return parseFloat(s);
+        })()
       };
       if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
         employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
       }
 
       await employeeService.updateEmployee(funcionario.id, employeeData);
+      // Invalida caches de listas + remove a entrada byId obsoleta para que
+      // o próximo open do modal/lista busque os dados frescos.
+      queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+      queryClient.removeQueries({ queryKey: queryKeys.employees.byId(funcionario.id) });
       toast({
         title: "Sucesso",
         description: "Funcionário atualizado com sucesso!",
@@ -1143,13 +1179,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   const resetForm = () => {
     if (funcionario) {
+      const addr = funcionario.address && typeof funcionario.address === 'object' ? funcionario.address as any : null;
       setForm({
         name: funcionario.name || '',
         cpf: funcionario.cpf || '',
         rg: funcionario.rg || '',
         email: funcionario.email || '',
         phone: funcionario.phone || '',
-        address: funcionario.address?.street || '',
+        address: addr?.street || (typeof funcionario.address === 'string' ? funcionario.address : '') || '',
         birthDate: funcionario.birthDate || '',
         maritalStatus: funcionario.maritalStatus || 'SINGLE',
         nationality: funcionario.nationality || 'Brasileiro',
@@ -1162,6 +1199,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         user: { id: funcionario.user?.id || '' },
         nomePai: funcionario.nomePai || '',
         nomeMae: funcionario.nomeMae || '',
+        // Campos de endereço separados
+        enderecoRua: (funcionario as any).enderecoRua || addr?.street || '',
+        enderecoNumero: (funcionario as any).enderecoNumero || addr?.number || '',
+        enderecoComplemento: (funcionario as any).enderecoComplemento || addr?.complement || '',
+        enderecoBairro: (funcionario as any).enderecoBairro || addr?.neighborhood || '',
+        enderecoCidade: (funcionario as any).enderecoCidade || addr?.city || '',
+        enderecoEstado: (funcionario as any).enderecoEstado || addr?.state || '',
+        enderecoCep: (funcionario as any).enderecoCep || addr?.zipCode || '',
         // Garantir que todos os campos sejam resetados ou mantidos conforme o funcionário
         cinNumero: (funcionario as any).cinNumero || '',
         cinOrgaoEmissor: (funcionario as any).cinOrgaoEmissor || '',
@@ -1765,9 +1810,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-                <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-4' : 'grid-cols-3'} bg-seguranca-graphite border border-gray-600`}>
+                <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-5' : 'grid-cols-4'} bg-seguranca-graphite border border-gray-600`}>
                   <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
                   <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
+                  <TabsTrigger value="documentos">Documentos</TabsTrigger>
                   <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
                   {canSeeHistory && (
                     <TabsTrigger value="historico" className="flex items-center gap-1.5">
@@ -2030,13 +2076,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">Data de Nascimento</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                <Input 
-                  name="birthDate" 
-                  type="date" 
-                  value={form.birthDate} 
-                  onChange={handleChange} 
-                  required 
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                <DatePicker 
+                  date={parseDateFromBackend(form.birthDate) || undefined} 
+                  onDateChange={(date) => setForm(prev => ({ ...prev, birthDate: formatDateForBackend(date) || '' }))} 
+                  className="h-10 sm:h-11"
                 />
               </div>
               <div>
@@ -2244,57 +2287,53 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   />
                 </div>
                 <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Zona</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Zona</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
                   <Input 
                     name="tituloEleitorZona" 
                     value={form.tituloEleitorZona || ''} 
                     onChange={handleChange} 
                     placeholder="Ex: 316"
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                   />
                 </div>
                 <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Seção</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Seção</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
                   <Input 
                     name="tituloEleitorSecao" 
                     value={form.tituloEleitorSecao || ''} 
                     onChange={handleChange} 
                     placeholder="Ex: 0585"
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                   />
                 </div>
-                          <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Data de Expedição</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
-                            <Input
-                              name="tituloEleitorDataExpedicao"
-                              type="date"
-                              value={form.tituloEleitorDataExpedicao || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Validade</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
-                            <Input
-                              name="tituloEleitorValidade"
-                              type="date"
-                              value={form.tituloEleitorValidade || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                            />
-                          </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Data de Expedição</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
+                  <DatePicker
+                    date={parseDateFromBackend(form.tituloEleitorDataExpedicao) || undefined}
+                    onDateChange={(date) => setForm(prev => ({ ...prev, tituloEleitorDataExpedicao: formatDateForBackend(date) || '' }))}
+                    className="h-10 sm:h-11"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Validade</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
+                  <DatePicker
+                    date={parseDateFromBackend(form.tituloEleitorValidade) || undefined}
+                    onDateChange={(date) => setForm(prev => ({ ...prev, tituloEleitorValidade: formatDateForBackend(date) || '' }))}
+                    className="h-10 sm:h-11"
+                  />
+                </div>
               </div>
             </div>
             
@@ -2372,14 +2411,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Validade da CNH</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                  <Input 
-                              name="cnhExpirationDate"
-                    type="date" 
-                              value={form.cnhExpirationDate || ''}
-                    onChange={handleChange} 
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                  />
-                </div>
+                            <DatePicker
+                              date={parseDateFromBackend(form.cnhExpirationDate) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, cnhExpirationDate: formatDateForBackend(date) || '' }))}
+                              className="h-10 sm:h-11"
+                            />
+                          </div>
 
                           {/* CTPS */}
                           <div>
@@ -2413,14 +2450,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Data de Emissão da CTPS</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="ctpsIssueDate"
-                              type="date"
-                              value={form.ctpsIssueDate || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.ctpsIssueDate) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, ctpsIssueDate: formatDateForBackend(date) || '' }))}
+                              className="h-10 sm:h-11"
                             />
-          </div>
+                          </div>
 
                           {/* CIN - Carteira de Identidade Nacional */}
                           <div>
@@ -2454,12 +2489,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Data de Emissão do CIN</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="cinDataEmissao"
-                              type="date"
-                              value={form.cinDataEmissao || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.cinDataEmissao) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, cinDataEmissao: formatDateForBackend(date) || '' }))}
+                              className="h-10 sm:h-11"
                             />
                           </div>
                         </div>
@@ -2520,15 +2553,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 <span className="truncate">Data de Nascimento do Cônjuge</span>
                                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                               </Label>
-                  <Input 
-                    name="spouseBirthDate" 
-                    type="date" 
-                                value={form.spouseBirthDate || ''}
-                    onChange={handleChange} 
-                                required
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                  />
-                </div>
+                              <DatePicker
+                                date={parseDateFromBackend(form.spouseBirthDate) || undefined}
+                                onDateChange={(date) => setForm(prev => ({ ...prev, spouseBirthDate: formatDateForBackend(date) || '' }))}
+                                className="h-10 sm:h-11"
+                              />
+                            </div>
                 <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">Profissão do Cônjuge</span>
@@ -2858,33 +2888,19 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                          <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
-                <Input 
-                            name="exameMedicoData"
-                  type="date" 
-                            value={form.exameMedicoData || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.exameMedicoData) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoData: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
-                          <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
-                <Input 
-                            name="exameMedicoVencimento"
-                            type="date"
-                            value={form.exameMedicoVencimento || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoVencimento: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                          <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
-                <Input 
-                            name="exameMedicoVencimento"
-                            type="date"
-                            value={form.exameMedicoVencimento || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoVencimento: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.exameMedicoVencimento) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoVencimento: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
@@ -3047,13 +3063,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                          <Label className="text-sm font-medium text-gray-200">Validade</Label>
-                <Input 
-                            name="rneValidade"
-                  type="date" 
-                            value={form.rneValidade || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-sm font-medium text-gray-200">Validade</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.rneValidade) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, rneValidade: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
@@ -3112,13 +3126,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                              <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
-                <Input 
-                                name="ricDataEmissao"
-                  type="date" 
-                                value={form.ricDataEmissao || ''}
-                                onChange={(e) => setForm(prev => ({ ...prev, ricDataEmissao: e.target.value }))}
-                                className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.ricDataEmissao) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, ricDataEmissao: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10 w-full"
                 />
               </div>
             </div>
@@ -3174,17 +3186,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                            <span className="truncate">Data de Admissão</span>
-                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                          </Label>
-                <Input 
-                            name="hireDate"
-                            type="date"
-                            value={form.hireDate}
-                  onChange={handleChange} 
-                            required
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                  <span className="truncate">Data de Admissão</span>
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                </Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.hireDate) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, hireDate: formatDateForBackend(date) || '' }))}
+                  className="h-10 sm:h-11 w-full"
                 />
               </div>
               <div>
@@ -3192,14 +3201,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">Data de Demissão</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                <Input 
-                            name="dataRescisao"
-                            type="date"
-                            value={form.dataRescisao || ''}
-                  onChange={handleChange} 
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                />
-              </div>
+                          <DatePicker
+                            date={parseDateFromBackend(form.dataRescisao) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, dataRescisao: formatDateForBackend(date) || '' }))}
+                            className="h-10 sm:h-11 w-full"
+                          />
+                        </div>
                         {form.dataRescisao && (
                           <div className="md:col-span-2">
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
@@ -3569,19 +3576,59 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               </div>
               <div>
                           <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                            <span className="truncate">Departamento</span>
+                            <span className="truncate">Cliente</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
                             <SearchableSelect
-                              options={departments.map(d => ({
-                                value: String(d.id),
-                                label: d.name,
-                                description: d.code ? `Código: ${d.code}` : ''
+                              options={clients.map(c => ({
+                                value: String(c.id),
+                                label: c.name,
+                                description: c.cnpj || ''
+                              }))}
+                              value={selectedClientId}
+                              onChange={async (val) => {
+                                setSelectedClientId(val);
+                                setForm(prev => ({ ...(prev as any), departmentId: '' }));
+                                setFilteredWorkPosts([]);
+                                if (val) {
+                                  setLoadingWorkPosts(true);
+                                  try {
+                                    const posts = await workPostService.getWorkPostsByClient(val);
+                                    setFilteredWorkPosts(Array.isArray(posts) ? posts : []);
+                                  } catch (err) {
+                                    console.warn('Erro ao carregar setores do cliente:', err);
+                                    setFilteredWorkPosts([]);
+                                  } finally {
+                                    setLoadingWorkPosts(false);
+                                  }
+                                }
+                              }}
+                              placeholder="Selecione o cliente"
+                              emptyMessage="Nenhum cliente encontrado"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                              Selecione o cliente para listar os setores de trabalho disponíveis.
+                            </p>
+              </div>
+              <div>
+                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                            <span className="truncate">Setor de Trabalho</span>
+                            <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                          </Label>
+                            <SearchableSelect
+                              options={(
+                                selectedClientId
+                                  ? filteredWorkPosts
+                                  : workPosts
+                              ).map(wp => ({
+                                value: String(wp.id),
+                                label: wp.name,
+                                description: wp.clientName ? `Cliente: ${wp.clientName}` : (wp.address || '')
                               }))}
                               value={(form as any).departmentId || ''}
                               onChange={(val) => setForm(prev => ({ ...(prev as any), departmentId: val }))}
-                              placeholder="Selecione o departamento"
-                              emptyMessage="Nenhum departamento encontrado"
+                              placeholder={loadingWorkPosts ? 'Carregando setores...' : (selectedClientId ? 'Selecione o setor de trabalho' : 'Selecione um cliente primeiro')}
+                              emptyMessage={selectedClientId ? 'Nenhum setor encontrado para este cliente' : 'Selecione um cliente para listar os setores'}
                             />
               </div>
               <div>
@@ -3883,6 +3930,23 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                     </div>
                   </Card>
 
+                </TabsContent>
+                <TabsContent value="documentos" className="space-y-4 sm:space-y-6">
+                   {funcionario?.id ? (
+                     <EmployeeDocumentsTab employeeId={funcionario.id} />
+                   ) : (
+                     <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
+                       <div className="p-12 text-center space-y-4">
+                         <div className="p-4 bg-seguranca-yellow/20 rounded-full w-fit mx-auto">
+                           <AlertCircle className="h-10 w-10 text-seguranca-yellow" />
+                         </div>
+                         <h3 className="text-xl font-bold text-white">Salve o cadastro primeiro</h3>
+                         <p className="text-gray-400 max-w-sm mx-auto">
+                           É necessário salvar o cadastro básico do funcionário antes de iniciar a importação de documentos.
+                         </p>
+                       </div>
+                     </Card>
+                   )}
                 </TabsContent>
                 <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
                   {/* Ficha para Contabilidade - Agora em primeiro */}
@@ -4301,11 +4365,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
                   Data de início no novo setor <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  type="date"
-                  value={remanejamentoForm.dataInicio}
-                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: e.target.value }))}
-                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                <DatePicker
+                  date={parseDateFromBackend(remanejamentoForm.dataInicio) || undefined}
+                  onDateChange={(date) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: formatDateForBackend(date) || '' }))}
+                  className="w-full"
                 />
               </div>
               <div>
