@@ -55,7 +55,7 @@ export function SearchableSelect({
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
 
-  const selectedOption = options.find((opt) => opt.value === value)
+  const selectedOption = options.find((opt) => opt && opt.value === value)
 
   // Notifica busca externa (server-side) com debounce simples
   React.useEffect(() => {
@@ -70,11 +70,12 @@ export function SearchableSelect({
     if (!showOptions) return [] as Option[]
     if (!search) return options
     const q = search.toLowerCase()
-    return options.filter(
-      (o) =>
-        o.label.toLowerCase().includes(q) ||
-        (o.description ? o.description.toLowerCase().includes(q) : false)
-    )
+    return options.filter((o) => {
+      if (!o) return false
+      const labelMatch = (o.label || "").toLowerCase().includes(q)
+      const descMatch = o.description ? o.description.toLowerCase().includes(q) : false
+      return labelMatch || descMatch
+    })
   }, [options, search, showOptions])
 
   const resolvedMinCharsMessage =

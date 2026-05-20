@@ -226,10 +226,12 @@ export default function WorkPostAssignmentFormModal({
                   Funcionário <span className="text-seguranca-red">*</span>
                 </Label>
                 <SearchableSelect
-                  options={employees.map((employee) => ({
-                    value: employee.id,
-                    label: employee.name,
-                  }))}
+                  options={(employees || [])
+                    .filter((employee) => employee && employee.id)
+                    .map((employee) => ({
+                      value: employee.id,
+                      label: employee.name || '',
+                    }))}
                   value={watch('employeeId') || ''}
                   onChange={handleEmployeeChange}
                   placeholder="Selecione o funcionário"
@@ -262,10 +264,12 @@ export default function WorkPostAssignmentFormModal({
                   Posto de Trabalho <span className="text-seguranca-red">*</span>
                 </Label>
                 <SearchableSelect
-                  options={workPosts.map((post) => ({
-                    value: post.id,
-                    label: `${post.postCode} - ${post.name}`,
-                  }))}
+                  options={(workPosts || [])
+                    .filter((post) => post && post.id)
+                    .map((post) => ({
+                      value: post.id,
+                      label: `${post.postCode || ''} - ${post.name || ''}`,
+                    }))}
                   value={watch('workPostId') || ''}
                   onChange={(value) =>
                     setValue('workPostId', value === 'all' ? '' : value, {
