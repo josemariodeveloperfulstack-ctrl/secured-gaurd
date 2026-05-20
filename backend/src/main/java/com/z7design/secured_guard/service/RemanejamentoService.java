@@ -127,9 +127,14 @@ public class RemanejamentoService {
      * Exclui um remanejamento e registra no histórico
      */
     public void delete(UUID id, User usuarioQueExecutou, String motivoAlteracao) {
+        if (!remanejamentoRepository.existsById(id)) {
+            log.warn("Remanejamento não encontrado para exclusão com ID: {}. Retornando com sucesso (operação idempotente).", id);
+            return;
+        }
+
         Optional<Remanejamento> existingOpt = remanejamentoRepository.findById(id);
         if (existingOpt.isEmpty()) {
-            throw new ResourceNotFoundException("Remanejamento não encontrado com id: " + id);
+            return;
         }
 
         Remanejamento existing = existingOpt.get();

@@ -283,7 +283,8 @@ public class KmControlService {
         
         UUID uuid = UUID.fromString(id);
         if (!kmControlRepository.existsById(uuid)) {
-            throw new ResourceNotFoundException("Registro de controle de KM não encontrado com ID: " + id);
+            log.warn("Registro de controle de KM com ID {} não existe. Ignorando exclusão (idempotente).", id);
+            return;
         }
         
         kmControlRepository.deleteById(uuid);

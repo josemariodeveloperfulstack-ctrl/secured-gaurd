@@ -116,6 +116,12 @@ public class TransportGuideService {
     @Transactional
     public void deleteTransportGuide(Long id) {
         log.info("Excluindo guia de transporte ID: {}", id);
+        
+        if (!transportGuideRepository.existsById(id)) {
+            log.warn("Guia de transporte não encontrada para exclusão com ID: {}. Retornando com sucesso (operação idempotente).", id);
+            return;
+        }
+        
         TransportGuide guide = transportGuideRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Guia de transporte não encontrada"));
         
