@@ -168,50 +168,27 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
     }
   }, [report, filteredWorkPosts]);
 
-  useEffect(() => {
-    if (report) {
-      console.log('📋 Inicializando formData com dados do report:', {
-        employeeId: report.employeeId,
-        clientId: report.clientId,
-        workPostId: report.workPostId,
-        workPostName: report.workPostName
-      });
-      setFormData({
-        employeeId: report.employeeId || '',
-        clientId: report.clientId || '',
-        workPostId: report.workPostId || '',
-        date: report.date || '',
-        startTime: report.startTime || '',
-        endTime: report.endTime || '',
-        description: report.description || '',
-        ballisticPlate: report.ballisticPlate,
-        weaponRegistry: report.weaponRegistry,
-        absenceStatus: report.absenceStatus || 'PRESENT',
-        divergences: report.divergences,
-        medicalConsultation: report.medicalConsultation
-      });
-    } else {
-      setFormData({
-        employeeId: '',
-        clientId: '',
-        workPostId: '',
-        date: new Date().toISOString().split('T')[0],
-        startTime: '',
-        endTime: '',
-        description: '',
-        absenceStatus: 'PRESENT'
-      });
-    }
-    setPhotos([]);
-    setDocuments([]);
-  }, [report, open]);
-
-  // Carregar dados quando modal abrir
+  // Carregar dados quando modal abrir — passa o report para inicializar formData APÓS os dados estarem prontos
   useEffect(() => {
     if (open) {
-      loadDropdownData();
+      setPhotos([]);
+      setDocuments([]);
+      if (!report) {
+        // Modo criação: resetar form imediatamente
+        setFormData({
+          employeeId: '',
+          clientId: '',
+          workPostId: '',
+          date: new Date().toISOString().split('T')[0],
+          startTime: '',
+          endTime: '',
+          description: '',
+          absenceStatus: 'PRESENT'
+        });
+      }
+      loadDropdownData(report ?? null);
     }
-  }, [open]);
+  }, [open, report]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -228,8 +205,8 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
     }
   };
 
-  // Carregar dados dos dropdowns
-  const loadDropdownData = async () => {
+  // Carregar dados dos dropdowns — recebe report para inicializar formData após carregamento
+  const loadDropdownData = async (pendingReport: typeof report) => {
     try {
       setLoadingData(true);
       console.log('🔄 Iniciando carregamento de dados dos dropdowns...');
@@ -293,9 +270,29 @@ const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
         });
       }
       
-      // Não precisamos mais carregar todos os postos antecipadamente
-      // Os postos serão carregados dinamicamente quando um cliente for selecionado
-      
+      // Inicializar formData com dados do report APÓS os dropdowns estarem prontos
+      if (pendingReport) {
+        console.log('📋 Inicializando formData após carregamento dos dropdowns:', {
+          employeeId: pendingReport.employeeId,
+          clientId: pendingReport.clientId,
+          workPostId: pendingReport.workPostId,
+        });
+        setFormData({
+          employeeId: pendingReport.employeeId || '',
+          clientId: pendingReport.clientId || '',
+          workPostId: pendingReport.workPostId || '',
+          date: pendingReport.date || '',
+          startTime: pendingReport.startTime || '',
+          endTime: pendingReport.endTime || '',
+          description: pendingReport.description || '',
+          ballisticPlate: pendingReport.ballisticPlate,
+          weaponRegistry: pendingReport.weaponRegistry,
+          absenceStatus: pendingReport.absenceStatus || 'PRESENT',
+          divergences: pendingReport.divergences,
+          medicalConsultation: pendingReport.medicalConsultation
+        });
+      }
+
     } catch (error) {
       console.error('❌ Erro geral ao carregar dados dos dropdowns:', error);
       toast({
