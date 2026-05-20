@@ -5,6 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   AlertTriangle, 
   Plus, 
@@ -15,7 +23,8 @@ import {
   Edit,
   Trash2,
   Loader2,
-  Shield
+  Shield,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,6 +50,63 @@ const RiskMatrixByPosition: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Estados do Modal
+  const [isNewMatrixModalOpen, setIsNewMatrixModalOpen] = useState(false);
+  const [newMatrixPositionName, setNewMatrixPositionName] = useState('');
+  const [newMatrixDepartment, setNewMatrixDepartment] = useState('');
+  const [newMatrixRisks, setNewMatrixRisks] = useState<RiskMatrix['risks']>([]);
+  
+  const [newRiskName, setNewRiskName] = useState('');
+  const [newRiskCategory, setNewRiskCategory] = useState<RiskMatrix['risks'][0]['category']>('FISICO');
+  const [newRiskLevel, setNewRiskLevel] = useState<RiskMatrix['risks'][0]['level']>('BAIXO');
+
+  const handleAddRiskToNewMatrix = () => {
+    if (!newRiskName) {
+      toast({ title: 'Atenção', description: 'Informe o nome do risco.', variant: 'destructive' });
+      return;
+    }
+    const newRisk = {
+      riskId: `r${Date.now()}`,
+      riskName: newRiskName,
+      category: newRiskCategory,
+      level: newRiskLevel
+    };
+    setNewMatrixRisks([...newMatrixRisks, newRisk]);
+    setNewRiskName('');
+  };
+
+  const handleRemoveRiskFromNewMatrix = (id: string) => {
+    setNewMatrixRisks(newMatrixRisks.filter(r => r.riskId !== id));
+  };
+
+  const handleSaveNewMatrix = () => {
+    if (!newMatrixPositionName || !newMatrixDepartment) {
+      toast({ title: 'Atenção', description: 'Preencha cargo e setor.', variant: 'destructive' });
+      return;
+    }
+    if (newMatrixRisks.length === 0) {
+      toast({ title: 'Atenção', description: 'Adicione pelo menos um risco.', variant: 'destructive' });
+      return;
+    }
+
+    const newMatrix: RiskMatrix = {
+      id: `m${Date.now()}`,
+      positionId: `pos${Date.now()}`,
+      positionName: newMatrixPositionName,
+      department: newMatrixDepartment,
+      risks: newMatrixRisks
+    };
+
+    setRiskMatrices([newMatrix, ...riskMatrices]);
+    setIsNewMatrixModalOpen(false);
+    toast({ title: 'Sucesso', description: 'Matriz de riscos criada com sucesso.' });
+    
+    // Reset form
+    setNewMatrixPositionName('');
+    setNewMatrixDepartment('');
+    setNewMatrixRisks([]);
+  };
 
   // Dados mockados para demonstração
   useEffect(() => {
@@ -176,7 +242,7 @@ const RiskMatrixByPosition: React.FC = () => {
             Matriz de Riscos por Cargo ({filteredMatrices.length})
           </CardTitle>
           <Button
-            onClick={() => toast({ title: "Em desenvolvimento", description: "Funcionalidade de criar matriz será implementada em breve" })}
+            onClick={() => setIsNewMatrixModalOpen(true)}
             className="bg-seguranca-red hover:bg-seguranca-darkred text-sm sm:text-base"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -261,6 +327,135 @@ const RiskMatrixByPosition: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal Nova Matriz */}
+      <Dialog open={isNewMatrixModalOpen} onOpenChange={setIsNewMatrixModalOpen}>
+        <DialogContent className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Nova Matriz de Riscos</DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[70vh] pr-4">
+            <div className="space-y-6">
+              {/* Informações Básicas */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-400">Informações Básicas</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="positionName" className="text-seguranca-lightgray">Cargo</Label>
+                    <Input
+                      id="positionName"
+                      placeholder="Ex: Vigilante"
+                      value={newMatrixPositionName}
+                      onChange={(e) => setNewMatrixPositionName(e.target.value)}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="departmentName" className="text-seguranca-lightgray">Setor</Label>
+                    <Input
+                      id="departmentName"
+                      placeholder="Ex: Segurança"
+                      value={newMatrixDepartment}
+                      onChange={(e) => setNewMatrixDepartment(e.target.value)}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Adicionar Riscos */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-400">Adicionar Risco</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end">
+                  <div className="sm:col-span-5 space-y-2">
+                    <Label className="text-seguranca-lightgray">Nome do Risco</Label>
+                    <Input
+                      placeholder="Ex: Ruído constante"
+                      value={newRiskName}
+                      onChange={(e) => setNewRiskName(e.target.value)}
+                      className="bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 space-y-2">
+                    <Label className="text-seguranca-lightgray">Categoria</Label>
+                    <Select value={newRiskCategory} onValueChange={(v: any) => setNewRiskCategory(v)}>
+                      <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FISICO">Físico</SelectItem>
+                        <SelectItem value="QUIMICO">Químico</SelectItem>
+                        <SelectItem value="BIOLOGICO">Biológico</SelectItem>
+                        <SelectItem value="ERGONOMICO">Ergonômico</SelectItem>
+                        <SelectItem value="ACIDENTE">Acidente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-3 space-y-2">
+                    <Label className="text-seguranca-lightgray">Nível</Label>
+                    <Select value={newRiskLevel} onValueChange={(v: any) => setNewRiskLevel(v)}>
+                      <SelectTrigger className="bg-seguranca-black border-gray-600 text-seguranca-lightgray">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BAIXO">Baixo</SelectItem>
+                        <SelectItem value="MEDIO">Médio</SelectItem>
+                        <SelectItem value="ALTO">Alto</SelectItem>
+                        <SelectItem value="CRITICO">Crítico</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-1">
+                    <Button 
+                      onClick={handleAddRiskToNewMatrix}
+                      type="button"
+                      className="w-full bg-seguranca-black border border-gray-600 hover:bg-gray-800"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lista de Riscos Adicionados */}
+              {newMatrixRisks.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-gray-400">Riscos Adicionados ({newMatrixRisks.length})</h3>
+                  <div className="space-y-2">
+                    {newMatrixRisks.map((risk) => (
+                      <div key={risk.riskId} className="flex items-center justify-between p-3 bg-seguranca-black border border-gray-600 rounded-md">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-seguranca-lightgray mr-2">{risk.riskName}</span>
+                          <Badge className={getCategoryColor(risk.category)}>{risk.category}</Badge>
+                          <Badge className={getLevelColor(risk.level)}>{risk.level}</Badge>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleRemoveRiskFromNewMatrix(risk.riskId)}
+                          className="text-gray-400 hover:text-red-400"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="mt-6 border-t border-gray-600 pt-4">
+            <Button variant="outline" onClick={() => setIsNewMatrixModalOpen(false)} className="border-gray-600 text-seguranca-lightgray">
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveNewMatrix} className="bg-seguranca-red hover:bg-seguranca-darkred">
+              Salvar Matriz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

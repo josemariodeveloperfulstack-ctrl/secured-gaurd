@@ -52,8 +52,11 @@ public class EmploymentContractStandardPdfService {
                                         .companyId(request.getCompanyId())
                                         .reportTitle(reportTitle)
                                         .topMargin(100f)
-                                        .bottomMargin(50f)
+                                        .bottomMargin(60f)
                                         .includeEmailInFooter(true)
+                                        .removeBoldFromFooterCompanyName(true)
+                                        .useCalibriLightFooter(true)
+                                        .footerCompanyNameFontSize(11f)
                                         .build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
@@ -140,10 +143,25 @@ public class EmploymentContractStandardPdfService {
                 document.add(intro);
 
                 // Cláusulas
+                String setorPhrase = "";
+                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
+                        setorPhrase = ", alocado(a) no setor de " + request.getDepartment().trim();
+                }
+
+                java.util.List<String> clause1Bolds = new java.util.ArrayList<>();
+                if (request.getPosition() != null) {
+                        clause1Bolds.add(request.getPosition().toUpperCase());
+                }
+                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
+                        clause1Bolds.add(request.getDepartment().trim());
+                }
+
                 addClauseAsSection(document, "CLÁUSULA 1ª - DA FUNÇÃO",
                                 "O EMPREGADO é contratado para exercer a função de "
-                                                + request.getPosition().toUpperCase() +
-                                                ", comprometendo-se a executá-la com zelo e dedicação, bem como outras tarefas compatíveis.");
+                                                + request.getPosition().toUpperCase()
+                                                + setorPhrase
+                                                + ", comprometendo-se a executá-la com zelo e dedicação, bem como outras tarefas compatíveis.",
+                                clause1Bolds);
 
                 addClauseAsSection(document, "CLÁUSULA 2ª - DA REMUNERAÇÃO",
                                 "A EMPREGADORA pagará ao EMPREGADO a remuneração mensal de R$ "
@@ -230,6 +248,11 @@ public class EmploymentContractStandardPdfService {
                                                 ? " série " + request.getEmployeeCtpsSeries()
                                                 : "");
 
+                String setorPhrase = "";
+                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
+                        setorPhrase = ", alocado(a) no setor de " + request.getDepartment().trim();
+                }
+
                 return template
                                 .replace("{{EMPREGADOR_NOME}}", empregadorNome)
                                 .replace("{{EMPREGADOR_ENDERECO}}", CompanyDataFormatter.formatFullAddress(company))
@@ -243,6 +266,7 @@ public class EmploymentContractStandardPdfService {
                                 .replace("{{EMPREGADO_CTPS}}", ctpsCompleta)
                                 .replace("{{EMPREGADO_PIS}}", nullToEmpty(request.getPis()))
                                 .replace("{{FUNCAO}}", funcao)
+                                .replace("{{SETOR_ALOCACAO}}", setorPhrase)
                                 .replace("{{SALARIO_VALOR}}", salarioValor)
                                 .replace("{{SALARIO_EXTENSO}}", salarioExtenso)
                                 .replace("{{CIDADE_DATA_EXTENSO}}", cidadeDataExtenso);
@@ -454,9 +478,12 @@ public class EmploymentContractStandardPdfService {
         }
 
         private void addClauseAsSection(Document document, String title, String content) {
+                addClauseAsSection(document, title, content, java.util.Collections.emptyList());
+        }
+
+        private void addClauseAsSection(Document document, String title, String content, java.util.List<String> boldTerms) {
                 document.add(new Paragraph(title).setBold().setFontSize(10f).setMarginTop(5f).setMarginBottom(2f));
-                document.add(new Paragraph(content).setFontSize(10f).setTextAlignment(TextAlignment.JUSTIFIED)
-                                .setMarginBottom(4f));
+                document.add(buildParagraphWithBoldTerms(content, boldTerms, 10f));
         }
 
         private Cell createLabelValueCell(String label, String value) {
@@ -585,7 +612,7 @@ public class EmploymentContractStandardPdfService {
                         if (integerPart > 0) {
                                 sb.append(" e ");
                         }
-                        sb.append(centsPart);
+                        sb.append(convertGroupToWords(centsPart));
                         sb.append(centsPart == 1 ? " Centavo" : " Centavos");
                 }
 

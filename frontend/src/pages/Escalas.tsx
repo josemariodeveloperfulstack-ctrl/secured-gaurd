@@ -11,6 +11,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { scheduleService, Schedule } from '@/services/scheduleService';
 import EscalaTrabalhoTable from '@/components/operacional/EscalaTrabalhoTable';
 import { dashboardService, ScheduleSummary } from '@/services/dashboardService';
+import { employeeService } from '@/services/employeeService';
+import { clientService } from '@/services/clientService';
+import { workPostService } from '@/services/workPostService';
 import {
   Popover,
   PopoverContent,
@@ -117,7 +120,57 @@ const Escalas = () => {
         console.log('📊 Tipo do scheduleDate:', typeof data[0].scheduleDate);
       }
       
-      setSchedules(data || []);
+      // Enrich data with names in case backend only sends IDs
+      let enrichedData = data || [];
+      if (enrichedData.length > 0) {
+        try {
+          const [employees, clients, workPosts] = await Promise.all([
+            employeeService.getSimpleEmployees().catch(() => []),
+            clientService.getAllClients().catch(() => []),
+            workPostService.getAllWorkPosts().catch(() => [])
+          ]);
+          
+          enrichedData = enrichedData.map((s: any) => {
+            const empId = s.employee?.id || s.employeeId;
+            const clientId = s.location?.id || s.locationId || s.clientId;
+            const wpId = s.workPost?.id || s.workPostId;
+
+            let empName = s.employee?.name || s.employeeName;
+            if (!empName && empId) {
+               const emp = employees.find(e => e.id === String(empId));
+               if (emp) empName = emp.name;
+            }
+
+            let locName = s.location?.name || s.locationName || s.clientName;
+            if (!locName && clientId) {
+               const client = clients.find(c => c.id === String(clientId));
+               if (client) locName = client.name;
+            }
+
+            let wpName = s.workPost?.name || s.workPostName;
+            let wpCode = s.workPost?.postCode || s.workPostCode;
+            if (!wpName && wpId) {
+               const wp = workPosts.find(w => w.id === String(wpId));
+               if (wp) {
+                 wpName = wp.name;
+                 if (!wpCode) wpCode = wp.postCode;
+               }
+            }
+
+            return {
+              ...s,
+              employeeName: empName || s.employeeName,
+              locationName: locName || s.locationName,
+              workPostName: wpName || s.workPostName,
+              workPostCode: wpCode || s.workPostCode,
+            };
+          });
+        } catch (e) {
+          console.error('Erro ao enriquecer dados das escalas:', e);
+        }
+      }
+
+      setSchedules(enrichedData);
     } catch (err: any) {
       console.error('❌ Erro ao carregar escalas:', err);
       console.error('❌ Status:', err.response?.status);
