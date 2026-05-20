@@ -53,8 +53,48 @@ export default function ModuloFiscal() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [zipLoading, setZipLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setUploadFilePdf(file);
+    if (!file) return;
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'pdf') {
+      toast({ title: 'Atenção', description: 'Por favor, selecione um arquivo PDF.', variant: 'destructive' });
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const data = await fiscalService.analyze(file);
+      if (data.clientName) {
+        setUploadClientName(data.clientName);
+      }
+      if (data.periodMonth) {
+        setUploadMonth(data.periodMonth);
+      }
+      if (data.periodYear) {
+        setUploadYear(data.periodYear);
+      }
+      toast({
+        title: 'Nota fiscal identificada!',
+        description: `Cliente: "${data.clientName}" | Período: ${data.periodMonth}/${data.periodYear}`,
+      });
+    } catch (err: any) {
+      console.warn('Falha ao analisar PDF automaticamente:', err);
+      toast({
+        title: 'Leitura automática',
+        description: 'Não foi possível extrair os dados automaticamente. Por favor, preencha os campos manualmente.',
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   // Filtros da listagem
+
   const [filterYear, setFilterYear] = useState<number | ''>('');
   const [filterMonth, setFilterMonth] = useState<number | ''>('');
   const [filterClient, setFilterClient] = useState('');
@@ -211,39 +251,59 @@ export default function ModuloFiscal() {
     <StandardLayout title="Módulo Fiscal">
       <div className="space-y-4">
         {/* Upload apenas PDF */}
-        <Card className="p-4 bg-seguranca-graphite border-gray-700">
+        <Card className={`p-4 bg-seguranca-graphite border-gray-700 transition-all duration-500 ${analyzing ? 'border-seguranca-red shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-pulse' : ''}`}>
           <h3 className="text-sm font-medium text-gray-200 mb-3 flex items-center gap-2">
-            <Upload className="w-4 h-4" /> Importar nota fiscal (PDF)
+            {analyzing ? (
+              <RefreshCw className="w-4 h-4 text-seguranca-red animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4 text-gray-400" />
+            )}
+            Importar nota fiscal (PDF)
           </h3>
           <p className="text-xs text-gray-500 mb-3">
-            Envie o PDF da nota fiscal e informe o nome do cliente e o período (mês/ano) para organização e filtros.
+            {analyzing 
+              ? 'Analisando a estrutura do PDF com tecnologia de extração semântica da prefeitura...'
+              : 'Envie o PDF da nota fiscal e o sistema preencherá automaticamente os campos com o nome do cliente e o período.'}
           </p>
           <form onSubmit={handleUploadPdf} className="flex flex-wrap items-end gap-3">
-            <div>
+            <div className="relative">
               <label htmlFor="fiscal-upload-pdf" className="block text-xs text-gray-400 mb-1">PDF</label>
               <Input
                 id="fiscal-upload-pdf"
                 type="file"
                 accept=".pdf,application/pdf"
-                onChange={(e) => setUploadFilePdf(e.target.files?.[0] || null)}
-                className="bg-seguranca-black border-gray-600 max-w-xs"
+                onChange={handleFileChange}
+                disabled={analyzing || uploading}
+                className="bg-seguranca-black border-gray-600 max-w-xs focus-visible:ring-seguranca-red disabled:opacity-50"
               />
             </div>
-            <div>
+            <div className="relative">
               <label htmlFor="fiscal-client-name" className="block text-xs text-gray-400 mb-1">Cliente</label>
-              <Input
-                id="fiscal-client-name"
-                type="text"
-                placeholder="Nome do cliente"
-                value={uploadClientName}
-                onChange={(e) => setUploadClientName(e.target.value)}
-                className="bg-seguranca-black border-gray-600 w-56 max-w-full"
-              />
+              <div className="relative">
+                <Input
+                  id="fiscal-client-name"
+                  type="text"
+                  placeholder={analyzing ? 'Extraindo tomador...' : 'Nome do cliente'}
+                  value={uploadClientName}
+                  onChange={(e) => setUploadClientName(e.target.value)}
+                  disabled={analyzing || uploading}
+                  className="bg-seguranca-black border-gray-600 w-56 max-w-full focus-visible:ring-seguranca-red disabled:opacity-50 pr-8"
+                />
+                {analyzing && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <RefreshCw className="w-3.5 h-3.5 text-seguranca-red animate-spin" />
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <span className="block text-xs text-gray-400 mb-1">Período (mês)</span>
-              <Select value={String(uploadMonth)} onValueChange={(v) => setUploadMonth(Number(v))}>
-                <SelectTrigger className="w-36 bg-seguranca-black border-gray-600">
+              <Select 
+                value={String(uploadMonth)} 
+                onValueChange={(v) => setUploadMonth(Number(v))}
+                disabled={analyzing || uploading}
+              >
+                <SelectTrigger className="w-36 bg-seguranca-black border-gray-600 focus:ring-seguranca-red disabled:opacity-50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -255,8 +315,12 @@ export default function ModuloFiscal() {
             </div>
             <div>
               <span className="block text-xs text-gray-400 mb-1">Ano</span>
-              <Select value={String(uploadYear)} onValueChange={(v) => setUploadYear(Number(v))}>
-                <SelectTrigger className="w-24 bg-seguranca-black border-gray-600">
+              <Select 
+                value={String(uploadYear)} 
+                onValueChange={(v) => setUploadYear(Number(v))}
+                disabled={analyzing || uploading}
+              >
+                <SelectTrigger className="w-24 bg-seguranca-black border-gray-600 focus:ring-seguranca-red disabled:opacity-50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -266,8 +330,24 @@ export default function ModuloFiscal() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" disabled={uploading} className="bg-seguranca-red hover:bg-seguranca-red/90">
-              {uploading ? 'Importando...' : 'Importar PDF'}
+            <Button 
+              type="submit" 
+              disabled={uploading || analyzing || !uploadFilePdf || !uploadClientName.trim()} 
+              className="bg-seguranca-red hover:bg-seguranca-red/90 text-white flex items-center gap-2"
+            >
+              {uploading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Importando...
+                </>
+              ) : analyzing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Analisando...
+                </>
+              ) : (
+                'Importar PDF'
+              )}
             </Button>
           </form>
         </Card>

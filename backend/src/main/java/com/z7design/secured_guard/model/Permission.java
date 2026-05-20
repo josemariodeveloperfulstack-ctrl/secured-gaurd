@@ -6,10 +6,12 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "permissions")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(of = "id")
 public class Permission {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)

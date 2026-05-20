@@ -42,7 +42,7 @@ export function DatePickerWithRange({
           variant="outline"
           disabled={disabled}
           className={cn(
-            "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow hover:border-seguranca-yellow/50 transition-all rounded-md h-10",
+            "w-full justify-start text-left font-normal bg-seguranca-black border-gray-600 text-seguranca-lightgray hover:bg-seguranca-graphite hover:text-seguranca-yellow hover:border-seguranca-yellow/50 transition-all duration-200 rounded-lg h-10",
             !date && "text-gray-500",
             className
           )}
@@ -51,7 +51,7 @@ export function DatePickerWithRange({
           {date?.from ? (
             date.to ? (
               <span className="truncate">
-                {format(date.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
+                {format(date.from, "dd/MM/yyyy", { locale: ptBR })} –{" "}
                 {format(date.to, "dd/MM/yyyy", { locale: ptBR })}
               </span>
             ) : (
@@ -62,7 +62,11 @@ export function DatePickerWithRange({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 bg-seguranca-black border-gray-700 shadow-2xl z-[1000]" align="start">
+      <PopoverContent
+        className="w-auto p-0 bg-seguranca-black border border-gray-700 shadow-2xl shadow-black/50 z-[10100] rounded-lg"
+        align="start"
+        sideOffset={8}
+      >
         <Calendar
           initialFocus
           mode="range"
@@ -71,9 +75,9 @@ export function DatePickerWithRange({
           onSelect={handleSelect}
           numberOfMonths={2}
           locale={ptBR}
+          className="rounded-lg"
         />
       </PopoverContent>
     </Popover>
   );
 }
-

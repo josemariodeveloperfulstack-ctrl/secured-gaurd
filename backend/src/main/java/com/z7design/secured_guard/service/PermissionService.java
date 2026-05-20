@@ -167,6 +167,7 @@ public class PermissionService {
             Permission.PROPOSALS_READ, Permission.PROPOSALS_WRITE, Permission.PROPOSALS_CREATE, Permission.PROPOSALS_DELETE,
             Permission.QUOTES_READ, Permission.QUOTES_WRITE, Permission.QUOTES_CREATE, Permission.QUOTES_DELETE,
             Permission.CONTRACTS_READ, Permission.CONTRACTS_WRITE, Permission.CONTRACTS_CREATE, Permission.CONTRACTS_DELETE,
+            Permission.WORK_POSTS_READ, Permission.WORK_POSTS_WRITE,
             Permission.DASHBOARD_READ, Permission.REPORTS_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE,
             Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE

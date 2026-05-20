@@ -31,6 +31,7 @@ public class EquipmentService {
 
     private final EquipmentRepository equipmentRepository;
     private final EmployeeRepository employeeRepository;
+    private final com.z7design.secured_guard.repository.WorkPostRepository workPostRepository;
 
     public Page<EquipmentDTO> findAll(Pageable pageable) {
         log.debug("Buscando equipamentos com paginação: {}", pageable);
@@ -128,6 +129,12 @@ public class EquipmentService {
                 .manufacturingDate(request.getManufacturingDate())
                 .validityDate(request.getValidityDate())
                 .weaponRegistrationValidity(request.getWeaponRegistrationValidity())
+                .type(request.getType() != null ? request.getType() : com.z7design.secured_guard.model.enums.EquipmentType.COLETE)
+                .shotsQuantity(request.getShotsQuantity())
+                .weaponRegistration(request.getWeaponRegistration())
+                .quantity(request.getQuantity() != null ? request.getQuantity() : 1)
+                .caliber(request.getCaliber())
+                .workPostId(request.getWorkPostId())
                 .lastMaintenanceDate(request.getLastMaintenanceDate())
                 .nextMaintenanceDate(request.getNextMaintenanceDate())
                 .isDangerous(request.getIsDangerous())
@@ -166,6 +173,12 @@ public class EquipmentService {
         equipment.setManufacturingDate(request.getManufacturingDate());
         equipment.setValidityDate(request.getValidityDate());
         equipment.setWeaponRegistrationValidity(request.getWeaponRegistrationValidity());
+        equipment.setType(request.getType() != null ? request.getType() : com.z7design.secured_guard.model.enums.EquipmentType.COLETE);
+        equipment.setShotsQuantity(request.getShotsQuantity());
+        equipment.setWeaponRegistration(request.getWeaponRegistration());
+        equipment.setQuantity(request.getQuantity() != null ? request.getQuantity() : 1);
+        equipment.setCaliber(request.getCaliber());
+        equipment.setWorkPostId(request.getWorkPostId());
         equipment.setLastMaintenanceDate(request.getLastMaintenanceDate());
         equipment.setNextMaintenanceDate(request.getNextMaintenanceDate());
         equipment.setIsDangerous(request.getIsDangerous());
@@ -239,6 +252,11 @@ public class EquipmentService {
         long expired = equipmentRepository.countByValidityDateBefore(today);
         long expiringSoon = equipmentRepository.countByValidityDateBetween(today, alertDate);
 
+        // Contadores específicos do cofre (localização nula)
+        long weaponsInSafe = equipmentRepository.countByTypeAndWorkPostIdIsNull(com.z7design.secured_guard.model.enums.EquipmentType.ARMA);
+        long vestsInSafe = equipmentRepository.countByTypeAndWorkPostIdIsNull(com.z7design.secured_guard.model.enums.EquipmentType.COLETE);
+        long ammoInSafe = equipmentRepository.sumQuantityByTypeAndWorkPostIdIsNull(com.z7design.secured_guard.model.enums.EquipmentType.MUNICAO);
+
         return Map.of(
                 "total", total,
                 "inUse", inUse,
@@ -246,7 +264,10 @@ public class EquipmentService {
                 "inMaintenance", inMaintenance,
                 "dangerous", dangerous,
                 "expired", expired,
-                "expiringSoon", expiringSoon);
+                "expiringSoon", expiringSoon,
+                "weaponsInSafe", weaponsInSafe,
+                "vestsInSafe", vestsInSafe,
+                "ammoInSafe", ammoInSafe);
     }
 
     private EquipmentDTO toDTO(Equipment equipment) {
@@ -254,6 +275,12 @@ public class EquipmentService {
         if (equipment.getCurrentUserId() != null) {
             // Buscar apenas o nome para evitar carregar toda a entidade e possíveis colunas inexistentes
             currentUserName = employeeRepository.findNameById(equipment.getCurrentUserId())
+                    .orElse(null);
+        }
+
+        String workPostName = null;
+        if (equipment.getWorkPostId() != null) {
+            workPostName = workPostRepository.findNameById(equipment.getWorkPostId())
                     .orElse(null);
         }
 
@@ -277,6 +304,13 @@ public class EquipmentService {
                 .isDangerous(equipment.getIsDangerous())
                 .currentUserId(equipment.getCurrentUserId())
                 .currentUserName(currentUserName)
+                .type(equipment.getType())
+                .shotsQuantity(equipment.getShotsQuantity())
+                .weaponRegistration(equipment.getWeaponRegistration())
+                .quantity(equipment.getQuantity())
+                .caliber(equipment.getCaliber())
+                .workPostId(equipment.getWorkPostId())
+                .workPostName(workPostName)
                 .notes(equipment.getNotes())
                 .qrCode(equipment.getQrCode())
                 .createdAt(equipment.getCreatedAt())

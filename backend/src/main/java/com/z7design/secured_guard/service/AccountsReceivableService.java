@@ -5,10 +5,12 @@ import com.z7design.secured_guard.model.AccountsReceivable;
 import com.z7design.secured_guard.model.Client;
 import com.z7design.secured_guard.model.MeasurementBulletin;
 import com.z7design.secured_guard.model.enums.ReceivableStatus;
+import com.z7design.secured_guard.model.WorkPost;
 import com.z7design.secured_guard.repository.AccountsReceivableRepository;
 import com.z7design.secured_guard.repository.ClientRepository;
 import com.z7design.secured_guard.repository.MeasurementBulletinRepository;
 import com.z7design.secured_guard.repository.UnitRepository;
+import com.z7design.secured_guard.repository.WorkPostRepository;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,7 @@ public class AccountsReceivableService {
     private final ClientRepository clientRepository;
     private final UnitRepository unitRepository;
     private final MeasurementBulletinRepository measurementBulletinRepository;
+    private final WorkPostRepository workPostRepository;
     
     /**
      * Buscar todas as contas a receber com paginação
@@ -113,8 +116,11 @@ public class AccountsReceivableService {
             account.setUnit(unitRepository.findById(dto.getUnitId()).orElse(null));
         }
         
-        // Definir centro de custo se fornecido
-        account.setCentroCusto(dto.getCentroCusto());
+        // Definir posto de trabalho se fornecido
+        if (dto.getWorkPostId() != null) {
+            account.setWorkPost(workPostRepository.findById(dto.getWorkPostId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + dto.getWorkPostId())));
+        }
         
         // Calcular dias em atraso
         account.calculateOverdueDays();
@@ -181,11 +187,12 @@ public class AccountsReceivableService {
             account.setUnit(null);
         }
         
-        // Atualizar centro de custo se fornecido
-        if (dto.getCentroCusto() != null) {
-            account.setCentroCusto(dto.getCentroCusto());
+        // Atualizar posto de trabalho se fornecido
+        if (dto.getWorkPostId() != null) {
+            account.setWorkPost(workPostRepository.findById(dto.getWorkPostId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Posto de trabalho não encontrado com ID: " + dto.getWorkPostId())));
         } else {
-            account.setCentroCusto(null);
+            account.setWorkPost(null);
         }
         
         // Calcular dias em atraso

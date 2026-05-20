@@ -227,4 +227,18 @@ public class FiscalInvoiceService {
         }
         repository.delete(inv);
     }
+
+    public com.z7design.secured_guard.dto.FiscalInvoiceAnalysisDTO analyzePdf(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo não pode estar vazio");
+        }
+        String ext = getExtension(file.getOriginalFilename()).toLowerCase();
+        if (!"pdf".equals(ext)) {
+            throw new IllegalArgumentException("Apenas arquivos PDF são suportados para preenchimento automático");
+        }
+        try (java.io.InputStream is = file.getInputStream()) {
+            return FiscalCnpjExtractor.analyzePdf(is);
+        }
+    }
 }
+

@@ -26,6 +26,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { WorkPostAssignment, CreateWorkPostAssignmentDTO } from '@/services/operationalService';
 import { Loader2, User, MapPin, Calendar, Clock, FileText } from 'lucide-react';
 import { workPostService, WorkPost } from '@/services/workPostService';
+import { employeeService } from '@/services/employeeService';
 
 const assignmentSchema = z.object({
   employeeId: z.string().min(1, 'Funcionário é obrigatório'),
@@ -116,10 +117,59 @@ export default function WorkPostAssignmentFormModal({
       };
       if (fixedEmployeeId) {
         defaultValues.employeeId = fixedEmployeeId;
+        // Auto-carregar o posto do funcionário fixado se for novo
+        employeeService.getEmployeeById(fixedEmployeeId)
+          .then((emp) => {
+            if (emp) {
+              const wpId = emp.workPostId || emp.workPost?.id;
+              if (wpId) {
+                setValue('workPostId', String(wpId), { shouldValidate: true });
+              }
+            }
+          })
+          .catch((err) => console.error('Erro ao carregar posto do funcionário fixo:', err));
       }
       reset(defaultValues);
     }
   }, [assignment, setValue, reset, fixedEmployeeId]);
+
+  const handleEmployeeChange = async (employeeId: string) => {
+    const val = employeeId === 'all' ? '' : employeeId;
+    setValue('employeeId', val, { shouldValidate: true });
+    
+    if (val) {
+      try {
+        const emp = await employeeService.getEmployeeById(val);
+        if (emp) {
+          const wpId = emp.workPostId || emp.workPost?.id;
+          if (wpId) {
+            const wpIdStr = String(wpId);
+            setValue('workPostId', wpIdStr, { shouldValidate: true });
+            
+            // Tentar preencher turno e horários com base no posto
+            const post = workPosts.find(p => String(p.id) === wpIdStr);
+            if (post) {
+              if (post.type === '12H_NOTURNO' || post.type === 'NIGHT') {
+                setValue('shift', 'NIGHT');
+              } else if (post.type === 'MIXED') {
+                setValue('shift', 'MIXED');
+              } else {
+                setValue('shift', 'DAY');
+              }
+              if (post.shiftStart) {
+                setValue('startTime', post.shiftStart.substring(0, 5));
+              }
+              if (post.shiftEnd) {
+                setValue('endTime', post.shiftEnd.substring(0, 5));
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar posto do funcionário selecionado:', error);
+      }
+    }
+  };
 
   const handleFormSubmit = async (data: AssignmentFormData) => {
     setIsSubmitting(true);
@@ -181,11 +231,7 @@ export default function WorkPostAssignmentFormModal({
                     label: employee.name,
                   }))}
                   value={watch('employeeId') || ''}
-                  onChange={(value) =>
-                    setValue('employeeId', value === 'all' ? '' : value, {
-                      shouldValidate: true,
-                    })
-                  }
+                  onChange={handleEmployeeChange}
                   placeholder="Selecione o funcionário"
                   searchPlaceholder="Digite ao menos 3 caracteres do nome..."
                   emptyPlaceholder="Nenhum funcionário encontrado."

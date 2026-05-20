@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.z7design.secured_guard.model.User;
@@ -415,12 +416,14 @@ public class UserService {
         return roleRepository;
     }
 
+    @Transactional(readOnly = true)
     public Set<Permission> getUserPermissions(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
         return user.getPermissions();
     }
 
+    @Transactional
     public Set<Permission> setUserPermissions(UUID userId, Set<Permission> permissions) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -429,6 +432,7 @@ public class UserService {
         return user.getPermissions();
     }
 
+    @Transactional
     public Set<Permission> addUserPermissions(UUID userId, Set<Permission> permissionsToAdd) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -437,6 +441,7 @@ public class UserService {
         return user.getPermissions();
     }
 
+    @Transactional
     public Set<Permission> removeUserPermissions(UUID userId, Set<Permission> permissionsToRemove) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -447,32 +452,98 @@ public class UserService {
 
     private final com.z7design.secured_guard.repository.PermissionRepository permissionRepository;
 
+    @Transactional
     public Set<Permission> addUserPermissionsByIds(UUID userId, List<UUID> permissionIds) {
         if (permissionIds == null || permissionIds.isEmpty()) {
             return getUserPermissions(userId);
         }
 
+        log.info("📝 Adicionando permissões ao usuário {}: IDs={}", userId, permissionIds);
         List<Permission> permissionsToAdd = permissionRepository.findAllById(permissionIds);
+        log.info("📝 Permissões encontradas no banco: {}", permissionsToAdd.size());
+        
         if (permissionsToAdd.isEmpty()) {
-            // Se não encontrou por ID (UUID), talvez sejam nomes (Strings) de permissões
-            // antigas?
-            // Mas o frontend envia UUIDs se vier do backend.
-            // Se vier do fallback "ASSISTENTE_ADMINISTRATIVO", o ID é string.
-            // UUID.fromString falharia no controller antes de chegar aqui se o ID não for
-            // UUID.
-            // Então assumimos UUIDs válidos.
+            log.warn("⚠️ Nenhuma permissão encontrada para os IDs: {}", permissionIds);
             return getUserPermissions(userId);
         }
 
         return addUserPermissions(userId, new java.util.HashSet<>(permissionsToAdd));
     }
 
+    @Transactional
     public Set<Permission> removeUserPermissionsByIds(UUID userId, List<UUID> permissionIds) {
         if (permissionIds == null || permissionIds.isEmpty()) {
             return getUserPermissions(userId);
         }
 
         List<Permission> permissionsToRemove = permissionRepository.findAllById(permissionIds);
+        return removeUserPermissions(userId, new java.util.HashSet<>(permissionsToRemove));
+    }
+
+    @Transactional
+    public Set<Permission> addUserPermissionsByIdentifiers(UUID userId, List<String> identifiers) {
+        if (identifiers == null || identifiers.isEmpty()) {
+            return getUserPermissions(userId);
+        }
+
+        List<Permission> permissionsToAdd = new java.util.ArrayList<>();
+        List<UUID> uuids = new java.util.ArrayList<>();
+        List<String> names = new java.util.ArrayList<>();
+
+        for (String idOrName : identifiers) {
+            if (idOrName == null || idOrName.trim().isEmpty()) {
+                continue;
+            }
+            try {
+                uuids.add(UUID.fromString(idOrName.trim()));
+            } catch (IllegalArgumentException e) {
+                names.add(idOrName.trim());
+            }
+        }
+
+        if (!uuids.isEmpty()) {
+            permissionsToAdd.addAll(permissionRepository.findAllById(uuids));
+        }
+        if (!names.isEmpty()) {
+            permissionsToAdd.addAll(permissionRepository.findByNames(names));
+        }
+
+        if (permissionsToAdd.isEmpty()) {
+            log.warn("⚠️ Nenhuma permissão encontrada para os identificadores: {}", identifiers);
+            return getUserPermissions(userId);
+        }
+
+        return addUserPermissions(userId, new java.util.HashSet<>(permissionsToAdd));
+    }
+
+    @Transactional
+    public Set<Permission> removeUserPermissionsByIdentifiers(UUID userId, List<String> identifiers) {
+        if (identifiers == null || identifiers.isEmpty()) {
+            return getUserPermissions(userId);
+        }
+
+        List<Permission> permissionsToRemove = new java.util.ArrayList<>();
+        List<UUID> uuids = new java.util.ArrayList<>();
+        List<String> names = new java.util.ArrayList<>();
+
+        for (String idOrName : identifiers) {
+            if (idOrName == null || idOrName.trim().isEmpty()) {
+                continue;
+            }
+            try {
+                uuids.add(UUID.fromString(idOrName.trim()));
+            } catch (IllegalArgumentException e) {
+                names.add(idOrName.trim());
+            }
+        }
+
+        if (!uuids.isEmpty()) {
+            permissionsToRemove.addAll(permissionRepository.findAllById(uuids));
+        }
+        if (!names.isEmpty()) {
+            permissionsToRemove.addAll(permissionRepository.findByNames(names));
+        }
+
         return removeUserPermissions(userId, new java.util.HashSet<>(permissionsToRemove));
     }
 

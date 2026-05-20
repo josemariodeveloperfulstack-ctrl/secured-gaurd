@@ -50,7 +50,7 @@ export interface EquipmentReportFilters {
   caNumber?: string;
   
   // Filtros de relatório
-  reportType?: 'equipment_by_employee' | 'weapon_validity' | 'usage_report' | 'expiry_report' | 'general';
+  reportType?: 'equipment_by_employee' | 'weapon_validity' | 'usage_report' | 'expiry_report' | 'general' | 'equipment_by_work_post' | 'weapons_in_transit';
   exportFormat?: 'pdf' | 'excel';
   includeHistory?: boolean;
   includeMovements?: boolean;
@@ -88,6 +88,8 @@ export interface EquipmentReport {
   weaponValidity?: WeaponValidity[];
   equipmentUsage?: EquipmentUsageReport[];
   equipmentExpiry?: EquipmentExpiry[];
+  equipmentByWorkPost?: EquipmentByWorkPost[];
+  weaponsInTransit?: WeaponsInTransit[];
   
   // Resumo por categoria
   categorySummary?: EquipmentCategorySummary[];
@@ -105,6 +107,41 @@ export interface EquipmentByEmployee {
   expiredEquipments: number;
   equipments: Equipment[];
   movements: EquipmentMovement[];
+}
+
+export interface EquipmentByWorkPost {
+  workPostId: string;
+  workPostName: string;
+  workPostLocation?: string;
+  totalEquipment: number;
+  activeEquipment: number;
+  inactiveEquipment: number;
+  equipmentDetails: Array<{
+    equipmentId: string;
+    equipmentName: string;
+    serialNumber: string;
+    status: string;
+    assignedDate: string;
+    lastMovement: string;
+  }>;
+}
+
+export interface WeaponsInTransit {
+  id: number;
+  cnpj: string;
+  empresa: string;
+  numeroArma: string;
+  numeroColete?: string;
+  calibre: string;
+  qtdMunicoes: number;
+  origem: string;
+  destino: string;
+  trajeto: string;
+  motivo: string;
+  status: string;
+  arquivoGuiaPath?: string;
+  createdBy: string;
+  createdAt: string;
 }
 
 export interface WeaponValidity {
@@ -176,7 +213,9 @@ export const REPORT_TYPES = {
   WEAPON_VALIDITY: 'weapon_validity',
   USAGE_REPORT: 'usage_report',
   EXPIRY_REPORT: 'expiry_report',
-  GENERAL: 'general'
+  GENERAL: 'general',
+  EQUIPMENT_BY_WORK_POST: 'equipment_by_work_post',
+  WEAPONS_IN_TRANSIT: 'weapons_in_transit'
 } as const;
 
 export const REPORT_TYPE_LABELS = {
@@ -184,5 +223,7 @@ export const REPORT_TYPE_LABELS = {
   [REPORT_TYPES.WEAPON_VALIDITY]: 'Validade de Armas',
   [REPORT_TYPES.USAGE_REPORT]: 'Relatório de Uso',
   [REPORT_TYPES.EXPIRY_REPORT]: 'Relatório de Vencimento',
-  [REPORT_TYPES.GENERAL]: 'Relatório Geral'
+  [REPORT_TYPES.GENERAL]: 'Relatório Geral',
+  [REPORT_TYPES.EQUIPMENT_BY_WORK_POST]: 'Equipamentos por Posto de Trabalho',
+  [REPORT_TYPES.WEAPONS_IN_TRANSIT]: 'Armas em Trânsito'
 } as const; 

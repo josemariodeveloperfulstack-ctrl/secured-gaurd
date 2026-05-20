@@ -120,7 +120,9 @@ const Postos: React.FC = () => {
       workPost.postCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       workPost.address.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || workPost.status === statusFilter;
+    const matchesStatus = statusFilter === 'all'
+      ? (workPost.status !== 'INATIVO' && workPost.status !== 'CANCELADO')
+      : workPost.status === statusFilter;
     const matchesType = typeFilter === 'all' || workPost.type === typeFilter;
     const matchesClient = clientFilter === 'all' || workPost.clientId === clientFilter;
     const matchesCity = !cityFilter || workPost.city?.toLowerCase().includes(cityFilter.toLowerCase());

@@ -45,6 +45,16 @@ public class FiscalInvoiceController {
         return ResponseEntity.ok(created);
     }
 
+    @PostMapping(value = "/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Analisar nota fiscal PDF em tempo real para preenchimento dos campos")
+    @PreAuthorize("hasAnyAuthority('FISCAL_WRITE','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")
+    public ResponseEntity<com.z7design.secured_guard.dto.FiscalInvoiceAnalysisDTO> analyze(
+            @RequestParam("file") MultipartFile file) throws IOException {
+        com.z7design.secured_guard.dto.FiscalInvoiceAnalysisDTO analysis = service.analyzePdf(file);
+        return ResponseEntity.ok(analysis);
+    }
+
+
     @PostMapping(value = "/upload-pair", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Importar nota fiscal PDF e XML em conjunto (valida se o CNPJ é o mesmo em ambos)")
     @PreAuthorize("hasAnyAuthority('FISCAL_WRITE','ROLE_SUPER_ADMIN','ROLE_ADMIN','ROLE_FINANCEIRO')")

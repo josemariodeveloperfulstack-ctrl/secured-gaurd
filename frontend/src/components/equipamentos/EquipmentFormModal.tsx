@@ -18,10 +18,12 @@ import {
   ProtectionLevel, 
   EquipmentUsage, 
   EquipmentSize,
+  EquipmentType,
   EQUIPMENT_STATUS_LABELS,
   PROTECTION_LEVEL_LABELS,
   EQUIPMENT_USAGE_LABELS,
-  EQUIPMENT_SIZE_LABELS
+  EQUIPMENT_SIZE_LABELS,
+  EQUIPMENT_TYPE_LABELS
 } from '@/types/equipment';
 import equipmentService from '@/services/equipmentService';
 import { workPostService, WorkPost } from '@/services/workPostService';
@@ -49,7 +51,12 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
     status: EquipmentStatus.EM_ESTOQUE,
     manufacturingDate: '',
     serialNumber: '',
-    isDangerous: false
+    isDangerous: false,
+    type: EquipmentType.COLETE,
+    quantity: 1,
+    weaponRegistration: '',
+    caliber: '',
+    workPostId: ''
   });
 
   useEffect(() => {
@@ -104,7 +111,13 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
         lastMaintenanceDate: equipment.lastMaintenanceDate || '',
         nextMaintenanceDate: equipment.nextMaintenanceDate || '',
         sourceWorkPostId: equipment.sourceWorkPostId || '',
-        destinationWorkPostId: equipment.destinationWorkPostId || ''
+        destinationWorkPostId: equipment.destinationWorkPostId || '',
+        type: equipment.type || EquipmentType.COLETE,
+        shotsQuantity: equipment.shotsQuantity,
+        weaponRegistration: equipment.weaponRegistration || '',
+        quantity: equipment.quantity || 1,
+        caliber: equipment.caliber || '',
+        workPostId: equipment.workPostId || ''
       });
     } else {
       // Reset para novo equipamento
@@ -114,7 +127,13 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
         serialNumber: '',
         isDangerous: false,
         sourceWorkPostId: '',
-        destinationWorkPostId: ''
+        destinationWorkPostId: '',
+        type: EquipmentType.COLETE,
+        shotsQuantity: undefined,
+        weaponRegistration: '',
+        quantity: 1,
+        caliber: '',
+        workPostId: ''
       });
     }
   }, [equipment]);
@@ -175,6 +194,12 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
         isDangerous: formData.isDangerous ?? false,
         currentUserId: formData.currentUserId && formData.currentUserId.trim() !== '' ? formData.currentUserId : undefined,
         notes: formData.notes || undefined,
+        type: formData.type || undefined,
+        shotsQuantity: formData.shotsQuantity || undefined,
+        weaponRegistration: formData.weaponRegistration || undefined,
+        quantity: formData.quantity || undefined,
+        caliber: formData.caliber || undefined,
+        workPostId: formData.workPostId || undefined,
       };
 
       // Remover campos undefined, null ou string vazia para não enviar no JSON
@@ -218,13 +243,32 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   const renderBasicInfo = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="col-span-1 md:col-span-2">
+          <Label htmlFor="type">Tipo de Equipamento *</Label>
+          <Select 
+            value={formData.type || EquipmentType.COLETE} 
+            onValueChange={(value) => handleInputChange('type', value as EquipmentType)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o tipo de equipamento" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(EQUIPMENT_TYPE_LABELS).map(([key, label]) => (
+                <SelectItem key={key} value={key}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div>
-          <Label htmlFor="serialNumber">Número de Série *</Label>
+          <Label htmlFor="serialNumber">
+            {formData.type === EquipmentType.MUNICAO ? 'Lote / Série da Munição *' : 'Número de Série *'}
+          </Label>
           <Input
             id="serialNumber"
             value={formData.serialNumber}
             onChange={(e) => handleInputChange('serialNumber', e.target.value)}
-            placeholder="Ex: EQ-001-2025"
+            placeholder={formData.type === EquipmentType.MUNICAO ? 'Ex: LOTE-38-001' : 'Ex: EQ-001-2025'}
             required
           />
         </div>
@@ -242,55 +286,146 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
             </SelectContent>
           </Select>
         </div>
-        
-        <div>
-          <Label htmlFor="model">Modelo</Label>
-          <Input
-            id="model"
-            value={formData.model || ''}
-            onChange={(e) => handleInputChange('model', e.target.value)}
-            placeholder="Ex: Colete Balístico X"
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="ballisticPlate">Placa Balística</Label>
-          <Input
-            id="ballisticPlate"
-            value={formData.ballisticPlate || ''}
-            onChange={(e) => handleInputChange('ballisticPlate', e.target.value)}
-            placeholder="Ex: BP-001"
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="protectionLevel">Nível de Proteção</Label>
-          <Select value={formData.protectionLevel || ''} onValueChange={(value) => handleInputChange('protectionLevel', value as ProtectionLevel)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o nível" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(PROTECTION_LEVEL_LABELS).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div>
-          <Label htmlFor="size">Tamanho</Label>
-          <Select value={formData.size || ''} onValueChange={(value) => handleInputChange('size', value as EquipmentSize)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o tamanho" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(EQUIPMENT_SIZE_LABELS).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
+
+        {/* Campos dinâmicos baseados no tipo do equipamento */}
+        {formData.type === EquipmentType.ARMA && (
+          <>
+            <div>
+              <Label htmlFor="model">Modelo *</Label>
+              <Input
+                id="model"
+                value={formData.model || ''}
+                onChange={(e) => handleInputChange('model', e.target.value)}
+                placeholder="Ex: Taurus PT92"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="weaponRegistration">Número de Registro *</Label>
+              <Input
+                id="weaponRegistration"
+                value={formData.weaponRegistration || ''}
+                onChange={(e) => handleInputChange('weaponRegistration', e.target.value)}
+                placeholder="Ex: REG-123456"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="shotsQuantity">Quantidade de Tiros *</Label>
+              <Input
+                id="shotsQuantity"
+                type="number"
+                value={formData.shotsQuantity !== undefined ? formData.shotsQuantity : ''}
+                onChange={(e) => handleInputChange('shotsQuantity', e.target.value ? parseInt(e.target.value) : undefined)}
+                placeholder="Ex: 15"
+                required
+              />
+            </div>
+          </>
+        )}
+
+        {formData.type === EquipmentType.COLETE && (
+          <>
+            <div>
+              <Label htmlFor="model">Modelo</Label>
+              <Input
+                id="model"
+                value={formData.model || ''}
+                onChange={(e) => handleInputChange('model', e.target.value)}
+                placeholder="Ex: Colete Balístico Premium"
+              />
+            </div>
+            <div>
+              <Label htmlFor="ballisticPlate">Placa Balística</Label>
+              <Input
+                id="ballisticPlate"
+                value={formData.ballisticPlate || ''}
+                onChange={(e) => handleInputChange('ballisticPlate', e.target.value)}
+                placeholder="Ex: BP-001"
+              />
+            </div>
+            <div>
+              <Label htmlFor="protectionLevel">Nível de Proteção</Label>
+              <Select value={formData.protectionLevel || ''} onValueChange={(value) => handleInputChange('protectionLevel', value as ProtectionLevel)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o nível" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PROTECTION_LEVEL_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="size">Tamanho</Label>
+              <Select value={formData.size || ''} onValueChange={(value) => handleInputChange('size', value as EquipmentSize)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tamanho" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(EQUIPMENT_SIZE_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="caNumber">Número do CA</Label>
+              <Input
+                id="caNumber"
+                value={formData.caNumber || ''}
+                onChange={(e) => handleInputChange('caNumber', e.target.value)}
+                placeholder="Ex: CA-12345"
+              />
+            </div>
+            <div>
+              <Label htmlFor="batch">Lote</Label>
+              <Input
+                id="batch"
+                value={formData.batch || ''}
+                onChange={(e) => handleInputChange('batch', e.target.value)}
+                placeholder="Ex: LOTE-2025-01"
+              />
+            </div>
+          </>
+        )}
+
+        {formData.type === EquipmentType.MUNICAO && (
+          <>
+            <div>
+              <Label htmlFor="model">Modelo / Descrição</Label>
+              <Input
+                id="model"
+                value={formData.model || ''}
+                onChange={(e) => handleInputChange('model', e.target.value)}
+                placeholder="Ex: Munição CBC Treino"
+              />
+            </div>
+            <div>
+              <Label htmlFor="caliber">Calibre *</Label>
+              <Input
+                id="caliber"
+                value={formData.caliber || ''}
+                onChange={(e) => handleInputChange('caliber', e.target.value)}
+                placeholder="Ex: .38, .380, 9mm"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="quantity">Quantidade *</Label>
+              <Input
+                id="quantity"
+                type="number"
+                value={formData.quantity !== undefined ? formData.quantity : 1}
+                onChange={(e) => handleInputChange('quantity', e.target.value ? parseInt(e.target.value) : 1)}
+                placeholder="Ex: 50"
+                required
+              />
+            </div>
+          </>
+        )}
+
         <div>
           <Label htmlFor="usageType">Tipo de Uso</Label>
           <Select value={formData.usageType || ''} onValueChange={(value) => handleInputChange('usageType', value as EquipmentUsage)}>
@@ -304,29 +439,9 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
             </SelectContent>
           </Select>
         </div>
-        
-        <div>
-          <Label htmlFor="caNumber">Número do CA</Label>
-          <Input
-            id="caNumber"
-            value={formData.caNumber || ''}
-            onChange={(e) => handleInputChange('caNumber', e.target.value)}
-            placeholder="Ex: CA-12345"
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="batch">Lote</Label>
-          <Input
-            id="batch"
-            value={formData.batch || ''}
-            onChange={(e) => handleInputChange('batch', e.target.value)}
-            placeholder="Ex: LOTE-2025-01"
-          />
-        </div>
       </div>
       
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 pt-2">
         <Checkbox
           id="isDangerous"
           checked={formData.isDangerous}
@@ -420,96 +535,104 @@ const EquipmentFormModal: React.FC<EquipmentFormModalProps> = ({
   const renderLocation = () => {
     console.log('Renderizando localização, postos disponíveis:', workPosts.length);
     console.log('LoadingWorkPosts:', loadingWorkPosts);
-    console.log('FormData sourceWorkPostId:', formData.sourceWorkPostId);
-    console.log('FormData destinationWorkPostId:', formData.destinationWorkPostId);
+    console.log('FormData workPostId:', formData.workPostId);
     
     return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="space-y-6">
+        <div className="bg-slate-50 p-4 border rounded-lg space-y-4">
+          <h4 className="font-semibold text-slate-800">Alocação Fixa do Equipamento</h4>
           <div>
-            <Label htmlFor="sourceWorkPostId">Posto de Trabalho de Origem</Label>
+            <Label htmlFor="workPostId">Posto de Trabalho Alocado (Localização Atual)</Label>
             <Select 
-              value={formData.sourceWorkPostId || ''} 
+              value={formData.workPostId || 'safe'} 
               onValueChange={(value) => {
-                console.log('Selecionando posto de origem:', value);
-                handleInputChange('sourceWorkPostId', value);
+                console.log('Selecionando local de armazenamento:', value);
+                // "safe" mapeia para string vazia (nulo no backend)
+                handleInputChange('workPostId', value === 'safe' ? '' : value);
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de origem"} />
+                <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione a localização"} />
               </SelectTrigger>
               <SelectContent>
-                {workPosts.length === 0 ? (
-                  <SelectItem value="loading" disabled>
-                    {loadingWorkPosts ? "Carregando..." : "Nenhum posto encontrado"}
+                <SelectItem value="safe">🏢 Cofre da Empresa (Padrão)</SelectItem>
+                {workPosts.map((post) => (
+                  <SelectItem key={post.id} value={post.id}>
+                    {post.postCode ? `${post.postCode} - ${post.name}` : post.name}
+                    {post.address ? ` (${post.address})` : ''}
                   </SelectItem>
-                ) : (
-                  workPosts.map((post) => (
-                    <SelectItem key={post.id} value={post.id}>
-                      {post.postCode ? `${post.postCode} - ${post.name}` : post.name}
-                      {post.address ? ` (${post.address})` : ''}
-                    </SelectItem>
-                  ))
-                )}
+                ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500 mt-1">
-              Posto onde o equipamento está atualmente
-            </p>
-          </div>
-          
-          <div>
-            <Label htmlFor="destinationWorkPostId">Posto de Trabalho de Destino</Label>
-            <Select 
-              value={formData.destinationWorkPostId || 'none'} 
-              onValueChange={(value) => {
-                console.log('Selecionando posto de destino:', value);
-                // Converter "none" para string vazia para o backend
-                handleInputChange('destinationWorkPostId', value === 'none' ? '' : value);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de destino"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhum (opcional)</SelectItem>
-                {workPosts.length === 0 ? (
-                  <SelectItem value="loading" disabled>
-                    {loadingWorkPosts ? "Carregando..." : "Nenhum posto encontrado"}
-                  </SelectItem>
-                ) : (
-                  workPosts.map((post) => (
-                    <SelectItem key={post.id} value={post.id}>
-                      {post.postCode ? `${post.postCode} - ${post.name}` : post.name}
-                      {post.address ? ` (${post.address})` : ''}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500 mt-1">
-              Posto para onde o equipamento será transferido (opcional)
+              Selecione o posto de trabalho ao qual este equipamento está alocado. Caso contrário, selecione &quot;Cofre da Empresa&quot;.
             </p>
           </div>
         </div>
-        
-        {formData.sourceWorkPostId && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Posto de origem: {workPosts.find(p => p.id === formData.sourceWorkPostId)?.name || 'Posto selecionado'}
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        {formData.destinationWorkPostId && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Posto de destino: {workPosts.find(p => p.id === formData.destinationWorkPostId)?.name || 'Posto selecionado'}
-            </AlertDescription>
-          </Alert>
-        )}
+
+        <div className="border-t pt-4 space-y-4">
+          <h4 className="font-semibold text-slate-800">Histórico / Movimentação Rápida</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="sourceWorkPostId">Posto de Trabalho de Origem (Para Registro de Movimento)</Label>
+              <Select 
+                value={formData.sourceWorkPostId || ''} 
+                onValueChange={(value) => {
+                  console.log('Selecionando posto de origem:', value);
+                  handleInputChange('sourceWorkPostId', value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de origem"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {workPosts.length === 0 ? (
+                    <SelectItem value="loading" disabled>
+                      {loadingWorkPosts ? "Carregando..." : "Nenhum posto encontrado"}
+                    </SelectItem>
+                  ) : (
+                    workPosts.map((post) => (
+                      <SelectItem key={post.id} value={post.id}>
+                        {post.postCode ? `${post.postCode} - ${post.name}` : post.name}
+                        {post.address ? ` (${post.address})` : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="destinationWorkPostId">Posto de Trabalho de Destino (Para Registro de Movimento)</Label>
+              <Select 
+                value={formData.destinationWorkPostId || 'none'} 
+                onValueChange={(value) => {
+                  console.log('Selecionando posto de destino:', value);
+                  handleInputChange('destinationWorkPostId', value === 'none' ? '' : value);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingWorkPosts ? "Carregando..." : "Selecione o posto de destino"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum (opcional)</SelectItem>
+                  {workPosts.length === 0 ? (
+                    <SelectItem value="loading" disabled>
+                      {loadingWorkPosts ? "Carregando..." : "Nenhum posto encontrado"}
+                    </SelectItem>
+                  ) : (
+                    workPosts.map((post) => (
+                      <SelectItem key={post.id} value={post.id}>
+                        {post.postCode ? `${post.postCode} - ${post.name}` : post.name}
+                        {post.address ? ` (${post.address})` : ''}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };

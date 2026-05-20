@@ -12,10 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { QuotationReportFilters } from '@/services/quotationService';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { DatePicker } from '@/components/ui/date-picker';
 import { formatDateForBackend } from '@/utils/dateUtils';
-import { ptBR } from 'date-fns/locale';
 import { Calendar, Filter, DollarSign, FileDown, Search, Building2, User as UserIcon, FileText } from 'lucide-react';
 import { QuotationStatus } from '@/services/quotationService';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
@@ -286,13 +284,10 @@ export function QuotationReportModal({
                     Data Inicial
                   </Label>
                   <DatePicker
-                    selected={startValidUntil}
-                    onChange={(date) => setStartValidUntil(date)}
-                    dateFormat="dd/MM/yyyy"
-                    locale={ptBR}
-                    placeholderText="dd/mm/aaaa"
-                    className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-graphite !text-seguranca-lightgray !placeholder:text-gray-400 font-medium h-11"
-                    id="startValidUntil"
+                    date={startValidUntil || undefined}
+                    onDateChange={(date) => setStartValidUntil(date || null)}
+                    placeholder="dd/mm/aaaa"
+                    className="h-11"
                   />
                 </div>
                 <div className="space-y-2">
@@ -300,13 +295,10 @@ export function QuotationReportModal({
                     Data Final
                   </Label>
                   <DatePicker
-                    selected={endValidUntil}
-                    onChange={(date) => setEndValidUntil(date)}
-                    dateFormat="dd/MM/yyyy"
-                    locale={ptBR}
-                    placeholderText="dd/mm/aaaa"
-                    className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-graphite !text-seguranca-lightgray !placeholder:text-gray-400 font-medium h-11"
-                    id="endValidUntil"
+                    date={endValidUntil || undefined}
+                    onDateChange={(date) => setEndValidUntil(date || null)}
+                    placeholder="dd/mm/aaaa"
+                    className="h-11"
                   />
                 </div>
               </div>

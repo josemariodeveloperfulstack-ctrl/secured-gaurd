@@ -39,9 +39,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import ReactDatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import { ptBR } from 'date-fns/locale';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
     Collapsible,
     CollapsibleContent,
@@ -922,25 +920,19 @@ export function RelatoriosModal({
                                     </Label>
                                     <div className="grid grid-cols-2 gap-2">
                                         <div className="w-full">
-                                            <ReactDatePicker
-                                                selected={hireDateStart}
-                                                onChange={(date: Date | null) => setHireDateStart(date || undefined)}
-                                                dateFormat="dd/MM/yyyy"
-                                                locale={ptBR}
-                                                placeholderText="Data Inicial"
-                                                className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-black !text-seguranca-lightgray !placeholder:text-gray-400 font-medium text-sm h-10"
-                                                wrapperClassName="w-full"
+                                            <DatePicker
+                                                date={hireDateStart}
+                                                onDateChange={(date) => setHireDateStart(date)}
+                                                placeholder="Data Inicial"
+                                                className="h-10"
                                             />
                                         </div>
                                         <div className="w-full">
-                                            <ReactDatePicker
-                                                selected={hireDateEnd}
-                                                onChange={(date: Date | null) => setHireDateEnd(date || undefined)}
-                                                dateFormat="dd/MM/yyyy"
-                                                locale={ptBR}
-                                                placeholderText="Data Final"
-                                                className="w-full px-3 py-2 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-seguranca-yellow bg-seguranca-black !text-seguranca-lightgray !placeholder:text-gray-400 font-medium text-sm h-10"
-                                                wrapperClassName="w-full"
+                                            <DatePicker
+                                                date={hireDateEnd}
+                                                onDateChange={(date) => setHireDateEnd(date)}
+                                                placeholder="Data Final"
+                                                className="h-10"
                                             />
                                         </div>
                                     </div>

@@ -49,6 +49,8 @@ interface EscalaFormModalProps {
 
 interface EscalaFormData {
   employeeId: string;
+  employeeName?: string;
+  employeeStatus?: string;
   locationId: string;
   workPostId: string;
   scheduleDate: Date;
@@ -217,6 +219,16 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
       setDisplayEmployeeName('');
       return;
     }
+
+    // Se o funcionário selecionado é o mesmo dos dados iniciais, usar o nome que já temos de forma síncrona
+    if (initialData && formData.employeeId === initialData.employeeId) {
+      const empName = String(initialData.employeeName || '').trim() || String((initialData as any).employee?.name || '').trim();
+      if (empName) {
+        setDisplayEmployeeName(empName);
+        return;
+      }
+    }
+
     let cancelled = false;
     employeeService
       .getEmployeeById(formData.employeeId)
@@ -229,7 +241,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, formData.employeeId]);
+  }, [open, formData.employeeId, initialData]);
 
   useEffect(() => {
     if (!open || !selectedClientId) {

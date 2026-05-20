@@ -1026,6 +1026,7 @@ public class EmployeeService {
                             .salario(emp.getSalario())
                             .escalaTrabalho(emp.getEscalaTrabalho())
                             .horarioTrabalho(emp.getHorarioTrabalho())
+                            .status(emp.getStatus() != null ? emp.getStatus().name() : null)
                             .build())
                     .collect(java.util.stream.Collectors.toList());
 
@@ -2031,6 +2032,7 @@ public class EmployeeService {
                         .salario(emp.getSalario())
                         .escalaTrabalho(emp.getEscalaTrabalho())
                         .horarioTrabalho(emp.getHorarioTrabalho())
+                        .status(emp.getStatus() != null ? emp.getStatus().name() : null)
                         .build())
                 .collect(java.util.stream.Collectors.toList());
 

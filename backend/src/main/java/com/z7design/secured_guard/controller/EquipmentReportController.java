@@ -42,6 +42,39 @@ public class EquipmentReportController {
         }
     }
 
+    @GetMapping("/equipment-by-work-post")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<Map<String, Object>>> getEquipmentByWorkPostReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String equipmentType) {
+        try {
+            log.info("Gerando relatório de equipamentos por posto de trabalho");
+            List<Map<String, Object>> report = equipmentReportService.generateEquipmentByWorkPostReport(
+                    startDate, endDate, status, equipmentType);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de equipamentos por posto de trabalho", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/weapons-in-transit")
+    @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
+    public ResponseEntity<List<Map<String, Object>>> getWeaponsInTransitReport(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        try {
+            log.info("Gerando relatório de armas em trâmite de transporte");
+            List<Map<String, Object>> report = equipmentReportService.generateWeaponsInTransitReport(startDate, endDate);
+            return ResponseEntity.ok(report);
+        } catch (Exception e) {
+            log.error("Erro ao gerar relatório de armas em trâmite de transporte", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @GetMapping("/weapon-validity")
     @PreAuthorize("hasAnyAuthority('EQUIPMENTS_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR')")
     public ResponseEntity<List<Map<String, Object>>> getWeaponValidityReport(

@@ -128,11 +128,16 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
   }
   
   const filteredEscalas = safeEscalas.filter(escala => {
+    const employeeName = (escala as any).employeeName || escala.employee?.name || '';
+    const locationName = (escala as any).locationName || escala.location?.name || '';
+    const workPostName = (escala as any).workPostName || escala.workPost?.name || '';
+    const workPostCode = (escala as any).workPostCode || escala.workPost?.postCode || '';
+
     const matchesSearch = 
-      (escala.employee?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (escala.location?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (escala.workPost?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (escala.workPost?.postCode?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      locationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      workPostName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      workPostCode.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || escala.status === statusFilter;
     
@@ -283,7 +288,9 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                       <div className="w-9 h-9 bg-seguranca-red/20 rounded-full flex items-center justify-center">
                         <User className="text-seguranca-red" size={18} />
                       </div>
-                      <span className="font-medium text-seguranca-lightgray">{escala.employee?.name || '-'}</span>
+                      <span className="font-medium text-seguranca-lightgray">
+                        {(escala as any).employeeName || escala.employee?.name || '-'}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -291,7 +298,9 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                        <div className="w-9 h-9 bg-blue-500/20 rounded-full flex items-center justify-center">
                         <Building className="text-blue-400" size={18} />
                       </div>
-                      <span className="text-gray-300">{escala.location?.name || '-'}</span>
+                      <span className="text-gray-300">
+                        {(escala as any).locationName || escala.location?.name || '-'}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -300,9 +309,13 @@ const EscalaTrabalhoTable: React.FC<EscalaTrabalhoTableProps> = ({
                         <Building className="text-green-400" size={18} />
                       </div>
                       <div>
-                        <div className="text-gray-300 font-medium">{escala.workPost?.name || '-'}</div>
-                        {escala.workPost?.postCode && (
-                          <div className="text-xs text-gray-400">{escala.workPost.postCode}</div>
+                        <div className="text-gray-300 font-medium">
+                          {(escala as any).workPostName || escala.workPost?.name || '-'}
+                        </div>
+                        {((escala as any).workPostCode || escala.workPost?.postCode) && (
+                          <div className="text-xs text-gray-400">
+                            {(escala as any).workPostCode || escala.workPost?.postCode}
+                          </div>
                         )}
                       </div>
                     </div>

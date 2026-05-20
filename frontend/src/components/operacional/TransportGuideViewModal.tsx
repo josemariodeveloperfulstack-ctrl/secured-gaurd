@@ -18,6 +18,7 @@ import {
 import { TransportGuide, TransportGuideStatusLabels, TransportGuideStatusColors } from '@/types/transportGuide';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import TransportGuidePDFGenerator from './TransportGuidePDFGenerator';
 
 interface TransportGuideViewModalProps {
   open: boolean;
@@ -131,7 +132,7 @@ const TransportGuideViewModal: React.FC<TransportGuideViewModalProps> = ({
           </Card>
 
           {/* Motivo e Informações Adicionais */}
-          <Card className="border-l-4 border-l-purple-500">
+          <Card className="border-l-4 border-l-amber-500">
             <CardContent className="pt-6">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <FileText className="h-5 w-5" />
@@ -234,16 +235,15 @@ const TransportGuideViewModal: React.FC<TransportGuideViewModalProps> = ({
 
           {/* Botões de Ação */}
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
-            {onGeneratePDF && (
-              <Button 
-                type="button" 
-                variant="outline"
-                onClick={onGeneratePDF}
-                className="w-full sm:w-auto"
+            {onGeneratePDF && guide && (
+              <TransportGuidePDFGenerator 
+                data={guide}
+                onGenerate={onGeneratePDF}
+                className="w-full sm:w-auto inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-10 py-2 px-4 bg-background"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Baixar PDF
-              </Button>
+              </TransportGuidePDFGenerator>
             )}
             {onEdit && guide.status === 'DRAFT' && (
               <Button 

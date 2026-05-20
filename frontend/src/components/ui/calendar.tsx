@@ -7,8 +7,6 @@ import { buttonVariants } from "@/components/ui/button";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
-// Remover CustomHead e uso de components.Head
-
 function Calendar({
   className,
   classNames,
@@ -27,15 +25,15 @@ function Calendar({
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border-gray-600 text-white hover:bg-seguranca-graphite"
+          "h-8 w-8 bg-transparent p-0 opacity-60 hover:opacity-100 border-gray-600 text-white hover:bg-seguranca-graphite transition-all duration-200"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
-        table: "w-full border-collapse space-y-1",
+        table: "w-full border-collapse",
         head_row: "flex w-full",
         head_cell:
           "text-gray-500 rounded-md w-9 font-medium text-[0.75rem] flex-1 text-center uppercase tracking-tighter",
-        row: "flex w-full mt-2",
+        row: "flex w-full mt-1",
         cell: cn(
           "relative p-0 text-center text-sm focus-within:relative focus-within:z-20 flex-1 transition-all",
           props.mode === "range"
@@ -44,18 +42,18 @@ function Calendar({
         ),
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-seguranca-yellow hover:text-black transition-all mx-auto"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-seguranca-yellow/20 hover:text-seguranca-yellow transition-all duration-200 mx-auto rounded-lg"
         ),
-        day_range_start: "day-range-start bg-seguranca-yellow text-black !rounded-l-md font-bold shadow-lg shadow-seguranca-yellow/20",
-        day_range_end: "day-range-end bg-seguranca-yellow text-black !rounded-r-md font-bold shadow-lg shadow-seguranca-yellow/20",
+        day_range_start: "day-range-start bg-seguranca-yellow text-black !rounded-l-lg font-bold shadow-lg shadow-seguranca-yellow/20",
+        day_range_end: "day-range-end bg-seguranca-yellow text-black !rounded-r-lg font-bold shadow-lg shadow-seguranca-yellow/20",
         day_selected:
-          "bg-seguranca-yellow text-black hover:bg-seguranca-yellow hover:text-black focus:bg-seguranca-yellow focus:text-black",
-        day_today: "bg-seguranca-graphite text-seguranca-yellow border border-seguranca-yellow/30 font-bold",
+          "bg-seguranca-yellow text-black hover:bg-seguranca-yellow hover:text-black focus:bg-seguranca-yellow focus:text-black font-semibold shadow-md shadow-seguranca-yellow/25 rounded-lg",
+        day_today: "bg-seguranca-graphite text-seguranca-yellow border border-seguranca-yellow/40 font-bold rounded-lg",
         day_outside:
-          "day-outside text-gray-600 opacity-50 aria-selected:bg-seguranca-yellow/10 aria-selected:text-gray-500 aria-selected:opacity-30",
-        day_disabled: "text-gray-600 opacity-50",
+          "day-outside text-gray-600 opacity-40 aria-selected:bg-seguranca-yellow/10 aria-selected:text-gray-500 aria-selected:opacity-30",
+        day_disabled: "text-gray-700 opacity-40",
         day_range_middle:
-          "aria-selected:bg-seguranca-yellow/20 aria-selected:text-seguranca-yellow !rounded-none",
+          "aria-selected:bg-seguranca-yellow/15 aria-selected:text-seguranca-yellow !rounded-none",
         day_hidden: "invisible",
         ...classNames,
       }}

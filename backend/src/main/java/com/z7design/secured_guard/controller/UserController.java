@@ -409,36 +409,43 @@ public class UserController {
 
     @PostMapping("/{id}/permissions")
     @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    @Operation(summary = "Adicionar permissões ao usuário", description = "Adiciona permissões individuais ao usuário")
-    public ResponseEntity<?> addUserPermissions(@PathVariable String id, @RequestBody List<UUID> permissionIds) {
+    @Operation(summary = "Adicionar permissões ao usuário", description = "Adiciona permissões individuais ao usuário. Aceita UUIDs ou nomes de permissões.")
+    public ResponseEntity<?> addUserPermissions(@PathVariable String id, @RequestBody List<String> permissionIdentifiers) {
         try {
+            log.info("📝 Adicionando permissões ao usuário {}: {}", id, permissionIdentifiers);
             UUID userId = UUID.fromString(id);
-            Set<Permission> updated = userService.addUserPermissionsByIds(userId, permissionIds);
+            Set<Permission> updated = userService.addUserPermissionsByIdentifiers(userId, permissionIdentifiers);
+            log.info("✅ Permissões adicionadas com sucesso ao usuário {}: {} permissões", id, updated.size());
             return ResponseEntity.ok(updated.stream()
                     .map(com.z7design.secured_guard.dto.PermissionDTO::fromEntity)
                     .collect(java.util.stream.Collectors.toList()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "ID inválido"));
+            log.warn("⚠️ Erro de validação ao adicionar permissões: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            log.error("Erro ao adicionar permissões: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+            log.error("❌ Erro ao adicionar permissões ao usuário {}: {}", id, e.getMessage(), e);
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "Erro desconhecido";
+            if (e.getCause() != null) {
+                errorMsg = e.getCause().getMessage() != null ? e.getCause().getMessage() : errorMsg;
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", errorMsg));
         }
     }
 
     @DeleteMapping("/{id}/permissions")
     @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
-    @Operation(summary = "Remover permissões do usuário", description = "Remove permissões individuais do usuário")
-    public ResponseEntity<?> removeUserPermissions(@PathVariable String id, @RequestBody List<UUID> permissionIds) {
+    @Operation(summary = "Remover permissões do usuário", description = "Remove permissões individuais do usuário. Aceita UUIDs ou nomes de permissões.")
+    public ResponseEntity<?> removeUserPermissions(@PathVariable String id, @RequestBody List<String> permissionIdentifiers) {
         try {
             UUID userId = UUID.fromString(id);
-            Set<Permission> updated = userService.removeUserPermissionsByIds(userId, permissionIds);
+            Set<Permission> updated = userService.removeUserPermissionsByIdentifiers(userId, permissionIdentifiers);
             return ResponseEntity.ok(updated.stream()
                     .map(com.z7design.secured_guard.dto.PermissionDTO::fromEntity)
                     .collect(java.util.stream.Collectors.toList()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "ID inválido"));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            log.error("Erro ao remover permissões: {}", e.getMessage());
+            log.error("❌ Erro ao remover permissões: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }

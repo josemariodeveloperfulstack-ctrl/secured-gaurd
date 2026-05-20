@@ -76,6 +76,7 @@ export interface SimpleEmployee {
   diasTrabalho?: string;
   horarioTrabalho?: string;
   escalaTrabalho?: string;
+  status?: string;
 }
 
 export interface EmployeeFilters {
@@ -244,7 +245,8 @@ export const employeeService = {
           phone: emp.phone,
           document: emp.document,
           workPostId: emp.workPostId || emp.workPost?.id,
-          workPostName: emp.workPostName || emp.workPost?.name
+          workPostName: emp.workPostName || emp.workPost?.name,
+          status: emp.status
         }));
       }
 
@@ -255,7 +257,8 @@ export const employeeService = {
         phone: emp.phone,
         document: emp.document,
         workPostId: emp.workPostId || emp.workPost?.id,
-        workPostName: emp.workPostName || emp.workPost?.name
+        workPostName: emp.workPostName || emp.workPost?.name,
+        status: emp.status
       }));
     } catch (error) {
       console.error('Erro ao buscar funcionários simplificados:', error);

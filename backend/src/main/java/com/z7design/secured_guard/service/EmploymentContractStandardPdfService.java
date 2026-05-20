@@ -118,34 +118,6 @@ public class EmploymentContractStandardPdfService {
         private void addContent(Document document, EmploymentContractRequest request, Company company) {
                 // Espaço inicial para o conteúdo não ficar em cima da imagem do cabeçalho
                 document.add(new Paragraph("").setMarginBottom(14f));
-                document.add(createSectionHeader("IDENTIFICAÇÃO DA EMPREGADORA").setMarginTop(6f));
-                Table employerTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-                employerTable.addCell(createLabelValueCell("NOME / RAZÃO SOCIAL:", company.getName()));
-                employerTable.addCell(
-                                createLabelValueCell("CNPJ:", CompanyDataFormatter.formatCnpj(company.getCnpj())));
-                employerTable.addCell(
-                                createLabelValueCell("ENDEREÇO:", CompanyDataFormatter.formatFullAddress(company)));
-                document.add(employerTable);
-
-                // Seção: Identificação do Empregado
-                document.add(createSectionHeader("IDENTIFICAÇÃO DO EMPREGADO"));
-                Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
-                                .useAllAvailableWidth();
-                employeeTable.addCell(createLabelValueCell("NOME:", request.getEmployeeName()));
-                employeeTable.addCell(createLabelValueCell("CPF:", request.getEmployeeCpf()));
-                employeeTable.addCell(createLabelValueCell("RG:", request.getEmployeeRg()));
-                employeeTable.addCell(createLabelValueCell("CTPS / SÉRIE:",
-                                (request.getEmployeeCtps() != null ? request.getEmployeeCtps() : "") + " / "
-                                                + (request.getEmployeeCtpsSeries() != null
-                                                                ? request.getEmployeeCtpsSeries()
-                                                                : "")));
-                employeeTable.addCell(createLabelValueCell("ENDEREÇO:", request.getEmployeeAddress()));
-                if (request.getDepartment() != null && !request.getDepartment().trim().isEmpty()) {
-                        employeeTable.addCell(createLabelValueCell("SETOR / LOCAL DE TRABALHO:",
-                                        request.getDepartment().trim()));
-                }
-                document.add(employeeTable);
 
                 if (isExperienceContract(request)) {
                         String raw = experienceTemplateLoader.loadRawTemplate();
@@ -337,11 +309,28 @@ public class EmploymentContractStandardPdfService {
         /**
          * Quebra o texto em blocos (parágrafos) para o iText fluir em várias páginas com alinhamento justificado.
          * Detecta o marcador {{ASSINATURAS_DUAS_COLUNAS}} e renderiza assinaturas em duas colunas.
+         * Destaca em negrito: nome da empresa, nome do funcionário, cargo e setor de trabalho.
          */
         private void appendMultipagePlainText(Document document, String text,
                         EmploymentContractRequest request, Company company) {
                 String normalized = text.replace("\r\n", "\n");
                 document.add(new Paragraph("").setMarginBottom(8f));
+
+                // Termos que devem aparecer em negrito no corpo do contrato
+                java.util.List<String> boldTerms = new java.util.ArrayList<>();
+                if (company != null && company.getName() != null && !company.getName().isBlank()) {
+                        boldTerms.add(company.getName());
+                }
+                if (request.getEmployeeName() != null && !request.getEmployeeName().isBlank()) {
+                        boldTerms.add(request.getEmployeeName());
+                }
+                if (request.getPosition() != null && !request.getPosition().isBlank()) {
+                        boldTerms.add(request.getPosition().trim().toUpperCase());
+                }
+                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
+                        boldTerms.add(request.getDepartment().trim());
+                }
+
                 String[] blocks = normalized.split("\n\n+");
                 for (String block : blocks) {
                         String b = block.trim();
@@ -352,11 +341,56 @@ public class EmploymentContractStandardPdfService {
                                 addTwoColumnSignatures(document, request, company);
                                 continue;
                         }
-                        document.add(new Paragraph(b)
-                                        .setFontSize(9f)
-                                        .setTextAlignment(TextAlignment.JUSTIFIED)
-                                        .setMarginBottom(6f));
+                        document.add(buildParagraphWithBoldTerms(b, boldTerms, 9f));
                 }
+        }
+
+        /**
+         * Constrói um Paragraph onde cada ocorrência dos termos indicados fica em negrito.
+         */
+        private Paragraph buildParagraphWithBoldTerms(String text, java.util.List<String> boldTerms, float fontSize) {
+                if (boldTerms.isEmpty()) {
+                        return new Paragraph(text)
+                                        .setFontSize(fontSize)
+                                        .setTextAlignment(TextAlignment.JUSTIFIED)
+                                        .setMarginBottom(6f);
+                }
+
+                Paragraph p = new Paragraph()
+                                .setFontSize(fontSize)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(6f);
+
+                // Percorre o texto procurando os termos para destacar
+                String remaining = text;
+                while (!remaining.isEmpty()) {
+                        int earliestIdx = -1;
+                        String matchedTerm = null;
+
+                        for (String term : boldTerms) {
+                                int idx = remaining.indexOf(term);
+                                if (idx >= 0 && (earliestIdx < 0 || idx < earliestIdx)) {
+                                        earliestIdx = idx;
+                                        matchedTerm = term;
+                                }
+                        }
+
+                        if (earliestIdx < 0) {
+                                // Nenhum termo encontrado no restante — adiciona tudo como texto normal
+                                p.add(new Text(remaining).setFontSize(fontSize));
+                                break;
+                        }
+
+                        // Texto antes do termo
+                        if (earliestIdx > 0) {
+                                p.add(new Text(remaining.substring(0, earliestIdx)).setFontSize(fontSize));
+                        }
+                        // O termo em negrito
+                        p.add(new Text(matchedTerm).setBold().setFontSize(fontSize));
+                        remaining = remaining.substring(earliestIdx + matchedTerm.length());
+                }
+
+                return p;
         }
 
         private void addTwoColumnSignatures(Document document, EmploymentContractRequest request, Company company) {

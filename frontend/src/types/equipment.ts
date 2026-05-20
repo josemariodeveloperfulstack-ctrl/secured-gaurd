@@ -28,6 +28,12 @@ export enum EquipmentSize {
   UNICO = 'UNICO'
 }
 
+export enum EquipmentType {
+  ARMA = 'ARMA',
+  COLETE = 'COLETE',
+  MUNICAO = 'MUNICAO'
+}
+
 export interface Equipment {
   id: string;
   status: EquipmentStatus;
@@ -54,6 +60,15 @@ export interface Equipment {
   destinationWorkPostId?: string;
   createdAt: string;
   updatedAt: string;
+  
+  // Novos campos para controle de tipo e postos
+  type?: EquipmentType;
+  shotsQuantity?: number;
+  weaponRegistration?: string;
+  quantity?: number;
+  caliber?: string;
+  workPostId?: string;
+  workPostName?: string;
   
   // Campos calculados
   isExpired: boolean;
@@ -84,6 +99,14 @@ export interface CreateEquipmentRequest {
   nextMaintenanceDate?: string;
   sourceWorkPostId?: string;
   destinationWorkPostId?: string;
+  
+  // Novos campos para controle de tipo
+  type?: EquipmentType;
+  shotsQuantity?: number;
+  weaponRegistration?: string;
+  quantity?: number;
+  caliber?: string;
+  workPostId?: string;
 }
 
 export interface EquipmentFilters {
@@ -106,6 +129,10 @@ export interface EquipmentFilters {
   manufacturingDateTo?: string;
   weaponRegistrationValidityFrom?: string;
   weaponRegistrationValidityTo?: string;
+  
+  // Novos campos
+  type?: EquipmentType;
+  workPostId?: string;
 }
 
 export interface EquipmentSummary {
@@ -121,6 +148,11 @@ export interface EquipmentSummary {
   weaponRegistrationExpiringSoon60Days: number;
   dangerousEquipments: number;
   equipmentsWithUsers: number;
+  
+  // Novos contadores de estoque no cofre
+  weaponsInSafe?: number;
+  vestsInSafe?: number;
+  ammoInSafe?: number;
 }
 
 export const EQUIPMENT_STATUS_LABELS = {
@@ -151,4 +183,10 @@ export const EQUIPMENT_SIZE_LABELS = {
   [EquipmentSize.G]: 'G',
   [EquipmentSize.GG]: 'GG',
   [EquipmentSize.UNICO]: 'Único'
-}; 
+};
+
+export const EQUIPMENT_TYPE_LABELS = {
+  [EquipmentType.ARMA]: 'Arma',
+  [EquipmentType.COLETE]: 'Colete',
+  [EquipmentType.MUNICAO]: 'Munição'
+};

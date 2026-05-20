@@ -30,4 +30,5 @@ public class SimpleEmployeeDTO {
     private java.math.BigDecimal salario;
     private String escalaTrabalho;
     private String horarioTrabalho;
+    private String status;
 }

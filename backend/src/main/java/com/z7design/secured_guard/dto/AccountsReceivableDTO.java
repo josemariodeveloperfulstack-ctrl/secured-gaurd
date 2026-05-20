@@ -72,7 +72,9 @@ public class AccountsReceivableDTO {
     
     private UUID unitId;
     
-    private String centroCusto;
+    private UUID workPostId;
+    
+    private String workPostName;
     
     // Constructors
     public AccountsReceivableDTO() {}
@@ -106,7 +108,10 @@ public class AccountsReceivableDTO {
         this.latePenalty = entity.getLatePenalty();
         this.notes = entity.getNotes();
         this.unitId = entity.getUnit() != null ? entity.getUnit().getId() : null;
-        this.centroCusto = entity.getCentroCusto();
+        if (entity.getWorkPost() != null) {
+            this.workPostId = entity.getWorkPost().getId();
+            this.workPostName = entity.getWorkPost().getName();
+        }
     }
     
     // Static factory method

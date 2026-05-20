@@ -12,7 +12,9 @@ import {
   Download,
   Filter,
   X,
-  CheckCircle2
+  CheckCircle2,
+  MapPin,
+  Truck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { equipmentReportService, EquipmentReportRequest } from '@/services/equipmentReportService';
@@ -25,7 +27,7 @@ interface EquipmentReportModalProps {
   onReportGenerated?: (reportData: any) => void;
 }
 
-type ReportType = 'equipment_by_employee' | 'weapon_validity' | 'usage_report' | 'expiration_report' | 'general_report';
+type ReportType = 'equipment_by_employee' | 'weapon_validity' | 'usage_report' | 'expiration_report' | 'general_report' | 'equipment_by_work_post' | 'weapons_in_transit';
 
 interface ReportTypeConfig {
   id: ReportType;
@@ -42,6 +44,20 @@ const reportTypes: ReportTypeConfig[] = [
     description: 'Equipamentos agrupados por funcionário',
     icon: <Users className="w-6 h-6" />,
     color: 'bg-blue-500/20 text-blue-400'
+  },
+  {
+    id: 'equipment_by_work_post',
+    title: 'Equipamentos por Posto de Trabalho',
+    description: 'Equipamentos agrupados por posto de trabalho',
+    icon: <MapPin className="w-6 h-6" />,
+    color: 'bg-amber-500/20 text-amber-400'
+  },
+  {
+    id: 'weapons_in_transit',
+    title: 'Armas em Trânsito',
+    description: 'Armas e munições em trâmite de transporte',
+    icon: <Truck className="w-6 h-6" />,
+    color: 'bg-orange-500/20 text-orange-400'
   },
   {
     id: 'weapon_validity',
@@ -69,7 +85,7 @@ const reportTypes: ReportTypeConfig[] = [
     title: 'Relatório Geral',
     description: 'Relatório geral de equipamentos',
     icon: <FileText className="w-6 h-6" />,
-    color: 'bg-purple-500/20 text-purple-400'
+    color: 'bg-slate-500/20 text-slate-400'
   }
 ];
 
@@ -83,6 +99,11 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
   const [currentStep, setCurrentStep] = useState<'type' | 'filters' | 'export'>('type');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [status, setStatus] = useState<string>('');
+  const [equipmentType, setEquipmentType] = useState<string>('');
 
   // Encontrar a configuração do relatório selecionado
   const selectedReportConfig = reportTypes.find(type => type.id === selectedReportType);
@@ -127,8 +148,10 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
 
       const reportRequest: EquipmentReportRequest = {
         reportType: selectedReportType,
-        startDate: '2025-01-01', // Valores padrão para demonstração
-        endDate: '2025-01-31',
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        status: status || undefined,
+        equipmentType: equipmentType || undefined,
         exportFormat: 'pdf'
       };
 
@@ -138,6 +161,12 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
       switch (selectedReportType) {
         case 'equipment_by_employee':
           reportData = await equipmentReportService.getEquipmentByEmployeeReport(reportRequest);
+          break;
+        case 'equipment_by_work_post':
+          reportData = await equipmentReportService.getEquipmentByWorkPostReport(reportRequest);
+          break;
+        case 'weapons_in_transit':
+          reportData = await equipmentReportService.getWeaponsInTransitReport(reportRequest);
           break;
         case 'weapon_validity':
           reportData = await equipmentReportService.getWeaponValidityReport(reportRequest);
@@ -204,8 +233,10 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
 
       const reportRequest: EquipmentReportRequest = {
         reportType: selectedReportType,
-        startDate: '2025-01-01',
-        endDate: '2025-01-31',
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        status: status || undefined,
+        equipmentType: equipmentType || undefined,
         exportFormat: format
       };
 
@@ -375,6 +406,8 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                         </label>
                         <input
                           type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
                           className="w-full px-3 py-2 bg-seguranca-graphite border border-gray-600 rounded-md text-seguranca-lightgray focus:ring-seguranca-red focus:border-seguranca-red"
                         />
                       </div>
@@ -384,6 +417,8 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                         </label>
                         <input
                           type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
                           className="w-full px-3 py-2 bg-seguranca-graphite border border-gray-600 rounded-md text-seguranca-lightgray focus:ring-seguranca-red focus:border-seguranca-red"
                         />
                       </div>
@@ -402,22 +437,32 @@ const EquipmentReportModal: React.FC<EquipmentReportModalProps> = ({
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                           Status do Equipamento
                         </label>
-                        <select className="w-full px-3 py-2 bg-seguranca-graphite border border-gray-600 rounded-md text-seguranca-lightgray focus:ring-seguranca-red focus:border-seguranca-red">
+                        <select
+                          value={status}
+                          onChange={(e) => setStatus(e.target.value)}
+                          className="w-full px-3 py-2 bg-seguranca-graphite border border-gray-600 rounded-md text-seguranca-lightgray focus:ring-seguranca-red focus:border-seguranca-red"
+                        >
                           <option value="">Todos</option>
-                          <option value="active">Ativo</option>
-                          <option value="inactive">Inativo</option>
-                          <option value="maintenance">Manutenção</option>
+                          <option value="EM_USO">Em uso</option>
+                          <option value="EM_ESTOQUE">Em estoque</option>
+                          <option value="EM_MANUTENCAO">Em manutenção</option>
+                          <option value="BAIXADO">Baixado</option>
+                          <option value="AGUARDANDO_DESCARTE">Aguardando descarte</option>
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
                           Tipo de Equipamento
                         </label>
-                        <select className="w-full px-3 py-2 bg-seguranca-graphite border border-gray-600 rounded-md text-seguranca-lightgray focus:ring-seguranca-red focus:border-seguranca-red">
+                        <select
+                          value={equipmentType}
+                          onChange={(e) => setEquipmentType(e.target.value)}
+                          className="w-full px-3 py-2 bg-seguranca-graphite border border-gray-600 rounded-md text-seguranca-lightgray focus:ring-seguranca-red focus:border-seguranca-red"
+                        >
                           <option value="">Todos</option>
-                          <option value="weapon">Arma</option>
-                          <option value="uniform">Uniforme</option>
-                          <option value="equipment">Equipamento</option>
+                          <option value="ARMA">Arma</option>
+                          <option value="COLETE">Colete</option>
+                          <option value="MUNICAO">Munição</option>
                         </select>
                       </div>
                     </div>

@@ -164,6 +164,32 @@ export const ContasAReceber: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
+  const [effectiveSearch, setEffectiveSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'cliente' | 'medicao' | 'valor' | 'vencimento' | 'status' | null>(null);
+  const [sortDir, setSortDir] = useState<'ASC' | 'DESC' | null>(null);
+
+  useEffect(() => {
+    if (searchTerm.trim().length >= 3) {
+      setEffectiveSearch(searchTerm);
+    } else {
+      setEffectiveSearch('');
+    }
+  }, [searchTerm]);
+
+  const handleSort = (field: 'cliente' | 'medicao' | 'valor' | 'vencimento' | 'status') => {
+    if (sortBy !== field) {
+      setSortBy(field);
+      setSortDir('DESC');
+    } else {
+      if (sortDir === 'DESC') {
+        setSortDir('ASC');
+      } else {
+        setSortDir(null);
+        setSortBy(null);
+      }
+    }
+  };
+
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCategoria, setFilterCategoria] = useState('all');
   const [filterCliente, setFilterCliente] = useState('all');
@@ -559,7 +585,8 @@ export const ContasAReceber: React.FC = () => {
   };
 
   // Função para carregar contas e clientes
-  const loadContas = async () => {
+  const loadContas = async (keepScroll = true) => {
+    const scrollY = keepScroll ? window.scrollY || document.documentElement.scrollTop : 0;
     try {
       setLoading(true);
       console.log('Carregando dados de Contas a Receber...');
@@ -591,26 +618,33 @@ export const ContasAReceber: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      if (keepScroll) {
+        setTimeout(() => {
+          window.scrollTo({ top: scrollY, behavior: 'instant' });
+        }, 50);
+      }
     }
   };
 
   // Carregar dados reais da API
   useEffect(() => {
-    loadContas();
+    loadContas(false);
   }, []);
 
-  // Filtros aplicados
+  // Filtros aplicados com busca dinâmica e ordenação
   const filteredContas = contas.filter(conta => {
     if (!conta) return false;
 
-    const q = searchTerm.toLowerCase();
+    const q = effectiveSearch.toLowerCase();
     const matchesSearch =
-      (conta.client?.name?.toLowerCase().includes(q) || false) ||
-      (typeof conta.cliente === 'string' && conta.cliente.toLowerCase().includes(q)) ||
-      (conta.invoiceNumber?.toLowerCase().includes(q) || false) ||
-      (conta.numeroFatura?.toLowerCase().includes(q) || false) ||
-      (conta.description?.toLowerCase().includes(q) || false) ||
-      (conta.descricao?.toLowerCase().includes(q) || false);
+      !q ? true : (
+        (conta.client?.name?.toLowerCase().includes(q) || false) ||
+        (typeof conta.cliente === 'string' && conta.cliente.toLowerCase().includes(q)) ||
+        (conta.invoiceNumber?.toLowerCase().includes(q) || false) ||
+        (conta.numeroFatura?.toLowerCase().includes(q) || false) ||
+        (conta.description?.toLowerCase().includes(q) || false) ||
+        (conta.descricao?.toLowerCase().includes(q) || false)
+      );
     const matchesStatus =
       filterStatus === 'all' ||
       (filterStatus === 'ABERTA' && isStatusAberta(conta.status)) ||
@@ -637,6 +671,46 @@ export const ContasAReceber: React.FC = () => {
     }
 
     return matchesSearch && matchesStatus && matchesCategoria && matchesCliente && matchesUnit && matchesDate;
+  }).sort((a, b) => {
+    if (!sortBy || !sortDir) return 0;
+    
+    let comparison = 0;
+    switch (sortBy) {
+      case 'cliente': {
+        const nameA = (a.client?.name || a.cliente || '').toLowerCase();
+        const nameB = (b.client?.name || b.cliente || '').toLowerCase();
+        comparison = nameA.localeCompare(nameB, 'pt-BR');
+        break;
+      }
+      case 'medicao': {
+        const medA = (a.measurementInfo || a.measurementNumber || '').toLowerCase();
+        const medB = (b.measurementInfo || b.measurementNumber || '').toLowerCase();
+        comparison = medA.localeCompare(medB, 'pt-BR');
+        break;
+      }
+      case 'valor': {
+        const valA = a.amount || a.valor || 0;
+        const valB = b.amount || b.valor || 0;
+        comparison = valA - valB;
+        break;
+      }
+      case 'vencimento': {
+        const dateA = new Date(a.dueDate || a.vencimento).getTime();
+        const dateB = new Date(b.dueDate || b.vencimento).getTime();
+        comparison = dateA - dateB;
+        break;
+      }
+      case 'status': {
+        const statusA = (a.status || '').toLowerCase();
+        const statusB = (b.status || '').toLowerCase();
+        comparison = statusA.localeCompare(statusB, 'pt-BR');
+        break;
+      }
+      default:
+        comparison = 0;
+    }
+    
+    return sortDir === 'ASC' ? comparison : -comparison;
   });
 
   const stats = calcularEstatisticas(filteredContas);
@@ -1292,22 +1366,72 @@ export const ContasAReceber: React.FC = () => {
                             />
                           </th>
                         ) : null}
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Cliente / Fatura
+                        <th
+                          onClick={() => handleSort('cliente')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Cliente / Fatura</span>
+                            {sortBy === 'cliente' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Medição
+                        <th
+                          onClick={() => handleSort('medicao')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Medição</span>
+                            {sortBy === 'medicao' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Valor
+                        <th
+                          onClick={() => handleSort('valor')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Valor</span>
+                            {sortBy === 'valor' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Vencimento
+                        <th
+                          onClick={() => handleSort('vencimento')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Vencimento</span>
+                            {sortBy === 'vencimento' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
-                          Status
+                        <th
+                          onClick={() => handleSort('status')}
+                          className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider cursor-pointer select-none hover:bg-seguranca-graphite/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>Status</span>
+                            {sortBy === 'status' && (
+                              <span className="text-seguranca-yellow font-bold text-[10px]">
+                                {sortDir === 'DESC' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-seguranca-lightgray uppercase tracking-wider select-none">
                           Ações
                         </th>
                       </tr>
@@ -1484,7 +1608,10 @@ export const ContasAReceber: React.FC = () => {
 
         {/* Modal de Alteração de Status */}
         <Dialog open={showStatusModal} onOpenChange={setShowStatusModal}>
-          <DialogContent className="max-w-md bg-seguranca-graphite border-gray-600 text-white">
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="max-w-md bg-seguranca-graphite border-gray-600 text-white"
+          >
             <DialogHeader>
               <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
                 <Check className="w-5 h-5" />
@@ -1563,7 +1690,10 @@ export const ContasAReceber: React.FC = () => {
 
         {/* Modal de Visualização */}
         <Dialog open={showViewModal} onOpenChange={setShowViewModal}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white">
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="max-w-2xl max-h-[90vh] overflow-y-auto bg-seguranca-graphite border-gray-600 text-white"
+          >
             <DialogHeader>
               <DialogTitle className="text-xl font-bold text-seguranca-yellow flex items-center gap-2">
                 <Eye size={20} />
@@ -1678,7 +1808,10 @@ export const ContasAReceber: React.FC = () => {
             }
           }}
         >
-          <AlertDialogContent className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[440px]">
+          <AlertDialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[440px]"
+          >
             <AlertDialogHeader>
               <AlertDialogTitle className="text-seguranca-yellow">
                 Marcar como pago?
@@ -1744,7 +1877,10 @@ export const ContasAReceber: React.FC = () => {
             if (!bulkDeleting) setShowBulkDeleteConfirm(open);
           }}
         >
-          <AlertDialogContent className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[480px]">
+          <AlertDialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="bg-seguranca-graphite border-gray-600 text-white sm:max-w-[480px]"
+          >
             <AlertDialogHeader>
               <AlertDialogTitle className="text-seguranca-red">
                 Excluir contas selecionadas?
@@ -1785,7 +1921,10 @@ export const ContasAReceber: React.FC = () => {
 
         {/* Modal de Confirmação de Exclusão */}
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <DialogContent className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white">
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white"
+          >
             <DialogHeader>
               <DialogTitle className="text-seguranca-red">Confirmar Exclusão</DialogTitle>
               <DialogDescription className="text-gray-300">
@@ -1842,7 +1981,10 @@ export const ContasAReceber: React.FC = () => {
         
         {/* Modal de Seleção de Período para Relatório */}
         <Dialog open={showReportPeriodModal} onOpenChange={setShowReportPeriodModal}>
-          <DialogContent className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white shadow-2xl">
+          <DialogContent 
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className="sm:max-w-[425px] bg-seguranca-graphite border-gray-600 text-white shadow-2xl"
+          >
             <DialogHeader>
               <DialogTitle className="text-seguranca-yellow flex items-center gap-2">
                 <FileText className="w-5 h-5" />

@@ -39,7 +39,7 @@ export interface CreateContaAReceberRequest {
   overdueDays?: number; // Dias em atraso
   lateFee?: number; // Taxa de atraso
   latePenalty?: number; // Multa de atraso
-  centroCusto?: string; // Centro de custo
+  workPostId?: string; // ID do posto de trabalho
 }
 
 export interface UpdateContaAReceberRequest extends Partial<CreateContaAReceberRequest> {
@@ -177,7 +177,8 @@ function mapAccountsReceivableListItem(account: any): ContaAReceber | null {
     dataPagamento: parseDateFromBackend(account.paymentDate),
     observacoes: account.notes,
     categoria: account.category,
-    centroCusto: account.centroCusto,
+    workPostId: account.workPostId || account.workPost?.id,
+    workPostName: account.workPostName || account.workPost?.name,
     paymentMethod: account.paymentMethod || 'PIX',
     invoiceNumber: account.invoiceNumber,
     measurementNumber: account.measurementNumber,
@@ -294,7 +295,8 @@ export const contasAReceberService = {
       dataPagamento: parseDateFromBackend(account.paymentDate),
       observacoes: account.notes,
       categoria: account.category || 'INVOICE', // Garantir categoria
-      centroCusto: account.centroCusto || undefined,
+      workPostId: account.workPostId || account.workPost?.id,
+      workPostName: account.workPostName || account.workPost?.name,
       paymentMethod: account.paymentMethod || 'PIX' // Incluir paymentMethod do backend
     };
   },
@@ -331,7 +333,7 @@ export const contasAReceberService = {
       paymentMethod: paymentMethod,
       status: mapFrontendStatusToBackend(conta.status) || 'PENDING',
       notes: conta.observacoes,
-      centroCusto: conta.centroCusto || undefined
+      workPostId: conta.workPostId || undefined
     };
 
     // Adicionar invoiceNumber apenas se fornecido
@@ -378,7 +380,7 @@ export const contasAReceberService = {
       paymentDate: conta.dataPagamento ? formatDateForBackend(conta.dataPagamento) : (contaExistente.dataPagamento ? formatDateForBackend(contaExistente.dataPagamento) : undefined),
       barcode: conta.codigoBarras !== undefined ? conta.codigoBarras : contaExistente.codigoBarras,
       notes: conta.observacoes !== undefined ? conta.observacoes : contaExistente.observacoes,
-      centroCusto: conta.centroCusto !== undefined ? conta.centroCusto : contaExistente.centroCusto,
+      workPostId: conta.workPostId !== undefined ? conta.workPostId : contaExistente.workPostId,
       measurementId: conta.measurementId !== undefined ? (conta.measurementId || undefined) : contaExistente.measurementId,
       measurementNumber: conta.measurementNumber !== undefined ? (conta.measurementNumber || undefined) : contaExistente.measurementNumber,
       overdueDays: Number(contaExistente.overdueDays || 0),
@@ -487,8 +489,8 @@ export const contasAReceberService = {
     if (requestData.amountPaid !== undefined && requestData.amountPaid !== null) {
       cleanRequestData.amountPaid = Number(requestData.amountPaid);
     }
-    if (requestData.centroCusto && String(requestData.centroCusto).trim()) {
-      cleanRequestData.centroCusto = String(requestData.centroCusto).trim();
+    if (requestData.workPostId) {
+      cleanRequestData.workPostId = String(requestData.workPostId);
     }
     if (requestData.barcode && String(requestData.barcode).trim()) {
       cleanRequestData.barcode = String(requestData.barcode).trim();
@@ -757,7 +759,8 @@ export const contasAReceberService = {
       dataPagamento: parseDateFromBackend(account.paymentDate),
       observacoes: account.notes,
       categoria: account.category,
-      centroCusto: account.centroCusto,
+      workPostId: account.workPostId || account.workPost?.id,
+      workPostName: account.workPostName || account.workPost?.name,
       createdAt: parseDateFromBackend(account.createdAt)
     };
   }

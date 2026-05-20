@@ -41,6 +41,54 @@ export const equipmentReportService = {
     }
   },
 
+  // Gerar relatório de equipamentos por posto de trabalho
+  async getEquipmentByWorkPostReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
+    try {
+      console.log('🔗 Gerando relatório de equipamentos por posto de trabalho:', filters);
+
+      const params = new URLSearchParams();
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.equipmentType) params.append('equipmentType', filters.equipmentType);
+
+      const response = await api.get(`/api/equipment-reports/equipment-by-work-post?${params.toString()}`);
+
+      console.log('✅ Relatório de equipamentos por posto de trabalho gerado:', response.data);
+
+      return {
+        data: response.data,
+        generatedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ Erro ao gerar relatório de equipamentos por posto de trabalho:', error);
+      throw error;
+    }
+  },
+
+  // Gerar relatório de armas em trâmite de transporte
+  async getWeaponsInTransitReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
+    try {
+      console.log('🔗 Gerando relatório de armas em trâmite de transporte:', filters);
+
+      const params = new URLSearchParams();
+      if (filters?.startDate) params.append('startDate', filters.startDate);
+      if (filters?.endDate) params.append('endDate', filters.endDate);
+
+      const response = await api.get(`/api/equipment-reports/weapons-in-transit?${params.toString()}`);
+
+      console.log('✅ Relatório de armas em trâmite de transporte gerado:', response.data);
+
+      return {
+        data: response.data,
+        generatedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ Erro ao gerar relatório de armas em trâmite de transporte:', error);
+      throw error;
+    }
+  },
+
   // Gerar relatório de validade de armas
   async getWeaponValidityReport(filters?: Partial<EquipmentReportRequest>): Promise<EquipmentReportResponse> {
     try {

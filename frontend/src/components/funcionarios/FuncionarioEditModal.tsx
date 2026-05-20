@@ -1,6 +1,8 @@
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
+import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import { DependentFormModal } from '@/components/dependentes/DependentFormModal';
@@ -520,16 +522,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         let enderecoEstado = (employeeData as any).enderecoEstado || '';
         let enderecoCep = (employeeData as any).enderecoCep || '';
         
-        // Se endereço vier como objeto address com campos separados
-        if (employeeData.address && typeof employeeData.address === 'object' && !addressValue) {
+        // Se endereço vier como objeto address com campos separados, preencher campos vazios
+        if (employeeData.address && typeof employeeData.address === 'object') {
           const addr = employeeData.address as any;
-          enderecoRua = addr.street || enderecoRua;
-          enderecoNumero = addr.number || enderecoNumero;
-          enderecoComplemento = addr.complement || enderecoComplemento;
-          enderecoBairro = addr.neighborhood || enderecoBairro;
-          enderecoCidade = addr.city || enderecoCidade;
-          enderecoEstado = addr.state || enderecoEstado;
-          enderecoCep = addr.zipCode || enderecoCep;
+          if (!enderecoRua && addr.street) enderecoRua = addr.street;
+          if (!enderecoNumero && addr.number) enderecoNumero = addr.number;
+          if (!enderecoComplemento && addr.complement) enderecoComplemento = addr.complement;
+          if (!enderecoBairro && addr.neighborhood) enderecoBairro = addr.neighborhood;
+          if (!enderecoCidade && addr.city) enderecoCidade = addr.city;
+          if (!enderecoEstado && addr.state) enderecoEstado = addr.state;
+          if (!enderecoCep && addr.zipCode) enderecoCep = addr.zipCode;
         }
         
         const formToSet = {
@@ -1121,7 +1123,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       const { remanejamentoDataInicio, ...formRest } = form as any;
       const employeeData: any = {
         ...formRest,
-        salario: form.salario ? parseFloat(String(form.salario).replace(/\./g, '').replace(',', '.')) : 0
+        salario: (() => {
+          if (!form.salario) return 0;
+          const s = String(form.salario);
+          if (s.includes(',')) {
+            return parseFloat(s.replace(/\./g, '').replace(',', '.'));
+          }
+          return parseFloat(s);
+        })()
       };
       if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
         employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
@@ -1170,13 +1179,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   const resetForm = () => {
     if (funcionario) {
+      const addr = funcionario.address && typeof funcionario.address === 'object' ? funcionario.address as any : null;
       setForm({
         name: funcionario.name || '',
         cpf: funcionario.cpf || '',
         rg: funcionario.rg || '',
         email: funcionario.email || '',
         phone: funcionario.phone || '',
-        address: funcionario.address?.street || '',
+        address: addr?.street || (typeof funcionario.address === 'string' ? funcionario.address : '') || '',
         birthDate: funcionario.birthDate || '',
         maritalStatus: funcionario.maritalStatus || 'SINGLE',
         nationality: funcionario.nationality || 'Brasileiro',
@@ -1189,6 +1199,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         user: { id: funcionario.user?.id || '' },
         nomePai: funcionario.nomePai || '',
         nomeMae: funcionario.nomeMae || '',
+        // Campos de endereço separados
+        enderecoRua: (funcionario as any).enderecoRua || addr?.street || '',
+        enderecoNumero: (funcionario as any).enderecoNumero || addr?.number || '',
+        enderecoComplemento: (funcionario as any).enderecoComplemento || addr?.complement || '',
+        enderecoBairro: (funcionario as any).enderecoBairro || addr?.neighborhood || '',
+        enderecoCidade: (funcionario as any).enderecoCidade || addr?.city || '',
+        enderecoEstado: (funcionario as any).enderecoEstado || addr?.state || '',
+        enderecoCep: (funcionario as any).enderecoCep || addr?.zipCode || '',
         // Garantir que todos os campos sejam resetados ou mantidos conforme o funcionário
         cinNumero: (funcionario as any).cinNumero || '',
         cinOrgaoEmissor: (funcionario as any).cinOrgaoEmissor || '',
@@ -2058,13 +2076,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">Data de Nascimento</span>
                             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                           </Label>
-                <Input 
-                  name="birthDate" 
-                  type="date" 
-                  value={form.birthDate} 
-                  onChange={handleChange} 
-                  required 
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                <DatePicker 
+                  date={parseDateFromBackend(form.birthDate) || undefined} 
+                  onDateChange={(date) => setForm(prev => ({ ...prev, birthDate: formatDateForBackend(date) || '' }))} 
+                  className="h-10 sm:h-11"
                 />
               </div>
               <div>
@@ -2272,57 +2287,53 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                   />
                 </div>
                 <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Zona</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Zona</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
                   <Input 
                     name="tituloEleitorZona" 
                     value={form.tituloEleitorZona || ''} 
                     onChange={handleChange} 
                     placeholder="Ex: 316"
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                   />
                 </div>
                 <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Seção</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Seção</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
                   <Input 
                     name="tituloEleitorSecao" 
                     value={form.tituloEleitorSecao || ''} 
                     onChange={handleChange} 
                     placeholder="Ex: 0585"
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
+                    className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray placeholder:text-gray-400 focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11"
                   />
                 </div>
-                          <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Data de Expedição</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
-                            <Input
-                              name="tituloEleitorDataExpedicao"
-                              type="date"
-                              value={form.tituloEleitorDataExpedicao || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                              <span className="truncate">Validade</span>
-                              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
-                            </Label>
-                            <Input
-                              name="tituloEleitorValidade"
-                              type="date"
-                              value={form.tituloEleitorValidade || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                            />
-                          </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Data de Expedição</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
+                  <DatePicker
+                    date={parseDateFromBackend(form.tituloEleitorDataExpedicao) || undefined}
+                    onDateChange={(date) => setForm(prev => ({ ...prev, tituloEleitorDataExpedicao: formatDateForBackend(date) || '' }))}
+                    className="h-10 sm:h-11"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                    <span className="truncate">Validade</span>
+                    <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
+                  </Label>
+                  <DatePicker
+                    date={parseDateFromBackend(form.tituloEleitorValidade) || undefined}
+                    onDateChange={(date) => setForm(prev => ({ ...prev, tituloEleitorValidade: formatDateForBackend(date) || '' }))}
+                    className="h-10 sm:h-11"
+                  />
+                </div>
               </div>
             </div>
             
@@ -2400,14 +2411,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Validade da CNH</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                  <Input 
-                              name="cnhExpirationDate"
-                    type="date" 
-                              value={form.cnhExpirationDate || ''}
-                    onChange={handleChange} 
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                  />
-                </div>
+                            <DatePicker
+                              date={parseDateFromBackend(form.cnhExpirationDate) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, cnhExpirationDate: formatDateForBackend(date) || '' }))}
+                              className="h-10 sm:h-11"
+                            />
+                          </div>
 
                           {/* CTPS */}
                           <div>
@@ -2441,14 +2450,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Data de Emissão da CTPS</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="ctpsIssueDate"
-                              type="date"
-                              value={form.ctpsIssueDate || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.ctpsIssueDate) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, ctpsIssueDate: formatDateForBackend(date) || '' }))}
+                              className="h-10 sm:h-11"
                             />
-          </div>
+                          </div>
 
                           {/* CIN - Carteira de Identidade Nacional */}
                           <div>
@@ -2482,12 +2489,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <span className="truncate">Data de Emissão do CIN</span>
                               <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                             </Label>
-                            <Input
-                              name="cinDataEmissao"
-                              type="date"
-                              value={form.cinDataEmissao || ''}
-                              onChange={handleChange}
-                              className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                            <DatePicker
+                              date={parseDateFromBackend(form.cinDataEmissao) || undefined}
+                              onDateChange={(date) => setForm(prev => ({ ...prev, cinDataEmissao: formatDateForBackend(date) || '' }))}
+                              className="h-10 sm:h-11"
                             />
                           </div>
                         </div>
@@ -2548,15 +2553,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                                 <span className="truncate">Data de Nascimento do Cônjuge</span>
                                 <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                               </Label>
-                  <Input 
-                    name="spouseBirthDate" 
-                    type="date" 
-                                value={form.spouseBirthDate || ''}
-                    onChange={handleChange} 
-                                required
-                                className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                  />
-                </div>
+                              <DatePicker
+                                date={parseDateFromBackend(form.spouseBirthDate) || undefined}
+                                onDateChange={(date) => setForm(prev => ({ ...prev, spouseBirthDate: formatDateForBackend(date) || '' }))}
+                                className="h-10 sm:h-11"
+                              />
+                            </div>
                 <div>
                               <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
                                 <span className="truncate">Profissão do Cônjuge</span>
@@ -2886,33 +2888,19 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                          <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
-                <Input 
-                            name="exameMedicoData"
-                  type="date" 
-                            value={form.exameMedicoData || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoData: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-sm font-medium text-gray-200">Data Realizada</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.exameMedicoData) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoData: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
-                          <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
-                <Input 
-                            name="exameMedicoVencimento"
-                            type="date"
-                            value={form.exameMedicoVencimento || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoVencimento: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
-                />
-              </div>
-              <div>
-                          <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
-                <Input 
-                            name="exameMedicoVencimento"
-                            type="date"
-                            value={form.exameMedicoVencimento || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, exameMedicoVencimento: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-sm font-medium text-gray-200">Data de Vencimento</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.exameMedicoVencimento) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, exameMedicoVencimento: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
@@ -3075,13 +3063,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                          <Label className="text-sm font-medium text-gray-200">Validade</Label>
-                <Input 
-                            name="rneValidade"
-                  type="date" 
-                            value={form.rneValidade || ''}
-                            onChange={(e) => setForm(prev => ({ ...prev, rneValidade: e.target.value }))}
-                            className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-sm font-medium text-gray-200">Validade</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.rneValidade) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, rneValidade: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10"
                 />
               </div>
               <div>
@@ -3140,13 +3126,11 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                              <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
-                <Input 
-                                name="ricDataEmissao"
-                  type="date" 
-                                value={form.ricDataEmissao || ''}
-                                onChange={(e) => setForm(prev => ({ ...prev, ricDataEmissao: e.target.value }))}
-                                className="text-xs sm:text-sm h-9 sm:h-10"
+                <Label className="text-xs font-medium text-gray-300">Data Emissão</Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.ricDataEmissao) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, ricDataEmissao: formatDateForBackend(date) || '' }))}
+                  className="h-9 sm:h-10 w-full"
                 />
               </div>
             </div>
@@ -3202,17 +3186,14 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 />
               </div>
               <div>
-                          <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
-                            <span className="truncate">Data de Admissão</span>
-                            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
-                          </Label>
-                <Input 
-                            name="hireDate"
-                            type="date"
-                            value={form.hireDate}
-                  onChange={handleChange} 
-                            required
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
+                <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
+                  <span className="truncate">Data de Admissão</span>
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
+                </Label>
+                <DatePicker
+                  date={parseDateFromBackend(form.hireDate) || undefined}
+                  onDateChange={(date) => setForm(prev => ({ ...prev, hireDate: formatDateForBackend(date) || '' }))}
+                  className="h-10 sm:h-11 w-full"
                 />
               </div>
               <div>
@@ -3220,14 +3201,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                             <span className="truncate">Data de Demissão</span>
                             <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs ml-auto">Opcional</Badge>
                           </Label>
-                <Input 
-                            name="dataRescisao"
-                            type="date"
-                            value={form.dataRescisao || ''}
-                  onChange={handleChange} 
-                            className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11 [color-scheme:dark]"
-                />
-              </div>
+                          <DatePicker
+                            date={parseDateFromBackend(form.dataRescisao) || undefined}
+                            onDateChange={(date) => setForm(prev => ({ ...prev, dataRescisao: formatDateForBackend(date) || '' }))}
+                            className="h-10 sm:h-11 w-full"
+                          />
+                        </div>
                         {form.dataRescisao && (
                           <div className="md:col-span-2">
                             <Label className="text-sm font-medium text-gray-200 flex items-center gap-1.5 sm:gap-2 mb-1.5">
@@ -4386,11 +4365,10 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                 <Label className="text-sm font-medium text-gray-200 mb-1.5 block">
                   Data de início no novo setor <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  type="date"
-                  value={remanejamentoForm.dataInicio}
-                  onChange={(e) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: e.target.value }))}
-                  className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray"
+                <DatePicker
+                  date={parseDateFromBackend(remanejamentoForm.dataInicio) || undefined}
+                  onDateChange={(date) => setRemanejamentoForm(prev => ({ ...prev, dataInicio: formatDateForBackend(date) || '' }))}
+                  className="w-full"
                 />
               </div>
               <div>

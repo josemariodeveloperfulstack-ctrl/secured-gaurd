@@ -61,6 +61,16 @@ export const fiscalService = {
     return data;
   },
 
+  async analyze(file: File): Promise<{ clientName: string; periodMonth: number; periodYear: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post<{ clientName: string; periodMonth: number; periodYear: number }>(`${BASE}/analyze`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+
   async getById(id: string): Promise<FiscalInvoice> {
     const { data } = await api.get<FiscalInvoice>(`${BASE}/${id}`);
     return data;
