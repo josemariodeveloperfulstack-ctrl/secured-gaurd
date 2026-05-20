@@ -69,19 +69,25 @@ export default function ModuloFiscal() {
     setAnalyzing(true);
     try {
       const data = await fiscalService.analyze(file);
-      if (data.clientName) {
-        setUploadClientName(data.clientName);
-      }
+      // Sempre reflete o que o backend retornou (string vazia = não identificado)
+      setUploadClientName(data.clientName || '');
       if (data.periodMonth) {
         setUploadMonth(data.periodMonth);
       }
       if (data.periodYear) {
         setUploadYear(data.periodYear);
       }
-      toast({
-        title: 'Nota fiscal identificada!',
-        description: `Cliente: "${data.clientName}" | Período: ${data.periodMonth}/${data.periodYear}`,
-      });
+      if (data.clientName) {
+        toast({
+          title: 'Nota fiscal identificada!',
+          description: `Cliente: "${data.clientName}" | Período: ${data.periodMonth}/${data.periodYear}`,
+        });
+      } else {
+        toast({
+          title: 'Período identificado!',
+          description: `Cliente não identificado no PDF. Preencha manualmente. | Período: ${data.periodMonth}/${data.periodYear}`,
+        });
+      }
     } catch (err: any) {
       console.warn('Falha ao analisar PDF automaticamente:', err);
       toast({

@@ -224,8 +224,9 @@ public final class FiscalCnpjExtractor {
         }
 
         // Sanitização final do nome do cliente
+        // Retorna string vazia se não foi possível identificar — o frontend deixará o campo em branco
         if (clientName == null || clientName.trim().isBlank()) {
-            clientName = "Cliente Não Identificado";
+            clientName = "";
         } else {
             clientName = clientName.trim();
         }
@@ -319,7 +320,7 @@ public final class FiscalCnpjExtractor {
             }
         }
 
-        return "Cliente Não Identificado";
+        return "";
     }
 
     private static boolean isValidClientName(String name) {
