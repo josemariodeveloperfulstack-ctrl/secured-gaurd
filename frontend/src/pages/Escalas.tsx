@@ -231,7 +231,7 @@ const Escalas = () => {
         map[employeeId] = {
           nome: employeeName,
           cargo: '', // Pode ser preenchido se vier do backend
-          escalas: Array(7).fill({ turno: '', cliente: '', horario: '' }),
+          escalas: Array.from({ length: 7 }, () => ({ turno: '', cliente: '', horario: '' })),
         };
       }
       
@@ -315,8 +315,9 @@ const Escalas = () => {
     }
   };
 
-  const getTurnoCellClass = (turno: string) => {
+  const getTurnoCellClass = (turno: string | undefined | null) => {
     // Aceitar tanto valores em português quanto do backend
+    if (!turno) return '';
     const turnoLower = turno.toLowerCase();
     if (turnoLower === 'day' || turnoLower === 'diurno') {
       return 'bg-seguranca-yellow/30 text-seguranca-black';
