@@ -19,6 +19,10 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Cell;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.io.font.PdfEncodings;
+import com.itextpdf.io.font.constants.StandardFonts;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
@@ -278,7 +282,7 @@ public class StandardReportLayoutService {
                 service.addHeader(canvasLayout, pageSize, company, config, pdfDoc);
                 int pageNum = pdfDoc.getPageNumber(page);
                 int totalPages = pdfDoc.getNumberOfPages();
-                service.addFooter(canvasLayout, pageSize, company, config, pageNum, totalPages);
+                service.addFooter(canvasLayout, pageSize, company, config, pageNum, totalPages, pdfDoc);
 
                 canvasLayout.close();
                 headerFooterCanvas.release();
@@ -368,45 +372,95 @@ public class StandardReportLayoutService {
      * @param pageNum número da página atual (1-based)
      * @param totalPages total de páginas (pode ser aproximado durante a geração)
      */
+    private PdfFont loadCalibriLightFont(PdfDocument pdfDoc) {
+        try {
+            // Tenta caminhos comuns de Calibri Light (.ttf)
+            String[] paths = {
+                "C:\\Windows\\Fonts\\calibril.ttf", // Windows
+                "/usr/share/fonts/truetype/msttcorefonts/calibril.ttf", // Linux standard
+                "/usr/share/fonts/truetype/microsoft/calibril.ttf",
+                "/usr/share/fonts/truetype/calibri/calibril.ttf"
+            };
+            for (String path : paths) {
+                if (java.nio.file.Files.exists(java.nio.file.Paths.get(path))) {
+                    return PdfFontFactory.createFont(path, PdfEncodings.IDENTITY_H, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Calibri Light font could not be loaded, falling back to Helvetica: {}", e.getMessage());
+        }
+        try {
+            return PdfFontFactory.createFont(StandardFonts.HELVETICA);
+        } catch (Exception e) {
+            log.error("Failed to load fallback font HELVETICA: {}", e.getMessage());
+            return null;
+        }
+    }
+
     private void addFooter(Canvas canvas, Rectangle pageSize, Company company, ReportLayoutConfig config,
-            int pageNum, int totalPages) {
+            int pageNum, int totalPages, PdfDocument pdfDoc) {
         float pageWidth = pageSize.getWidth();
         float yPosition = 0;
 
         // Informações da empresa no rodapé (retrato e paisagem — dados da vigilância/empresa)
         // O rodapé deve ficar acima da linha gradiente (4pt de altura)
 
+        boolean removeBold = config.isRemoveBoldFromFooterCompanyName();
+        boolean useCalibriLight = config.isUseCalibriLightFooter();
+        float nameSize = useCalibriLight ? config.getFooterCompanyNameFontSize() : 9f;
+        float addressSize = useCalibriLight ? 9f : 8f;
+        float cnpjSize = useCalibriLight ? 9f : 8f;
+
+        PdfFont footerFont = null;
+        if (useCalibriLight) {
+            footerFont = loadCalibriLightFont(pdfDoc);
+        }
+
         // Primeira linha: Nome da empresa (centralizado)
         if (company.getName() != null && !company.getName().isEmpty()) {
             Paragraph companyNameFooter = new Paragraph(company.getName())
-                    .setFontSize(9)
-                    .setBold()
+                    .setFontSize(nameSize)
                     .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(companyNameFooter.setFixedPosition(12f, yPosition + 30f, pageWidth));
+            if (!removeBold) {
+                companyNameFooter.setBold();
+            }
+            if (footerFont != null) {
+                companyNameFooter.setFont(footerFont);
+            }
+            float yPos = useCalibriLight ? yPosition + 37f : yPosition + 30f;
+            canvas.add(companyNameFooter.setFixedPosition(12f, yPos, pageWidth));
         }
 
         // Segunda linha: Endereço completo
         String address = CompanyDataFormatter.formatFullAddress(company);
         if (!address.isEmpty()) {
             Paragraph addressFooter = new Paragraph(address)
-                    .setFontSize(8)
+                    .setFontSize(addressSize)
                     .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(addressFooter.setFixedPosition(12f, yPosition + 20f, pageWidth));
+            if (footerFont != null) {
+                addressFooter.setFont(footerFont);
+            }
+            float yPos = useCalibriLight ? yPosition + 23f : yPosition + 20f;
+            canvas.add(addressFooter.setFixedPosition(12f, yPos, pageWidth));
         }
 
         // Terceira linha: CNPJ
         String cnpjText = CompanyDataFormatter.formatCnpjForHeader(company);
         if (!cnpjText.isEmpty()) {
             Paragraph cnpjFooter = new Paragraph(cnpjText)
-                    .setFontSize(8)
+                    .setFontSize(cnpjSize)
                     .setTextAlignment(TextAlignment.LEFT)
                     .setFontColor(DeviceRgb.BLACK)
                     .setMarginBottom(0f);
-            canvas.add(cnpjFooter.setFixedPosition(12f, yPosition + 10f, pageWidth));
+            if (footerFont != null) {
+                cnpjFooter.setFont(footerFont);
+            }
+            float yPos = useCalibriLight ? yPosition + 10f : yPosition + 10f;
+            canvas.add(cnpjFooter.setFixedPosition(12f, yPos, pageWidth));
         }
 
         // Bloco direito: usuário e data da geração (acima da numeração), alinhado à direita

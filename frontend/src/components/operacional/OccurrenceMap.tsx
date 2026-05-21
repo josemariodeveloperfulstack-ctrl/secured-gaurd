@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Occurrence, occurrenceService } from '@/services/occurrenceService';
+import { employeeService } from '@/services/employeeService';
 import OcorrenciaMapaFormModal from './OcorrenciaMapaFormModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -65,7 +66,37 @@ const OccurrenceMap: React.FC = () => {
     setIsLoading(true);
     try {
       const data = await occurrenceService.getOccurrences();
-      setOccurrences(data);
+      
+      let enrichedData = data || [];
+      if (enrichedData.length > 0) {
+        try {
+          const employees = await employeeService.getSimpleEmployees().catch(() => []);
+          
+          enrichedData = enrichedData.map(occ => {
+            let empName = occ.employeeName;
+            if (!empName && occ.employeeId) {
+              const emp = employees.find(e => e.id === String(occ.employeeId));
+              if (emp) empName = emp.name;
+            }
+
+            let subName = occ.substituteName;
+            if (!subName && occ.substituteId) {
+              const sub = employees.find(e => e.id === String(occ.substituteId));
+              if (sub) subName = sub.name;
+            }
+
+            return {
+              ...occ,
+              employeeName: empName || occ.employeeName,
+              substituteName: subName || occ.substituteName
+            };
+          });
+        } catch (e) {
+          console.error('Erro ao enriquecer dados de ocorrências:', e);
+        }
+      }
+
+      setOccurrences(enrichedData);
     } catch (error) {
       console.error('Erro ao carregar mapa de ocorrências:', error);
       toast({

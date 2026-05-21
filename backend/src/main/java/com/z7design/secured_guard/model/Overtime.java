@@ -9,6 +9,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.z7design.secured_guard.model.enums.OvertimeStatus;
 import com.z7design.secured_guard.model.enums.OvertimeType;
 
@@ -46,6 +47,7 @@ public class Overtime {
     @NotNull(message = "Employee is required")
     @ManyToOne
     @JoinColumn(name = "employee_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Employee employee;
     
     @NotNull(message = "Overtime date is required")
@@ -92,6 +94,7 @@ public class Overtime {
 
     @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @JoinColumn(name = "work_post_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private WorkPost workPost;
 
     @ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)

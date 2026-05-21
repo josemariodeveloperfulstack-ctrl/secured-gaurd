@@ -318,18 +318,21 @@ public class ScheduleService {
         }
     }
 
+    @Transactional(readOnly = true)
     public ScheduleDTO findById(UUID id) {
         Schedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Schedule not found with id: " + id));
         return toDTO(schedule);
     }
 
+    @Transactional(readOnly = true)
     public List<ScheduleDTO> findByEmployeeIdDTO(UUID employeeId) {
         return scheduleRepository.findByEmployeeId(employeeId).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<ScheduleDTO> findByDateDTO(LocalDate date) {
         return scheduleRepository.findByScheduleDate(date).stream()
                 .map(this::toDTO)

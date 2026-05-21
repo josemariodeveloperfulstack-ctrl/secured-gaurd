@@ -20,7 +20,8 @@ import {
   MapPin,
   Calendar,
   User,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { TransportGuide, CreateTransportGuideDTO } from '@/types/transportGuide';
 import TransportGuidePDFGenerator from './TransportGuidePDFGenerator';
@@ -68,6 +69,8 @@ const TransportGuideModal: React.FC<TransportGuideModalProps> = ({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjFound, setCnpjFound] = useState(false);
 
   const {
     register,
@@ -169,7 +172,37 @@ const TransportGuideModal: React.FC<TransportGuideModalProps> = ({
     }
   };
 
-  // Aplicar máscara de CNPJ
+  // Busca dados da empresa pelo CNPJ na API pública ReceitaWS
+  const fetchEmpresaByCnpj = async (cnpj: string) => {
+    const digits = cnpj.replace(/\D/g, '');
+    if (digits.length !== 14) return;
+    setCnpjLoading(true);
+    setCnpjFound(false);
+    try {
+      const response = await fetch(`https://receitaws.com.br/v1/cnpj/${digits}`, {
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error('CNPJ não encontrado');
+      const data = await response.json();
+      if (data.status === 'ERROR') throw new Error(data.message || 'CNPJ inválido');
+      const nome = data.nome || data.fantasia || '';
+      if (nome) {
+        setValue('empresa', nome);
+        setCnpjFound(true);
+        toast({ title: 'Empresa encontrada!', description: nome });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'CNPJ não encontrado',
+        description: 'Preencha o nome da empresa manualmente.',
+        variant: 'default'
+      });
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
+
+  // Aplica máscara de CNPJ e dispara busca quando completo
   const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length <= 14) {
@@ -179,6 +212,12 @@ const TransportGuideModal: React.FC<TransportGuideModalProps> = ({
       value = value.replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4');
       value = value.replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5');
       setValue('cnpj', value);
+      // Buscar empresa automaticamente quando CNPJ estiver completo
+      if (value.replace(/\D/g, '').length === 14) {
+        fetchEmpresaByCnpj(value);
+      } else {
+        setCnpjFound(false);
+      }
     }
   };
 
@@ -217,12 +256,24 @@ const TransportGuideModal: React.FC<TransportGuideModalProps> = ({
 
               <div className="space-y-2">
                 <Label htmlFor="empresa" className="text-sm font-medium">Empresa/Filial *</Label>
-                <Input
-                  id="empresa"
-                  placeholder="Nome da empresa ou filial"
-                  {...register('empresa')}
-                  className="h-10"
-                />
+                <div className="relative">
+                  <Input
+                    id="empresa"
+                    placeholder={cnpjLoading ? 'Buscando empresa...' : 'Nome da empresa ou filial'}
+                    {...register('empresa')}
+                    readOnly={cnpjLoading}
+                    className={`h-10 pr-9 ${cnpjFound ? 'border-green-500 focus-visible:ring-green-500' : ''}`}
+                  />
+                  {cnpjLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                  {cnpjFound && !cnpjLoading && (
+                    <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                  )}
+                </div>
+                {cnpjFound && (
+                  <p className="text-xs text-green-500">✓ Empresa identificada automaticamente</p>
+                )}
                 {errors.empresa && (
                   <p className="text-red-500 text-xs mt-1">{errors.empresa.message}</p>
                 )}

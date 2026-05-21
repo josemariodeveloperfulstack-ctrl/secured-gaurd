@@ -126,4 +126,22 @@ public class ReportLayoutConfig {
      * Opcional; se null ou vazio, a linha não é desenhada.
      */
     private String footerReportAt;
+
+    /**
+     * Se deve remover o negrito do nome da empresa no rodapé
+     */
+    @Builder.Default
+    private boolean removeBoldFromFooterCompanyName = false;
+
+    /**
+     * Se deve usar a fonte Calibri Light no rodapé
+     */
+    @Builder.Default
+    private boolean useCalibriLightFooter = false;
+
+    /**
+     * Tamanho da fonte do nome da empresa no rodapé
+     */
+    @Builder.Default
+    private float footerCompanyNameFontSize = 9f;
 }

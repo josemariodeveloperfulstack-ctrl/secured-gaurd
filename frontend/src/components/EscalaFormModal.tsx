@@ -930,69 +930,61 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
             </div>
             <EmployeeCombobox
               value={String(formData.employeeId || '')}
-              onChange={async (id) => {
+              onChange={(id) => {
                 handleInputChange('employeeId', id);
-                if (id) {
+                if (!id) {
+                  // Limpar os campos dependentes se o funcionário for removido
+                  setFormData(prev => ({ ...prev, locationId: '', workPostId: '' }));
+                  setSelectedClientId('');
                   setDisplayEmployeeName('');
-                  
-                  try {
-                    // Buscar detalhes do funcionário para auto-preencher Cliente e Posto
-                    const emp = await employeeService.getEmployeeById(id);
-                    if (emp) {
-                      if (emp.name) setDisplayEmployeeName(emp.name);
-                      
-                      // Buscar o posto sugerido
-                      const wpId = emp.workPostId || emp.workPost?.id;
-                      if (wpId) {
-                        const wpIdStr = String(wpId);
-                        
-                        // Tentar pegar do cache local ou buscar api
-                        let workPost = postosTrabalho.find(wp => String(wp.id) === wpIdStr);
-                        if (!workPost) {
-                          try {
-                            const { workPostService } = await import('@/services/workPostService');
-                            workPost = await workPostService.getWorkPostById(wpIdStr);
-                            if (workPost) ensureWorkPostInList(workPost);
-                          } catch (e) { console.error(e); }
-                        }
-
-                        if (workPost) {
-                          const clientIdStr = String(workPost.clientId);
-                          console.log('🚀 Auto-populando Escala:', { client: clientIdStr, post: wpIdStr });
-                          
-                          setSelectedClientId(clientIdStr);
-                          
-                          // Atualizar múltiplos campos de uma vez
-                          setFormData(prev => ({
-                            ...prev,
-                            employeeId: id,
-                            locationId: wpIdStr,
-                            workPostId: wpIdStr,
-                            // Se for novo, sugerir horários do posto
-                            shift: prev.shift || (workPost?.type === '12H_NOTURNO' ? 'NIGHT' : 'DAY'),
-                            startTime: prev.startTime || workPost?.shiftStart || '',
-                            endTime: prev.endTime || workPost?.shiftEnd || '',
-                            sigla: prev.sigla || 'PL'
-                          }));
-
-                          if (workPost.clientName) setDisplayClientName(workPost.clientName);
-                          
-                          // Limpar erros
-                          setErrors(prev => ({ 
-                            ...prev, 
-                            employeeId: undefined,
-                            locationId: undefined, 
-                            workPostId: undefined 
-                          }));
-                          return; // Interromper para não sobrescrever o setFormData abaixo
-                        }
-                      }
-                    }
-                  } catch (error) {
-                    console.error('Erro ao buscar detalhes do funcionário:', error);
-                  }
                 }
                 if (errors.employeeId) setErrors((prev) => ({ ...prev, employeeId: undefined }));
+              }}
+              onEmployeeSelect={async (emp) => {
+                if (emp.name) setDisplayEmployeeName(emp.name);
+                
+                // Em SimpleEmployee, a interface pode ter apenas workPostId, não workPost
+                const wpIdStr = String(emp.workPostId || (emp as any).workPost?.id || '');
+                if (wpIdStr) {
+                  let workPost = postosTrabalho.find(wp => String(wp.id) === wpIdStr);
+                  if (!workPost) {
+                    try {
+                      const { workPostService } = await import('@/services/workPostService');
+                      workPost = await workPostService.getWorkPostById(wpIdStr);
+                      if (workPost) ensureWorkPostInList(workPost);
+                    } catch (e) { console.error(e); }
+                  }
+
+                  if (workPost) {
+                    const clientIdStr = String(workPost.clientId);
+                    console.log('🚀 Auto-populando Escala com onEmployeeSelect:', { client: clientIdStr, post: wpIdStr });
+                    
+                    setSelectedClientId(clientIdStr);
+                    
+                    setFormData(prev => ({
+                      ...prev,
+                      locationId: wpIdStr,
+                      workPostId: wpIdStr,
+                      shift: workPost?.type === '12H_NOTURNO' ? 'NIGHT' : 'DAY',
+                      startTime: workPost?.shiftStart || '',
+                      endTime: workPost?.shiftEnd || '',
+                      sigla: prev.sigla || 'PL'
+                    }));
+
+                    if (workPost.clientName) setDisplayClientName(workPost.clientName);
+                    
+                    setErrors(prev => ({ 
+                      ...prev, 
+                      employeeId: undefined,
+                      locationId: undefined, 
+                      workPostId: undefined 
+                    }));
+                  }
+                } else {
+                  // Limpar se o funcionário não tem posto de trabalho
+                  setFormData(prev => ({ ...prev, locationId: '', workPostId: '' }));
+                  setSelectedClientId('');
+                }
               }}
               disabled={mode === 'view'}
               minChars={3}
@@ -1125,29 +1117,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
                     }}
                     disabled={(date) => isBefore(startOfDay(date), startOfDay(new Date()))}
                     initialFocus
-                    className="rounded-md border-0"
-                    classNames={{
-                      months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-                      month: "space-y-4",
-                      caption: "flex justify-center pt-1 relative items-center text-seguranca-lightgray",
-                      caption_label: "text-sm font-medium",
-                      nav: "space-x-1 flex items-center",
-                      nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 text-seguranca-lightgray hover:bg-seguranca-black rounded-md",
-                      nav_button_previous: "absolute left-1",
-                      nav_button_next: "absolute right-1",
-                      table: "w-full border-collapse space-y-1",
-                      head_row: "flex",
-                      head_cell: "text-gray-400 rounded-md w-9 font-normal text-[0.8rem]",
-                      row: "flex w-full mt-2",
-                      cell: "text-center text-sm p-0 relative [&:has([aria-selected])]:bg-seguranca-yellow/20 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                      day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-seguranca-black rounded-md text-seguranca-lightgray",
-                      day_selected: "bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow hover:text-seguranca-black focus:bg-seguranca-yellow focus:text-seguranca-black",
-                      day_today: "bg-seguranca-graphite text-seguranca-yellow font-semibold",
-                      day_outside: "text-gray-500 opacity-50",
-                      day_disabled: "text-gray-500 opacity-30 cursor-not-allowed",
-                      day_range_middle: "aria-selected:bg-seguranca-yellow/20 aria-selected:text-seguranca-lightgray",
-                      day_hidden: "invisible",
-                    }}
+                    className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>

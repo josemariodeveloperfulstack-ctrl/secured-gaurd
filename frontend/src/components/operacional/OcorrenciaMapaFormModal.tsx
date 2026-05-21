@@ -10,6 +10,7 @@ import { occurrenceService, CreateOccurrenceRequest, Occurrence } from '@/servic
 import { employeeService, Employee } from '@/services/employeeService';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { Clock, MapPin, AlertCircle } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
 
 interface OcorrenciaMapaFormModalProps {
   isOpen: boolean;
@@ -104,6 +105,25 @@ const OcorrenciaMapaFormModal: React.FC<OcorrenciaMapaFormModalProps> = ({
     }
   };
 
+  // Cálculo automático do total de horas
+  useEffect(() => {
+    if (formData.substituteStartTime && formData.substituteEndTime) {
+      const [startHours, startMinutes] = formData.substituteStartTime.split(':').map(Number);
+      const [endHours, endMinutes] = formData.substituteEndTime.split(':').map(Number);
+
+      if (!isNaN(startHours) && !isNaN(startMinutes) && !isNaN(endHours) && !isNaN(endMinutes)) {
+        let totalMinutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
+        if (totalMinutes < 0) {
+          totalMinutes += 24 * 60; // Passou da meia-noite
+        }
+        
+        const hours = totalMinutes / 60;
+        // Arredondar para duas casas decimais
+        setFormData(prev => ({ ...prev, totalHours: Math.round(hours * 100) / 100 }));
+      }
+    }
+  }, [formData.substituteStartTime, formData.substituteEndTime]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.employeeId || !formData.date || !formData.type) {
@@ -158,10 +178,9 @@ const OcorrenciaMapaFormModal: React.FC<OcorrenciaMapaFormModalProps> = ({
             {/* Linha 1: Data e Tipo */}
             <div className="space-y-2">
               <Label className="text-slate-400">Data da Ocorrência</Label>
-              <Input 
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              <DatePicker
+                date={formData.date ? new Date(`${formData.date}T12:00:00`) : undefined}
+                onDateChange={(date) => setFormData(prev => ({ ...prev, date: date ? date.toISOString().split('T')[0] : '' }))}
                 className="bg-slate-950 border-slate-800 text-white"
               />
             </div>
