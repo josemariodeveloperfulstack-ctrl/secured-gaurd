@@ -93,6 +93,8 @@ interface MessageState {
     error: string | null;
     searchTerm: string;
     typingUsers: Set<string>;
+    isFloatingChatOpen: boolean;
+    latestIncomingChatMessage: ChatMessage | null;
 
     // WebSocket connection
     wsConnection: WebSocketConnection | null;
@@ -121,6 +123,8 @@ interface MessageState {
 
     setWsConnection: (connection: WebSocketConnection | null) => void;
     setIsConnected: (connected: boolean) => void;
+    setIsFloatingChatOpen: (isOpen: boolean) => void;
+    setLatestIncomingChatMessage: (msg: ChatMessage | null) => void;
 
     // Computed getters
     getUnreadChatCount: () => number;
@@ -144,6 +148,8 @@ export const useMessageStore = create<MessageState>()(
             typingUsers: new Set(),
             wsConnection: null,
             isConnected: false,
+            isFloatingChatOpen: false,
+            latestIncomingChatMessage: null,
 
             // Actions
             setConversations: (conversations) => {
@@ -279,9 +285,25 @@ export const useMessageStore = create<MessageState>()(
                     updatedConversations = conversations;
                 }
                 
+                // Se a mensagem for de outro usuário, definir como latestIncomingChatMessage se não estiver visualizando no momento
+                const currentUser = state.getCurrentUser();
+                const isFromOtherUser = currentUser && message.sender && message.sender.id !== currentUser.id;
+                let latestIncomingChatMessage = state.latestIncomingChatMessage;
+                
+                if (isFromOtherUser) {
+                    const isChatOpenAndFocused = 
+                        (state.selectedConversation?.id === conversationId && 
+                         (state.isFloatingChatOpen || window.location.pathname.includes('/chat')));
+                    
+                    if (!isChatOpenAndFocused) {
+                        latestIncomingChatMessage = message;
+                    }
+                }
+
                 return {
                     chatMessages: updatedMessages,
-                    conversations: updatedConversations
+                    conversations: updatedConversations,
+                    latestIncomingChatMessage
                 };
             }),
 
@@ -386,6 +408,8 @@ export const useMessageStore = create<MessageState>()(
 
             setWsConnection: (connection) => set({ wsConnection: connection }),
             setIsConnected: (connected) => set({ isConnected: connected }),
+            setIsFloatingChatOpen: (isOpen) => set({ isFloatingChatOpen: isOpen }),
+            setLatestIncomingChatMessage: (msg) => set({ latestIncomingChatMessage: msg }),
 
             // Computed getters
             getUnreadChatCount: () => {

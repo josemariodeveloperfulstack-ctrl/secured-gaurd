@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -24,6 +25,10 @@ public class ClientContractRequest {
     private String clientPhone;
     private String clientEmail;
 
+    // Representante Legal do Cliente
+    private String representativeName;
+    private String representativeCpf;
+
     // Dados do Contrato
     private String contractNumber;
     private String description;
@@ -38,4 +43,17 @@ public class ClientContractRequest {
 
     private String city; // Cidade para data
     private LocalDate contractDate; // Data do contrato
+
+    // Campos das Minutas Comerciais
+    private String contractTemplate; // ADMINISTRATIVO, VIGILANCIA_PATRIMONIAL, COMBINADO
+    private String contractedCompanyCnpj; // CNPJ da empresa promotora
+    private Integer replacementTimeHours; // Tempo de reposição de efetivo
+    private Integer maxAbsenceMinutes; // Ausência máxima permitida
+    private String patrolFrequency; // Frequência de rondas
+    private String obligationsContractor; // Obrigações do contratado
+    private String obligationsContracted; // Obrigações do contratante
+    private String penalties; // Penalidades
+    private List<UUID> workPostIds; // IDs dos postos de trabalho a vincular
+    private BigDecimal monthlyValue; // Valor mensal do contrato
 }
+

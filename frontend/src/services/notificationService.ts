@@ -441,6 +441,76 @@ class NotificationService {
     const response = await api.post('/notifications', notificationData);
     return response.data;
   }
+
+  /**
+   * Notifica aprovadores quando o Almoxarifado cria uma nova Requisição de Compra.
+   * Envia notificação in-app para cada aprovador + email best-effort.
+   */
+  async notifyNewPurchaseRequest(params: {
+    requesterName: string;
+    title: string;
+    quantity?: number;
+    category?: string;
+  }): Promise<void> {
+    const APPROVER_ROLES = [
+      'SUPRIMENTOS', 'ANALISTA_SUPRIMENTOS', 'ADMIN', 'SUPER_ADMIN',
+      'GESTOR', 'GESTOR_OPERACIONAL', 'FINANCEIRO',
+    ];
+
+    try {
+      // Importação dinâmica para evitar circular dependency
+      const { userService: us } = await import('@/services/userService');
+      const allUsers = await us.getAllUsers();
+
+      const approverUsers = allUsers.filter(u =>
+        u.active &&
+        u.roles.some(r => APPROVER_ROLES.includes(r.replace(/^ROLE_/, '').toUpperCase()))
+      );
+
+      if (approverUsers.length === 0) return;
+
+      const titulo = `🛒 Nova Requisição de Compra — ${params.title}`;
+      const descricao = `${params.requesterName} (Almoxarifado) criou uma nova requisição de compra.` +
+        (params.quantity ? ` Quantidade: ${params.quantity}.` : '') +
+        (params.category ? ` Categoria: ${params.category}.` : '') +
+        ` Acesse o módulo de Compras para analisar e aprovar.`;
+
+      const panelPromises = approverUsers.map(u =>
+        api.post('/api/notifications', {
+          titulo,
+          descricao,
+          tipo: 'nova_requisicao_compra',
+          prioridade: 'alta',
+          destinatarioId: u.id,
+          destinatario: u.email,
+        }).catch(() => { /* best-effort */ })
+      );
+
+      const emailPromises = approverUsers
+        .filter(u => u.email)
+        .map(u =>
+          this.sendEmailNotification({
+            to: u.email,
+            subject: titulo,
+            body: `
+              <h2>Nova Requisição de Compra</h2>
+              <p><strong>Solicitante:</strong> ${params.requesterName} (Almoxarifado)</p>
+              <p><strong>Item:</strong> ${params.title}</p>
+              ${params.quantity ? `<p><strong>Quantidade:</strong> ${params.quantity}</p>` : ''}
+              ${params.category ? `<p><strong>Categoria:</strong> ${params.category}</p>` : ''}
+              <br/>
+              <p>Acesse o sistema SecuredGuard &rarr; Compras &rarr; Requisições para analisar e aprovar.</p>
+              <p><em>Notificação automática do sistema SecuredGuard.</em></p>
+            `,
+            priority: 'alta',
+          }).catch(() => { /* best-effort */ })
+        );
+
+      await Promise.allSettled([...panelPromises, ...emailPromises]);
+    } catch (error) {
+      console.warn('[notifyNewPurchaseRequest] Notificação falhou (non-blocking):', error);
+    }
+  }
 }
 
 export const notificationService = new NotificationService(); 

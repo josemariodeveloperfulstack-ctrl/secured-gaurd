@@ -55,24 +55,24 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
   ];
 
   return (
-    <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-seguranca-graphite rounded-lg border border-gray-600">
-      <div className="flex items-center gap-2">
-        <Filter className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-yellow" />
-        <span className="text-xs sm:text-sm font-medium text-seguranca-lightgray">Filtros:</span>
+    <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4 p-4 bg-[#121212] border-2 border-zinc-800 rounded-none font-mono">
+      <div className="flex items-center gap-2 border-r-2 border-zinc-800 pr-3">
+        <Filter className="h-4 w-4 text-yellow-500" />
+        <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Filtros:</span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         {/* Filtro por Origem */}
         {onOriginFilterChange && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 hidden sm:inline">Origem:</span>
+            <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider hidden sm:inline">Origem::</span>
             <Select value={originFilter} onValueChange={onOriginFilterChange}>
-              <SelectTrigger className="w-full min-w-[120px] sm:w-40 bg-seguranca-black border-gray-600 text-seguranca-lightgray text-xs sm:text-sm">
+              <SelectTrigger className="w-full min-w-[120px] sm:w-40 bg-black border-2 border-zinc-800 text-white placeholder-zinc-700 rounded-none text-xs h-9 uppercase font-bold tracking-wider">
                 <SelectValue placeholder="Origem" />
               </SelectTrigger>
-              <SelectContent className="bg-seguranca-graphite border-gray-600">
+              <SelectContent className="bg-[#121212] border-2 border-zinc-800 rounded-none text-white font-mono">
                 {originOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  <SelectItem key={opt.value} value={opt.value} className="hover:bg-zinc-800 uppercase text-xs font-bold">{opt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -81,17 +81,17 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
 
         {/* Filtro por Status */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 hidden sm:inline">Status:</span>
+          <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider hidden sm:inline">Status::</span>
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger className="w-full min-w-[120px] sm:w-40 bg-seguranca-black border-gray-600 text-seguranca-lightgray text-xs sm:text-sm">
+            <SelectTrigger className="w-full min-w-[120px] sm:w-40 bg-black border-2 border-zinc-800 text-white placeholder-zinc-700 rounded-none text-xs h-9 uppercase font-bold tracking-wider">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
-            <SelectContent className="bg-seguranca-graphite border-gray-600">
+            <SelectContent className="bg-[#121212] border-2 border-zinc-800 rounded-none text-white font-mono">
               {statusOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+                <SelectItem key={option.value} value={option.value} className="hover:bg-zinc-800 uppercase text-xs font-bold">
                   <div className="flex items-center gap-2">
                     {option.color && (
-                      <div className={`w-2 h-2 rounded-full ${option.color}`} />
+                      <div className={`w-2 h-2 rounded-none border border-zinc-800 ${option.color}`} />
                     )}
                     <span>{option.label}</span>
                   </div>
@@ -103,10 +103,10 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
 
         {/* Indicador de contratos encontrados */}
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="border-gray-500 text-gray-300 text-xs">
+          <span className="border-2 border-zinc-700 bg-zinc-900 text-zinc-400 font-bold uppercase tracking-wider text-[10px] px-2 py-1 rounded-none">
             <span className="hidden sm:inline">{filteredContracts} de {totalContracts} contratos</span>
             <span className="sm:hidden">{filteredContracts}/{totalContracts}</span>
-          </Badge>
+          </span>
         </div>
 
         {/* Botão para limpar filtros */}
@@ -115,9 +115,8 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
             variant="ghost"
             size="sm"
             onClick={onClearFilters}
-            className="text-gray-400 hover:text-white hover:bg-seguranca-black text-xs sm:text-sm"
+            className="border-2 border-zinc-700 text-zinc-400 bg-transparent hover:bg-zinc-700 hover:text-white rounded-none h-9 px-3 font-bold uppercase tracking-wider text-xs transition-colors"
           >
-            <X className="h-3 w-3 mr-1" />
             <span className="hidden sm:inline">Limpar Filtros</span>
             <span className="sm:hidden">Limpar</span>
           </Button>
@@ -130,10 +129,10 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
           variant={statusFilter === 'ACTIVE' ? 'default' : 'outline'}
           size="sm"
           onClick={() => onStatusFilterChange(statusFilter === 'ACTIVE' ? 'all' : 'ACTIVE')}
-          className={`text-xs flex-shrink-0 ${
+          className={`text-xs font-bold uppercase tracking-wider rounded-none h-9 px-3 transition-all active:scale-[0.98] ${
             statusFilter === 'ACTIVE' 
-              ? 'bg-green-500 hover:bg-green-600 text-white' 
-              : 'border-green-500 text-green-400 hover:bg-green-500/20'
+              ? 'bg-green-500 hover:bg-green-600 text-black border-2 border-green-500' 
+              : 'border-2 border-green-500/30 text-green-500 bg-transparent hover:bg-green-500/10'
           }`}
         >
           Ativos
@@ -143,10 +142,10 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
           variant={statusFilter === 'PENDING' ? 'default' : 'outline'}
           size="sm"
           onClick={() => onStatusFilterChange(statusFilter === 'PENDING' ? 'all' : 'PENDING')}
-          className={`text-xs flex-shrink-0 ${
+          className={`text-xs font-bold uppercase tracking-wider rounded-none h-9 px-3 transition-all active:scale-[0.98] ${
             statusFilter === 'PENDING' 
-              ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
-              : 'border-yellow-500 text-yellow-400 hover:bg-yellow-500/20'
+              ? 'bg-yellow-500 hover:bg-yellow-600 text-black border-2 border-yellow-500' 
+              : 'border-2 border-yellow-500/30 text-yellow-500 bg-transparent hover:bg-yellow-500/10'
           }`}
         >
           Pendentes
@@ -156,13 +155,13 @@ export const ContractsFilters: React.FC<ContractsFiltersProps> = ({
           variant={expiringFilter !== 'all' ? 'default' : 'outline'}
           size="sm"
           onClick={() => onExpiringFilterChange?.(expiringFilter === '30' ? 'all' : '30')}
-          className={`text-xs flex-shrink-0 whitespace-nowrap ${
+          className={`text-xs font-bold uppercase tracking-wider whitespace-nowrap rounded-none h-9 px-3 transition-all active:scale-[0.98] ${
             expiringFilter === '30'
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'border-red-500 text-red-400 hover:bg-red-500/20'
+              ? 'bg-red-500 hover:bg-red-600 text-white border-2 border-red-500'
+              : 'border-2 border-red-500/30 text-red-500 bg-transparent hover:bg-red-500/10'
           }`}
         >
-          <Calendar className="h-3 w-3 mr-1" />
+          <Calendar className="h-3.5 w-3.5 mr-1" />
           <span className="hidden md:inline">Vencendo (30d)</span>
           <span className="md:hidden">Venc.</span>
         </Button>

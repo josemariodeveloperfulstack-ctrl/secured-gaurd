@@ -105,6 +105,12 @@ export interface CreatePurchaseRequestRequest {
   unitId?: string;
   requesterId?: string;
   approverId?: string;
+  // Campos de item
+  quantity?: number;
+  unitOfMeasure?: string;
+  category?: string;
+  size?: string;
+  itemNumber?: string;
 }
 
 export interface UpdatePurchaseRequestRequest extends CreatePurchaseRequestRequest {

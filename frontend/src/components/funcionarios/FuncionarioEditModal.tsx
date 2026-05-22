@@ -248,7 +248,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
   const [pendingWorkPostId, setPendingWorkPostId] = useState<string>('');
   const [remanejamentoForm, setRemanejamentoForm] = useState({ dataInicio: '', escalaTrabalho: '', horarioTrabalho: '' });
 
-  const loadEmployeeDependents = async (employeeId: string | undefined) => {
+  const loadEmployeeDependents = async (employeeId: string | undefined, keepOnError = false) => {
     const raw = String(employeeId ?? '').trim();
     if (!raw) {
       setEmployeeDependents([]);
@@ -266,9 +266,16 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     try {
       const list = await dependentService.getDependentsByEmployee(raw);
       setEmployeeDependents(Array.isArray(list) ? list : []);
-    } catch (err) {
-      console.error('Erro ao carregar dependentes:', err);
-      setEmployeeDependents([]);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 500) {
+        // Backend serialization error — dependente provavelmente foi salvo
+        console.warn('[dependentes] GET retornou 500 — backend issue (mantém lista atual):', err);
+        if (!keepOnError) setEmployeeDependents([]);
+      } else {
+        console.error('Erro ao carregar dependentes:', err);
+        if (!keepOnError) setEmployeeDependents([]);
+      }
     } finally {
       setLoadingDependents(false);
     }
@@ -1341,11 +1348,20 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setNovoMedicoModalOpen(false);
   };
 
-  const handleDependentSaved = async () => {
+  const handleDependentSaved = async (savedDependent?: any) => {
     setDependentModalOpen(false);
     setDependentToEdit(null);
     if (funcionario?.id) {
-      await loadEmployeeDependents(String(funcionario.id).trim());
+      // Optimistic update: reflete na lista imediatamente
+      if (savedDependent) {
+        setEmployeeDependents(prev => {
+          const exists = prev.some(d => d.id === savedDependent.id);
+          if (exists) return prev.map(d => d.id === savedDependent.id ? savedDependent : d);
+          return [...prev, savedDependent];
+        });
+      }
+      // Recarregar mantendo lista se o servidor retornar 500
+      await loadEmployeeDependents(String(funcionario.id).trim(), true);
     }
   };
 

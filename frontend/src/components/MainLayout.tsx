@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePagePrefetch } from '@/hooks/usePagePrefetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  CalendarClock
+  CalendarClock,
+  MessageCircle
 } from 'lucide-react';
 import { getRoleDisplayName, getRoleColor } from '@/utils/permissions';
 import { CollapsibleSidebar } from './CollapsibleSidebar';
@@ -20,6 +22,8 @@ import { NotificationBell } from './NotificationBell';
 import UserProfileModal from './UserProfileModal';
 import Logo from './Logo';
 import { MobileNavbar } from './MobileNavbar';
+import { useMessageStore } from '@/stores/messageStore';
+import { FloatingChat } from './FloatingChat';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -38,6 +42,53 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const { collapsed, isMobile, toggleSidebar } = useSidebar();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const navigate = useNavigate();
+
+  const { 
+    latestIncomingChatMessage, 
+    setLatestIncomingChatMessage, 
+    setIsFloatingChatOpen, 
+    setSelectedConversation, 
+    conversations 
+  } = useMessageStore();
+
+  const handleHeaderAlertClick = () => {
+    if (!latestIncomingChatMessage) return;
+
+    let convType: 'individual' | 'group' | 'department' = 'individual';
+    let convId = latestIncomingChatMessage.sender.id;
+    let convName = latestIncomingChatMessage.sender.name;
+
+    if (latestIncomingChatMessage.group?.id) {
+      convType = 'group';
+      convId = latestIncomingChatMessage.group.id;
+      convName = latestIncomingChatMessage.group.name;
+    } else if (latestIncomingChatMessage.department?.id) {
+      convType = 'department';
+      convId = latestIncomingChatMessage.department.id;
+      convName = latestIncomingChatMessage.department.name;
+    }
+
+    const existingConv = conversations.find(c => c.id === convId && c.type === convType);
+    
+    if (existingConv) {
+      setSelectedConversation(existingConv);
+    } else {
+      setSelectedConversation({
+        id: convId,
+        name: convName,
+        type: convType,
+        unreadCount: 0,
+        isOnline: latestIncomingChatMessage.sender.isOnline || false
+      });
+    }
+
+    setIsFloatingChatOpen(true);
+    setLatestIncomingChatMessage(null);
+  };
+
+  // Start prefetching all page chunks in the background as soon as the
+  // authenticated layout mounts — this makes sidebar navigation instant.
+  usePagePrefetch();
 
   const handleProfileClick = () => {
     setIsProfileModalOpen(true);
@@ -90,6 +141,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
             {/* Lado direito - Informações do usuário */}
             <div className="flex items-center space-x-2 md:space-x-4">
+              {latestIncomingChatMessage && (
+                <button
+                  onClick={handleHeaderAlertClick}
+                  className="flex items-center space-x-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/30 text-seguranca-yellow px-2.5 py-1 rounded-full text-xs font-semibold animate-pulse shadow-md transition-all duration-300 transform hover:scale-105 shrink-0"
+                >
+                  <MessageCircle className="h-3.5 w-3.5 text-seguranca-yellow animate-bounce" />
+                  <span className="hidden sm:inline">Novo chat de:</span>
+                  <span className="font-extrabold truncate max-w-[80px] sm:max-w-[120px]">{latestIncomingChatMessage.sender.name}</span>
+                </button>
+              )}
+
               <div
                 className="flex items-center space-x-1 md:space-x-2 cursor-pointer hover:bg-seguranca-black p-1 md:p-2 rounded-lg transition-colors"
                 onClick={handleProfileClick}
@@ -169,6 +231,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
       {/* Navegação Mobile (Bottom) */}
       <MobileNavbar />
+
+      {/* Janela de Chat Flutuante */}
+      <FloatingChat />
     </div>
   );
 }; 

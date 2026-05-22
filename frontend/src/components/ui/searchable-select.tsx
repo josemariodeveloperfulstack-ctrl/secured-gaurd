@@ -38,6 +38,7 @@ interface SearchableSelectProps {
   minCharsMessage?: string;
   /** Callback para busca server-side (debounced opcional). */
   onSearchChange?: (query: string) => void;
+  className?: string;
 }
 
 export function SearchableSelect({
@@ -51,6 +52,7 @@ export function SearchableSelect({
   minSearchChars = 0,
   minCharsMessage,
   onSearchChange,
+  className,
 }: Readonly<SearchableSelectProps>) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -70,10 +72,17 @@ export function SearchableSelect({
     if (!showOptions) return [] as Option[]
     if (!search) return options
     const q = search.toLowerCase()
+    const qClean = q.replace(/[^a-zA-Z0-9]/g, '')
     return options.filter((o) => {
       if (!o) return false
-      const labelMatch = (o.label || "").toLowerCase().includes(q)
-      const descMatch = o.description ? o.description.toLowerCase().includes(q) : false
+      const label = (o.label || "").toLowerCase()
+      const desc = o.description ? o.description.toLowerCase() : ""
+      
+      const labelClean = label.replace(/[^a-zA-Z0-9]/g, '')
+      const descClean = desc.replace(/[^a-zA-Z0-9]/g, '')
+      
+      const labelMatch = label.includes(q) || (qClean !== '' && labelClean.includes(qClean))
+      const descMatch = desc.includes(q) || (qClean !== '' && descClean.includes(qClean))
       return labelMatch || descMatch
     })
   }, [options, search, showOptions])
@@ -94,7 +103,10 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className="h-11 w-full justify-between border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50 px-3"
+          className={cn(
+            "h-11 w-full justify-between border-gray-600 bg-seguranca-black/70 text-seguranca-lightgray hover:border-gray-500 focus:border-seguranca-yellow transition-colors disabled:opacity-50 px-3",
+            className
+          )}
         >
           <div className="flex items-center gap-2 truncate font-medium text-sm sm:text-base">
             {selectedOption ? selectedOption.label : placeholder}

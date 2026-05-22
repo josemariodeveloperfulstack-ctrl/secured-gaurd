@@ -43,7 +43,12 @@ const dependentService = {
 
   // Criar novo dependente
   async createDependent(dependent: DependentCreateRequest): Promise<Dependent> {
-    const response = await api.post('/dependents', dependent);
+    // Strip fields that are undefined, null, or empty string so the backend
+    // never receives an empty email/CPF triggering a UNIQUE constraint conflict.
+    const payload = Object.fromEntries(
+      Object.entries(dependent).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    ) as DependentCreateRequest;
+    const response = await api.post('/dependents', payload);
     return response.data;
   },
 

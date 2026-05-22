@@ -76,8 +76,7 @@ public class PayrollClosure {
     @Column(name = "closed_by_id")
     private UUID closedById;
 
-    @Column(name = "observations")
-    @Lob
+    @Column(name = "observations", columnDefinition = "TEXT")
     private String observations;
 
     @ManyToOne(fetch = FetchType.LAZY)

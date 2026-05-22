@@ -3,11 +3,14 @@ package com.z7design.secured_guard.service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ import com.z7design.secured_guard.repository.SupportAgentRepository;
 import com.z7design.secured_guard.repository.SupportTicketRepository;
 import com.z7design.secured_guard.repository.TicketMessageRepository;
 import com.z7design.secured_guard.repository.UserRepository;
+import com.z7design.secured_guard.repository.ContractRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -55,6 +59,9 @@ public class SupportTicketService {
     
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ContractRepository contractRepository;
     
     /**
      * Criar novo ticket
@@ -122,12 +129,59 @@ public class SupportTicketService {
         return SupportTicketDTO.fromEntity(ticket, true);
     }
     
+    private User getCurrentUserFromSecurityContext() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof User) {
+            return (User) auth.getPrincipal();
+        }
+        return null;
+    }
+
+    private boolean isCommercialRole(User user) {
+        if (user == null || user.getRoles() == null) {
+            return false;
+        }
+        return user.getRoles().stream()
+            .anyMatch(r -> r.getName() != null && 
+                (r.getName().equals("COMERCIAL") || r.getName().equals("ROLE_COMERCIAL") ||
+                 r.getName().equals("GESTOR_COMERCIAL") || r.getName().equals("ROLE_GESTOR_COMERCIAL") ||
+                 r.getName().equals("ASSISTENTE_COMERCIAL") || r.getName().equals("ROLE_ASSISTENTE_COMERCIAL")));
+    }
+
+    private List<UUID> getCompanyIdsInPortfolio(User user) {
+        List<com.z7design.secured_guard.model.Contract> contracts = contractRepository.findByResponsibleCommercialId(user.getId());
+        List<String> cnpjs = contracts.stream()
+            .map(c -> c.getClient() != null ? c.getClient().getCnpj() : null)
+            .filter(Objects::nonNull)
+            .map(cnpj -> cnpj.replaceAll("[^0-9]", ""))
+            .collect(Collectors.toList());
+
+        if (cnpjs.isEmpty()) {
+            return List.of();
+        }
+
+        List<Company> allCompanies = companyRepository.findAll();
+        return allCompanies.stream()
+            .filter(comp -> comp.getCnpj() != null && cnpjs.contains(comp.getCnpj().replaceAll("[^0-9]", "")))
+            .map(Company::getId)
+            .collect(Collectors.toList());
+    }
+
     /**
      * Buscar todos os tickets
      */
     public Page<SupportTicketDTO> getAllTickets(Pageable pageable) {
         log.info("Buscando todos os tickets");
         try {
+            User currentUser = getCurrentUserFromSecurityContext();
+            if (currentUser != null && isCommercialRole(currentUser)) {
+                List<UUID> companyIds = getCompanyIdsInPortfolio(currentUser);
+                if (companyIds.isEmpty()) {
+                    return Page.empty(pageable);
+                }
+                return ticketRepository.findByCompanyIdIn(companyIds, pageable)
+                    .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
+            }
             return ticketRepository.findAll(pageable)
                 .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
         } catch (Exception e) {
@@ -143,6 +197,14 @@ public class SupportTicketService {
         log.info("Buscando ticket por ID: {}", id);
         SupportTicket ticket = ticketRepository.findById(id)
             .orElseThrow(() -> new BusinessException("Ticket não encontrado"));
+        
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser != null && isCommercialRole(currentUser)) {
+            List<UUID> companyIds = getCompanyIdsInPortfolio(currentUser);
+            if (ticket.getCompany() == null || !companyIds.contains(ticket.getCompany().getId())) {
+                throw new BusinessException("Acesso negado: este ticket não pertence à sua carteira de clientes.");
+            }
+        }
         return SupportTicketDTO.fromEntity(ticket, true);
     }
     
@@ -151,6 +213,15 @@ public class SupportTicketService {
      */
     public Page<SupportTicketDTO> getTicketsByStatus(TicketStatus status, Pageable pageable) {
         log.info("Buscando tickets com status: {}", status);
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser != null && isCommercialRole(currentUser)) {
+            List<UUID> companyIds = getCompanyIdsInPortfolio(currentUser);
+            if (companyIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+            return ticketRepository.findByStatusAndCompanyIdIn(status, companyIds, pageable)
+                .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
+        }
         return ticketRepository.findByStatus(status, pageable)
             .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
     }
@@ -175,6 +246,15 @@ public class SupportTicketService {
             Pageable pageable) {
         
         log.info("Buscando tickets com filtros");
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser != null && isCommercialRole(currentUser)) {
+            List<UUID> companyIds = getCompanyIdsInPortfolio(currentUser);
+            if (companyIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+            return ticketRepository.findByFiltersAndCompanyIdIn(status, priority, category, agentId, companyIds, pageable)
+                .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
+        }
         return ticketRepository.findByFilters(status, priority, category, agentId, pageable)
             .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
     }
@@ -184,6 +264,15 @@ public class SupportTicketService {
      */
     public Page<SupportTicketDTO> searchTickets(String searchTerm, Pageable pageable) {
         log.info("Buscando tickets com termo: {}", searchTerm);
+        User currentUser = getCurrentUserFromSecurityContext();
+        if (currentUser != null && isCommercialRole(currentUser)) {
+            List<UUID> companyIds = getCompanyIdsInPortfolio(currentUser);
+            if (companyIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+            return ticketRepository.searchTicketsAndCompanyIdIn(searchTerm, companyIds, pageable)
+                .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
+        }
         return ticketRepository.searchTickets(searchTerm, pageable)
             .map(ticket -> SupportTicketDTO.fromEntity(ticket, false));
     }

@@ -619,7 +619,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/contas-pagar" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_WRITE']}>
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_PAYABLE_READ']}>
                         <ContasAPagar />
                       </ProtectedRoute>
                     } />
@@ -655,7 +655,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/financeiro/pagamentos" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_WRITE']}>
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_READ', 'FINANCIAL_WRITE']} requireAllPermissions={false}>
                         <Pagamentos />
                       </ProtectedRoute>
                     } />
@@ -679,7 +679,7 @@ function App() {
 
                     {/* Contas a Pagar */}
                     <Route path="/contas-a-pagar" element={
-                      <ProtectedRoute requiredPermissions={['FINANCIAL_WRITE']}>
+                      <ProtectedRoute requiredPermissions={['FINANCIAL_PAYABLE_READ']}>
                         <ContasAPagar />
                       </ProtectedRoute>
                     } />

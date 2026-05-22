@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import DOMPurify from 'dompurify';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Paperclip, Download, AlertTriangle, User, MoreHorizontal, Reply, FolderInput, Trash2 } from 'lucide-react';
+import { Paperclip, Download, AlertTriangle, User, MoreHorizontal, Reply, FolderInput, Trash2, ShieldAlert } from 'lucide-react';
 
 interface Props {
   email: EmailCache;
@@ -12,6 +12,27 @@ interface Props {
   folders?: string[];
   onEmailMoved?: () => void;
 }
+
+// Helper to generate initials from sender name
+const getInitials = (sender: string) => {
+  const cleanName = sender.split('<')[0].trim();
+  const parts = cleanName.split(' ');
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return cleanName.substring(0, 2).toUpperCase();
+};
+
+// Helper to get stable HSL background color based on string
+const getAvatarColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hues = [200, 220, 35, 175, 12, 115, 190];
+  const hue = hues[Math.abs(hash) % hues.length];
+  return `hsl(${hue}, 70%, 45%)`;
+};
 
 export function EmailReader({ email, accountId, folders = [], onEmailMoved }: Props) {
   const [content, setContent] = useState<EmailContent | null>(null);
@@ -64,55 +85,48 @@ export function EmailReader({ email, accountId, folders = [], onEmailMoved }: Pr
   };
 
   const trashFolder = folders.find(f => f.toLowerCase().includes('trash') || f.toLowerCase().includes('lixeira'));
+  const senderName = email.sender.split('<')[0].trim() || email.sender;
+  const avatarBg = getAvatarColor(senderName);
+  const initials = getInitials(senderName);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 w-full overflow-hidden">
+    <div className="flex flex-col h-full bg-zinc-950 w-full overflow-hidden font-mono select-none">
       
-      {/* Header */}
-      <div className="p-6 border-b border-zinc-800 bg-zinc-900/30">
-        
-        {email.isSpam && (
-          <div className="bg-red-500/10 text-red-400 p-3 rounded-md text-sm font-medium flex items-center gap-3 mb-4 border border-red-500/20">
-            <AlertTriangle size={18} />
-            Aviso de Segurança: Este remetente foi sinalizado como SPAM. Imagens externas foram bloqueadas.
-          </div>
-        )}
+      {/* Top Command Action Bar (Outlook Command Ribbon) */}
+      <div className="px-4 py-2 border-b border-zinc-900 bg-zinc-950/60 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick Reply */}
+          <button 
+            className="px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900 text-xs font-black uppercase text-zinc-300 hover:text-zinc-100 flex items-center gap-2 transition-all rounded-none"
+            title="Responder"
+          >
+            <Reply size={12} className="text-blue-400" />
+            <span>Responder</span>
+          </button>
 
-        <div className="flex justify-between items-start mb-6">
-          <h1 className="text-2xl md:text-3xl font-semibold text-zinc-100 leading-tight">
-            {email.subject || '(Sem Assunto)'}
-          </h1>
-          <div className="flex gap-2 text-zinc-400 relative">
-            {trashFolder && (
-              <button 
-                onClick={() => moveEmail(trashFolder)}
-                disabled={isMoving}
-                className="p-2 hover:bg-red-500/10 hover:text-red-400 rounded-md transition-colors disabled:opacity-50" 
-                title="Excluir"
-              >
-                <Trash2 size={18} />
-              </button>
-            )}
+          {/* Quick Move Selector */}
+          <div className="relative">
             <button 
               onClick={() => setShowMoveMenu(!showMoveMenu)}
               disabled={isMoving}
-              className="p-2 hover:bg-zinc-800 hover:text-zinc-200 rounded-md transition-colors disabled:opacity-50" 
-              title="Mover para..."
+              className="px-3 py-1.5 border border-zinc-800 hover:border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900 text-xs font-black uppercase text-zinc-300 hover:text-zinc-100 flex items-center gap-2 transition-all disabled:opacity-50 rounded-none"
+              title="Mover e organizar"
             >
-              <FolderInput size={18} />
+              <FolderInput size={12} className="text-amber-500" />
+              <span>Mover Pasta</span>
             </button>
             
             {showMoveMenu && folders.length > 0 && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg z-10 overflow-hidden">
-                <div className="px-3 py-2 text-xs font-semibold text-zinc-500 bg-zinc-950/50 uppercase tracking-wider">
-                  Mover para
+              <div className="absolute left-0 top-full mt-2 w-48 bg-zinc-950 border-2 border-zinc-800 shadow-xl z-30 overflow-hidden font-mono">
+                <div className="px-3 py-2 text-[9px] font-black text-zinc-600 bg-zinc-900/40 uppercase tracking-widest border-b border-zinc-900">
+                  Pastas Disponíveis
                 </div>
                 <div className="max-h-60 overflow-y-auto">
                   {folders.map(f => (
                     <button 
                       key={f}
                       onClick={() => moveEmail(f)}
-                      className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-blue-600 hover:text-white transition-colors truncate"
+                      className="w-full text-left px-4 py-2 text-[10px] uppercase font-bold text-zinc-400 hover:bg-zinc-900 hover:text-blue-400 transition-colors truncate border-b border-zinc-900/40 rounded-none"
                     >
                       {f}
                     </button>
@@ -120,80 +134,122 @@ export function EmailReader({ email, accountId, folders = [], onEmailMoved }: Pr
                 </div>
               </div>
             )}
+          </div>
 
-            <button className="p-2 hover:bg-zinc-800 rounded-md transition-colors" title="Responder">
-              <Reply size={18} />
+          {/* Quick Delete */}
+          {trashFolder && (
+            <button 
+              onClick={() => moveEmail(trashFolder)}
+              disabled={isMoving}
+              className="px-3 py-1.5 border border-zinc-800 hover:border-red-900 bg-zinc-900/50 hover:bg-red-950/20 text-xs font-black uppercase text-zinc-400 hover:text-red-400 flex items-center gap-2 transition-all disabled:opacity-50 rounded-none" 
+              title="Mover para Lixeira"
+            >
+              <Trash2 size={12} />
+              <span>Excluir</span>
             </button>
-            <button className="p-2 hover:bg-zinc-800 rounded-md transition-colors" title="Mais opções">
-              <MoreHorizontal size={18} />
-            </button>
-          </div>
+          )}
         </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center border border-zinc-700 shadow-sm">
-            <User size={20} className="text-zinc-400" />
-          </div>
-          <div className="flex flex-col">
-            <div className="text-lg font-medium text-zinc-200">{email.sender}</div>
-            <div className="text-sm text-zinc-500">
-              {format(new Date(email.receivedDate), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-            </div>
-          </div>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-[8px] font-black text-zinc-600 font-mono tracking-widest uppercase">READING HUD</span>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 relative" onClick={() => setShowMoveMenu(false)}>
-        {loading && (
-          <div className="text-blue-500 text-sm animate-pulse flex items-center justify-center h-full">
-            Sincronizando corpo da mensagem...
+      {/* Main Reader Frame */}
+      <div className="flex-1 flex flex-col overflow-y-auto" onClick={() => setShowMoveMenu(false)}>
+        {/* Spam Warning Panel */}
+        {email.isSpam && (
+          <div className="m-4 bg-red-950/20 text-red-400 p-3 text-[10px] uppercase tracking-wider font-black flex items-center gap-3 border border-red-900/50 rounded-none">
+            <ShieldAlert size={14} className="text-red-500 animate-pulse shrink-0" />
+            <span>Alerta de Risco: Mensagem classificada como Spam. Links e imagens externas desativados por segurança.</span>
           </div>
         )}
 
-        {error && (
-          <div className="text-red-400 text-sm flex items-center justify-center h-full">
-            {error}
+        {/* Sender details and subject line header */}
+        <div className="p-6 border-b border-zinc-900 bg-zinc-950 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5 select-text">
+            <div className="text-[10px] font-black text-zinc-600 uppercase tracking-widest font-mono">Assunto da Mensagem</div>
+            <h1 className="text-lg md:text-xl font-black text-zinc-100 uppercase tracking-tight leading-tight">
+              {email.subject || '(Sem Assunto)'}
+            </h1>
           </div>
-        )}
-
-        {content && !loading && (
-          <div className="flex flex-col xl:flex-row gap-6 h-full">
-            
-            {/* HTML Body */}
-            <div className="flex-1 bg-white text-zinc-900 p-8 shadow-md rounded-lg overflow-y-auto border border-zinc-200/20">
-              <div 
-                className="email-html-content prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={createSafeHtml(content.htmlBody)} 
-              />
+          
+          <div className="flex items-start gap-4 pt-2">
+            {/* Initials Avatar */}
+            <div
+              className="w-10 h-10 border border-zinc-800 flex items-center justify-center text-zinc-100 text-sm font-black select-none tracking-tighter"
+              style={{ backgroundColor: avatarBg }}
+            >
+              {initials}
             </div>
 
-            {/* Attachments Sidebar */}
-            {content.attachments && content.attachments.length > 0 && (
-              <div className="w-full xl:w-72 flex flex-col gap-3">
-                <div className="text-sm font-medium text-zinc-300 mb-2 border-b border-zinc-800 pb-2">
-                  Anexos ({content.attachments.length})
+            {/* Meta Text */}
+            <div className="flex-1 min-w-0 flex flex-col gap-1 select-text">
+              <div className="flex justify-between items-start gap-4 flex-wrap">
+                <div className="text-xs font-bold text-zinc-200 truncate">{email.sender}</div>
+                <div className="text-[9px] font-bold text-zinc-500 font-mono uppercase tracking-wider shrink-0 mt-0.5">
+                  {format(new Date(email.receivedDate), "dd/MM/yyyy - HH:mm", { locale: ptBR })}
                 </div>
-                {content.attachments.map((att, idx) => (
-                  <div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 flex flex-col gap-3 hover:border-blue-500 transition-colors group shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-zinc-800 rounded-md">
-                        <Paperclip size={16} className="text-blue-400" />
-                      </div>
-                      <span className="text-sm font-medium text-zinc-200 truncate flex-1" title={att.filename}>
-                        {att.filename}
-                      </span>
-                    </div>
-                    <button className="text-xs text-white bg-zinc-800 hover:bg-blue-600 rounded-md py-2 px-3 font-medium w-full flex items-center justify-center gap-2 transition-colors">
-                      <Download size={14} />
-                      Baixar Arquivo
-                    </button>
-                  </div>
-                ))}
               </div>
-            )}
+              <div className="text-[9px] font-bold text-zinc-500 font-mono uppercase tracking-wider">
+                Para: <span className="text-zinc-400">mim (IMAP Client)</span>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* Dynamic Email Body Content */}
+        <div className="flex-1 p-6 flex flex-col gap-6 relative min-h-[300px]">
+          {loading && (
+            <div className="text-blue-500 text-xs font-black uppercase tracking-widest animate-pulse flex items-center justify-center h-48 w-full font-mono">
+              Baixando corpo de e-mail via IMAP...
+            </div>
+          )}
+
+          {error && (
+            <div className="text-red-400 text-xs font-black uppercase tracking-widest flex items-center justify-center h-48 w-full font-mono border border-red-900/30 bg-red-950/5">
+              {error}
+            </div>
+          )}
+
+          {content && !loading && (
+            <div className="flex flex-col xl:flex-row gap-6 h-full items-start">
+              
+              {/* HTML Viewport card */}
+              <div className="flex-1 bg-white text-zinc-900 p-8 shadow-md border-2 border-zinc-800 rounded-none overflow-y-auto max-w-full select-text">
+                <div 
+                  className="email-html-content prose prose-sm max-w-none text-zinc-900 font-sans"
+                  dangerouslySetInnerHTML={createSafeHtml(content.htmlBody)} 
+                />
+              </div>
+
+              {/* Sidebar Anexos (Geometric Cards) */}
+              {content.attachments && content.attachments.length > 0 && (
+                <div className="w-full xl:w-72 shrink-0 flex flex-col gap-3">
+                  <div className="text-[10px] font-black text-zinc-500 mb-1 border-b border-zinc-900 pb-2 uppercase tracking-widest">
+                    Anexos Detectados ({content.attachments.length})
+                  </div>
+                  {content.attachments.map((att, idx) => (
+                    <div key={idx} className="bg-zinc-900/60 border border-zinc-800 rounded-none p-3.5 flex flex-col gap-3 hover:border-zinc-700 transition-colors group">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-zinc-900 border border-zinc-800">
+                          <Paperclip size={14} className="text-blue-400" />
+                        </div>
+                        <span className="text-xs font-bold text-zinc-300 truncate flex-1 uppercase tracking-tight" title={att.filename}>
+                          {att.filename}
+                        </span>
+                      </div>
+                      <button className="text-[9px] tracking-widest font-black uppercase text-zinc-100 bg-zinc-800 hover:bg-blue-600 rounded-none py-2 px-3 w-full flex items-center justify-center gap-2 transition-all">
+                        <Download size={12} />
+                        Baixar Arquivo
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

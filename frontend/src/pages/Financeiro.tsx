@@ -12,9 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FinanceiroDashboard } from '@/components/financeiro/FinanceiroDashboard';
 import ContasAPagar from '@/components/financeiro/ContasAPagar';
 import ContasAReceber from '@/components/financeiro/ContasAReceber';
-import FluxoCaixaTab from '@/components/financeiro/FluxoCaixaTab';
 import PagamentosTab from '@/components/financeiro/PagamentosTab';
-import RelatoriosTab from '@/components/financeiro/RelatoriosTab';
 import CentroCustosTab from '@/components/financeiro/CentroCustosTab';
 import FaturasTab from '@/components/financeiro/FaturasTab';
 import MedicoesTab from '@/components/financeiro/MedicoesTab';
@@ -86,7 +84,7 @@ const FinanceiroSimple: React.FC = () => {
         <div className="space-y-6">
           <Tabs defaultValue="dashboard" className="w-full">
             {/* Tabs - Padrão SST Simplificado */}
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-9 bg-seguranca-graphite border-gray-600">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 bg-seguranca-graphite border-gray-600">
               {hasTabPermission('DASHBOARD_READ') && (
                 <TabsTrigger value="dashboard" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
                   Dashboard
@@ -102,19 +100,9 @@ const FinanceiroSimple: React.FC = () => {
                   Contas a Receber
                 </TabsTrigger>
               )}
-              {hasTabPermission('FINANCIAL_CASHFLOW_READ') && (
-                <TabsTrigger value="fluxo-caixa" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                  Fluxo de Caixa
-                </TabsTrigger>
-              )}
               {hasTabPermission('FINANCIAL_READ') && (
                 <TabsTrigger value="pagamentos" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
                   Pagamentos
-                </TabsTrigger>
-              )}
-              {hasTabPermission('REPORTS_READ') && (
-                <TabsTrigger value="relatorios-financeiros" className="text-seguranca-lightgray data-[state='active']:bg-seguranca-red text-xs sm:text-sm">
-                  Relatórios
                 </TabsTrigger>
               )}
               {hasTabPermission('FINANCIAL_READ') && (
@@ -155,16 +143,8 @@ const FinanceiroSimple: React.FC = () => {
               <ContasAReceber />
             </TabsContent>
 
-            <TabsContent value="fluxo-caixa">
-              <FluxoCaixaTab />
-            </TabsContent>
-
             <TabsContent value="pagamentos">
               <PagamentosTab />
-            </TabsContent>
-
-            <TabsContent value="relatorios-financeiros">
-              <RelatoriosTab />
             </TabsContent>
 
             <TabsContent value="centro-custos">

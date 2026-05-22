@@ -50,7 +50,6 @@ public class EmailAccount {
     @Column(name = "last_sync_error", length = 500)
     private String lastSyncError;
 
-    @Lob
     @Column(name = "assinatura", columnDefinition = "TEXT")
     private String signature;
 

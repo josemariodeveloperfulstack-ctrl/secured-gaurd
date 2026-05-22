@@ -105,5 +105,49 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, UU
     @Query(value = "SELECT (COUNT(CASE WHEN status = 'RESOLVED' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) " +
            "FROM support_tickets WHERE created_at >= :since", nativeQuery = true)
     Double getResolutionRate(@Param("since") LocalDateTime since);
+
+    /**
+     * Busca tickets por múltiplos IDs de empresa
+     */
+    Page<SupportTicket> findByCompanyIdIn(List<UUID> companyIds, Pageable pageable);
+
+    /**
+     * Busca tickets por status e múltiplos IDs de empresa
+     */
+    Page<SupportTicket> findByStatusAndCompanyIdIn(TicketStatus status, List<UUID> companyIds, Pageable pageable);
+
+    /**
+     * Busca tickets por múltiplos critérios e carteira de clientes
+     */
+    @Query("SELECT st FROM SupportTicket st WHERE " +
+           "(:status IS NULL OR st.status = :status) AND " +
+           "(:priority IS NULL OR st.priority = :priority) AND " +
+           "(:category IS NULL OR st.category = :category) AND " +
+           "(:agentId IS NULL OR st.assignedTo.id = :agentId) AND " +
+           "st.company.id IN :companyIds " +
+           "ORDER BY st.createdAt DESC")
+    Page<SupportTicket> findByFiltersAndCompanyIdIn(
+        @Param("status") TicketStatus status,
+        @Param("priority") TicketPriority priority,
+        @Param("category") TicketCategory category,
+        @Param("agentId") UUID agentId,
+        @Param("companyIds") List<UUID> companyIds,
+        Pageable pageable
+    );
+
+    /**
+     * Busca por texto na carteira de clientes do vendedor
+     */
+    @Query("SELECT st FROM SupportTicket st WHERE " +
+           "(LOWER(st.title) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(st.description) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(st.customerName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(st.customerEmail) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "st.company.id IN :companyIds")
+    Page<SupportTicket> searchTicketsAndCompanyIdIn(
+        @Param("search") String search,
+        @Param("companyIds") List<UUID> companyIds,
+        Pageable pageable
+    );
 }
 

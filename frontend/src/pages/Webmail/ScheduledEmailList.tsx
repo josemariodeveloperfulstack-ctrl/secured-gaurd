@@ -46,10 +46,10 @@ export function ScheduledEmailList({ emails }: Props) {
                 <span className="text-[10px] font-bold text-orange-500 uppercase tracking-tighter">
                   {format(new Date(email.scheduledTime), "dd MMM, HH:mm", { locale: ptBR })}
                 </span>
-                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded mt-1 uppercase ${
-                  email.status === 'PENDING' ? 'bg-zinc-800 text-zinc-400' :
-                  email.status === 'SENT' ? 'bg-green-500/20 text-green-400' :
-                  'bg-red-500/20 text-red-400'
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-none mt-1 uppercase ${
+                  email.status === 'PENDING' ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' :
+                  email.status === 'SENT' ? 'bg-green-500/20 text-green-400 border border-green-600/30' :
+                  'bg-red-500/20 text-red-400 border border-red-600/30'
                 }`}>
                   {email.status === 'PENDING' ? 'Aguardando' : email.status === 'SENT' ? 'Enviado' : 'Falhou'}
                 </span>

@@ -173,6 +173,9 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ]),
   ALMOXARIFADO: new Set([
     'dashboard',
+    // Área do Funcionário (dados pessoais: Ponto, Docs, Férias, Plantões)
+    'area-funcionario',
+    'meus-holerites',
     'compras',
     'compras-solicitacoes',
     'compras-aprovacoes',
@@ -202,13 +205,21 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ]),
   SUPRIMENTOS: new Set([
     'dashboard',
+    // Área do Funcionário (dados pessoais: Ponto, Docs, Férias, Plantões)
+    'area-funcionario',
+    'meus-holerites',
+    // Frota
+    'frota',
+    // Gestão de Holerites
     'holerites',
+    // Financeiro (acesso parcial) — Contas a Pagar e Pagamentos
     'modulo-financeiro',
     'gestao-financeira-dashboard',
     'gestao-financeira-contas-pagar',
     'gestao-financeira-fluxo-caixa',
     'gestao-financeira-relatorios',
     'gestao-financeira-centros-custo',
+    // Estoque e Compras (core do papel)
     'estoque',
     'estoque-simplificado',
     'compras',
@@ -216,8 +227,44 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'compras-aprovacoes',
     'compras-cotacoes',
     'compras-relatorios',
+    // Comunicação, Emails e Mensagens
     'mensagens',
     'chat-interno',
+    'gestao-mensagens-inbox',
+    'gestao-mensagens-enviar',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    // ❌ RH / DPE / SST: não permitidos
+  ]),
+  ANALISTA_SUPRIMENTOS: new Set([
+    'dashboard',
+    // Área do Funcionário (dados pessoais: Ponto, Docs, Férias, Plantões)
+    'area-funcionario',
+    'meus-holerites',
+    // Frota
+    'frota',
+    // Gestão de Holerites
+    'holerites',
+    // Financeiro — Contas a Pagar e Pagamentos
+    'gestao-financeira-contas-pagar',
+    'gestao-financeira-relatorios',
+    'gestao-financeira-centros-custo',
+    // Estoque e Compras
+    'estoque',
+    'estoque-simplificado',
+    'compras',
+    'compras-solicitacoes',
+    'compras-aprovacoes',
+    'compras-cotacoes',
+    'compras-relatorios',
+    // Comunicação, Emails e Mensagens
+    'mensagens',
+    'chat-interno',
+    'gestao-mensagens-inbox',
+    'gestao-mensagens-enviar',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    // ❌ Financeiro completo / RH / DPE / SST: não permitidos
   ]),
   // 🟩 SUPERVISOR — APENAS módulo operacional, supervisão de visitas e comunicação.
   // ❌ NÃO tem acesso a Financeiro, Comercial, Holerites/Folha, RH SST, Compras, Estoque, Admin.
@@ -460,24 +507,10 @@ export function DynamicSidebar() {
       requiredPermission: 'FINANCIAL_WRITE'
     },
     {
-      icon: TrendingUp,
-      text: 'Relatórios Financeiros',
-      to: '/gestao-financeira/relatorios',
-      id: 'gestao-financeira-relatorios',
-      requiredPermission: 'FINANCIAL_READ'
-    },
-    {
       icon: Target,
       text: 'Orçamento e Metas',
       to: '/gestao-financeira/orcamento',
       id: 'gestao-financeira-orcamento',
-      requiredPermission: 'FINANCIAL_MANAGE'
-    },
-    {
-      icon: Wallet,
-      text: 'Centros de Custo',
-      to: '/gestao-financeira/centros-custo',
-      id: 'gestao-financeira-centros-custo',
       requiredPermission: 'FINANCIAL_MANAGE'
     },
 

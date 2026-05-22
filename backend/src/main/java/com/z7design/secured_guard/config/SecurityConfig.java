@@ -215,17 +215,32 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/frota/**")
                                                 .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
-                                                                "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                                                                "ROLE_GESTOR", "ROLE_SUPERVISOR", "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
+                                                                "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ANALISTAS_DE_SUPRIMENTOS",
+                                                                "ANALISTAS_DE_SUPRIMENTOS",
+                                                                "ANALISATA_DE_SUPREMIMENTOSS", "ROLE_ANALISATA_DE_SUPREMIMENTOSS",
+                                                                "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS")
                                                 // Endpoints de fuel-records
                                                 .requestMatchers("/api/fuel-records/**")
                                                 .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
-                                                                "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                                                                "ROLE_GESTOR", "ROLE_SUPERVISOR", "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
+                                                                "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ANALISTAS_DE_SUPRIMENTOS",
+                                                                "ANALISTAS_DE_SUPRIMENTOS",
+                                                                "ANALISATA_DE_SUPREMIMENTOSS", "ROLE_ANALISATA_DE_SUPREMIMENTOSS",
+                                                                "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS")
                                                 // Endpoints de veículos
                                                 .requestMatchers("/api/vehicles/**")
                                                 .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
-                                                                "ROLE_GESTOR", "ROLE_SUPERVISOR")
+                                                                "ROLE_GESTOR", "ROLE_SUPERVISOR", "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
+                                                                "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
+                                                                "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ANALISTAS_DE_SUPRIMENTOS",
+                                                                "ANALISTAS_DE_SUPRIMENTOS",
+                                                                "ANALISATA_DE_SUPREMIMENTOSS", "ROLE_ANALISATA_DE_SUPREMIMENTOSS",
+                                                                "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS")
                                                 // Endpoints de work-posts
                                                 .requestMatchers("/api/work-posts/**")
                                                 .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",

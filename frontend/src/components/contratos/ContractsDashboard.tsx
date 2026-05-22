@@ -100,174 +100,155 @@ export const ContractsDashboard: React.FC<ContractsDashboardProps> = ({ contract
     return total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
   };
 
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return "border-2 border-green-500/50 text-green-500 bg-green-500/10";
+      case 'PENDING':
+        return "border-2 border-yellow-500/50 text-yellow-500 bg-yellow-500/10";
+      case 'TERMINATED':
+      case 'CANCELLED':
+      case 'EXPIRED':
+        return "border-2 border-red-500/50 text-red-500 bg-red-500/10";
+      case 'SUSPENDED':
+        return "border-2 border-orange-500/50 text-orange-500 bg-orange-500/10";
+      default:
+        return "border-2 border-zinc-700 text-zinc-400 bg-zinc-800/30";
+    }
+  };
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6 w-full min-w-0">
+    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 w-full min-w-0 font-mono">
       {/* Total de Contratos */}
-      <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-          <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-seguranca-lightgray truncate pr-1">
-            Total de Contratos
+      <Card className="bg-[#121212] border-2 border-zinc-800 rounded-none min-w-0 overflow-hidden hover:border-yellow-500/40 transition-colors">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
+          <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-zinc-400 truncate pr-1">
+            SYS::CONTRATOS
           </CardTitle>
-          <Users className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-yellow flex-shrink-0" />
+          <Users className="h-4 w-4 text-yellow-500 flex-shrink-0" />
         </CardHeader>
-        <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6 pt-0">
-          <div className="text-base sm:text-xl lg:text-2xl font-bold text-white">{stats.total}</div>
-          <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 truncate">
-            Total cadastrados
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="text-xl sm:text-2xl lg:text-3xl font-black text-white">{stats.total}</div>
+          <p className="text-[10px] text-zinc-500 mt-1 uppercase font-bold tracking-widest">
+            REGISTROS_TOTAIS
           </p>
         </CardContent>
       </Card>
 
       {/* Contratos Ativos */}
-      <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-          <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-seguranca-lightgray truncate pr-1">
-            Contratos Ativos
+      <Card className="bg-[#121212] border-2 border-zinc-800 rounded-none min-w-0 overflow-hidden hover:border-green-500/40 transition-colors">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
+          <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-green-500 truncate pr-1">
+            SYS::ATIVOS
           </CardTitle>
-          <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
+          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
         </CardHeader>
-        <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6 pt-0">
-          <div className="text-base sm:text-xl lg:text-2xl font-bold text-white">{stats.active}</div>
-          <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-            {getPercentage(stats.active, stats.total)}% do total
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="text-xl sm:text-2xl lg:text-3xl font-black text-green-500">{stats.active}</div>
+          <p className="text-[10px] text-zinc-500 mt-1 uppercase font-bold tracking-widest">
+            {getPercentage(stats.active, stats.total)}% DO_VOLUME
           </p>
-          <div className="flex items-center mt-1">
-            <Badge className="bg-green-500 text-white text-[10px] sm:text-xs px-1.5 py-0">
-              {stats.active} ativos
-            </Badge>
+          <div className="flex items-center mt-2">
+            <span className="border-2 border-green-500 text-green-500 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-none bg-green-500/10">
+              LIVE_SYSTEM
+            </span>
           </div>
         </CardContent>
       </Card>
 
       {/* Valor Total */}
-      <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-          <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-seguranca-lightgray truncate pr-1">
-            Valor Total
+      <Card className="bg-[#121212] border-2 border-zinc-800 rounded-none min-w-0 overflow-hidden hover:border-yellow-500/40 transition-colors">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
+          <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-zinc-400 truncate pr-1">
+            SYS::VALOR_ANUAL
           </CardTitle>
-          <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-yellow flex-shrink-0" />
+          <DollarSign className="h-4 w-4 text-yellow-500 flex-shrink-0" />
         </CardHeader>
-        <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6 pt-0">
-          <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white min-w-0 break-words" title={formatCurrency(stats.totalValue)}>
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="text-base sm:text-xl lg:text-2xl font-black text-white min-w-0 break-words" title={formatCurrency(stats.totalValue)}>
             {formatCurrency(stats.totalValue)}
           </div>
-          <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 truncate">
-            Média: {formatCurrency(stats.averageValue)}
+          <p className="text-[10px] text-zinc-500 mt-1 uppercase font-bold tracking-widest truncate">
+            MED:: {formatCurrency(stats.averageValue)}
           </p>
         </CardContent>
       </Card>
 
       {/* MRR - se disponível da API */}
-      {apiStats != null && (
-        <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-seguranca-lightgray truncate pr-1">
-              MRR
+      {apiStats != null ? (
+        <Card className="bg-[#121212] border-2 border-zinc-800 rounded-none min-w-0 overflow-hidden hover:border-green-500/40 transition-colors">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
+            <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-green-400 truncate pr-1">
+              SYS::MRR_RECORRENTE
             </CardTitle>
-            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
+            <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6 pt-0">
-            <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white min-w-0 break-words" title={formatCurrency(apiStats.mrr ?? 0)}>
+          <CardContent className="px-4 pb-4 pt-0">
+            <div className="text-base sm:text-xl lg:text-2xl font-black text-green-400 min-w-0 break-words" title={formatCurrency(apiStats.mrr ?? 0)}>
               {formatCurrency(apiStats.mrr ?? 0)}
             </div>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">Receita recorrente mensal</p>
+            <p className="text-[10px] text-zinc-500 mt-1 uppercase font-bold tracking-widest">FATURAMENTO_MENSAL</p>
           </CardContent>
         </Card>
-      )}
-
-      {/* Aditivos no mês */}
-      {apiStats != null && apiStats.amendmentsThisMonth > 0 && (
-        <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-seguranca-lightgray truncate pr-1">
-              Aditivos (mês)
+      ) : (
+        /* Contratos Vencendo (Fallback para ocupar espaço quando API sem estatísticas detalhadas) */
+        <Card className="bg-[#121212] border-2 border-zinc-800 rounded-none min-w-0 overflow-hidden hover:border-red-500/40 transition-colors">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-4">
+            <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-red-500 truncate pr-1">
+              SYS::VENCENDO_MES
             </CardTitle>
-            <FileEdit className="h-3 w-3 sm:h-4 sm:w-4 text-seguranca-yellow flex-shrink-0" />
+            <Calendar className="h-4 w-4 text-red-500 flex-shrink-0" />
           </CardHeader>
-          <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6 pt-0">
-            <div className="text-base sm:text-xl lg:text-2xl font-bold text-white">{apiStats.amendmentsThisMonth}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">Este mês</p>
+          <CardContent className="px-4 pb-4 pt-0">
+            <div className="text-xl sm:text-2xl lg:text-3xl font-black text-red-500">{stats.expiringThisMonth}</div>
+            <p className="text-[10px] text-zinc-500 mt-1 uppercase font-bold tracking-widest">REQUIERE_ATENCAO</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Suspensos */}
-      {apiStats != null && apiStats.suspendedCount > 0 && (
-        <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-seguranca-lightgray truncate pr-1">
-              Suspensos
-            </CardTitle>
-            <PauseCircle className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500 flex-shrink-0" />
-          </CardHeader>
-          <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6 pt-0">
-            <div className="text-base sm:text-xl lg:text-2xl font-bold text-white">{apiStats.suspendedCount}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">Contratos suspensos</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Contratos Vencendo */}
-      <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-          <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-seguranca-lightgray truncate pr-1">
-            Vencendo Este Mês
-          </CardTitle>
-          <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-red-500 flex-shrink-0" />
-        </CardHeader>
-        <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6 pt-0">
-          <div className="text-base sm:text-xl lg:text-2xl font-bold text-white">{stats.expiringThisMonth}</div>
-          <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">Requerem atenção</p>
-          {stats.expiringThisMonth > 0 && (
-            <div className="flex items-center mt-1">
-              <Badge className="bg-red-500 text-white text-[10px] sm:text-xs px-1.5 py-0">Urgente</Badge>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Status Distribution */}
-      <Card className="bg-seguranca-graphite border-gray-600 col-span-2 lg:col-span-4 min-w-0 overflow-hidden">
-        <CardHeader className="px-2 sm:px-4 lg:px-6 pt-2 sm:pt-4 lg:pt-6">
-          <CardTitle className="text-xs sm:text-sm lg:text-base font-medium text-seguranca-lightgray">
-            Distribuição por Status
+      {/* Distribuição por Status */}
+      <Card className="bg-[#121212] border-2 border-zinc-800 rounded-none col-span-2 lg:col-span-4 min-w-0 overflow-hidden">
+        <CardHeader className="px-4 pt-4 pb-2 border-b border-zinc-800">
+          <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+            <span className="w-2 h-2 bg-yellow-500 rounded-none animate-pulse" />
+            CONSOLE::DISTRIBUICAO_STATUS
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-2 sm:px-4 lg:px-6 pb-2 sm:pb-4 lg:pb-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4">
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-seguranca-black/50 min-w-0">
+        <CardContent className="px-4 py-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="flex items-center gap-3 p-3 bg-black border-2 border-zinc-800 rounded-none min-w-0 hover:border-green-500/30 transition-colors">
               {getStatusIcon('ACTIVE')}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-medium text-white truncate">Ativos</p>
-                <p className="text-[10px] sm:text-xs text-gray-400">{stats.active}</p>
+                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Ativos</p>
+                <p className="text-xs font-bold text-green-500">{stats.active}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-seguranca-black/50 min-w-0">
+            <div className="flex items-center gap-3 p-3 bg-black border-2 border-zinc-800 rounded-none min-w-0 hover:border-zinc-500/30 transition-colors">
               {getStatusIcon('DRAFT')}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-medium text-white truncate">Em elaboração</p>
-                <p className="text-[10px] sm:text-xs text-gray-400">{stats.draft}</p>
+                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Elaborando</p>
+                <p className="text-xs font-bold text-zinc-400">{stats.draft}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-seguranca-black/50 min-w-0">
+            <div className="flex items-center gap-3 p-3 bg-black border-2 border-zinc-800 rounded-none min-w-0 hover:border-yellow-500/30 transition-colors">
               {getStatusIcon('PENDING')}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-medium text-white truncate">Pendentes</p>
-                <p className="text-[10px] sm:text-xs text-gray-400">{stats.pending}</p>
+                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Pendentes</p>
+                <p className="text-xs font-bold text-yellow-500">{stats.pending}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-seguranca-black/50 min-w-0">
+            <div className="flex items-center gap-3 p-3 bg-black border-2 border-zinc-800 rounded-none min-w-0 hover:border-zinc-700/30 transition-colors">
               {getStatusIcon('INACTIVE')}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-medium text-white truncate">Inativos</p>
-                <p className="text-[10px] sm:text-xs text-gray-400">{stats.inactive}</p>
+                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Inativos</p>
+                <p className="text-xs font-bold text-zinc-500">{stats.inactive}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-seguranca-black/50 min-w-0">
+            <div className="flex items-center gap-3 p-3 bg-black border-2 border-zinc-800 rounded-none min-w-0 hover:border-red-500/30 transition-colors">
               {getStatusIcon('TERMINATED')}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-medium text-white truncate">Terminados</p>
-                <p className="text-[10px] sm:text-xs text-gray-400">{stats.terminated}</p>
+                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">Terminados</p>
+                <p className="text-xs font-bold text-red-500">{stats.terminated}</p>
               </div>
             </div>
           </div>

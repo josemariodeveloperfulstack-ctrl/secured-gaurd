@@ -7,6 +7,20 @@ import { generatePermissions, generatePermissionsFromGroups, combinePermissions 
 import { groupService } from '@/services/groupService';
 import { getApiUrl } from '@/config/environment';
 
+const sanitizeRole = (roleStr: string): string => {
+  if (!roleStr) return '';
+  let clean = roleStr.replace(/^ROLE_/, '').toUpperCase();
+  if (clean === 'SUPREIMENTOS') return 'SUPRIMENTOS';
+  if (
+    clean === 'ANALISATA_DE_SUPREMIMENTOSS' || 
+    clean === 'ANALISATA_DE_SUPREMIMENTOS' || 
+    clean === 'ANALISTAS_DE_SUPRIMENTOS'
+  ) {
+    return 'ANALISTA_SUPRIMENTOS';
+  }
+  return clean;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
@@ -86,6 +100,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (token && savedUser) {
           const userData = JSON.parse(savedUser);
+          if (userData.role) {
+            userData.role = sanitizeRole(userData.role);
+          }
+          if (Array.isArray(userData.roles)) {
+            userData.roles = userData.roles.map((r: string) => sanitizeRole(r));
+          }
           console.log('👤 User data valid:', !!userData.id, userData.name, userData.role);
 
           // Gerar permissões a partir do role principal
@@ -151,12 +171,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { role: dbRole, roles: dbRoles, token: newToken } = response.data as { role: string; roles?: string[]; token: string };
 
         const savedUser = JSON.parse(savedUserStr);
-        const storedRole = (savedUser.role ?? '').replace(/^ROLE_/, '');
-        const normalizedDbRole = dbRole.replace(/^ROLE_/, '');
+        const storedRole = sanitizeRole(savedUser.role ?? '');
+        const normalizedDbRole = sanitizeRole(dbRole);
 
         // Verificar se houve mudança em qualquer um dos roles ou no role principal
-        const storedRoles = Array.isArray(savedUser.roles) ? savedUser.roles.map((r: string) => r.replace(/^ROLE_/, '').toUpperCase()) : [storedRole];
-        const normalizedDbRoles = Array.isArray(dbRoles) ? dbRoles.map((r: string) => r.replace(/^ROLE_/, '').toUpperCase()) : [normalizedDbRole];
+        const storedRoles = Array.isArray(savedUser.roles) ? savedUser.roles.map((r: string) => sanitizeRole(r)) : [storedRole];
+        const normalizedDbRoles = Array.isArray(dbRoles) ? dbRoles.map((r: string) => sanitizeRole(r)) : [normalizedDbRole];
         
         const rolesChanged = JSON.stringify(storedRoles.sort()) !== JSON.stringify(normalizedDbRoles.sort()) || storedRole !== normalizedDbRole;
 
@@ -174,7 +194,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const updatedUser = { 
             ...savedUser, 
             role: normalizedDbRole, 
-            roles: dbRoles || [dbRole],
+            roles: (dbRoles || [dbRole]).map((r: string) => sanitizeRole(r)),
             permissions: combinedPermissions 
           };
           localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -277,8 +297,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       console.log('🔍 Roles recebidos do backend:', userRoles);
 
-      // Normalizar roles (remover prefixo ROLE_ se existir)
-      const normalizedRoles = userRoles.map(r => r.replace(/^ROLE_/, '').toUpperCase());
+      // Normalizar roles (remover prefixo ROLE_ se existir e corrigir typos)
+      const normalizedRoles = userRoles.map(r => sanitizeRole(r));
       console.log('🔍 Roles normalizados:', normalizedRoles);
 
       // Definir o role principal por prioridade
@@ -346,7 +366,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email: response.data.user?.email || email,
         username: response.data.user?.username || email, // CPF usado no login
         role: userRole,
-        roles: userRoles, // Adicionar a propriedade roles
+        roles: userRoles.map(r => sanitizeRole(r)),
         groups: userGroups,
         permissions: combinedPermissions,
         avatar: response.data.user?.avatar,

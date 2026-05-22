@@ -27,6 +27,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.text.NumberFormat;
 import java.time.LocalDate;
+import com.z7design.secured_guard.model.WorkPost;
+import com.z7design.secured_guard.repository.WorkPostRepository;
+import java.util.List;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
@@ -38,6 +41,7 @@ public class ClientContractStandardPdfService {
         private final StandardReportLayoutService pdfLayoutService;
         private final CompanyRepository companyRepository;
         private final CompanyConfigRepository companyConfigRepository;
+        private final WorkPostRepository workPostRepository;
 
         private static final String DEFAULT_REPORT_TITLE = "Contrato de Prestação de Serviços";
 
@@ -263,6 +267,18 @@ public class ClientContractStandardPdfService {
 
         private void addContent(Document document, ClientContractRequest request, Company company,
                         CompanyConfig config) {
+                
+                if (request.getContractTemplate() != null && !request.getContractTemplate().isBlank()) {
+                        log.info("Gerando contrato comercial baseado no template: {}", request.getContractTemplate());
+                        addCommercialTemplateContent(document, request, company, config);
+                } else {
+                        log.info("Gerando contrato com layout padrão genérico.");
+                        generateDefaultLayoutContent(document, request, company, config);
+                }
+        }
+
+        private void generateDefaultLayoutContent(Document document, ClientContractRequest request, Company company,
+                        CompanyConfig config) {
                 document.add(new Paragraph("").setMarginBottom(14f));
                 // Seção: Partes Contratantes
                 document.add(createSectionHeader("1. PARTES CONTRATANTES").setMarginTop(6f));
@@ -358,7 +374,166 @@ public class ClientContractStandardPdfService {
                 }
 
                 // Assinaturas
-                addSignatures(document, request, company, config);
+                addSignatures(document, request, company, config, null);
+        }
+
+        private void addCommercialTemplateContent(Document document, ClientContractRequest request, Company company,
+                        CompanyConfig config) {
+                document.add(new Paragraph("").setMarginBottom(10f));
+
+                boolean isVigilancia = "VIGILANCIA_PATRIMONIAL".equalsIgnoreCase(request.getContractTemplate());
+                boolean isCombinado = "COMBINADO".equalsIgnoreCase(request.getContractTemplate());
+
+                // Determinar dados da Contratada baseada na minuta e na empresa selecionada
+                String contractedName = "PROMOVER SERVIÇOS ADMINISTRATIVOS LTDA";
+                String contractedCnpj = "57.303.811/0001-89";
+                String contractedAddress = "Rua Pelegrino de Paula Ferreira, 77, Bairro Centro, Contagem/MG, CEP: 32017-400";
+
+                if (request.getContractedCompanyCnpj() != null && !request.getContractedCompanyCnpj().isBlank()) {
+                        String cleanCnpj = request.getContractedCompanyCnpj().replaceAll("[^0-9]", "");
+                        if ("43576260000112".equals(cleanCnpj) || cleanCnpj.contains("43576260")) {
+                                contractedName = "PROMOVER VIGILÂNCIA PATRIMONIAL LTDA";
+                                contractedCnpj = "43.576.260/0001-12";
+                                contractedAddress = "Rua Coronel João Camargos, 267, Bairro Centro, Contagem/MG, CEP: 32040-620";
+                        } else {
+                                contractedName = "PROMOVER SERVIÇOS ADMINISTRATIVOS LTDA";
+                                contractedCnpj = "57.303.811/0001-89";
+                                contractedAddress = "Rua Pelegrino de Paula Ferreira, 77, Bairro Centro, Contagem/MG, CEP: 32017-400";
+                        }
+                } else if (isVigilancia) {
+                        contractedName = "PROMOVER VIGILÂNCIA PATRIMONIAL LTDA";
+                        contractedCnpj = "43.576.260/0001-12";
+                        contractedAddress = "Rua Coronel João Camargos, 267, Bairro Centro, Contagem/MG, CEP: 32040-620";
+                }
+
+                // Título em destaque no iText
+                document.add(new Paragraph("CONTRATO DE PRESTAÇÃO DE SERVIÇOS")
+                                .setBold().setFontSize(14f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                                .setMarginBottom(15f));
+
+                // CLÁUSULA PRIMEIRA - Das Partes
+                document.add(new Paragraph("CLÁUSULA PRIMEIRA - DAS PARTES CONTRATANTES").setBold().setFontSize(10f).setMarginBottom(4f));
+                
+                String contratanteText = String.format(
+                                "CONTRATANTE: %s, com endereço situado a %s, inscrita no CNPJ/CPF sob nº %s, neste ato representada por %s, doravante denominada CONTRATANTE.",
+                                request.getClientName() != null ? request.getClientName() : "[NOME DO CLIENTE]",
+                                request.getClientAddress() != null ? request.getClientAddress() : "[ENDEREÇO DO CLIENTE]",
+                                request.getClientDocument() != null ? request.getClientDocument() : "[DOCUMENTO DO CLIENTE]",
+                                request.getRepresentativeName() != null ? request.getRepresentativeName() : "[REPRESENTANTE LEGAL]"
+                );
+                
+                String contratadaText = String.format(
+                                "CONTRATADA: %s, com sede na %s, inscrita no CNPJ sob o nº %s, doravante denominada CONTRATADA.",
+                                contractedName, contractedAddress, contractedCnpj
+                );
+
+                document.add(new Paragraph(contratanteText).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(4f));
+                document.add(new Paragraph(contratadaText).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
+
+                // CLÁUSULA SEGUNDA - Do Objeto
+                document.add(new Paragraph("CLÁUSULA SEGUNDA - DO OBJETO E DOS POSTOS DE TRABALHO").setBold().setFontSize(10f).setMarginBottom(4f));
+                
+                String objetoBase = isVigilancia 
+                                ? "Constitui objeto do presente Contrato a prestação, pela CONTRATADA ao CONTRATANTE, de serviços especializados de vigilância e segurança patrimonial ativa, através de mão de obra qualificada."
+                                : "Constitui objeto do presente Contrato o fornecimento, pela CONTRATADA ao CONTRATANTE, de mão de obra qualificada para a realização de serviços administrativos, facilidades, apoio operacional e controle de portaria.";
+                
+                if (isCombinado) {
+                        objetoBase = "Constitui objeto do presente Contrato a prestação de serviços integrados, envolvendo o fornecimento de mão de obra qualificada para facilidades administrativas, apoio operacional e vigilância patrimonial ativa.";
+                }
+
+                document.add(new Paragraph(objetoBase).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(6f));
+
+                // Listar Postos de Trabalho vinculados se existirem
+                if (request.getWorkPostIds() != null && !request.getWorkPostIds().isEmpty()) {
+                        document.add(new Paragraph("Relação de Postos de Trabalho Contratados:").setBold().setFontSize(9f).setMarginBottom(4f));
+                        
+                        try {
+                                List<WorkPost> posts = workPostRepository.findAllById(request.getWorkPostIds());
+                                if (!posts.isEmpty()) {
+                                        Table postsTable = new Table(UnitValue.createPercentArray(new float[] { 25, 20, 20, 20, 15 }))
+                                                        .useAllAvailableWidth().setMarginBottom(10f);
+                                        
+                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Posto / Código").setBold().setFontSize(8f)));
+                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Escala / Turno").setBold().setFontSize(8f)));
+                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Tipo").setBold().setFontSize(8f)));
+                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Cidade/UF").setBold().setFontSize(8f)));
+                                        postsTable.addHeaderCell(new Cell().add(new Paragraph("Efetivo").setBold().setFontSize(8f)));
+
+                                        for (WorkPost post : posts) {
+                                                postsTable.addCell(new Cell().add(new Paragraph(post.getName() + " (" + (post.getPostCode() != null ? post.getPostCode() : "N/D") + ")").setFontSize(8f)));
+                                                postsTable.addCell(new Cell().add(new Paragraph((post.getWorkSchedule() != null ? post.getWorkSchedule() : "-") + "\n" + (post.getShiftDescription() != null ? post.getShiftDescription() : "-")).setFontSize(8f)));
+                                                postsTable.addCell(new Cell().add(new Paragraph(post.getType() != null ? post.getType().toString() : "-").setFontSize(8f)));
+                                                postsTable.addCell(new Cell().add(new Paragraph((post.getCity() != null ? post.getCity() : "-") + "/" + (post.getState() != null ? post.getState() : "-")).setFontSize(8f)));
+                                                postsTable.addCell(new Cell().add(new Paragraph(post.getRequiredVigilantes() != null ? post.getRequiredVigilantes().toString() : "1").setFontSize(8f)));
+                                        }
+                                        document.add(postsTable);
+                                } else {
+                                        document.add(new Paragraph("Efetivos e postos de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
+                                }
+                        } catch (Exception e) {
+                                log.error("Erro ao buscar postos de trabalho para o PDF", e);
+                                document.add(new Paragraph("Efetivos e postos de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
+                        }
+                } else {
+                        document.add(new Paragraph("Efetivos e postos de trabalho conforme proposta comercial em anexo.").setFontSize(9f).setItalic().setMarginBottom(6f));
+                }
+
+                // CLÁUSULA TERCEIRA - Obrigações da Contratada
+                document.add(new Paragraph("CLÁUSULA TERCEIRA - DAS OBRIGAÇÕES DA CONTRATADA").setBold().setFontSize(10f).setMarginBottom(4f));
+                int replacementHours = request.getReplacementTimeHours() != null ? request.getReplacementTimeHours() : 72;
+                
+                String obrigacaotrab = String.format(
+                                "Fica a CONTRATADA obrigada a manter profissionais habilitados, devidamente treinados e uniformizados. É de inteira e exclusiva responsabilidade da CONTRATADA todos os encargos trabalhistas, previdenciários e securitários de seu pessoal. Fica também estabelecido que qualquer membro da equipe alocado será substituído em até %d (setenta e duas) horas em caso de falta, férias, licença ou por solicitação expressa da CONTRATANTE.",
+                                replacementHours
+                );
+
+                if (isVigilancia) {
+                        obrigacaotrab += String.format(
+                                        " Tratando-se de vigilância patrimonial ativa, a CONTRATADA compromete-se a manter rondas periódicas de frequência de '%s' e assegurar que a ausência máxima ininterrupta no posto não ultrapasse %d minutos.",
+                                        request.getPatrolFrequency() != null ? request.getPatrolFrequency() : "conforme plano de segurança",
+                                        request.getMaxAbsenceMinutes() != null ? request.getMaxAbsenceMinutes() : 15
+                        );
+                }
+                
+                document.add(new Paragraph(obrigacaotrab).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
+
+                // CLÁUSULA QUARTA - Obrigações da Contratante
+                document.add(new Paragraph("CLÁUSULA QUARTA - DAS OBRIGAÇÕES DA CONTRATANTE").setBold().setFontSize(10f).setMarginBottom(4f));
+                String obrigacaoContratante = "Fica a CONTRATANTE obrigada a franquear o acesso livre dos funcionários da CONTRATADA devidamente identificados aos locais de prestação de serviços, bem como disponibilizar a infraestrutura mínima necessária para o desempenho das funções e efetuar os pagamentos de forma pontual conforme acordado neste instrumento.";
+                document.add(new Paragraph(obrigacaoContratante).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
+
+                // CLÁUSULA QUINTA - Do Preço e Condições
+                document.add(new Paragraph("CLÁUSULA QUINTA - DO PREÇO E DO REAJUSTE").setBold().setFontSize(10f).setMarginBottom(4f));
+                
+                BigDecimal monthlyVal = request.getMonthlyValue() != null ? request.getMonthlyValue() : request.getValue();
+                String precoText = String.format(
+                                "Pelos serviços ora contratados, a CONTRATANTE pagará à CONTRATADA o valor mensal fixo de R$ %s (conforme demonstrado em algarismos), sendo efetuado o pagamento nas condições a seguir: %s. O contrato será reajustado anualmente pela variação acumulada do IPCA/IBGE ou outro índice oficial substituto.",
+                                formatMoney(monthlyVal),
+                                request.getPaymentTerms() != null ? request.getPaymentTerms() : "até o 5º dia útil do mês subsequente"
+                );
+                document.add(new Paragraph(precoText).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
+
+                // CLÁUSULA SEXTA - Da Vigência e Penalidades
+                document.add(new Paragraph("CLÁUSULA SEXTA - DA VIGÊNCIA E DAS PENALIDADES").setBold().setFontSize(10f).setMarginBottom(4f));
+                
+                String dataFim = request.getEndDate() != null ? formatDate(request.getEndDate()) : "Prazo Indeterminado";
+                String vigenciaText = String.format(
+                                "O presente contrato entra em vigor na data de %s, com término previsto para %s. Fica pactuada multa penal correspondente a 10%% (dez por cento) sobre o saldo devedor ou conforme regras adicionais de multas: %s para a parte que descumprir as cláusulas contratuais, sem prejuízo da rescisão de pleno direito mediante aviso prévio de 30 dias.",
+                                formatDate(request.getStartDate()),
+                                dataFim,
+                                request.getPenalties() != null && !request.getPenalties().isEmpty() ? request.getPenalties() : "multa padrão contratual de 10%"
+                );
+                document.add(new Paragraph(vigenciaText).setFontSize(9f).setTextAlignment(TextAlignment.JUSTIFIED).setMarginBottom(12f));
+
+                // Observações Extras
+                if (request.getObservations() != null && !request.getObservations().isEmpty()) {
+                        document.add(new Paragraph("OBSERVAÇÕES COMPLEMENTARES").setBold().setFontSize(9f).setMarginBottom(2f));
+                        document.add(new Paragraph(request.getObservations()).setFontSize(8.5f).setItalic().setMarginBottom(12f));
+                }
+
+                // Assinaturas
+                addSignatures(document, request, company, config, contractedName);
         }
 
         private String processPlaceholders(String terms, ClientContractRequest request, Company company) {
@@ -394,7 +569,7 @@ public class ClientContractStandardPdfService {
         }
 
         private void addSignatures(Document document, ClientContractRequest request, Company company,
-                        CompanyConfig config) {
+                        CompanyConfig config, String contractorNameOverride) {
                 String city = request.getCity() != null ? request.getCity()
                                 : (config.getCity() != null ? config.getCity() : "_______________");
                 String date = formatDateExtended(
@@ -410,7 +585,8 @@ public class ClientContractStandardPdfService {
                 Table sigTable = new Table(UnitValue.createPercentArray(new float[] { 45, 10, 45 }))
                                 .useAllAvailableWidth();
 
-                String contractorName = company.getName() != null ? company.getName() : "";
+                String contractorName = contractorNameOverride != null ? contractorNameOverride
+                                : (company.getName() != null ? company.getName() : "");
                 String clientSignName = request.getClientName() != null ? request.getClientName() : "";
 
                 Cell cell1 = new Cell()

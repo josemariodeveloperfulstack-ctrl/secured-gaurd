@@ -53,27 +53,40 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
         companyService.getAllCompanies(),
         companyConfigService.getActiveConfig()
       ]);
-      setCompaniesList(Array.isArray(companies) ? companies : []);
+      const actualCompanies = Array.isArray(companies) ? companies : [];
+      setCompaniesList(actualCompanies);
 
       let companyIdToSet = '';
       if (activeConfig) {
-        setConfig(activeConfig);
         if (activeConfig.companyId) {
           companyIdToSet = activeConfig.companyId;
-        } else if (activeConfig.cnpj && companies?.length) {
-          const match = companies.find((c: any) =>
+        } else if (activeConfig.cnpj && actualCompanies.length) {
+          const match = actualCompanies.find((c: any) =>
             (c.cnpj || '').replace(/\D/g, '') === (activeConfig.cnpj || '').replace(/\D/g, '')
           );
           if (match) companyIdToSet = match.id;
         }
       }
-      if (!companyIdToSet && companies?.length > 0) {
-        companyIdToSet = companies[0].id;
+      if (!companyIdToSet && actualCompanies.length > 0) {
+        companyIdToSet = actualCompanies[0].id;
       }
       setSelectedCompanyId(companyIdToSet);
 
-      if (!activeConfig && companies?.length > 0) {
-        const first = companies[0];
+      if (activeConfig) {
+        let mergedConfig = { ...activeConfig };
+        if (companyIdToSet && actualCompanies.length) {
+          const matchingComp = actualCompanies.find((c: any) => c.id === companyIdToSet);
+          if (matchingComp) {
+            mergedConfig = {
+              ...mergedConfig,
+              phone: matchingComp.phone || mergedConfig.phone || '',
+              email: matchingComp.email || mergedConfig.email || '',
+            };
+          }
+        }
+        setConfig(mergedConfig);
+      } else if (actualCompanies.length > 0) {
+        const first = actualCompanies[0];
         const addr = [first.address, first.enderecoRua, first.city, first.state, first.zipCode].filter(Boolean).join(', ');
         setConfig({
           name: first.name || '',
@@ -119,7 +132,7 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
 7. DO FORO:
    - Foro da comarca de Contagem/MG para questões judiciais`
         });
-      } else if (!activeConfig && companies?.length === 0) {
+      } else {
         setConfig(prev => ({ ...prev, name: '', cnpj: '', address: '', city: '', state: '', zipCode: '', phone: '', email: '', website: '' }));
       }
     } catch (error) {
@@ -143,15 +156,15 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
       setConfig(prev => ({
         ...prev,
         companyId: companyId,
-        name: company.name || prev.name,
-        cnpj: company.cnpj || prev.cnpj,
-        address: address || prev.address,
-        city: company.city || prev.city,
-        state: company.state || prev.state,
-        zipCode: company.zipCode || prev.zipCode,
-        phone: company.phone || prev.phone,
-        email: company.email || prev.email,
-        website: company.website || prev.website,
+        name: company.name || '',
+        cnpj: company.cnpj || '',
+        address: address || '',
+        city: company.city || '',
+        state: company.state || '',
+        zipCode: company.zipCode || '',
+        phone: company.phone || '',
+        email: company.email || '',
+        website: company.website || '',
         logoUrl: company.logoUrl || ''
       }));
     }

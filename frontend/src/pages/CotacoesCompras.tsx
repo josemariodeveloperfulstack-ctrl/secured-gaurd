@@ -490,6 +490,7 @@ const CotacoesCompras: React.FC = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Número</TableHead>
+                    <TableHead>Solicitação</TableHead>
                     <TableHead>Título</TableHead>
                     <TableHead>Fornecedor</TableHead>
                     <TableHead>Status</TableHead>
@@ -503,6 +504,24 @@ const CotacoesCompras: React.FC = () => {
                   {filteredQuotations.map((quotation) => (
                     <TableRow key={quotation.id} className="cursor-pointer hover:bg-muted/50">
                       <TableCell className="font-medium">{quotation.quoteNumber}</TableCell>
+                      <TableCell>
+                        {quotation.purchaseRequestNumber ? (
+                          <Button
+                            variant="link"
+                            className="p-0 h-auto text-seguranca-yellow hover:text-yellow-400 font-semibold hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (quotation.purchaseRequestId) {
+                                handleViewPurchaseRequestFromQuotation(quotation.purchaseRequestId);
+                              }
+                            }}
+                          >
+                            {quotation.purchaseRequestNumber}
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div>
                           <div className="font-medium">{quotation.title}</div>
@@ -574,7 +593,7 @@ const CotacoesCompras: React.FC = () => {
                   ))}
                   {filteredQuotations.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={9} className="text-center py-8">
                         <div className="text-muted-foreground">
                           {searchTerm || filters.status !== 'ALL' || filters.supplier || filters.assignedTo
                             ? 'Nenhuma cotação encontrada com os filtros aplicados.'

@@ -26,6 +26,11 @@ import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import { Client } from '@/types/client';
 import { formatDateForBackend, formatDateForDisplay, parseDateFromBackend, parseBrazilianDateString } from '@/utils/dateUtils';
 import { getApiUrl } from '@/config/environment';
+import { ClientSearchCombobox } from '@/components/ui/client-search-combobox';
+import { workPostService, WorkPost } from '@/services/workPostService';
+import { Checkbox } from '@/components/ui/checkbox';
+import { WorkPostDrawer } from './WorkPostDrawer';
+
 
 interface ContractGeneratorProps {
   open: boolean;
@@ -84,6 +89,11 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   const [clientsLoading, setClientsLoading] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isWorkPostDrawerOpen, setIsWorkPostDrawerOpen] = useState(false);
+
+  const [workPosts, setWorkPosts] = useState<WorkPost[]>([]);
+  const [workPostsLoading, setWorkPostsLoading] = useState(false);
+  const [selectedWorkPostIds, setSelectedWorkPostIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -92,6 +102,8 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       loadCompanyConfig();
       loadCompaniesList();
       loadClients();
+      setWorkPosts([]);
+      setSelectedWorkPostIds([]);
 
       // Carregar dados do contrato se fornecido
       if (contract) {
@@ -116,6 +128,27 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
       }
     }
   }, [open, contract]);
+
+  // Carregar os postos de trabalho do cliente selecionado de forma reativa
+  useEffect(() => {
+    if (selectedClientId) {
+      setWorkPostsLoading(true);
+      workPostService.getWorkPostsByClient(selectedClientId)
+        .then(posts => {
+          setWorkPosts(Array.isArray(posts) ? posts : []);
+        })
+        .catch(err => {
+          console.error("Erro ao carregar postos de trabalho do cliente:", err);
+          setWorkPosts([]);
+        })
+        .finally(() => {
+          setWorkPostsLoading(false);
+        });
+    } else {
+      setWorkPosts([]);
+      setSelectedWorkPostIds([]);
+    }
+  }, [selectedClientId]);
 
   // Preencher dados do cliente quando a lista carregar e houver contract com clientId
   useEffect(() => {
@@ -207,9 +240,16 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     }
   };
 
-  const handleSelectClient = (clientId: string) => {
+  const handleSelectClient = async (clientId: string) => {
     setSelectedClientId(clientId);
-    const selected = clients.find((c: any) => c.id === clientId);
+    let selected = clients.find((c: any) => c.id === clientId);
+    if (!selected && clientId) {
+      try {
+        selected = await clientService.getClientById(clientId);
+      } catch (err) {
+        console.error('Erro ao buscar detalhes do cliente:', err);
+      }
+    }
     if (!selected) return;
     const composedAddress = [selected.address, selected.city, selected.state, selected.zipCode]
       .filter(Boolean)
@@ -243,6 +283,32 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
     }
   };
 
+  const handleWorkPostCreated = (newPost: any) => {
+    if (newPost && newPost.id) {
+      if (selectedClientId) {
+        setWorkPostsLoading(true);
+        workPostService.getWorkPostsByClient(selectedClientId)
+          .then(posts => {
+            const list = Array.isArray(posts) ? posts : [];
+            setWorkPosts(list);
+            // Auto-select the newly created post
+            setSelectedWorkPostIds(prev => {
+              if (!prev.includes(newPost.id)) {
+                return [...prev, newPost.id];
+              }
+              return prev;
+            });
+          })
+          .catch(err => {
+            console.error("Erro ao carregar postos de trabalho após criação:", err);
+          })
+          .finally(() => {
+            setWorkPostsLoading(false);
+          });
+      }
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', {
       style: 'currency',
@@ -269,6 +335,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
   const generateContractHTML = () => {
     if (!configForContract) return '';
     const logoUrl = configForContract?.logoUrl && getLogoDisplayUrl(configForContract.logoUrl);
+    const selectedWorkPosts = workPosts.filter(wp => selectedWorkPostIds.includes(wp.id));
 
     return `
       <!DOCTYPE html>
@@ -456,6 +523,34 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
             </table>
           </div>
 
+          ${selectedWorkPosts.length > 0 ? `
+          <div class="clause">
+            <div class="clause-title">POSTOS DE TRABALHO VINCULADOS:</div>
+            <table class="table">
+              <thead>
+                <tr style="background-color: #f0f0f0;">
+                  <th>Código</th>
+                  <th>Nome do Posto</th>
+                  <th>Escala</th>
+                  <th>Horário</th>
+                  <th>Cidade/UF</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${selectedWorkPosts.map(wp => `
+                  <tr>
+                    <td>${wp.postCode || '-'}</td>
+                    <td>${wp.name || '-'}</td>
+                    <td>${wp.workSchedule || '-'}</td>
+                    <td>${wp.shiftStart && wp.shiftEnd ? `${wp.shiftStart} - ${wp.shiftEnd}` : '-'}</td>
+                    <td>${wp.city || '-'}/${wp.state || '-'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
           <div class="clause">
             <div class="clause-title">CLÁUSULA 1ª - DO PAGAMENTO:</div>
             <p>${contractData.paymentTerms}</p>
@@ -563,6 +658,7 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
         observations: contractData.observations || '',
         city: configForContract?.city || '',
         contractDate: new Date().toISOString().split('T')[0],
+        workPostIds: selectedWorkPostIds || [],
       };
 
       const blob = await contractService.generateContractPdf(payload);
@@ -716,32 +812,21 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-end gap-3">
                   <div className="flex-1">
                     <Label className="text-seguranca-lightgray text-xs sm:text-sm">Cliente *</Label>
-                    <Select
-                      value={selectedClientId || '__none__'}
-                      onValueChange={(v) => {
-                        if (v === '__none__') {
+                    <ClientSearchCombobox
+                      value={selectedClientId}
+                      onChange={(v) => {
+                        if (!v) {
                           setSelectedClientId('');
                           setContractData(prev => ({ ...prev, clientName: '', clientDocument: '', clientAddress: '', clientPhone: '', clientEmail: '' }));
                         } else {
                           handleSelectClient(v);
                         }
                       }}
+                      minChars={1}
+                      placeholder="Selecione ou busque por CNPJ/Nome"
+                      initialDisplayName={contractData.clientName}
                       disabled={clientsLoading}
-                    >
-                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray text-xs sm:text-sm mt-1">
-                        <SelectValue placeholder={clientsLoading ? 'Carregando...' : 'Selecione um cliente'} />
-                      </SelectTrigger>
-                      <SelectContent className="bg-seguranca-graphite border-gray-600">
-                        <SelectItem value="__none__" className="text-gray-500">
-                          Selecione um cliente
-                        </SelectItem>
-                        {clients.map((c: any) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name} {c.cnpj ? `- ${c.cnpj}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                   <Button
                     type="button"
@@ -768,10 +853,143 @@ export const ContractGenerator: React.FC<ContractGeneratorProps> = ({
               </CardContent>
             </Card>
 
+            {selectedClientId && (
+              <Card className="bg-seguranca-black border-2 border-zinc-800 rounded-none mt-4">
+                <CardHeader className="px-3 sm:px-6 py-3 sm:py-4 border-b border-zinc-800 flex flex-row items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-seguranca-lightgray text-xs sm:text-sm font-mono tracking-wider text-yellow-500 uppercase">
+                      [POSTOS DE TRABALHO DO CLIENTE]
+                    </CardTitle>
+                    <p className="text-xs text-gray-400 mt-1">Selecione os postos de trabalho deste cliente que farão parte das cláusulas deste contrato.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsWorkPostDrawerOpen(true)}
+                    className="border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black rounded-none font-mono text-xs uppercase shrink-0"
+                  >
+                    [CADASTRAR POSTO]
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4 px-3 sm:px-6 py-4">
+                  {workPostsLoading ? (
+                    <div className="flex items-center gap-2 text-seguranca-lightgray text-sm py-4">
+                      <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
+                      <span>Carregando postos de trabalho do cliente...</span>
+                    </div>
+                  ) : workPosts.length === 0 ? (
+                    <div className="p-6 border-2 border-dashed border-zinc-800 text-center rounded-none flex flex-col items-center gap-3">
+                      <p className="text-zinc-500 text-sm font-mono uppercase font-bold tracking-wider">[Nenhum posto de trabalho cadastrado para este cliente]</p>
+                      <p className="text-xs text-zinc-600">Adicione postos de trabalho de forma instantânea e permanente para este cliente.</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsWorkPostDrawerOpen(true)}
+                        className="border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-black rounded-none font-mono text-xs uppercase"
+                      >
+                        [Cadastrar Primeiro Posto]
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 justify-end border-b border-zinc-800 pb-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedWorkPostIds(workPosts.map(wp => wp.id))}
+                          className="h-7 text-xs font-mono border border-zinc-800 rounded-none bg-zinc-900 text-yellow-500 hover:bg-yellow-500 hover:text-black"
+                        >
+                          [SELECIONAR TODOS]
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedWorkPostIds([])}
+                          className="h-7 text-xs font-mono border border-zinc-800 rounded-none bg-zinc-900 text-zinc-400 hover:bg-red-600 hover:text-white"
+                        >
+                          [LIMPAR SELEÇÃO]
+                        </Button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                        {workPosts.map((wp) => {
+                          const isSelected = selectedWorkPostIds.includes(wp.id);
+                          return (
+                            <div
+                              key={wp.id}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedWorkPostIds(prev => prev.filter(id => id !== wp.id));
+                                } else {
+                                  setSelectedWorkPostIds(prev => [...prev, wp.id]);
+                                }
+                              }}
+                              className={`flex items-start gap-3 p-3 border-2 transition-all cursor-pointer rounded-none ${
+                                isSelected
+                                  ? 'border-yellow-500 bg-yellow-500/5 text-seguranca-lightgray'
+                                  : 'border-zinc-800 bg-zinc-900/40 text-zinc-400 hover:border-zinc-700'
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedWorkPostIds(prev => [...prev, wp.id]);
+                                  } else {
+                                    setSelectedWorkPostIds(prev => prev.filter(id => id !== wp.id));
+                                  }
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mt-0.5 rounded-none border-2 border-zinc-600 data-[state=checked]:bg-yellow-500 data-[state=checked]:text-black data-[state=checked]:border-yellow-500"
+                              />
+                              <div className="flex-1 font-mono text-xs space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-seguranca-lightgray truncate">{wp.name}</span>
+                                  {wp.postCode && (
+                                    <span className="px-1.5 py-0.5 bg-zinc-800 text-zinc-500 text-[10px] uppercase font-semibold">
+                                      COD: {wp.postCode}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-zinc-500 flex flex-wrap gap-x-3 gap-y-1">
+                                  {wp.workSchedule && (
+                                    <span>Escala: <strong className="text-zinc-400">{wp.workSchedule}</strong></span>
+                                  )}
+                                  {wp.shiftStart && wp.shiftEnd && (
+                                    <span>Horário: <strong className="text-zinc-400">{wp.shiftStart} - {wp.shiftEnd}</strong></span>
+                                  )}
+                                  {(wp.city || wp.state) && (
+                                    <span>Local: <strong className="text-zinc-400">{wp.city || '-'}/{wp.state || '-'}</strong></span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="text-[10px] font-mono text-zinc-500 text-right">
+                        {selectedWorkPostIds.length} de {workPosts.length} posto(s) selecionado(s)
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <ClientFormModal
               isOpen={isClientModalOpen}
               onClose={() => setIsClientModalOpen(false)}
               onSuccess={handleClientCreated}
+            />
+
+            <WorkPostDrawer
+              open={isWorkPostDrawerOpen}
+              onClose={() => setIsWorkPostDrawerOpen(false)}
+              clientId={selectedClientId}
+              onSuccess={handleWorkPostCreated}
             />
 
             {/* Dados do Contrato */}

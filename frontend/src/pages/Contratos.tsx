@@ -310,21 +310,23 @@ const Contratos = () => {
 
   return (
     <StandardLayout>
-      <div className="space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden px-3 sm:px-4 lg:px-6 pb-6">
+      <div className="space-y-6 w-full max-w-full overflow-x-hidden px-4 sm:px-6 lg:px-8 pb-8 bg-[#0C0C0C]">
         <div className="space-y-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray">Contratos</h1>
+          <div className="border-b-2 border-zinc-800 pb-3">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold uppercase tracking-widest text-yellow-500 font-mono">
+              🛡️ Gestão de Contratos <span className="text-xs text-zinc-500 font-mono tracking-normal lowercase">v1.2.0-brutalist</span>
+            </h1>
           </div>
           
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 lg:gap-4">
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 lg:gap-4 bg-[#121212] border-2 border-zinc-800 p-4 rounded-none">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-1">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCompanySettings}
-                className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black text-xs sm:text-sm flex-shrink-0"
+                className="border-2 border-yellow-500 text-yellow-500 bg-transparent hover:bg-yellow-500 hover:text-black text-xs sm:text-sm font-bold uppercase tracking-wider rounded-none flex-shrink-0 h-9 transition-all active:scale-[0.98]"
               >
-                <Building className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <Building className="h-3.5 w-3.5 mr-1.5" />
                 <span className="hidden sm:inline">Config. Empresa</span>
                 <span className="sm:hidden">Empresa</span>
               </Button>
@@ -333,9 +335,9 @@ const Contratos = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => handleGenerateContract()}
-                className="border-green-500 text-green-400 hover:bg-green-500 hover:text-white text-xs sm:text-sm flex-shrink-0"
+                className="border-2 border-green-500 text-green-500 bg-transparent hover:bg-green-500 hover:text-black text-xs sm:text-sm font-bold uppercase tracking-wider rounded-none flex-shrink-0 h-9 transition-all active:scale-[0.98]"
               >
-                <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
                 <span className="hidden sm:inline">Gerar Contrato</span>
                 <span className="sm:hidden">Gerar</span>
               </Button>
@@ -344,9 +346,9 @@ const Contratos = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setConfigModalOpen(true)}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs sm:text-sm flex-shrink-0"
+                className="border-2 border-zinc-700 text-zinc-400 bg-transparent hover:bg-zinc-700 hover:text-white text-xs sm:text-sm font-bold uppercase tracking-wider rounded-none flex-shrink-0 h-9 transition-all active:scale-[0.98]"
               >
-                <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <Settings className="h-3.5 w-3.5 mr-1.5" />
                 <span className="hidden sm:inline">Config. Emails</span>
                 <span className="sm:hidden">Emails</span>
               </Button>
@@ -360,24 +362,24 @@ const Contratos = () => {
                   setTimeout(() => setRefreshing(false), 1000);
                 }}
                 disabled={refreshing}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black flex-shrink-0"
+                className="border-2 border-zinc-700 text-zinc-400 bg-transparent hover:bg-zinc-700 hover:text-white rounded-none flex-shrink-0 h-9 transition-all active:scale-[0.98]"
               >
                 {refreshing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                 ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                 )}
-                <span className="hidden sm:inline">{refreshing ? 'Atualizando...' : 'Atualizar'}</span>
-                <span className="sm:hidden">{refreshing ? '...' : 'Atualizar'}</span>
+                <span className="hidden sm:inline uppercase font-bold tracking-wider text-xs">{refreshing ? 'Atualizando...' : 'Atualizar'}</span>
+                <span className="sm:hidden uppercase font-bold tracking-wider text-xs">{refreshing ? '...' : 'Atualizar'}</span>
               </Button>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1 sm:flex-initial">
               <div className="relative flex-1 sm:flex-initial min-w-0">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-500" size={16} />
                 <Input
-                  placeholder="Pesquisar contratos..."
-                  className="pl-10 w-full sm:w-48 lg:w-64 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
+                  placeholder="Pesquisar contratos/CNPJ..."
+                  className="pl-10 w-full sm:w-48 lg:w-64 bg-black border-2 border-zinc-800 text-white placeholder-zinc-700 rounded-none focus-visible:ring-1 focus-visible:ring-yellow-500 text-xs h-9 uppercase font-mono"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -385,9 +387,9 @@ const Contratos = () => {
               
               <Button
                 onClick={() => setModalOpen(true)}
-                className="bg-seguranca-red hover:bg-seguranca-darkred flex-shrink-0 whitespace-nowrap"
+                className="bg-yellow-500 text-black hover:bg-yellow-600 border-2 border-yellow-500 hover:border-yellow-600 rounded-none flex-shrink-0 whitespace-nowrap font-extrabold uppercase tracking-wider text-xs h-9 transition-all active:scale-[0.98]"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-1.5" />
                 <span className="hidden sm:inline">Novo Contrato</span>
                 <span className="sm:hidden">Novo</span>
               </Button>

@@ -9,6 +9,7 @@ import { ScrollPreservingLink } from './ScrollPreservingLink';
 import UserProfileModal from './UserProfileModal';
 import { UserRole } from '@/types/user';
 import Logo from './Logo';
+import { prefetchRoute } from '@/hooks/usePagePrefetch';
 import {
   BarChart3,
   FileText,
@@ -84,6 +85,110 @@ import {
 
 /** Persistência das seções abertas/fechadas (acordeão vertical da sidebar) */
 const SIDEBAR_NAV_STORAGE_KEY = 'secured-guard-sidebar-nav-sections';
+
+/**
+ * Map of route path (without query string) → dynamic import function.
+ * Used by the hover prefetch: when the user hovers a sidebar item, the
+ * corresponding JS chunk is downloaded immediately — so the click is instant.
+ */
+const ROUTE_PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
+  '/dashboard':                    () => import('@/pages/Dashboard'),
+  '/dashboard-home':               () => import('@/pages/Dashboard'),
+  '/area-funcionario':             () => import('@/pages/EmployeePortal'),
+  '/dashboard-colaborador':        () => import('@/pages/EmployeePortal'),
+  '/holerites':                    () => import('@/pages/Holerites'),
+  '/meus-holerites':               () => import('@/pages/MeusHolerites'),
+  '/frota':                        () => import('@/pages/Frota'),
+  '/filiais':                      () => import('@/pages/Filiais'),
+  // Operacional
+  '/operacional':                  () => import('@/pages/Operacional'),
+  '/controle-rondas':              () => import('@/pages/ControleRondas'),
+  '/guia-transporte':              () => import('@/pages/GuiaTransporte'),
+  // Financeiro
+  '/financeiro':                   () => import('@/pages/Financeiro'),
+  '/financeiro/contas-pagar':      () => import('@/pages/ContasAPagar'),
+  '/financeiro/contas-receber':    () => import('@/pages/ContasAReceber'),
+  '/financeiro/fluxo-caixa':       () => import('@/pages/FluxoCaixa'),
+  '/financeiro/pagamentos':        () => import('@/pages/Pagamentos'),
+  '/financeiro/conciliacao-bancaria': () => import('@/pages/ConciliacaoBancaria'),
+  '/financeiro/bancos':            () => import('@/pages/Bancos'),
+  '/financeiro/agencias':          () => import('@/pages/Agencias'),
+  '/financeiro/relatorios':        () => import('@/pages/RelatoriosFinanceiros'),
+  '/financeiro/centro-custos':     () => import('@/pages/CentrosDeCusto'),
+  '/financeiro/medicao':           () => import('@/pages/Medicao'),
+  '/gestao-patrimonial':           () => import('@/pages/GestaoPatrimonial'),
+  '/modulo-fiscal':                () => import('@/pages/ModuloFiscal'),
+  // RH
+  '/rh':                           () => import('@/pages/RH'),
+  '/rh/funcionarios':              () => import('@/pages/Funcionarios'),
+  '/rh/postos':                    () => import('@/pages/Postos'),
+  '/rh/vagas':                     () => import('@/pages/Vagas'),
+  '/rh/beneficios':                () => import('@/pages/Beneficios'),
+  '/rh/aniversariantes':           () => import('@/pages/RH/Aniversariantes'),
+  '/rh/treinamentos':              () => import('@/pages/RH/Treinamentos'),
+  '/rh/sst':                       () => import('@/pages/RH/SST'),
+  '/rh/sst/exames':                () => import('@/pages/RH/SST/ExamesMedicos'),
+  '/rh/sst/epis':                  () => import('@/pages/RH/SST/EPIs'),
+  '/rh/sst/acidentes':             () => import('@/pages/RH/SST/Acidentes'),
+  '/rh/sst/treinamentos':          () => import('@/pages/RH/SST/Treinamentos'),
+  '/rh/sst/cipa':                  () => import('@/pages/RH/SST/CIPA'),
+  '/rh/sst/relatorios':            () => import('@/pages/RH/SST/Relatorios'),
+  '/rh/admissao-demissao':         () => import('@/pages/AdmissaoDemissao'),
+  '/rh/remanejamentos':            () => import('@/pages/Remanejamento'),
+  '/rh/ferias':                    () => import('@/pages/Ferias'),
+  '/rh/ponto-eletronico':          () => import('@/pages/RH/PontoEletronico'),
+  '/rh/fechamento-horas':          () => import('@/pages/RH/FechamentoHoras'),
+  '/rh/ocorrencias':               () => import('@/pages/Ocorrencias'),
+  '/rh/funcoes':                   () => import('@/pages/Funcoes'),
+  '/rh/cargos':                    () => import('@/pages/Cargos'),
+  '/rh/epis':                      () => import('@/pages/EPIs'),
+  // Comercial
+  '/leads':                        () => import('@/pages/Leads'),
+  '/comercial/marketing':          () => import('@/pages/ComercialMarketing'),
+  '/comercial/empresas':           () => import('@/pages/Empresas'),
+  '/clientes':                     () => import('@/pages/Clientes'),
+  '/propostas':                    () => import('@/pages/Propostas'),
+  '/orcamentos':                   () => import('@/pages/Orcamentos'),
+  '/contratos':                    () => import('@/pages/Contratos'),
+  '/crm':                          () => import('@/pages/CrmKanban'),
+  // Estoque / Compras
+  '/estoque-simplificado':         () => import('@/pages/EstoqueSimplificado'),
+  '/estoque/relatorios':           () => import('@/pages/EstoqueRelatorios'),
+  '/estoque/fornecedores':         () => import('@/pages/Fornecedores'),
+  '/compras':                      () => import('@/pages/Compras'),
+  '/compras/solicitacoes':         () => import('@/pages/Compras'),
+  '/compras/aprovacoes':           () => import('@/pages/Compras'),
+  '/compras/cotacoes':             () => import('@/pages/CotacoesCompras'),
+  '/compras/fornecedores':         () => import('@/pages/Fornecedores'),
+  '/compras/relatorios':           () => import('@/pages/Compras'),
+  // Comunicação
+  '/chat-interno':                 () => import('@/pages/ChatInterno'),
+  '/mensagens':                    () => import('@/pages/Mensagens'),
+  '/webmail':                      () => import('@/pages/Webmail/WebmailApp'),
+  '/gestao-mensagens/grupos':      () => import('@/pages/GestaoMensagens'),
+  '/gestao-mensagens/notificacoes':() => import('@/pages/GestaoMensagens'),
+  // Atendimento
+  '/gestao-atendimento/dashboard': () => import('@/pages/GestaoAtendimento'),
+  '/gestao-atendimento/tickets':   () => import('@/pages/GestaoAtendimento'),
+  '/gestao-atendimento/historico': () => import('@/pages/GestaoAtendimento'),
+  '/gestao-atendimento/agentes':   () => import('@/pages/GestaoAtendimento'),
+  '/gestao-atendimento/metricas':  () => import('@/pages/GestaoAtendimento'),
+  '/gestao-atendimento/chatbot':   () => import('@/pages/GestaoAtendimento'),
+  // Sistema
+  '/usuarios':                     () => import('@/pages/Usuarios'),
+  '/grupos':                       () => import('@/pages/Grupos'),
+  '/atividades':                   () => import('@/pages/ActivityManagement'),
+  '/configuracoes':                () => import('@/pages/Configuracoes'),
+  '/configuracoes/backup':         () => import('@/pages/ConfiguracaoBackup'),
+  '/whatsapp-connection':          () => import('@/pages/WhatsAppConnection'),
+};
+
+/** Trigger hover prefetch for a given route path */
+function prefetchByPath(to: string): void {
+  const basePath = to.split('?')[0];
+  const importFn = ROUTE_PREFETCH_MAP[basePath];
+  if (importFn) prefetchRoute(importFn);
+}
 
 type SidebarNavSectionProps = {
   title: string;
@@ -293,8 +398,6 @@ const financeiroMenuItems = [
   { icon: Upload, text: 'Conciliação Bancária', to: '/financeiro/conciliacao-bancaria', id: 'financeiro-conciliacao-bancaria', requiredPermission: 'FINANCIAL_READ' },
   { icon: Building2, text: 'Bancos', to: '/financeiro/bancos', id: 'financeiro-bancos', requiredPermission: 'FINANCIAL_READ' },
   { icon: Building, text: 'Agências', to: '/financeiro/agencias', id: 'financeiro-agencias', requiredPermission: 'FINANCIAL_READ' },
-  { icon: BarChart3, text: 'Relatórios Financeiros', to: '/financeiro/relatorios', id: 'financeiro-relatorios', requiredPermission: 'REPORTS_READ' },
-  { icon: Wallet, text: 'Centro de Custos', to: '/financeiro/centro-custos', id: 'financeiro-centro-custos', requiredPermission: 'FINANCIAL_READ' },
   { icon: Ruler, text: 'Medição', to: '/financeiro/medicao', id: 'financeiro-medicao', requiredPermission: 'FINANCIAL_MEASUREMENT_READ' },
   { icon: Package, text: 'Gestão Patrimonial', to: '/gestao-patrimonial', id: 'gestao-patrimonial', requiredPermission: 'PATRIMONIAL_READ' },
 ];
@@ -430,6 +533,9 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'chat-interno',
     'mensagens',
     'webmail',
+    'area-funcionario',
+    'meus-holerites',
+    'gestao-atendimento-tickets',
   ]),
   GESTOR_COMERCIAL: new Set([
     'dashboard',
@@ -444,6 +550,9 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'chat-interno',
     'mensagens',
     'webmail',
+    'area-funcionario',
+    'meus-holerites',
+    'gestao-atendimento-tickets',
   ]),
   ASSISTENTE_COMERCIAL: new Set([
     'dashboard',
@@ -456,6 +565,9 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
     'chat-interno',
     'mensagens',
     'webmail',
+    'area-funcionario',
+    'meus-holerites',
+    'gestao-atendimento-tickets',
   ]),
   OPERACIONAL: new Set([
     'dashboard',
@@ -494,29 +606,45 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ]),
   ANALISTA_SUPRIMENTOS: new Set([
     'dashboard',
+    // Área do Funcionário (dados pessoais: Ponto, Docs, Férias, Plantões)
+    'area-funcionario',
+    'meus-holerites',
+    // Frota
+    'frota',
+    // Gestão de Holerites
     'holerites',
+    // Financeiro — Contas a Pagar e Pagamentos
     'financeiro',
     'financeiro-contas-pagar',
+    'financeiro-pagamentos',
     'financeiro-relatorios',
     'financeiro-centro-custos',
+    // Estoque
     'estoque-simplificado',
     'estoque-relatorios',
     'estoque-alertas',
     'estoque-fornecedores',
+    // Compras
     'compras',
     'compras-solicitacoes',
     'compras-aprovacoes',
     'compras-cotacoes',
+    'compras-fornecedores',
     'compras-relatorios',
+    // Comunicação, Emails e Mensagens
     'chat-interno',
     'mensagens',
-    'rh-funcionarios',
-    'dp-funcionarios',
-    'rh-sst-epis',
-    'dp-epis',
+    'webmail',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    'gestao-atendimento-tickets',
+    // ❌ RH / DPE / SST: não permitidos
   ]),
   ALMOXARIFADO: new Set([
     'dashboard',
+    // Área do Funcionário (dados pessoais: Ponto, Docs, Férias, Plantões)
+    'area-funcionario',
+    'meus-holerites',
     'estoque-simplificado',
     'estoque-relatorios',
     'estoque-alertas',
@@ -573,29 +701,72 @@ const ROLE_ALLOWED_ITEM_IDS: Partial<Record<UserRole, Set<string>>> = {
   ]),
   SUPRIMENTOS: new Set([
     'dashboard',
+    // Área do Funcionário (dados pessoais: Ponto, Docs, Férias, Plantões)
+    'area-funcionario',
+    'meus-holerites',
+    // Frota
+    'frota',
+    // Gestão de Holerites
     'holerites',
+    // Financeiro — Contas a Pagar e Pagamentos
     'financeiro',
     'financeiro-contas-pagar',
+    'financeiro-pagamentos',
+    'financeiro-fluxo-caixa',
     'financeiro-relatorios',
     'financeiro-centro-custos',
+    // Estoque
     'estoque-simplificado',
     'estoque-relatorios',
     'estoque-alertas',
     'estoque-fornecedores',
+    // Compras
+    'compras',
+    'compras-solicitacoes',
+    'compras-aprovacoes',
+    'compras-cotacoes',
+    'compras-fornecedores',
+    'compras-relatorios',
+    // Comunicação, Emails e Mensagens
+    'chat-interno',
+    'mensagens',
+    'webmail',
+    'gestao-mensagens-grupos',
+    'gestao-mensagens-notificacoes',
+    'gestao-atendimento-tickets',
+    // ❌ RH / DPE / SST: não permitidos
+  ]),
+  ANALISTA_SUPRIMENTOS: new Set([
+    'dashboard',
+    // Frota
+    'frota',
+    // Gestão de Holerites
+    'holerites',
+    // Financeiro — Contas a Pagar e Pagamentos
+    'financeiro',
+    'financeiro-contas-pagar',
+    'financeiro-pagamentos',
+    'financeiro-relatorios',
+    'financeiro-centro-custos',
+    // Estoque
+    'estoque-simplificado',
+    'estoque-relatorios',
+    'estoque-alertas',
+    'estoque-fornecedores',
+    // Compras
     'compras',
     'compras-solicitacoes',
     'compras-aprovacoes',
     'compras-cotacoes',
     'compras-relatorios',
+    // Comunicação, Emails e Mensagens
     'chat-interno',
     'mensagens',
+    'webmail',
     'gestao-mensagens-grupos',
     'gestao-mensagens-notificacoes',
     'gestao-atendimento-tickets',
-    'rh-funcionarios',
-    'dp-funcionarios',
-    'rh-sst-epis',
-    'dp-epis',
+    // ❌ RH / DPE / SST: não permitidos
   ]),
   // 🟩 SUPERVISOR — APENAS módulo Operacional, supervisão e comunicação.
   // ❌ NÃO vê: Financeiro, Fiscal, Comercial, Holerites/Folha, RH SST, Compras, Estoque, Sistema.
@@ -634,6 +805,7 @@ const ROLES_WITHOUT_FINANCIAL_MODULES = new Set<UserRole>([
   'VIGILANTE',
   'OPERACIONAL',
   'COLABORADOR',
+  // ✅ ANALISTA_SUPRIMENTOS removido — agora acessa Contas a Pagar e Pagamentos
 ]);
 
 // Roles que NÃO devem ver módulo Comercial (Leads, Marketing, Empresas, Clientes, Propostas, etc.)
@@ -648,6 +820,7 @@ const ROLES_WITHOUT_COMMERCIAL_MODULES = new Set<UserRole>([
   'ESTOQUE',
   'COMPRAS',
   'SUPRIMENTOS',
+  'ANALISTA_SUPRIMENTOS', // ✅ não acessa comercial
 ]);
 
 // Roles que NÃO devem ver módulo Sistema (Usuários, Grupos, Configurações, Backup)
@@ -665,6 +838,7 @@ const ROLES_WITHOUT_SYSTEM_MODULES = new Set<UserRole>([
   'ESTOQUE',
   'COMPRAS',
   'SUPRIMENTOS',
+  'ANALISTA_SUPRIMENTOS', // ✅ não acessa administração do sistema
   'FINANCEIRO',
   'AUDITOR',
 ]);
@@ -682,6 +856,7 @@ const ROLES_WITHOUT_HR_MODULES = new Set<UserRole>([
   'ESTOQUE',
   'COMPRAS',
   'SUPRIMENTOS',
+  'ANALISTA_SUPRIMENTOS', // ✅ Suprimentos não acessa RH, DPE, SST
   'FINANCEIRO',
 ]);
 
@@ -1085,6 +1260,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 to={item.to}
                 preserveScroll={true}
                 ref={isActive(item.id) ? activeItemRef : undefined}
+                onMouseEnter={() => prefetchByPath(item.to)}
                 className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1118,6 +1294,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 to={item.to}
                 preserveScroll={true}
                 ref={isActive(item.id) ? activeItemRef : undefined}
+                onMouseEnter={() => prefetchByPath(item.to)}
                 className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1151,6 +1328,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                 to={item.to}
                 preserveScroll={true}
                 ref={isActive(item.id) ? activeItemRef : undefined}
+                onMouseEnter={() => prefetchByPath(item.to)}
                 className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1185,6 +1363,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1220,6 +1399,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1255,6 +1435,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1290,6 +1471,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1325,6 +1507,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1361,6 +1544,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     to={item.to}
                     preserveScroll={true}
                     ref={isActive(item.id) ? activeItemRef : undefined}
+                    onMouseEnter={() => prefetchByPath(item.to)}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1398,6 +1582,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                     to={item.to}
                     preserveScroll={true}
                     ref={isActive(item.id) ? activeItemRef : undefined}
+                    onMouseEnter={() => prefetchByPath(item.to)}
                     className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1469,6 +1654,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1504,6 +1690,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)
@@ -1539,6 +1726,7 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
                   to={item.to}
                   preserveScroll={true}
                   ref={isActive(item.id) ? activeItemRef : undefined}
+                  onMouseEnter={() => prefetchByPath(item.to)}
                   className={`
                       flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors
                       ${isActive(item.id)

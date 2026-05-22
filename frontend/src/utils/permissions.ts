@@ -32,7 +32,17 @@ export const USER_ROLE_LIST: UserRole[] = [
 // Função para gerar permissões baseadas no role principal
 export const generatePermissions = (role: UserRole): UserPermissions => {
   // Normalizar role (remover prefixo ROLE_ para compatibilidade com backend)
-  const normalizedRole = (typeof role === 'string' ? role.replace(/^ROLE_/, '') : role) as UserRole;
+  let tempRole = typeof role === 'string' ? role.replace(/^ROLE_/, '') : role;
+  if (tempRole === 'SUPREIMENTOS') {
+    tempRole = 'SUPRIMENTOS';
+  } else if (
+    tempRole === 'ANALISATA_DE_SUPREMIMENTOSS' || 
+    tempRole === 'ANALISATA_DE_SUPREMIMENTOS' || 
+    tempRole === 'ANALISTAS_DE_SUPRIMENTOS'
+  ) {
+    tempRole = 'ANALISTA_SUPRIMENTOS';
+  }
+  const normalizedRole = tempRole as UserRole;
   const basePermissions: UserPermissions = {
     // Permissões de Usuários
     USERS_READ: false,
@@ -773,27 +783,18 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     case 'ANALISTA_SUPRIMENTOS':
       return {
         ...basePermissions,
-        // Sistema de Processamento de Holerites - acesso total
-        PAYSLIPS_READ: true,
-        PAYSLIPS_WRITE: true,
-        PAYSLIPS_CREATE: true,
-        PAYSLIPS_DELETE: true,
-        PAYSLIPS_PUBLISH: true,
-        PAYROLL_READ: true,
-        PAYROLL_MANAGE: true,
+        // Analista de Suprimentos: Estoque, Compras, Holerites (leitura), Financeiro parcial, Frota, Mensagens
+        // ❌ SEM acesso a RH, DPE, SST, Folha de Pagamento
+        PAYSLIPS_READ: true,              // Gestão de Holerites (somente leitura)
         FINANCIAL_READ: true,
-        FINANCIAL_WRITE: true,
-        FINANCIAL_PAYABLE_READ: true,
-        FINANCIAL_PAYABLE_WRITE: true,
+        FINANCIAL_PAYABLE_READ: true,     // Contas a Pagar
+        FINANCIAL_PAYABLE_WRITE: true,    // Pagamentos
         FINANCIAL_CASHFLOW_READ: true,
-        FINANCIAL_INVOICE_READ: true,
-        FINANCIAL_RECEIVABLE_READ: false,
-        FINANCIAL_RECEIVABLE_WRITE: false,
-        FINANCIAL_MEASUREMENT_READ: false,
         STOCK_READ: true,
         STOCK_WRITE: true,
         STOCK_CREATE: true,
         STOCK_MANAGE: true,
+        EQUIPMENTS_READ: true,            // Frota
         REPORTS_READ: true,
         REPORTS_GENERATE: true,
         DASHBOARD_READ: true,
@@ -802,9 +803,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         MESSAGES_READ: true,
         MESSAGES_WRITE: true,
         MESSAGES_CREATE: true,
-        EMPLOYEES_READ: true,
-        CLIENTS_READ: true,
-        CONTRACTS_READ: true,
+        MESSAGES_MANAGE: true,            // Gestão de Mensagens completa
+        SUPPORT_READ: true,
+        SUPPORT_CREATE: true,
       };
 
     case 'ESTOQUE':
@@ -830,18 +831,13 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
     case 'SUPRIMENTOS':
       return {
         ...basePermissions,
-        // Sistema de Processamento de Holerites - acesso total; módulo financeiro exceto Contas a Receber e Medição
-        PAYSLIPS_READ: true,
-        PAYSLIPS_WRITE: true,
-        PAYSLIPS_CREATE: true,
-        PAYSLIPS_DELETE: true,
-        PAYSLIPS_PUBLISH: true,
-        PAYROLL_READ: true,
-        PAYROLL_MANAGE: true,
+        // Suprimentos: Financeiro (parcial) + Estoque + Compras + Holerites + Frota + Mensagens
+        // ❌ SEM acesso a RH, DPE, SST, Folha de Pagamento (PAYROLL)
+        PAYSLIPS_READ: true,              // Gestão de Holerites (leitura)
         FINANCIAL_READ: true,
         FINANCIAL_WRITE: true,
-        FINANCIAL_PAYABLE_READ: true,
-        FINANCIAL_PAYABLE_WRITE: true,
+        FINANCIAL_PAYABLE_READ: true,     // Contas a Pagar
+        FINANCIAL_PAYABLE_WRITE: true,    // Pagamentos
         FINANCIAL_CASHFLOW_READ: true,
         FINANCIAL_INVOICE_READ: true,
         FINANCIAL_RECEIVABLE_READ: false,
@@ -851,15 +847,15 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         STOCK_WRITE: true,
         STOCK_CREATE: true,
         STOCK_MANAGE: true,
+        EQUIPMENTS_READ: true,            // Frota
         DASHBOARD_READ: true,
         PROFILE_READ: true,
         PROFILE_WRITE: true,
         REPORTS_READ: true,
-        CONTRACTS_READ: true,
-        EMPLOYEES_READ: true,
         MESSAGES_READ: true,
         MESSAGES_WRITE: true,
         MESSAGES_CREATE: true,
+        MESSAGES_MANAGE: true,            // Gestão de Mensagens completa
         SUPPORT_READ: true,
         SUPPORT_CREATE: true,
       };
@@ -924,6 +920,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         CLIENTS_READ: true,
         CLIENTS_WRITE: true,
         CLIENTS_CREATE: true,
+        CLIENTS_DELETE: true,
         LEADS_READ: true,
         LEADS_WRITE: true,
         LEADS_CREATE: true,
@@ -952,6 +949,12 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         // Dashboard Comercial (somente leitura, sem metas)
         COMMERCIAL_DASHBOARD_READ: true,
         SALES_GOALS_READ: true,
+
+        // Acesso ao portal do funcionário e holerites pessoais
+        PAYSLIPS_READ: true,
+
+        // Gestão de Atendimento (Tickets)
+        ATTENDANCE_READ: true,
       };
 
     case 'GESTOR_COMERCIAL':
@@ -988,6 +991,12 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         COMMERCIAL_DASHBOARD_READ: true,
         SALES_GOALS_READ: true,
         SALES_GOALS_WRITE: normalizedRole === 'GESTOR_COMERCIAL',
+
+        // Acesso ao portal do funcionário e holerites pessoais
+        PAYSLIPS_READ: true,
+
+        // Gestão de Atendimento (Tickets)
+        ATTENDANCE_READ: true,
       };
 
     default:

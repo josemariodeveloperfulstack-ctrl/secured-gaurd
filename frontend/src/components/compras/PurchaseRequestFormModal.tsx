@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,7 @@ import { unitService } from '@/services/unitService';
 import { employeeService, Employee } from '@/services/employeeService';
 import { contasAPagarService, Supplier } from '@/services/contasAPagarService';
 import { costCenterService, CostCenterDTO } from '@/services/costCenterService';
+import { userService, User as SystemUser } from '@/services/userService';
 import { SupplierFormModal } from '@/components/estoque/SupplierFormModal';
 import { DatePicker } from '@/components/ui/date-picker';
 import { format } from 'date-fns';
@@ -37,10 +39,36 @@ interface PurchaseRequestFormModalProps {
 
 export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loading }: PurchaseRequestFormModalProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const loggedUserName = user?.name || '';
+
+  // Helper: normaliza role extraindo o prefixo ROLE_
+  const normalizeRole = (r: string) => r.replace(/^ROLE_/, '').toUpperCase();
+  const userRoles: string[] = [
+    ...(user?.role ? [user.role.toUpperCase()] : []),
+    ...((user?.roles ?? []) as string[]).map(normalizeRole),
+  ];
+  const hasRole = (...roles: string[]) => roles.some(r => userRoles.includes(r.toUpperCase()));
+
+  // Roles com acesso completo ao formulário (incluindo Fornecedor)
+  const canSeeSupplier = hasRole(
+    'SUPRIMENTOS', 'ANALISTA_SUPRIMENTOS',
+    'ADMIN', 'SUPER_ADMIN',
+    'GESTOR', 'GESTOR_OPERACIONAL',
+    'FINANCEIRO', 'COMPRAS'
+  );
+
+  // Almoxarifado/Estoque — formulário simplificado
+  const isAlmoxarifado = hasRole('ALMOXARIFADO', 'ESTOQUE');
+
+  // Aprovadores podem ver/editar a seção de aprovação
+  const canSeeApproval = !isAlmoxarifado;
   const [units, setUnits] = useState<any[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [costCenters, setCostCenters] = useState<CostCenterDTO[]>([]);
+  const [approvers, setApprovers] = useState<SystemUser[]>([]);
+  const [approverSearchTerm, setApproverSearchTerm] = useState('');
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [requestNumber, setRequestNumber] = useState<string>('');
   const [estimatedTotalDisplay, setEstimatedTotalDisplay] = useState<string>('');
@@ -73,6 +101,11 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
     unitId: '',
     requesterId: '',
     approverId: '',
+    quantity: undefined,
+    unitOfMeasure: '',
+    category: '',
+    size: '',
+    itemNumber: '',
   });
 
   const parseCurrencyToNumber = (value?: string) => {
@@ -98,6 +131,7 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
       loadEmployees();
       loadSuppliers();
       loadCostCenters();
+      loadApprovers();
       if (request) {
         setRequestNumber(request.requestNumber || '');
         const estimatedTotalValue = normalizeEstimatedTotal(request.estimatedTotal);
@@ -128,6 +162,11 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
           notes: request.notes || '',
           unitId: request.unitId ? String(request.unitId) : '',
           approverId: request.approverId ? String(request.approverId) : '',
+          quantity: (request as any).quantity ?? undefined,
+          unitOfMeasure: (request as any).unitOfMeasure || '',
+          category: (request as any).category || '',
+          size: (request as any).size || '',
+          itemNumber: (request as any).itemNumber || '',
         });
         setEstimatedTotalDisplay(
           estimatedTotalValue.toLocaleString('pt-BR', {
@@ -162,6 +201,11 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
           unitId: '',
           requesterId: '',
           approverId: '',
+          quantity: undefined,
+          unitOfMeasure: '',
+          category: '',
+          size: '',
+          itemNumber: '',
         });
         setEstimatedTotalDisplay('');
       }
@@ -201,6 +245,26 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
       setCostCenters(costCentersData);
     } catch (error) {
       console.error('Erro ao carregar centros de custo:', error);
+    }
+  };
+
+  // Roles que podem aprovar requisições de compra
+  const APPROVER_ROLES = [
+    'SUPRIMENTOS', 'ANALISTA_SUPRIMENTOS', 'ADMIN', 'SUPER_ADMIN',
+    'GESTOR', 'GESTOR_OPERACIONAL', 'FINANCEIRO', 'ROLE_SUPRIMENTOS',
+    'ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_GESTOR', 'ROLE_FINANCEIRO'
+  ];
+
+  const loadApprovers = async () => {
+    try {
+      const allUsers = await userService.getAllUsers();
+      const filtered = allUsers.filter(u =>
+        u.active &&
+        u.roles.some(r => APPROVER_ROLES.includes(r.toUpperCase().replace(/^ROLE_/, 'ROLE_').toUpperCase()))
+      );
+      setApprovers(filtered.length > 0 ? filtered : allUsers.filter(u => u.active));
+    } catch (error) {
+      console.error('Erro ao carregar aprovadores:', error);
     }
   };
 
@@ -295,6 +359,11 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
     costCenter.department?.toLowerCase().includes(departmentSearchTerm.toLowerCase())
   );
 
+  const filteredApprovers = approvers.filter(u =>
+    u.name?.toLowerCase().includes(approverSearchTerm.toLowerCase()) ||
+    u.email?.toLowerCase().includes(approverSearchTerm.toLowerCase())
+  );
+
   const handleInputChange = (field: keyof CreatePurchaseRequestRequest, value: any) => {
     setFormData(prev => ({
       ...prev,
@@ -305,22 +374,28 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Converter requiredDate de "YYYY-MM-DD" para "YYYY-MM-DDTHH:mm:ss" se necessário
-      const dataToSend = { ...formData };
+      const dataToSend = { ...formData, requesterName: loggedUserName || formData.requesterName };
       if (dataToSend.requiredDate && dataToSend.requiredDate.length === 10) {
-        // Se a data está no formato "YYYY-MM-DD", adicionar hora
         dataToSend.requiredDate = `${dataToSend.requiredDate}T00:00:00`;
       }
 
       const savedRequest = await onSave(dataToSend);
-      // Atualizar número da requisição após salvar
       if (savedRequest && typeof savedRequest === 'object' && 'requestNumber' in savedRequest) {
         setRequestNumber((savedRequest as any).requestNumber || '');
       }
-      // Não mostrar toast aqui, pois o onSave já mostra
-      // O onClose será chamado pelo componente pai após o sucesso
+
+      // Notificar aprovadores quando Almoxarifado criar nova requisição
+      if (isAlmoxarifado && !request) {
+        const { notificationService } = await import('@/services/notificationService');
+        notificationService.notifyNewPurchaseRequest({
+          requesterName: loggedUserName,
+          title: formData.title || 'Sem título',
+          quantity: (formData as any).quantity,
+          category: formData.category,
+        });
+      }
     } catch (error) {
-      // Erro já será tratado pelo componente pai
+      // Erro já é tratado pelo componente pai
     }
   };
 
@@ -460,87 +535,13 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="department" className="text-seguranca-lightgray font-medium">Departamento</Label>
-                    <Select
-                      value={formData.department || ''}
-                      onValueChange={(value) => {
-                        const selectedCostCenter = costCenters.find(cc => cc.name === value || cc.code === value);
-                        handleInputChange('department', selectedCostCenter?.name || value);
-                      }}
-                    >
-                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                        <SelectValue placeholder="Selecione o centro de custo" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                        <div className="p-2 border-b border-gray-600">
-                          <Input
-                            placeholder="Buscar centro de custo..."
-                            value={departmentSearchTerm}
-                            onChange={(e) => setDepartmentSearchTerm(e.target.value)}
-                            className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        {filteredCostCenters.length === 0 ? (
-                          <div className="p-4 text-center text-gray-400 text-sm">
-                            {departmentSearchTerm ? 'Nenhum centro de custo encontrado' : 'Nenhum centro de custo cadastrado'}
-                          </div>
-                        ) : (
-                          filteredCostCenters.filter(cc => cc.name).map((costCenter) => (
-                            <SelectItem
-                              key={costCenter.id}
-                              value={costCenter.name || 'unknown'}
-                              className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                            >
-                              {costCenter.code} - {costCenter.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
+                  {/* Solicitante — preenchido automaticamente com o usuario logado */}
                   <div className="space-y-2">
                     <Label htmlFor="requesterName" className="text-seguranca-lightgray font-medium">Solicitante</Label>
-                    <Select
-                      value={formData.requesterId ? String(formData.requesterId) : ''}
-                      onValueChange={(value) => {
-                        const selectedEmployee = employees.find(emp => String(emp.id) === String(value));
-                        handleInputChange('requesterId', value);
-                        handleInputChange('requesterName', selectedEmployee?.name || '');
-                      }}
-                    >
-                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
-                        <SelectValue placeholder="Selecione o solicitante" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
-                        <div className="p-2 border-b border-gray-600">
-                          <Input
-                            placeholder="Buscar funcionário..."
-                            value={requesterSearchTerm}
-                            onChange={(e) => setRequesterSearchTerm(e.target.value)}
-                            className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        {filteredRequesters.length === 0 ? (
-                          <div className="p-4 text-center text-gray-400 text-sm">
-                            {requesterSearchTerm ? 'Nenhum funcionário encontrado' : 'Nenhum funcionário cadastrado'}
-                          </div>
-                        ) : (
-                          filteredRequesters.map((employee) => (
-                            <SelectItem
-                              key={employee.id}
-                              value={String(employee.id)}
-                              className="text-seguranca-lightgray hover:bg-seguranca-red/20"
-                            >
-                              {employee.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2 h-11 px-3 bg-seguranca-graphite/50 border border-gray-600 rounded-md">
+                      <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span className="text-seguranca-lightgray/80 text-sm truncate">{loggedUserName || 'Usuário logado'}</span>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -570,6 +571,8 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                     />
                   </div>
 
+                  {/* Valor Estimado — oculto para Almoxarifado */}
+                  {!isAlmoxarifado && (
                   <div className="space-y-2">
                     <Label htmlFor="estimatedTotal" className="text-seguranca-lightgray font-medium">Valor Estimado</Label>
                     <div className="relative">
@@ -593,6 +596,95 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                         className="w-full pl-10 pr-3 py-2.5 bg-seguranca-graphite border border-gray-600 text-seguranca-lightgray rounded-md focus:outline-none focus:ring-2 focus:ring-seguranca-yellow focus:border-transparent h-11"
                       />
                     </div>
+                  </div>
+                  )}
+                </div>
+
+                {/* Campos: Categoria, Quantidade e Unidade de Medida */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="category" className="text-seguranca-lightgray font-medium">Categoria</Label>
+                    <Select value={formData.category || ''} onValueChange={(value) => handleInputChange('category', value)}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione a categoria" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="MATERIAL" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Material</SelectItem>
+                        <SelectItem value="EQUIPAMENTO" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Equipamento</SelectItem>
+                        <SelectItem value="SERVICO" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Serviço</SelectItem>
+                        <SelectItem value="EPI" className="text-seguranca-lightgray hover:bg-seguranca-red/20">EPI</SelectItem>
+                        <SelectItem value="INFORMATICA" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Informática</SelectItem>
+                        <SelectItem value="LIMPEZA" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Limpeza</SelectItem>
+                        <SelectItem value="ESCRITORIO" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Escritório</SelectItem>
+                        <SelectItem value="MANUTENCAO" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Manutenção</SelectItem>
+                        <SelectItem value="VEICULO" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Veículo</SelectItem>
+                        <SelectItem value="OUTRO" className="text-seguranca-lightgray hover:bg-seguranca-red/20">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity" className="text-seguranca-lightgray font-medium">
+                      Quantidade <span className="text-seguranca-red">*</span>
+                    </Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={formData.quantity ?? ''}
+                      onChange={(e) => handleInputChange('quantity', e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="Ex: 10"
+                      required
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="unitOfMeasure" className="text-seguranca-lightgray font-medium">Unidade de Medida</Label>
+                    <Select value={formData.unitOfMeasure || ''} onValueChange={(value) => handleInputChange('unitOfMeasure', value)}>
+                      <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
+                        <SelectValue placeholder="Selecione a unidade" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-graphite border-gray-600">
+                        <SelectItem value="UN" className="text-seguranca-lightgray hover:bg-seguranca-red/20">UN — Unidade</SelectItem>
+                        <SelectItem value="CX" className="text-seguranca-lightgray hover:bg-seguranca-red/20">CX — Caixa</SelectItem>
+                        <SelectItem value="PC" className="text-seguranca-lightgray hover:bg-seguranca-red/20">PC — Peça</SelectItem>
+                        <SelectItem value="KG" className="text-seguranca-lightgray hover:bg-seguranca-red/20">KG — Quilograma</SelectItem>
+                        <SelectItem value="L" className="text-seguranca-lightgray hover:bg-seguranca-red/20">L — Litro</SelectItem>
+                        <SelectItem value="M" className="text-seguranca-lightgray hover:bg-seguranca-red/20">M — Metro</SelectItem>
+                        <SelectItem value="M2" className="text-seguranca-lightgray hover:bg-seguranca-red/20">M² — Metro Quadrado</SelectItem>
+                        <SelectItem value="PAR" className="text-seguranca-lightgray hover:bg-seguranca-red/20">PAR — Par</SelectItem>
+                        <SelectItem value="ROLO" className="text-seguranca-lightgray hover:bg-seguranca-red/20">ROLO — Rolo</SelectItem>
+                        <SelectItem value="PCT" className="text-seguranca-lightgray hover:bg-seguranca-red/20">PCT — Pacote</SelectItem>
+                        <SelectItem value="HORA" className="text-seguranca-lightgray hover:bg-seguranca-red/20">HORA — Hora</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Tamanho e Número */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="size" className="text-seguranca-lightgray font-medium">Tamanho</Label>
+                    <Input
+                      id="size"
+                      value={(formData as any).size ?? ''}
+                      onChange={(e) => handleInputChange('size' as any, e.target.value)}
+                      placeholder="Ex: P, M, G, XG, 42"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="itemNumber" className="text-seguranca-lightgray font-medium">Número / Código</Label>
+                    <Input
+                      id="itemNumber"
+                      value={(formData as any).itemNumber ?? ''}
+                      onChange={(e) => handleInputChange('itemNumber' as any, e.target.value)}
+                      placeholder="Ex: REF-001"
+                      className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11"
+                    />
                   </div>
                 </div>
 
@@ -622,7 +714,8 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
               </CardContent>
             </Card>
 
-            {/* Informações de Fornecedor */}
+            {/* Informações de Fornecedor — visível somente para Suprimentos */}
+            {canSeeSupplier && (
             <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
@@ -791,8 +884,10 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                 </div>
               </CardContent>
             </Card>
+            )}
 
-            {/* Informações de Aprovação */}
+            {/* Informações de Aprovação — oculto para Almoxarifado */}
+            {canSeeApproval && (
             <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg text-seguranca-lightgray flex items-center gap-2">
@@ -809,9 +904,9 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                     <Select
                       value={formData.approverId ? String(formData.approverId) : ''}
                       onValueChange={(value) => {
-                        const selectedEmployee = employees.find(emp => String(emp.id) === String(value));
+                        const selected = approvers.find(u => String(u.id) === String(value));
                         handleInputChange('approverId', value);
-                        handleInputChange('approvedBy', selectedEmployee?.name || '');
+                        handleInputChange('approvedBy', selected?.name || '');
                       }}
                     >
                       <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow h-11">
@@ -820,25 +915,34 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                       <SelectContent className="bg-seguranca-graphite border-gray-600 max-h-[200px]">
                         <div className="p-2 border-b border-gray-600">
                           <Input
-                            placeholder="Buscar funcionário..."
-                            value={employeeSearchTerm}
-                            onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                            placeholder="Buscar aprovador..."
+                            value={approverSearchTerm}
+                            onChange={(e) => setApproverSearchTerm(e.target.value)}
                             className="bg-seguranca-black/50 border-gray-600 text-seguranca-lightgray h-9"
                             onClick={(e) => e.stopPropagation()}
                           />
                         </div>
-                        {filteredEmployees.length === 0 ? (
+                        {filteredApprovers.length === 0 ? (
                           <div className="p-4 text-center text-gray-400 text-sm">
-                            {employeeSearchTerm ? 'Nenhum funcionário encontrado' : 'Nenhum funcionário cadastrado'}
+                            {approverSearchTerm ? 'Nenhum aprovador encontrado' : 'Nenhum aprovador disponível'}
                           </div>
                         ) : (
-                          filteredEmployees.map((employee) => (
+                          filteredApprovers.map((approver) => (
                             <SelectItem
-                              key={employee.id}
-                              value={String(employee.id)}
+                              key={approver.id}
+                              value={String(approver.id)}
                               className="text-seguranca-lightgray hover:bg-seguranca-red/20"
                             >
-                              {employee.name}
+                              <div className="flex flex-col">
+                                <span>{approver.name}</span>
+                                <span className="text-xs text-gray-400">
+                                  {approver.roles
+                                    .map(r => r.replace(/^ROLE_/, ''))
+                                    .filter(r => ['SUPRIMENTOS', 'ANALISTA_SUPRIMENTOS', 'ADMIN', 'SUPER_ADMIN', 'GESTOR', 'GESTOR_OPERACIONAL', 'FINANCEIRO'].includes(r.toUpperCase()))
+                                    .map(r => r === 'SUPER_ADMIN' ? 'Administrador' : r === 'ADMIN' ? 'Administrador' : r === 'GESTOR' ? 'Gestor' : r === 'GESTOR_OPERACIONAL' ? 'Gestor Operacional' : r === 'FINANCEIRO' ? 'Financeiro' : r === 'SUPRIMENTOS' ? 'Suprimentos' : r === 'ANALISTA_SUPRIMENTOS' ? 'Analista de Suprimentos' : r)
+                                    .join(', ') || approver.roles.map(r => r.replace(/^ROLE_/, '')).join(', ')}
+                                </span>
+                              </div>
                             </SelectItem>
                           ))
                         )}
@@ -860,6 +964,29 @@ export function PurchaseRequestFormModal({ isOpen, onClose, request, onSave, loa
                 </div>
               </CardContent>
             </Card>
+            )}
+
+            {/* Motivo de Reprovação — visível para Almoxarifado quando status=REJECTED */}
+            {isAlmoxarifado && request?.status === 'REJECTED' && formData.approvalNotes && (
+            <Card className="bg-gradient-to-r from-red-950/40 to-red-900/20 border-red-700/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-red-300 flex items-center gap-2">
+                  <div className="p-1.5 bg-red-500/20 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-red-400" />
+                  </div>
+                  Motivo da Reprovação
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-red-200 bg-red-950/50 rounded-md p-3 border border-red-700/40 text-sm leading-relaxed">
+                  {formData.approvalNotes}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Você pode atualizar a justificativa no campo abaixo e reenviar a solicitação.
+                </p>
+              </CardContent>
+            </Card>
+            )}
 
             {/* Observações */}
             <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">

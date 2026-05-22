@@ -586,17 +586,23 @@ public class UserGroupService {
                 "REPORTS_READ", "EMPLOYEES_READ")));
 
         // GRUPO_ASSISTENTE_COMERCIAL - Assistente Comercial
+        permissions.put(UserGroup.GRUPO_COMERCIAL, new HashSet<>(Arrays.asList(
+                "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "LEADS_READ",
+                "LEADS_WRITE", "PROPOSALS_READ", "PROPOSALS_WRITE", "QUOTES_READ",
+                "QUOTES_WRITE", "CLIENTS_READ", "CLIENTS_WRITE", "CONTRACTS_READ",
+                "REPORTS_READ", "ATTENDANCE_READ")));
+
         permissions.put(UserGroup.GRUPO_ASSISTENTE_COMERCIAL, new HashSet<>(Arrays.asList(
                 "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "LEADS_READ",
                 "LEADS_WRITE", "PROPOSALS_READ", "PROPOSALS_WRITE", "QUOTES_READ",
-                "QUOTES_WRITE", "CLIENTS_READ", "REPORTS_READ")));
+                "QUOTES_WRITE", "CLIENTS_READ", "REPORTS_READ", "ATTENDANCE_READ")));
 
         // GRUPO_GESTOR_COMERCIAL - Gestor Comercial
         permissions.put(UserGroup.GRUPO_GESTOR_COMERCIAL, new HashSet<>(Arrays.asList(
                 "PAYSLIPS_READ", "PAYSLIPS_DOWNLOAD", "PROFILE_WRITE", "LEADS_READ",
                 "LEADS_WRITE", "PROPOSALS_READ", "PROPOSALS_WRITE", "QUOTES_READ",
                 "QUOTES_WRITE", "CLIENTS_READ", "CLIENTS_WRITE", "CONTRACTS_READ",
-                "REPORTS_READ")));
+                "REPORTS_READ", "ATTENDANCE_READ")));
 
         // GRUPO_GESTOR_SUPERVISAO - Gestor de Supervisão (alinhado ao módulo operacional completo no front)
         permissions.put(UserGroup.GRUPO_GESTOR_SUPERVISAO, new HashSet<>(Arrays.asList(

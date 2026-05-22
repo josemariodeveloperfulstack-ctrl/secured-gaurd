@@ -273,7 +273,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [dependentToEdit, setDependentToEdit] = useState<Dependent | null>(null);
   const [loadingDependents, setLoadingDependents] = useState(false);
 
-  const loadEmployeeDependents = useCallback(async (employeeId: string | undefined) => {
+  const loadEmployeeDependents = useCallback(async (employeeId: string | undefined, keepOnError = false) => {
     const raw = String(employeeId ?? '').trim();
     if (!raw) {
       setEmployeeDependents([]);
@@ -295,11 +295,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setEmployeeDependents(Array.isArray(dependents) ? dependents : []);
     } catch (error: unknown) {
       const err = error as { response?: { status?: number } };
-      console.error('Erro ao carregar dependentes:', error);
-      if (err?.response?.status === 403) {
-        console.warn('Acesso negado ao carregar dependentes. Verifique as permissões do usuário.');
+      const status = err?.response?.status;
+      if (status === 500) {
+        // Backend serialization error — dependente provavelmente foi salvo
+        // Mantém lista atual se keepOnError=true (logo após salvar)
+        console.warn('[dependentes] GET retornou 500 — backend issue (mantém lista atual):', error);
+        if (!keepOnError) setEmployeeDependents([]);
+      } else if (status === 403) {
+        console.warn('Acesso negado ao carregar dependentes.');
+        if (!keepOnError) setEmployeeDependents([]);
+      } else {
+        console.error('Erro ao carregar dependentes:', error);
+        if (!keepOnError) setEmployeeDependents([]);
       }
-      setEmployeeDependents([]);
     } finally {
       setLoadingDependents(false);
     }
@@ -696,13 +704,23 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   };
 
   // Callback quando dependente é criado/editado com sucesso
-  const handleDependentSaved = async () => {
+  const handleDependentSaved = async (savedDependent?: any) => {
     setDependentModalOpen(false);
     setDependentToEdit(null);
 
-    // Recarregar dependentes
     if (employeeToEdit?.id) {
-      await loadEmployeeDependents(employeeToEdit.id);
+      // Optimistic update: adiciona/atualiza na lista local imediatamente
+      if (savedDependent) {
+        setEmployeeDependents(prev => {
+          const exists = prev.some(d => d.id === savedDependent.id);
+          if (exists) {
+            return prev.map(d => d.id === savedDependent.id ? savedDependent : d);
+          }
+          return [...prev, savedDependent];
+        });
+      }
+      // Tenta recarregar do servidor; mantém lista atual se der 500
+      await loadEmployeeDependents(employeeToEdit.id, true);
     }
 
     toast({
@@ -2013,18 +2031,54 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-                <TabsList className={`grid w-full ${showHistoryTab ? 'grid-cols-5' : 'grid-cols-4'} bg-seguranca-graphite border border-gray-600`}>
-                  <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
-                  <TabsTrigger value="dependentes">Dependentes</TabsTrigger>
-                  <TabsTrigger value="documentos">Documentos</TabsTrigger>
-                  <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
-                  {showHistoryTab && (
-                    <TabsTrigger value="historico" className="flex items-center gap-1.5">
-                      <History className="h-4 w-4" />
-                      Histórico
-                    </TabsTrigger>
-                  )}
-                </TabsList>
+                {/* tabsLocked: true when creating a new employee and record not yet saved */}
+                {(() => {
+                  const tabsLocked = !isEditMode && !currentEmployeeId;
+                  return (
+                    <>
+                      {tabsLocked && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm mb-2">
+                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                          <span>Salve o cadastro primeiro para liberar as demais abas.</span>
+                        </div>
+                      )}
+                      <TabsList className={`grid w-full ${showHistoryTab ? 'grid-cols-5' : 'grid-cols-4'} bg-seguranca-graphite border border-gray-600`}>
+                        <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+                        <TabsTrigger
+                          value="dependentes"
+                          disabled={tabsLocked}
+                          className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Dependentes
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="documentos"
+                          disabled={tabsLocked}
+                          className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Documentos
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="relatorios"
+                          disabled={tabsLocked}
+                          className="disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Relatórios
+                        </TabsTrigger>
+                        {showHistoryTab && (
+                          <TabsTrigger
+                            value="historico"
+                            disabled={tabsLocked}
+                            className="flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            <History className="h-4 w-4" />
+                            Histórico
+                          </TabsTrigger>
+                        )}
+                      </TabsList>
+                    </>
+                  );
+                })()}
                 <TabsContent value="cadastro" className="space-y-4 sm:space-y-6">
                   {/* Seção: Relacionamentos Obrigatórios */}
                   <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
