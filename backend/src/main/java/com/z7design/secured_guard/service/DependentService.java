@@ -112,10 +112,12 @@ public class DependentService {
         log.info("Dependente excluído com sucesso. ID: {}", id);
     }
     
+    @Transactional(readOnly = true)
     public DependentDTO findById(UUID id) {
         return mapToDTO(findByIdEntity(id));
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findByEmployeeId(UUID employeeId) {
         log.info("Buscando dependentes do funcionário ID: {}", employeeId);
         return dependentRepository.findByEmployeeId(employeeId)
@@ -124,32 +126,35 @@ public class DependentService {
             .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findAll() {
         log.info("Buscando todos os dependentes");
-        return dependentRepository.findAll()
+        return dependentRepository.findAllWithEmployee()
             .stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findByCpf(String cpf) {
         log.info("Buscando dependente por CPF: {}", cpf);
-        return dependentRepository.findByCpf(cpf)
+        return dependentRepository.findByCpfWithEmployee(cpf)
             .stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findByRelationship(String relationship) {
         log.info("Buscando dependentes por relacionamento: {}", relationship);
-        return dependentRepository.findByRelationship(relationship)
+        return dependentRepository.findByRelationshipWithEmployee(relationship)
             .stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
     
     private Dependent findByIdEntity(UUID id) {
-        return dependentRepository.findById(id)
+        return dependentRepository.findByIdWithEmployee(id)
             .orElseThrow(() -> new ResourceNotFoundException("Dependente não encontrado"));
     }
     
