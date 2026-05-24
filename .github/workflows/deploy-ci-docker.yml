@@ -367,7 +367,8 @@ jobs:
             docker swarm leave --force 2>/dev/null || true
             cd /var/www/secured_guard/ci
             $DC -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            docker ps -a | grep secured-guard | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+            # Apenas containers CI — NÃO remover prod/test/dev (grep secured-guard apagava tudo)
+            docker ps -a --format '{{.Names}}' | grep -E '^secured-guard-.*-ci$|^whatsapp-service-ci$' | xargs -r docker rm -f 2>/dev/null || true
 
             echo "🌐 Preparando rede e Traefik..."
             docker network create z7network 2>/dev/null || true
