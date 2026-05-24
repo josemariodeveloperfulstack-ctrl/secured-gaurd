@@ -19,7 +19,16 @@ cleanup_and_exit() {
 
 trap cleanup_and_exit EXIT INT TERM
 
-echo "🏥 Verificando saúde da aplicação CI (Executando no servidor inteiro)..."
+CI_BASE_DIR="${CI_BASE_DIR:-/var/www/secured_guard}"
+CI_DIR="${CI_BASE_DIR}/ci"
+
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE="docker compose"
+else
+  DOCKER_COMPOSE="docker-compose"
+fi
+
+echo "🏥 Verificando saúde da aplicação CI (VPS: ${CI_BASE_DIR})..."
 
 # Configurações
 MAX_ATTEMPTS=25
@@ -182,8 +191,8 @@ collect_diagnostics() {
     log "🔍 Coletando informações de diagnóstico..."
     
     echo "📋 Status dos containers CI:"
-    cd /var/www/secured_guard/ci || true
-    docker-compose -f docker-compose.ci.yml ps 2>&1 || echo "Erro ao verificar containers"
+    cd "${CI_DIR}" || { echo "❌ Diretório CI não encontrado: ${CI_DIR}"; return; }
+    ${DOCKER_COMPOSE} -f docker-compose.ci.yml ps 2>&1 || echo "Erro ao verificar containers"
     
     echo ""
     echo "🔍 Verificando Traefik:"
@@ -233,13 +242,15 @@ while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
         if ! check_traefik; then
             log "💡 Tentando Traefik: compose down + rm container falho + up -d..."
             (
-              cd /var/www/secured_guard || exit 0
+              cd "${CI_BASE_DIR}" || exit 0
               if [ -f ci/scripts/free-host-ports-for-traefik.sh ]; then
                 bash ci/scripts/free-host-ports-for-traefik.sh 2>/dev/null || true
+              elif [ -f scripts/free-host-ports-for-traefik.sh ]; then
+                bash scripts/free-host-ports-for-traefik.sh 2>/dev/null || true
               fi
-              docker-compose -f docker-compose.traefik.yml down 2>/dev/null || true
+              ${DOCKER_COMPOSE} -f docker-compose.traefik.yml down 2>/dev/null || true
               docker rm -f traefik 2>/dev/null || true
-              docker-compose -f docker-compose.traefik.yml up -d 2>&1
+              ${DOCKER_COMPOSE} -f docker-compose.traefik.yml up -d 2>&1
             ) || true
             sleep 15
             if ! check_traefik; then
