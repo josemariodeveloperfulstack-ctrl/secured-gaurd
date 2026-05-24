@@ -420,7 +420,8 @@ jobs:
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
             
             echo "🚀 Iniciando todos os containers..."
-            docker-compose -f docker-compose.ci.yml up -d --force-recreate --pull always --remove-orphans
+            # Imagens já foram puxadas do Docker Hub acima; --pull missing evita re-pull do GHCR/registry errado
+            docker-compose -f docker-compose.ci.yml up -d --force-recreate --pull missing --remove-orphans
             
             echo "⏳ Aguardando backend subir..."
             sleep 15
