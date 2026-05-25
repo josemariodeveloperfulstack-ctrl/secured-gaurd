@@ -47,8 +47,33 @@ for img in z7design/secured-guard-backend:prod z7design/secured-guard-frontend:p
   done
 done
 
-echo "🚀 Subindo PROD..."
-$DC -f "$COMPOSE_FILE" up -d --pull missing --remove-orphans
+echo "🔧 Flyway repair (se postgres já existir)..."
+if docker ps --format '{{.Names}}' | grep -q '^secured-guard-db-prod$'; then
+  docker exec -i secured-guard-db-prod psql -U postgres -d secured_guard_prod -c \
+    "DELETE FROM flyway_schema_history WHERE success = false;" 2>/dev/null || true
+fi
+
+echo "🚀 Subindo PROD (postgres/redis primeiro)..."
+$DC -f "$COMPOSE_FILE" up -d postgres redis
+for i in $(seq 1 24); do
+  docker exec secured-guard-db-prod pg_isready -U postgres -d secured_guard_prod 2>/dev/null && break
+  sleep 5
+done
+
+echo "🚀 Subindo backend, frontend, whatsapp..."
+$DC -f "$COMPOSE_FILE" up -d backend frontend whatsapp-service
+
+echo "⏳ Aguardando backend healthy (até 5 min)..."
+for i in $(seq 1 60); do
+  H=$(docker inspect secured-guard-backend-prod --format '{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+  C=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:8084/api/health 2>/dev/null || echo "000")
+  [ "$C" = "200" ] && echo "✅ Backend OK ($H)" && break
+  [ "$i" -eq 60 ] && echo "⚠️ Backend ainda não healthy — rode: bash ../scripts/fix-backend-prod-unhealthy.sh"
+  sleep 5
+done
+
+echo "🚀 Subindo nginx..."
+$DC -f "$COMPOSE_FILE" up -d nginx
 
 echo "⏳ Aguardando postgres..."
 for i in $(seq 1 24); do

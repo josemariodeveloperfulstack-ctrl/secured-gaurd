@@ -122,8 +122,8 @@ jobs:
           } > .prod.env
 
           # Create deployment archive locally including the health check script
-          chmod +x scripts/health-check-prod.sh scripts/fix-404-prod.sh scripts/diagnostico-502-prod.sh scripts/bootstrap-prod-vps.sh
-          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh scripts/health-check-prod.sh scripts/diagnostico-502-prod.sh scripts/bootstrap-prod-vps.sh traefik-dynamic-prod.yml backend/src/main/resources/db/migration
+          chmod +x scripts/health-check-prod.sh scripts/fix-404-prod.sh scripts/diagnostico-502-prod.sh scripts/bootstrap-prod-vps.sh scripts/fix-backend-prod-unhealthy.sh
+          tar -czf prod-deploy.tar.gz .prod.env deploy/docker-compose.prod.yml deploy/nginx/nginx-prod.conf scripts/fix-404-prod.sh scripts/health-check-prod.sh scripts/diagnostico-502-prod.sh scripts/bootstrap-prod-vps.sh scripts/fix-backend-prod-unhealthy.sh traefik-dynamic-prod.yml backend/src/main/resources/db/migration
 
           # Encode archive in base64 to safely pass it into the heredoc
           B64_TAR=$(base64 -w 0 prod-deploy.tar.gz)
@@ -179,6 +179,7 @@ jobs:
             mv /tmp/scripts/health-check-prod.sh \$SCRIPT_DIR/
             mv /tmp/scripts/diagnostico-502-prod.sh \$SCRIPT_DIR/
             mv /tmp/scripts/bootstrap-prod-vps.sh \$SCRIPT_DIR/
+            mv /tmp/scripts/fix-backend-prod-unhealthy.sh \$SCRIPT_DIR/
             mv /tmp/traefik-dynamic-prod.yml \$TRAEFIK_DIR/prod.yml
             
             mkdir -p /var/www/secured_guard/prod/backend
@@ -242,6 +243,7 @@ jobs:
             
             echo "🔧 Flyway repair PROD..."
             docker exec -i secured-guard-db-prod psql -U postgres -d secured_guard_prod -c "
+              DELETE FROM flyway_schema_history WHERE success = false;
               UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';
               UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';
               UPDATE flyway_schema_history SET checksum = -1673547286 WHERE version = '429';
