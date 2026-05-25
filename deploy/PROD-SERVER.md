@@ -33,9 +33,19 @@ Tens de correr **sempre a partir de `prod/deploy`**.
 
 ## Comando correto para subir
 
+**Esta VPS usa `docker-compose` (v1), não `docker compose` (plugin v2).**  
+Se aparecer `unknown shorthand flag: 'f' in -f`, use o hífen:
+
 ```bash
 cd /var/www/secured_guard/prod/deploy
+docker-compose -f docker-compose.prod.yml pull
 docker-compose -f docker-compose.prod.yml up -d
+```
+
+Ou o script automatizado:
+
+```bash
+bash /var/www/secured_guard/prod/scripts/bootstrap-prod-vps.sh
 ```
 
 Não uses `cd /var/www/secured_guard/prod` para o `docker-compose`; os volumes `../backend` e `./nginx` ficam corretos só quando o comando é executado dentro de **deploy**.
