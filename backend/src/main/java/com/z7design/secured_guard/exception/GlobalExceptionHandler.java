@@ -157,7 +157,13 @@ public class GlobalExceptionHandler {
         } else if (path.contains("remanejamentos") && (fullMsg.contains("remanejamento_id") || fullMsg.contains("remanejamentos_historico") || fullMsg.contains("not-null"))) {
             message = "Não foi possível concluir a exclusão do remanejamento (integridade dos dados). Execute as migrações do banco (Flyway) ou contate o suporte.";
         } else if (path.contains("/dependents") || path.contains("dependents")) {
-            if (fullMsg.toLowerCase().contains("cpf") || fullMsg.contains("dependents")) {
+            if (fullMsg.toLowerCase().contains("muito longo") || fullMsg.contains("22001")) {
+                if (fullMsg.toLowerCase().contains("rg")) {
+                    message = "RG do dependente é muito longo (máximo 50 caracteres). Use só o número ou abrevie órgão/UF.";
+                } else {
+                    message = "Um dos campos do dependente excede o tamanho permitido. Revise RG, nome e demais textos.";
+                }
+            } else if (fullMsg.toLowerCase().contains("cpf") || fullMsg.contains("dependents")) {
                 message = "Este CPF já está cadastrado como dependente (restrição no banco de dados). Use outro CPF ou edite o registo existente.";
             }
         }

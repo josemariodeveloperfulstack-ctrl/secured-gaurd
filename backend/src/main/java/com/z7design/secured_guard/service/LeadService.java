@@ -538,6 +538,11 @@ public class LeadService {
         return leadRepository.count();
     }
 
+    @Transactional(readOnly = true)
+    public long countActive() {
+        return leadRepository.countActive();
+    }
+
     public long countByStatus(LeadStatus status) {
         return leadRepository.countByStatus(status);
     }

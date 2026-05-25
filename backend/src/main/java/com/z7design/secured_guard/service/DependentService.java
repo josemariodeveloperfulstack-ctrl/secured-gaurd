@@ -44,7 +44,7 @@ public class DependentService {
             .relationship(request.getRelationship())
             .birthDate(request.getBirthDate())
             .cpf(cpfNormalizado)
-            .rg(request.getRg())
+            .rg(normalizeRg(request.getRg()))
             .gender(request.getGender())
             .phone(blankToNull(request.getPhone()))
             .email(blankToNull(request.getEmail()))
@@ -84,7 +84,7 @@ public class DependentService {
         if (request.getName() != null) existingDependent.setName(request.getName());
         if (request.getRelationship() != null) existingDependent.setRelationship(request.getRelationship());
         if (request.getBirthDate() != null) existingDependent.setBirthDate(request.getBirthDate());
-        if (request.getRg() != null) existingDependent.setRg(request.getRg());
+        if (request.getRg() != null) existingDependent.setRg(normalizeRg(request.getRg()));
         if (request.getGender() != null) existingDependent.setGender(request.getGender());
         if (request.getPhone() != null) existingDependent.setPhone(blankToNull(request.getPhone()));
         if (request.getEmail() != null) existingDependent.setEmail(blankToNull(request.getEmail()));
@@ -222,6 +222,21 @@ public class DependentService {
             }
             throw new IllegalArgumentException("Este CPF já está cadastrado como dependente deste funcionário");
         }
+    }
+
+    private static String normalizeRg(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > 50) {
+            throw new IllegalArgumentException(
+                    "RG deve ter no máximo 50 caracteres. Informe apenas o número ou abrevie órgão e UF.");
+        }
+        return trimmed;
     }
 
     private static String blankToNull(String s) {

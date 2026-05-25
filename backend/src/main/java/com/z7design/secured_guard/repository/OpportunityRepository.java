@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface OpportunityRepository extends JpaRepository<Opportunity, java.util.UUID> {
@@ -18,4 +19,10 @@ public interface OpportunityRepository extends JpaRepository<Opportunity, java.u
 
     @Query("SELECT o FROM Opportunity o WHERE o.isDeleted = false")
     List<Opportunity> findAllActive();
+
+    @Query("SELECT COUNT(o) FROM Opportunity o WHERE o.isDeleted = false")
+    long countActive();
+
+    @Query("SELECT COALESCE(SUM(o.estimatedValue), 0) FROM Opportunity o WHERE o.isDeleted = false")
+    BigDecimal sumActiveEstimatedValue();
 } 

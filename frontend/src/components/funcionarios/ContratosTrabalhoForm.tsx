@@ -22,6 +22,7 @@ import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { resolveCompanySigningCity } from '@/utils/resolveCompanySigningCity';
+import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
 
 interface ContratosTrabalhoFormProps {
   employeeId?: string;
@@ -83,6 +84,7 @@ function buildSetorLocalTrabalhoContrato(emp: Employee): string {
 }
 
 const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeId, companyId }) => {
+  const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
   const { toast } = useToast();
   const [form, setForm] = useState({
     employeeId: employeeId || '',
@@ -407,9 +409,11 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       a.remove();
       window.URL.revokeObjectURL(url);
 
+      invalidateDocumentosGerados(funcionario!.id);
+
       toast({
         title: 'Sucesso',
-        description: 'Contrato de Trabalho gerado com sucesso!',
+        description: 'Contrato de Trabalho gerado com sucesso! Confira em Documentos → Documentos gerados pelo sistema.',
       });
     } catch (err: any) {
       console.error('Erro ao gerar contrato:', err);

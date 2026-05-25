@@ -9,8 +9,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import com.z7design.secured_guard.model.User;
 
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -108,20 +112,14 @@ public class OpportunityController {
             return ResponseEntity.notFound().build();
         }
         
-        // Obter usuário logado (simulado ou via SecurityContext)
-        // No contexto atual, assumimos que o SecurityContext está configurado
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        com.z7design.secured_guard.model.User user = opportunityService.findUserByUsername(username);
-        
+        User user = resolveCurrentUser();
         opportunityService.delete(UUID.fromString(id), reason, user);
         return ResponseEntity.noContent().build();
     }
     @DeleteMapping("/all")
     @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<Void> deleteAll(@RequestParam String reason) {
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        com.z7design.secured_guard.model.User user = opportunityService.findUserByUsername(username);
-        
+        User user = resolveCurrentUser();
         opportunityService.deleteAll(reason, user);
         return ResponseEntity.noContent().build();
     }
@@ -140,9 +138,7 @@ public class OpportunityController {
             reason = "Exclusão em massa via sistema";
         }
 
-        String username = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
-        com.z7design.secured_guard.model.User user = opportunityService.findUserByUsername(username);
-
+        User user = resolveCurrentUser();
         opportunityService.deleteBulk(ids, reason, user);
         return ResponseEntity.noContent().build();
     }
@@ -170,5 +166,16 @@ public class OpportunityController {
             }
         }
         return ids;
+    }
+
+    private User resolveCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null) {
+            throw new ResourceNotFoundException("Usuário não autenticado");
+        }
+        if (auth.getPrincipal() instanceof User user) {
+            return user;
+        }
+        return opportunityService.findUserByUsername(auth.getName());
     }
 } 

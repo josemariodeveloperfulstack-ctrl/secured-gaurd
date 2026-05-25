@@ -53,8 +53,10 @@ export default function CrmKanban() {
       setMetrics({
         totalLeads: 0,
         activeOpportunities: 0,
+        totalOpportunities: 0,
         conversionRate: 0,
-        estimatedRevenue: 0
+        estimatedRevenue: 0,
+        totalValue: 0
       });
     } finally {
       setLoading(false);
@@ -107,7 +109,7 @@ export default function CrmKanban() {
                     <Loader2 className="h-6 w-6 animate-spin text-seguranca-yellow mt-2" />
                   ) : (
                     <p className="text-2xl font-bold text-seguranca-yellow">
-                      {metrics?.activeOpportunities || 0}
+                      {metrics?.totalOpportunities ?? metrics?.activeOpportunities ?? 0}
                     </p>
                   )}
                 </div>
@@ -143,7 +145,9 @@ export default function CrmKanban() {
                     <Loader2 className="h-6 w-6 animate-spin text-seguranca-yellow mt-2" />
                   ) : (
                     <p className="text-2xl font-bold text-seguranca-yellow">
-                      {formatCurrency(metrics?.estimatedRevenue || metrics?.totalValue || 0)}
+                      {formatCurrency(
+                        metrics?.kanbanPipelineValue ?? metrics?.totalValue ?? metrics?.estimatedRevenue ?? 0
+                      )}
                     </p>
                   )}
                 </div>

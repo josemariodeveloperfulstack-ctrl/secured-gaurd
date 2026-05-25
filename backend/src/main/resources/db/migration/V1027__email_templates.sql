@@ -18,6 +18,31 @@ CREATE TABLE IF NOT EXISTS email_templates (
 CREATE INDEX IF NOT EXISTS idx_email_templates_active ON email_templates(is_active);
 CREATE INDEX IF NOT EXISTS idx_email_templates_default ON email_templates(is_default) WHERE is_default = TRUE;
 
+-- Banco legado pode ter email_templates sem UNIQUE em code (CREATE IF NOT EXISTS não altera tabela existente)
+DELETE FROM email_templates a
+USING email_templates b
+WHERE a.code IS NOT NULL
+  AND a.code = b.code
+  AND a.id > b.id;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        JOIN pg_namespace n ON t.relnamespace = n.oid
+        WHERE n.nspname = 'public'
+          AND t.relname = 'email_templates'
+          AND c.contype = 'u'
+          AND pg_get_constraintdef(c.oid) LIKE '%(code)%'
+    ) THEN
+        ALTER TABLE email_templates ADD CONSTRAINT email_templates_code_key UNIQUE (code);
+    END IF;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
 -- Sementes: 3 templates padrão (sincronizáveis pela UI)
 -- O HTML é minimalista; o conteúdo final é editado pelo usuário.
 INSERT INTO email_templates (code, name, subject, html_body, description, variables, is_default, is_active)
