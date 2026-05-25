@@ -2,6 +2,7 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import com.z7design.secured_guard.model.enums.ProposalStatus;
+import com.z7design.secured_guard.repository.OpportunityRepository;
 import com.z7design.secured_guard.service.LeadService;
 import com.z7design.secured_guard.service.ProposalService;
 import com.z7design.secured_guard.service.QuoteService;
@@ -29,6 +30,7 @@ public class CrmController {
     private final LeadService leadService;
     private final ProposalService proposalService;
     private final QuoteService quoteService;
+    private final OpportunityRepository opportunityRepository;
 
     @GetMapping("/dashboard/metrics")
     @Operation(summary = "Obter métricas do CRM", description = "Retorna métricas agregadas para o dashboard do CRM")
@@ -38,18 +40,25 @@ public class CrmController {
             log.info("Buscando métricas do CRM");
             
             // Totais via count() para evitar carregar todas entidades (evita 500 por lazy/mapping)
-            long totalLeads = leadService.count();
-            long qualifiedLeads = leadService.countByStatus(LeadStatus.QUALIFIED);
-            long proposalSentLeads = leadService.countByStatus(LeadStatus.PROPOSAL_SENT);
-            long negotiationLeads = leadService.countByStatus(LeadStatus.NEGOTIATION);
+            long totalLeads = leadService.countActive();
             long wonLeads = leadService.countByStatus(LeadStatus.WON);
-            long activeOpportunities = qualifiedLeads + negotiationLeads + proposalSentLeads;
+            long kanbanOpportunityCount = opportunityRepository.countActive();
+            BigDecimal kanbanPipelineValue = opportunityRepository.sumActiveEstimatedValue();
+            if (kanbanPipelineValue == null) {
+                kanbanPipelineValue = BigDecimal.ZERO;
+            }
             long totalProposals = proposalService.count();
-            long totalQuotes = quoteService.count();
+            long totalQuotes = safeQuoteCount();
             
-            BigDecimal estimatedRevenue = proposalService.getTotalValueByStatus(ProposalStatus.SENT)
+            BigDecimal proposalRevenue = proposalService.getTotalValueByStatus(ProposalStatus.SENT)
                     .add(proposalService.getTotalValueByStatus(ProposalStatus.UNDER_REVIEW));
+            BigDecimal estimatedRevenue = kanbanPipelineValue.compareTo(BigDecimal.ZERO) > 0
+                    ? kanbanPipelineValue
+                    : (proposalRevenue != null ? proposalRevenue : BigDecimal.ZERO);
             double conversionRate = totalLeads > 0 ? (wonLeads * 100.0 / totalLeads) : 0.0;
+            double kanbanConversionRate = kanbanOpportunityCount > 0
+                    ? (wonLeads * 100.0 / kanbanOpportunityCount)
+                    : 0.0;
             
             // Contagem por mês (últimos 6 meses) — consultas agregadas (evita carregar todos os leads / 500 por timeout ou memória)
             Map<String, Long> monthlyCount = new HashMap<>();
@@ -77,13 +86,15 @@ public class CrmController {
             
             Map<String, Object> metrics = new HashMap<>();
             metrics.put("totalLeads", totalLeads);
-            metrics.put("activeOpportunities", activeOpportunities);
-            metrics.put("totalOpportunities", activeOpportunities);
+            metrics.put("activeOpportunities", kanbanOpportunityCount);
+            metrics.put("totalOpportunities", kanbanOpportunityCount);
             metrics.put("totalProposals", totalProposals);
             metrics.put("totalQuotes", totalQuotes);
             metrics.put("conversionRate", Math.round(conversionRate * 10.0) / 10.0);
-            metrics.put("estimatedRevenue", estimatedRevenue != null ? estimatedRevenue : BigDecimal.ZERO);
-            metrics.put("totalValue", estimatedRevenue != null ? estimatedRevenue : BigDecimal.ZERO);
+            metrics.put("kanbanConversionRate", Math.round(kanbanConversionRate * 10.0) / 10.0);
+            metrics.put("estimatedRevenue", estimatedRevenue);
+            metrics.put("totalValue", estimatedRevenue);
+            metrics.put("kanbanPipelineValue", kanbanPipelineValue);
             metrics.put("monthlyCount", monthlyCount);
             metrics.put("statusHistory", statusHistory);
             
@@ -95,6 +106,15 @@ public class CrmController {
             body.put("error", true);
             body.put("message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        }
+    }
+
+    private long safeQuoteCount() {
+        try {
+            return quoteService.count();
+        } catch (Exception e) {
+            log.warn("Contagem de orçamentos indisponível (quotes): {}", e.getMessage());
+            return 0L;
         }
     }
 

@@ -19,6 +19,9 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     
     @Query("SELECT l FROM Lead l WHERE l.isDeleted = false")
     List<Lead> findAllActive();
+
+    @Query("SELECT COUNT(l) FROM Lead l WHERE l.isDeleted = false")
+    long countActive();
     
     // Buscar leads por status
     List<Lead> findByStatus(LeadStatus status);

@@ -430,9 +430,10 @@ export const DependentFormModal: React.FC<DependentFormModalProps> = ({
                     <Input
                       id="rg"
                       value={formData.rg}
+                      maxLength={50}
                       onChange={(e) => handleInputChange('rg', e.target.value)}
                       className="bg-white text-gray-900 border-2 border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-600 rounded-lg h-12 shadow-md transition-all text-base font-semibold placeholder:text-gray-600 placeholder:font-medium"
-                      placeholder="Número do RG"
+                      placeholder="Ex.: 14116028622 ou 14116028622 SSP MG"
                     />
                   </div>
                 </div>

@@ -44,7 +44,7 @@ public class DependentService {
             .relationship(request.getRelationship())
             .birthDate(request.getBirthDate())
             .cpf(cpfNormalizado)
-            .rg(request.getRg())
+            .rg(normalizeRg(request.getRg()))
             .gender(request.getGender())
             .phone(blankToNull(request.getPhone()))
             .email(blankToNull(request.getEmail()))
@@ -84,7 +84,7 @@ public class DependentService {
         if (request.getName() != null) existingDependent.setName(request.getName());
         if (request.getRelationship() != null) existingDependent.setRelationship(request.getRelationship());
         if (request.getBirthDate() != null) existingDependent.setBirthDate(request.getBirthDate());
-        if (request.getRg() != null) existingDependent.setRg(request.getRg());
+        if (request.getRg() != null) existingDependent.setRg(normalizeRg(request.getRg()));
         if (request.getGender() != null) existingDependent.setGender(request.getGender());
         if (request.getPhone() != null) existingDependent.setPhone(blankToNull(request.getPhone()));
         if (request.getEmail() != null) existingDependent.setEmail(blankToNull(request.getEmail()));
@@ -112,10 +112,12 @@ public class DependentService {
         log.info("Dependente excluído com sucesso. ID: {}", id);
     }
     
+    @Transactional(readOnly = true)
     public DependentDTO findById(UUID id) {
         return mapToDTO(findByIdEntity(id));
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findByEmployeeId(UUID employeeId) {
         log.info("Buscando dependentes do funcionário ID: {}", employeeId);
         return dependentRepository.findByEmployeeId(employeeId)
@@ -124,32 +126,35 @@ public class DependentService {
             .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findAll() {
         log.info("Buscando todos os dependentes");
-        return dependentRepository.findAll()
+        return dependentRepository.findAllWithEmployee()
             .stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findByCpf(String cpf) {
         log.info("Buscando dependente por CPF: {}", cpf);
-        return dependentRepository.findByCpf(cpf)
+        return dependentRepository.findByCpfWithEmployee(cpf)
             .stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
     
+    @Transactional(readOnly = true)
     public List<DependentDTO> findByRelationship(String relationship) {
         log.info("Buscando dependentes por relacionamento: {}", relationship);
-        return dependentRepository.findByRelationship(relationship)
+        return dependentRepository.findByRelationshipWithEmployee(relationship)
             .stream()
             .map(this::mapToDTO)
             .collect(Collectors.toList());
     }
     
     private Dependent findByIdEntity(UUID id) {
-        return dependentRepository.findById(id)
+        return dependentRepository.findByIdWithEmployee(id)
             .orElseThrow(() -> new ResourceNotFoundException("Dependente não encontrado"));
     }
     
@@ -217,6 +222,21 @@ public class DependentService {
             }
             throw new IllegalArgumentException("Este CPF já está cadastrado como dependente deste funcionário");
         }
+    }
+
+    private static String normalizeRg(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > 50) {
+            throw new IllegalArgumentException(
+                    "RG deve ter no máximo 50 caracteres. Informe apenas o número ou abrevie órgão e UF.");
+        }
+        return trimmed;
     }
 
     private static String blankToNull(String s) {

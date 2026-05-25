@@ -20,6 +20,20 @@ import java.util.UUID;
 public interface DocumentoGeradoRepository extends JpaRepository<DocumentoGerado, UUID> {
     
     /**
+     * Busca documentos por funcionário com relacionamentos carregados (open-in-view=false).
+     */
+    @Query("""
+            SELECT DISTINCT dg FROM DocumentoGerado dg
+            LEFT JOIN FETCH dg.modelo
+            LEFT JOIN FETCH dg.funcionario
+            LEFT JOIN FETCH dg.criadoPor
+            LEFT JOIN FETCH dg.assinadoPor
+            WHERE dg.funcionario.id = :funcionarioId
+            ORDER BY dg.dataCriacao DESC
+            """)
+    List<DocumentoGerado> findByFuncionarioIdWithDetails(@Param("funcionarioId") UUID funcionarioId);
+
+    /**
      * Busca documentos por funcionário
      */
     List<DocumentoGerado> findByFuncionarioOrderByDataCriacaoDesc(Employee funcionario);

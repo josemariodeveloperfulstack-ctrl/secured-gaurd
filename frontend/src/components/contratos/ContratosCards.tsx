@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, FileText, Bell, Download, Calendar, DollarSign, AlertTriangle, XCircle, ExternalLink } from 'lucide-react';
+import { Edit, Trash2, FileText, Bell, Download, Calendar, DollarSign, AlertTriangle, XCircle, ExternalLink, FilterX, RotateCcw } from 'lucide-react';
 import { contractService } from '@/services/contractService';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -37,6 +37,8 @@ interface Contrato {
 
 interface ContratosCardsProps {
   contratos: Contrato[];
+  totalCount?: number;
+  onClearFilters?: () => void;
   onEdit: (contrato: Contrato) => void;
   onDelete: () => void;
   onStatusChange?: (contractId: string, newStatus: string) => void;
@@ -46,6 +48,8 @@ interface ContratosCardsProps {
 
 export const ContratosCards: React.FC<ContratosCardsProps> = ({
   contratos,
+  totalCount = 0,
+  onClearFilters,
   onEdit,
   onDelete,
   onStatusChange,
@@ -147,13 +151,39 @@ export const ContratosCards: React.FC<ContratosCardsProps> = ({
   };
 
   if (contratos.length === 0) {
+    const filteredEmpty = totalCount > 0;
+
     return (
-      <div className="text-center py-12">
-        <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
-          <FileText className="h-12 w-12" />
+      <div className="rounded-xl border border-gray-600/80 bg-seguranca-graphite text-center py-12 px-6">
+        <div className="mx-auto h-12 w-12 text-gray-500 mb-4 flex items-center justify-center rounded-full bg-seguranca-black/60">
+          {filteredEmpty ? (
+            <FilterX className="h-7 w-7 text-amber-400/80" />
+          ) : (
+            <FileText className="h-7 w-7" />
+          )}
         </div>
-        <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">Nenhum contrato encontrado</h3>
-        <p className="text-gray-400">Tente ajustar os filtros de busca ou criar um novo contrato.</p>
+        <h3 className="text-lg font-medium text-seguranca-lightgray mb-2">
+          {filteredEmpty
+            ? 'Nenhum contrato com estes filtros'
+            : 'Nenhum contrato cadastrado'}
+        </h3>
+        <p className="text-sm text-gray-400 max-w-md mx-auto">
+          {filteredEmpty
+            ? `Existem ${totalCount} contrato(s) no sistema, mas nenhum corresponde à combinação atual de filtros.`
+            : 'Crie o primeiro contrato usando o botão "Novo Contrato" acima.'}
+        </p>
+        {filteredEmpty && onClearFilters && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onClearFilters}
+            className="mt-5 border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow/10"
+          >
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            Limpar filtros e ver todos
+          </Button>
+        )}
       </div>
     );
   }

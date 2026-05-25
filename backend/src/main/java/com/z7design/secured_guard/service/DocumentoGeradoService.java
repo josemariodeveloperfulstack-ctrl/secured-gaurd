@@ -2,6 +2,7 @@ package com.z7design.secured_guard.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.z7design.secured_guard.dto.DocumentoGeradoListDTO;
 import com.z7design.secured_guard.model.*;
 import com.z7design.secured_guard.repository.DocumentoGeradoRepository;
 import com.z7design.secured_guard.repository.ModeloDocumentoRepository;
@@ -145,11 +146,13 @@ public class DocumentoGeradoService {
      * Lista documentos por funcionário
      */
     @Transactional(readOnly = true)
-    public List<DocumentoGerado> listarPorFuncionario(UUID funcionarioId) {
-        Employee funcionario = employeeRepository.findById(funcionarioId)
-                .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
-
-        return documentoGeradoRepository.findByFuncionarioOrderByDataCriacaoDesc(funcionario);
+    public List<DocumentoGeradoListDTO> listarPorFuncionario(UUID funcionarioId) {
+        if (!employeeRepository.existsById(funcionarioId)) {
+            throw new RuntimeException("Funcionário não encontrado");
+        }
+        return documentoGeradoRepository.findByFuncionarioIdWithDetails(funcionarioId).stream()
+                .map(DocumentoGeradoListDTO::from)
+                .toList();
     }
 
     /**

@@ -104,9 +104,14 @@ export default function KanbanCard({
         <div className="absolute top-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
           <input 
             type="checkbox" 
-            checked={selected} 
-            onChange={() => onSelect?.(opportunity.id)}
-            className="h-4 w-4 rounded border-gray-600 bg-seguranca-black text-seguranca-yellow focus:ring-seguranca-yellow"
+            checked={!!selected} 
+            onChange={(e) => {
+              e.stopPropagation();
+              onSelect?.(opportunity.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 rounded border-gray-600 bg-seguranca-black text-seguranca-yellow focus:ring-seguranca-yellow cursor-pointer"
+            aria-label={`Selecionar oportunidade ${opportunity.title}`}
           />
         </div>
 
@@ -115,7 +120,10 @@ export default function KanbanCard({
           <Button
             size="icon"
             variant="ghost"
-            onClick={() => onDelete?.(opportunity.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(opportunity.id);
+            }}
             className="h-7 w-7 text-gray-500 hover:text-red-500 hover:bg-red-500/10"
           >
             <XCircle className="h-4 w-4" />

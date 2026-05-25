@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - ci
-      - prod
   workflow_dispatch:
 
 env:
@@ -16,9 +15,6 @@ jobs:
   build-and-deploy:
     name: 🚀 Build & Deploy to CI (Docker)
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: read
     
     steps:
       # ============================================
@@ -27,7 +23,7 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ci
 
       - name: ☕ Setup Java 17
         uses: actions/setup-java@v4
@@ -144,15 +140,6 @@ jobs:
           npm run build
 
       # ============================================
-      # 3.5️⃣ SETUP DOCKER BUILDX
-      # ============================================
-      - name: 🐳 Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: 🐳 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # ============================================
       # 4️⃣ BUILD DOCKER IMAGES
       # ============================================
       - name: 🐳 Build Docker images
@@ -177,8 +164,8 @@ jobs:
           echo "🔨 Construindo imagem do backend..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
-            -t ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci \
+            --label org.opencontainers.image.source=https://github.com/zemarioramos/secured-guard \
+            -t z7design/secured-guard-backend:ci \
             -f backend/Dockerfile.prod ./backend || {
             echo "❌ Build do backend Docker falhou!"
             exit 1
@@ -189,8 +176,8 @@ jobs:
           echo "🎨 Construindo imagem do frontend..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
-            -t ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci \
+            --label org.opencontainers.image.source=https://github.com/zemarioramos/secured-guard \
+            -t z7design/secured-guard-frontend:ci \
             --build-arg VITE_API_URL=https://ci.z7botsolutions.com.br/api \
             --build-arg VITE_WS_URL=wss://ci.z7botsolutions.com.br/ws \
             --build-arg VITE_ENVIRONMENT=ci \
@@ -204,8 +191,8 @@ jobs:
           echo "📱 Construindo imagem do WhatsApp service..."
           docker build --no-cache \
             --label org.opencontainers.image.revision=${{ github.sha }} \
-            --label org.opencontainers.image.source=https://github.com/${{ github.repository }} \
-            -t ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci \
+            --label org.opencontainers.image.source=https://github.com/zemarioramos/secured-guard \
+            -t z7design/secured-guard-whatsapp:ci \
             -f whatsapp-service/Dockerfile ./whatsapp-service || {
             echo "❌ Build do WhatsApp service Docker falhou!"
             exit 1
@@ -214,36 +201,25 @@ jobs:
           
           # Verificar imagens construídas
           echo "📋 Verificando imagens construídas..."
-          docker images | grep ghcr.io/${{ github.repository_owner }}/secured-guard || echo "⚠️ Nenhuma imagem encontrada"
+          docker images | grep z7design/secured-guard || echo "⚠️ Nenhuma imagem encontrada"
 
       # ============================================
-      # 5️⃣ LOGIN TO GHCR
+      # 5️⃣ LOGIN TO DOCKER HUB
       # ============================================
-      - name: 🔐 Login to GitHub Container Registry
+      - name: 🔐 Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       # ============================================
-      # 6️⃣ PUSH IMAGES TO GHCR
+      # 6️⃣ PUSH IMAGES TO DOCKER HUB
       # ============================================
-      - name: 📤 Push images to GitHub Container Registry
+      - name: 📤 Push images to Docker Hub
         run: |
-          push_with_retry() {
-            local img=$1
-            for i in 1 2 3; do
-              echo "Push attempt $i/3: $img"
-              if docker push "$img"; then return 0; fi
-              echo "Retry in 30s..."
-              sleep 30
-            done
-            return 1
-          }
-          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-backend:ci
-          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-frontend:ci
-          push_with_retry ghcr.io/${{ github.repository_owner }}/secured-guard-whatsapp:ci
+          docker push z7design/secured-guard-backend:ci
+          docker push z7design/secured-guard-frontend:ci
+          docker push z7design/secured-guard-whatsapp:ci
 
       # ============================================
       # 7️⃣ INSTALL SSHPASS AND CONFIGURE SSH
@@ -258,41 +234,17 @@ jobs:
           done
 
       # ============================================
-      # 7b Validar VPS_HOST_CI (evitar IP inválido ex: 0.0.7.234)
-      # ============================================
-      - name: 🔍 Validar host VPS (CI)
-        run: |
-          HOST="${{ secrets.VPS_HOST_CI }}"
-          if [ -z "$HOST" ]; then
-            echo "::error::VPS_HOST_CI está vazio. Configure em Settings → Secrets and variables → Actions."
-            exit 1
-          fi
-          if [[ "$HOST" == 0.* ]]; then
-            echo "::error::VPS_HOST_CI parece inválido (IP começa com 0.). Ex.: use 10.0.7.234 em vez de 0.0.7.234. Corrija o secret VPS_HOST_CI no repositório."
-            exit 1
-          fi
-          echo "✓ Host VPS validado"
-
-      # ============================================
       # 8️⃣ TRANSFER FILES TO VPS (com retry para Connection reset)
       # ============================================
       - name: 📤 Transfer files to VPS
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
           do_transfer() {
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} "mkdir -p /var/www/secured_guard/ci/nginx /var/www/secured_guard/ci/scripts /var/www/secured_guard/traefik/dynamic" || return 1
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.traefik.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ || return 1
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/ || return 1
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/ || return 1
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/health-check-ci.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ || return 1
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/clear-service-worker-cache.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ || return 1
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/recover-ci-502.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/fix-404-traefik.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/free-host-ports-for-traefik.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/fix_all_duplicates.sql ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/scripts/ 2>/dev/null || true
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik-dynamic-ci.yml 2>/dev/null || true
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik/dynamic/ci.yml 2>/dev/null || true
-            return 0
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} "mkdir -p /var/www/secured_guard/ci/nginx /var/www/secured_guard/traefik/dynamic /var/www/secured_guard/traefik/letsencrypt /var/www/secured_guard/traefik/logs"
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS nginx/ci.conf ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/ci/nginx/ci.conf
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS docker-compose.traefik.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/
+            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS traefik-dynamic-ci.yml ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/var/www/secured_guard/traefik/dynamic/ci.yml
           }
           for i in 1 2 3 4 5; do
             echo "📤 Tentativa $i de transferência..."
@@ -303,7 +255,18 @@ jobs:
           echo "❌ Transferência falhou após 5 tentativas"
           exit 1
 
-
+      # ============================================
+      # 9️⃣ VALIDATE AND CONFIGURE JWT_SECRET
+      # ============================================
+      - name: 🔐 Validate and configure JWT_SECRET
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
+            fi
+            export JWT_SECRET
+          EOF
 
       # ============================================
       # 🔟 CREATE .ENV FILE ON VPS
@@ -352,208 +315,189 @@ jobs:
           # Limpar arquivo temporário
           rm -f /tmp/ci.env
 
+      # ============================================
+      # 1️⃣1️⃣ ENSURE JWT_SECRET IS CORRECT ON HOST AND .ENV
+      # ============================================
+      - name: 🔐 Ensure JWT_SECRET is correct on host and .env
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            cd /var/www/secured_guard/ci
+            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
+            fi
+            export JWT_SECRET=$JWT_SECRET
+            echo "JWT_SECRET_CI=$JWT_SECRET" >> .env
+          EOF
 
+      # ============================================
+      # 1️⃣2️⃣ FORCE .ENV CORRECTION BEFORE STOPPING CONTAINERS
+      # ============================================
+      - name: 🔧 Force .env correction before stopping containers
+        run: |
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            cd /var/www/secured_guard/ci
+            JWT_SECRET="${{ secrets.JWT_SECRET_CI }}"
+            if [ -z "$JWT_SECRET" ]; then
+              JWT_SECRET="jwt_secret_ci_2025_secure_key_64bytes_minimum_required_for_hmac_sha512_algorithm_secure_extra_long_key"
+            fi
+            sed -i '/^JWT_SECRET_CI=/d' .env
+            echo "JWT_SECRET_CI=$JWT_SECRET" >> .env
+          EOF
 
       # ============================================
       # 1️⃣3️⃣ EXECUTE ALL DEPLOYMENT COMMANDS IN SINGLE SSH SESSION
       # ============================================
       - name: 🚀 Execute Deployment (Single SSH Session)
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_ACTOR: ${{ github.actor }}
-          REPO_OWNER: ${{ github.repository_owner }}
         run: |
-          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=15 -o ServerAliveCountMax=60 -o ConnectTimeout=60 -o IPQoS=none -o TCPKeepAlive=yes"
-
-          SUCCESS=0
-          for i in 1 2 3 4 5; do
-            echo "======================================"
-            echo "🔁 Tentativa $i de 5 de conexão SSH..."
-            echo "======================================"
-
-            set +e
-            sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << EOF
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
+          
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
             set -e
-            export DOCKER_CLIENT_TIMEOUT=600
-            export DOCKER_HTTP_TIMEOUT=600
-            export COMPOSE_HTTP_TIMEOUT=600
+            export DOCKER_CLIENT_TIMEOUT=300
+            export DOCKER_HTTP_TIMEOUT=300
+
+            if docker compose version >/dev/null 2>&1; then
+              DC="docker compose"
+            else
+              DC="docker-compose"
+            fi
 
             echo "🔧 Force exit Swarm mode and complete cleanup..."
             docker swarm leave --force 2>/dev/null || true
             cd /var/www/secured_guard/ci
-            docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            docker ps -a | grep "secured-guard-.*-ci" | awk '{print \$1}' | xargs -r docker rm -f 2>/dev/null || true
+            $DC -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
+            # Apenas containers CI — NÃO remover prod/test/dev (grep secured-guard apagava tudo)
+            docker ps -a --format '{{.Names}}' | grep -E '^secured-guard-.*-ci$|^whatsapp-service-ci$' | xargs -r docker rm -f 2>/dev/null || true
 
-            remove_secured_guard_ci_network() {
-              local net=secured-guard-ci
-              docker network inspect "\$net" >/dev/null 2>&1 || return 0
-              local cids
-              cids=\$(docker network inspect "\$net" -f '{{range \$k, \$v := .Containers}}{{\$k}} {{end}}' 2>/dev/null || true)
-              for cid in \$cids; do
-                [ -n "\$cid" ] || continue
-                echo "   Desligando endpoint \$cid da rede \$net..."
-                docker network disconnect -f "\$net" "\$cid" 2>/dev/null || true
-              done
-              docker network rm "\$net" 2>/dev/null && echo "✅ Rede \$net removida" || echo "⚠️ Rede \$net ainda em uso"
-            }
-            remove_secured_guard_ci_network
+            echo "🌐 Preparando rede e Traefik..."
+            docker network create z7network 2>/dev/null || true
+            mkdir -p /var/www/secured_guard/traefik/dynamic /var/www/secured_guard/traefik/letsencrypt /var/www/secured_guard/traefik/logs
+            if ! docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
+              cd /var/www/secured_guard
+              $DC -f docker-compose.traefik.yml up -d
+              sleep 10
+            fi
+            cd /var/www/secured_guard/ci
 
-            echo "🔎 Verificando acesso ao GHCR (Aplicando hack de conectividade Contabo)..."
-            # Forçar IP do GHCR no hosts para evitar falhas de DNS/IPv6 comuns na Contabo
-            GHCR_IP=\$(dig +short ghcr.io | head -n1)
-            if [ -z "\$GHCR_IP" ]; then GHCR_IP="140.82.121.33"; fi
-            echo "🔧 Mapeando ghcr.io para \$GHCR_IP no /etc/hosts..."
-            sudo sed -i '/ghcr.io/d' /etc/hosts || true
-            echo "\$GHCR_IP ghcr.io" | sudo tee -a /etc/hosts > /dev/null
-
-            GHCR_OK=0
-            for j in 1 2 3 4 5; do
-              if curl -4 --connect-timeout 20 -fsSL https://ghcr.io/v2/ >/dev/null 2>&1; then
-                echo "✅ GHCR acessível"
-                GHCR_OK=1
+            echo "🔎 Verificando acesso ao Docker Hub..."
+            for i in 1 2 3; do
+              if curl -fsSL https://registry-1.docker.io/v2/ >/dev/null; then
+                echo "✅ Docker Hub acessível"
                 break
               fi
-              echo "⚠️ Tentativa \$j de acesso ao GHCR falhou, tentando alternativa..."
-              sleep 5
+              echo "⚠️ Tentativa $i de acesso ao Docker Hub falhou, aguardando 10s..."
+              sleep 10
             done
-            [ \$GHCR_OK -eq 0 ] && echo "⚠️ GHCR inacessível da VPS. Tentando usar imagens em cache..."
 
-            echo "🔐 Login no GitHub Container Registry (actor: $GHCR_ACTOR)..."
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin \
-              && echo "✅ Login GHCR realizado com sucesso" \
-              || echo "⚠️ Login GHCR falhou — pull pode usar cache"
+            echo "🔐 Login no Docker Hub..."
+            echo '${{ secrets.DOCKER_PASSWORD }}' | docker login -u '${{ secrets.DOCKER_USERNAME }}' --password-stdin
 
-            pull_or_use_cache() {
-              local img=\$1
-              local name=\$2
-              for j in 1 2 3 4 5; do
-                if docker pull "\$img" 2>/dev/null; then echo "✅ \$name baixado com sucesso"; return 0; fi
-                WAIT=\$((j * 10 + 5))
-                echo "⚠️ Pull \$name falhou (\$j/5), aguardando \${WAIT}s..."
-                sleep \$WAIT
-              done
-              if docker image inspect "\$img" >/dev/null 2>&1; then
-                echo "⚠️ Usando imagem \$name em cache (GHCR inacessível)"
-                return 0
-              fi
-              echo "❌ \$name não disponível e sem cache"; return 1
-            }
-            echo "📥 Pull backend..."
-            pull_or_use_cache ghcr.io/$REPO_OWNER/secured-guard-backend:ci "backend" || exit 1
-            echo "📥 Pull frontend..."
-            pull_or_use_cache ghcr.io/$REPO_OWNER/secured-guard-frontend:ci "frontend" || exit 1
-            echo "📥 Pull whatsapp..."
-            pull_or_use_cache ghcr.io/$REPO_OWNER/secured-guard-whatsapp:ci "whatsapp" || exit 1
+            echo "🧹 Removendo imagens antigas..."
+            docker image rm -f z7design/secured-guard-backend:ci z7design/secured-guard-frontend:ci z7design/secured-guard-whatsapp:ci 2>/dev/null || true
 
-            echo "🔎 Verificando commit das imagens baixadas:"
-            docker image inspect ghcr.io/$REPO_OWNER/secured-guard-backend:ci \
-              --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
-            docker image inspect ghcr.io/$REPO_OWNER/secured-guard-frontend:ci \
-              --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
+            echo "📥 Pull backend (retry)..."
+            for i in 1 2 3; do
+              docker pull z7design/secured-guard-backend:ci && break || { echo "⚠️ Pull backend falhou ($i)"; sleep 10; }
+            done
 
-            echo "🧹 Removendo imagens dangling..."
-            docker image prune -f --filter "dangling=true" 2>/dev/null || true
+            echo "📥 Pull frontend (retry)..."
+            for i in 1 2 3; do
+              docker pull z7design/secured-guard-frontend:ci && break || { echo "⚠️ Pull frontend falhou ($i)"; sleep 10; }
+            done
+
+            echo "📥 Pull whatsapp (retry)..."
+            for i in 1 2 3; do
+              docker pull z7design/secured-guard-whatsapp:ci && break || { echo "⚠️ Pull whatsapp falhou ($i)"; sleep 10; }
+            done
+
+            echo "🔎 Labels das imagens:"
+            docker image inspect z7design/secured-guard-backend:ci --format 'backend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "backend.revision=unknown"
+            docker image inspect z7design/secured-guard-frontend:ci --format 'frontend.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "frontend.revision=unknown"
+            docker image inspect z7design/secured-guard-whatsapp:ci --format 'whatsapp.revision={{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo "whatsapp.revision=unknown"
 
             echo "🧹 Limpando redes..."
-            docker-compose -f docker-compose.ci.yml down --remove-orphans 2>/dev/null || true
-            remove_secured_guard_ci_network
+            docker network rm secured-guard-ci 2>/dev/null || true
             sleep 2
-
-            echo "📦 Iniciando banco de dados (Postgres + Redis)..."
-            docker-compose -f docker-compose.ci.yml up -d postgres-ci redis-ci
-            echo "⏳ Aguardando Postgres aceitar conexões (até ~200s)..."
-            PG_READY=0
-            for j in \$(seq 1 40); do
-              if docker exec secured-guard-db-ci pg_isready -U secured_guard_ci -d secured_guard_ci 2>/dev/null \
-                && docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -tAc "SELECT 1" >/dev/null 2>&1; then
-                echo "✅ Postgres pronto após ~\$(((j - 1) * 5))s"
-                PG_READY=1
+            
+            echo "📦 Iniciando bando de dados e Flyway repair..."
+            $DC -f docker-compose.ci.yml up -d postgres-ci redis-ci
+            echo "⏳ Aguardando postgres ficar pronto..."
+            for i in $(seq 1 18); do
+              if docker exec secured-guard-db-ci pg_isready -U secured_guard_ci -d secured_guard_ci 2>/dev/null; then
+                echo "✅ Postgres pronto!"
                 break
               fi
-              if [ \$((j % 5)) -eq 0 ]; then
-                echo "   ...aguardando Postgres (tentativa \$j/40, ~\$((j * 5))s)..."
-              fi
-              [ \$j -eq 40 ] && { echo "⚠️ Timeout aguardando Postgres após 200s"; exit 1; }
+              [ $i -eq 18 ] && { echo "⚠️ Timeout aguardando postgres"; exit 1; }
               sleep 5
             done
-            [ "\$PG_READY" -eq 1 ] || { echo "⚠️ Postgres não ficou pronto"; exit 1; }
             sleep 3
-
-            echo "🧹 Executando limpeza de duplicatas (Roles & Permissions)..."
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci < scripts/fix_all_duplicates.sql || echo "⚠️ Erro na limpeza, continuando..."
-
-            echo "🔧 Flyway: removendo entradas de migrações falhas..."
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE success = false;" 2>/dev/null || true
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '457';" 2>/dev/null || true
-            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version = '1008';" 2>/dev/null || true
+            
+            echo "🔧 Removendo registros de migrações falhas..."
+            docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427','429') AND success = false;" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';" 2>/dev/null || true
             docker exec secured-guard-db-ci psql -U secured_guard_ci -d secured_guard_ci -c "UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';" 2>/dev/null || true
-
-            echo "🚀 Iniciando todos os containers (usando imagens recém baixadas)..."
-            docker-compose -f docker-compose.ci.yml up -d --force-recreate --remove-orphans
-
-            echo "⏳ Aguardando backend + Flyway em /api/health (máx. 540s)..."
-            for j in \$(seq 1 54); do
-              BACKEND_STATE=\$(docker inspect secured-guard-backend-ci --format '{{.State.Status}}' 2>/dev/null || echo "missing")
-              if [ "\$BACKEND_STATE" = "exited" ] || [ "\$BACKEND_STATE" = "dead" ]; then
-                echo "❌ Backend crashou (status: \$BACKEND_STATE). Logs:"
-                docker logs --tail 100 secured-guard-backend-ci 2>&1 || true
-                exit 1
-              fi
-              if curl -sf http://localhost:8081/api/health >/dev/null 2>&1; then
-                echo "✅ Backend respondendo após ~\$(((j - 1) * 10))s"
-                break
-              fi
-              echo "   Aguardando... ~\$((j * 10))s (backend status: \$BACKEND_STATE)"
-              sleep 10
-              if [ \$j -eq 54 ]; then
-                echo "❌ Timeout 540s - backend não respondeu em /api/health. Logs:"
-                docker logs --tail 200 secured-guard-backend-ci 2>&1 || true
-                exit 1
-              fi
-            done
-
-            docker-compose -f docker-compose.ci.yml ps
-
+            
+            echo "🚀 Iniciando todos os containers..."
+            # Imagens já foram puxadas do Docker Hub acima; --pull missing evita re-pull do GHCR/registry errado
+            $DC -f docker-compose.ci.yml up -d --force-recreate --pull missing --remove-orphans
+            
+            echo "🔎 Verificando containers CI..."
+            $DC -f docker-compose.ci.yml ps
+            if ! docker ps --format '{{.Names}}' | grep -q '^secured-guard-backend-ci$'; then
+              echo "❌ secured-guard-backend-ci não subiu!"
+              $DC -f docker-compose.ci.yml logs --tail 50 backend-ci 2>&1 || true
+              exit 1
+            fi
+            
+            echo "🔐 Verificando JWT_SECRET e configs..."
+            cat .env | grep JWT_SECRET || true
+            
+            echo "--- Logs do backend (últimas 80 linhas) ---"
+            docker logs --tail 80 secured-guard-backend-ci 2>&1 || true
+            
             echo "🌐 Testando conexão local..."
             curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:8081/api/health || echo "Backend não responde"
-
-            echo "🔄 Rodando script proativo de correção 404 do Traefik..."
-            chmod +x /var/www/secured_guard/ci/scripts/fix-404-traefik.sh 2>/dev/null || true
-            bash /var/www/secured_guard/ci/scripts/fix-404-traefik.sh 2>/dev/null || true
-            sleep 5
-
-            echo "🏥 Iniciando script de Health Check internamente..."
-            chmod +x /var/www/secured_guard/ci/scripts/health-check-ci.sh
-            /var/www/secured_guard/ci/scripts/health-check-ci.sh
-
-            echo "🧹 Limpando cache do Service Worker..."
-            chmod +x /var/www/secured_guard/ci/scripts/clear-service-worker-cache.sh
-            /var/www/secured_guard/ci/scripts/clear-service-worker-cache.sh
-
+            
+            echo "🔄 Garantindo que o traefik está a rodar..."
+            if ! docker ps --format '{{.Names}}' | grep -q '^traefik$'; then
+              cd /var/www/secured_guard
+              $DC -f docker-compose.traefik.yml up -d
+            fi
+            docker network connect z7network secured-guard-nginx-ci 2>/dev/null || true
+            
           EOF
 
-            SSH_EXIT_CODE=$?
-            set -e
-            
-            if [ $SSH_EXIT_CODE -eq 0 ]; then
-              echo "✅ Deployment concluído com sucesso!"
-              SUCCESS=1
-              break
-            else
-              echo "⚠️ Erro na execução SSH (Código: $SSH_EXIT_CODE). Aguardando 20s para tentar novamente..."
-              sleep 20
-            fi
-          done
+      # ============================================
+      # 2️⃣6️⃣ CLEAR SERVICE WORKER CACHE
+      # ============================================
+      - name: 🧹 Clear Service Worker Cache
+        run: |
+          # Enviar script de limpeza para VPS
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp scripts/clear-service-worker-cache.sh \
+            ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/tmp/clear-service-worker-cache.sh
           
-          if [ $SUCCESS -eq 0 ]; then
-            echo "❌ Falha crítica: O Deploy não pôde ser concluído após 5 tentativas de conexão SSH."
-            exit 1
-          fi
+          # Executar script na VPS
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            chmod +x /tmp/clear-service-worker-cache.sh
+            /tmp/clear-service-worker-cache.sh
+          EOF
 
-
-
-
+      # ============================================
+      # 2️⃣7️⃣ HEALTH CHECK
+      # ============================================
+      - name: 🏥 Health check
+        env:
+          SSH_USER: ${{ secrets.VPS_USER_CI }}
+          SSH_HOST: ${{ secrets.VPS_HOST_CI }}
+          SSH_PASSWORD: ${{ secrets.VPS_PASSWORD_CI }}
+        run: |
+          SSH_OPTS="-o StrictHostKeyChecking=no -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o ConnectTimeout=30"
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" scp $SSH_OPTS scripts/health-check-ci.sh ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }}:/tmp/health-check-ci.sh
+          sshpass -p "${{ secrets.VPS_PASSWORD_CI }}" ssh $SSH_OPTS ${{ secrets.VPS_USER_CI }}@${{ secrets.VPS_HOST_CI }} << 'EOF'
+            chmod +x /tmp/health-check-ci.sh
+            CI_BASE_DIR=/var/www/secured_guard /tmp/health-check-ci.sh
+          EOF
 
       # ============================================
       # 2️⃣7️⃣ RUN LOGIN AFTER DEPLOY

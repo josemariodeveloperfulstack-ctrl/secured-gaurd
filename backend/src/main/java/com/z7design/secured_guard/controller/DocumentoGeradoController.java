@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.DocumentoGeradoListDTO;
 import com.z7design.secured_guard.model.DocumentoGerado;
 import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
@@ -65,9 +66,9 @@ public class DocumentoGeradoController {
      * Lista documentos por funcionário
      */
     @GetMapping("/funcionario/{funcionarioId}")
-    public ResponseEntity<List<DocumentoGerado>> listarPorFuncionario(@PathVariable UUID funcionarioId) {
+    public ResponseEntity<List<DocumentoGeradoListDTO>> listarPorFuncionario(@PathVariable UUID funcionarioId) {
         try {
-            List<DocumentoGerado> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId);
+            List<DocumentoGeradoListDTO> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId);
             return ResponseEntity.ok(documentos);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -304,11 +305,12 @@ public class DocumentoGeradoController {
      * Busca documentos por funcionário e modelo
      */
     @GetMapping("/funcionario/{funcionarioId}/modelo/{modeloId}")
-    public ResponseEntity<List<DocumentoGerado>> buscarPorFuncionarioEModelo(
+    public ResponseEntity<List<DocumentoGeradoListDTO>> buscarPorFuncionarioEModelo(
             @PathVariable UUID funcionarioId, @PathVariable UUID modeloId) {
         try {
-            List<DocumentoGerado> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId);
-            // Filtrar por modelo se necessário
+            List<DocumentoGeradoListDTO> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId).stream()
+                    .filter(d -> modeloId.equals(d.modeloId()))
+                    .toList();
             return ResponseEntity.ok(documentos);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();

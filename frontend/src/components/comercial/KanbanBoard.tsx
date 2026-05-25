@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,8 @@ import {
   updateOpportunity, 
   createKanbanStatus,
   deleteOpportunity,
-  deleteMultipleOpportunities
+  deleteMultipleOpportunities,
+  deleteAllOpportunities
 } from '@/services/crmService';
 import { userService } from '@/services/userService';
 import leadService from '@/services/leadService';
@@ -153,6 +154,20 @@ const mockLeads: Lead[] = [
     createdAt: '2024-12-20'
   }
 ];
+
+/** Uma oportunidade por ID — evita cards duplicados no board e seleção em massa fantasma. */
+function dedupeOpportunitiesById(list: Opportunity[]): Opportunity[] {
+  const byId = new Map<string, Opportunity>();
+  for (const opp of list) {
+    if (opp?.id == null) continue;
+    const id = String(opp.id).trim();
+    if (!id || id === 'undefined' || id === 'null') continue;
+    if (!byId.has(id)) {
+      byId.set(id, opp);
+    }
+  }
+  return Array.from(byId.values());
+}
 
 const mockOpportunities: Opportunity[] = [
   {
@@ -276,6 +291,26 @@ export default function KanbanBoard() {
   const isOpportunityUuid = (id: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
+  const dedupeKanbanStatuses = (list: KanbanStatus[]): KanbanStatus[] => {
+    const byId = new Map<string, KanbanStatus>();
+    for (const s of list) {
+      const id = String(s.id);
+      if (!byId.has(id)) {
+        byId.set(id, s);
+      }
+    }
+    const byName = new Map<string, KanbanStatus>();
+    for (const s of byId.values()) {
+      const key = (s.name || '').trim().toLowerCase();
+      if (!key) continue;
+      const existing = byName.get(key);
+      if (!existing || (s.orderIndex ?? 999) < (existing.orderIndex ?? 999)) {
+        byName.set(key, s);
+      }
+    }
+    return Array.from(byName.values()).sort((a, b) => a.orderIndex - b.orderIndex);
+  };
+
   const toggleSelect = (id: string | number) => {
     const key = String(id);
     setSelectedOppIds(prev =>
@@ -283,8 +318,44 @@ export default function KanbanBoard() {
     );
   };
 
+  const uniqueOpportunities = useMemo(
+    () => dedupeOpportunitiesById(opportunities),
+    [opportunities]
+  );
+
+  const uniqueFiltered = useMemo(
+    () => dedupeOpportunitiesById(filteredOpportunities),
+    [filteredOpportunities]
+  );
+
+  /** Cada oportunidade aparece em uma única coluna. */
+  const opportunitiesByColumn = useMemo(() => {
+    const map = new Map<string, Opportunity[]>();
+    for (const s of statuses) {
+      map.set(String(s.id), []);
+    }
+    if (statuses.length === 0) {
+      return map;
+    }
+    const validStatusIds = new Set(statuses.map(s => String(s.id)));
+    const defaultStatusId = String(statuses[0].id);
+    for (const opp of uniqueFiltered) {
+      let colId = opp.statusId != null ? String(opp.statusId) : '';
+      if (!validStatusIds.has(colId)) {
+        colId = defaultStatusId;
+      }
+      const bucket = map.get(colId);
+      if (bucket) {
+        bucket.push(opp);
+      } else {
+        map.get(defaultStatusId)?.push(opp);
+      }
+    }
+    return map;
+  }, [uniqueFiltered, statuses]);
+
   const selectAll = () => {
-    setSelectedOppIds(filteredOpportunities.map(opp => String(opp.id)));
+    setSelectedOppIds(uniqueFiltered.map(opp => String(opp.id)));
   };
 
   const deselectAll = () => {
@@ -353,8 +424,8 @@ export default function KanbanBoard() {
         toast({ title: 'Sucesso', description: 'Oportunidade excluída com sucesso.' });
         setSelectedOppIds(prev => prev.filter(i => i !== deleteSingleId));
       } else if (deleteMode === 'all') {
-        await leadService.deleteAllLeads(reason);
-        toast({ title: 'Sucesso', description: 'Todos os leads e oportunidades foram excluídos.' });
+        await deleteAllOpportunities(reason);
+        toast({ title: 'Sucesso', description: 'Todas as oportunidades do Kanban foram excluídas.' });
         setSelectedOppIds([]);
       }
       setDeleteModalOpen(false);
@@ -457,6 +528,8 @@ export default function KanbanBoard() {
         bgColor: mockStatuses[index]?.bgColor || '#DBEAFE'
       })).sort((a, b) => a.orderIndex - b.orderIndex);
 
+      mappedStatuses = dedupeKanbanStatuses(mappedStatuses);
+
       // Se não houver status no backend, criar status padrão automaticamente
       if (mappedStatuses.length === 0) {
         console.warn('Nenhum status encontrado no backend ou erro na busca. Tentando obter ou criar status padrão...');
@@ -501,8 +574,9 @@ export default function KanbanBoard() {
               color: mockStatuses[index]?.color || '#3B82F6',
               bgColor: mockStatuses[index]?.bgColor || '#DBEAFE'
             })).sort((a, b) => a.orderIndex - b.orderIndex);
+            mappedStatuses = dedupeKanbanStatuses(mappedStatuses);
           } else {
-            mappedStatuses = createdStatuses;
+            mappedStatuses = dedupeKanbanStatuses(createdStatuses);
           }
         } catch (err) {
           console.error('Erro ao gerenciar status padrão:', err);
@@ -571,8 +645,10 @@ export default function KanbanBoard() {
         };
       });
 
-      setOpportunities(mappedOpportunities);
-      setFilteredOpportunities(mappedOpportunities);
+      const unique = dedupeOpportunitiesById(mappedOpportunities);
+      setOpportunities(unique);
+      setFilteredOpportunities(unique);
+      setSelectedOppIds([]);
     } catch (err: any) {
       console.error('Erro crítico ao carregar dados do Kanban:', err);
       setError(err.message || 'Erro ao carregar dados');
@@ -589,6 +665,11 @@ export default function KanbanBoard() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const visible = new Set(uniqueFiltered.map(o => String(o.id)));
+    setSelectedOppIds(prev => prev.filter(id => visible.has(id)));
+  }, [uniqueFiltered]);
 
   useEffect(() => {
     let filtered = opportunities;
@@ -877,7 +958,7 @@ export default function KanbanBoard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Total de Oportunidades</p>
-                <p className="text-2xl font-bold text-seguranca-yellow">{opportunities.length}</p>
+                <p className="text-2xl font-bold text-seguranca-yellow">{uniqueOpportunities.length}</p>
               </div>
               <Target className="h-8 w-8 text-seguranca-yellow" />
             </div>
@@ -890,7 +971,7 @@ export default function KanbanBoard() {
               <div>
                 <p className="text-sm text-gray-400">Valor Total</p>
                 <p className="text-2xl font-bold text-seguranca-yellow">
-                  {formatCurrency(opportunities.reduce((sum, opp) => sum + opp.value, 0))}
+                  {formatCurrency(uniqueOpportunities.reduce((sum, opp) => sum + opp.value, 0))}
                 </p>
               </div>
               <DollarSign className="h-8 w-8 text-seguranca-yellow" />
@@ -904,7 +985,15 @@ export default function KanbanBoard() {
               <div>
                 <p className="text-sm text-gray-400">Taxa de Conversão</p>
                 <p className="text-2xl font-bold text-seguranca-yellow">
-                  {Math.round((opportunities.filter(opp => opp.statusId === 5).length / opportunities.length) * 100)}%
+                  {(() => {
+                    const closed = statuses.find(s => (s.name || '').toLowerCase() === 'fechado');
+                    const closedCount = closed
+                      ? uniqueOpportunities.filter(opp => String(opp.statusId) === String(closed.id)).length
+                      : 0;
+                    return uniqueOpportunities.length > 0
+                      ? Math.round((closedCount / uniqueOpportunities.length) * 100)
+                      : 0;
+                  })()}%
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-seguranca-yellow" />
@@ -919,8 +1008,8 @@ export default function KanbanBoard() {
                 <p className="text-sm text-gray-400">Média de Valor</p>
                 <p className="text-2xl font-bold text-seguranca-yellow">
                   {formatCurrency(
-                    opportunities.length > 0
-                      ? opportunities.reduce((sum, opp) => sum + opp.value, 0) / opportunities.length
+                    uniqueOpportunities.length > 0
+                      ? uniqueOpportunities.reduce((sum, opp) => sum + opp.value, 0) / uniqueOpportunities.length
                       : 0
                   )}
                 </p>
@@ -1022,13 +1111,13 @@ export default function KanbanBoard() {
 
       {/* Kanban Board */}
       <div className={styles['kanban-board-scroll']}>
-        {statuses.map(status => {
-          const statusOpportunities = filteredOpportunities.filter(opp => String(opp.statusId) === String(status.id));
+        {statuses.map((status) => {
+          const statusOpportunities = opportunitiesByColumn.get(String(status.id)) ?? [];
           const totalValue = statusOpportunities.reduce((sum, opp) => sum + opp.value, 0);
           
           return (
             <div
-              key={status.id}
+              key={`col-${status.id}`}
               className={styles['kanban-column']}
               style={{ borderLeft: `4px solid ${status.color}` }}
             >
@@ -1051,7 +1140,7 @@ export default function KanbanBoard() {
               <div className="space-y-3">
                 {statusOpportunities.map(opp => (
                   <KanbanCard
-                    key={String(opp.id)}
+                    key={`${status.id}-${opp.id}`}
                     opportunity={opp}
                     onEdit={openEditModal}
                     onDragStart={() => {}}
@@ -1095,7 +1184,7 @@ export default function KanbanBoard() {
             </DialogTitle>
             <DialogDescription className="text-gray-400 text-center">
               {deleteMode === 'all'
-                ? 'Esta ação remove permanentemente todos os leads e oportunidades. Informe o motivo para o registro de auditoria.'
+                ? 'Esta ação remove permanentemente todas as oportunidades do Kanban (soft delete). Informe o motivo para o registro de auditoria.'
                 : 'Informe o motivo da exclusão (obrigatório para auditoria).'}
             </DialogDescription>
           </DialogHeader>

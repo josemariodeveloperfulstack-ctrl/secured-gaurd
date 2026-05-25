@@ -35,6 +35,24 @@ DELETE FROM flyway_schema_history WHERE version IN ('424','425','426','427','429
 UPDATE flyway_schema_history SET checksum = 318441356 WHERE version = '424';
 UPDATE flyway_schema_history SET checksum = -1437677079 WHERE version = '427';
 UPDATE flyway_schema_history SET checksum = -1673547286 WHERE version = '429';
+
+-- V1027: email_templates sem UNIQUE em code (tabela legada)
+DELETE FROM flyway_schema_history WHERE version = '1027' AND success = false;
+DELETE FROM email_templates a USING email_templates b
+WHERE a.code IS NOT NULL AND a.code = b.code AND a.id > b.id;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        JOIN pg_namespace n ON t.relnamespace = n.oid
+        WHERE n.nspname = 'public' AND t.relname = 'email_templates'
+          AND c.contype = 'u' AND pg_get_constraintdef(c.oid) LIKE '%(code)%'
+    ) THEN
+        ALTER TABLE email_templates ADD CONSTRAINT email_templates_code_key UNIQUE (code);
+    END IF;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 SQL
 
 echo "🔄 Reiniciando backend..."

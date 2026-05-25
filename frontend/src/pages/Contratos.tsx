@@ -104,40 +104,54 @@ const Contratos = () => {
     }
   }, [searchTerm]);
 
+  const normalizeStatus = (status: unknown) =>
+    String(status ?? '').toUpperCase().trim();
+
   // Filtrar contratos localmente
-  const filteredContratos = contratos.filter(contrato => {
-    // Verificar se o contrato e suas propriedades existem antes de filtrar
-    if (!contrato || !contrato.clientName) {
-      console.warn('⚠️ Contrato sem dados do cliente:', contrato);
-      return false; // Excluir contratos sem dados do cliente
-    }
-    
-    // Filtro por texto de busca
-    const matchesSearch = (
-      contrato.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contrato.contractNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contrato.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    // Filtro por status (TERMINATED agrupa CANCELLED e EXPIRED)
-    const matchesStatus = statusFilter === 'all' 
-      || contrato.status === statusFilter 
-      || (statusFilter === 'TERMINATED' && (contrato.status === 'CANCELLED' || contrato.status === 'EXPIRED'));
+  const filteredContratos = contratos.filter((contrato) => {
+    if (!contrato?.id) return false;
 
-    // Filtro por origem
-    const matchesOrigin = originFilter === 'all' || contrato.contractOrigin === originFilter;
+    const term = searchTerm.trim().toLowerCase();
+    const matchesSearch =
+      term.length === 0 ||
+      (contrato.clientName?.toLowerCase().includes(term) ?? false) ||
+      (contrato.contractNumber?.toLowerCase().includes(term) ?? false) ||
+      (contrato.description?.toLowerCase().includes(term) ?? false);
 
-    // Filtro por vencimento (contratos que vencem em 30 dias)
-    const matchesExpiring = expiringFilter === 'all' || (() => {
-      if (!contrato.endDate) return false;
-      const end = new Date(contrato.endDate);
-      const now = new Date();
-      const daysUntil = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      return expiringFilter === '30' && daysUntil >= 0 && daysUntil <= 30;
-    })();
-    
+    const st = normalizeStatus(contrato.status);
+    const matchesStatus =
+      statusFilter === 'all' ||
+      st === statusFilter ||
+      (statusFilter === 'AWAITING' && (st === 'PENDING' || st === 'DRAFT')) ||
+      (statusFilter === 'TERMINATED' &&
+        (st === 'CANCELLED' || st === 'EXPIRED' || st === 'TERMINATED'));
+
+    const matchesOrigin =
+      originFilter === 'all' || contrato.contractOrigin === originFilter;
+
+    const matchesExpiring =
+      expiringFilter === 'all' ||
+      (() => {
+        if (!contrato.endDate || expiringFilter !== '30') return false;
+        const end = new Date(contrato.endDate);
+        const daysUntil = Math.ceil(
+          (end.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        );
+        return daysUntil >= 0 && daysUntil <= 30;
+      })();
+
     return matchesSearch && matchesStatus && matchesOrigin && matchesExpiring;
   });
+
+  const handleStatusFilterChange = (status: string) => {
+    setStatusFilter(status);
+    if (status !== 'all') setExpiringFilter('all');
+  };
+
+  const handleExpiringFilterChange = (days: string) => {
+    setExpiringFilter(days);
+    if (days !== 'all') setStatusFilter('all');
+  };
 
   // Limpar filtros
   const clearFilters = () => {
@@ -308,124 +322,138 @@ const Contratos = () => {
     );
   }
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadContractsWithFilters().finally(() => setTimeout(() => setRefreshing(false), 600));
+  };
+
   return (
     <StandardLayout>
-      <div className="space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden px-3 sm:px-4 lg:px-6 pb-6">
-        <div className="space-y-4">
+      <div className="space-y-5 sm:space-y-6 w-full max-w-full overflow-x-hidden px-3 sm:px-4 lg:px-6 pb-8">
+        {/* Cabeçalho */}
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray">Contratos</h1>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-seguranca-lightgray tracking-tight">
+              Contratos
+            </h1>
+            <p className="text-sm text-gray-400 mt-1 max-w-xl">
+              Gerencie contratos, acompanhe vencimentos e filtre por status com um clique nos indicadores.
+            </p>
           </div>
-          
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 lg:gap-4">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCompanySettings}
-                className="border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black text-xs sm:text-sm flex-shrink-0"
-              >
-                <Building className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Config. Empresa</span>
-                <span className="sm:hidden">Empresa</span>
-              </Button>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleGenerateContract()}
-                className="border-green-500 text-green-400 hover:bg-green-500 hover:text-white text-xs sm:text-sm flex-shrink-0"
-              >
-                <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Gerar Contrato</span>
-                <span className="sm:hidden">Gerar</span>
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setConfigModalOpen(true)}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black text-xs sm:text-sm flex-shrink-0"
-              >
-                <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Config. Emails</span>
-                <span className="sm:hidden">Emails</span>
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setRefreshing(true);
-                  clearFilters();
-                  setTimeout(() => setRefreshing(false), 1000);
-                }}
-                disabled={refreshing}
-                className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black flex-shrink-0"
-              >
-                {refreshing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                <span className="hidden sm:inline">{refreshing ? 'Atualizando...' : 'Atualizar'}</span>
-                <span className="sm:hidden">{refreshing ? '...' : 'Atualizar'}</span>
-              </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto lg:min-w-[280px]">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Input
+                placeholder="Buscar por cliente, número ou descrição…"
+                className="pl-10 h-10 bg-seguranca-black border-gray-600 text-seguranca-lightgray focus-visible:ring-seguranca-yellow"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 flex-1 sm:flex-initial">
-              <div className="relative flex-1 sm:flex-initial min-w-0">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                <Input
-                  placeholder="Pesquisar contratos..."
-                  className="pl-10 w-full sm:w-48 lg:w-64 bg-seguranca-black border-gray-600 text-seguranca-lightgray"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              
-              <Button
-                onClick={() => setModalOpen(true)}
-                className="bg-seguranca-red hover:bg-seguranca-darkred flex-shrink-0 whitespace-nowrap"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Novo Contrato</span>
-                <span className="sm:hidden">Novo</span>
-              </Button>
-            </div>
+            <Button
+              onClick={() => setModalOpen(true)}
+              className="bg-seguranca-red hover:bg-seguranca-darkred h-10 flex-shrink-0 whitespace-nowrap shadow-md shadow-seguranca-red/20"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo contrato
+            </Button>
           </div>
+        </header>
+
+        {/* Ações secundárias */}
+        <div className="flex flex-wrap items-center gap-2 p-2 sm:p-3 rounded-xl bg-seguranca-graphite/80 border border-gray-600/60">
+          <span className="text-[11px] uppercase tracking-wider text-gray-500 px-1 w-full sm:w-auto sm:mr-1">
+            Ações
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCompanySettings}
+            className="border-seguranca-yellow/50 text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black h-8"
+          >
+            <Building className="h-3.5 w-3.5 mr-1.5" />
+            Empresa
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleGenerateContract()}
+            className="border-emerald-600/50 text-emerald-400 hover:bg-emerald-600 hover:text-white h-8"
+          >
+            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            Gerar contrato
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfigModalOpen(true)}
+            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-8"
+          >
+            <Settings className="h-3.5 w-3.5 mr-1.5" />
+            E-mails
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black h-8 ml-auto sm:ml-0"
+          >
+            {refreshing ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Atualizar
+          </Button>
         </div>
 
-        {/* Dashboard de Estatísticas e Alertas */}
+        {/* Dashboard + alertas */}
         {!loading && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 w-full">
-            <div className="xl:col-span-2 min-w-0">
-              <ContractsDashboard contracts={contratos} />
-            </div>
-            <div className="min-w-0">
-              <ExpiringAlertsWidget onRenew={handleRenewClick} />
-            </div>
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_minmax(280px,340px)] gap-4 w-full items-start">
+            <ContractsDashboard
+              contracts={contratos}
+              statusFilter={statusFilter}
+              expiringFilter={expiringFilter}
+              onStatusFilterChange={handleStatusFilterChange}
+              onFocusExpiring={() => handleExpiringFilterChange('30')}
+            />
+            <ExpiringAlertsWidget onRenew={handleRenewClick} />
           </div>
         )}
 
-        {/* Filtros */}
+        {/* Lista */}
         {!loading && (
           <ContractsFilters
             statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
+            onStatusFilterChange={handleStatusFilterChange}
             originFilter={originFilter}
             onOriginFilterChange={setOriginFilter}
             expiringFilter={expiringFilter}
-            onExpiringFilterChange={setExpiringFilter}
+            onExpiringFilterChange={handleExpiringFilterChange}
             onClearFilters={clearFilters}
+            onClearSearch={() => setSearchTerm('')}
             totalContracts={contratos.length}
             filteredContracts={filteredContratos.length}
+            searchTerm={searchTerm}
           />
         )}
 
-        {/* Cards de Contratos */}
+        {!loading && filteredContratos.length > 0 && (
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-seguranca-yellow">
+            Contratos cadastrados
+            <span className="ml-2 text-gray-500 font-normal normal-case tracking-normal text-xs">
+              ({filteredContratos.length})
+            </span>
+          </h2>
+        )}
+
         {!loading && (
           <ContratosCards
             contratos={filteredContratos}
+            totalCount={contratos.length}
+            onClearFilters={clearFilters}
             onEdit={handleEditContrato}
             onDelete={handleDeleteSuccess}
             onStatusChange={updateContractStatus}

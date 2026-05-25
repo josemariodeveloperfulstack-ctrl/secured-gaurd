@@ -2,13 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { contractService, ContractExpiringAlert } from '@/services/contractService';
-import { Calendar, AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import { Calendar, Loader2, RefreshCw, AlertCircle, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 interface ExpiringAlertsWidgetProps {
   onRenew?: (contractId: string, contractNumber?: string, value?: number) => void;
 }
+
+const URGENCY_STYLES: Record<string, { badge: string; border: string }> = {
+  CRITICAL: { badge: 'bg-red-500/25 text-red-300', border: 'border-red-500/40' },
+  WARNING: { badge: 'bg-amber-500/25 text-amber-300', border: 'border-amber-500/40' },
+  INFO: { badge: 'bg-blue-500/25 text-blue-300', border: 'border-blue-500/40' },
+  DEFAULT: { badge: 'bg-gray-500/25 text-gray-300', border: 'border-gray-600' },
+};
 
 export const ExpiringAlertsWidget: React.FC<ExpiringAlertsWidgetProps> = ({ onRenew }) => {
   const [alerts, setAlerts] = useState<ContractExpiringAlert[]>([]);
@@ -32,66 +40,115 @@ export const ExpiringAlertsWidget: React.FC<ExpiringAlertsWidgetProps> = ({ onRe
     loadAlerts();
   }, []);
 
-  const formatCurrency = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
   const formatDate = (d: string) => new Date(d).toLocaleDateString('pt-BR');
 
-  const getUrgencyBadge = (level: string) => {
-    const baseClass = "text-[10px] sm:text-xs px-1.5 py-0";
-    if (level === 'CRITICAL') return <Badge className={`bg-red-500/20 text-red-400 ${baseClass}`}>≤30 dias</Badge>;
-    if (level === 'WARNING') return <Badge className={`bg-yellow-500/20 text-yellow-400 ${baseClass}`}>31-60 dias</Badge>;
-    if (level === 'INFO') return <Badge className={`bg-blue-500/20 text-blue-400 ${baseClass}`}>61-90 dias</Badge>;
-    return <Badge variant="secondary" className={baseClass}>91-120 dias</Badge>;
+  const getUrgency = (level: string) => URGENCY_STYLES[level] ?? URGENCY_STYLES.DEFAULT;
+
+  const getUrgencyLabel = (level: string) => {
+    if (level === 'CRITICAL') return '≤ 30 dias';
+    if (level === 'WARNING') return '31–60 dias';
+    if (level === 'INFO') return '61–90 dias';
+    return '91–120 dias';
   };
 
+  const criticalCount = alerts.filter((a) => a.urgencyLevel === 'CRITICAL').length;
+
   return (
-    <Card className="bg-seguranca-graphite border-gray-600 min-w-0 overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4">
-        <CardTitle className="text-xs sm:text-sm font-medium text-seguranca-lightgray flex items-center gap-2 truncate min-w-0">
-          <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-seguranca-yellow flex-shrink-0" />
-          <span className="truncate">Contratos a vencer (120 dias)</span>
-        </CardTitle>
-        <Button variant="ghost" size="sm" onClick={loadAlerts} disabled={loading} className="flex-shrink-0 h-8 w-8 p-0">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
+    <Card className="bg-seguranca-graphite border-gray-600/80 h-full flex flex-col min-w-0 overflow-hidden">
+      <CardHeader className="pb-2 px-4 pt-4 space-y-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <CardTitle className="text-sm font-semibold text-seguranca-lightgray flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/10 flex-shrink-0">
+                <AlertCircle className="h-4 w-4 text-red-400" />
+              </span>
+              <span className="leading-tight">Vencimentos próximos</span>
+            </CardTitle>
+            <p className="text-[11px] text-gray-500 mt-2 pl-10">
+              Próximos 120 dias · {alerts.length} contrato(s)
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={loadAlerts}
+            disabled={loading}
+            className="h-8 w-8 text-gray-400 hover:text-seguranca-yellow flex-shrink-0"
+            aria-label="Atualizar alertas"
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </Button>
+        </div>
+        {criticalCount > 0 && (
+          <Badge className="mt-3 ml-10 w-fit bg-red-500/20 text-red-300 border-red-500/30 text-[10px]">
+            {criticalCount} crítico(s) — ação imediata
+          </Badge>
+        )}
       </CardHeader>
-      <CardContent className="px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4">
+
+      <CardContent className="px-4 pb-4 flex-1 flex flex-col min-h-0">
         {loading ? (
-          <div className="flex justify-center py-6">
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-seguranca-yellow" />
+            <p className="text-xs text-gray-500">Carregando alertas…</p>
           </div>
         ) : alerts.length === 0 ? (
-          <p className="text-gray-400 text-xs sm:text-sm py-4">Nenhum contrato a vencer nos próximos 120 dias.</p>
+          <div className="flex flex-col items-center justify-center py-10 text-center px-2">
+            <Calendar className="h-8 w-8 text-gray-600 mb-2" />
+            <p className="text-sm text-gray-400">Nenhum vencimento</p>
+            <p className="text-xs text-gray-500 mt-1">nos próximos 120 dias</p>
+          </div>
         ) : (
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {alerts.slice(0, 10).map((a) => (
-              <div
-                key={a.contractId}
-                className="p-2 sm:p-2.5 bg-seguranca-black border border-gray-600 rounded-lg flex justify-between items-center gap-2 min-w-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-seguranca-lightgray truncate text-xs sm:text-sm">{a.contractNumber}</p>
-                  <p className="text-[10px] sm:text-xs text-gray-400 truncate">{a.clientName}</p>
-                  <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
-                    {getUrgencyBadge(a.urgencyLevel)}
-                    <span className="text-[10px] sm:text-xs text-gray-500">{a.daysRemaining} dias</span>
-                    <span className="text-[10px] sm:text-xs text-gray-500">{formatDate(a.endDate)}</span>
+          <div className="space-y-2 overflow-y-auto max-h-[320px] pr-1 custom-scrollbar flex-1">
+            {alerts.slice(0, 12).map((a) => {
+              const style = getUrgency(a.urgencyLevel);
+              return (
+                <div
+                  key={a.contractId}
+                  className={cn(
+                    'group p-3 rounded-lg border bg-seguranca-black/60 transition-colors',
+                    'hover:bg-seguranca-black hover:border-seguranca-yellow/30',
+                    style.border
+                  )}
+                >
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-seguranca-lightgray text-sm truncate">
+                        {a.contractNumber}
+                      </p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{a.clientName}</p>
+                    </div>
+                    <Badge className={cn('text-[10px] border-0 flex-shrink-0', style.badge)}>
+                      {getUrgencyLabel(a.urgencyLevel)}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between mt-2.5 gap-2">
+                    <div className="text-[11px] text-gray-500">
+                      <span className="text-white font-medium tabular-nums">
+                        {a.daysRemaining}
+                      </span>{' '}
+                      dias · {formatDate(a.endDate)}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px] border-seguranca-yellow/40 text-seguranca-yellow hover:bg-seguranca-yellow hover:text-black opacity-90 group-hover:opacity-100"
+                      onClick={() => {
+                        if (onRenew) onRenew(a.contractId, a.contractNumber, a.value);
+                        else navigate(`/contratos?edit=${a.contractId}`);
+                      }}
+                    >
+                      Renovar
+                      <ChevronRight className="h-3 w-3 ml-0.5" />
+                    </Button>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-[10px] sm:text-xs flex-shrink-0 px-2 sm:px-3"
-                  onClick={() => {
-                    if (onRenew) onRenew(a.contractId, a.contractNumber, a.value);
-                    else navigate(`/contratos?edit=${a.contractId}`);
-                  }}
-                >
-                  Renovar
-                </Button>
-              </div>
-            ))}
-            {alerts.length > 10 && (
-              <p className="text-xs text-gray-500 text-center">+ {alerts.length - 10} mais</p>
+              );
+            })}
+            {alerts.length > 12 && (
+              <p className="text-center text-xs text-gray-500 py-2">
+                + {alerts.length - 12} contratos na fila
+              </p>
             )}
           </div>
         )}

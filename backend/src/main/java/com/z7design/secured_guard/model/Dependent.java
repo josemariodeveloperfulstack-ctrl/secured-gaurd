@@ -54,7 +54,7 @@ public class Dependent {
     @Cpf(message = "CPF inválido")
     private String cpf;
     
-    @Column(length = 20)
+    @Column(length = 50)
     private String rg;
     
     @Column(name = "gender", length = 1)
