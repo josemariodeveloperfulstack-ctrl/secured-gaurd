@@ -97,8 +97,11 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<SimpleEmployee | null>(null);
   const [companies, setCompanies] = useState<any[]>([]);
 
+  const activeEmployeeId = form.funcionarioId || employeeId || '';
+  const activeCompanyId = form.empresaId || companyId || '';
   const funcionario = selectedEmployeeData;
-  const empresa = companies.find(e => e.id === form.empresaId);
+  const empresa = companies.find(e => String(e.id) === String(activeCompanyId));
+  const canGenerate = Boolean(activeEmployeeId && activeCompanyId);
 
 
   // Sincronizar props com state
@@ -149,10 +152,10 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   };
 
   useEffect(() => {
-    if (form.funcionarioId) {
-      loadEmployeeDetails(form.funcionarioId);
+    if (activeEmployeeId) {
+      loadEmployeeDetails(activeEmployeeId);
     }
-  }, [form.funcionarioId]);
+  }, [activeEmployeeId]);
 
 
   // Carregar dados do backend (empresas)
@@ -185,14 +188,14 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   ];
 
   const buildCompletePayload = async () => {
-    if (!funcionario || !empresa) {
+    if (!activeEmployeeId || !activeCompanyId) {
       throw new Error('MISSING_SELECTION');
     }
     if (!form.tipoVale || !form.dataInicio) {
       throw new Error('MISSING_FIELDS');
     }
 
-    const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
+    const fullEmployee = await employeeService.getEmployeeById(activeEmployeeId);
     if (!fullEmployee) {
       throw new Error('EMPLOYEE_NOT_FOUND');
     }
@@ -201,7 +204,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     const addressValue = formatEmployeeAddress(fullEmployee as EmployeeAddressSource);
 
     return {
-      companyId: empresa.id,
+      companyId: activeCompanyId,
       employeeId: fullEmployee.id,
       employeeName: fullEmployee.name,
       employeeCpf: fullEmployee.cpf || (fullEmployee as { document?: string }).document || '',
@@ -214,7 +217,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       voucherValue: form.valorVale,
       startDate: form.dataInicio,
       endDate: form.dataFim || null,
-      city: empresa.city || '',
+      city: empresa?.city || (fullEmployee.company as { city?: string } | undefined)?.city || '',
       documentDate: admissionDate || undefined,
       observations: form.observacoes || '',
       optingVoucher: form.optingVoucher === 'true',
@@ -228,19 +231,36 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     };
   };
 
-  const buildManualPayload = () => {
-    if (!empresa) {
+  const buildManualPayload = async () => {
+    if (!activeCompanyId) {
       throw new Error('MISSING_COMPANY');
     }
+    if (!activeEmployeeId) {
+      throw new Error('MISSING_SELECTION');
+    }
+
+    const fullEmployee = await employeeService.getEmployeeById(activeEmployeeId);
+    if (!fullEmployee) {
+      throw new Error('EMPLOYEE_NOT_FOUND');
+    }
+
+    const admissionDate = fullEmployee.hireDate || form.dataInicio || '';
+
     return {
-      companyId: empresa.id,
-      employeeId: form.funcionarioId || undefined,
+      companyId: activeCompanyId,
+      employeeId: fullEmployee.id,
+      employeeName: fullEmployee.name,
+      employeeCpf: fullEmployee.cpf || (fullEmployee as { document?: string }).document || '',
+      hireDate: admissionDate,
+      employeeAddress: formatEmployeeAddress(fullEmployee as EmployeeAddressSource),
+      city: empresa?.city || (fullEmployee.company as { city?: string } | undefined)?.city || '',
+      documentDate: admissionDate || undefined,
       manualFill: true,
     };
   };
 
   const handlePreview = async () => {
-    if (!funcionario || !empresa) {
+    if (!canGenerate) {
       toast({
         title: 'Atenção',
         description: 'Selecione funcionário e empresa para visualizar o termo!',
@@ -282,7 +302,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
 
   const handleGerarPDF = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!funcionario || !empresa) {
+    if (!canGenerate) {
       toast({
         title: 'Atenção',
         description: 'Selecione funcionário e empresa!',
@@ -335,10 +355,10 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   };
 
   const handleGerarManual = async () => {
-    if (!empresa) {
+    if (!canGenerate) {
       toast({
         title: 'Atenção',
-        description: 'Selecione a empresa para gerar o termo em branco (cabeçalho da empresa).',
+        description: 'Selecione funcionário e empresa para gerar o termo.',
         variant: 'destructive',
       });
       return;
@@ -346,7 +366,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
 
     setLoading(true);
     try {
-      const payload = buildManualPayload();
+      const payload = await buildManualPayload();
       const response = await api.post('/api/transport-voucher/generate-pdf', payload, {
         responseType: 'blob',
       });
@@ -355,7 +375,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'termo-vale-transporte-manual.pdf';
+      a.download = `termo-vale-transporte-manual-${payload.employeeName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -367,9 +387,17 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
 
       toast({
         title: 'Sucesso',
-        description: 'Termo em branco gerado para preenchimento manual!',
+        description: 'Termo gerado! O funcionário preenche SIM/NÃO, ida e volta manualmente.',
       });
     } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'MISSING_SELECTION') {
+        toast({
+          title: 'Atenção',
+          description: 'Selecione o funcionário para preencher nome, empresa, endereço e data.',
+          variant: 'destructive',
+        });
+        return;
+      }
       console.error('Erro ao gerar PDF manual:', err);
       toast({
         title: 'Erro',
@@ -382,10 +410,10 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   };
 
   const handlePreviewManual = async () => {
-    if (!empresa) {
+    if (!canGenerate) {
       toast({
         title: 'Atenção',
-        description: 'Selecione a empresa para visualizar o modelo em branco.',
+        description: 'Selecione funcionário e empresa para visualizar o termo.',
         variant: 'destructive',
       });
       return;
@@ -393,7 +421,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
 
     setLoading(true);
     try {
-      const payload = buildManualPayload();
+      const payload = await buildManualPayload();
       const response = await api.post('/api/transport-voucher/preview-pdf', payload, {
         responseType: 'blob',
       });
@@ -424,10 +452,11 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                 Termo de Compromisso de Vale-Transporte
               </CardTitle>
               <CardDescription>
-                Gere o termo completo com os dados do formulário ou a versão em branco para preenchimento manual.
+                Gere o termo completo (com trajetos) ou a versão híbrida: dados do funcionário preenchidos,
+                com SIM/NÃO e ida/volta em branco para o funcionário assinar.
               </CardDescription>
             </div>
-            {(funcionario && empresa) && (
+            {canGenerate && (
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
                 <CheckCircle2 className="h-3 w-3" />
                 Pronto para gerar
@@ -716,7 +745,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                   type="button"
                   variant="outline"
                   onClick={handlePreview}
-                  disabled={loading || !funcionario || !empresa}
+                  disabled={loading || !canGenerate}
                   className="flex-1 sm:flex-none gap-2"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
@@ -725,7 +754,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                 <Button
                   type="button"
                   onClick={() => handleGerarPDF()}
-                  disabled={loading || !funcionario || !empresa}
+                  disabled={loading || !canGenerate}
                   className="flex-1 sm:flex-none gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -738,12 +767,12 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
               <div>
                 <p className="text-sm font-semibold flex items-center gap-2">
                   <PenLine className="h-4 w-4 text-amber-600" />
-                  Termo para preenchimento manual
+                  Termo para preenchimento manual (ida/volta)
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Gera o PDF no mesmo layout oficial, com campos em branco: ( ) SIM / ( ) NÃO, nome do
-                  funcionário, empresa, endereço, linhas/tarifas de ida e volta, data e assinatura.
-                  Basta selecionar a empresa (cabeçalho). Funcionário é opcional.
+                  Preenche automaticamente nome, empresa, endereço e data de admissão. Ficam em branco para o
+                  funcionário: ( ) SIM / ( ) NÃO, linhas e tarifas de ida e volta, e quantidade de vales.
+                  Selecione funcionário e empresa.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-end">
@@ -751,17 +780,17 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                   type="button"
                   variant="outline"
                   onClick={handlePreviewManual}
-                  disabled={loading || !empresa}
+                  disabled={loading || !canGenerate}
                   className="flex-1 sm:flex-none gap-2 border-amber-500/30"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                  Visualizar em branco
+                  Visualizar manual
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={handleGerarManual}
-                  disabled={loading || !empresa}
+                  disabled={loading || !canGenerate}
                   className="flex-1 sm:flex-none gap-2"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}

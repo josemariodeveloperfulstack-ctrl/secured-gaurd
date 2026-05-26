@@ -135,7 +135,11 @@ public class TransportVoucherStandardPdfService {
                     .setFontSize(11f)
                     .setBold()
                     .setMarginBottom(15f));
-            addManualDeclarationBody(document);
+            if (shouldFillIdentification(request)) {
+                addCompleteDeclarationBody(document, request, company);
+            } else {
+                addManualDeclarationBody(document);
+            }
             addManualRouteSection(document);
         } else {
             // Opções SIM/NÃO
@@ -175,14 +179,15 @@ public class TransportVoucherStandardPdfService {
                 .setTextAlignment(TextAlignment.JUSTIFIED)
                 .setMultipliedLeading(1.5f);
 
-        String employeeName = request.getEmployeeName() != null ? request.getEmployeeName() : "";
+        String employeeName = resolveEmployeeName(request);
+        String companyName = resolveCompanyName(request, company);
+        String address = resolveEmployeeAddress(request);
+
         body.add("Eu, ");
         body.add(new Text(employeeName.toUpperCase()).setBold().setUnderline());
         body.add(", empregado(a) da ");
-        body.add(new Text(company.getName().toUpperCase()).setBold());
+        body.add(new Text(companyName.toUpperCase()).setBold());
         body.add(" desejo adquirir vale-transporte, declaro que estou morando na ");
-
-        String address = request.getEmployeeAddress() != null ? request.getEmployeeAddress() : "";
         body.add(new Text(address).setBold());
         body.add(", e uso __________ vales transportes para o meu deslocamento residência-trabalho e vice-versa.");
         document.add(body);
@@ -248,7 +253,7 @@ public class TransportVoucherStandardPdfService {
     }
 
     private void addSignatures(Document document, TransportVoucherRequest request, Company company, boolean manual) {
-        if (manual) {
+        if (manual && !shouldFillIdentification(request)) {
             document.add(new Paragraph("\n_______________, ___/___/______")
                     .setFontSize(11f)
                     .setMarginTop(25f)
@@ -279,7 +284,7 @@ public class TransportVoucherStandardPdfService {
 
         document.add(new Paragraph("______________________________________________________")
                 .setTextAlignment(TextAlignment.LEFT));
-        String employeeName = request.getEmployeeName() != null ? request.getEmployeeName() : "";
+        String employeeName = resolveEmployeeName(request);
         document.add(new Paragraph(employeeName.toUpperCase())
                 .setBold()
                 .setFontSize(10f)
@@ -291,10 +296,6 @@ public class TransportVoucherStandardPdfService {
     }
 
     private void enrichRequestFromEmployee(TransportVoucherRequest request) {
-        if (Boolean.TRUE.equals(request.getManualFill())) {
-            return;
-        }
-
         if (request.getEmployeeId() != null) {
             employeeRepository.findById(request.getEmployeeId()).ifPresent(employee -> {
                 if (isBlank(request.getEmployeeName())) {
@@ -343,6 +344,49 @@ public class TransportVoucherStandardPdfService {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private static boolean shouldFillIdentification(TransportVoucherRequest request) {
+        return request.getEmployeeId() != null || !isBlank(request.getEmployeeName());
+    }
+
+    private String resolveEmployeeName(TransportVoucherRequest request) {
+        if (!isBlank(request.getEmployeeName())) {
+            return request.getEmployeeName().trim();
+        }
+        if (request.getEmployeeId() == null) {
+            return "";
+        }
+        return employeeRepository.findById(request.getEmployeeId())
+                .map(Employee::getName)
+                .map(String::trim)
+                .orElse("");
+    }
+
+    private String resolveEmployeeAddress(TransportVoucherRequest request) {
+        if (!isBlank(request.getEmployeeAddress())) {
+            return request.getEmployeeAddress().trim();
+        }
+        if (request.getEmployeeId() == null) {
+            return "";
+        }
+        return employeeRepository.findById(request.getEmployeeId())
+                .map(TransportVoucherStandardPdfService::buildEmployeeAddress)
+                .orElse("");
+    }
+
+    private String resolveCompanyName(TransportVoucherRequest request, Company company) {
+        if (company != null && !isBlank(company.getName())) {
+            return company.getName().trim();
+        }
+        if (request.getEmployeeId() == null) {
+            return "";
+        }
+        return employeeRepository.findById(request.getEmployeeId())
+                .map(Employee::getEmpresaNome)
+                .filter(name -> !isBlank(name))
+                .map(String::trim)
+                .orElse("");
     }
 
     private static String buildEmployeeAddress(Employee employee) {
