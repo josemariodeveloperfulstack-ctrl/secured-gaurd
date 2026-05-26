@@ -146,8 +146,8 @@ public class EmployeeService {
                 throw new java.lang.IllegalArgumentException("Email já cadastrado");
             }
 
-            if (dto.getCpf() != null && employeeRepository.existsByDocument(dto.getCpf())) {
-                throw new java.lang.IllegalArgumentException("CPF já cadastrado para outro funcionário");
+            if (dto.getCpf() != null && documentAlreadyRegistered(dto.getCpf())) {
+                throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
             }
 
             System.out.println("[DEBUG] Validações passaram, convertendo DTO para Entity");
@@ -164,6 +164,8 @@ public class EmployeeService {
             Employee saved = employeeRepository.save(employee);
             System.out.println("[DEBUG] Funcionário salvo com ID: " + saved.getId());
             return toDTO(saved);
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             System.err.println("[ERROR] Erro ao criar funcionário: " + e.getMessage());
             if (dto.getSalario() != null) {
@@ -196,13 +198,13 @@ public class EmployeeService {
             if (dto.getEmail() != null && existingEmployee.getEmail() != null &&
                     !existingEmployee.getEmail().equals(dto.getEmail()) &&
                     employeeRepository.existsByEmail(dto.getEmail())) {
-                throw new RuntimeException("Email já cadastrado");
+                throw new IllegalArgumentException("Email já cadastrado");
             }
 
             // Validar CPF único (exceto para o próprio funcionário)
-            if (dto.getCpf() != null && !dto.getCpf().equals(existingEmployee.getDocument())) {
-                if (employeeRepository.existsByDocument(dto.getCpf())) {
-                    throw new RuntimeException("CPF já cadastrado para outro funcionário");
+            if (dto.getCpf() != null && !isSameDocument(dto.getCpf(), existingEmployee.getDocument())) {
+                if (documentAlreadyRegisteredByOther(dto.getCpf(), id)) {
+                    throw new IllegalArgumentException("CPF já cadastrado para outro funcionário");
                 }
             }
 
@@ -714,6 +716,8 @@ public class EmployeeService {
             System.out.println("[DEBUG] DTO retornado - Nome: " + result.getName());
 
             return result;
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             System.err.println("[ERROR] Erro ao atualizar funcionário ID " + id + ": " + e.getMessage());
             System.err.println("[ERROR] Tipo da exceção: " + e.getClass().getName());
@@ -2036,6 +2040,39 @@ public class EmployeeService {
                         .build())
                 .collect(java.util.stream.Collectors.toList());
 
+    }
+
+    private String normalizeDocumentDigits(String document) {
+        if (document == null) {
+            return null;
+        }
+        String digits = document.replaceAll("[^0-9]", "");
+        return digits.isBlank() ? null : digits;
+    }
+
+    private boolean isSameDocument(String left, String right) {
+        String normalizedLeft = normalizeDocumentDigits(left);
+        String normalizedRight = normalizeDocumentDigits(right);
+        if (normalizedLeft == null || normalizedRight == null) {
+            return Objects.equals(left, right);
+        }
+        return normalizedLeft.equals(normalizedRight);
+    }
+
+    private boolean documentAlreadyRegistered(String document) {
+        String normalized = normalizeDocumentDigits(document);
+        if (normalized == null) {
+            return false;
+        }
+        return employeeRepository.existsByNormalizedDocument(normalized);
+    }
+
+    private boolean documentAlreadyRegisteredByOther(String document, UUID excludeId) {
+        String normalized = normalizeDocumentDigits(document);
+        if (normalized == null) {
+            return false;
+        }
+        return employeeRepository.existsByNormalizedDocumentExcludingId(normalized, excludeId);
     }
 
     /**

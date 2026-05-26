@@ -31,6 +31,20 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
         boolean existsByDocument(String document);
 
+        @Query(value = "SELECT EXISTS(SELECT 1 FROM employees WHERE "
+                        + "REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :normalizedDocument OR "
+                        + "REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :normalizedDocument)",
+                        nativeQuery = true)
+        boolean existsByNormalizedDocument(@Param("normalizedDocument") String normalizedDocument);
+
+        @Query(value = "SELECT EXISTS(SELECT 1 FROM employees WHERE id != :excludeId AND ("
+                        + "REGEXP_REPLACE(COALESCE(document, ''), '[^0-9]', '', 'g') = :normalizedDocument OR "
+                        + "REGEXP_REPLACE(COALESCE(cpf, ''), '[^0-9]', '', 'g') = :normalizedDocument))",
+                        nativeQuery = true)
+        boolean existsByNormalizedDocumentExcludingId(
+                        @Param("normalizedDocument") String normalizedDocument,
+                        @Param("excludeId") UUID excludeId);
+
         Optional<Employee> findByNameIgnoreCase(String name);
 
         Optional<Employee> findByDocument(String document);

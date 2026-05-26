@@ -36,8 +36,8 @@ export const WorkPostDrawer: React.FC<WorkPostDrawerProps> = ({
     postCode: '',
     name: '',
     description: '',
-    type: 'PORTARIA',
-    status: 'ACTIVE',
+    type: 'POSTO_24H',
+    status: 'EM_IMPLANTACAO',
     address: '',
     city: '',
     state: '',
@@ -127,13 +127,24 @@ export const WorkPostDrawer: React.FC<WorkPostDrawerProps> = ({
       });
       return;
     }
+    if (!formData.address.trim()) {
+      toast({
+        title: "Erro",
+        description: "O endereço do posto é obrigatório.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setLoading(true);
     try {
       const payload = {
         ...formData,
         postCode: formData.postCode || `PST-${Math.floor(100 + Math.random() * 900)}`,
-        clientId
+        clientId,
+        nrs: [] as string[],
+        epis: [] as string[],
+        trainings: [] as string[]
       };
 
       console.log('📤 Salvando posto de trabalho via API:', payload);
@@ -237,9 +248,13 @@ export const WorkPostDrawer: React.FC<WorkPostDrawerProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
-                  <SelectItem value="PORTARIA" className="hover:bg-zinc-800">Portaria</SelectItem>
-                  <SelectItem value="VIGILANCIA" className="hover:bg-zinc-800">Vigilância</SelectItem>
-                  <SelectItem value="FACILITIES" className="hover:bg-zinc-800">Facilities</SelectItem>
+                  <SelectItem value="POSTO_24H" className="hover:bg-zinc-800">Posto 24h</SelectItem>
+                  <SelectItem value="POSTO_SDF" className="hover:bg-zinc-800">Posto SDF</SelectItem>
+                  <SelectItem value="POSTO_12H_NOTURNO" className="hover:bg-zinc-800">12h Noturno</SelectItem>
+                  <SelectItem value="POSTO_12H_DIURNO" className="hover:bg-zinc-800">12h Diurno</SelectItem>
+                  <SelectItem value="POSTO_6H" className="hover:bg-zinc-800">Posto 6h</SelectItem>
+                  <SelectItem value="POSTO_8H" className="hover:bg-zinc-800">Posto 8h</SelectItem>
+                  <SelectItem value="OUTROS" className="hover:bg-zinc-800">Outros</SelectItem>
                 </SelectContent>
               </Select>
             </div>

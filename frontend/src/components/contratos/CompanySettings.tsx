@@ -173,11 +173,14 @@ export const CompanySettings: React.FC<CompanySettingsProps> = ({ open, onSave }
   const getLogoDisplayUrl = (logoUrl: string | undefined): string | null => {
     if (!logoUrl) return null;
     const baseUrl = getApiUrl().replace('/api', '');
-    const normalized = logoUrl.startsWith('/') ? logoUrl : `/${logoUrl}`;
-    if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) return logoUrl;
-    if (normalized.startsWith('/api/uploads/')) return `${baseUrl}${normalized}`;
-    if (normalized.startsWith('/uploads/')) return `${baseUrl}/api${normalized}`;
-    return `${baseUrl}/api/uploads/companies/logos/${logoUrl.replace(/^\/+/, '')}`;
+    const trimmed = logoUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    if (trimmed.startsWith('/api/uploads/')) return `${baseUrl}${trimmed}`;
+    if (trimmed.startsWith('api/uploads/')) return `${baseUrl}/${trimmed}`;
+    if (trimmed.startsWith('/uploads/')) return `${baseUrl}/api${trimmed}`;
+    if (trimmed.startsWith('uploads/')) return `${baseUrl}/api/${trimmed}`;
+    const filename = trimmed.replace(/^\/+/, '').replace(/^api\/uploads\/companies\/logos\//, '');
+    return `${baseUrl}/api/uploads/companies/logos/${filename}`;
   };
 
   const handleSave = async () => {

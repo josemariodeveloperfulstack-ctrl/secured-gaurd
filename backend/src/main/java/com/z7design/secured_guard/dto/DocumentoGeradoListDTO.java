@@ -24,11 +24,19 @@ public record DocumentoGeradoListDTO(
         LocalDateTime dataVencimento) {
 
     public static DocumentoGeradoListDTO from(DocumentoGerado documento) {
+        return from(documento, null);
+    }
+
+    public static DocumentoGeradoListDTO from(DocumentoGerado documento, UUID funcionarioIdFallback) {
+        UUID funcionarioId = documento.getFuncionario() != null
+                ? documento.getFuncionario().getId()
+                : funcionarioIdFallback;
+
         return new DocumentoGeradoListDTO(
                 documento.getId(),
                 documento.getModelo() != null ? documento.getModelo().getId() : null,
                 documento.getTipo(),
-                documento.getFuncionario() != null ? documento.getFuncionario().getId() : null,
+                funcionarioId,
                 documento.getConteudoFinal(),
                 documento.getNomeArquivoGerado(),
                 documento.getTamanhoArquivoGerado(),

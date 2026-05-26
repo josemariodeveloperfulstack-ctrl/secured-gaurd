@@ -2,6 +2,8 @@ package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.service.AccountingFormService;
 import com.z7design.secured_guard.service.AccountingFormStandardPdfService;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -10,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -21,6 +25,7 @@ public class AccountingFormController {
 
     private final AccountingFormService accountingFormService;
     private final AccountingFormStandardPdfService accountingFormPdfService;
+    private final DocumentoGeradoPersistenceService persistenceService;
 
     /**
      * Gera ficha de contabilidade em HTML para um funcionário
@@ -58,6 +63,15 @@ public class AccountingFormController {
             byte[] pdf = accountingFormPdfService.generateAccountingFormPdf(employeeId);
 
             String fileName = "ficha_contabilidade_" + employeeId + ".pdf";
+
+            Map<String, Object> dados = new LinkedHashMap<>();
+            dados.put("employeeId", employeeId.toString());
+            persistenceService.persistir(
+                    employeeId,
+                    TipoDocumentoGerado.ACCOUNTING_FORM,
+                    pdf,
+                    fileName,
+                    dados);
 
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_PDF)

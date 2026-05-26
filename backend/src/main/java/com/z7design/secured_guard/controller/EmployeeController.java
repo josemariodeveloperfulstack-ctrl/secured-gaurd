@@ -8,6 +8,8 @@ import com.z7design.secured_guard.service.EmployeeService;
 import com.z7design.secured_guard.service.EmployeeRecordPdfService;
 import com.z7design.secured_guard.service.EmployeeHistoryPdfService;
 import com.z7design.secured_guard.service.EmployeeChangeHistoryService;
+import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
+import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -34,6 +36,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.LinkedHashMap;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -54,6 +57,7 @@ public class EmployeeController {
     private final EmployeeExcelImportService employeeExcelImportService;
     private final EmployeeImportService employeeImportService;
     private final EmployeeChangeHistoryService employeeChangeHistoryService;
+    private final DocumentoGeradoPersistenceService documentoGeradoPersistenceService;
 
     @GetMapping("/count")
     @Operation(summary = "Contar funcionários", description = "Retorna o número total de funcionários")
@@ -1004,6 +1008,16 @@ public class EmployeeController {
             UUID employeeId = UUID.fromString(id);
             byte[] pdf = employeeHistoryPdfService.generateEmployeeHistoryPdf(employeeId);
             String fileName = "historico-funcionario-" + id + ".pdf";
+
+            Map<String, Object> dados = new LinkedHashMap<>();
+            dados.put("employeeId", id);
+            documentoGeradoPersistenceService.persistir(
+                    employeeId,
+                    TipoDocumentoGerado.EMPLOYEE_HISTORY,
+                    pdf,
+                    fileName,
+                    dados);
+
             return ResponseEntity.ok()
                     .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
                             "attachment; filename=\"" + fileName + "\"")
@@ -1031,6 +1045,15 @@ public class EmployeeController {
             byte[] pdf = employeeRecordPdfService.generateEmployeeRecordPdf(employeeId);
 
             String fileName = "ficha-registro-funcionario-" + id + ".pdf";
+
+            Map<String, Object> dados = new LinkedHashMap<>();
+            dados.put("employeeId", id);
+            documentoGeradoPersistenceService.persistir(
+                    employeeId,
+                    TipoDocumentoGerado.EMPLOYEE_RECORD,
+                    pdf,
+                    fileName,
+                    dados);
 
             return ResponseEntity.ok()
                     .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,

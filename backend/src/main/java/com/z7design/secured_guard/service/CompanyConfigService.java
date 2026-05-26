@@ -6,6 +6,8 @@ import com.z7design.secured_guard.model.CompanyConfig;
 import com.z7design.secured_guard.repository.CompanyConfigRepository;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.util.CompanyDataFormatter;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -14,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -25,6 +28,7 @@ public class CompanyConfigService {
 
     private final CompanyConfigRepository companyConfigRepository;
     private final CompanyRepository companyRepository;
+    private final Validator validator;
 
     /**
      * Busca a configuração ativa da empresa
@@ -57,6 +61,7 @@ public class CompanyConfigService {
      */
     public CompanyConfigDTO saveConfig(CompanyConfigDTO configDTO) {
         log.info("Salvando configuração da empresa: {}", configDTO.getName());
+        normalizeConfigFields(configDTO);
 
         // Se companyId informado, buscar dados da empresa na tabela companies
         if (configDTO.getCompanyId() != null) {
@@ -76,6 +81,8 @@ public class CompanyConfigService {
                 configDTO.setLogoUrl(company.getLogoUrl());
             }
         }
+
+        validateConfig(configDTO);
 
         // Verificar se CNPJ já existe para outra empresa
         if (configDTO.getId() != null) {
@@ -171,6 +178,30 @@ public class CompanyConfigService {
 
     private static boolean nonBlank(String s) {
         return s != null && !s.trim().isEmpty();
+    }
+
+    private void normalizeConfigFields(CompanyConfigDTO configDTO) {
+        if (configDTO.getState() != null) {
+            String state = configDTO.getState().trim().toUpperCase();
+            configDTO.setState(state.length() >= 2 ? state.substring(0, 2) : state);
+        }
+        if (configDTO.getZipCode() != null) {
+            configDTO.setZipCode(configDTO.getZipCode().trim());
+        }
+        if (configDTO.getCnpj() != null) {
+            configDTO.setCnpj(configDTO.getCnpj().trim());
+        }
+    }
+
+    private void validateConfig(CompanyConfigDTO configDTO) {
+        Set<ConstraintViolation<CompanyConfigDTO>> violations = validator.validate(configDTO);
+        if (violations.isEmpty()) {
+            return;
+        }
+        String message = violations.stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                .collect(Collectors.joining("; "));
+        throw new IllegalArgumentException(message);
     }
 
     /**

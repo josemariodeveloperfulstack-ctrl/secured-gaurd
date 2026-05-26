@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/axios';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -121,6 +122,7 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         providerName: funcionario.name,
         providerCnpjCpf: funcionario.cpf || funcionario.document || '',
         representativeName: form.representativeName,
@@ -156,6 +158,7 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         providerName: funcionario.name,
         providerCnpjCpf: funcionario.cpf || funcionario.document || '',
         representativeName: form.representativeName,
@@ -180,6 +183,7 @@ const TermoCienciaPrestadorForm: React.FC<TermoCienciaPrestadorFormProps> = ({ e
       window.URL.revokeObjectURL(url);
 
       alert('Termo de ciência gerado com sucesso!');
+      void refreshEmployeeDocuments(funcionario.id);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert('Erro ao gerar PDF. Tente novamente.');

@@ -6,6 +6,7 @@ import { Label } from '../ui/label';
 import { FileText, Download, Eye, Loader2, Shield, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { employeeService, SimpleEmployee } from '@/services/employeeService';
 
@@ -59,6 +60,7 @@ const NppsForm: React.FC<NppsFormProps> = ({ employeeId, companyId }) => {
     try {
       const payload = {
         companyId: selectedCompanyId || null,
+        employeeId: funcionarioId || null,
         employeeName: employeeName || null,
         employeeCpf: employeeCpf || null
       };
@@ -86,6 +88,7 @@ const NppsForm: React.FC<NppsFormProps> = ({ employeeId, companyId }) => {
     try {
       const payload = {
         companyId: selectedCompanyId || null,
+        employeeId: funcionarioId || null,
         employeeName: employeeName || null,
         employeeCpf: employeeCpf || null
       };
@@ -105,6 +108,7 @@ const NppsForm: React.FC<NppsFormProps> = ({ employeeId, companyId }) => {
         title: 'Sucesso',
         description: 'Documento NPPS gerado e baixado com sucesso.',
       });
+      void refreshEmployeeDocuments(funcionarioId);
     } catch (error) {
       console.error('Erro ao baixar NPPS:', error);
       toast({

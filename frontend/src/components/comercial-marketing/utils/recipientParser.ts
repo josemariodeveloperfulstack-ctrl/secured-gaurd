@@ -23,6 +23,20 @@ const NAME_KEYS = ['name', 'nome', 'fullname', 'full_name', 'contato'];
 const COMPANY_KEYS = ['company', 'empresa', 'organization', 'organização'];
 const POSITION_KEYS = ['position', 'cargo', 'role', 'titulo', 'título'];
 const PHONE_KEYS = ['phone', 'telefone', 'mobile', 'celular', 'whatsapp'];
+const CITY_KEYS = ['city', 'cidade', 'municipio', 'município'];
+const STATE_KEYS = ['state', 'estado', 'uf'];
+const COMPANY_TYPE_KEYS = [
+  'companytype',
+  'tipo empresa',
+  'tipo de empresa',
+  'tipo_empresa',
+  'segmento',
+  'segment',
+  'ramo',
+  'atividade',
+  'classificação',
+  'classificacao',
+];
 
 function pickKey(row: Record<string, unknown>, keys: string[]): string | undefined {
   const lowered = Object.keys(row).reduce<Record<string, string>>((acc, k) => {
@@ -83,18 +97,40 @@ export async function parseRecipientFile(file: File): Promise<ParseResult> {
     const company = pickKey(row, COMPANY_KEYS);
     const position = pickKey(row, POSITION_KEYS);
     const phone = pickKey(row, PHONE_KEYS);
+    const city = pickKey(row, CITY_KEYS);
+    const state = pickKey(row, STATE_KEYS);
+    const companyType = pickKey(row, COMPANY_TYPE_KEYS);
     const metadata: Record<string, unknown> = {};
     if (company) metadata.company = company;
     if (position) metadata.position = position;
     if (phone) metadata.phone = phone;
+    if (city) {
+      metadata.city = city;
+      metadata.cidade = city;
+    }
+    if (state) {
+      metadata.state = state;
+      metadata.estado = state;
+    }
+    if (companyType) {
+      metadata.companyType = companyType;
+      metadata.tipoEmpresa = companyType;
+    }
+    const reserved = new Set<string>([
+      'email',
+      ...NAME_KEYS,
+      ...COMPANY_KEYS,
+      ...POSITION_KEYS,
+      ...PHONE_KEYS,
+      ...CITY_KEYS,
+      ...COMPANY_TYPE_KEYS,
+    ]);
     // Preserva colunas extras como metadados (útil para personalização)
     for (const [k, v] of Object.entries(row)) {
       const key = k.trim();
       if (!key || v == null || String(v).trim() === '') continue;
       const lk = key.toLowerCase();
-      if (lk === 'email' || NAME_KEYS.includes(lk) || COMPANY_KEYS.includes(lk) || POSITION_KEYS.includes(lk) || PHONE_KEYS.includes(lk)) {
-        continue;
-      }
+      if (reserved.has(lk) || STATE_KEYS.includes(lk)) continue;
       metadata[key] = v;
     }
     rows.push({ raw: row, email, name, company, position, phone, metadata });
@@ -185,6 +221,9 @@ export interface SpreadsheetColumnMapping {
   phone?: string;
   /** Gravado em metadata.segment (segmento / texto livre). */
   segment?: string;
+  city?: string;
+  state?: string;
+  companyType?: string;
 }
 
 function readFirstSheetRows(fileBuffer: ArrayBuffer): Record<string, unknown>[] {
@@ -231,7 +270,41 @@ export function buildDefaultSpreadsheetMapping(headers: string[]): SpreadsheetCo
     position: pickHeader(headers, /cargo|position|role|titulo|título/i),
     phone: pickHeader(headers, /telefone|phone|celular|whatsapp|mobile/i),
     segment: pickHeader(headers, /segmento|segment|tags?/i),
+    city: pickHeader(headers, /cidade|city|municipio|município/i),
+    state: pickHeader(headers, /^(estado|uf|state)$/i) ?? pickHeader(headers, /\bestado\b|\buf\b/i),
+    companyType: pickHeader(
+      headers,
+      /tipo.*empresa|tipo de empresa|tipo_empresa|ramo|atividade|classifica/i,
+    ),
   };
+}
+
+function applyMappedMeta(
+  metadata: Record<string, unknown>,
+  company?: string,
+  position?: string,
+  phone?: string,
+  segment?: string,
+  city?: string,
+  state?: string,
+  companyType?: string,
+) {
+  if (company) metadata.company = company;
+  if (position) metadata.position = position;
+  if (phone) metadata.phone = phone;
+  if (segment) metadata.segment = segment;
+  if (city) {
+    metadata.city = city;
+    metadata.cidade = city;
+  }
+  if (state) {
+    metadata.state = state;
+    metadata.estado = state;
+  }
+  if (companyType) {
+    metadata.companyType = companyType;
+    metadata.tipoEmpresa = companyType;
+  }
 }
 
 function cell(row: Record<string, unknown>, col?: string): string | undefined {
@@ -257,7 +330,17 @@ export async function parseRecipientFileWithMapping(
   const headers = json.length > 0 ? Object.keys(json[0]) : [];
 
   const usedCols = new Set(
-    [mapping.email, mapping.name, mapping.company, mapping.position, mapping.phone, mapping.segment].filter(Boolean),
+    [
+      mapping.email,
+      mapping.name,
+      mapping.company,
+      mapping.position,
+      mapping.phone,
+      mapping.segment,
+      mapping.city,
+      mapping.state,
+      mapping.companyType,
+    ].filter(Boolean),
   );
 
   const rows: ParsedRow[] = [];
@@ -279,12 +362,12 @@ export async function parseRecipientFileWithMapping(
     const position = cell(row, mapping.position);
     const phone = cell(row, mapping.phone);
     const segment = cell(row, mapping.segment);
+    const city = cell(row, mapping.city);
+    const state = cell(row, mapping.state);
+    const companyType = cell(row, mapping.companyType);
 
     const metadata: Record<string, unknown> = {};
-    if (company) metadata.company = company;
-    if (position) metadata.position = position;
-    if (phone) metadata.phone = phone;
-    if (segment) metadata.segment = segment;
+    applyMappedMeta(metadata, company, position, phone, segment, city, state, companyType);
 
     for (const k of Object.keys(row)) {
       if (!k || usedCols.has(k)) continue;

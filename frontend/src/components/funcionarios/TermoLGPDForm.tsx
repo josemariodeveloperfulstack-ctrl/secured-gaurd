@@ -18,6 +18,7 @@ import { EmployeeCombobox } from '../ui/employee-combobox';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 import api from '@/lib/axios';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { formatCNPJ, formatCPF } from '@/utils/validation';
 
 interface TermoLGPDFormProps {
@@ -206,6 +207,7 @@ const TermoLGPDForm: React.FC<TermoLGPDFormProps> = ({ employeeId, companyId }) 
         title: "Sucesso",
         description: "Termo LGPD gerado com sucesso!",
       });
+      void refreshEmployeeDocuments(funcionario.id);
 
     } catch (error) {
       console.error('Erro ao gerar documento:', error);

@@ -236,6 +236,9 @@ public class EmailDispatchService {
             putAlias(map, "cargo", r.getMetadata().get("position"));
             putAlias(map, "telefone", r.getMetadata().get("phone"));
             putAlias(map, "celular", r.getMetadata().get("mobile"));
+            putAlias(map, "cidade", firstNonNull(r.getMetadata(), "city", "cidade"));
+            putAlias(map, "estado", firstNonNull(r.getMetadata(), "state", "estado", "uf"));
+            putAlias(map, "tipoEmpresa", firstNonNull(r.getMetadata(), "companyType", "tipoEmpresa", "tipo_empresa"));
         }
         if (!map.containsKey("nomeEmpresa") || map.get("nomeEmpresa") == null || map.get("nomeEmpresa").isBlank()) {
             map.put("nomeEmpresa", "sua empresa");
@@ -365,6 +368,15 @@ public class EmailDispatchService {
         if (value != null && !ctx.containsKey(alias)) {
             ctx.put(alias, value.toString());
         }
+    }
+
+    private static Object firstNonNull(Map<String, Object> metadata, String... keys) {
+        if (metadata == null) return null;
+        for (String key : keys) {
+            Object v = metadata.get(key);
+            if (v != null) return v;
+        }
+        return null;
     }
 
     /**

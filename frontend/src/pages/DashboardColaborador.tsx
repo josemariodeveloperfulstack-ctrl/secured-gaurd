@@ -359,7 +359,8 @@ const DashboardColaborador: React.FC = () => {
                 <SystemGeneratedDocumentsSection
                   documents={meusDocumentos}
                   isLoading={isLoadingMeusDocumentos}
-                  variant="rh"
+                  variant="colaborador"
+                  allowDelete={false}
                   title="Meus Documentos do RH"
                   subtitle="Contratos, termos, OS, advertências e demais documentos disponibilizados pelo RH."
                 />

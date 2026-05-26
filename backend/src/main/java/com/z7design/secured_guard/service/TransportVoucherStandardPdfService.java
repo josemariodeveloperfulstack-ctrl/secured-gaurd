@@ -116,39 +116,92 @@ public class TransportVoucherStandardPdfService {
     }
 
     private void addContent(Document document, TransportVoucherRequest request, Company company) {
+        boolean manual = Boolean.TRUE.equals(request.getManualFill());
+
         // Texto Introdutório
         document.add(new Paragraph("O vale-transporte é um direito do trabalhador, faça sua opção se quer adquiri-lo ou não, assinalando com um X.")
                 .setFontSize(11f)
                 .setMarginTop(10f)
                 .setMarginBottom(10f));
 
-        // Opções SIM/NÃO
-        String simX = Boolean.TRUE.equals(request.getOptingVoucher()) ? "X" : " ";
-        String naoX = Boolean.FALSE.equals(request.getOptingVoucher()) ? "X" : " ";
-        document.add(new Paragraph("( " + simX + " ) SIM  ( " + naoX + " ) NÃO;")
-                .setFontSize(11f)
-                .setBold()
-                .setMarginBottom(15f));
+        if (manual) {
+            document.add(new Paragraph("(   ) SIM  (   ) NÃO;")
+                    .setFontSize(11f)
+                    .setBold()
+                    .setMarginBottom(15f));
+            addManualDeclarationBody(document);
+            addManualRouteSection(document);
+        } else {
+            // Opções SIM/NÃO
+            String simX = Boolean.TRUE.equals(request.getOptingVoucher()) ? "X" : " ";
+            String naoX = Boolean.FALSE.equals(request.getOptingVoucher()) ? "X" : " ";
+            document.add(new Paragraph("( " + simX + " ) SIM  ( " + naoX + " ) NÃO;")
+                    .setFontSize(11f)
+                    .setBold()
+                    .setMarginBottom(15f));
+            addCompleteDeclarationBody(document, request, company);
+            addCompleteRouteSection(document, request);
+        }
 
-        // Corpo da Declaração
+        addLegalTerms(document);
+        addSignatures(document, request, company, manual);
+    }
+
+    private void addManualDeclarationBody(Document document) {
         Paragraph body = new Paragraph()
                 .setFontSize(11f)
                 .setTextAlignment(TextAlignment.JUSTIFIED)
                 .setMultipliedLeading(1.5f);
 
         body.add("Eu, ");
-        body.add(new Text(request.getEmployeeName().toUpperCase()).setBold().setUnderline());
+        body.add(new Text("________________________________________________________").setUnderline());
+        body.add(", empregado(a) da ");
+        body.add(new Text("________________________________________________________").setBold());
+        body.add(" desejo adquirir vale-transporte, declaro que estou morando na ");
+        body.add(new Text("________________________________________________________").setBold());
+        body.add(", e uso __________ vales transportes para o meu deslocamento residência-trabalho e vice-versa.");
+        document.add(body);
+    }
+
+    private void addCompleteDeclarationBody(Document document, TransportVoucherRequest request, Company company) {
+        Paragraph body = new Paragraph()
+                .setFontSize(11f)
+                .setTextAlignment(TextAlignment.JUSTIFIED)
+                .setMultipliedLeading(1.5f);
+
+        String employeeName = request.getEmployeeName() != null ? request.getEmployeeName() : "";
+        body.add("Eu, ");
+        body.add(new Text(employeeName.toUpperCase()).setBold().setUnderline());
         body.add(", empregado(a) da ");
         body.add(new Text(company.getName().toUpperCase()).setBold());
         body.add(" desejo adquirir vale-transporte, declaro que estou morando na ");
-        
+
         String address = request.getEmployeeAddress() != null ? request.getEmployeeAddress() : "";
         body.add(new Text(address).setBold());
-        
         body.add(", e uso __________ vales transportes para o meu deslocamento residência-trabalho e vice-versa.");
         document.add(body);
+    }
 
-        // Seção de Linhas e Tarifas (Tabela estruturada)
+    private void addManualRouteSection(Document document) {
+        document.add(new Paragraph("Ida")
+                .setFontSize(10.5f)
+                .setBold()
+                .setMarginTop(12f)
+                .setMarginBottom(4f));
+        document.add(new Paragraph("Linha: ________________________________ Tarifa R$: ________________________")
+                .setFontSize(10.5f)
+                .setMarginBottom(8f));
+
+        document.add(new Paragraph("Volta")
+                .setFontSize(10.5f)
+                .setBold()
+                .setMarginBottom(4f));
+        document.add(new Paragraph("Linha: ________________________________ Tarifa R$: ________________________")
+                .setFontSize(10.5f)
+                .setMarginBottom(10f));
+    }
+
+    private void addCompleteRouteSection(Document document, TransportVoucherRequest request) {
         Table routeTable = new Table(UnitValue.createPercentArray(new float[]{20, 60, 20}))
                 .useAllAvailableWidth()
                 .setMarginTop(10f)
@@ -167,8 +220,9 @@ public class TransportVoucherStandardPdfService {
         routeTable.addCell(new Cell().add(new Paragraph(request.getVoltaTarifa() != null && !request.getVoltaTarifa().isEmpty() ? request.getVoltaTarifa() : " ").setFontSize(9f)));
 
         document.add(routeTable);
+    }
 
-        // Termos de Compromisso
+    private void addLegalTerms(Document document) {
         document.add(new Paragraph("\nAssumo o compromisso de utilizar o vale-transporte exclusivamente para o meu efetivo deslocamento residência-trabalho e vice-versa; e afirmo ter conhecimento do artigo 7°, § 3° do Decreto n° 95.247/87, de que constitui falta grave o seu uso indevido ou que essa declaração seja falsa.")
                 .setFontSize(10.5f)
                 .setTextAlignment(TextAlignment.JUSTIFIED)
@@ -185,21 +239,30 @@ public class TransportVoucherStandardPdfService {
         document.add(new Paragraph("Por ser a expressão da verdade, firmo a presente declaração e termo de compromisso.")
                 .setFontSize(10.5f)
                 .setMarginTop(15f));
-
-        // Assinaturas e Data
-        addSignatures(document, request, company);
     }
 
-    private void addSignatures(Document document, TransportVoucherRequest request, Company company) {
+    private void addSignatures(Document document, TransportVoucherRequest request, Company company, boolean manual) {
+        if (manual) {
+            document.add(new Paragraph("\n_______________, ___/___/______")
+                    .setFontSize(11f)
+                    .setMarginTop(25f)
+                    .setMarginBottom(40f));
+
+            document.add(new Paragraph("______________________________________________________")
+                    .setTextAlignment(TextAlignment.LEFT));
+            document.add(new Paragraph(" ")
+                    .setMarginTop(8f));
+            return;
+        }
+
         String city = request.getCity();
-        
-        // Se a cidade informada parecer um endereço (contém Rua ou vírgula), buscar a cidade real da empresa
+
         if (city == null || city.isEmpty() || city.toLowerCase().contains("rua") || city.contains(",")) {
             city = com.z7design.secured_guard.util.CompanyDataFormatter.resolveContractSigningCity(company);
         }
-        
-        if (city == null || city.isEmpty()) city = "Contagem"; // Fallback para Contagem
-        
+
+        if (city == null || city.isEmpty()) city = "Contagem";
+
         LocalDate docDate = request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now();
         String dateStr = formatDateExtended(docDate);
 
@@ -210,7 +273,8 @@ public class TransportVoucherStandardPdfService {
 
         document.add(new Paragraph("______________________________________________________")
                 .setTextAlignment(TextAlignment.LEFT));
-        document.add(new Paragraph(request.getEmployeeName().toUpperCase())
+        String employeeName = request.getEmployeeName() != null ? request.getEmployeeName() : "";
+        document.add(new Paragraph(employeeName.toUpperCase())
                 .setBold()
                 .setFontSize(10f)
                 .setMarginTop(-5f));

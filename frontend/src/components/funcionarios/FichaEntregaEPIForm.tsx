@@ -16,6 +16,7 @@ import { companyService } from '@/services/companyService';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { caepiService, CAEPIResponse } from '@/services/caepiService';
@@ -645,6 +646,7 @@ const FichaEntregaEPIForm: React.FC<FichaEntregaEPIFormProps> = ({ employeeId, c
         title: 'Sucesso',
         description: 'Ficha de Entrega de EPI gerada e salva com sucesso!',
       });
+      void refreshEmployeeDocuments(form.funcionarioId);
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
       toast({

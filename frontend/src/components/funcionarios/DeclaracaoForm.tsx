@@ -17,6 +17,7 @@ import { EmployeeCombobox } from '../ui/employee-combobox';
 import { SimpleEmployee } from '@/services/employeeService';
 
 import api from '@/lib/axios';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 
 interface DeclaracaoFormProps {
   employeeId?: string;
@@ -148,6 +149,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         personName: funcionario.name,
         personCpf: funcionario.cpf || funcionario.document || '',
         personPosition: funcionario.positionName || (funcionario as any).position?.name || '',
@@ -186,6 +188,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         personName: funcionario.name,
         personCpf: funcionario.cpf || funcionario.document || '',
         personPosition: funcionario.positionName || (funcionario as any).position?.name || '',
@@ -213,6 +216,7 @@ const DeclaracaoForm: React.FC<DeclaracaoFormProps> = ({ employeeId, companyId }
       window.URL.revokeObjectURL(url);
 
       alert('Declaração gerada com sucesso!');
+      void refreshEmployeeDocuments(funcionario.id);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       alert('Erro ao gerar PDF. Tente novamente.');

@@ -12,6 +12,7 @@ import { companyService } from '@/services/companyService';
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
 import { EmployeeCombobox } from '../ui/employee-combobox';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 
 
 const documentTypes = [
@@ -117,6 +118,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
         try {
             const payload = {
                 companyId: selectedEmp.id,
+                employeeId: selectedFunc.id,
                 reportTitle: selectedDocType?.label,
                 employeeName: selectedFunc.name,
                 employeeCpf: selectedFunc.document || '',
@@ -160,6 +162,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+                void refreshEmployeeDocuments(selectedFunc.id);
             }
 
             setTimeout(() => window.URL.revokeObjectURL(url), 100);

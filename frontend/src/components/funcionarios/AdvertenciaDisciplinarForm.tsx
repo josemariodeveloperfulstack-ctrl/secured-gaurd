@@ -13,6 +13,7 @@ import { companyService } from '@/services/companyService';
 import { documentService } from '@/services/documentService';
 import { useToast } from '../ui/use-toast';
 import api from '@/lib/axios';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { Company } from '@/types/company';
 import { EmployeeCombobox } from '../ui/employee-combobox';
@@ -146,6 +147,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         employeeName: funcionario.name,
         employeeCpf: (funcionario as any).document || funcionario.cpf || '',
         employeePosition: funcionario.positionName || (funcionario as any).position?.name || '',
@@ -184,6 +186,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         employeeName: funcionario.name,
         employeeCpf: (funcionario as any).document || funcionario.cpf || '',
         employeePosition: funcionario.positionName || (funcionario as any).position?.name || '',
@@ -210,6 +213,7 @@ const AdvertenciaDisciplinarForm: React.FC<AdvertenciaDisciplinarFormProps> = ({
       window.URL.revokeObjectURL(url);
 
       toast({ title: 'Sucesso', description: 'Advertência gerada com sucesso!' });
+      void refreshEmployeeDocuments(funcionario.id);
     } catch (err) {
       console.error('Erro ao gerar PDF:', err);
       toast({ title: 'Erro', description: 'Erro ao gerar PDF. Tente novamente.', variant: 'destructive' });

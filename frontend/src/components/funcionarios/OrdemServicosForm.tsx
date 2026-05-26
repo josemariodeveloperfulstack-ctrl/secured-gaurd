@@ -17,6 +17,7 @@ import { clientService, Client } from '@/services/clientService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 
 // Predefined Safety Templates for common roles
 const SAFETY_TEMPLATES: Record<string, any> = {
@@ -327,6 +328,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
         title: 'Sucesso',
         description: 'Ordem de Serviço gerada com sucesso!',
       });
+      void refreshEmployeeDocuments(fullEmployee.id);
     } catch (err: any) {
       console.error('Erro ao gerar OS:', err);
       toast({

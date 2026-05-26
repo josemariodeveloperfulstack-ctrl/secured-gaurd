@@ -4,6 +4,7 @@ import {
   type DocumentoGerado,
 } from '@/services/documentoGeradoService';
 import { queryKeys } from './queryKeys';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 
 /**
  * Lista documentos gerados (templates fixos + dinâmicos) de um funcionário.
@@ -19,7 +20,10 @@ export function useDocumentosGeradosByEmployee(
       : ['documentosGerados', 'byEmployee', 'disabled'],
     queryFn: () => documentoGeradoService.listarPorFuncionario(employeeId ?? ''),
     enabled: Boolean(employeeId) && (options?.enabled ?? true),
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    retry: 1,
   });
 }
 
@@ -43,10 +47,6 @@ export function useInvalidateDocumentosGerados() {
   const queryClient = useQueryClient();
   return (employeeId?: string) => {
     queryClient.invalidateQueries({ queryKey: queryKeys.documentosGerados.all });
-    if (employeeId) {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.documentosGerados.byEmployee(employeeId),
-      });
-    }
+    void refreshEmployeeDocuments(employeeId);
   };
 }

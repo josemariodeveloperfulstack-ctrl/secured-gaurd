@@ -422,6 +422,9 @@ function ImportPane({ value, onChange, darkTabs, columnMappingImport }: ImportPa
                 ['company', 'Empresa', false],
                 ['position', 'Cargo', false],
                 ['phone', 'Telefone', false],
+                ['city', 'Cidade', false],
+                ['state', 'Estado (UF)', false],
+                ['companyType', 'Tipo de empresa', false],
                 ['segment', 'Segmento / texto', false],
               ] as const
             ).map(([key, label, required]) => (
@@ -487,8 +490,8 @@ function ImportPane({ value, onChange, darkTabs, columnMappingImport }: ImportPa
           <p className={cn('text-sm font-medium', titleClass)}>Clique para escolher um arquivo .csv, .xlsx ou .xls</p>
           <p className={cn('mt-1 text-xs', hintClass)}>
             {columnMappingImport
-              ? 'Primeira linha com cabeçalhos. Depois você mapeia cada coluna para e-mail, nome, empresa, etc.'
-              : 'A primeira linha deve conter os cabeçalhos. Detectamos automaticamente: email, nome, empresa, cargo, telefone.'}
+              ? 'Primeira linha com cabeçalhos. Depois você mapeia cada coluna para e-mail, nome, empresa, cidade, estado, tipo de empresa, etc.'
+              : 'A primeira linha deve conter os cabeçalhos. Detectamos automaticamente: email, nome, empresa, cidade, estado, cargo, telefone.'}
           </p>
           <input
             ref={inputRef}

@@ -93,7 +93,14 @@ class CompanyConfigService {
     } catch (error) {
       console.error('❌ Erro ao salvar configuração:', error);
       if (error && typeof error === 'object' && 'response' in error && (error as any).response?.data) {
-        throw new Error((error as any).response.data.message || 'Erro ao salvar configuração');
+        const data = (error as any).response.data;
+        if (data.fieldErrors && typeof data.fieldErrors === 'object') {
+          const details = Object.entries(data.fieldErrors)
+            .map(([field, msg]) => `${field}: ${msg}`)
+            .join('; ');
+          throw new Error(details || data.message || 'Erro ao salvar configuração');
+        }
+        throw new Error(data.message || 'Erro ao salvar configuração');
       }
       throw new Error('Erro interno do servidor');
     }

@@ -695,10 +695,9 @@ public class WorkPostService {
         workPost.setCorporates(dto.getCorporates() != null ? dto.getCorporates() : 0);
         workPost.setDocumentBank(dto.getDocumentBank() != null ? dto.getDocumentBank() : false);
         
-        // Listas (assumindo que o DTO enviaria listas vazias, não null)
-        workPost.setNrs(dto.getNrs());
-        workPost.setEpis(dto.getEpis());
-        workPost.setTrainings(dto.getTrainings());
+        workPost.setNrs(dto.getNrs() != null ? dto.getNrs() : new java.util.ArrayList<>());
+        workPost.setEpis(dto.getEpis() != null ? dto.getEpis() : new java.util.ArrayList<>());
+        workPost.setTrainings(dto.getTrainings() != null ? dto.getTrainings() : new java.util.ArrayList<>());
 
         workPost.setPgr(dto.getPgr() != null ? dto.getPgr() : false);
         workPost.setPcmso(dto.getPcmso() != null ? dto.getPcmso() : false);

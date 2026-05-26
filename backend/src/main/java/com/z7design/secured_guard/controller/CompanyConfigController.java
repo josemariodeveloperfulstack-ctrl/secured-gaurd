@@ -67,16 +67,10 @@ public class CompanyConfigController {
      * Salva ou atualiza configuração da empresa
      */
     @PostMapping
-    public ResponseEntity<CompanyConfigDTO> saveConfig(@Valid @RequestBody CompanyConfigDTO configDTO) {
+    public ResponseEntity<CompanyConfigDTO> saveConfig(@RequestBody CompanyConfigDTO configDTO) {
         log.info("POST /api/company-config - Salvando configuração da empresa");
-        
-        try {
-            CompanyConfigDTO savedConfig = companyConfigService.saveConfig(configDTO);
-            return ResponseEntity.ok(savedConfig);
-        } catch (RuntimeException e) {
-            log.error("Erro ao salvar configuração: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
-        }
+        CompanyConfigDTO savedConfig = companyConfigService.saveConfig(configDTO);
+        return ResponseEntity.ok(savedConfig);
     }
 
     /**

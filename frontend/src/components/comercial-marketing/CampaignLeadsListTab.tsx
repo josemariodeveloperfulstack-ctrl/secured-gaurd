@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, X } from 'lucide-react';
 import { RecipientPicker } from '@/components/comercial-marketing/RecipientPicker';
+import { RecipientSegmentSelector } from '@/components/comercial-marketing/RecipientSegmentSelector';
+import {
+  applySegmentRules,
+  type RecipientSegmentRule,
+} from '@/components/comercial-marketing/utils/recipientMetadata';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,8 +19,14 @@ const CampaignLeadsListTab: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [recipients, setRecipients] = useState<EmailCampaignRecipientInput[]>([]);
+  const [segmentRules, setSegmentRules] = useState<RecipientSegmentRule[]>([]);
   const [campaignId, setCampaignId] = useState<string>('');
   const [checkingOptOut, setCheckingOptOut] = useState(false);
+
+  const filteredRecipients = React.useMemo(
+    () => applySegmentRules(recipients, segmentRules),
+    [recipients, segmentRules],
+  );
 
   const campaignsQuery = useQuery({
     queryKey: ['email-campaigns'],
@@ -27,8 +38,8 @@ const CampaignLeadsListTab: React.FC = () => {
   const appendMutation = useMutation({
     mutationFn: async () => {
       if (!campaignId) throw new Error('Selecione uma campanha em rascunho.');
-      if (recipients.length === 0) throw new Error('Monte a lista de destinatários antes de enviar.');
-      await emailCampaignService.appendRecipients(campaignId, recipients);
+      if (filteredRecipients.length === 0) throw new Error('Monte a lista de destinatários antes de enviar.');
+      await emailCampaignService.appendRecipients(campaignId, filteredRecipients);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
@@ -79,8 +90,8 @@ const CampaignLeadsListTab: React.FC = () => {
 
   const exportCsv = () => {
     const lines = [
-      ['email', 'name', 'sourceType', 'leadId', 'company', 'segment'].join(','),
-      ...recipients.map((r) => {
+      ['email', 'name', 'sourceType', 'leadId', 'company', 'city', 'state', 'companyType', 'segment'].join(','),
+      ...filteredRecipients.map((r) => {
         const meta = r.metadata ?? {};
         const esc = (s: string) => (s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s);
         return [
@@ -89,6 +100,9 @@ const CampaignLeadsListTab: React.FC = () => {
           esc((r.sourceType ?? '').toString()),
           esc((r.leadId ?? '').toString()),
           esc(String(meta.company ?? '')),
+          esc(String(meta.city ?? meta.cidade ?? '')),
+          esc(String(meta.state ?? meta.estado ?? '')),
+          esc(String(meta.companyType ?? meta.tipoEmpresa ?? '')),
           esc(String(meta.segment ?? '')),
         ].join(',');
       }),
@@ -110,8 +124,8 @@ const CampaignLeadsListTab: React.FC = () => {
           <h2 className="text-xl font-semibold text-slate-100">Lista de leads para campanhas</h2>
         </div>
         <p className="text-sm text-slate-400">
-          Importe contatos por CSV/Excel (com mapeamento de colunas), filtre leads do CRM por origem, status e segmento,
-          e remova automaticamente quem já pediu descadastro (opt-out).
+          Importe contatos por CSV/Excel (mapeie cidade, estado e tipo de empresa), monte lotes por região com
+          quantidade definida e remova automaticamente quem pediu descadastro (opt-out).
         </p>
       </div>
 
@@ -159,23 +173,43 @@ const CampaignLeadsListTab: React.FC = () => {
         </div>
 
         {recipients.length > 0 && (
-          <div className="mt-6 rounded-lg border border-white/10 bg-seguranca-black/25 p-3">
+          <div className="mt-6 space-y-4">
+            <RecipientSegmentSelector
+              recipients={recipients}
+              rules={segmentRules}
+              onRulesChange={setSegmentRules}
+              dark
+            />
+          <div className="rounded-lg border border-white/10 bg-seguranca-black/25 p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-medium text-slate-200">
-                {recipients.length} destinatário(s) na lista
+                {filteredRecipients.length} destinatário(s) na lista
+                {filteredRecipients.length !== recipients.length && (
+                  <span className="ml-1 text-xs font-normal text-slate-500">
+                    (de {recipients.length} importados)
+                  </span>
+                )}
               </span>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" className="border-white/20" onClick={exportCsv}>
                   Exportar CSV
                 </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => setRecipients([])}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setRecipients([]);
+                    setSegmentRules([]);
+                  }}
+                >
                   Limpar lista
                 </Button>
               </div>
             </div>
             <ScrollArea className="max-h-40">
               <div className="flex flex-wrap gap-1.5">
-                {recipients.slice(0, 80).map((r) => (
+                {filteredRecipients.slice(0, 80).map((r) => (
                   <Badge key={r.email} variant="outline" className="border-white/15 text-xs text-slate-200">
                     {r.email}
                     <button
@@ -188,13 +222,14 @@ const CampaignLeadsListTab: React.FC = () => {
                     </button>
                   </Badge>
                 ))}
-                {recipients.length > 80 && (
+                {filteredRecipients.length > 80 && (
                   <Badge variant="outline" className="border-white/15">
-                    +{recipients.length - 80} mais
+                    +{filteredRecipients.length - 80} mais
                   </Badge>
                 )}
               </div>
             </ScrollArea>
+          </div>
           </div>
         )}
 
@@ -204,7 +239,7 @@ const CampaignLeadsListTab: React.FC = () => {
             className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
             disabled={
               !campaignId ||
-              recipients.length === 0 ||
+              filteredRecipients.length === 0 ||
               appendMutation.isPending ||
               checkingOptOut ||
               draftCampaigns.length === 0

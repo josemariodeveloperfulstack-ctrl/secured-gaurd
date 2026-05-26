@@ -52,8 +52,15 @@ const FuncionarioNovo: React.FC = () => {
       setSuccess(true);
       setForm(initialState);
       setPhotoPreview(null);
-    } catch (err) {
-      setError('Erro ao cadastrar funcionário.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.includes('CPF já cadastrado')) {
+        setError('CPF já cadastrado para outro funcionário');
+      } else if (message.includes('Email já cadastrado')) {
+        setError('Email já cadastrado para outro funcionário');
+      } else {
+        setError(message || 'Erro ao cadastrar funcionário.');
+      }
     } finally {
       setLoading(false);
     }

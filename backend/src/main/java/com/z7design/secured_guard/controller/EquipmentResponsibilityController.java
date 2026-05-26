@@ -38,9 +38,13 @@ public class EquipmentResponsibilityController {
         if (request.getDocumentDate() != null) dados.put("documentDate", request.getDocumentDate().toString());
         if (request.getEquipments() != null) dados.put("equipmentCount", request.getEquipments().size());
 
+        TipoDocumentoGerado tipo = (request.getReportTitle() != null && !request.getReportTitle().isBlank())
+                ? TipoDocumentoGerado.EQUIPMENT_RESPONSIBILITY_SPECIFIC
+                : TipoDocumentoGerado.EQUIPMENT_RESPONSIBILITY;
+
         persistenceService.persistir(
                 request.getEmployeeId(),
-                TipoDocumentoGerado.EQUIPMENT_RESPONSIBILITY,
+                tipo,
                 pdfBytes,
                 "termo-equipamento-" + safeSlug(request.getEmployeeName()) + ".pdf",
                 dados);

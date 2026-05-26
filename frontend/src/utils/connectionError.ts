@@ -16,14 +16,42 @@ export function isConnectionError(error: any): boolean {
   return (
     error?.code === 'ECONNREFUSED' ||
     error?.code === 'ERR_CONNECTION_REFUSED' ||
+    error?.code === 'ERR_NETWORK' ||
     error?.code === 'ERR_TOO_MANY_REDIRECTS' ||
     error?.message?.includes('too many redirects') ||
     error?.message?.includes('Network Error') ||
     error?.message?.includes('connection refused') ||
     error?.message?.includes('Failed to fetch') ||
     error?.message?.includes('Backend não está disponível') ||
-    error?.isConnectionError === true
+    error?.message?.includes('servidor está temporariamente indisponível') ||
+    error?.isConnectionError === true ||
+    error?.is522Error === true
   );
+}
+
+/**
+ * Erros que podem ser enfileirados para sincronização offline posterior.
+ */
+export function isRetryableConnectionError(error: unknown): boolean {
+  const err = error as {
+    response?: { status?: number };
+    request?: unknown;
+    code?: string;
+    message?: string;
+    isConnectionError?: boolean;
+    is522Error?: boolean;
+  };
+
+  if (isConnectionError(err)) {
+    return true;
+  }
+
+  if (!err?.response && err?.request) {
+    return true;
+  }
+
+  const status = err.response?.status;
+  return status === 502 || status === 503 || status === 504 || status === 522;
 }
 
 /**
@@ -48,4 +76,3 @@ export function handleConnectionErrorSilently(error: any, context?: string): boo
   }
   return false;
 }
-

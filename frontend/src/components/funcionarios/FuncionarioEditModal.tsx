@@ -14,7 +14,7 @@ import { Dependent, DependentCreateRequest } from '@/types/dependent';
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import accountingFormService from '@/services/accountingFormService';
 import CurrencyInput from 'react-currency-input-field';
-import { Eye, Shield, Edit2, Trash2, Users as UsersIcon, Link, X, UserPlus, Upload, FileCheck, AlertCircle, FileSpreadsheet } from 'lucide-react';
+import { Eye, Shield, Edit2, Trash2, Users as UsersIcon, Link, X, UserPlus, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -226,12 +226,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
 
   // Estados que devem estar antes de qualquer return (Rules of Hooks)
   const [cpfError, setCpfError] = useState<string | null>(null);
-  const [showPDFImport, setShowPDFImport] = useState(false);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfSuccess, setPdfSuccess] = useState(false);
-  const [extractedPreview, setExtractedPreview] = useState<any | null>(null);
-  const [pdfProcessing, setPdfProcessing] = useState(false);
   const [canCreateDefaultUser, setCanCreateDefaultUser] = useState(false);
   const [criarUsuarioModalOpen, setCriarUsuarioModalOpen] = useState(false);
   const [novoMedicoModalOpen, setNovoMedicoModalOpen] = useState(false);
@@ -1335,10 +1329,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     setForm(prev => ({ ...prev, user: { id: user.id } }));
   };
 
-  const handlePDFFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { };
-  const handleProcessPDF = () => { };
-  const fillFormWithPDFData = (data: any) => { };
-
   const handleUsuarioPadraoCriado = (userId: string) => {
     setCriarUsuarioModalOpen(false);
     // Update user select
@@ -1576,254 +1566,6 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         </DialogHeader>
         
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-            {/* Botão de Importação de PDF */}
-            <div className="flex justify-end mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowPDFImport(!showPDFImport)}
-                className="flex items-center gap-2 border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
-              >
-                <Upload className="h-4 w-4" />
-                Importar PDF
-              </Button>
-            </div>
-
-            {/* Seção de Importação de PDF */}
-            {showPDFImport && (
-              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-                <div className="p-4">
-                  <h4 className="text-lg font-semibold text-seguranca-yellow mb-3 flex items-center">
-                    <FileCheck className="mr-2" size={20} />
-                    Importar FICHA DE REGISTRO DOS EMPREGADOS
-                  </h4>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-seguranca-lightgray">
-                        Selecionar arquivo PDF
-                </Label>
-                  <Input
-                        type="file"
-                        accept=".pdf"
-                        onChange={handlePDFFileChange}
-                        className="mt-1 bg-seguranca-black border-seguranca-lightgray/30 text-white"
-                      />
-                      <p className="text-xs text-seguranca-lightgray/60 mt-1">
-                        Apenas arquivos PDF. Máximo 10MB.
-                      </p>
-                </div>
-
-                    {pdfFile && (
-                      <div className="flex items-center gap-2 p-2 bg-seguranca-black rounded border border-seguranca-lightgray/30">
-                        <FileText className="h-4 w-4 text-seguranca-yellow" />
-                        <span className="text-sm text-white">{pdfFile.name}</span>
-                        <span className="text-xs text-seguranca-lightgray/60">
-                          ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
-                          </span>
-                        </div>
-                    )}
-
-                    {pdfError && (
-                      <div className="flex items-center gap-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="text-sm">{pdfError}</span>
-                      </div>
-                    )}
-
-                    {pdfSuccess && (
-                      <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-500/30 rounded text-green-400">
-                        <FileCheck className="h-4 w-4" />
-                        <span className="text-sm">PDF processado com sucesso! Formulário preenchido automaticamente.</span>
-              </div>
-                    )}
-
-                    {extractedPreview && (
-                      <div className="mt-3 p-3 bg-seguranca-black rounded border border-seguranca-lightgray/30 text-sm text-white">
-                        <h5 className="font-semibold mb-2">Pré-visualização dos dados extraídos</h5>
-               <div className="space-y-2">
-                          <details className="bg-[#2a2a2a] rounded p-2" open>
-                            <summary className="cursor-pointer font-medium">Dados da Empresa</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ employer: extractedPreview.employer })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.employer || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Dados do Funcionário</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ employee: extractedPreview.employee })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.employee || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Vínculo Empregatício</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ contract: extractedPreview.contract })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.contract || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">FGTS</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ fgts: extractedPreview.fgts })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.fgts || {}).map(([k, v]) => (
-                                (v !== undefined && v !== null && String(v).length > 0) ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">PIS</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ pis: extractedPreview.pis })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.pis || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Título de Eleitor</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ voter: extractedPreview.voter })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.voter || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Quando Estrangeiro</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ foreigner: extractedPreview.foreigner })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.foreigner || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          {extractedPreview.notes ? (
-                            <div className="bg-[#2a2a2a] rounded p-2">
-                              <div className="font-medium">Observações</div>
-                              <div className="text-xs mt-1">{extractedPreview.notes}</div>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    )}
-
-                 <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        onClick={handleProcessPDF}
-                        disabled={!pdfFile || pdfProcessing}
-                        className="flex items-center gap-2 bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
-                      >
-                        {pdfProcessing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-black"></div>
-                            Processando...
-                          </>
-                        ) : (
-                          <>
-                            <FileCheck className="h-4 w-4" />
-                            Processar PDF
-                          </>
-                        )}
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setShowPDFImport(false);
-                          setPdfFile(null);
-                          setPdfError(null);
-                          setPdfSuccess(false);
-                        }}
-                        className="border-seguranca-lightgray/30 text-seguranca-lightgray hover:bg-seguranca-lightgray/10"
-                      >
-                        Cancelar
-                      </Button>
-                             </div>
-                           </div>
-                </div>
-              </Card>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
                 <TabsList className={`grid w-full ${canSeeHistory ? 'grid-cols-5' : 'grid-cols-4'} bg-seguranca-graphite border border-gray-600`}>

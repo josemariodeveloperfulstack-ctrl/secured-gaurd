@@ -176,8 +176,17 @@ export const workPostService = {
     try {
       const response = await api.post('/api/work-posts', data);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Erro ao criar posto de trabalho:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resp = (error as { response?: { data?: { message?: string }; status?: number } }).response;
+        if (resp?.data?.message) {
+          throw new Error(resp.data.message);
+        }
+        if (resp?.status === 400) {
+          throw new Error('Dados do posto inválidos. Verifique tipo (POSTO_24H), status (EM_IMPLANTACAO) e endereço.');
+        }
+      }
       throw error;
     }
   },

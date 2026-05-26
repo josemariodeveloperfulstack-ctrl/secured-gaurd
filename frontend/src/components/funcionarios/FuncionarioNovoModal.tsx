@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,11 +16,10 @@ import { userService } from '@/services/userService';
 import { User } from '@/types/user';
 import { companyService } from '@/services/companyService';
 import { Company } from '@/types/company';
-import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, Upload, FileCheck, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet, History, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, User as UserIcon, Building, Briefcase, Plus, UserPlus, Link, X, FileText, AlertCircle, Users as UsersIcon, Trash2, Edit2, Shield, Eye, FileSpreadsheet, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import NovoCargoModal from '@/components/funcionarios/NovoCargoModal';
 import NovoMedicoModal from '@/components/funcionarios/NovoMedicoModal';
 import CriarUsuarioPadraoModal from '@/components/funcionarios/CriarUsuarioPadraoModal';
-import { EmployeeDataFromPDF } from '@/services/pdfProcessingService';
 import { DependentFormModal } from '@/components/dependentes/DependentFormModal';
 import dependentService from '@/services/dependentService';
 import { Dependent, DependentCreateRequest } from '@/types/dependent';
@@ -38,12 +37,28 @@ import { validateCPF, formatCpfForInput, formatTituloEleitorForInput } from '@/u
 import CurrencyInput from 'react-currency-input-field';
 import DocumentosGerarTab from './DocumentosGerarTab';
 import { EmployeeDocumentsTab } from './EmployeeDocumentsTab';
+import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission } from '@/utils/permissions';
 import { employeeChangeHistoryService, EmployeeChangeHistoryPage } from '@/services/employeeChangeHistoryService';
 import { DismissalReasonSelect } from '@/components/funcionarios/DismissalReasonSelect';
 import { DatePicker } from '@/components/ui/date-picker';
 import { parseDateFromBackend, formatDateForBackend } from '@/utils/dateUtils';
+import { useDebounce } from '@/hooks/use-debounce';
+import {
+  clearEmployeeFormDraft,
+  formatDraftSavedTime,
+  getEmployeeFormDraftKey,
+  hasAnyFilledEmployeeField,
+  isEmployeeFormDraftEmpty,
+  loadEmployeeFormDraft,
+  mergeEmployeeFormDraft,
+  saveEmployeeFormDraft,
+} from '@/utils/employeeFormDraft';
+import { enqueueEmployeeSync } from '@/utils/employeeOfflineSync';
+import { isRetryableConnectionError } from '@/utils/connectionError';
+import { useEmployeeOfflineSync } from '@/hooks/useEmployeeOfflineSync';
+import { EmployeeOfflineSyncBanner } from '@/components/funcionarios/EmployeeOfflineSyncBanner';
 
 interface FuncionarioNovoModalProps {
   open: boolean;
@@ -137,6 +152,51 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentEmployeeId, setCurrentEmployeeId] = useState<string | null>(null);
   const [cpfError, setCpfError] = useState<string | null>(null);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const draftRestoreNotifiedRef = useRef(false);
+  const modalWasOpenRef = useRef(false);
+  const loadedEmployeeIdRef = useRef<string | null>(null);
+  const draftStorageKey = useMemo(
+    () => getEmployeeFormDraftKey(user?.id || user?.username),
+    [user?.id, user?.username],
+  );
+  const [offlineQueueId, setOfflineQueueId] = useState<string | null>(null);
+
+  const handleOfflineItemSynced = useCallback(
+    ({ item, employee }: { item: { id: string; operation: string }; employee?: { id?: string } }) => {
+      if (offlineQueueId && item.id !== offlineQueueId) {
+        return;
+      }
+
+      toast({
+        title: 'Sincronizado com sucesso',
+        description:
+          item.operation === 'create'
+            ? 'Cadastro enviado ao servidor.'
+            : 'Alterações enviadas ao servidor.',
+      });
+
+      if (item.operation === 'create' && employee?.id) {
+        setCurrentEmployeeId(employee.id);
+        setIsEditMode(true);
+        setPendingDependents([]);
+        void clearEmployeeFormDraft(draftStorageKey);
+        setDraftSavedAt(null);
+      }
+
+      setOfflineQueueId(null);
+      onCreated();
+    },
+    [draftStorageKey, offlineQueueId, onCreated, toast],
+  );
+
+  const {
+    pendingCount,
+    isSyncing,
+    syncPending,
+  } = useEmployeeOfflineSync(user?.id || user?.username, {
+    onItemSynced: handleOfflineItemSynced,
+  });
 
   // Estados para médicos
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -331,15 +391,111 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyPageIndex, setHistoryPageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('cadastro');
+  const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
 
   // Intervalos Almoço/Janta: controla visibilidade do campo Horário do Intervalo
   const [temIntervaloAlmoco, setTemIntervaloAlmoco] = useState<'sim' | 'nao'>('nao');
 
-  // Resetar aba ativa ao fechar ou quando Histórico não está disponível
+  const debouncedForm = useDebounce(form, 800);
+  const debouncedPendingDependents = useDebounce(pendingDependents, 800);
+  const debouncedTemIntervaloAlmoco = useDebounce(temIntervaloAlmoco, 800);
+  const debouncedActiveTab = useDebounce(activeTab, 800);
+  const debouncedDoctorSearchTerm = useDebounce(doctorSearchTerm, 800);
+  const debouncedUserSearchTerm = useDebounce(userSearchTerm, 800);
+  const debouncedPositionSearchTerm = useDebounce(positionSearchTerm, 800);
+
+  const persistEmployeeDraft = useCallback(async () => {
+    if (isEditMode || employeeToEdit) {
+      return null;
+    }
+
+    const saved = await saveEmployeeFormDraft(draftStorageKey, {
+      form,
+      pendingDependents,
+      temIntervaloAlmoco,
+      activeTab,
+      doctorSearchTerm,
+      userSearchTerm,
+      positionSearchTerm,
+    });
+
+    if (saved) {
+      setDraftSavedAt(saved.savedAt);
+    } else {
+      setDraftSavedAt(null);
+    }
+
+    return saved;
+  }, [
+    activeTab,
+    doctorSearchTerm,
+    draftStorageKey,
+    employeeToEdit,
+    form,
+    isEditMode,
+    userSearchTerm,
+    positionSearchTerm,
+    pendingDependents,
+    temIntervaloAlmoco,
+  ]);
+
+  // Resetar aba Histórico ao fechar; não limpar aba ativa para preservar rascunho
   useEffect(() => {
-    if (!open) setActiveTab('cadastro');
-    else if (!showHistoryTab && activeTab === 'historico') setActiveTab('cadastro');
+    if (!open) {
+      draftRestoreNotifiedRef.current = false;
+    } else if (!showHistoryTab && activeTab === 'historico') {
+      setActiveTab('cadastro');
+    }
   }, [open, showHistoryTab, activeTab]);
+
+  useEffect(() => {
+    if (!open || isEditMode || employeeToEdit) {
+      return;
+    }
+
+    void (async () => {
+      const saved = await saveEmployeeFormDraft(draftStorageKey, {
+        form: debouncedForm,
+        pendingDependents: debouncedPendingDependents,
+        temIntervaloAlmoco: debouncedTemIntervaloAlmoco,
+        activeTab: debouncedActiveTab,
+        doctorSearchTerm: debouncedDoctorSearchTerm,
+        userSearchTerm: debouncedUserSearchTerm,
+        positionSearchTerm: debouncedPositionSearchTerm,
+      });
+
+      if (saved) {
+        setDraftSavedAt(saved.savedAt);
+      } else {
+        setDraftSavedAt(null);
+      }
+    })();
+  }, [
+    open,
+    isEditMode,
+    employeeToEdit,
+    draftStorageKey,
+    debouncedForm,
+    debouncedPendingDependents,
+    debouncedTemIntervaloAlmoco,
+    debouncedActiveTab,
+    debouncedDoctorSearchTerm,
+    debouncedUserSearchTerm,
+    debouncedPositionSearchTerm,
+  ]);
+
+  useEffect(() => {
+    if (!open || isEditMode || employeeToEdit) {
+      return;
+    }
+
+    const handleBeforeUnload = () => {
+      persistEmployeeDraft();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [open, isEditMode, employeeToEdit, persistEmployeeDraft]);
 
   // Carregar histórico de mudanças quando abrir a aba Histórico (modo edição)
   useEffect(() => {
@@ -364,7 +520,20 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
   // useEffect para carregar dados do funcionário em modo de edição
   useEffect(() => {
-    if (employeeToEdit && open) {
+    const justOpened = open && !modalWasOpenRef.current;
+    modalWasOpenRef.current = open;
+
+    if (!open) {
+      loadedEmployeeIdRef.current = null;
+      return;
+    }
+
+    if (employeeToEdit) {
+      const employeeId = employeeToEdit.id || null;
+      if (!justOpened && loadedEmployeeIdRef.current === employeeId) {
+        return;
+      }
+      loadedEmployeeIdRef.current = employeeId;
       console.log('🔍 Carregando dados do funcionário para edição:', employeeToEdit);
       setIsEditMode(true);
       // Definir currentEmployeeId quando abrir para edição
@@ -573,10 +742,52 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
           })
           .catch(err => console.error('Erro ao carregar médico:', err));
       }
-    } else if (!employeeToEdit && open) {
-      // Modo de criação - resetar formulário
+      return;
+    }
+
+    if (!justOpened) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const restoreDraft = async () => {
       setIsEditMode(false);
+      const draft = await loadEmployeeFormDraft(draftStorageKey);
+      if (cancelled) {
+        return;
+      }
+
+      if (draft && !isEmployeeFormDraftEmpty(draft.form, draft.pendingDependents)) {
+        setForm(mergeEmployeeFormDraft(draft.form, initialState));
+        setPendingDependents(draft.pendingDependents);
+        setTemIntervaloAlmoco(draft.temIntervaloAlmoco);
+        setActiveTab(draft.activeTab || 'cadastro');
+        setDoctorSearchTerm(draft.doctorSearchTerm || '');
+        setUserSearchTerm(draft.userSearchTerm || '');
+        setPositionSearchTerm(draft.positionSearchTerm || '');
+        setDraftSavedAt(draft.savedAt);
+        setCpfError(null);
+        setEmployeeDependents([]);
+        setShowDoctorDropdown(false);
+
+        if (!draftRestoreNotifiedRef.current) {
+          draftRestoreNotifiedRef.current = true;
+          toast({
+            title: 'Rascunho restaurado',
+            description: 'Todos os campos preenchidos foram mantidos.',
+          });
+        }
+        return;
+      }
+
+      if (hasAnyFilledEmployeeField(form) || pendingDependents.length > 0) {
+        setDraftSavedAt(null);
+        return;
+      }
+
       setForm(initialState);
+      setPendingDependents([]);
       setTemIntervaloAlmoco('nao');
       setCpfError(null);
       setSelectedPosition(null);
@@ -590,8 +801,14 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       setSelectedDoctor(null);
       setDoctorSearchTerm('');
       setShowDoctorDropdown(false);
-    }
-  }, [employeeToEdit, open]);
+      setDraftSavedAt(null);
+    };
+
+    void restoreDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeToEdit, open, draftStorageKey, toast]);
 
   // Carregar médicos quando abrir o modal
   useEffect(() => {
@@ -645,6 +862,66 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
       }
     }
   }, [companies, employeeToEdit?.company?.id]);
+
+  // Restaurar seleções do rascunho (modo criação) quando listas carregarem
+  useEffect(() => {
+    if (!open || employeeToEdit || isEditMode) {
+      return;
+    }
+
+    if (form.company?.id && companies.length > 0) {
+      const company = companies.find(c => c.id === form.company?.id);
+      if (company && selectedCompany?.id !== company.id) {
+        setSelectedCompany(company);
+      }
+    }
+
+    if (form.unit?.id && units.length > 0) {
+      const unit = units.find(u => u.id === form.unit?.id);
+      if (unit && selectedUnit?.id !== unit.id) {
+        setSelectedUnit(unit);
+      }
+    }
+  }, [
+    open,
+    employeeToEdit,
+    isEditMode,
+    form.company?.id,
+    form.unit?.id,
+    companies,
+    units,
+    selectedCompany?.id,
+    selectedUnit?.id,
+  ]);
+
+  useEffect(() => {
+    if (!open || employeeToEdit || isEditMode || !form.exameMedicoDoctor?.id) {
+      return;
+    }
+
+    if (selectedDoctor?.id === form.exameMedicoDoctor.id) {
+      return;
+    }
+
+    doctorService.getById(form.exameMedicoDoctor.id)
+      .then((doctor) => {
+        if (!doctor) {
+          return;
+        }
+        setSelectedDoctor(doctor);
+        if (!doctorSearchTerm) {
+          setDoctorSearchTerm(`${doctor.name} - CRM ${doctor.crmNumber}/${doctor.crmState}`);
+        }
+      })
+      .catch((err) => console.error('Erro ao restaurar médico do rascunho:', err));
+  }, [
+    open,
+    employeeToEdit,
+    isEditMode,
+    form.exameMedicoDoctor?.id,
+    selectedDoctor?.id,
+    doctorSearchTerm,
+  ]);
 
   // Abrir modal para adicionar dependente
   const handleAddDependent = () => {
@@ -748,14 +1025,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     cpf: string;
     rg: string;
   }>>([]);
-
-  // Estados para importação de PDF
-  const [showPDFImport, setShowPDFImport] = useState(false);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfProcessing, setPdfProcessing] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfSuccess, setPdfSuccess] = useState(false);
-  const [extractedPreview, setExtractedPreview] = useState<any | null>(null);
 
   // Carregar dados para os selects
   useEffect(() => {
@@ -1030,36 +1299,37 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
     setLoading(true);
     setError(null);
-    try {
-      // Incluir dependentes no payload (mas não enviar na criação/edição de funcionário)
-      // Os dependentes devem ser gerenciados separadamente
-      // Prepara os dados do funcionário, garantindo que o salário seja enviado como número
-      const employeeData = {
-        ...form,
-        salario: form.salario ? parseFloat(String(form.salario).replace(/\./g, '').replace(',', '.')) : 0
-      };
 
-      if (isEditMode && employeeToEdit?.id) {
-        // Modo de edição
-        const updatedEmployee = await employeeService.updateEmployee(employeeToEdit.id, employeeData);
-        const savedId = updatedEmployee?.id || employeeToEdit.id;
+    const employeeData = {
+      ...form,
+      salario: form.salario ? parseFloat(String(form.salario).replace(/\./g, '').replace(',', '.')) : 0,
+    };
+    const targetEmployeeId = employeeToEdit?.id || currentEmployeeId;
+    const isUpdate = Boolean(isEditMode && targetEmployeeId);
+
+  try {
+      if (isUpdate && targetEmployeeId) {
+        const updatedEmployee = await employeeService.updateEmployee(targetEmployeeId, employeeData);
+        const savedId = updatedEmployee?.id || targetEmployeeId;
         console.log('✅ Funcionário atualizado - ID:', savedId);
         console.log('✅ updatedEmployee:', updatedEmployee);
         setCurrentEmployeeId(savedId);
+        setOfflineQueueId(null);
         toast({
           title: "Sucesso!",
           description: "Funcionário atualizado com sucesso.",
           variant: "default"
         });
-        onCreated(); // Atualizar lista
-        // Não fechar o modal para permitir gerar fichas
+        onCreated();
       } else {
-        // Modo de criação
         const createdEmployee = await employeeService.createEmployee(employeeData);
         console.log('✅ Funcionário criado - ID:', createdEmployee.id);
         console.log('✅ createdEmployee:', createdEmployee);
         setCurrentEmployeeId(createdEmployee.id);
-        setIsEditMode(true); // Mudar para modo de edição após criar
+        setIsEditMode(true);
+        setOfflineQueueId(null);
+        void clearEmployeeFormDraft(draftStorageKey);
+        setDraftSavedAt(null);
 
         // Salvar dependentes pendentes após criar o funcionário
         if (pendingDependents.length > 0 && createdEmployee.id) {
@@ -1097,16 +1367,54 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         // Não limpar o formulário nem fechar o modal após criar
         // Permitir que o usuário gere as fichas imediatamente
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao cadastrar funcionário:', err);
 
-      // Tratar erros específicos
-      if (err.message.includes('CPF já cadastrado')) {
+      if (isRetryableConnectionError(err)) {
+        const queued = await enqueueEmployeeSync({
+          userKey: user?.id || user?.username,
+          operation: isUpdate ? 'update' : 'create',
+          payload: employeeData,
+          pendingDependents: isUpdate ? [] : pendingDependents,
+          employeeId: isUpdate ? targetEmployeeId || undefined : undefined,
+          queueId: offlineQueueId || undefined,
+        });
+
+        setOfflineQueueId(queued.id);
+        await persistEmployeeDraft();
+
+        toast({
+          title: 'Sem conexão com o servidor',
+          description: 'Os dados foram mantidos na tela e salvos neste dispositivo. Enviaremos automaticamente quando a conexão voltar.',
+          variant: 'default',
+        });
+        setError(null);
+        return;
+      }
+
+      const message = err instanceof Error ? err.message : '';
+
+      if (message.includes('CPF já cadastrado')) {
         setError('CPF já cadastrado para outro funcionário');
-      } else if (err.message.includes('Email já cadastrado')) {
+        toast({
+          title: 'CPF já cadastrado',
+          description: 'Este CPF já está cadastrado para outro funcionário.',
+          variant: 'destructive',
+        });
+      } else if (message.includes('Email já cadastrado')) {
         setError('Email já cadastrado para outro funcionário');
+        toast({
+          title: 'Email já cadastrado',
+          description: 'Este email já está cadastrado para outro funcionário.',
+          variant: 'destructive',
+        });
       } else {
-        setError('Erro ao cadastrar funcionário.');
+        setError(message || 'Erro ao cadastrar funcionário.');
+        toast({
+          title: 'Erro ao cadastrar',
+          description: message || 'Não foi possível cadastrar o funcionário.',
+          variant: 'destructive',
+        });
       }
     } finally {
       setLoading(false);
@@ -1117,10 +1425,13 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setCurrentEmployeeId(null);
     setIsEditMode(false);
     setForm(initialState);
+    setPendingDependents([]);
     setTemIntervaloAlmoco('nao');
     setPhotoPreview(null);
     setError(null);
     setUserSearchTerm('');
+    void clearEmployeeFormDraft(draftStorageKey);
+    setDraftSavedAt(null);
   };
 
   const handleCargoCreated = (cargo: { id: string; name: string; description: string }) => {
@@ -1160,193 +1471,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
     // Fechar o modal principal após criar o usuário
     onClose();
-  };
-
-  // Funções para importação de PDF
-  const handlePDFFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== 'application/pdf') {
-        setPdfError('Apenas arquivos PDF são aceitos');
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) { // 10MB
-        setPdfError('Arquivo muito grande. Máximo 10MB');
-        return;
-      }
-      setPdfFile(file);
-      setPdfError(null);
-    }
-  };
-
-  const handleProcessPDF = async () => {
-    if (!pdfFile) return;
-
-    setPdfProcessing(true);
-    setPdfError(null);
-    setPdfSuccess(false);
-
-    try {
-      // Processar no backend
-      const data = await employeeService.processEmployeeForm(pdfFile);
-      // Converter para tipo esperado pelo preenchimento
-      fillFormWithPDFData(data as EmployeeDataFromPDF);
-      // Guardar pré-visualização por blocos
-      setExtractedPreview({
-        employer: data?.employer || {},
-        employee: data?.employee || {},
-        contract: data?.contract || {},
-        fgts: data?.fgts || {},
-        pis: data?.pis || {},
-        voter: data?.voter || {},
-        foreigner: data?.foreigner || {},
-        notes: data?.notes || ''
-      });
-      setPdfSuccess(true);
-      setShowPDFImport(false);
-    } catch (error) {
-      console.error('Erro ao processar PDF:', error);
-      setPdfError('Erro ao processar PDF. Tente novamente.');
-    } finally {
-      setPdfProcessing(false);
-    }
-  };
-
-  const fillFormWithPDFData = (data: any) => {
-    // Suporte a novo formato por blocos do backend
-    const employer = data?.employer || {};
-    const employee = data?.employee || {};
-    const contract = data?.contract || {};
-    const fgts = data?.fgts || {};
-    const pis = data?.pis || {};
-    const voter = data?.voter || {};
-    const foreigner = data?.foreigner || {};
-
-    // Criar objeto combinado com retrocompatibilidade
-    const combined: EmployeeDataFromPDF = {
-      // Employer
-      empresaNome: employer.companyName ?? data.empresaNome,
-      empresaCnpj: employer.cnpj ?? data.empresaCnpj,
-      empresaEndereco: employer.address ?? data.empresaEndereco,
-      // Employee
-      name: employee.name ?? data.name,
-      cpf: employee.cpf ?? data.cpf,
-      rg: employee.rg ?? data.rg,
-      carteiraIdentidadeOrgaoEmissor: employee.issuingAuthority ?? data.carteiraIdentidadeOrgaoEmissor,
-      birthDate: employee.birthDate ?? data.birthDate,
-      nationality: employee.nationality ?? data.nationality,
-      maritalStatus: employee.maritalStatus ?? data.maritalStatus,
-      nomePai: employee.fatherName ?? data.nomePai,
-      nomeMae: employee.motherName ?? data.nomeMae,
-      address: employee.address ?? data.address,
-      cep: employee.cep ?? data.cep,
-      city: employee.city ?? data.city,
-      // Contract
-      hireDate: contract.admissionDate ?? data.hireDate,
-      position: contract.position ?? data.position,
-      cbo: contract.cbo ?? data.cbo,
-      salary: contract.salary ?? (data as any).salary,
-      periodoPagamento: contract.paymentPeriod ?? (data as any).periodoPagamento,
-      horarioTrabalho: contract.workSchedule ?? data.horarioTrabalho,
-      folgaSemanal: contract.weeklyRest ?? data.folgaSemanal,
-      // FGTS
-      fgtsOptante: fgts.optante ?? data.fgtsOptante,
-      fgtsDataOpcao: fgts.optionDate ?? data.fgtsDataOpcao,
-      fgtsBancoDepositario: fgts.bank ?? data.fgtsBancoDepositario,
-      // PIS
-      pis: pis.number ?? data.pis,
-      pisDataCadastro: pis.registeredAt ?? data.pisDataCadastro,
-      pisBancoDepositario: pis.bank ?? data.pisBancoDepositario,
-      pisEnderecoBanco: pis.address ?? (data as any).pisEnderecoBanco,
-      pisCodigoBanco: pis.bankCode ?? (data as any).pisCodigoBanco,
-      pisCodigoAgencia: pis.agencyCode ?? (data as any).pisCodigoAgencia,
-      // Voter
-      tituloEleitor: voter.titulo ?? data.tituloEleitor,
-      tituloEleitorZona: voter.zona ?? data.tituloEleitorZona,
-      tituloEleitorSecao: voter.secao ?? data.tituloEleitorSecao,
-      // Foreigner (opcional)
-      spouseName: foreigner.spouseName ?? data.spouseName,
-      notes: data.notes ?? data.observations,
-    } as any;
-
-    setForm(prev => ({
-      ...prev,
-      // Employer
-      empresaNome: combined.empresaNome || prev.empresaNome,
-      empresaCnpj: combined.empresaCnpj || prev.empresaCnpj,
-      empresaEndereco: combined.empresaEndereco || prev.empresaEndereco,
-      // Employee
-      name: combined.name || prev.name,
-      cpf: combined.cpf || prev.cpf,
-      rg: combined.rg || prev.rg,
-      birthDate: combined.birthDate || prev.birthDate,
-      nationality: combined.nationality || prev.nationality,
-      maritalStatus: combined.maritalStatus || prev.maritalStatus,
-      address: combined.address || prev.address,
-      city: combined.city || prev.city,
-      cep: combined.cep || prev.cep,
-      hireDate: combined.hireDate || prev.hireDate,
-      email: data.email || prev.email,
-      phone: data.phone || prev.phone,
-      notes: combined.notes || prev.notes,
-
-      // Campos adicionais
-      tituloEleitor: combined.tituloEleitor || prev.tituloEleitor,
-      tituloEleitorZona: combined.tituloEleitorZona || prev.tituloEleitorZona,
-      carteiraIdentidadeOrgaoEmissor: combined.carteiraIdentidadeOrgaoEmissor || prev.carteiraIdentidadeOrgaoEmissor,
-      cnhNumber: data.cnhNumber || prev.cnhNumber,
-      certificadoMilitar: data.certificadoMilitar || prev.certificadoMilitar,
-      nomePai: combined.nomePai || prev.nomePai,
-      nomeMae: combined.nomeMae || prev.nomeMae,
-      localNascimento: data.localNascimento || prev.localNascimento,
-      municipioNascimento: data.municipioNascimento || prev.municipioNascimento,
-      estadoNascimento: data.estadoNascimento || prev.estadoNascimento,
-      sexo: data.sexo || prev.sexo,
-      grauInstrucao: data.grauInstrucao || prev.grauInstrucao,
-      matriculaEsocial: data.matriculaEsocial || prev.matriculaEsocial,
-      cbo: combined.cbo || prev.cbo,
-      salario: combined.salary || prev.salario,
-      salarioPorExtenso: data.salarioPorExtenso || prev.salarioPorExtenso,
-      periodoPagamento: combined.periodoPagamento || prev.periodoPagamento,
-      horarioTrabalho: combined.horarioTrabalho || prev.horarioTrabalho,
-      folgaSemanal: combined.folgaSemanal || prev.folgaSemanal,
-      escalaTrabalho: combined.escalaTrabalho || prev.escalaTrabalho,
-      fgtsOptante: combined.fgtsOptante !== undefined ? combined.fgtsOptante : prev.fgtsOptante,
-      fgtsDataOpcao: combined.fgtsDataOpcao || prev.fgtsDataOpcao,
-      fgtsBancoDepositario: combined.fgtsBancoDepositario || prev.fgtsBancoDepositario,
-      pis: combined.pis || prev.pis,
-      pisDataCadastro: combined.pisDataCadastro || prev.pisDataCadastro,
-      pisBancoDepositario: combined.pisBancoDepositario || prev.pisBancoDepositario,
-      vistoFiscalizacao: data.vistoFiscalizacao || prev.vistoFiscalizacao,
-
-      // Dados do cônjuge
-      spouseName: combined.spouseName || prev.spouseName,
-      spouseCpf: data.spouseCpf || prev.spouseCpf,
-      spouseRg: data.spouseRg || prev.spouseRg,
-      spouseBirthDate: data.spouseBirthDate || prev.spouseBirthDate,
-      spouseProfession: data.spouseProfession || prev.spouseProfession,
-      spousePhone: data.spousePhone || prev.spousePhone,
-    }));
-
-    // Se há dados de dependentes, adicionar
-    if (data.dependents && data.dependents.length > 0) {
-      setDependents(data.dependents);
-    }
-
-    // Pré-preencher cargo a partir do PDF, se houver correspondência
-    const positionText = combined.position || data.position;
-    if (positionText && positionText.trim()) {
-      const normalized = positionText.trim().toLowerCase();
-      const matched = positions.find(p => (p.name || '').trim().toLowerCase() === normalized);
-      if (matched) {
-        setSelectedPosition(matched);
-        setPositionSearchTerm('');
-        setForm(prev => ({ ...prev, position: { id: matched.id } }));
-      } else {
-        // Preenche o campo de busca para facilitar a seleção/criação
-        setPositionSearchTerm(positionText);
-      }
-    }
   };
 
   const handleUserSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1517,6 +1641,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         description: "Ficha de registro gerada com sucesso!",
         variant: "default"
       });
+      invalidateDocumentosGerados(employeeIdValue);
     } catch (error: any) {
       console.error('❌ Erro ao gerar ficha:', error);
       toast({
@@ -1604,6 +1729,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         description: "Ficha de entrega de EPI gerada com sucesso!",
         variant: "default"
       });
+      invalidateDocumentosGerados(employeeIdValue);
     } catch (error: any) {
       console.error('❌ Erro ao gerar ficha de EPI:', error);
       toast({
@@ -1697,6 +1823,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         title: "✅ Ficha Gerada",
         description: "Ficha de contabilidade gerada e baixada com sucesso.",
       });
+      invalidateDocumentosGerados(employeeIdValue);
     } catch (error) {
       console.error('Erro ao gerar ficha de contabilidade:', error);
       toast({
@@ -1763,6 +1890,9 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         if (!isOpen) {
           // Só fechar se não estiver carregando e não houver funcionário salvo recentemente
           if (!loading) {
+            if (!isEditMode && !employeeToEdit) {
+              persistEmployeeDraft();
+            }
             onClose();
           }
         }
@@ -1777,260 +1907,33 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
             </DialogTitle>
             <DialogDescription className="text-white/90 text-xs sm:text-sm mt-1">
               Preencha os dados abaixo. Itens obrigatórios estão indicados em vermelho.
+              {!isEditMode && !employeeToEdit && draftSavedAt && (
+                <span className="block mt-1 text-white/80">
+                  Rascunho salvo automaticamente às {formatDraftSavedTime(draftSavedAt)}.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
+          <EmployeeOfflineSyncBanner
+            visible={Boolean((offlineQueueId || pendingCount > 0) && !employeeToEdit)}
+            isSyncing={isSyncing}
+            onSyncNow={() => void syncPending()}
+          />
+
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-            {/* Botão de Importação de PDF */}
-            <div className="flex justify-end mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowPDFImport(!showPDFImport)}
-                className="flex items-center gap-2 border-seguranca-yellow text-seguranca-yellow hover:bg-seguranca-yellow hover:text-seguranca-black"
-              >
-                <Upload className="h-4 w-4" />
-                Importar PDF
-              </Button>
-            </div>
-
-            {/* Seção de Importação de PDF */}
-            {showPDFImport && (
-              <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-                <div className="p-4">
-                  <h4 className="text-lg font-semibold text-seguranca-yellow mb-3 flex items-center">
-                    <FileCheck className="mr-2" size={20} />
-                    Importar FICHA DE REGISTRO DOS EMPREGADOS
-                  </h4>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-seguranca-lightgray">
-                        Selecionar arquivo PDF
-                      </Label>
-                      <Input
-                        type="file"
-                        accept=".pdf"
-                        onChange={handlePDFFileChange}
-                        className="mt-1 bg-seguranca-black border-seguranca-lightgray/30 text-white"
-                      />
-                      <p className="text-xs text-seguranca-lightgray/60 mt-1">
-                        Apenas arquivos PDF. Máximo 10MB.
-                      </p>
-                    </div>
-
-                    {pdfFile && (
-                      <div className="flex items-center gap-2 p-2 bg-seguranca-black rounded border border-seguranca-lightgray/30">
-                        <FileText className="h-4 w-4 text-seguranca-yellow" />
-                        <span className="text-sm text-white">{pdfFile.name}</span>
-                        <span className="text-xs text-seguranca-lightgray/60">
-                          ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      </div>
-                    )}
-
-                    {pdfError && (
-                      <div className="flex items-center gap-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="text-sm">{pdfError}</span>
-                      </div>
-                    )}
-
-                    {pdfSuccess && (
-                      <div className="flex items-center gap-2 p-2 bg-green-900/20 border border-green-500/30 rounded text-green-400">
-                        <FileCheck className="h-4 w-4" />
-                        <span className="text-sm">PDF processado com sucesso! Formulário preenchido automaticamente.</span>
-                      </div>
-                    )}
-
-                    {extractedPreview && (
-                      <div className="mt-3 p-3 bg-seguranca-black rounded border border-seguranca-lightgray/30 text-sm text-white">
-                        <h5 className="font-semibold mb-2">Pré-visualização dos dados extraídos</h5>
-                        <div className="space-y-2">
-                          <details className="bg-[#2a2a2a] rounded p-2" open>
-                            <summary className="cursor-pointer font-medium">Dados da Empresa</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ employer: extractedPreview.employer })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.employer || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Dados do Funcionário</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ employee: extractedPreview.employee })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.employee || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Vínculo Empregatício</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ contract: extractedPreview.contract })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.contract || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">FGTS</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ fgts: extractedPreview.fgts })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.fgts || {}).map(([k, v]) => (
-                                (v !== undefined && v !== null && String(v).length > 0) ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">PIS</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ pis: extractedPreview.pis })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.pis || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Título de Eleitor</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ voter: extractedPreview.voter })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.voter || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          <details className="bg-[#2a2a2a] rounded p-2">
-                            <summary className="cursor-pointer font-medium">Quando Estrangeiro</summary>
-                            <div className="flex justify-end mb-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fillFormWithPDFData({ foreigner: extractedPreview.foreigner })}
-                                className="h-7 text-xs"
-                              >
-                                Aplicar este bloco
-                              </Button>
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                              {Object.entries(extractedPreview.foreigner || {}).map(([k, v]) => (
-                                v ? <div key={k}><span className="text-gray-400">{k}:</span> {String(v)}</div> : null
-                              ))}
-                            </div>
-                          </details>
-                          {extractedPreview.notes ? (
-                            <div className="bg-[#2a2a2a] rounded p-2">
-                              <div className="font-medium">Observações</div>
-                              <div className="text-xs mt-1">{extractedPreview.notes}</div>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        onClick={handleProcessPDF}
-                        disabled={!pdfFile || pdfProcessing}
-                        className="flex items-center gap-2 bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
-                      >
-                        {pdfProcessing ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-seguranca-black"></div>
-                            Processando...
-                          </>
-                        ) : (
-                          <>
-                            <FileCheck className="h-4 w-4" />
-                            Processar PDF
-                          </>
-                        )}
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setShowPDFImport(false);
-                          setPdfFile(null);
-                          setPdfError(null);
-                          setPdfSuccess(false);
-                        }}
-                        className="border-seguranca-lightgray/30 text-seguranca-lightgray hover:bg-seguranca-lightgray/10"
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
-
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+              <Tabs
+                value={activeTab}
+                onValueChange={(tab) => {
+                  setActiveTab(tab);
+                  if (tab === 'documentos') {
+                    const id = currentEmployeeId || employeeToEdit?.id;
+                    if (id) invalidateDocumentosGerados(id);
+                  }
+                }}
+                className="space-y-4 sm:space-y-6"
+              >
                 {/* tabsLocked: true when creating a new employee and record not yet saved */}
                 {(() => {
                   const tabsLocked = !isEditMode && !currentEmployeeId;

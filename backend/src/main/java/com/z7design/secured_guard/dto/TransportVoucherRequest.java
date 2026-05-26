@@ -48,6 +48,9 @@ public class TransportVoucherRequest {
     private LocalDate documentDate;
     private String observations;
 
+    /** Quando true, gera PDF com campos em branco para preenchimento manual. */
+    private Boolean manualFill;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

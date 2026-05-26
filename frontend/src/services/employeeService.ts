@@ -1,4 +1,45 @@
 import api from '@/lib/axios';
+import { isRetryableConnectionError } from '@/utils/connectionError';
+
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  const err = error as {
+    response?: { data?: { message?: string } };
+    message?: string;
+  };
+  const apiMessage = err.response?.data?.message;
+  if (typeof apiMessage === 'string' && apiMessage.trim()) {
+    return apiMessage.trim();
+  }
+  if (typeof err.message === 'string' && err.message.trim()) {
+    return err.message.trim();
+  }
+  return fallback;
+}
+
+export function prepareEmployeePayload(employeeData: Record<string, unknown>): Record<string, unknown> {
+  const payload = { ...employeeData };
+  const bankData = payload.bankData as Record<string, string> | undefined;
+
+  if (bankData) {
+    payload.bankInfo = {
+      bank: bankData.bank || '',
+      agency: bankData.agency || '',
+      account: bankData.account || '',
+      accountDigit: bankData.accountDigit || '',
+      accountType: bankData.type || 'CORRENTE',
+      pixKey: bankData.chavePix || '',
+    };
+    delete payload.bankData;
+  }
+
+  return payload;
+}
+
+function rethrowIfConnectionError(error: unknown): void {
+  if (isRetryableConnectionError(error)) {
+    throw error;
+  }
+}
 
 export interface EmployeeWorkPost {
   id: string;
@@ -464,25 +505,13 @@ export const employeeService = {
    */
   async createEmployee(employeeData: any): Promise<Employee> {
     try {
-      // Converter bankData para bankInfo se existir
-      const payload = { ...employeeData };
-      if (payload.bankData) {
-        payload.bankInfo = {
-          bank: payload.bankData.bank || '',
-          agency: payload.bankData.agency || '',
-          account: payload.bankData.account || '',
-          accountDigit: payload.bankData.accountDigit || '',
-          accountType: payload.bankData.type || 'CORRENTE',
-          pixKey: payload.bankData.chavePix || ''
-        };
-        delete payload.bankData;
-      }
-
+      const payload = prepareEmployeePayload(employeeData);
       const response = await api.post('/api/employees', payload);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao criar funcionário:', error);
-      throw new Error(error.response?.data?.message || 'Erro ao criar funcionário');
+      rethrowIfConnectionError(error);
+      throw new Error(getApiErrorMessage(error, 'Erro ao criar funcionário'));
     }
   },
 
@@ -491,25 +520,13 @@ export const employeeService = {
    */
   async updateEmployee(id: string, employeeData: any): Promise<Employee> {
     try {
-      // Converter bankData para bankInfo se existir
-      const payload = { ...employeeData };
-      if (payload.bankData) {
-        payload.bankInfo = {
-          bank: payload.bankData.bank || '',
-          agency: payload.bankData.agency || '',
-          account: payload.bankData.account || '',
-          accountDigit: payload.bankData.accountDigit || '',
-          accountType: payload.bankData.type || 'CORRENTE',
-          pixKey: payload.bankData.chavePix || ''
-        };
-        delete payload.bankData;
-      }
-
+      const payload = prepareEmployeePayload(employeeData);
       const response = await api.put(`/api/employees/${id}`, payload);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao atualizar funcionário:', error);
-      throw new Error(error.response?.data?.message || 'Erro ao atualizar funcionário');
+      rethrowIfConnectionError(error);
+      throw new Error(getApiErrorMessage(error, 'Erro ao atualizar funcionário'));
     }
   },
 

@@ -14,6 +14,7 @@ import { companyService } from '@/services/companyService';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import api from '@/lib/axios';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 
 import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
@@ -162,6 +163,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         employeeName: funcionario.name,
         employeeCpf: funcionario.cpf || funcionario.document || '',
         employeePosition: (funcionario as any).position?.name || '',
@@ -214,6 +216,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
     try {
       const payload = {
         companyId: empresa.id,
+        employeeId: funcionario.id,
         employeeName: funcionario.name,
         employeeCpf: funcionario.cpf || funcionario.document || '',
         employeePosition: (funcionario as any).position?.name || '',
@@ -248,6 +251,7 @@ const TermoResponsabilidadeEquipamentoForm: React.FC<TermoResponsabilidadeEquipa
         title: 'Sucesso',
         description: 'Termo de responsabilidade gerado com sucesso!',
       });
+      void refreshEmployeeDocuments(funcionario.id);
     } catch (err: any) {
       console.error('Erro ao gerar PDF:', err);
       toast({

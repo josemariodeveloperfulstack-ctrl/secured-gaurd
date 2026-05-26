@@ -8,7 +8,7 @@ import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
 import { Badge } from '../ui/badge';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { FileText, Download, Eye, User, Building, Calendar, MapPin, CreditCard, Loader2, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { FileText, Download, Eye, User, Building, Calendar, Loader2, CheckCircle2, ArrowRight, ArrowLeft, PenLine } from 'lucide-react';
 import { employeeService, SimpleEmployee } from '@/services/employeeService';
 
 import { companyService } from '@/services/companyService';
@@ -17,6 +17,7 @@ import { formatCPF, formatCNPJ } from '@/utils/validation';
 import api from '@/lib/axios';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
 import { CompanyCombobox } from '@/components/ui/company-combobox';
+import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
 
 interface TermoValeTransporteFormProps {
   employeeId?: string;
@@ -25,6 +26,7 @@ interface TermoValeTransporteFormProps {
 
 const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
+  const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
   const [form, setForm] = useState({
     funcionarioId: employeeId || '',
     empresaId: companyId || '',
@@ -127,85 +129,97 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
     'Reembolso de Passagem',
   ];
 
+  const buildCompletePayload = async () => {
+    if (!funcionario || !empresa) {
+      throw new Error('MISSING_SELECTION');
+    }
+    if (!form.tipoVale || !form.dataInicio) {
+      throw new Error('MISSING_FIELDS');
+    }
+
+    const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
+    if (!fullEmployee) {
+      throw new Error('EMPLOYEE_NOT_FOUND');
+    }
+
+    const addressValue = typeof fullEmployee.address === 'string'
+      ? fullEmployee.address
+      : (fullEmployee.address as { street?: string })?.street || '';
+
+    return {
+      companyId: empresa.id,
+      employeeId: fullEmployee.id,
+      employeeName: fullEmployee.name,
+      employeeCpf: fullEmployee.cpf || (fullEmployee as { document?: string }).document || '',
+      employeePosition: (fullEmployee as { positionName?: string; position?: { name?: string } }).positionName
+        || (fullEmployee as { position?: { name?: string } }).position?.name
+        || '',
+      hireDate: fullEmployee.hireDate || '',
+      employeeAddress: addressValue,
+      voucherType: form.tipoVale,
+      voucherValue: form.valorVale,
+      startDate: form.dataInicio,
+      endDate: form.dataFim || null,
+      city: empresa.city || '',
+      documentDate: new Date().toISOString().split('T')[0],
+      observations: form.observacoes || '',
+      optingVoucher: form.optingVoucher === 'true',
+      idaLinha: form.idaLinha,
+      idaTarifa: form.idaTarifa,
+      voltaLinha: form.voltaLinha,
+      voltaTarifa: form.voltaTarifa,
+      employeeUnit: (fullEmployee as { unit?: { name?: string } }).unit?.name || '',
+      employeeWorkSector: form.employeeWorkSector,
+      manualFill: false,
+    };
+  };
+
+  const buildManualPayload = () => {
+    if (!empresa) {
+      throw new Error('MISSING_COMPANY');
+    }
+    return {
+      companyId: empresa.id,
+      employeeId: form.funcionarioId || undefined,
+      manualFill: true,
+    };
+  };
+
   const handlePreview = async () => {
     if (!funcionario || !empresa) {
       toast({
         title: 'Atenção',
         description: 'Selecione funcionário e empresa para visualizar o termo!',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (!form.tipoVale || !form.dataInicio) {
-      toast({
-        title: 'Atenção',
-        description: 'Preencha todos os campos obrigatórios para visualizar o termo!',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
 
     try {
       setLoading(true);
-      // Buscar dados completos do funcionário
-      const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-      if (!fullEmployee) {
-        toast({
-          title: 'Erro',
-          description: 'Funcionário não encontrado!',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      const addressValue = typeof fullEmployee.address === 'string'
-        ? fullEmployee.address
-        : (fullEmployee.address as any)?.street || '';
-
-      const payload = {
-        companyId: empresa.id,
-        employeeName: fullEmployee.name,
-        employeeCpf: fullEmployee.cpf || (fullEmployee as any).document || '',
-        employeePosition: (fullEmployee as any).positionName || (fullEmployee as any).position?.name || '',
-        hireDate: fullEmployee.hireDate || '',
-        employeeAddress: addressValue,
-        voucherType: form.tipoVale,
-        voucherValue: form.valorVale,
-        startDate: form.dataInicio,
-        endDate: form.dataFim || null,
-        city: empresa.city || '',
-        documentDate: new Date().toISOString().split('T')[0],
-        observations: form.observacoes || '',
-        optingVoucher: form.optingVoucher === 'true',
-        idaLinha: form.idaLinha,
-        idaTarifa: form.idaTarifa,
-        voltaLinha: form.voltaLinha,
-        voltaTarifa: form.voltaTarifa,
-        employeeUnit: (fullEmployee as any).unit?.name || '',
-        employeeWorkSector: form.employeeWorkSector
-      };
-
-
-      // Gerar PDF para visualização
+      const payload = await buildCompletePayload();
       const response = await api.post('/api/transport-voucher/preview-pdf', payload, {
-        responseType: 'blob'
+        responseType: 'blob',
       });
 
-      // Abrir PDF em nova aba para visualização
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-
-      // Limpar URL após um tempo
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
-
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'MISSING_FIELDS') {
+        toast({
+          title: 'Atenção',
+          description: 'Preencha todos os campos obrigatórios para visualizar o termo!',
+          variant: 'destructive',
+        });
+        return;
+      }
       console.error('Erro ao gerar preview:', err);
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar preview do termo. Tente novamente.',
-        variant: 'destructive'
+        description: 'Erro ao gerar preview do termo. Tente novamente.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -218,83 +232,127 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       toast({
         title: 'Atenção',
         description: 'Selecione funcionário e empresa!',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (!form.tipoVale || !form.dataInicio) {
-      toast({
-        title: 'Atenção',
-        description: 'Preencha todos os campos obrigatórios!',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
 
     setLoading(true);
     try {
-      // Buscar dados completos do funcionário
-      const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-      if (!fullEmployee) {
-        throw new Error('Funcionário não encontrado');
-      }
-
-      // Preparar dados para o template
-      const addressValue = typeof fullEmployee.address === 'string'
-        ? fullEmployee.address
-        : (fullEmployee.address as any)?.street || '';
-
-      const payload = {
-        companyId: empresa.id,
-        employeeName: fullEmployee.name,
-        employeeCpf: fullEmployee.cpf || (fullEmployee as any).document || '',
-        employeePosition: (fullEmployee as any).positionName || (fullEmployee as any).position?.name || '',
-        hireDate: fullEmployee.hireDate || '',
-        employeeAddress: addressValue,
-        voucherType: form.tipoVale,
-        voucherValue: form.valorVale,
-        startDate: form.dataInicio,
-        endDate: form.dataFim || null,
-        city: empresa.city || '',
-        documentDate: new Date().toISOString().split('T')[0],
-        observations: form.observacoes || '',
-        optingVoucher: form.optingVoucher === 'true',
-        idaLinha: form.idaLinha,
-        idaTarifa: form.idaTarifa,
-        voltaLinha: form.voltaLinha,
-        voltaTarifa: form.voltaTarifa,
-        employeeUnit: (fullEmployee as any).unit?.name || '',
-        employeeWorkSector: form.employeeWorkSector
-      };
-
-      // Gerar PDF
+      const payload = await buildCompletePayload();
       const response = await api.post('/api/transport-voucher/generate-pdf', payload, {
-        responseType: 'blob'
+        responseType: 'blob',
       });
 
-      // Fazer download do PDF
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `termo-vale-transporte-${fullEmployee.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      a.download = `termo-vale-transporte-${payload.employeeName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
 
+      invalidateDocumentosGerados(form.funcionarioId);
+
       toast({
         title: 'Sucesso',
-        description: 'Termo de Vale-Transporte gerado com sucesso!',
+        description: 'Termo completo gerado com sucesso!',
       });
-
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'MISSING_FIELDS') {
+        toast({
+          title: 'Atenção',
+          description: 'Preencha todos os campos obrigatórios!',
+          variant: 'destructive',
+        });
+        return;
+      }
       console.error('Erro ao gerar PDF:', err);
       toast({
         title: 'Erro',
-        description: err.response?.data?.message || 'Erro ao gerar PDF. Tente novamente.',
-        variant: 'destructive'
+        description: 'Erro ao gerar PDF. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGerarManual = async () => {
+    if (!empresa) {
+      toast({
+        title: 'Atenção',
+        description: 'Selecione a empresa para gerar o termo em branco (cabeçalho da empresa).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = buildManualPayload();
+      const response = await api.post('/api/transport-voucher/generate-pdf', payload, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'termo-vale-transporte-manual.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      if (form.funcionarioId) {
+        invalidateDocumentosGerados(form.funcionarioId);
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Termo em branco gerado para preenchimento manual!',
+      });
+    } catch (err: unknown) {
+      console.error('Erro ao gerar PDF manual:', err);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao gerar PDF manual. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePreviewManual = async () => {
+    if (!empresa) {
+      toast({
+        title: 'Atenção',
+        description: 'Selecione a empresa para visualizar o modelo em branco.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = buildManualPayload();
+      const response = await api.post('/api/transport-voucher/preview-pdf', payload, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+    } catch (err: unknown) {
+      console.error('Erro ao visualizar PDF manual:', err);
+      toast({
+        title: 'Erro',
+        description: 'Erro ao visualizar o termo manual.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -308,11 +366,11 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-2xl">
-                <CreditCard className="h-6 w-6 text-primary" />
+                <FileText className="h-6 w-6 text-primary" />
                 Termo de Compromisso de Vale-Transporte
               </CardTitle>
               <CardDescription>
-                Preencha os dados abaixo para gerar o termo de compromisso.
+                Gere o termo completo com os dados do formulário ou a versão em branco para preenchimento manual.
               </CardDescription>
             </div>
             {(funcionario && empresa) && (
@@ -587,27 +645,70 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
 
             <Separator />
 
-            {/* Ações */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePreview}
-                disabled={loading || !funcionario || !empresa}
-                className="flex-1 sm:flex-none gap-2"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                Visualizar Termo
-              </Button>
-              <Button
-                type="button"
-                onClick={() => handleGerarPDF()}
-                disabled={loading || !funcionario || !empresa}
-                className="flex-1 sm:flex-none gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Gerar e Baixar Termo (PDF)
-              </Button>
+            <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
+              <div>
+                <p className="text-sm font-semibold">Termo completo (dados do sistema)</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Usa SIM/NÃO, nome, empresa, endereço, trajetos e tarifas preenchidos acima.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePreview}
+                  disabled={loading || !funcionario || !empresa}
+                  className="flex-1 sm:flex-none gap-2"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                  Visualizar completo
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => handleGerarPDF()}
+                  disabled={loading || !funcionario || !empresa}
+                  className="flex-1 sm:flex-none gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Baixar termo completo (PDF)
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-dashed border-amber-500/40 p-4 bg-amber-500/5">
+              <div>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <PenLine className="h-4 w-4 text-amber-600" />
+                  Termo para preenchimento manual
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Gera o PDF no mesmo layout oficial, com campos em branco: ( ) SIM / ( ) NÃO, nome do
+                  funcionário, empresa, endereço, linhas/tarifas de ida e volta, data e assinatura.
+                  Basta selecionar a empresa (cabeçalho). Funcionário é opcional.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePreviewManual}
+                  disabled={loading || !empresa}
+                  className="flex-1 sm:flex-none gap-2 border-amber-500/30"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                  Visualizar em branco
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleGerarManual}
+                  disabled={loading || !empresa}
+                  className="flex-1 sm:flex-none gap-2"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  Baixar PDF manual
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>

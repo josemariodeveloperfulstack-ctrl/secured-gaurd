@@ -8,6 +8,7 @@ import { remanejamentoService } from '@/services/remanejamentoService';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import employeeService, { SimpleEmployee } from '@/services/employeeService';
 import { useToast } from '@/hooks/use-toast';
+import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 
 interface RelatorioMovimentacaoFormProps {
   employeeId?: string;
@@ -86,6 +87,7 @@ const RelatorioMovimentacaoForm: React.FC<RelatorioMovimentacaoFormProps> = ({ e
         title: 'Sucesso',
         description: 'Relatório gerado com sucesso!',
       });
+      void refreshEmployeeDocuments(funcionarioId);
     } catch (err: any) {
       console.error('Erro ao gerar relatório de movimentação:', err);
       toast({

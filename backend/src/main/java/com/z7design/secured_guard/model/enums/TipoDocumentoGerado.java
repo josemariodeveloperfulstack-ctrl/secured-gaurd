@@ -26,8 +26,11 @@ public enum TipoDocumentoGerado {
     NPPS("Norma e Procedimento do Posto de Serviço"),
     EPI_DELIVERY("Ficha de Entrega de EPI"),
 
-    // Relatórios
+    // Relatórios / Fichas RH
     ACTIVITY_REPORT("Relatório de Atividades"),
+    ACCOUNTING_FORM("Ficha de Contabilidade"),
+    EMPLOYEE_RECORD("Ficha de Registro do Funcionário"),
+    EMPLOYEE_HISTORY("Histórico do Funcionário"),
     VISIT_CONTROL_REPORT("Relatório de Controle de Visitas"),
     VEHICLE_MAINTENANCE_REPORT("Relatório de Manutenção de Veículos"),
     TRANSPORT_GUIDE("Guia de Transporte"),

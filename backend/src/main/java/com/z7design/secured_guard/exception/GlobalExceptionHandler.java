@@ -13,6 +13,7 @@ import org.springframework.web.context.request.WebRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.apache.catalina.connector.ClientAbortException;
 import java.time.LocalDateTime;
@@ -113,6 +114,31 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, WebRequest request) {
+        log.warn("Corpo da requisição inválido: {}", ex.getMessage());
+        String message = "Dados inválidos no corpo da requisição.";
+        Throwable cause = ex.getCause();
+        if (cause != null && cause.getMessage() != null) {
+            String causeMsg = cause.getMessage();
+            if (causeMsg.contains("WorkPostStatus") || causeMsg.contains("WorkPostType")) {
+                message = "Tipo ou status do posto inválido. Use os valores do sistema (ex.: POSTO_24H, EM_IMPLANTACAO).";
+            } else if (causeMsg.contains("not one of the values accepted")) {
+                message = "Um dos valores enviados não é aceito pelo servidor: " + causeMsg;
+            }
+        }
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("INVALID_REQUEST_BODY")
+                .message(message)
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

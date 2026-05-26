@@ -67,12 +67,8 @@ public class DocumentoGeradoController {
      */
     @GetMapping("/funcionario/{funcionarioId}")
     public ResponseEntity<List<DocumentoGeradoListDTO>> listarPorFuncionario(@PathVariable UUID funcionarioId) {
-        try {
-            List<DocumentoGeradoListDTO> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId);
-            return ResponseEntity.ok(documentos);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        List<DocumentoGeradoListDTO> documentos = documentoGeradoService.listarPorFuncionario(funcionarioId);
+        return ResponseEntity.ok(documentos);
     }
 
     /**

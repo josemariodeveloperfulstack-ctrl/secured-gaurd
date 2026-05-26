@@ -147,11 +147,11 @@ public class DocumentoGeradoService {
      */
     @Transactional(readOnly = true)
     public List<DocumentoGeradoListDTO> listarPorFuncionario(UUID funcionarioId) {
-        if (!employeeRepository.existsById(funcionarioId)) {
-            throw new RuntimeException("Funcionário não encontrado");
+        if (funcionarioId == null || !employeeRepository.existsById(funcionarioId)) {
+            return java.util.Collections.emptyList();
         }
         return documentoGeradoRepository.findByFuncionarioIdWithDetails(funcionarioId).stream()
-                .map(DocumentoGeradoListDTO::from)
+                .map(doc -> DocumentoGeradoListDTO.from(doc, funcionarioId))
                 .toList();
     }
 

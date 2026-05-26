@@ -70,7 +70,22 @@ public class EmailRecipientImportService {
             Map.entry("fone", "phone"),
             Map.entry("celular", "mobile"),
             Map.entry("mobile", "mobile"),
-            Map.entry("whatsapp", "mobile")
+            Map.entry("whatsapp", "mobile"),
+            Map.entry("cidade", "city"),
+            Map.entry("city", "city"),
+            Map.entry("municipio", "city"),
+            Map.entry("município", "city"),
+            Map.entry("estado", "state"),
+            Map.entry("state", "state"),
+            Map.entry("uf", "state"),
+            Map.entry("tipo de empresa", "companyType"),
+            Map.entry("tipo empresa", "companyType"),
+            Map.entry("tipo_empresa", "companyType"),
+            Map.entry("ramo", "companyType"),
+            Map.entry("atividade", "companyType"),
+            Map.entry("segmento", "companyType"),
+            Map.entry("classificacao", "companyType"),
+            Map.entry("classificação", "companyType")
     );
 
     public ImportRecipientsResponse parse(MultipartFile file) {

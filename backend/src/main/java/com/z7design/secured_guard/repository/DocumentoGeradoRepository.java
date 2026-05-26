@@ -20,14 +20,13 @@ import java.util.UUID;
 public interface DocumentoGeradoRepository extends JpaRepository<DocumentoGerado, UUID> {
     
     /**
-     * Busca documentos por funcionário com relacionamentos carregados (open-in-view=false).
+     * Busca documentos por funcionário para listagem (sem DISTINCT — PostgreSQL
+     * não suporta igualdade em colunas JSON usadas no SELECT DISTINCT).
+     * Carrega apenas modelo; demais campos vêm da entidade principal.
      */
     @Query("""
-            SELECT DISTINCT dg FROM DocumentoGerado dg
+            SELECT dg FROM DocumentoGerado dg
             LEFT JOIN FETCH dg.modelo
-            LEFT JOIN FETCH dg.funcionario
-            LEFT JOIN FETCH dg.criadoPor
-            LEFT JOIN FETCH dg.assinadoPor
             WHERE dg.funcionario.id = :funcionarioId
             ORDER BY dg.dataCriacao DESC
             """)

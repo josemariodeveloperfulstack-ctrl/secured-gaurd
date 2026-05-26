@@ -33,15 +33,20 @@ public class TransportVoucherController {
         byte[] pdfBytes = voucherService.generatePdf(request);
 
         Map<String, Object> dados = new LinkedHashMap<>();
+        dados.put("manualFill", Boolean.TRUE.equals(request.getManualFill()));
         if (request.getEmployeeName() != null) dados.put("employeeName", request.getEmployeeName());
         dados.put("optIn", request.isOptIn());
         if (request.getDocumentDate() != null) dados.put("documentDate", request.getDocumentDate().toString());
+
+        String fileName = Boolean.TRUE.equals(request.getManualFill())
+                ? "vale-transporte-manual.pdf"
+                : "vale-transporte-" + safeSlug(request.getEmployeeName()) + ".pdf";
 
         persistenceService.persistir(
                 request.getEmployeeId(),
                 TipoDocumentoGerado.TRANSPORT_VOUCHER,
                 pdfBytes,
-                "vale-transporte-" + safeSlug(request.getEmployeeName()) + ".pdf",
+                fileName,
                 dados);
 
         return ResponseEntity.ok()

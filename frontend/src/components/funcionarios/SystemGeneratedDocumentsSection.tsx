@@ -11,15 +11,18 @@ import {
   Clock,
   XCircle,
   AlertTriangle,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   documentoGeradoService,
   type DocumentoGerado,
   StatusDocumento,
   TipoDocumentoGerado,
-  TIPO_DOCUMENTO_GERADO_LABEL,
+  getTipoDocumentoGeradoLabel,
 } from '@/services/documentoGeradoService';
 import { useToast } from '@/hooks/use-toast';
+import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGerados';
 
 interface SystemGeneratedDocumentsSectionProps {
   /**
@@ -28,6 +31,10 @@ interface SystemGeneratedDocumentsSectionProps {
    */
   documents: DocumentoGerado[] | undefined;
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
+  /** ID do funcionário — usado para atualizar a lista após excluir. */
+  employeeId?: string;
   /**
    * Variante visual. "rh" usa o tema escuro do form do RH; "colaborador"
    * usa um tema mais leve para o dashboard.
@@ -37,6 +44,8 @@ interface SystemGeneratedDocumentsSectionProps {
   title?: string;
   /** Texto secundário do cabeçalho. */
   subtitle?: string;
+  /** Exibe botão de excluir (RH). Colaborador vê apenas download. */
+  allowDelete?: boolean;
 }
 
 function getStatusBadge(status: StatusDocumento) {
@@ -75,11 +84,11 @@ function getStatusBadge(status: StatusDocumento) {
 }
 
 function getTipoLabel(doc: DocumentoGerado): string {
-  if (doc.tipo && TIPO_DOCUMENTO_GERADO_LABEL[doc.tipo]) {
-    return TIPO_DOCUMENTO_GERADO_LABEL[doc.tipo];
+  if (doc.tipo) {
+    return getTipoDocumentoGeradoLabel(doc.tipo);
   }
   if (doc.modeloId) return 'Documento (Modelo Dinâmico)';
-  return TIPO_DOCUMENTO_GERADO_LABEL[TipoDocumentoGerado.OTHER];
+  return getTipoDocumentoGeradoLabel(TipoDocumentoGerado.OTHER);
 }
 
 export const SystemGeneratedDocumentsSection: React.FC<
@@ -87,12 +96,18 @@ export const SystemGeneratedDocumentsSection: React.FC<
 > = ({
   documents,
   isLoading,
+  isError,
+  onRetry,
+  employeeId,
   variant = 'rh',
   title = 'Documentos Gerados pelo Sistema',
   subtitle = 'Contratos, termos, ordens de serviço e demais documentos gerados pelo RH.',
+  allowDelete = true,
 }) => {
   const { toast } = useToast();
+  const invalidateDocumentos = useInvalidateDocumentosGerados();
   const [downloadingId, setDownloadingId] = React.useState<string | null>(null);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const handleDownload = async (doc: DocumentoGerado) => {
     try {
@@ -118,6 +133,36 @@ export const SystemGeneratedDocumentsSection: React.FC<
     }
   };
 
+  const handleDelete = async (doc: DocumentoGerado) => {
+    const label = getTipoLabel(doc);
+    if (
+      !globalThis.confirm(
+        `Excluir permanentemente o documento "${label}"?\n\nEsta ação não pode ser desfeita.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingId(doc.id);
+      await documentoGeradoService.excluirDocumento(doc.id);
+      toast({
+        title: 'Documento excluído',
+        description: 'O arquivo foi removido da lista.',
+      });
+      invalidateDocumentos(employeeId ?? doc.funcionarioId);
+    } catch (error) {
+      console.error('Erro ao excluir documento:', error);
+      toast({
+        title: 'Erro ao excluir',
+        description: 'Não foi possível excluir o documento.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const isRh = variant === 'rh';
   const headerColor = isRh ? 'text-gray-400' : 'text-gray-700';
   const cardBg = isRh ? 'bg-seguranca-black border-gray-700' : 'bg-white border-gray-200';
@@ -127,9 +172,11 @@ export const SystemGeneratedDocumentsSection: React.FC<
     ? 'bg-seguranca-black/20 border-gray-700'
     : 'bg-gray-50 border-gray-200';
 
+  const docCount = documents?.length ?? 0;
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4
             className={`text-sm font-semibold uppercase tracking-wider ${headerColor}`}
@@ -138,6 +185,19 @@ export const SystemGeneratedDocumentsSection: React.FC<
           </h4>
           <p className={`text-xs mt-1 ${subTextColor}`}>{subtitle}</p>
         </div>
+        {onRetry && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={isRh ? 'border-gray-600 text-gray-300' : ''}
+            onClick={onRetry}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Atualizar lista
+          </Button>
+        )}
       </div>
 
       {isLoading && (
@@ -153,7 +213,28 @@ export const SystemGeneratedDocumentsSection: React.FC<
         </div>
       )}
 
-      {!isLoading && (!documents || documents.length === 0) && (
+      {!isLoading && isError && (
+        <div
+          className={`flex flex-col items-center justify-center py-10 rounded-xl border border-dashed text-center px-6 ${emptyBg}`}
+        >
+          <AlertTriangle className="h-8 w-8 text-amber-500 mb-3" />
+          <h5 className={`text-sm font-medium mb-1 ${titleColor}`}>
+            Não foi possível carregar a lista
+          </h5>
+          <p className={`text-xs max-w-sm mb-4 ${subTextColor}`}>
+            Verifique a conexão ou tente atualizar. Os documentos gerados continuam
+            salvos no servidor.
+          </p>
+          {onRetry && (
+            <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+              <RefreshCw className="h-4 w-4 mr-1.5" />
+              Tentar novamente
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!isLoading && !isError && (!documents || documents.length === 0) && (
         <div
           className={`flex flex-col items-center justify-center py-12 rounded-xl border border-dashed text-center px-6 ${emptyBg}`}
         >
@@ -168,85 +249,108 @@ export const SystemGeneratedDocumentsSection: React.FC<
             Nenhum documento gerado ainda
           </h5>
           <p className={`text-xs max-w-xs ${subTextColor}`}>
-            Quando o RH gerar contratos, termos ou relatórios, eles aparecerão
-            aqui para download.
+            Quando o RH gerar contratos, termos ou relatórios na aba Relatórios,
+            eles aparecerão aqui com opções de baixar e excluir.
           </p>
         </div>
       )}
 
-      {!isLoading && documents && documents.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {documents.map((doc) => (
-            <Card
-              key={doc.id}
-              className={`hover:border-gray-500 transition-all group overflow-hidden ${cardBg}`}
-            >
-              <div className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`p-2 rounded-lg flex-shrink-0 ${
-                        isRh
-                          ? 'bg-seguranca-red/10 group-hover:bg-seguranca-red/20'
-                          : 'bg-seguranca-red/10'
-                      } transition-colors`}
-                    >
-                      <FileText className="h-5 w-5 text-seguranca-red" />
+      {!isLoading && !isError && documents && documents.length > 0 && (
+        <div className="space-y-3">
+          <p className={`text-xs ${subTextColor}`}>
+            {docCount} documento(s) disponível(is) para download
+          </p>
+          <div className="grid grid-cols-1 gap-3">
+            {documents.map((doc) => (
+              <Card
+                key={doc.id}
+                className={`hover:border-gray-500 transition-all group overflow-hidden ${cardBg}`}
+              >
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`p-2 rounded-lg flex-shrink-0 ${
+                          isRh
+                            ? 'bg-seguranca-red/10 group-hover:bg-seguranca-red/20'
+                            : 'bg-seguranca-red/10'
+                        } transition-colors`}
+                      >
+                        <FileText className="h-5 w-5 text-seguranca-red" />
+                      </div>
+                      <div className="min-w-0">
+                        <h5
+                          className={`text-sm font-bold truncate ${titleColor}`}
+                          title={getTipoLabel(doc)}
+                        >
+                          {getTipoLabel(doc)}
+                        </h5>
+                        <p
+                          className={`text-xs truncate ${subTextColor}`}
+                          title={doc.nomeArquivoGerado}
+                        >
+                          {doc.nomeArquivoGerado || 'documento.pdf'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h5
-                        className={`text-sm font-bold truncate ${titleColor}`}
-                        title={getTipoLabel(doc)}
+                    {getStatusBadge(doc.status)}
+                  </div>
+
+                  <div
+                    className={`flex items-center justify-between pt-2 border-t ${
+                      isRh ? 'border-gray-700' : 'border-gray-100'
+                    }`}
+                  >
+                    <span className={`text-[10px] ${subTextColor}`}>
+                      Gerado em{' '}
+                      {new Date(doc.dataCriacao).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-8 gap-1.5 ${
+                          isRh
+                            ? 'text-gray-400 hover:text-white hover:bg-gray-700'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        }`}
+                        onClick={() => handleDownload(doc)}
+                        disabled={downloadingId === doc.id || deletingId === doc.id}
+                        title="Baixar"
                       >
-                        {getTipoLabel(doc)}
-                      </h5>
-                      <p
-                        className={`text-xs truncate ${subTextColor}`}
-                        title={doc.nomeArquivoGerado}
-                      >
-                        {doc.nomeArquivoGerado || 'documento.pdf'}
-                      </p>
+                        {downloadingId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                        Baixar
+                      </Button>
+                      {allowDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                          onClick={() => handleDelete(doc)}
+                          disabled={deletingId === doc.id || downloadingId === doc.id}
+                          title="Excluir"
+                        >
+                          {deletingId === doc.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  {getStatusBadge(doc.status)}
                 </div>
-
-                <div
-                  className={`flex items-center justify-between pt-2 border-t ${
-                    isRh ? 'border-gray-700' : 'border-gray-100'
-                  }`}
-                >
-                  <span className={`text-[10px] ${subTextColor}`}>
-                    Gerado em{' '}
-                    {new Date(doc.dataCriacao).toLocaleDateString('pt-BR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                    })}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-8 gap-1.5 ${
-                      isRh
-                        ? 'text-gray-400 hover:text-white hover:bg-gray-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                    onClick={() => handleDownload(doc)}
-                    disabled={downloadingId === doc.id}
-                    title="Baixar"
-                  >
-                    {downloadingId === doc.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    Baixar
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>
