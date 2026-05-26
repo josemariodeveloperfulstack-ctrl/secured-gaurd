@@ -73,6 +73,17 @@ function formatEmployeeAddress(emp: EmployeeAddressSource): string {
   return parts.join(' - ');
 }
 
+function toIsoDateOnly(value?: string): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    return trimmed.substring(0, 10);
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString().split('T')[0];
+}
+
 const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
@@ -200,14 +211,19 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       throw new Error('EMPLOYEE_NOT_FOUND');
     }
 
-    const admissionDate = fullEmployee.hireDate || form.dataInicio || '';
+    const admissionDate = toIsoDateOnly(fullEmployee.hireDate || form.dataInicio);
     const addressValue = formatEmployeeAddress(fullEmployee as EmployeeAddressSource);
+    const companyName =
+      empresa?.name
+      || (fullEmployee.company as { name?: string } | undefined)?.name
+      || '';
 
     return {
       companyId: activeCompanyId,
       employeeId: fullEmployee.id,
       employeeName: fullEmployee.name,
       employeeCpf: fullEmployee.cpf || (fullEmployee as { document?: string }).document || '',
+      companyName,
       employeePosition: (fullEmployee as { positionName?: string; position?: { name?: string } }).positionName
         || (fullEmployee as { position?: { name?: string } }).position?.name
         || '',
@@ -218,7 +234,7 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       startDate: form.dataInicio,
       endDate: form.dataFim || null,
       city: empresa?.city || (fullEmployee.company as { city?: string } | undefined)?.city || '',
-      documentDate: admissionDate || undefined,
+      documentDate: admissionDate,
       observations: form.observacoes || '',
       optingVoucher: form.optingVoucher === 'true',
       idaLinha: form.idaLinha,
@@ -244,17 +260,22 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       throw new Error('EMPLOYEE_NOT_FOUND');
     }
 
-    const admissionDate = fullEmployee.hireDate || form.dataInicio || '';
+    const admissionDate = toIsoDateOnly(fullEmployee.hireDate || form.dataInicio);
+    const companyName =
+      empresa?.name
+      || (fullEmployee.company as { name?: string } | undefined)?.name
+      || '';
 
     return {
       companyId: activeCompanyId,
       employeeId: fullEmployee.id,
       employeeName: fullEmployee.name,
       employeeCpf: fullEmployee.cpf || (fullEmployee as { document?: string }).document || '',
+      companyName,
       hireDate: admissionDate,
       employeeAddress: formatEmployeeAddress(fullEmployee as EmployeeAddressSource),
       city: empresa?.city || (fullEmployee.company as { city?: string } | undefined)?.city || '',
-      documentDate: admissionDate || undefined,
+      documentDate: admissionDate,
       manualFill: true,
     };
   };
@@ -767,12 +788,11 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
               <div>
                 <p className="text-sm font-semibold flex items-center gap-2">
                   <PenLine className="h-4 w-4 text-amber-600" />
-                  Termo para preenchimento manual (ida/volta)
+                  Termo semi-preenchido (ida/volta manual)
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Preenche automaticamente nome, empresa, endereço e data de admissão. Ficam em branco para o
-                  funcionário: ( ) SIM / ( ) NÃO, linhas e tarifas de ida e volta, e quantidade de vales.
-                  Selecione funcionário e empresa.
+                  O sistema preenche nome do funcionário, empresa, endereço, data de admissão e linha de assinatura.
+                  O funcionário preenche à mão: ( ) SIM / ( ) NÃO, ida, volta e quantidade de vales.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-end">

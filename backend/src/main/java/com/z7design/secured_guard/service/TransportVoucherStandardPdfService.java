@@ -26,7 +26,9 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -39,24 +41,24 @@ public class TransportVoucherStandardPdfService {
     private final EmployeeRepository employeeRepository;
 
     private static final String REPORT_TITLE = "DECLARAÇÃO E TERMO DE COMPROMISSO\nPARA ADQUIRIR OU NÃO O VALE-TRANSPORTE";
+    private static final DateTimeFormatter BR_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy", new Locale("pt", "BR"));
 
     public byte[] generatePdf(TransportVoucherRequest request) {
-        enrichRequestFromEmployee(request);
+        VoucherDocumentContext ctx = buildDocumentContext(request);
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(outputStream);
 
             ReportLayoutConfig config = ReportLayoutConfig.builder()
-                    .companyId(request.getCompanyId())
+                    .companyId(ctx.companyId())
                     .reportTitle(REPORT_TITLE)
                     .includeEmailInFooter(true)
-                    .topMargin(110f) // Aumentado em 20f (de 90f)
+                    .topMargin(110f)
                     .build();
 
             DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
             Document document = docWithPdf.getDocument();
-            Company company = docWithPdf.getCompany();
 
-            addContent(document, request, company);
+            addContent(document, request, ctx);
 
             document.close();
             return outputStream.toByteArray();
@@ -67,28 +69,26 @@ public class TransportVoucherStandardPdfService {
     }
 
     public byte[] generateExcel(TransportVoucherRequest request) {
-        enrichRequestFromEmployee(request);
+        VoucherDocumentContext ctx = buildDocumentContext(request);
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Vale-Transporte");
-            Company company = companyRepository.findById(request.getCompanyId())
+            Company company = companyRepository.findById(ctx.companyId())
                     .orElseThrow(() -> new ResourceNotFoundException("Empresa não encontrada"));
 
             int startRow = excelLayoutService.addHeader(sheet, workbook, company, REPORT_TITLE);
 
-            // Adicionar dados principais
             Row row = sheet.createRow(startRow);
             row.createCell(0).setCellValue("Funcionário:");
-            row.createCell(1).setCellValue(request.getEmployeeName());
+            row.createCell(1).setCellValue(ctx.employeeName());
 
             row = sheet.createRow(startRow + 1);
             row.createCell(0).setCellValue("CPF:");
-            row.createCell(1).setCellValue(request.getEmployeeCpf());
+            row.createCell(1).setCellValue(request.getEmployeeCpf() != null ? request.getEmployeeCpf() : "");
 
             row = sheet.createRow(startRow + 2);
             row.createCell(0).setCellValue("Opção:");
             row.createCell(1).setCellValue(Boolean.TRUE.equals(request.getOptingVoucher()) ? "OPTANTE" : "NÃO OPTANTE");
 
-            // Se optante, listar rotas
             int currentRow = startRow + 4;
             if (Boolean.TRUE.equals(request.getOptingVoucher())) {
                 Row headerRow = sheet.createRow(currentRow++);
@@ -121,10 +121,102 @@ public class TransportVoucherStandardPdfService {
         }
     }
 
-    private void addContent(Document document, TransportVoucherRequest request, Company company) {
+    private VoucherDocumentContext buildDocumentContext(TransportVoucherRequest request) {
+        Employee employee = null;
+        if (request.getEmployeeId() != null) {
+            employee = employeeRepository.findWithOrgContextById(request.getEmployeeId()).orElse(null);
+            if (employee == null) {
+                log.warn("Funcionário não encontrado para termo VT: {}", request.getEmployeeId());
+            }
+        }
+
+        applyEmployeeToRequest(request, employee);
+
+        UUID companyId = request.getCompanyId();
+        if (companyId == null && employee != null && employee.getCompany() != null) {
+            companyId = employee.getCompany().getId();
+            request.setCompanyId(companyId);
+        }
+        if (companyId == null) {
+            throw new ResourceNotFoundException("Empresa não informada para o termo de vale-transporte");
+        }
+
+        Company company = companyRepository.findById(companyId)
+                .orElseGet(() -> employee != null ? employee.getCompany() : null);
+        if (company == null) {
+            throw new ResourceNotFoundException("Empresa não encontrada com ID: " + companyId);
+        }
+
+        String employeeName = firstNonBlank(
+                request.getEmployeeName(),
+                employee != null ? employee.getName() : null);
+        String companyName = firstNonBlank(
+                request.getCompanyName(),
+                company.getName(),
+                employee != null ? employee.getEmpresaNome() : null,
+                employee != null && employee.getCompany() != null ? employee.getCompany().getName() : null);
+        String address = firstNonBlank(
+                request.getEmployeeAddress(),
+                employee != null ? buildEmployeeAddress(employee) : null);
+        LocalDate signatureDate = resolveSignatureDate(request, employee);
+        String city = resolveCity(request, company, employee);
+
+        if (!isBlank(employeeName)) {
+            request.setEmployeeName(employeeName);
+        }
+        if (!isBlank(companyName)) {
+            request.setCompanyName(companyName);
+        }
+        if (!isBlank(address)) {
+            request.setEmployeeAddress(address);
+        }
+        if (signatureDate != null) {
+            request.setDocumentDate(signatureDate);
+        }
+        if (!isBlank(city)) {
+            request.setCity(city);
+        }
+
+        return new VoucherDocumentContext(companyId, company, employeeName, companyName, address, signatureDate, city);
+    }
+
+    private void applyEmployeeToRequest(TransportVoucherRequest request, Employee employee) {
+        if (employee == null) {
+            return;
+        }
+        if (isBlank(request.getEmployeeName())) {
+            request.setEmployeeName(employee.getName());
+        }
+        if (isBlank(request.getEmployeeCpf())) {
+            String cpf = employee.getCpf();
+            request.setEmployeeCpf(cpf != null && !cpf.isBlank() ? cpf : employee.getDocument());
+        }
+        if (isBlank(request.getEmployeeAddress())) {
+            request.setEmployeeAddress(buildEmployeeAddress(employee));
+        }
+        if (employee.getHireDate() != null) {
+            if (request.getDocumentDate() == null) {
+                request.setDocumentDate(employee.getHireDate());
+            }
+            if (isBlank(request.getHireDate())) {
+                request.setHireDate(employee.getHireDate().toString());
+            }
+        }
+        if (request.getCompanyId() == null && employee.getCompany() != null) {
+            request.setCompanyId(employee.getCompany().getId());
+        }
+        if (isBlank(request.getCompanyName())) {
+            if (employee.getCompany() != null && !isBlank(employee.getCompany().getName())) {
+                request.setCompanyName(employee.getCompany().getName());
+            } else if (!isBlank(employee.getEmpresaNome())) {
+                request.setCompanyName(employee.getEmpresaNome());
+            }
+        }
+    }
+
+    private void addContent(Document document, TransportVoucherRequest request, VoucherDocumentContext ctx) {
         boolean manual = Boolean.TRUE.equals(request.getManualFill());
 
-        // Texto Introdutório
         document.add(new Paragraph("O vale-transporte é um direito do trabalhador, faça sua opção se quer adquiri-lo ou não, assinalando com um X.")
                 .setFontSize(11f)
                 .setMarginTop(10f)
@@ -135,62 +227,45 @@ public class TransportVoucherStandardPdfService {
                     .setFontSize(11f)
                     .setBold()
                     .setMarginBottom(15f));
-            if (shouldFillIdentification(request)) {
-                addCompleteDeclarationBody(document, request, company);
-            } else {
-                addManualDeclarationBody(document);
-            }
+            addDeclarationBody(document, ctx);
             addManualRouteSection(document);
         } else {
-            // Opções SIM/NÃO
             String simX = Boolean.TRUE.equals(request.getOptingVoucher()) ? "X" : " ";
             String naoX = Boolean.FALSE.equals(request.getOptingVoucher()) ? "X" : " ";
             document.add(new Paragraph("( " + simX + " ) SIM  ( " + naoX + " ) NÃO;")
                     .setFontSize(11f)
                     .setBold()
                     .setMarginBottom(15f));
-            addCompleteDeclarationBody(document, request, company);
+            addDeclarationBody(document, ctx);
             addCompleteRouteSection(document, request);
         }
 
         addLegalTerms(document);
-        addSignatures(document, request, company, manual);
+        addSignatures(document, ctx);
     }
 
-    private void addManualDeclarationBody(Document document) {
+    private void addDeclarationBody(Document document, VoucherDocumentContext ctx) {
         Paragraph body = new Paragraph()
                 .setFontSize(11f)
                 .setTextAlignment(TextAlignment.JUSTIFIED)
                 .setMultipliedLeading(1.5f);
 
         body.add("Eu, ");
-        body.add(new Text("________________________________________________________").setUnderline());
+        appendField(body, ctx.employeeName());
         body.add(", empregado(a) da ");
-        body.add(new Text("________________________________________________________").setBold());
+        appendField(body, ctx.companyName());
         body.add(" desejo adquirir vale-transporte, declaro que estou morando na ");
-        body.add(new Text("________________________________________________________").setBold());
+        appendField(body, ctx.employeeAddress());
         body.add(", e uso __________ vales transportes para o meu deslocamento residência-trabalho e vice-versa.");
         document.add(body);
     }
 
-    private void addCompleteDeclarationBody(Document document, TransportVoucherRequest request, Company company) {
-        Paragraph body = new Paragraph()
-                .setFontSize(11f)
-                .setTextAlignment(TextAlignment.JUSTIFIED)
-                .setMultipliedLeading(1.5f);
-
-        String employeeName = resolveEmployeeName(request);
-        String companyName = resolveCompanyName(request, company);
-        String address = resolveEmployeeAddress(request);
-
-        body.add("Eu, ");
-        body.add(new Text(employeeName.toUpperCase()).setBold().setUnderline());
-        body.add(", empregado(a) da ");
-        body.add(new Text(companyName.toUpperCase()).setBold());
-        body.add(" desejo adquirir vale-transporte, declaro que estou morando na ");
-        body.add(new Text(address).setBold());
-        body.add(", e uso __________ vales transportes para o meu deslocamento residência-trabalho e vice-versa.");
-        document.add(body);
+    private void appendField(Paragraph body, String value) {
+        if (isBlank(value)) {
+            body.add(new Text("________________________________________________________").setUnderline());
+        } else {
+            body.add(new Text(value.toUpperCase()).setBold().setUnderline());
+        }
     }
 
     private void addManualRouteSection(Document document) {
@@ -252,30 +327,14 @@ public class TransportVoucherStandardPdfService {
                 .setMarginTop(15f));
     }
 
-    private void addSignatures(Document document, TransportVoucherRequest request, Company company, boolean manual) {
-        if (manual && !shouldFillIdentification(request)) {
-            document.add(new Paragraph("\n_______________, ___/___/______")
-                    .setFontSize(11f)
-                    .setMarginTop(25f)
-                    .setMarginBottom(40f));
-
-            document.add(new Paragraph("______________________________________________________")
-                    .setTextAlignment(TextAlignment.LEFT));
-            document.add(new Paragraph(" ")
-                    .setMarginTop(8f));
-            return;
+    private void addSignatures(Document document, VoucherDocumentContext ctx) {
+        String city = ctx.city();
+        if (isBlank(city)) {
+            city = "Contagem";
         }
 
-        String city = request.getCity();
-
-        if (city == null || city.isEmpty() || city.toLowerCase().contains("rua") || city.contains(",")) {
-            city = com.z7design.secured_guard.util.CompanyDataFormatter.resolveContractSigningCity(company);
-        }
-
-        if (city == null || city.isEmpty()) city = "Contagem";
-
-        LocalDate docDate = resolveSignatureDate(request);
-        String dateStr = formatDateExtended(docDate);
+        LocalDate docDate = ctx.signatureDate() != null ? ctx.signatureDate() : LocalDate.now();
+        String dateStr = docDate.format(BR_DATE);
 
         document.add(new Paragraph("\n" + city + ", " + dateStr)
                 .setFontSize(11f)
@@ -284,109 +343,80 @@ public class TransportVoucherStandardPdfService {
 
         document.add(new Paragraph("______________________________________________________")
                 .setTextAlignment(TextAlignment.LEFT));
-        String employeeName = resolveEmployeeName(request);
-        document.add(new Paragraph(employeeName.toUpperCase())
-                .setBold()
-                .setFontSize(10f)
-                .setMarginTop(-5f));
-    }
 
-    private String formatDateExtended(LocalDate date) {
-        return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", new Locale("pt", "BR")));
-    }
-
-    private void enrichRequestFromEmployee(TransportVoucherRequest request) {
-        if (request.getEmployeeId() != null) {
-            employeeRepository.findById(request.getEmployeeId()).ifPresent(employee -> {
-                if (isBlank(request.getEmployeeName())) {
-                    request.setEmployeeName(employee.getName());
-                }
-                if (isBlank(request.getEmployeeCpf())) {
-                    String cpf = employee.getCpf();
-                    request.setEmployeeCpf(cpf != null && !cpf.isBlank() ? cpf : employee.getDocument());
-                }
-                if (isBlank(request.getEmployeeAddress())) {
-                    request.setEmployeeAddress(buildEmployeeAddress(employee));
-                }
-                if (employee.getHireDate() != null) {
-                    if (request.getDocumentDate() == null) {
-                        request.setDocumentDate(employee.getHireDate());
-                    }
-                    if (isBlank(request.getHireDate())) {
-                        request.setHireDate(employee.getHireDate().toString());
-                    }
-                }
-            });
-        }
-
-        if (request.getDocumentDate() == null && !isBlank(request.getHireDate())) {
-            try {
-                request.setDocumentDate(LocalDate.parse(request.getHireDate().trim()));
-            } catch (Exception ignored) {
-                // mantém fallback em resolveSignatureDate
-            }
+        String employeeName = ctx.employeeName();
+        if (!isBlank(employeeName)) {
+            document.add(new Paragraph(employeeName.toUpperCase())
+                    .setBold()
+                    .setFontSize(10f)
+                    .setMarginTop(-5f));
         }
     }
 
-    private LocalDate resolveSignatureDate(TransportVoucherRequest request) {
+    private LocalDate resolveSignatureDate(TransportVoucherRequest request, Employee employee) {
         if (request.getDocumentDate() != null) {
             return request.getDocumentDate();
         }
-        if (!isBlank(request.getHireDate())) {
-            try {
-                return LocalDate.parse(request.getHireDate().trim());
-            } catch (Exception ignored) {
-                // segue para fallback
-            }
+        LocalDate fromHire = parseFlexibleDate(request.getHireDate());
+        if (fromHire != null) {
+            return fromHire;
+        }
+        if (employee != null && employee.getHireDate() != null) {
+            return employee.getHireDate();
         }
         return LocalDate.now();
+    }
+
+    private String resolveCity(TransportVoucherRequest request, Company company, Employee employee) {
+        String city = request.getCity();
+        if (!isBlank(city) && !city.toLowerCase().contains("rua") && !city.contains(",")) {
+            return city.trim();
+        }
+        if (employee != null && !isBlank(employee.getEnderecoCidade())) {
+            return employee.getEnderecoCidade().trim();
+        }
+        return CompanyDataFormatter.resolveContractSigningCity(company);
+    }
+
+    private static LocalDate parseFlexibleDate(String raw) {
+        if (isBlank(raw)) {
+            return null;
+        }
+        String value = raw.trim();
+        if (value.length() >= 10 && value.charAt(4) == '-') {
+            try {
+                return LocalDate.parse(value.substring(0, 10));
+            } catch (DateTimeParseException ignored) {
+                // tenta outros formatos
+            }
+        }
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException ignored) {
+            // continua
+        }
+        try {
+            return LocalDate.parse(value, BR_DATE);
+        } catch (DateTimeParseException ignored) {
+            return null;
+        }
     }
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
-    private static boolean shouldFillIdentification(TransportVoucherRequest request) {
-        return request.getEmployeeId() != null || !isBlank(request.getEmployeeName());
-    }
-
-    private String resolveEmployeeName(TransportVoucherRequest request) {
-        if (!isBlank(request.getEmployeeName())) {
-            return request.getEmployeeName().trim();
-        }
-        if (request.getEmployeeId() == null) {
+    @SafeVarargs
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
             return "";
         }
-        return employeeRepository.findById(request.getEmployeeId())
-                .map(Employee::getName)
-                .map(String::trim)
-                .orElse("");
-    }
-
-    private String resolveEmployeeAddress(TransportVoucherRequest request) {
-        if (!isBlank(request.getEmployeeAddress())) {
-            return request.getEmployeeAddress().trim();
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value.trim();
+            }
         }
-        if (request.getEmployeeId() == null) {
-            return "";
-        }
-        return employeeRepository.findById(request.getEmployeeId())
-                .map(TransportVoucherStandardPdfService::buildEmployeeAddress)
-                .orElse("");
-    }
-
-    private String resolveCompanyName(TransportVoucherRequest request, Company company) {
-        if (company != null && !isBlank(company.getName())) {
-            return company.getName().trim();
-        }
-        if (request.getEmployeeId() == null) {
-            return "";
-        }
-        return employeeRepository.findById(request.getEmployeeId())
-                .map(Employee::getEmpresaNome)
-                .filter(name -> !isBlank(name))
-                .map(String::trim)
-                .orElse("");
+        return "";
     }
 
     private static String buildEmployeeAddress(Employee employee) {
@@ -437,5 +467,15 @@ public class TransportVoucherStandardPdfService {
         }
 
         return address.toString();
+    }
+
+    private record VoucherDocumentContext(
+            UUID companyId,
+            Company company,
+            String employeeName,
+            String companyName,
+            String employeeAddress,
+            LocalDate signatureDate,
+            String city) {
     }
 }

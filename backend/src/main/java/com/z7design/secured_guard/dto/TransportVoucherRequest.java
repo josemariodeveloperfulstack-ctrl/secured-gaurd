@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -44,11 +45,16 @@ public class TransportVoucherRequest {
 
     // Dados Gerais
     private String city;
+    private String companyName;
     private String startDate; // Data de Início informada no form
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate documentDate;
     private String observations;
 
-    /** Quando true, gera PDF com campos em branco para preenchimento manual. */
+    /**
+     * Quando true: SIM/NÃO e trajetos ida/volta ficam em branco para preenchimento manual.
+     * Nome, empresa, endereço e data de assinatura são preenchidos quando houver employeeId.
+     */
     private Boolean manualFill;
 
     @Data
