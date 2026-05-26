@@ -1,15 +1,17 @@
-# Deploy CI: faz pull na VPS e sobe os containers.
-# IMPORTANTE: TOKEN_GITHUB deve ser um Personal Access Token (PAT), NÃO a senha da conta.
-# Criar em: GitHub → Settings → Developer settings → Personal access tokens (repo scope).
-# USER_GITHUB = seu usuário GitHub (ex: zemarioramos).
-# Atualiza o código na pasta CI da VPS. Dispara em `ci` ou `prod` e faz pull do mesmo branch
-# que originou o push (push em prod → ambiente CI recebe o commit de prod).
+# Deploy CI (git pull na VPS + build local).
+# Para push na branch `ci`, use deploy-ci-docker.yml (build no Actions + imagens Docker Hub).
+# Este workflow dispara em `prod` (atualiza ambiente CI com código de prod) ou manualmente.
+#
+# Secrets obrigatórios:
+#   TOKEN_GITHUB — Personal Access Token (NÃO use senha da conta GitHub)
+#     Classic: https://github.com/settings/tokens → scope "repo"
+#     Fine-grained: Contents = Read-only no repositório secured-guard
+#   VPS_HOST_CI, VPS_USER_CI, VPS_PASSWORD_CI
 name: Deploy CI
 
 on:
   push:
     branches:
-      - ci
       - prod
   workflow_dispatch:
 
@@ -21,14 +23,27 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Validar secrets de autenticação Git
+        run: |
+          if [ -z "${{ secrets.TOKEN_GITHUB }}" ]; then
+            echo "::error::Secret TOKEN_GITHUB não configurado."
+            echo "Crie um PAT em GitHub → Settings → Developer settings → Personal access tokens"
+            echo "Scope: repo (classic) ou Contents read (fine-grained). NÃO use a senha da conta."
+            exit 1
+          fi
+          echo "✅ TOKEN_GITHUB está definido"
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GITHUB_PAT: ${{ secrets.TOKEN_GITHUB }}
         with:
           host: ${{ secrets.VPS_HOST_CI }}
           username: ${{ secrets.VPS_USER_CI }}
           password: ${{ secrets.VPS_PASSWORD_CI }}
           port: ${{ secrets.VPS_SSH_PORT_CI || 22 }}
           command_timeout: 20m
+          envs: GITHUB_PAT
           script: |
             set -e
             BRANCH="${{ github.ref_name }}"
@@ -36,6 +51,11 @@ jobs:
             if [ -z "$APP_PATH" ]; then APP_PATH="/var/www/secured_guard/ci"; fi
 
             echo "🚀 Iniciando deploy | Branch: $BRANCH | Path: $APP_PATH"
+
+            if [ -z "$GITHUB_PAT" ]; then
+              echo "❌ GITHUB_PAT não chegou na VPS. Verifique o secret TOKEN_GITHUB no repositório."
+              exit 1
+            fi
 
             # Verificar se o diretório existe
             if [ ! -d "$APP_PATH" ]; then
@@ -46,8 +66,8 @@ jobs:
 
             cd "$APP_PATH"
 
-            # Usar PAT (Personal Access Token), não senha da conta
-            git remote set-url origin https://${{ secrets.USER_GITHUB }}:${{ secrets.TOKEN_GITHUB }}@github.com/${{ github.repository }}.git 2>/dev/null || true
+            # x-access-token funciona com PAT classic e fine-grained (não use senha da conta)
+            git remote set-url origin "https://x-access-token:${GITHUB_PAT}@github.com/${{ github.repository }}.git"
 
             echo "📥 Fazendo fetch de origin/$BRANCH..."
             git fetch origin "$BRANCH"

@@ -12,7 +12,10 @@ import com.z7design.secured_guard.dto.TransportVoucherRequest;
 import com.z7design.secured_guard.dto.ReportLayoutConfig;
 import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
+import com.z7design.secured_guard.model.Employee;
 import com.z7design.secured_guard.repository.CompanyRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
+import com.z7design.secured_guard.util.CompanyDataFormatter;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,10 +36,12 @@ public class TransportVoucherStandardPdfService {
     private final StandardReportLayoutService pdfLayoutService;
     private final ExcelReportLayoutService excelLayoutService;
     private final CompanyRepository companyRepository;
+    private final EmployeeRepository employeeRepository;
 
     private static final String REPORT_TITLE = "DECLARAÇÃO E TERMO DE COMPROMISSO\nPARA ADQUIRIR OU NÃO O VALE-TRANSPORTE";
 
     public byte[] generatePdf(TransportVoucherRequest request) {
+        enrichRequestFromEmployee(request);
         try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             PdfWriter writer = new PdfWriter(outputStream);
 
@@ -62,6 +67,7 @@ public class TransportVoucherStandardPdfService {
     }
 
     public byte[] generateExcel(TransportVoucherRequest request) {
+        enrichRequestFromEmployee(request);
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Vale-Transporte");
             Company company = companyRepository.findById(request.getCompanyId())
@@ -263,7 +269,7 @@ public class TransportVoucherStandardPdfService {
 
         if (city == null || city.isEmpty()) city = "Contagem";
 
-        LocalDate docDate = request.getDocumentDate() != null ? request.getDocumentDate() : LocalDate.now();
+        LocalDate docDate = resolveSignatureDate(request);
         String dateStr = formatDateExtended(docDate);
 
         document.add(new Paragraph("\n" + city + ", " + dateStr)
@@ -282,5 +288,110 @@ public class TransportVoucherStandardPdfService {
 
     private String formatDateExtended(LocalDate date) {
         return date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy", new Locale("pt", "BR")));
+    }
+
+    private void enrichRequestFromEmployee(TransportVoucherRequest request) {
+        if (Boolean.TRUE.equals(request.getManualFill())) {
+            return;
+        }
+
+        if (request.getEmployeeId() != null) {
+            employeeRepository.findById(request.getEmployeeId()).ifPresent(employee -> {
+                if (isBlank(request.getEmployeeName())) {
+                    request.setEmployeeName(employee.getName());
+                }
+                if (isBlank(request.getEmployeeCpf())) {
+                    String cpf = employee.getCpf();
+                    request.setEmployeeCpf(cpf != null && !cpf.isBlank() ? cpf : employee.getDocument());
+                }
+                if (isBlank(request.getEmployeeAddress())) {
+                    request.setEmployeeAddress(buildEmployeeAddress(employee));
+                }
+                if (employee.getHireDate() != null) {
+                    if (request.getDocumentDate() == null) {
+                        request.setDocumentDate(employee.getHireDate());
+                    }
+                    if (isBlank(request.getHireDate())) {
+                        request.setHireDate(employee.getHireDate().toString());
+                    }
+                }
+            });
+        }
+
+        if (request.getDocumentDate() == null && !isBlank(request.getHireDate())) {
+            try {
+                request.setDocumentDate(LocalDate.parse(request.getHireDate().trim()));
+            } catch (Exception ignored) {
+                // mantém fallback em resolveSignatureDate
+            }
+        }
+    }
+
+    private LocalDate resolveSignatureDate(TransportVoucherRequest request) {
+        if (request.getDocumentDate() != null) {
+            return request.getDocumentDate();
+        }
+        if (!isBlank(request.getHireDate())) {
+            try {
+                return LocalDate.parse(request.getHireDate().trim());
+            } catch (Exception ignored) {
+                // segue para fallback
+            }
+        }
+        return LocalDate.now();
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String buildEmployeeAddress(Employee employee) {
+        StringBuilder address = new StringBuilder();
+
+        if (!isBlank(employee.getEnderecoRua())) {
+            address.append(employee.getEnderecoRua().trim());
+        }
+        if (!isBlank(employee.getEnderecoNumero())) {
+            if (address.length() > 0) {
+                address.append(", ");
+            }
+            address.append(employee.getEnderecoNumero().trim());
+        }
+        if (!isBlank(employee.getEnderecoComplemento())) {
+            if (address.length() > 0) {
+                address.append(" - ");
+            }
+            address.append(employee.getEnderecoComplemento().trim());
+        }
+        if (!isBlank(employee.getEnderecoBairro())) {
+            if (address.length() > 0) {
+                address.append(", ");
+            }
+            address.append(employee.getEnderecoBairro().trim());
+        }
+        if (!isBlank(employee.getEnderecoCidade())) {
+            if (address.length() > 0) {
+                address.append(" - ");
+            }
+            address.append(employee.getEnderecoCidade().trim());
+        }
+        if (!isBlank(employee.getEnderecoEstado())) {
+            if (address.length() > 0) {
+                address.append("/");
+            }
+            address.append(employee.getEnderecoEstado().trim());
+        }
+        if (!isBlank(employee.getEnderecoCep())) {
+            if (address.length() > 0) {
+                address.append(" - CEP: ");
+            }
+            address.append(CompanyDataFormatter.formatZipCode(employee.getEnderecoCep().trim()));
+        }
+
+        if (address.length() == 0 && !isBlank(employee.getAddress())) {
+            address.append(employee.getAddress().trim());
+        }
+
+        return address.toString();
     }
 }

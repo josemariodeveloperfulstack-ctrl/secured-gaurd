@@ -24,6 +24,55 @@ interface TermoValeTransporteFormProps {
   companyId?: string;
 }
 
+type EmployeeAddressSource = {
+  address?: string | {
+    street?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+  };
+  enderecoRua?: string;
+  enderecoNumero?: string;
+  enderecoComplemento?: string;
+  enderecoBairro?: string;
+  enderecoCidade?: string;
+  enderecoEstado?: string;
+  enderecoCep?: string;
+};
+
+function formatEmployeeAddress(emp: EmployeeAddressSource): string {
+  if (typeof emp.address === 'string' && emp.address.trim()) {
+    return emp.address.trim();
+  }
+
+  const addr = typeof emp.address === 'object' && emp.address ? emp.address : undefined;
+  const parts: string[] = [];
+
+  const streetLine = [addr?.street ?? emp.enderecoRua, addr?.number ?? emp.enderecoNumero]
+    .filter(Boolean)
+    .join(', ');
+  if (streetLine) parts.push(streetLine);
+
+  const complement = addr?.complement ?? emp.enderecoComplemento;
+  if (complement) parts.push(complement);
+
+  const neighborhood = addr?.neighborhood ?? emp.enderecoBairro;
+  if (neighborhood) parts.push(neighborhood);
+
+  const cityState = [addr?.city ?? emp.enderecoCidade, addr?.state ?? emp.enderecoEstado]
+    .filter(Boolean)
+    .join('/');
+  if (cityState) parts.push(cityState);
+
+  const zip = addr?.zipCode ?? emp.enderecoCep;
+  if (zip) parts.push(`CEP ${zip}`);
+
+  return parts.join(' - ');
+}
+
 const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ employeeId, companyId }) => {
   const { toast } = useToast();
   const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
@@ -62,40 +111,46 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
   }, [employeeId, companyId]);
 
 
-  // Carregar dados iniciais do funcionário se vier apenas o ID via props
+  const loadEmployeeDetails = async (id: string) => {
+    try {
+      const emp = await employeeService.getEmployeeById(id);
+      if (!emp) return;
+
+      setSelectedEmployeeData({
+        id: emp.id,
+        name: emp.name,
+        document: emp.document || emp.cpf,
+        cpf: emp.cpf || emp.document,
+        email: emp.email,
+        phone: emp.phone,
+        registrationNumber: emp.registrationNumber,
+        hireDate: emp.hireDate,
+        positionName: emp.position?.name,
+        unitName: emp.unit?.name,
+        address: emp.address,
+        enderecoRua: (emp as EmployeeAddressSource).enderecoRua,
+        enderecoNumero: (emp as EmployeeAddressSource).enderecoNumero,
+        enderecoComplemento: (emp as EmployeeAddressSource).enderecoComplemento,
+        enderecoBairro: (emp as EmployeeAddressSource).enderecoBairro,
+        enderecoCidade: (emp as EmployeeAddressSource).enderecoCidade,
+        enderecoEstado: (emp as EmployeeAddressSource).enderecoEstado,
+        enderecoCep: (emp as EmployeeAddressSource).enderecoCep,
+      } as SimpleEmployee);
+
+      setForm(prev => ({
+        ...prev,
+        dataInicio: emp.hireDate || prev.dataInicio,
+        employeeWorkSector: emp.workPostName || emp.unitName || emp.unit?.name || emp.workPost?.name || '',
+        empresaId: emp.companyId || (emp.company as { id?: string })?.id || prev.empresaId,
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar dados do funcionário:', error);
+    }
+  };
+
   useEffect(() => {
-    if (form.funcionarioId && !selectedEmployeeData) {
-      const fetchEmployee = async () => {
-        try {
-          const emp = await employeeService.getEmployeeById(form.funcionarioId);
-          if (emp) {
-            setSelectedEmployeeData({
-              id: emp.id,
-              name: emp.name,
-              document: emp.document || emp.cpf,
-              cpf: emp.cpf || emp.document,
-              email: emp.email,
-              phone: emp.phone,
-              registrationNumber: emp.registrationNumber,
-              hireDate: emp.hireDate,
-              positionName: emp.position?.name,
-              unitName: emp.unit?.name,
-              address: emp.address
-            } as SimpleEmployee);
-            
-            // Auto-preencher data de início, posto de trabalho e empresa
-            setForm(prev => ({
-              ...prev,
-              dataInicio: emp.hireDate || prev.dataInicio,
-              employeeWorkSector: emp.workPostName || emp.unitName || emp.unit?.name || emp.workPost?.name || '',
-              empresaId: emp.companyId || (emp.company as any)?.id || prev.empresaId
-            }));
-          }
-        } catch (error) {
-          console.error("Erro ao carregar dados iniciais do funcionário:", error);
-        }
-      };
-      fetchEmployee();
+    if (form.funcionarioId) {
+      loadEmployeeDetails(form.funcionarioId);
     }
   }, [form.funcionarioId]);
 
@@ -142,9 +197,8 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       throw new Error('EMPLOYEE_NOT_FOUND');
     }
 
-    const addressValue = typeof fullEmployee.address === 'string'
-      ? fullEmployee.address
-      : (fullEmployee.address as { street?: string })?.street || '';
+    const admissionDate = fullEmployee.hireDate || form.dataInicio || '';
+    const addressValue = formatEmployeeAddress(fullEmployee as EmployeeAddressSource);
 
     return {
       companyId: empresa.id,
@@ -154,14 +208,14 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
       employeePosition: (fullEmployee as { positionName?: string; position?: { name?: string } }).positionName
         || (fullEmployee as { position?: { name?: string } }).position?.name
         || '',
-      hireDate: fullEmployee.hireDate || '',
+      hireDate: admissionDate,
       employeeAddress: addressValue,
       voucherType: form.tipoVale,
       voucherValue: form.valorVale,
       startDate: form.dataInicio,
       endDate: form.dataFim || null,
       city: empresa.city || '',
-      documentDate: new Date().toISOString().split('T')[0],
+      documentDate: admissionDate || undefined,
       observations: form.observacoes || '',
       optingVoucher: form.optingVoucher === 'true',
       idaLinha: form.idaLinha,
@@ -393,25 +447,21 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                 </Label>
                 <EmployeeCombobox
                   onEmployeeSelect={(emp) => {
-                    setSelectedEmployeeData({
-                      id: emp.id,
-                      name: emp.name,
-                      cpf: emp.cpf,
-                      hireDate: emp.hireDate,
-                      positionName: emp.positionName
-                    } as any);
-                    
-                    // Auto-preencher data de início, posto de trabalho e empresa
-                    setForm(prev => ({ 
-                      ...prev, 
+                    setForm(prev => ({
+                      ...prev,
+                      funcionarioId: emp.id,
                       dataInicio: emp.hireDate || prev.dataInicio,
                       employeeWorkSector: emp.workPostName || emp.unitName || emp.unit?.name || emp.workPost?.name || '',
-                      empresaId: emp.companyId || prev.empresaId
+                      empresaId: emp.companyId || prev.empresaId,
                     }));
+                    loadEmployeeDetails(emp.id);
                   }}
                   value={form.funcionarioId}
                   onChange={(id) => {
                     setForm(prev => ({ ...prev, funcionarioId: id }));
+                    if (!id) {
+                      setSelectedEmployeeData(null);
+                    }
                   }}
                   initialDisplayName={funcionario?.name}
                 />
@@ -454,10 +504,18 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
                     placeholder="Clique para editar"
                   />
                 </div>
+                <div className="space-y-1 md:col-span-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">Endereço do Funcionário</p>
+                  <p className="text-sm font-medium">
+                    {funcionario
+                      ? formatEmployeeAddress(selectedEmployeeData as EmployeeAddressSource) || 'Não cadastrado'
+                      : 'Selecione um funcionário'}
+                  </p>
+                </div>
                 {empresa && (
-                  <div className="space-y-1 md:col-span-2 lg:col-span-4">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">Endereço da Empresa</p>
-                    <p className="text-sm font-medium">{empresa.address || 'Endereço não cadastrado'}</p>
+                  <div className="space-y-1 md:col-span-2">
+                    <p className="text-xs text-muted-foreground uppercase font-semibold">Empresa (no termo)</p>
+                    <p className="text-sm font-medium">{empresa.name}</p>
                   </div>
                 )}
               </div>
@@ -649,7 +707,8 @@ const TermoValeTransporteForm: React.FC<TermoValeTransporteFormProps> = ({ emplo
               <div>
                 <p className="text-sm font-semibold">Termo completo (dados do sistema)</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Usa SIM/NÃO, nome, empresa, endereço, trajetos e tarifas preenchidos acima.
+                  Preenche automaticamente nome do funcionário, empresa, endereço residencial e data de assinatura
+                  (data de admissão).
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-end">
