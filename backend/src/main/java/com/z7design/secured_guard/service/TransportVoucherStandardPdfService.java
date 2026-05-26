@@ -122,12 +122,11 @@ public class TransportVoucherStandardPdfService {
     }
 
     private VoucherDocumentContext buildDocumentContext(TransportVoucherRequest request) {
-        Employee employee = null;
-        if (request.getEmployeeId() != null) {
-            employee = employeeRepository.findWithOrgContextById(request.getEmployeeId()).orElse(null);
-            if (employee == null) {
-                log.warn("Funcionário não encontrado para termo VT: {}", request.getEmployeeId());
-            }
+        final Employee employee = request.getEmployeeId() == null
+                ? null
+                : employeeRepository.findWithOrgContextById(request.getEmployeeId()).orElse(null);
+        if (request.getEmployeeId() != null && employee == null) {
+            log.warn("Funcionário não encontrado para termo VT: {}", request.getEmployeeId());
         }
 
         applyEmployeeToRequest(request, employee);
@@ -141,8 +140,10 @@ public class TransportVoucherStandardPdfService {
             throw new ResourceNotFoundException("Empresa não informada para o termo de vale-transporte");
         }
 
-        Company company = companyRepository.findById(companyId)
-                .orElseGet(() -> employee != null ? employee.getCompany() : null);
+        Company company = companyRepository.findById(companyId).orElse(null);
+        if (company == null && employee != null) {
+            company = employee.getCompany();
+        }
         if (company == null) {
             throw new ResourceNotFoundException("Empresa não encontrada com ID: " + companyId);
         }
@@ -406,7 +407,6 @@ public class TransportVoucherStandardPdfService {
         return value == null || value.isBlank();
     }
 
-    @SafeVarargs
     private static String firstNonBlank(String... values) {
         if (values == null) {
             return "";
