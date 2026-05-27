@@ -90,8 +90,21 @@ services:
       MAIL_TIMEOUT: ${MAIL_TIMEOUT:-10000}
       MAIL_WRITE_TIMEOUT: ${MAIL_WRITE_TIMEOUT:-10000}
       MAIL_DEBUG: ${MAIL_DEBUG:-false}
-      # WhatsApp Configuration
-      # Usar o serviço whatsapp-service-ci que está na mesma rede Docker
+      # WhatsApp — Agente multi-provedor (UAZAPI → Z-API → Evolution → Baileys)
+      WHATSAPP_PROVIDER_ORDER: ${WHATSAPP_PROVIDER_ORDER:-evolution,uazapi,zapi,baileys}
+      UAZAPI_ENABLED: ${UAZAPI_ENABLED:-false}
+      UAZAPI_BASE_URL: ${UAZAPI_BASE_URL:-}
+      UAZAPI_INSTANCE_TOKEN: ${UAZAPI_INSTANCE_TOKEN:-}
+      UAZAPI_ADMIN_TOKEN: ${UAZAPI_ADMIN_TOKEN:-}
+      ZAPI_ENABLED: ${ZAPI_ENABLED:-false}
+      ZAPI_BASE_URL: ${ZAPI_BASE_URL:-https://api.z-api.io}
+      ZAPI_INSTANCE_ID: ${ZAPI_INSTANCE_ID:-}
+      ZAPI_INSTANCE_TOKEN: ${ZAPI_INSTANCE_TOKEN:-}
+      ZAPI_CLIENT_TOKEN: ${ZAPI_CLIENT_TOKEN:-}
+      EVOLUTION_API_ENABLED: ${EVOLUTION_API_ENABLED:-true}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution-api-ci:8080}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-B6D711FCDE4D4FD5936544120E713976}
+      EVOLUTION_API_INSTANCE: ${EVOLUTION_API_INSTANCE:-securedguard}
       BAILEYS_REST_URL: ${BAILEYS_REST_URL:-http://whatsapp-service-ci:3333}
       BAILEYS_ENABLED: ${BAILEYS_ENABLED:-true}
       BAILEYS_INSTANCE_KEY: ${BAILEYS_INSTANCE_KEY:-securedguard_ci}
@@ -121,7 +134,49 @@ services:
       - "traefik.enable=false"
 
   # ========================================
-  # WHATSAPP SERVICE (Baileys)
+  # EVOLUTION API (WhatsApp — provedor principal no CI)
+  # ========================================
+  evolution-api-ci:
+    image: atendai/evolution-api:v2.1.1
+    container_name: evolution-api-ci
+    environment:
+      SERVER_URL: ${EVOLUTION_SERVER_URL:-https://evolution.z7botsolutions.com.br}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-B6D711FCDE4D4FD5936544120E713976}
+      AUTHENTICATION_TYPE: apikey
+      CONFIG_SESSION_PHONE_CLIENT: SecuredGuard
+      CONFIG_SESSION_PHONE_NAME: chrome
+      QRCODE_LIMIT: "30"
+      DATABASE_ENABLED: "false"
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_URL: http://backend-ci:8080/api/webhooks/whatsapp/evolution
+      WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
+      WEBHOOK_EVENTS_SEND_MESSAGE: "true"
+      LOG_LEVEL: ERROR
+    volumes:
+      - evolution_instances_ci:/evolution/instances
+    networks:
+      - secured-guard-ci-network
+      - z7network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.evolution-ci-https.rule=Host(`evolution.z7botsolutions.com.br`)"
+      - "traefik.http.routers.evolution-ci-https.entrypoints=websecure"
+      - "traefik.http.routers.evolution-ci-https.tls=true"
+      - "traefik.http.routers.evolution-ci-https.tls.certresolver=letsencryptresolver"
+      - "traefik.http.services.evolution-ci.loadbalancer.server.port=8080"
+      - "traefik.docker.network=z7network"
+
+  # ========================================
+  # WHATSAPP SERVICE (Baileys — fallback)
   # ========================================
   whatsapp-service-ci:
     image: z7design/secured-guard-whatsapp:ci
@@ -130,7 +185,7 @@ services:
       PORT: 3333
       INSTANCE_KEY: securedguard_ci
       SESSION_DIR: /app/sessions
-      WEBHOOK_URL: http://backend-ci:8080/api/whatsapp/webhook
+      WEBHOOK_URL: http://backend-ci:8080/api/webhooks/whatsapp/evolution
       NODE_ENV: production
     ports:
       - "3333:3333"
@@ -234,6 +289,8 @@ services:
 # VOLUMES CI (usando volumes nomeados para WSL)
 # ========================================
 volumes:
+  evolution_instances_ci:
+    name: evolution_instances_ci
   postgres_data_ci:
     driver: local
   redis_data_ci:

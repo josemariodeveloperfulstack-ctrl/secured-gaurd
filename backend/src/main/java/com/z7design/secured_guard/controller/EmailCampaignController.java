@@ -146,8 +146,21 @@ public class EmailCampaignController {
      */
     @PostMapping("/unsubscribe-check")
     public ResponseEntity<UnsubscribeCheckResponse> unsubscribeCheck(@Valid @RequestBody UnsubscribeCheckRequest request) {
-        List<String> unsubscribed = emailUnsubscribeService.findUnsubscribedAmong(request.emails());
+        List<String> validEmails = request.emails().stream()
+                .filter(e -> e != null && !e.isBlank())
+                .map(String::trim)
+                .filter(this::looksLikeEmail)
+                .distinct()
+                .toList();
+        if (validEmails.isEmpty()) {
+            return ResponseEntity.ok(new UnsubscribeCheckResponse(List.of()));
+        }
+        List<String> unsubscribed = emailUnsubscribeService.findUnsubscribedAmong(validEmails);
         return ResponseEntity.ok(new UnsubscribeCheckResponse(unsubscribed));
+    }
+
+    private boolean looksLikeEmail(String value) {
+        return value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 
     /** Acrescenta destinatários a uma campanha em rascunho (ignora duplicados). */

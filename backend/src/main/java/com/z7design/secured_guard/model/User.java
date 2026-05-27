@@ -398,7 +398,14 @@ public class User implements UserDetails {
         Set<GrantedAuthority> authorities = new HashSet<>();
         if (roles != null) {
             for (Role role : roles) {
-                authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+                if (role == null || role.getName() == null || role.getName().isBlank()) {
+                    continue;
+                }
+                String roleName = role.getName().trim();
+                String springRole = roleName.startsWith("ROLE_") ? roleName : "ROLE_" + roleName;
+                authorities.add(new SimpleGrantedAuthority(springRole));
+                // Compatível com hasAnyAuthority('COMERCIAL', ...) no SecurityConfig
+                authorities.add(new SimpleGrantedAuthority(roleName.replaceFirst("^ROLE_", "")));
                 if (role.getPermissions() != null) {
                     for (Permission permission : role.getPermissions()) {
                         authorities.add(new SimpleGrantedAuthority(permission.getName()));

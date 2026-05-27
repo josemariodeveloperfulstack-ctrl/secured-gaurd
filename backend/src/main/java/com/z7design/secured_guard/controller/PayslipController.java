@@ -142,6 +142,7 @@ public class PayslipController {
      */
     @GetMapping("/me")
     @Operation(summary = "Listar holerites do usuário autenticado")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<Payslip>> getMyPayslips() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
@@ -423,14 +424,10 @@ public class PayslipController {
     public ResponseEntity<List<Payslip>> getAllPayslips() {
         log.info("🔍 Iniciando busca de todos os payslips...");
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isColaborador = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
-                              a.getAuthority().equals("ROLE_ESTOQUE") || 
-                              a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
-                              a.getAuthority().equals("ROLE_COMPRAS"));
+        boolean restrictToOwnDocuments = authenticatedCpfResolver.restrictsToOwnEmployeeDocuments(auth);
         Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
         List<Payslip> payslips;
-        if (isColaborador) {
+        if (restrictToOwnDocuments) {
             if (resolvedCpf.isEmpty()) {
                 log.warn("⚠️ Não foi possível determinar o CPF do colaborador {}", auth.getName());
                 payslips = Collections.emptyList();
@@ -468,16 +465,12 @@ public class PayslipController {
                 return ResponseEntity.ok(emptyResponse);
             }
             
-            boolean isColaborador = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
-                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
-                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
-                                  a.getAuthority().equals("ROLE_COMPRAS"));
+            boolean restrictToOwnDocuments = authenticatedCpfResolver.restrictsToOwnEmployeeDocuments(auth);
             Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
 
             List<Payslip> payslips;
             try {
-                if (isColaborador) {
+                if (restrictToOwnDocuments) {
                     if (resolvedCpf.isEmpty()) {
                         log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização de holerites", auth.getName());
                         payslips = Collections.emptyList();
@@ -579,16 +572,12 @@ public class PayslipController {
                 return ResponseEntity.ok(emptyResponse);
             }
             
-            boolean isColaborador = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
-                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
-                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
-                                  a.getAuthority().equals("ROLE_COMPRAS"));
+            boolean restrictToOwnDocuments = authenticatedCpfResolver.restrictsToOwnEmployeeDocuments(auth);
             Optional<String> resolvedCpf = authenticatedCpfResolver.resolve(auth);
 
             List<Payslip> payslips;
             try {
-                if (isColaborador) {
+                if (restrictToOwnDocuments) {
                     if (resolvedCpf.isEmpty()) {
                         log.warn("⚠️ Não foi possível determinar o CPF do colaborador {} para organização por tipo", auth.getName());
                         payslips = Collections.emptyList();
@@ -768,13 +757,9 @@ public class PayslipController {
             log.info("✅ Payslip encontrado: ID={}, CPF={}, Nome={}, Arquivo={}", 
                 payslip.getId(), payslip.getCpf(), payslip.getEmployeeName(), payslip.getFileName());
             
-            boolean isColaborador = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
-                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
-                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
-                                  a.getAuthority().equals("ROLE_COMPRAS"));
+            boolean restrictToOwnDocuments = authenticatedCpfResolver.restrictsToOwnEmployeeDocuments(auth);
             
-            if (isColaborador) {
+            if (restrictToOwnDocuments) {
                 Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip.getCpf());
                 if (resolvedCpf.isEmpty() || payslipCpf.isEmpty() || !resolvedCpf.get().equals(payslipCpf.get())) {
                     log.warn("⚠️ Acesso negado: CPF do usuário ({}) não corresponde ao CPF do payslip ({})", 
@@ -833,13 +818,9 @@ public class PayslipController {
             log.info("✅ Payslip encontrado: ID={}, CPF={}, Nome={}, Arquivo={}", 
                 payslip.getId(), payslip.getCpf(), payslip.getEmployeeName(), payslip.getFileName());
             
-            boolean isColaborador = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
-                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
-                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
-                                  a.getAuthority().equals("ROLE_COMPRAS"));
+            boolean restrictToOwnDocuments = authenticatedCpfResolver.restrictsToOwnEmployeeDocuments(auth);
             
-            if (isColaborador) {
+            if (restrictToOwnDocuments) {
                 Optional<String> payslipCpf = authenticatedCpfResolver.normalizeCpf(payslip.getCpf());
                 if (resolvedCpf.isEmpty() || payslipCpf.isEmpty() || !resolvedCpf.get().equals(payslipCpf.get())) {
                     log.warn("⚠️ Acesso negado: CPF do usuário ({}) não corresponde ao CPF do payslip ({})", 

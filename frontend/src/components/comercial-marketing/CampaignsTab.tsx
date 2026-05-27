@@ -134,20 +134,26 @@ const CampaignsTab: React.FC = () => {
   );
 
   const sendMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      const resend =
+        selectedCampaign?.status === 'COMPLETED' || selectedCampaign?.status === 'CANCELED';
       if (sendMode === 'template') {
         if (!sendTemplateId) throw new Error('Selecione um template.');
-        return emailCampaignService.send(selectedId!, { templateId: sendTemplateId });
+        await emailCampaignService.send(selectedId!, { templateId: sendTemplateId });
+      } else {
+        await emailCampaignService.send(selectedId!, {
+          subject: sendSubject.trim(),
+          htmlBody: sendHtml,
+        });
       }
-      return emailCampaignService.send(selectedId!, {
-        subject: sendSubject.trim(),
-        htmlBody: sendHtml,
-      });
+      return resend;
     },
-    onSuccess: async () => {
+    onSuccess: async (resend) => {
       toast({
-        title: 'Envio iniciado',
-        description: 'E-mails disparados via SendGrid (verifique a configuração da API).',
+        title: resend ? 'Reenvio iniciado' : 'Envio iniciado',
+        description: resend
+          ? 'Nova rodada de envio em andamento para todos os destinatários.'
+          : 'E-mails disparados (verifique a configuração do provedor).',
       });
       setSendOpen(false);
       setSendSubject('');
@@ -246,10 +252,20 @@ const CampaignsTab: React.FC = () => {
 
   const canEditCampaign = Boolean(selectedCampaign);
 
+  const isResendCampaign =
+    selectedCampaign?.status === 'COMPLETED' || selectedCampaign?.status === 'CANCELED';
+
   const canStartSend =
-    selectedCampaign &&
-    selectedCampaign.status !== 'COMPLETED' &&
-    selectedCampaign.status !== 'CANCELED';
+    Boolean(selectedCampaign) && (selectedCampaign?.recipientCount ?? 0) > 0;
+
+  const sendActionLabel = isResendCampaign ? 'Reenviar' : 'Iniciar envio';
+  const sendActionTitle = !selectedCampaign
+    ? undefined
+    : (selectedCampaign.recipientCount ?? 0) === 0
+      ? 'Adicione destinatários antes de enviar.'
+      : isResendCampaign
+        ? 'Nova rodada de envio para todos os destinatários da campanha.'
+        : 'Abre o assistente de disparo (template ou HTML manual).';
 
   const openEditFor = (id: string) => {
     setSelectedId(id);
@@ -355,17 +371,11 @@ const CampaignsTab: React.FC = () => {
             size="sm"
             variant="secondary"
             disabled={!selectedId || !canStartSend}
-            title={
-              !selectedId
-                ? undefined
-                : !canStartSend
-                  ? 'Campanha concluída ou cancelada não pode ser reenviada.'
-                  : 'Abre o assistente de disparo (template ou HTML manual).'
-            }
+            title={sendActionTitle}
             onClick={() => setSendOpen(true)}
           >
             <Send className="h-4 w-4" />
-            <span className="ml-2">Iniciar envio</span>
+            <span className="ml-2">{sendActionLabel}</span>
           </Button>
           {canPause && (
             <Button
@@ -562,15 +572,11 @@ const CampaignsTab: React.FC = () => {
                   size="sm"
                   variant="secondary"
                   disabled={!canStartSend}
-                  title={
-                    !canStartSend
-                      ? 'Campanha concluída ou cancelada não pode ser reenviada.'
-                      : 'Iniciar disparo de e-mails'
-                  }
+                  title={sendActionTitle}
                   onClick={() => setSendOpen(true)}
                 >
                   <Send className="h-4 w-4" />
-                  <span className="ml-1.5">Iniciar envio</span>
+                  <span className="ml-1.5">{sendActionLabel}</span>
                 </Button>
                 {canPause && (
                   <Button
@@ -677,9 +683,11 @@ const CampaignsTab: React.FC = () => {
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto border-seguranca-graphite bg-seguranca-graphite text-white sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Enviar campanha</DialogTitle>
+            <DialogTitle>{isResendCampaign ? 'Reenviar campanha' : 'Enviar campanha'}</DialogTitle>
             <DialogDescription className="text-seguranca-lightgray">
-              Escolha um template (com variáveis dinâmicas) ou redija manualmente em HTML.
+              {isResendCampaign
+                ? 'Nova rodada para todos os destinatários. Escolha o template ou o HTML do e-mail.'
+                : 'Escolha um template (com variáveis dinâmicas) ou redija manualmente em HTML.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
@@ -737,9 +745,8 @@ const CampaignsTab: React.FC = () => {
                 <p className="text-xs text-seguranca-lightgray">
                   Variáveis como <code>{'{{nomeContato}}'}</code>, <code>{'{{nomeEmpresa}}'}</code>,{' '}
                   <code>{'{{whatsappUrl}}'}</code> e <code>{'{{solicitarApresentacaoUrl}}'}</code> são
-                  preenchidas no envio. Imagens usam <code>{'{{brandLogoUrl}}'}</code> /{' '}
-                  <code>{'{{brandBannerUrl}}'}</code> — configure a URL pública da API (HTTPS) para o Gmail
-                  carregar as imagens.
+                  preenchidas no envio. Logomarca e banner (<code>{'{{brandLogoUrl}}'}</code>,{' '}
+                  <code>{'{{brandBannerUrl}}'}</code>) são embutidos no e-mail (CID) — não dependem de URL pública.
                 </p>
               </div>
             ) : (
@@ -779,6 +786,8 @@ const CampaignsTab: React.FC = () => {
             >
               {sendMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isResendCampaign ? (
+                'Reenviar e-mails'
               ) : (
                 'Disparar e-mails'
               )}

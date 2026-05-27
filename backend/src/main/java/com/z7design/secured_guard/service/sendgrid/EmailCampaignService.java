@@ -168,7 +168,9 @@ public class EmailCampaignService {
      * de envio no scheduler global, que respeitará daily/hourly/intervalo.
      *
      * <p>O método não bloqueia até o término do envio — a campanha vai
-     * fluindo via {@link EmailDispatchScheduler}. Logs já existentes não são
+     * fluindo via {@link EmailDispatchScheduler}. Em campanhas {@code COMPLETED}
+     * ou {@code CANCELED}, os logs são resetados para {@code PENDING} antes do
+     * novo disparo (reenvio). Nos demais estados, logs já existentes não são
      * recriados, então é seguro chamar este endpoint mais de uma vez.
      */
     @Transactional
@@ -178,10 +180,10 @@ public class EmailCampaignService {
         if (recipients.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campanha sem destinatários");
         }
-        if (campaign.getStatus() == com.z7design.secured_guard.model.enums.EmailCampaignStatus.COMPLETED
-                || campaign.getStatus() == com.z7design.secured_guard.model.enums.EmailCampaignStatus.CANCELED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Campanha já está em estado " + campaign.getStatus() + " e não pode ser reenviada");
+        EmailCampaignStatus previousStatus = campaign.getStatus();
+        if (previousStatus == EmailCampaignStatus.COMPLETED
+                || previousStatus == EmailCampaignStatus.CANCELED) {
+            resetLogsForResend(campaignId);
         }
 
         // Resolve template vs envio manual
@@ -253,6 +255,25 @@ public class EmailCampaignService {
                 if (!sent) break;
             }
         }
+    }
+
+    /**
+     * Prepara nova rodada de envio: zera rastreamento dos logs existentes e volta todos para {@code PENDING}.
+     */
+    private void resetLogsForResend(UUID campaignId) {
+        List<EmailLog> logs = emailLogRepository.findByCampaign_IdOrderByCreatedAtDesc(campaignId);
+        for (EmailLog log : logs) {
+            log.setStatus(EmailLogStatus.PENDING);
+            log.setProviderMessageId(null);
+            log.setSentAt(null);
+            log.setDeliveredAt(null);
+            log.setReadAt(null);
+            log.setClickedAt(null);
+            log.setRepliedAt(null);
+            log.setBounceReason(null);
+            emailLogRepository.save(log);
+        }
+        dispatchScheduler.clearContext(campaignId);
     }
 
     /** Pausa uma campanha em andamento — o scheduler deixará de processá-la. */

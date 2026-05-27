@@ -361,6 +361,9 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         OCCURRENCES_CREATE: true,
         WORK_POSTS_READ: true,
         SCHEDULES_READ: true,
+        SCHEDULES_WRITE: true,
+        SCHEDULES_CREATE: true,
+        SCHEDULES_DELETE: true,
         TIME_RECORDS_READ: true,
         // Consultas necessárias durante a visita
         EMPLOYEES_READ: true,
@@ -376,6 +379,7 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
         MESSAGES_READ: true,
         MESSAGES_WRITE: true,
         MESSAGES_CREATE: true,
+        MESSAGES_MANAGE: true,
       };
 
     case 'RH':

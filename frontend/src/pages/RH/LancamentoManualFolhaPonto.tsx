@@ -4,8 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Calendar, Clock, User, Building2, Briefcase, FileText, Download } from 'lucide-react';
+import { Calendar, Clock, User, Building2, Briefcase, FileText, Download, ChevronsUpDown, Check, Save, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { formatCPF } from '@/utils/validation';
+import {
+  formatEscalaResumo,
+  isEscala12x36,
+  isWorkDayIn12x36,
+  parseHireDate,
+} from '@/utils/workSchedule';
 import { useToast } from '@/hooks/use-toast';
 import { employeeService, SimpleEmployee, type Employee } from '@/services/employeeService';
 import { timeSheetService } from '@/services/timeSheetService';
@@ -13,6 +24,7 @@ import { companyService } from '@/services/companyService';
 import timeRecordService from '@/services/timeRecordService';
 
 const DAY_NAMES = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const MIN_EMPLOYEE_SEARCH_CHARS = 3;
 
 /** Converte "HH:mm" para minutos desde 00:00 */
 function timeToMinutes(value: string): number {
@@ -110,6 +122,18 @@ function resolveEmployeeSetor(emp: Employee): string {
   return workPostName || deptName || unitName || '—';
 }
 
+function formatDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function rowHasTimes(row: DayRow, semIntervalo = false): boolean {
+  if (semIntervalo) return !!(row.entrada || row.saida);
+  return !!(row.entrada || row.intervaloEntrada || row.intervaloSaida || row.saida);
+}
+
 function buildDaysInPeriod(start: Date, end: Date): DayRow[] {
   const list: DayRow[] = [];
   const curr = new Date(start);
@@ -138,6 +162,13 @@ const LancamentoManualFolhaPonto: React.FC = () => {
   const [employees, setEmployees] = useState<SimpleEmployee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [employeeDetail, setEmployeeDetail] = useState<{ name: string; funcao: string; setor: string } | null>(null);
+  const [employeeSchedule, setEmployeeSchedule] = useState<{
+    escalaTrabalho?: string;
+    horarioTrabalho?: string;
+    diasTrabalho?: string;
+    is12x36: boolean;
+    hireDate: Date | null;
+  } | null>(null);
   const [periodStart, setPeriodStart] = useState<string>(() => {
     const d = new Date();
     d.setDate(1);
@@ -158,15 +189,53 @@ const LancamentoManualFolhaPonto: React.FC = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string; sigla?: string }[]>([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
+  const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  const [savingAll, setSavingAll] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const [rowSaveStatus, setRowSaveStatus] = useState<Record<number, 'saved' | 'error'>>({});
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cargaHorariaSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowsRef = useRef<DayRow[]>([]);
   const selectedEmployeeIdRef = useRef<string>('');
+  const cargaHorariaNormalRef = useRef<number>(8);
+  const is12x36Ref = useRef(false);
 
   const startDate = useMemo(() => (periodStart ? new Date(periodStart) : null), [periodStart]);
   const endDate = useMemo(() => (periodEnd ? new Date(periodEnd) : null), [periodEnd]);
 
+  const selectedEmployee = useMemo(
+    () => employees.find((e) => e.id === selectedEmployeeId),
+    [employees, selectedEmployeeId],
+  );
+
+  const is12x36 = employeeSchedule?.is12x36 ?? false;
+  const hireDateAnchor = employeeSchedule?.hireDate ?? null;
+
+  const filteredEmployeesForPicker = useMemo(() => {
+    const q = employeeSearchQuery.trim().toLowerCase();
+    if (q.length < MIN_EMPLOYEE_SEARCH_CHARS) return [];
+    const qDigits = q.replace(/\D/g, '');
+    return employees.filter((emp) => {
+      const name = (emp.name || '').toLowerCase();
+      const mat = (emp.registrationNumber || '').toLowerCase();
+      const docDigits = (emp.cpf || emp.document || '').replace(/\D/g, '');
+      if (name.includes(q) || mat.includes(q)) return true;
+      if (qDigits.length >= MIN_EMPLOYEE_SEARCH_CHARS && docDigits.includes(qDigits)) return true;
+      return false;
+    });
+  }, [employees, employeeSearchQuery]);
+
+  const handleSelectEmployee = (id: string) => {
+    setSelectedEmployeeId(id);
+    setEmployeePickerOpen(false);
+    setEmployeeSearchQuery('');
+  };
+
   rowsRef.current = rows;
   selectedEmployeeIdRef.current = selectedEmployeeId;
+  cargaHorariaNormalRef.current = cargaHorariaNormal;
 
   useEffect(() => {
     (async () => {
@@ -196,8 +265,11 @@ const LancamentoManualFolhaPonto: React.FC = () => {
   }, [toast]);
 
   useEffect(() => {
+    setRowSaveStatus({});
+    setLastAutoSavedAt(null);
     if (!selectedEmployeeId) {
       setEmployeeDetail(null);
+      setEmployeeSchedule(null);
       return;
     }
     setLoading(true);
@@ -207,10 +279,20 @@ const LancamentoManualFolhaPonto: React.FC = () => {
         if (emp) {
           const anyEmp = emp as Record<string, unknown>;
           const positionName = emp.position?.name ?? (anyEmp.positionName as string | undefined) ?? '';
+          const escala12 = isEscala12x36(emp.escalaTrabalho, emp.diasTrabalho);
+          const hireParsed = parseHireDate(emp.hireDate);
+
           setEmployeeDetail({
             name: emp.name ?? '—',
             funcao: positionName || '—',
             setor: resolveEmployeeSetor(emp),
+          });
+          setEmployeeSchedule({
+            escalaTrabalho: emp.escalaTrabalho,
+            horarioTrabalho: emp.horarioTrabalho,
+            diasTrabalho: emp.diasTrabalho,
+            is12x36: escala12,
+            hireDate: hireParsed,
           });
 
           const cid = emp.company?.id ? String(emp.company.id) : '';
@@ -218,17 +300,21 @@ const LancamentoManualFolhaPonto: React.FC = () => {
             setFormCompanyId(cid);
           }
 
-          // Para funções típicas de vigilância/portaria (ex.: 12x36), sugerir 12h/dia,
-          // sem sobrescrever se o usuário já alterou manualmente.
-          const inferred = inferDefaultDailyHours(positionName);
-          if (inferred) {
-            setCargaHorariaNormal((prev) => (prev === 8 ? inferred : prev));
+          if (escala12) {
+            setCargaHorariaNormal(12);
+          } else {
+            const inferred = inferDefaultDailyHours(positionName);
+            setCargaHorariaNormal(inferred ?? 8);
           }
         } else {
           setEmployeeDetail(null);
+          setEmployeeSchedule(null);
         }
       })
-      .catch(() => setEmployeeDetail(null))
+      .catch(() => {
+        setEmployeeDetail(null);
+        setEmployeeSchedule(null);
+      })
       .finally(() => setLoading(false));
   }, [selectedEmployeeId, companies]);
 
@@ -257,15 +343,21 @@ const LancamentoManualFolhaPonto: React.FC = () => {
           else if (r.recordType === 'RETORNO_ALMOCO') byDate[dateKey].intervaloEntrada = time;
           else if (r.recordType === 'SAIDA') byDate[dateKey].saida = time;
         });
+        const semIntervalo = employeeSchedule?.is12x36 ?? false;
         const merged = baseRows.map((row) => {
-          const dateKey = row.date.toISOString().slice(0, 10);
+          const dateKey = formatDateKey(row.date);
           const fill = byDate[dateKey];
-          if (!fill) return row;
+          if (!fill) {
+            if (semIntervalo) {
+              return { ...row, intervaloEntrada: '', intervaloSaida: '' };
+            }
+            return row;
+          }
           return {
             ...row,
             entrada: fill.entrada ?? row.entrada,
-            intervaloSaida: fill.intervaloSaida ?? row.intervaloSaida,
-            intervaloEntrada: fill.intervaloEntrada ?? row.intervaloEntrada,
+            intervaloSaida: semIntervalo ? '' : (fill.intervaloSaida ?? row.intervaloSaida),
+            intervaloEntrada: semIntervalo ? '' : (fill.intervaloEntrada ?? row.intervaloEntrada),
             saida: fill.saida ?? row.saida,
           };
         });
@@ -273,52 +365,152 @@ const LancamentoManualFolhaPonto: React.FC = () => {
       })
       .catch(() => setRows(baseRows))
       .finally(() => setLoadingRecords(false));
-  }, [periodStart, periodEnd, selectedEmployeeId]);
+  }, [periodStart, periodEnd, selectedEmployeeId, employeeSchedule?.is12x36]);
 
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (cargaHorariaSaveTimeoutRef.current) clearTimeout(cargaHorariaSaveTimeoutRef.current);
     };
   }, []);
 
-  const saveRowToBackend = (index: number) => {
+  const saveRowToBackend = async (index: number, options?: { silent?: boolean }): Promise<boolean> => {
     const row = rowsRef.current[index];
     const empId = selectedEmployeeIdRef.current;
-    if (!row || !empId) return;
-    const dateStr = row.date.toISOString().slice(0, 10);
-    timeRecordService
-      .saveManualDay(empId, dateStr, {
+    if (!row || !empId) return false;
+    const semIntervalo = is12x36Ref.current;
+    if (!rowHasTimes(row, semIntervalo)) return false;
+
+    const dateStr = formatDateKey(row.date);
+    try {
+      await timeRecordService.saveManualDay(empId, dateStr, {
         entrada: row.entrada || undefined,
-        saidaAlmoco: row.intervaloSaida || undefined,
-        retornoAlmoco: row.intervaloEntrada || undefined,
+        saidaAlmoco: semIntervalo ? undefined : row.intervaloSaida || undefined,
+        retornoAlmoco: semIntervalo ? undefined : row.intervaloEntrada || undefined,
         saida: row.saida || undefined,
-      })
-      .then(() => {
-        toast({ title: 'Salvo', description: `Horários do dia ${dateStr} registrados no banco.`, duration: 2000 });
-      })
-      .catch((err: any) => {
-        toast({
-          title: 'Erro ao salvar',
-          description: err?.response?.data?.error || err?.message || 'Não foi possível salvar no banco.',
-          variant: 'destructive',
-        });
+        cargaHorariaNormal: cargaHorariaNormalRef.current,
       });
+      setRowSaveStatus((prev) => ({ ...prev, [index]: 'saved' }));
+      if (!options?.silent) {
+        toast({ title: 'Salvo', description: `Horários do dia ${dateStr} registrados.`, duration: 2000 });
+      }
+      return true;
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        (err instanceof Error ? err.message : 'Não foi possível salvar no banco.');
+      setRowSaveStatus((prev) => ({ ...prev, [index]: 'error' }));
+      if (!options?.silent) {
+        toast({ title: 'Erro ao salvar', description: message, variant: 'destructive' });
+      }
+      return false;
+    }
   };
 
-  const updateRow = (index: number, field: keyof DayRow, value: string) => {
+  const saveAllRows = async (options?: { silent?: boolean }) => {
+    if (!selectedEmployeeIdRef.current) {
+      toast({
+        title: 'Selecione o colaborador',
+        description: 'Escolha um funcionário antes de salvar o lançamento.',
+        variant: 'destructive',
+      });
+      return { saved: 0, failed: 0, skipped: 0 };
+    }
+
+    const semIntervalo = is12x36Ref.current;
+    const indices = rowsRef.current
+      .map((row, index) => (rowHasTimes(row, semIntervalo) ? index : -1))
+      .filter((i) => i >= 0);
+
+    if (indices.length === 0) {
+      if (!options?.silent) {
+        toast({
+          title: 'Nada para salvar',
+          description: 'Preencha ao menos um horário (entrada ou saída) em algum dia.',
+          variant: 'destructive',
+        });
+      }
+      return { saved: 0, failed: 0, skipped: rowsRef.current.length };
+    }
+
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
+
+    setSavingAll(true);
+    let saved = 0;
+    let failed = 0;
+    for (const index of indices) {
+      const ok = await saveRowToBackend(index, { silent: true });
+      if (ok) saved += 1;
+      else failed += 1;
+    }
+    setSavingAll(false);
+
+    if (!options?.silent) {
+      if (failed === 0) {
+        toast({
+          title: 'Lançamento salvo',
+          description: `${saved} dia(s) registrado(s) com sucesso.`,
+        });
+      } else {
+        toast({
+          title: 'Salvamento parcial',
+          description: `${saved} dia(s) salvos, ${failed} com erro.`,
+          variant: 'destructive',
+        });
+      }
+    }
+
+    return { saved, failed, skipped: rowsRef.current.length - indices.length };
+  };
+
+  const scheduleAutoSaveRow = (index: number) => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      saveTimeoutRef.current = null;
+      if (!selectedEmployeeIdRef.current || !rowHasTimes(rowsRef.current[index], is12x36Ref.current)) return;
+      setAutoSaving(true);
+      const ok = await saveRowToBackend(index, { silent: true });
+      setAutoSaving(false);
+      if (ok) setLastAutoSavedAt(new Date());
+    }, 800);
+  };
+
+  const scheduleAutoSaveAllWithTimes = () => {
+    if (cargaHorariaSaveTimeoutRef.current) clearTimeout(cargaHorariaSaveTimeoutRef.current);
+    cargaHorariaSaveTimeoutRef.current = setTimeout(async () => {
+      cargaHorariaSaveTimeoutRef.current = null;
+      if (!selectedEmployeeIdRef.current) return;
+      setAutoSaving(true);
+      const result = await saveAllRows({ silent: true });
+      setAutoSaving(false);
+      if (result.saved > 0) setLastAutoSavedAt(new Date());
+    }, 1000);
+  };
+
+  const updateRow = (index: number, field: keyof DayRow, value: string) => {
     setRows((prev) => {
       const next = [...prev];
       if (next[index]) (next[index] as any)[field] = value;
       return next;
     });
-    saveTimeoutRef.current = setTimeout(() => {
+    scheduleAutoSaveRow(index);
+  };
+
+  const flushRowSave = (index: number) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
-      saveRowToBackend(index);
-    }, 800);
+    }
+    void (async () => {
+      if (!selectedEmployeeIdRef.current || !rowHasTimes(rowsRef.current[index], is12x36Ref.current)) return;
+      setAutoSaving(true);
+      const ok = await saveRowToBackend(index, { silent: true });
+      setAutoSaving(false);
+      if (ok) setLastAutoSavedAt(new Date());
+    })();
   };
 
   const normalMinutesPerDay = cargaHorariaNormal * 60;
@@ -334,7 +526,7 @@ const LancamentoManualFolhaPonto: React.FC = () => {
     rows.forEach((r) => {
       const ent = timeToMinutes(r.entrada);
       const sai = timeToMinutes(r.saida);
-      const int = intervalDurationMinutes(r.intervaloEntrada, r.intervaloSaida);
+      const int = is12x36 ? 0 : intervalDurationMinutes(r.intervaloEntrada, r.intervaloSaida);
       const worked =
         ent === 0 && sai === 0
           ? 0
@@ -362,7 +554,7 @@ const LancamentoManualFolhaPonto: React.FC = () => {
       totals: { totalWorked, totalOvertime, totalInterval, totalNormal, totalNight, totalPaid },
       dailyCalculations: daily,
     };
-  }, [rows, normalMinutesPerDay]);
+  }, [rows, normalMinutesPerDay, is12x36]);
 
   const formatDateBR = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -463,7 +655,9 @@ const LancamentoManualFolhaPonto: React.FC = () => {
           Lançamento Manual de Folha de Ponto
         </CardTitle>
         <CardDescription>
-          Preencha os horários de entrada, intervalo e saída por dia. As horas extras são calculadas automaticamente.
+          {is12x36
+            ? 'Escala 12x36: informe apenas entrada e saída nos dias trabalhados (sem intervalo). Horas acima da carga diária são extras.'
+            : 'Preencha os horários de entrada, intervalo e saída por dia. As horas extras são calculadas automaticamente.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -526,18 +720,78 @@ const LancamentoManualFolhaPonto: React.FC = () => {
               <User className="h-4 w-4" />
               Nome
             </Label>
-            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o colaborador" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-1">
+              Digite pelo menos {MIN_EMPLOYEE_SEARCH_CHARS} caracteres do nome, matrícula ou CPF para buscar.
+            </p>
+            <Popover
+              open={employeePickerOpen}
+              onOpenChange={(open) => {
+                setEmployeePickerOpen(open);
+                if (!open) setEmployeeSearchQuery('');
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={employeePickerOpen}
+                  disabled={employees.length === 0}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className={cn('truncate text-left', !selectedEmployee && 'text-muted-foreground')}>
+                    {selectedEmployee?.name ?? 'Selecione o colaborador'}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder={`Mín. ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres (nome, matrícula ou CPF)...`}
+                    value={employeeSearchQuery}
+                    onValueChange={setEmployeeSearchQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {employeeSearchQuery.trim().length < MIN_EMPLOYEE_SEARCH_CHARS
+                        ? `Digite pelo menos ${MIN_EMPLOYEE_SEARCH_CHARS} caracteres para exibir os registros.`
+                        : 'Nenhum colaborador encontrado.'}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {filteredEmployeesForPicker.map((emp) => {
+                        const doc = emp.cpf || emp.document || '';
+                        return (
+                          <CommandItem
+                            key={emp.id}
+                            value={emp.id}
+                            onSelect={() => handleSelectEmployee(emp.id)}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                'mr-2 h-4 w-4 shrink-0',
+                                selectedEmployeeId === emp.id ? 'opacity-100' : 'opacity-0',
+                              )}
+                            />
+                            <div className="flex flex-col min-w-0 text-left">
+                              <span className="font-medium truncate">{emp.name}</span>
+                              {(emp.registrationNumber || doc) && (
+                                <span className="text-xs text-muted-foreground">
+                                  {emp.registrationNumber ? `Matr.: ${emp.registrationNumber}` : ''}
+                                  {emp.registrationNumber && doc ? ' · ' : ''}
+                                  {doc ? `CPF: ${formatCPF(doc)}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div>
             <Label className="flex items-center gap-2">
@@ -575,10 +829,50 @@ const LancamentoManualFolhaPonto: React.FC = () => {
             max={12}
             step={0.5}
             value={cargaHorariaNormal}
-            onChange={(e) => setCargaHorariaNormal(Math.max(0, Math.min(12, parseFloat(e.target.value) || 8)))}
+            onChange={(e) => {
+              setCargaHorariaNormal(Math.max(0, Math.min(12, parseFloat(e.target.value) || 8)));
+              scheduleAutoSaveAllWithTimes();
+            }}
             className="w-24"
           />
           <span className="text-muted-foreground text-sm">horas</span>
+          {is12x36 && (
+            <span className="text-xs text-muted-foreground">(padrão 12h na escala 12x36)</span>
+          )}
+        </div>
+
+        {/* Salvar lançamento + status automático */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-4 py-3">
+          <div className="text-sm text-muted-foreground space-y-0.5">
+            <p>
+              Os horários são salvos automaticamente após cada alteração (cerca de 1 segundo).
+            </p>
+            {(autoSaving || savingAll) && (
+              <p className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Salvando…
+              </p>
+            )}
+            {!autoSaving && !savingAll && lastAutoSavedAt && (
+              <p className="text-emerald-600 dark:text-emerald-400">
+                Último salvamento automático:{' '}
+                {lastAutoSavedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </p>
+            )}
+          </div>
+          <Button
+            type="button"
+            onClick={() => void saveAllRows()}
+            disabled={savingAll || autoSaving || !selectedEmployeeId || rows.length === 0}
+            className="shrink-0"
+          >
+            {savingAll ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Salvar lançamento
+          </Button>
         </div>
 
         {/* Tabela de dias */}
@@ -588,8 +882,12 @@ const LancamentoManualFolhaPonto: React.FC = () => {
               <TableRow>
                 <TableHead className="w-[90px]">DIA</TableHead>
                 <TableHead className="w-[90px]">ENTRADA</TableHead>
-                <TableHead className="w-[90px]">INTERVALO (entrada)</TableHead>
-                <TableHead className="w-[90px]">INTERVALO (saída)</TableHead>
+                {!is12x36 && (
+                  <>
+                    <TableHead className="w-[90px]">INTERVALO (entrada)</TableHead>
+                    <TableHead className="w-[90px]">INTERVALO (saída)</TableHead>
+                  </>
+                )}
                 <TableHead className="w-[90px]">SAÍDA</TableHead>
                 <TableHead className="w-[95px]">Total (dia)</TableHead>
                 <TableHead className="w-[95px]">HORAS EXTRAS</TableHead>
@@ -600,52 +898,83 @@ const LancamentoManualFolhaPonto: React.FC = () => {
             <TableBody>
               {loadingRecords ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={is12x36 ? 7 : 9} className="text-center text-muted-foreground py-8">
                     Carregando registros do banco...
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={is12x36 ? 7 : 9} className="text-center text-muted-foreground py-8">
                     Defina o período (data início e fim) para gerar os dias.
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((row, idx) => (
-                  <TableRow key={idx}>
+                rows.map((row, idx) => {
+                  const isRestDay =
+                    is12x36 && hireDateAnchor != null && !isWorkDayIn12x36(row.date, hireDateAnchor);
+                  return (
+                  <TableRow
+                    key={`${formatDateKey(row.date)}-${idx}`}
+                    className={cn(isRestDay && 'bg-muted/40 opacity-80')}
+                  >
                     <TableCell className="font-medium">
-                      {row.dayLabel} {row.weekdayLabel}
+                      <div className="flex flex-col gap-0.5">
+                        <span>{row.dayLabel} {row.weekdayLabel}</span>
+                        {isRestDay && (
+                          <Badge variant="outline" className="w-fit text-[10px] px-1.5 py-0">
+                            Folga
+                          </Badge>
+                        )}
+                        {rowSaveStatus[idx] === 'saved' && (
+                          <span className="text-[10px] text-emerald-600">salvo</span>
+                        )}
+                        {rowSaveStatus[idx] === 'error' && (
+                          <span className="text-[10px] text-destructive">erro ao salvar</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Input
                         type="time"
                         value={row.entrada}
                         onChange={(e) => updateRow(idx, 'entrada', e.target.value)}
+                        onBlur={() => flushRowSave(idx)}
                         className="h-8"
+                        disabled={!selectedEmployeeId}
                       />
                     </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        value={row.intervaloEntrada}
-                        onChange={(e) => updateRow(idx, 'intervaloEntrada', e.target.value)}
-                        className="h-8"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="time"
-                        value={row.intervaloSaida}
-                        onChange={(e) => updateRow(idx, 'intervaloSaida', e.target.value)}
-                        className="h-8"
-                      />
-                    </TableCell>
+                    {!is12x36 && (
+                      <>
+                        <TableCell>
+                          <Input
+                            type="time"
+                            value={row.intervaloEntrada}
+                            onChange={(e) => updateRow(idx, 'intervaloEntrada', e.target.value)}
+                            onBlur={() => flushRowSave(idx)}
+                            className="h-8"
+                            disabled={!selectedEmployeeId}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="time"
+                            value={row.intervaloSaida}
+                            onChange={(e) => updateRow(idx, 'intervaloSaida', e.target.value)}
+                            onBlur={() => flushRowSave(idx)}
+                            className="h-8"
+                            disabled={!selectedEmployeeId}
+                          />
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell>
                       <Input
                         type="time"
                         value={row.saida}
                         onChange={(e) => updateRow(idx, 'saida', e.target.value)}
+                        onBlur={() => flushRowSave(idx)}
                         className="h-8"
+                        disabled={!selectedEmployeeId}
                       />
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
@@ -667,7 +996,8 @@ const LancamentoManualFolhaPonto: React.FC = () => {
                       —
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -701,10 +1031,12 @@ const LancamentoManualFolhaPonto: React.FC = () => {
                 <p className="text-sm text-muted-foreground">Total adicional noturno (22h–05h)</p>
                 <p className="text-lg font-semibold text-sky-600">{formatHoursMinutes(totals.totalNight)}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total intervalo</p>
-                <p className="text-lg font-semibold">{formatHoursMinutes(totals.totalInterval)}</p>
-              </div>
+              {!is12x36 && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Total intervalo</p>
+                  <p className="text-lg font-semibold">{formatHoursMinutes(totals.totalInterval)}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-muted-foreground">
                   Total horas pagas (c/ adicional noturno 20%)

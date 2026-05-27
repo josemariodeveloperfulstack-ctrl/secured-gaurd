@@ -10,6 +10,7 @@ import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 import com.sendgrid.helpers.mail.objects.OpenTrackingSetting;
 import com.sendgrid.helpers.mail.objects.Personalization;
+import com.sendgrid.helpers.mail.objects.Attachments;
 import com.sendgrid.helpers.mail.objects.TrackingSettings;
 import com.z7design.secured_guard.model.EmailLog;
 import org.slf4j.Logger;
@@ -18,6 +19,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -31,10 +35,19 @@ public class SendGridMailSendService {
     @Value("${sendgrid.from-email:}")
     private String fromEmail;
 
-    @Value("${sendgrid.from-name:SecuredGuard}")
+    @Value("${sendgrid.from-name:Promover}")
     private String fromName;
 
     public String sendHtml(EmailLog emailLog, String toEmail, String toName, String subject, String htmlBody) throws IOException {
+        return sendHtml(emailLog, toEmail, toName, subject, htmlBody, Collections.emptyList());
+    }
+
+    public String sendHtml(EmailLog emailLog,
+                           String toEmail,
+                           String toName,
+                           String subject,
+                           String htmlBody,
+                           List<EmailInlineImage> inlineImages) throws IOException {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("Variável sendgrid.api-key / SENDGRID_API_KEY não configurada");
         }
@@ -45,6 +58,23 @@ public class SendGridMailSendService {
         Mail mail = new Mail();
         mail.setFrom(new Email(fromEmail, fromName));
         mail.addContent(new Content("text/html", htmlBody));
+
+        if (inlineImages != null) {
+            for (EmailInlineImage img : inlineImages) {
+                if (img == null || img.contentId() == null || img.contentId().isBlank()
+                        || img.data() == null || img.data().length == 0) {
+                    continue;
+                }
+                Attachments attachment = new Attachments();
+                attachment.setContent(Base64.getEncoder().encodeToString(img.data()));
+                attachment.setType(img.mimeType() != null && !img.mimeType().isBlank()
+                        ? img.mimeType() : "image/png");
+                attachment.setFilename(img.contentId() + ".png");
+                attachment.setDisposition("inline");
+                attachment.setContentId(img.contentId());
+                mail.addAttachments(attachment);
+            }
+        }
 
         // Garante open/click tracking no envio (além das definições da conta SendGrid).
         ClickTrackingSetting click = new ClickTrackingSetting();

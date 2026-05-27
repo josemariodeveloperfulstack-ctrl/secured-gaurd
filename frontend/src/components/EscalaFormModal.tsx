@@ -31,7 +31,8 @@ import {
   CheckCircle2,
   Calendar as CalendarLucide,
   Eye,
-  Activity
+  Activity,
+  Briefcase
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { EmployeeCombobox } from '@/components/ui/employee-combobox';
@@ -107,6 +108,7 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
 
   /** Nomes para modo visualização e rótulos iniciais nos comboboxes */
   const [displayEmployeeName, setDisplayEmployeeName] = useState('');
+  const [displayPositionName, setDisplayPositionName] = useState('');
   const [displayClientName, setDisplayClientName] = useState('');
 
   const [postosTrabalho, setPostosTrabalho] = useState<{ id: string; name: string; postCode: string; clientId?: string }[]>([]);
@@ -196,36 +198,54 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
   // - Com cliente derivado do funcionário selecionado: filtra somente postos daquele cliente.
   // - Sem cliente (ex.: nenhum funcionário selecionado ainda): mostra todos os postos.
   useEffect(() => {
+    const wpId = String(formData.workPostId || '').trim();
+    let filtered: typeof postosTrabalho;
+
     if (selectedClientId) {
       const sid = String(selectedClientId).toLowerCase().trim();
-      const filtered = postosTrabalho.filter((posto) => {
+      filtered = postosTrabalho.filter((posto) => {
         if (!posto.clientId) return false;
         return String(posto.clientId).toLowerCase().trim() === sid;
       });
-      setPostosFiltrados(filtered);
     } else {
-      setPostosFiltrados(postosTrabalho);
+      filtered = postosTrabalho;
     }
-  }, [postosTrabalho, selectedClientId]);
+
+    if (wpId) {
+      const current = postosTrabalho.find((p) => String(p.id) === wpId);
+      if (current && !filtered.some((p) => String(p.id) === wpId)) {
+        filtered = [current, ...filtered];
+      }
+    }
+
+    setPostosFiltrados(filtered);
+  }, [postosTrabalho, selectedClientId, formData.workPostId]);
 
   // Nomes para visualização / rótulo inicial nos comboboxes
   useEffect(() => {
     if (!open) {
       setDisplayEmployeeName('');
+      setDisplayPositionName('');
       setDisplayClientName('');
       return;
     }
     if (!formData.employeeId) {
       setDisplayEmployeeName('');
+      setDisplayPositionName('');
       return;
     }
 
+    const initialEmployeeId = String(
+      initialData?.employeeId || (initialData as { employee?: { id?: string } })?.employee?.id || ''
+    );
+
     // Se o funcionário selecionado é o mesmo dos dados iniciais, usar o nome que já temos de forma síncrona
-    if (initialData && formData.employeeId === initialData.employeeId) {
-      const empName = String(initialData.employeeName || '').trim() || String((initialData as any).employee?.name || '').trim();
+    if (initialData && formData.employeeId === initialEmployeeId) {
+      const empName =
+        String(initialData.employeeName || '').trim() ||
+        String((initialData as { employee?: { name?: string } }).employee?.name || '').trim();
       if (empName) {
         setDisplayEmployeeName(empName);
-        return;
       }
     }
 
@@ -233,10 +253,16 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
     employeeService
       .getEmployeeById(formData.employeeId)
       .then((e) => {
-        if (!cancelled && e?.name) setDisplayEmployeeName(e.name);
+        if (cancelled || !e) return;
+        if (e.name) setDisplayEmployeeName(e.name);
+        const cargo = e.position?.name || '';
+        if (cargo) setDisplayPositionName(cargo);
       })
       .catch(() => {
-        if (!cancelled) setDisplayEmployeeName('');
+        if (!cancelled) {
+          setDisplayEmployeeName('');
+          setDisplayPositionName('');
+        }
       });
     return () => {
       cancelled = true;
@@ -920,89 +946,105 @@ const EscalaFormModal: React.FC<EscalaFormModalProps> = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Funcionário — busca após 3 caracteres */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-seguranca-yellow" />
-              <Label htmlFor="employeeId" className="text-sm font-medium">
-                Funcionário <span className="text-red-400">*</span>
-              </Label>
-            </div>
-            <EmployeeCombobox
-              value={String(formData.employeeId || '')}
-              onChange={(id) => {
-                handleInputChange('employeeId', id);
-                if (!id) {
-                  // Limpar os campos dependentes se o funcionário for removido
-                  setFormData(prev => ({ ...prev, locationId: '', workPostId: '' }));
-                  setSelectedClientId('');
-                  setDisplayEmployeeName('');
-                }
-                if (errors.employeeId) setErrors((prev) => ({ ...prev, employeeId: undefined }));
-              }}
-              onEmployeeSelect={async (emp) => {
-                if (emp.name) setDisplayEmployeeName(emp.name);
-                
-                // Em SimpleEmployee, a interface pode ter apenas workPostId, não workPost
-                const wpIdStr = String(emp.workPostId || (emp as any).workPost?.id || '');
-                if (wpIdStr) {
-                  let workPost = postosTrabalho.find(wp => String(wp.id) === wpIdStr);
-                  if (!workPost) {
-                    try {
-                      const { workPostService } = await import('@/services/workPostService');
-                      workPost = await workPostService.getWorkPostById(wpIdStr);
-                      if (workPost) ensureWorkPostInList(workPost);
-                    } catch (e) { console.error(e); }
-                  }
+          {/* Funcionário e cargo */}
+          <div className="rounded-lg border border-gray-700/80 bg-seguranca-black/40 p-4 space-y-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Dados do funcionário</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-seguranca-yellow shrink-0" />
+                  <Label htmlFor="employeeId" className="text-sm font-medium">
+                    Funcionário <span className="text-red-400">*</span>
+                  </Label>
+                </div>
+                <EmployeeCombobox
+                  value={String(formData.employeeId || '')}
+                  displayNameOnly
+                  onChange={(id) => {
+                    handleInputChange('employeeId', id);
+                    if (!id) {
+                      setFormData(prev => ({ ...prev, locationId: '', workPostId: '' }));
+                      setSelectedClientId('');
+                      setDisplayEmployeeName('');
+                      setDisplayPositionName('');
+                    }
+                    if (errors.employeeId) setErrors((prev) => ({ ...prev, employeeId: undefined }));
+                  }}
+                  onEmployeeSelect={async (emp) => {
+                    if (emp.name) setDisplayEmployeeName(emp.name);
+                    setDisplayPositionName(emp.positionName || '');
 
-                  if (workPost) {
-                    const clientIdStr = String(workPost.clientId);
-                    console.log('🚀 Auto-populando Escala com onEmployeeSelect:', { client: clientIdStr, post: wpIdStr });
-                    
-                    setSelectedClientId(clientIdStr);
-                    
-                    setFormData(prev => ({
-                      ...prev,
-                      locationId: wpIdStr,
-                      workPostId: wpIdStr,
-                      shift: workPost?.type === '12H_NOTURNO' ? 'NIGHT' : 'DAY',
-                      startTime: workPost?.shiftStart || '',
-                      endTime: workPost?.shiftEnd || '',
-                      sigla: prev.sigla || 'PL'
-                    }));
+                    const wpIdStr = String(emp.workPostId || (emp as { workPost?: { id?: string } }).workPost?.id || '');
+                    if (wpIdStr) {
+                      let workPost = postosTrabalho.find(wp => String(wp.id) === wpIdStr);
+                      if (!workPost) {
+                        try {
+                          const { workPostService } = await import('@/services/workPostService');
+                          workPost = await workPostService.getWorkPostById(wpIdStr);
+                          if (workPost) ensureWorkPostInList(workPost);
+                        } catch (e) { console.error(e); }
+                      }
 
-                    if (workPost.clientName) setDisplayClientName(workPost.clientName);
-                    
-                    setErrors(prev => ({ 
-                      ...prev, 
-                      employeeId: undefined,
-                      locationId: undefined, 
-                      workPostId: undefined 
-                    }));
-                  }
-                } else {
-                  // Limpar se o funcionário não tem posto de trabalho
-                  setFormData(prev => ({ ...prev, locationId: '', workPostId: '' }));
-                  setSelectedClientId('');
-                }
-              }}
-              disabled={mode === 'view'}
-              minChars={3}
-              initialDisplayName={displayEmployeeName || undefined}
-              placeholder="Selecione um funcionário"
-              searchPlaceholder="Digite pelo menos 3 letras do nome..."
-              emptyPlaceholder="Nenhum funcionário encontrado."
-            />
-            {errors.employeeId && (
-              <div className="flex items-center gap-2 text-red-400 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                {errors.employeeId}
+                      if (workPost) {
+                        const clientIdStr = String(workPost.clientId);
+                        setSelectedClientId(clientIdStr);
+                        setFormData(prev => ({
+                          ...prev,
+                          locationId: wpIdStr,
+                          workPostId: wpIdStr,
+                          shift: workPost?.type === '12H_NOTURNO' ? 'NIGHT' : 'DAY',
+                          startTime: workPost?.shiftStart || '',
+                          endTime: workPost?.shiftEnd || '',
+                          sigla: prev.sigla || 'PL'
+                        }));
+                        if (workPost.clientName) setDisplayClientName(workPost.clientName);
+                        setErrors(prev => ({
+                          ...prev,
+                          employeeId: undefined,
+                          locationId: undefined,
+                          workPostId: undefined
+                        }));
+                      }
+                    } else {
+                      setFormData(prev => ({ ...prev, locationId: '', workPostId: '' }));
+                      setSelectedClientId('');
+                    }
+                  }}
+                  disabled={mode === 'view'}
+                  minChars={3}
+                  initialDisplayName={displayEmployeeName || undefined}
+                  placeholder="Selecione um funcionário"
+                  searchPlaceholder="Digite pelo menos 3 letras do nome..."
+                  emptyPlaceholder="Nenhum funcionário encontrado."
+                />
+                {errors.employeeId && (
+                  <div className="flex items-center gap-2 text-red-400 text-sm">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.employeeId}
+                  </div>
+                )}
               </div>
-            )}
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-seguranca-yellow shrink-0" />
+                  <Label htmlFor="employeePosition" className="text-sm font-medium">
+                    Cargo
+                  </Label>
+                </div>
+                <Input
+                  id="employeePosition"
+                  readOnly
+                  value={displayPositionName || '—'}
+                  placeholder="Selecione um funcionário"
+                  className="h-11 bg-seguranca-black border-2 border-gray-600 text-seguranca-lightgray cursor-default opacity-90"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Posto de Trabalho */}
-          <div className="space-y-3">
+          <div className="rounded-lg border border-gray-700/80 bg-seguranca-black/40 p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Building className="w-4 h-4 text-seguranca-yellow" />
               <Label htmlFor="workPostId" className="text-sm font-medium">

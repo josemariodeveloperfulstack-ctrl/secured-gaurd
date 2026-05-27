@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -29,4 +30,15 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     @Modifying
     @Query(value = "DELETE FROM schedules WHERE id = :id", nativeQuery = true)
     void deleteByIdNative(@Param("id") UUID id);
+
+    /** Nome do funcionário mesmo quando a associação JPA está órfã (@NotFound IGNORE). */
+    @Query(value = """
+            SELECT e.name FROM employees e
+            INNER JOIN schedules s ON s.employee_id = e.id
+            WHERE s.id = :scheduleId
+            """, nativeQuery = true)
+    Optional<String> findEmployeeNameByScheduleId(@Param("scheduleId") UUID scheduleId);
+
+    @Query(value = "SELECT employee_id FROM schedules WHERE id = :scheduleId", nativeQuery = true)
+    Optional<UUID> findEmployeeIdByScheduleId(@Param("scheduleId") UUID scheduleId);
 } 

@@ -72,6 +72,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/test/**").permitAll()
                                                 .requestMatchers("/api/health").permitAll()
                                                 .requestMatchers("/api/webhooks/sendgrid/**").permitAll()
+                                                .requestMatchers("/api/webhooks/whatsapp/**").permitAll()
                                                  .requestMatchers("/api/public/**").permitAll()
                                                 .requestMatchers("/api/v1/public/**").permitAll()
                                                  .requestMatchers("/api/diagnostic/**").permitAll()
@@ -342,6 +343,12 @@ public class SecurityConfig {
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
                                                                 "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
+                                                .requestMatchers("/api/whatsapp/agent/conversations/**")
+                                                .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
+                                                                "LEADS_DELETE",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_COMERCIAL",
+                                                                "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 // CRM, oportunidades, Kanban, dashboard comercial e metas
                                                 .requestMatchers("/api/crm/**", "/api/opportunities/**",
                                                                 "/api/kanban-status/**",
@@ -431,6 +438,17 @@ public class SecurityConfig {
                                                                 "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS")
+                                                // Holerites/comprovantes do próprio colaborador (qualquer perfil com vínculo)
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/payslips/me")
+                                                .authenticated()
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/receipts/me")
+                                                .authenticated()
+                                                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                                                "/api/employee-certifications/me",
+                                                                "/api/employee-certifications/me/stats")
+                                                .authenticated()
                                                 // Endpoints de holerites - requerem permissões específicas
                                                 .requestMatchers("/api/payslips/**")
                                                 .hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE",
@@ -439,7 +457,10 @@ public class SecurityConfig {
                                                                 "ROLE_RH", "ROLE_FINANCEIRO",
                                                                 "ROLE_COLABORADOR", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
-                                                                "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
+                                                                "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO",
+                                                                "COMERCIAL", "ROLE_COMERCIAL",
+                                                                "GESTOR_COMERCIAL", "ROLE_GESTOR_COMERCIAL",
+                                                                "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 // Endpoints de recibos - requerem permissões específicas
                                                 .requestMatchers("/api/receipts/**")
                                                 .hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE",
@@ -448,7 +469,10 @@ public class SecurityConfig {
                                                                 "ROLE_FINANCEIRO", "ROLE_COLABORADOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
-                                                                "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
+                                                                "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO",
+                                                                "COMERCIAL", "ROLE_COMERCIAL",
+                                                                "GESTOR_COMERCIAL", "ROLE_GESTOR_COMERCIAL",
+                                                                "ASSISTENTE_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 // Endpoints de documentos unificados - arquivos públicos para
                                                 // download/visualização
                                                 .requestMatchers("/api/unified-documents/public/**").permitAll()
@@ -560,9 +584,12 @@ public class SecurityConfig {
                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
                                                 // Endpoints de clientes - temporariamente públicos para debug
                                                 .requestMatchers("/api/clients/**").permitAll()
-                                                // Endpoints de documentos e certificações - restritos a RH e Admins
-                                                .requestMatchers("/api/documents/**", "/api/employee-certifications/**")
+                                                // Documentos de RH - restritos a RH e Admins
+                                                .requestMatchers("/api/documents/**")
                                                 .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "RH", "ADMIN", "SUPER_ADMIN")
+                                                // Certificações: autenticado no HTTP; regra fina no controller (@PreAuthorize / checagem de employeeId)
+                                                .requestMatchers("/api/employee-certifications/**")
+                                                .authenticated()
                                                 // Endpoints de multas - requerem apenas autenticação (temporário para
                                                 // desenvolvimento)
                                                 .requestMatchers("/api/fines/**").authenticated()

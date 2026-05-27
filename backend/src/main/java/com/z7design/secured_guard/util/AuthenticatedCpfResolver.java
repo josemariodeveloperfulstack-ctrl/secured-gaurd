@@ -7,14 +7,21 @@ import com.z7design.secured_guard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class AuthenticatedCpfResolver {
+
+    private static final Set<String> PAYSLIP_ADMIN_AUTHORITIES = Set.of(
+          "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_FINANCEIRO", "ROLE_DEPARTAMENTO_PESSOAL",
+          "SUPER_ADMIN", "ADMIN", "RH", "FINANCEIRO", "DEPARTAMENTO_PESSOAL",
+          "PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE", "PAYSLIPS_DELETE", "PAYSLIPS_PUBLISH");
 
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
@@ -121,6 +128,19 @@ public class AuthenticatedCpfResolver {
             return Optional.empty();
         }
         return normalizeCpf(employee.getDocument());
+    }
+
+    /**
+     * Perfis que não são RH/Financeiro devem ver apenas documentos do próprio CPF
+     * (holerites, comprovantes, etc.), inclusive COMERCIAL com vínculo de funcionário.
+     */
+    public boolean restrictsToOwnEmployeeDocuments(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return true;
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .noneMatch(PAYSLIP_ADMIN_AUTHORITIES::contains);
     }
 }
 

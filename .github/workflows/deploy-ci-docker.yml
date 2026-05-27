@@ -304,8 +304,19 @@ jobs:
             printf 'MAIL_TIMEOUT=%s\n' "${{ secrets.MAIL_TIMEOUT || '10000' }}"
             printf 'MAIL_WRITE_TIMEOUT=%s\n' "${{ secrets.MAIL_WRITE_TIMEOUT || '10000' }}"
             printf 'MAIL_DEBUG=%s\n' "${{ secrets.MAIL_DEBUG || 'false' }}"
-            printf '# WhatsApp Configuration\n'
-            # Usar whatsapp-service-ci:3333 que está definido no docker-compose.ci.yml
+            printf '# WhatsApp — Agente multi-provedor\n'
+            printf 'WHATSAPP_PROVIDER_ORDER=%s\n' "${{ secrets.WHATSAPP_PROVIDER_ORDER || 'evolution,uazapi,zapi,baileys' }}"
+            printf 'EVOLUTION_API_ENABLED=%s\n' "${{ secrets.EVOLUTION_API_ENABLED || 'true' }}"
+            printf 'EVOLUTION_API_URL=%s\n' "${{ secrets.EVOLUTION_API_URL || 'http://evolution-api-ci:8080' }}"
+            printf 'EVOLUTION_API_KEY=%s\n' "${{ secrets.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976' }}"
+            printf 'EVOLUTION_API_INSTANCE=%s\n' "${{ secrets.EVOLUTION_API_INSTANCE || 'securedguard' }}"
+            printf 'UAZAPI_ENABLED=%s\n' "${{ secrets.UAZAPI_ENABLED || 'false' }}"
+            printf 'UAZAPI_BASE_URL=%s\n' "${{ secrets.UAZAPI_BASE_URL || '' }}"
+            printf 'UAZAPI_INSTANCE_TOKEN=%s\n' "${{ secrets.UAZAPI_INSTANCE_TOKEN || '' }}"
+            printf 'ZAPI_ENABLED=%s\n' "${{ secrets.ZAPI_ENABLED || 'false' }}"
+            printf 'ZAPI_INSTANCE_ID=%s\n' "${{ secrets.ZAPI_INSTANCE_ID || '' }}"
+            printf 'ZAPI_INSTANCE_TOKEN=%s\n' "${{ secrets.ZAPI_INSTANCE_TOKEN || '' }}"
+            printf 'ZAPI_CLIENT_TOKEN=%s\n' "${{ secrets.ZAPI_CLIENT_TOKEN || '' }}"
             printf 'BAILEYS_REST_URL=%s\n' "${{ secrets.BAILEYS_REST_URL || 'http://whatsapp-service-ci:3333' }}"
             printf 'BAILEYS_ENABLED=%s\n' "${{ secrets.BAILEYS_ENABLED || 'true' }}"
             printf 'BAILEYS_INSTANCE_KEY=%s\n' "${{ secrets.BAILEYS_INSTANCE_KEY || 'securedguard_ci' }}"

@@ -61,6 +61,8 @@ public class EmailDispatchService {
     private final SmtpMailSendService smtpMailSendService;
     private final EmailTemplateRenderer renderer;
     private final EmailUnsubscribeService unsubscribeService;
+    private final EmailTrackingService emailTrackingService;
+    private final EmailMarketingInlineAssetsService emailMarketingInlineAssetsService;
     private final Environment environment;
 
     @Value("${app.email.marketing.assets-base-url}")
@@ -177,12 +179,16 @@ public class EmailDispatchService {
         String subject = renderer.renderText(ctx.baseSubject, context);
         String html = renderer.renderHtml(ctx.baseHtml, context);
         html = injectUnsubscribeFooter(html, context.get("unsubscribeUrl"));
+        html = emailTrackingService.injectTracking(html, log.getId());
 
         try {
             String messageId = dispatchByProvider(campaign, log, recipient, subject, html);
             log.setProviderMessageId(messageId);
-            log.setStatus(EmailLogStatus.SENT);
-            log.setSentAt(Instant.now());
+            Instant sentAt = Instant.now();
+            log.setSentAt(sentAt);
+            // SMTP não envia webhooks: consideramos entregue quando o servidor aceita a mensagem.
+            log.setDeliveredAt(sentAt);
+            log.setStatus(EmailLogStatus.DELIVERED);
         } catch (IOException | jakarta.mail.MessagingException | RuntimeException e) {
             log.setStatus(EmailLogStatus.DROPPED);
             log.setBounceReason(truncate(e.getMessage(), 1000));
@@ -204,13 +210,14 @@ public class EmailDispatchService {
                                       String subject,
                                       String html) throws IOException, jakarta.mail.MessagingException {
         com.z7design.secured_guard.model.enums.EmailProviderType provider = campaign.getProviderType();
+        List<EmailInlineImage> inlineImages = emailMarketingInlineAssetsService.standardMarketingImages();
         if (provider == com.z7design.secured_guard.model.enums.EmailProviderType.SMTP) {
             return smtpMailSendService.sendHtml(
-                    log, recipient.getEmail(), recipient.getName(), subject, html);
+                    log, recipient.getEmail(), recipient.getName(), subject, html, inlineImages);
         }
         // SENDGRID (default)
         return sendGridMailSendService.sendHtml(
-                log, recipient.getEmail(), recipient.getName(), subject, html);
+                log, recipient.getEmail(), recipient.getName(), subject, html, inlineImages);
     }
 
     private void markCompletedIfDrained(EmailCampaign campaign) {
@@ -247,9 +254,8 @@ public class EmailDispatchService {
         // unsubscribe — sempre presente, mesmo quando base-url não está configurada
         String unsubUrl = unsubscribeService.buildUnsubscribeUrl(r.getEmail(), campaign);
         map.put("unsubscribeUrl", unsubUrl);
-        String assetsBase = resolvePublicAssetsBase();
-        map.put("brandLogoUrl", assetsBase + "/email-marketing/promover-logo.png");
-        map.put("brandBannerUrl", assetsBase + "/email-marketing/promover-hero-banner.png");
+        // Logo e banner embutidos no MIME (cid:) — não dependem de URL pública no Gmail/Outlook
+        emailMarketingInlineAssetsService.putCidPlaceholders(map);
         String wa = buildWhatsappUrlWithPrefill(nomeContato);
         map.put("whatsappUrl", wa);
         map.put("ctaUrl", wa);
@@ -327,8 +333,14 @@ public class EmailDispatchService {
         String primary = stripTrailingSlashes(emailMarketingAssetsBaseUrl);
         String fallback = stripTrailingSlashes(emailMarketingAssetsBaseUrlFallback);
         if (isUnsafeForPublicEmailImages(primary) && !fallback.isBlank()) {
-            LOG.debug("E-mail marketing: a usar assets-base-url-fallback (URL principal não é publicamente acessível).");
+            LOG.info("E-mail marketing: imagens (logo/banner) via fallback público {} (URL principal {} inacessível para clientes de e-mail).",
+                    fallback, primary.isBlank() ? "(vazio)" : primary);
             return fallback;
+        }
+        if (isUnsafeForPublicEmailImages(primary)) {
+            LOG.warn("E-mail marketing: assets-base-url ({}) não é acessível pelo Gmail/Outlook. "
+                    + "Configure EMAIL_MARKETING_ASSETS_BASE_FALLBACK ou EMAIL_MARKETING_ASSETS_BASE_URL com HTTPS público.",
+                    primary.isBlank() ? "localhost:" + environment.getProperty("server.port", "8083") : primary);
         }
         if (!primary.isBlank()) {
             return primary;

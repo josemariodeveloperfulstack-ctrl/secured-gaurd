@@ -73,6 +73,7 @@ export const timeRecordService = {
     saidaAlmoco?: string;
     retornoAlmoco?: string;
     saida?: string;
+    cargaHorariaNormal?: number;
   }) {
     const response = await api.post('/time-records/manual/day', {
       employeeId,
@@ -81,6 +82,7 @@ export const timeRecordService = {
       saidaAlmoco: payload.saidaAlmoco || undefined,
       retornoAlmoco: payload.retornoAlmoco || undefined,
       saida: payload.saida || undefined,
+      cargaHorariaNormal: payload.cargaHorariaNormal ?? 8,
     });
     return response.data;
   },

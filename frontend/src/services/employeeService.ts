@@ -155,9 +155,56 @@ export interface EmployeeFilters {
   companyId?: string;
   unitId?: string;
   workPostId?: string;
+  hireDateFrom?: string;
+  hireDateTo?: string;
+  terminationDateFrom?: string;
+  terminationDateTo?: string;
   /** Ordenação no servidor (lista paginada): admissão ou demissão mais recente primeiro com sortDir desc */
   sortBy?: 'hireDate' | 'terminationDate';
   sortDir?: 'asc' | 'desc';
+}
+
+/** Parâmetros de query para /api/employees/stats e /api/employees/paged (filtros compartilhados). */
+function buildEmployeeListQueryParams(
+  filters?: EmployeeFilters,
+  page?: number,
+  size?: number,
+): Record<string, string | number> {
+  const params: Record<string, string | number> = {};
+  if (page != null) params.page = page;
+  if (size != null) params.size = size;
+  if (filters?.searchTerm?.trim()) {
+    params.searchTerm = filters.searchTerm.trim();
+  }
+  if (filters?.status && filters.status !== 'all') {
+    params.status = filters.status;
+  }
+  if (filters?.companyId && filters.companyId !== 'all') {
+    params.companyId = filters.companyId;
+  }
+  if (filters?.unitId && filters.unitId !== 'all') {
+    params.unitId = filters.unitId;
+  }
+  if (filters?.workPostId && filters.workPostId !== 'all') {
+    params.workPostId = filters.workPostId;
+  }
+  if (filters?.hireDateFrom) {
+    params.hireDateFrom = filters.hireDateFrom;
+  }
+  if (filters?.hireDateTo) {
+    params.hireDateTo = filters.hireDateTo;
+  }
+  if (filters?.terminationDateFrom) {
+    params.terminationDateFrom = filters.terminationDateFrom;
+  }
+  if (filters?.terminationDateTo) {
+    params.terminationDateTo = filters.terminationDateTo;
+  }
+  if (filters?.sortBy && filters?.sortDir) {
+    params.sortBy = filters.sortBy;
+    params.sortDir = filters.sortDir;
+  }
+  return params;
 }
 
 export const employeeService = {
@@ -166,27 +213,7 @@ export const employeeService = {
    */
   async getAllEmployees(filters?: EmployeeFilters, page = 0, size = 500): Promise<Employee[]> {
     try {
-      const params: any = { page, size };
-      if (filters?.searchTerm && filters.searchTerm.trim()) {
-        params.searchTerm = filters.searchTerm.trim();
-      }
-      if (filters?.status && filters.status !== 'all') {
-        params.status = filters.status; // Enviado para API filtrar no backend (ACTIVE, TERMINATED, etc.)
-      }
-      if (filters?.companyId && filters.companyId !== 'all') {
-        params.companyId = filters.companyId;
-      }
-      if (filters?.unitId && filters.unitId !== 'all') {
-        params.unitId = filters.unitId;
-      }
-      if (filters?.workPostId && filters.workPostId !== 'all') {
-        params.workPostId = filters.workPostId;
-      }
-      if (filters?.sortBy && filters?.sortDir) {
-        params.sortBy = filters.sortBy;
-        params.sortDir = filters.sortDir;
-      }
-
+      const params = buildEmployeeListQueryParams(filters, page, size);
       const response = await api.get('/api/employees/paged', { params });
       const employees = response.data || [];
       return employees.map((e: any) => this.normalizeEmployee(e));
@@ -198,9 +225,9 @@ export const employeeService = {
 
   /**
    * Obter estatísticas de funcionários (total, ativos, férias, demitidos/suspensos).
-   * Se companyId for informado, retorna estatísticas da empresa.
+   * Usa os mesmos filtros da listagem paginada (busca, empresa, status, datas).
    */
-  async getEmployeesStats(companyId?: string): Promise<{
+  async getEmployeesStats(filters?: EmployeeFilters): Promise<{
     total: number;
     active: number;
     vacation: number;
@@ -209,7 +236,7 @@ export const employeeService = {
     suspended: number;
   }> {
     try {
-      const params = companyId && companyId !== 'all' ? { companyId } : {};
+      const params = buildEmployeeListQueryParams(filters);
       const response = await api.get('/api/employees/stats', { params });
       const d = response.data ?? {};
       return {

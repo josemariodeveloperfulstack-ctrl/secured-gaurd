@@ -78,10 +78,12 @@ public class OperationalRolePermissionMapper {
             OperationalPermission.REPORT_NOTIFICATION
         )));
         
-        // SUPERVISOR - Permissões de supervisão
+        // SUPERVISOR - Permissões de supervisão (CRUD de escalas)
         rolePermissions.put("SUPERVISOR", new HashSet<>(Arrays.asList(
+            OperationalPermission.SCHEDULE_CREATE,
             OperationalPermission.SCHEDULE_READ,
             OperationalPermission.SCHEDULE_UPDATE,
+            OperationalPermission.SCHEDULE_DELETE,
             OperationalPermission.SCHEDULE_CONFIRM,
             OperationalPermission.SCHEDULE_CANCEL,
             OperationalPermission.SCHEDULE_COMPLETE,

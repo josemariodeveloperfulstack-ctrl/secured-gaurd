@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -69,14 +70,17 @@ public class EmployeeCertificationController {
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
 
-    @Operation(summary = "Lista certificações com filtros (RH/DP/Admin)")
+    @Operation(summary = "Lista certificações com filtros (RH/DP/Admin ou próprio funcionário)")
     @GetMapping
-    @PreAuthorize(READ_ALL_AUTHORITY)
     public ResponseEntity<List<EmployeeCertificationResponse>> find(
             @RequestParam(value = "employeeId", required = false) UUID employeeId,
             @RequestParam(value = "trainingId", required = false) UUID trainingId,
             @RequestParam(value = "status", required = false) CertificationStatus status,
             @RequestParam(value = "expiringBefore", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate expiringBefore) {
+
+        if (!canReadCertifications(employeeId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         if (employeeId == null && trainingId == null && status == null && expiringBefore == null) {
             return ResponseEntity.ok(certificationService.findAll());
@@ -190,6 +194,40 @@ public class EmployeeCertificationController {
      *   <li>Tenta resolver por username / email do usuário.</li>
      * </ol>
      */
+    private boolean canReadCertifications(UUID employeeId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return false;
+        }
+        boolean hasHrRead = auth.getAuthorities().stream().anyMatch(a -> {
+            String role = a.getAuthority();
+            return role.equals("HR_READ") || role.equals("REPORTS_READ")
+                    || role.equals("ROLE_SUPER_ADMIN") || role.equals("ROLE_ADMIN")
+                    || role.equals("ROLE_GESTOR") || role.equals("ROLE_RH")
+                    || role.equals("ROLE_DEPARTAMENTO_PESSOAL") || role.equals("ROLE_AUDITOR")
+                    || role.equals("SUPER_ADMIN") || role.equals("ADMIN")
+                    || role.equals("GESTOR") || role.equals("RH")
+                    || role.equals("DEPARTAMENTO_PESSOAL") || role.equals("AUDITOR");
+        });
+        if (hasHrRead) {
+            return true;
+        }
+        if (employeeId == null) {
+            return false;
+        }
+        Optional<UUID> ownEmployeeId = resolveAuthenticatedEmployeeId();
+        if (ownEmployeeId.isPresent() && ownEmployeeId.get().equals(employeeId)) {
+            return true;
+        }
+        // Portal legado pode enviar user.id; permitir se o funcionário estiver vinculado ao usuário logado
+        return userRepository.findByUsername(auth.getName())
+                .or(() -> userRepository.findByEmail(auth.getName()))
+                .map(User::getId)
+                .flatMap(employeeRepository::findByUserId)
+                .map(emp -> emp.getId().equals(employeeId))
+                .orElse(false);
+    }
+
     private Optional<UUID> resolveAuthenticatedEmployeeId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {

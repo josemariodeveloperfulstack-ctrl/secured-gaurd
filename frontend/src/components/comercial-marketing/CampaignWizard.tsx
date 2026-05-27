@@ -124,12 +124,14 @@ export function CampaignWizard({ open, onClose }: CampaignWizardProps) {
         description: state.description.trim() || null,
         defaultTemplateId: state.defaultTemplateId,
         providerType: state.providerType,
-        maxEmails: numberOrNull(state.maxEmails),
+        totalLimit: numberOrNull(state.maxEmails),
         dailyLimit: numberOrNull(state.dailyLimit),
         hourlyLimit: numberOrNull(state.hourlyLimit),
         minIntervalSeconds: numberOrNull(state.minIntervalSeconds),
         scheduledAt: state.scheduledAt ? new Date(state.scheduledAt).toISOString() : null,
-        recipients: state.recipients,
+        recipients: state.recipients.filter(
+          (r) => r.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim())
+        ),
       });
       if (state.sendNow) {
         await emailCampaignService.send(created.id, {
@@ -152,7 +154,14 @@ export function CampaignWizard({ open, onClose }: CampaignWizardProps) {
       onClose();
     },
     onError: (e: unknown) => {
-      const msg = e instanceof Error ? e.message : 'Falha desconhecida';
+      const data = (e as { response?: { data?: { message?: string; fieldErrors?: Record<string, string> } } })
+        ?.response?.data;
+      const msg =
+        data?.fieldErrors && Object.keys(data.fieldErrors).length > 0
+          ? Object.entries(data.fieldErrors)
+              .map(([field, message]) => `${field}: ${message}`)
+              .join(' · ')
+          : data?.message ?? (e instanceof Error ? e.message : 'Falha desconhecida');
       toast({ title: 'Não foi possível salvar', description: msg, variant: 'destructive' });
     },
   });

@@ -492,7 +492,10 @@ const Operacional: React.FC = () => {
   const confirmDeleteEscala = async () => {
     if (!escalaToDelete) return;
 
-    const employeeName = escalaToDelete.employee?.name ?? 'a escala';
+    const employeeName =
+      escalaToDelete.employeeName ||
+      escalaToDelete.employee?.name ||
+      'funcionário';
     try {
       await scheduleService.delete(escalaToDelete.id);
       setEscalas(prev => prev.filter(e => e.id !== escalaToDelete.id));
@@ -648,8 +651,8 @@ const Operacional: React.FC = () => {
       if (selectedEscala) {
         // Atualizar escala existente
         const updateData: UpdateScheduleDTO = scheduleData;
-        await scheduleService.update(selectedEscala.id, updateData);
-        setEscalas(prev => prev.map(e => e.id === selectedEscala.id ? { ...e, ...scheduleData } : e));
+        const updated = await scheduleService.update(selectedEscala.id, updateData);
+        setEscalas(prev => prev.map(e => e.id === selectedEscala.id ? updated : e));
         toast({
           title: 'Sucesso!',
           description: 'Escala atualizada com sucesso.',

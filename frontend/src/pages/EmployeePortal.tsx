@@ -40,7 +40,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { timeRecordService } from '@/services/timeRecordService';
 import { feriasService } from '@/services/feriasService';
-import { trainingService } from '@/services/trainingService';
+import certificationService from '@/services/certificationService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import supportService, { TicketCategory, TicketPriority } from '@/services/supportService';
@@ -101,13 +101,13 @@ const EmployeePortal: React.FC = () => {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const employeeId = user.id;
-      
+      const employeeId = (user as { employeeId?: string }).employeeId ?? user.id;
+
       const [recordsRes, nextRes, feriasRes, certsRes] = await Promise.all([
         timeRecordService.getTodayRecords(employeeId).catch(() => ({ success: false, data: [] })),
         timeRecordService.getNextRecordType(employeeId).catch(() => ({ success: false, nextRecordType: 'ENTRADA' })),
         feriasService.getFeriasByEmployee(employeeId).catch(() => []),
-        trainingService.getEmployeeCertifications({ employeeId }).catch(() => [])
+        certificationService.getMyCertifications().catch(() => [])
       ]);
 
       if (recordsRes?.success) setTodayRecords(recordsRes.data || []);

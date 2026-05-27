@@ -18,6 +18,12 @@ const sanitizeRole = (roleStr: string): string => {
   ) {
     return 'ANALISTA_SUPRIMENTOS';
   }
+  if (clean === 'RECURSOS_HUMANOS' || clean === 'HR') {
+    return 'RH';
+  }
+  if (clean === 'ASSISTENTE_DE_RH' || clean === 'ASSISTENTE_RH') {
+    return 'ASSISTENCIA_RH';
+  }
   return clean;
 };
 

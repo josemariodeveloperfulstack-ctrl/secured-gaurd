@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.service.sendgrid;
 
+import com.z7design.secured_guard.config.MailBranding;
 import com.z7design.secured_guard.model.EmailLog;
 import com.z7design.secured_guard.model.SmtpSettings;
 import com.z7design.secured_guard.repository.SmtpSettingsRepository;
@@ -13,10 +14,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.UUID;
@@ -38,6 +42,7 @@ public class SmtpMailSendService {
 
     private final SmtpSettingsRepository smtpSettingsRepository;
     private final EncryptionService encryptionService;
+    private final MailBranding mailBranding;
 
     /**
      * Envia um e-mail HTML usando a configuração SMTP ativa.
@@ -51,13 +56,26 @@ public class SmtpMailSendService {
                            String toName,
                            String subject,
                            String htmlBody) throws MessagingException, MailException {
+        return sendHtml(emailLog, toEmail, toName, subject, htmlBody, Collections.emptyList());
+    }
+
+    /**
+     * Envia HTML com imagens embutidas (CID), ex.: logomarca e banner de marketing.
+     */
+    public String sendHtml(EmailLog emailLog,
+                           String toEmail,
+                           String toName,
+                           String subject,
+                           String htmlBody,
+                           List<EmailInlineImage> inlineImages) throws MessagingException, MailException {
         SmtpSettings cfg = smtpSettingsRepository.findFirstByIsActiveTrueOrderByUpdatedAtDesc()
                 .orElseThrow(() -> new IllegalStateException(
                         "Nenhuma configuração SMTP ativa. Configure em Marketing → SMTP."));
 
+        boolean multipart = inlineImages != null && !inlineImages.isEmpty();
         JavaMailSender sender = build(cfg);
         MimeMessage mime = sender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(mime, false, StandardCharsets.UTF_8.name());
+        MimeMessageHelper helper = new MimeMessageHelper(mime, multipart, StandardCharsets.UTF_8.name());
 
         // From
         try {
@@ -81,6 +99,18 @@ public class SmtpMailSendService {
 
         helper.setSubject(subject != null ? subject : "");
         helper.setText(htmlBody, true);
+
+        if (multipart && inlineImages != null) {
+            for (EmailInlineImage img : inlineImages) {
+                if (img == null || img.contentId() == null || img.contentId().isBlank()
+                        || img.data() == null || img.data().length == 0) {
+                    continue;
+                }
+                String mimeType = img.mimeType() != null && !img.mimeType().isBlank()
+                        ? img.mimeType() : "image/png";
+                helper.addInline(img.contentId(), new ByteArrayResource(img.data()), mimeType);
+            }
+        }
 
         // Carimba o emailLogId no Message-ID para correlacionar com tracking
         // (mesma estratégia do SendGrid via custom-arg).
@@ -106,12 +136,13 @@ public class SmtpMailSendService {
             MimeMessageHelper helper = new MimeMessageHelper(mime, false, StandardCharsets.UTF_8.name());
             helper.setFrom(cfg.getFromEmail());
             helper.setTo(to);
+            String brand = mailBranding.getBrandName();
             helper.setSubject(subject != null && !subject.isBlank()
-                    ? subject : "[SecuredGuard] Teste de configuração SMTP");
+                    ? subject : mailBranding.prefixSubject("Teste de configuração SMTP"));
             helper.setText(body != null && !body.isBlank()
                     ? body
                     : "<p>Olá!</p><p>Este é um e-mail de teste enviado para validar suas configurações "
-                            + "SMTP no <strong>SecuredGuard</strong>.</p>", true);
+                            + "SMTP no <strong>" + brand + "</strong>.</p>", true);
             sender.send(mime);
             return Optional.empty();
         } catch (Exception e) {

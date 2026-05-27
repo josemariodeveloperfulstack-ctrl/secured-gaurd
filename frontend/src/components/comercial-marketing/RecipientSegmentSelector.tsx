@@ -55,8 +55,11 @@ export function RecipientSegmentSelector({
           dark ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-900',
         )}
       >
-        Para segmentar por cidade, estado ou tipo de empresa, mapeie essas colunas ao importar a planilha
-        (aba Importar planilha → Mapear colunas).
+        <>
+          Para segmentar por cidade, estado ou tipo de empresa, mapeie essas colunas ao importar a planilha (aba
+          Importar planilha → Mapear colunas). Se a planilha só tiver coluna Bairro, mapeie-a em Cidade — o sistema
+          agrupa e filtra por esse valor.
+        </>
       </div>
     );
   }

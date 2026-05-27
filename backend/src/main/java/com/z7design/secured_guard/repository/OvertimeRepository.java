@@ -20,6 +20,8 @@ public interface OvertimeRepository extends JpaRepository<Overtime, UUID> {
     List<Overtime> findByEmployeeIdAndType(UUID employeeId, OvertimeType type);
     List<Overtime> findByEmployeeIdAndOvertimeDateBetween(UUID employeeId, LocalDate startDate, LocalDate endDate);
 
+    List<Overtime> findByEmployeeIdAndOvertimeDate(UUID employeeId, LocalDate overtimeDate);
+
     List<Overtime> findByStatus(OvertimeStatus status);
 
     @Query("SELECT DISTINCT o FROM Overtime o LEFT JOIN FETCH o.employee LEFT JOIN FETCH o.workPost ORDER BY o.overtimeDate DESC, o.id")

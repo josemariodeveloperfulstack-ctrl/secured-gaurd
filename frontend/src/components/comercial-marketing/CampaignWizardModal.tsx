@@ -36,6 +36,7 @@ import {
   FileSpreadsheet,
   ClipboardPaste,
 } from 'lucide-react';
+import { isValidEmail } from '@/components/comercial-marketing/utils/recipientParser';
 
 interface CampaignWizardModalProps {
   open: boolean;
@@ -60,6 +61,19 @@ const STEPS: StepDef[] = [
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function formatCampaignApiError(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: { message?: string; fieldErrors?: Record<string, string> } } })
+    ?.response?.data;
+  if (data?.fieldErrors && Object.keys(data.fieldErrors).length > 0) {
+    return Object.entries(data.fieldErrors)
+      .map(([field, message]) => `${field}: ${message}`)
+      .join(' · ');
+  }
+  if (data?.message) return data.message;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
 
 function parsePastedRecipients(raw: string): EmailCampaignRecipientInput[] {
   const lines = raw
@@ -195,7 +209,7 @@ const CampaignWizardModal: React.FC<CampaignWizardModalProps> = ({ open, onOpenC
     for (const r of pastedRecipients) map.set(r.email, r);
     for (const r of importedRecipients) map.set(r.email, r);
     for (const r of crmRecipients) map.set(r.email, r);
-    return Array.from(map.values());
+    return Array.from(map.values()).filter((r) => isValidEmail(r.email));
   }, [crmRecipients, importedRecipients, pastedRecipients]);
 
   const extraVars = useMemo(() => {
@@ -237,15 +251,21 @@ const CampaignWizardModal: React.FC<CampaignWizardModalProps> = ({ open, onOpenC
     onSuccess: async (res) => {
       toast({
         title: 'Campanha criada',
-        description: `${mergedRecipients.length} destinatário(s) registrado(s).`,
+        description:
+          mergedRecipients.length > 0
+            ? `${mergedRecipients.length} destinatário(s) registrado(s).`
+            : 'Campanha em rascunho. Acrescente destinatários na aba Lista de leads.',
       });
       await queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
       onCreated?.(res.id);
       onOpenChange(false);
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Erro ao criar campanha.';
-      toast({ title: 'Erro', description: msg, variant: 'destructive' });
+      toast({
+        title: 'Erro ao criar campanha',
+        description: formatCampaignApiError(err, 'Verifique título, destinatários e template.'),
+        variant: 'destructive',
+      });
     },
   });
 
@@ -302,13 +322,13 @@ const CampaignWizardModal: React.FC<CampaignWizardModalProps> = ({ open, onOpenC
       case 'info':
         return title.trim().length >= 3;
       case 'recipients':
-        return mergedRecipients.length > 0;
+        return true;
       case 'template':
         return true; // template é opcional (pode enviar manual depois)
       case 'limits':
         return true;
       case 'review':
-        return title.trim().length >= 3 && mergedRecipients.length > 0;
+        return title.trim().length >= 3;
       default:
         return false;
     }

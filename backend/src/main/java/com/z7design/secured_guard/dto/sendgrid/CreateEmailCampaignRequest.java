@@ -2,7 +2,7 @@ package com.z7design.secured_guard.dto.sendgrid;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,6 +29,7 @@ public record CreateEmailCampaignRequest(
         Integer hourlyLimit,
         Integer minIntervalSeconds,
         Instant scheduledAt,
-        @NotEmpty @Valid List<EmailCampaignRecipientDto> recipients
+        /** Pode ser vazio: destinatários podem ser acrescentados depois na aba Lista de leads. */
+        @NotNull @Valid List<EmailCampaignRecipientDto> recipients
 ) {
 }

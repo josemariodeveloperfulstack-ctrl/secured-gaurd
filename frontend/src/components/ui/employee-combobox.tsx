@@ -44,6 +44,8 @@ interface EmployeeComboboxProps {
    * a busca é case-insensitive e considera "contém". Útil para listar apenas supervisores, etc.
    */
   positionFilter?: string | string[];
+  /** Exibe apenas o nome no botão (sem cargo/posto). A lista de busca mantém detalhes. */
+  displayNameOnly?: boolean;
 }
 
 export function EmployeeCombobox({ 
@@ -56,7 +58,8 @@ export function EmployeeCombobox({
   minChars = 3,
   initialDisplayName,
   onEmployeeSelect,
-  positionFilter
+  positionFilter,
+  displayNameOnly = false
 }: EmployeeComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [employees, setEmployees] = React.useState<SimpleEmployee[]>([])
@@ -217,11 +220,16 @@ export function EmployeeCombobox({
     employee: emp
   }))
 
+  const formatEmployeeLabel = (emp: SimpleEmployee, nameOnly: boolean) => {
+    if (nameOnly) return emp.name;
+    return `${emp.name}${emp.positionName ? ` - ${emp.positionName}` : ''}${(emp.workPostName || emp.unitName) ? ` (${emp.workPostName || emp.unitName})` : ''}`;
+  };
+
   const effectiveSelected = selectedEmployee || employees.find(emp => emp.id === value)
   const displayLabel = effectiveSelected
-    ? `${effectiveSelected.name}${effectiveSelected.positionName ? ` - ${effectiveSelected.positionName}` : ''}${(effectiveSelected.workPostName || effectiveSelected.unitName) ? ` (${effectiveSelected.workPostName || effectiveSelected.unitName})` : ''}`
+    ? formatEmployeeLabel(effectiveSelected, displayNameOnly)
     : value && initialDisplayName
-      ? initialDisplayName
+      ? (displayNameOnly ? initialDisplayName.split(' - ')[0].split(' (')[0].trim() : initialDisplayName)
       : null
 
   const isSelectedInactive = effectiveSelected && isInactive(effectiveSelected.status);

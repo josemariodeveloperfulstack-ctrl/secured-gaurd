@@ -28,6 +28,7 @@ public class TimeRecordService {
     private final EmployeeRepository employeeRepository;
     private final WorkPostRepository workPostRepository;
     private final AuthenticatedCpfResolver authenticatedCpfResolver;
+    private final ManualTimesheetOvertimeSyncService manualTimesheetOvertimeSyncService;
 
     @Transactional
     public TimeRecord registerTimeRecord(UUID employeeId, TimeRecord.RecordType recordType,
@@ -272,6 +273,11 @@ public class TimeRecordService {
     @Transactional
     public List<TimeRecord> saveManualDay(UUID employeeId, LocalDate date,
             String entrada, String saidaAlmoco, String retornoAlmoco, String saida) {
+        return saveManualDay(employeeId, date, entrada, saidaAlmoco, retornoAlmoco, saida, 8.0);
+    }
+
+    public List<TimeRecord> saveManualDay(UUID employeeId, LocalDate date,
+            String entrada, String saidaAlmoco, String retornoAlmoco, String saida, double cargaHorariaNormal) {
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Funcionário não encontrado"));
 
@@ -291,6 +297,10 @@ public class TimeRecordService {
         if (isValidTime(saida)) {
             saved.add(saveManualRecord(employee, date, saida, TimeRecord.RecordType.SAIDA));
         }
+
+        double normalHours = cargaHorariaNormal > 0 ? cargaHorariaNormal : 8.0;
+        manualTimesheetOvertimeSyncService.syncApprovedOvertimeForManualDay(
+                employee, date, entrada, saidaAlmoco, retornoAlmoco, saida, normalHours);
 
         log.info("✅ Lançamento manual do dia {} para employee {}: {} registro(s) salvos",
                 date, employeeId, saved.size());

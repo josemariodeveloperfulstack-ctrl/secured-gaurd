@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Loader2, X } from 'lucide-react';
+import { AlertCircle, FileText, Loader2 } from 'lucide-react';
 import { RecipientPicker } from '@/components/comercial-marketing/RecipientPicker';
+import { RecipientListGrouped } from '@/components/comercial-marketing/RecipientListGrouped';
 import { RecipientSegmentSelector } from '@/components/comercial-marketing/RecipientSegmentSelector';
 import {
   applySegmentRules,
   type RecipientSegmentRule,
 } from '@/components/comercial-marketing/utils/recipientMetadata';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import emailCampaignService, { type EmailCampaignRecipientInput } from '@/services/emailCampaignService';
+import { isValidEmail } from '@/components/comercial-marketing/utils/recipientParser';
 
 const CampaignLeadsListTab: React.FC = () => {
   const { toast } = useToast();
@@ -35,17 +35,39 @@ const CampaignLeadsListTab: React.FC = () => {
 
   const draftCampaigns = (campaignsQuery.data ?? []).filter((c) => c.status === 'DRAFT');
 
+  const APPEND_CHUNK_SIZE = 400;
+
+  useEffect(() => {
+    if (campaignId || draftCampaigns.length !== 1) return;
+    setCampaignId(draftCampaigns[0].id);
+  }, [draftCampaigns, campaignId]);
+
+  const appendDisabledReason = useMemo(() => {
+    if (checkingOptOut) return 'Aguarde a verificação de descadastros (opt-out).';
+    if (draftCampaigns.length === 0) {
+      return 'Não há campanha em rascunho. Crie uma na aba Campanhas e volte aqui.';
+    }
+    if (!campaignId) return 'Selecione a campanha de destino no campo acima.';
+    if (filteredRecipients.length === 0) return 'Importe destinatários ou ajuste os lotes de segmentação.';
+    return null;
+  }, [checkingOptOut, draftCampaigns.length, campaignId, filteredRecipients.length]);
+
   const appendMutation = useMutation({
     mutationFn: async () => {
       if (!campaignId) throw new Error('Selecione uma campanha em rascunho.');
       if (filteredRecipients.length === 0) throw new Error('Monte a lista de destinatários antes de enviar.');
-      await emailCampaignService.appendRecipients(campaignId, filteredRecipients);
+      const total = filteredRecipients.length;
+      for (let i = 0; i < total; i += APPEND_CHUNK_SIZE) {
+        const chunk = filteredRecipients.slice(i, i + APPEND_CHUNK_SIZE);
+        await emailCampaignService.appendRecipients(campaignId, chunk);
+      }
+      return total;
     },
-    onSuccess: () => {
+    onSuccess: (total) => {
       void queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
       toast({
         title: 'Lista aplicada à campanha',
-        description: 'Os destinatários foram acrescentados ao rascunho. Pode continuar a montar outro lote.',
+        description: `${total?.toLocaleString('pt-BR') ?? ''} destinatário(s) acrescentados ao rascunho.`,
       });
     },
     onError: (e: unknown) => {
@@ -55,8 +77,17 @@ const CampaignLeadsListTab: React.FC = () => {
   });
 
   const handleRecipientsChange = async (next: EmailCampaignRecipientInput[]) => {
+    const sanitized = next.filter((r) => isValidEmail(r.email));
+    const droppedInvalid = next.length - sanitized.length;
+    if (droppedInvalid > 0) {
+      toast({
+        title: 'E-mails inválidos ignorados',
+        description: `${droppedInvalid} linha(s) sem e-mail válido foram excluídas da lista.`,
+        variant: 'destructive',
+      });
+    }
     const prevLower = new Set(recipients.map((r) => r.email.toLowerCase()));
-    const added = next.filter((r) => !prevLower.has(r.email.toLowerCase()));
+    const added = sanitized.filter((r) => !prevLower.has(r.email.toLowerCase()));
     if (added.length === 0) {
       setRecipients(next);
       return;
@@ -66,11 +97,11 @@ const CampaignLeadsListTab: React.FC = () => {
       const emails = added.map((r) => r.email);
       const unsubscribed = await emailCampaignService.checkUnsubscribed(emails);
       if (unsubscribed.length === 0) {
-        setRecipients(next);
+        setRecipients(sanitized);
         return;
       }
       const block = new Set(unsubscribed.map((e) => e.toLowerCase()));
-      const filtered = next.filter((r) => !block.has(r.email.toLowerCase()));
+      const filtered = sanitized.filter((r) => !block.has(r.email.toLowerCase()));
       setRecipients(filtered);
       toast({
         title: 'Opt-out aplicado',
@@ -82,7 +113,7 @@ const CampaignLeadsListTab: React.FC = () => {
         description: 'A lista foi atualizada; confira os destinatários antes de enviar.',
         variant: 'destructive',
       });
-      setRecipients(next);
+      setRecipients(sanitized);
     } finally {
       setCheckingOptOut(false);
     }
@@ -117,7 +148,7 @@ const CampaignLeadsListTab: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 text-center">
+      <div className="mx-auto max-w-6xl space-y-6 text-center">
       <div className="space-y-2">
         <div className="inline-flex items-center justify-center gap-2">
           <FileText className="h-8 w-8 text-seguranca-yellow" />
@@ -152,7 +183,16 @@ const CampaignLeadsListTab: React.FC = () => {
           </Select>
           <p className="text-xs text-slate-500">
             Só é possível acrescentar destinatários enquanto a campanha estiver em rascunho.
+            {draftCampaigns.length === 1 && campaignId && (
+              <span className="text-seguranca-yellow"> Campanha selecionada automaticamente.</span>
+            )}
           </p>
+          {draftCampaigns.length === 0 && !campaignsQuery.isLoading && (
+            <p className="text-xs text-amber-400/90 flex items-start gap-1.5 mt-2">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              Crie uma campanha na aba <strong>Campanhas</strong> (status rascunho) para habilitar o botão abaixo.
+            </p>
+          )}
         </div>
 
         <div className="relative mt-6">
@@ -207,53 +247,38 @@ const CampaignLeadsListTab: React.FC = () => {
                 </Button>
               </div>
             </div>
-            <ScrollArea className="max-h-40">
-              <div className="flex flex-wrap gap-1.5">
-                {filteredRecipients.slice(0, 80).map((r) => (
-                  <Badge key={r.email} variant="outline" className="border-white/15 text-xs text-slate-200">
-                    {r.email}
-                    <button
-                      type="button"
-                      className="ml-1 text-slate-500 hover:text-rose-400"
-                      onClick={() => setRecipients((prev) => prev.filter((x) => x.email !== r.email))}
-                      aria-label="Remover"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-                {filteredRecipients.length > 80 && (
-                  <Badge variant="outline" className="border-white/15">
-                    +{filteredRecipients.length - 80} mais
-                  </Badge>
-                )}
-              </div>
-            </ScrollArea>
+            <RecipientListGrouped
+              recipients={filteredRecipients}
+              dark
+              onRemove={(email) => setRecipients((prev) => prev.filter((x) => x.email !== email))}
+            />
           </div>
           </div>
         )}
 
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
-          <Button
-            type="button"
-            className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
-            disabled={
-              !campaignId ||
-              filteredRecipients.length === 0 ||
-              appendMutation.isPending ||
-              checkingOptOut ||
-              draftCampaigns.length === 0
-            }
-            onClick={() => appendMutation.mutate()}
-          >
-            {appendMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gravar…
-              </>
-            ) : (
-              'Acrescentar à campanha selecionada'
-            )}
-          </Button>
+        <div className="mt-6 space-y-2">
+          {appendDisabledReason && recipients.length > 0 && (
+            <p className="flex items-start gap-2 text-xs text-amber-300/90 justify-end text-right">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              {appendDisabledReason}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
+              disabled={!!appendDisabledReason || appendMutation.isPending}
+              onClick={() => appendMutation.mutate()}
+            >
+              {appendMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gravar…
+                </>
+              ) : (
+                `Acrescentar ${filteredRecipients.length.toLocaleString('pt-BR')} à campanha`
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

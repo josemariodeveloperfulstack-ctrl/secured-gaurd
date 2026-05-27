@@ -77,7 +77,8 @@ const FUNNEL: FunnelStep[] = [
   {
     key: 'DELIVERED',
     label: 'Entregues',
-    statuses: ['DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'],
+    // SMTP antigo podia gravar SENT; ambos indicam aceite pelo servidor de e-mail
+    statuses: ['SENT', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'],
     icon: <CheckCircle2 className="h-4 w-4" />,
     color: 'from-sky-500/40 to-sky-500/10 border-sky-500/40',
   },
@@ -183,8 +184,20 @@ const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({
 
   const pct = (num: number, den: number) => (den > 0 ? (num / den) * 100 : 0);
 
+  const showTrackingHint =
+    !isLive && totals.sent > 0 && totals.opened === 0 && totals.clicked === 0;
+
   return (
     <div className="space-y-6">
+      {showTrackingHint && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Aberturas e cliques em zero costumam indicar que o e-mail foi enviado{' '}
+          <strong>sem rastreamento</strong> (comum em <code className="text-xs">localhost</code>).
+          Configure uma URL pública (<code className="text-xs">EMAIL_MARKETING_TRACKING_BASE_URL</code>,
+          ex. ngrok ou CI) e envie uma <strong>nova</strong> campanha. Ver{' '}
+          <code className="text-xs">docs/EMAIL_MARKETING_RASTREAMENTO.md</code>.
+        </div>
+      )}
       {/* KPIs grandes */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <BigKpi

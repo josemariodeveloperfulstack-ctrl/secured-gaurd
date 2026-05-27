@@ -289,7 +289,7 @@ const SmtpSettingsModal: React.FC<SmtpSettingsModalProps> = ({ open, onOpenChang
                   id="smtp-from-name"
                   value={form.fromName}
                   onChange={(e) => setForm((f) => ({ ...f, fromName: e.target.value }))}
-                  placeholder="SecuredGuard"
+                  placeholder="Promover"
                   className="border-seguranca-graphite bg-seguranca-black text-white"
                 />
               </div>

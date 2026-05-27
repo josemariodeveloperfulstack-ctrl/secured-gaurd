@@ -36,10 +36,19 @@ export type ScheduleStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED'
 export interface Schedule {
   id: string;
   employee: ScheduleEmployee;
+  employeeId?: string;
+  employeeName?: string;
   scheduleDate: string; // Formato YYYY-MM-DD
   shift: Shift;
   location: ScheduleLocation;
+  locationId?: string;
+  locationName?: string;
   workPost?: ScheduleWorkPost;
+  workPostId?: string;
+  workPostName?: string;
+  workPostCode?: string;
+  clientId?: string;
+  clientName?: string;
   status: ScheduleStatus;
   observations?: string;
   sigla?: string;
@@ -51,6 +60,85 @@ export interface Schedule {
   endTime?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Normaliza ScheduleDTO (campos planos) para o formato aninhado usado na UI. */
+export function normalizeSchedule(raw: Record<string, unknown> | null | undefined): Schedule {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      id: '',
+      employee: { id: '', name: '' },
+      scheduleDate: '',
+      shift: 'DAY',
+      location: { id: '', name: '' },
+      status: 'PENDING',
+      createdAt: '',
+      updatedAt: '',
+    };
+  }
+
+  const employeeId = String(raw.employeeId ?? (raw.employee as ScheduleEmployee | undefined)?.id ?? '');
+  const employeeName = String(
+    raw.employeeName ?? (raw.employee as ScheduleEmployee | undefined)?.name ?? ''
+  ).trim();
+
+  const locationId = String(raw.locationId ?? (raw.location as ScheduleLocation | undefined)?.id ?? '');
+  const locationName = String(
+    raw.locationName ?? (raw.location as ScheduleLocation | undefined)?.name ?? ''
+  ).trim();
+
+  const workPostId = String(raw.workPostId ?? (raw.workPost as ScheduleWorkPost | undefined)?.id ?? '');
+  const workPostName = String(
+    raw.workPostName ?? (raw.workPost as ScheduleWorkPost | undefined)?.name ?? ''
+  ).trim();
+  const workPostCode = String(
+    raw.workPostCode ?? (raw.workPost as ScheduleWorkPost | undefined)?.postCode ?? ''
+  ).trim();
+
+  const workPost: ScheduleWorkPost | undefined = workPostId
+    ? {
+        id: workPostId,
+        name: workPostName,
+        postCode: workPostCode,
+        clientId: raw.clientId as string | undefined,
+        clientName: raw.clientName as string | undefined,
+      }
+    : undefined;
+
+  return {
+    ...(raw as Schedule),
+    id: String(raw.id ?? ''),
+    employeeId,
+    employeeName,
+    employee: { id: employeeId, name: employeeName },
+    scheduleDate: String(raw.scheduleDate ?? ''),
+    shift: (raw.shift as Shift) ?? 'DAY',
+    locationId,
+    locationName,
+    location: { id: locationId, name: locationName },
+    workPostId: workPostId || undefined,
+    workPostName: workPostName || undefined,
+    workPostCode: workPostCode || undefined,
+    workPost,
+    clientId: raw.clientId as string | undefined,
+    clientName: raw.clientName as string | undefined,
+    status: (raw.status as ScheduleStatus) ?? 'PENDING',
+    observations: raw.observations as string | undefined,
+    sigla: raw.sigla as string | undefined,
+    remanejamentoId: raw.remanejamentoId as string | undefined,
+    isMonitoria: Boolean(raw.isMonitoria),
+    isHoraExtra: Boolean(raw.isHoraExtra),
+    coverageScheduleId: raw.coverageScheduleId as string | undefined,
+    startTime: raw.startTime as string | undefined,
+    endTime: raw.endTime as string | undefined,
+    createdAt: String(raw.createdAt ?? ''),
+    updatedAt: String(raw.updatedAt ?? ''),
+  };
+}
+
+function normalizeScheduleList(data: unknown): Schedule[] {
+  if (!Array.isArray(data)) return [];
+  return data.map((item) => normalizeSchedule(item as Record<string, unknown>));
 }
 
 // DTO para criar uma nova escala
@@ -100,10 +188,10 @@ export const scheduleService = {
         if (data.length > 0) {
           console.log('📋 ScheduleService.findAll - Primeira escala:', data[0]);
         }
-        return data;
+        return normalizeScheduleList(data);
       } else if (data && Array.isArray(data.content)) {
         console.log('✅ ScheduleService.findAll - Retornando data.content com', data.content.length, 'escalas');
-        return data.content;
+        return normalizeScheduleList(data.content);
       } else if (data && typeof data === 'number') {
         // Se o backend retornou apenas um número (count), retornar array vazio
         console.warn('⚠️ API retornou apenas contagem de escalas:', data);
@@ -138,7 +226,7 @@ export const scheduleService = {
    */
   async findById(id: string): Promise<Schedule> {
     const response = await api.get(`/api/schedules/${id}`);
-    return response.data;
+    return normalizeSchedule(response.data);
   },
 
   /**
@@ -147,7 +235,7 @@ export const scheduleService = {
    */
   async findByEmployeeId(employeeId: string): Promise<Schedule[]> {
     const response = await api.get(`/api/schedules/employee/${employeeId}`);
-    return response.data;
+    return normalizeScheduleList(response.data);
   },
 
   /**
@@ -156,7 +244,7 @@ export const scheduleService = {
    */
   async findByDate(date: string): Promise<Schedule[]> {
     const response = await api.get('/api/schedules/date', { params: { date } });
-    return response.data;
+    return normalizeScheduleList(response.data);
   },
 
   /**
@@ -168,7 +256,7 @@ export const scheduleService = {
     try {
       const response = await api.post('/api/schedules', data);
       console.log('✅ ScheduleService.create - Resposta:', response.data);
-      return response.data;
+      return normalizeSchedule(response.data);
     } catch (error: any) {
       console.error('❌ ScheduleService.create - Erro:', error);
       console.error('❌ Response data:', error.response?.data);
@@ -184,7 +272,7 @@ export const scheduleService = {
    */
   async update(id: string, data: UpdateScheduleDTO): Promise<Schedule> {
     const response = await api.put(`/api/schedules/${id}`, data);
-    return response.data;
+    return normalizeSchedule(response.data);
   },
 
   /**
@@ -209,9 +297,9 @@ export const scheduleService = {
       
       // Garantir que sempre retornamos um array
       if (Array.isArray(data)) {
-        return data;
+        return normalizeScheduleList(data);
       } else if (data && Array.isArray(data.content)) {
-        return data.content;
+        return normalizeScheduleList(data.content);
       } else if (data && typeof data === 'number') {
         // Se o backend retornou apenas um número (count), retornar array vazio
         console.warn('⚠️ API retornou apenas contagem de escalas:', data);

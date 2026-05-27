@@ -99,14 +99,10 @@ public class PaymentReceiptController {
 
             log.info("🔍 Iniciando busca de todos os comprovantes...");
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            boolean isColaborador = auth.getAuthorities().stream()
-                    .anyMatch(a -> a.getAuthority().equals("ROLE_COLABORADOR") || 
-                                  a.getAuthority().equals("ROLE_ESTOQUE") || 
-                                  a.getAuthority().equals("ROLE_ALMOXARIFADO") ||
-                                  a.getAuthority().equals("ROLE_COMPRAS"));
+            boolean restrictToOwnDocuments = authenticatedCpfResolver.restrictsToOwnEmployeeDocuments(auth);
 
             List<PaymentReceiptDTO> receipts;
-            if (isColaborador) {
+            if (restrictToOwnDocuments) {
                 var resolvedCpf = authenticatedCpfResolver.resolve(auth);
                 if (resolvedCpf.isEmpty()) {
                     log.warn("⚠️ Não foi possível determinar o CPF do colaborador {}", auth.getName());

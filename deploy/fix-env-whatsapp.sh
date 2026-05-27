@@ -23,26 +23,17 @@ if [ -f ".env" ]; then
     echo "✅ Backup criado"
 fi
 
-# Corrigir BAILEYS_REST_URL
-echo -e "${YELLOW}🔄 Corrigindo BAILEYS_REST_URL...${NC}"
-if grep -q "BAILEYS_REST_URL=" .env; then
-    # Substituir a linha existente
-    sed -i 's|BAILEYS_REST_URL=.*|BAILEYS_REST_URL=http://whatsapp-service-ci:3333|' .env
-    echo -e "${GREEN}✅ BAILEYS_REST_URL corrigido${NC}"
+# Delegar para script completo do agente WhatsApp
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${SCRIPT_DIR}/configure-whatsapp-agent.sh" ]; then
+    bash "${SCRIPT_DIR}/configure-whatsapp-agent.sh" .env docker-compose.ci.yml
 else
-    # Adicionar se não existir
-    echo "BAILEYS_REST_URL=http://whatsapp-service-ci:3333" >> .env
-    echo -e "${GREEN}✅ BAILEYS_REST_URL adicionado${NC}"
+    echo -e "${YELLOW}🔄 Corrigindo BAILEYS_REST_URL (modo legado)...${NC}"
+    if grep -q "BAILEYS_REST_URL=" .env; then
+        sed -i 's|BAILEYS_REST_URL=.*|BAILEYS_REST_URL=http://whatsapp-service-ci:3333|' .env
+    else
+        echo "BAILEYS_REST_URL=http://whatsapp-service-ci:3333" >> .env
+    fi
+    grep -E "BAILEYS_|WHATSAPP_|EVOLUTION_|UAZAPI_|ZAPI_" .env || grep -E "BAILEYS_" .env
+    echo "   docker-compose -f docker-compose.ci.yml restart backend-ci"
 fi
-
-# Verificar resultado
-echo ""
-echo -e "${GREEN}📋 Configuração atual do WhatsApp:${NC}"
-grep -E "BAILEYS_" .env
-echo ""
-
-echo -e "${GREEN}✅ Processo concluído!${NC}"
-echo ""
-echo -e "${YELLOW}💡 Próximo passo:${NC}"
-echo "   Reiniciar o container do backend para aplicar as mudanças:"
-echo "   docker-compose -f docker-compose.ci.yml restart backend-ci"

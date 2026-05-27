@@ -1,6 +1,6 @@
 package com.z7design.secured_guard.controller;
 
-import com.z7design.secured_guard.service.BaileysRestService;
+import com.z7design.secured_guard.service.whatsapp.WhatsAppAgentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -15,16 +15,17 @@ import java.util.Map;
 @Slf4j
 public class WhatsAppTestController {
     
-    private final BaileysRestService baileysRestService;
+    private final WhatsAppAgentService whatsAppAgent;
     
     @PostMapping("/test")
     public ResponseEntity<Map<String, Object>> testConnection() {
         log.info("🔍 Testando conexão WhatsApp");
         
         try {
-            // TODO: Implementar verificação de disponibilidade
-            boolean disponivel = true; // Simulado por enquanto
-            String provedor = "WhatsApp Web API";
+            boolean disponivel = whatsAppAgent.isAnyServiceAvailable();
+            String provedor = whatsAppAgent.getLastSuccessfulProvider()
+                    .map(Enum::name)
+                    .orElse("agente-multi-provedor");
             
             Map<String, Object> result = Map.of(
                 "disponivel", disponivel,
@@ -65,11 +66,10 @@ public class WhatsAppTestController {
                 ? request.getMensagem()
                 : "✅ Teste SecuredGuard - WhatsApp conectado e funcionando!";
             
-            log.info("📱 Enviando mensagem de teste via Baileys REST para: {} - Mensagem: {}", 
+            log.info("📱 Enviando mensagem de teste via agente WhatsApp para: {} - Mensagem: {}",
                 request.getTelefone(), mensagem);
-            
-            // Enviar mensagem via Baileys REST Service
-            boolean success = baileysRestService.sendTextMessage(request.getTelefone(), mensagem);
+
+            boolean success = whatsAppAgent.sendTextMessage(request.getTelefone(), mensagem);
             
             Map<String, Object> result = new HashMap<>();
             result.put("sucesso", success);
@@ -80,7 +80,7 @@ public class WhatsAppTestController {
                 result.put("message", "Mensagem de teste enviada com sucesso");
                 log.info("✅ Mensagem de teste enviada com sucesso para: {}", request.getTelefone());
             } else {
-                String errorMsg = baileysRestService.getLastErrorMessage();
+                String errorMsg = whatsAppAgent.getLastErrorMessage();
                 result.put("message", errorMsg != null ? errorMsg : "Erro ao enviar mensagem de teste");
                 log.error("❌ Falha ao enviar mensagem de teste para: {}. Erro: {}", 
                     request.getTelefone(), errorMsg);
@@ -104,17 +104,20 @@ public class WhatsAppTestController {
         log.info("📤 Enviando arquivo de teste para: {}", request.getTelefone());
         
         try {
-            // TODO: Implementar envio de arquivo
-            log.info("📱 Arquivo de teste solicitado para {}: {} - Implementação pendente", 
-                request.getTelefone(), request.getCaminhoPdf());
-            
-            Map<String, Object> result = Map.of(
-                "sucesso", true,
-                "telefone", request.getTelefone(),
-                "arquivo", request.getCaminhoPdf(),
-                "timestamp", java.time.LocalDateTime.now().toString(),
-                "message", "Arquivo de teste enviado com sucesso"
-            );
+            boolean success = whatsAppAgent.sendFileMessage(
+                    request.getTelefone(),
+                    request.getMensagem() != null ? request.getMensagem() : "Documento de teste",
+                    request.getCaminhoPdf());
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("sucesso", success);
+            result.put("telefone", request.getTelefone());
+            result.put("arquivo", request.getCaminhoPdf());
+            result.put("timestamp", java.time.LocalDateTime.now().toString());
+            result.put("message", success
+                    ? "Arquivo de teste enviado com sucesso"
+                    : (whatsAppAgent.getLastErrorMessage() != null
+                    ? whatsAppAgent.getLastErrorMessage() : "Falha ao enviar arquivo"));
             
             return ResponseEntity.ok(result);
             
@@ -135,9 +138,10 @@ public class WhatsAppTestController {
         log.info("📊 Obtendo status do WhatsApp");
         
         try {
-            // TODO: Implementar verificação de disponibilidade
-            boolean disponivel = true; // Simulado por enquanto
-            String provedor = "WhatsApp Web API";
+            boolean disponivel = whatsAppAgent.isAnyServiceAvailable();
+            String provedor = whatsAppAgent.getLastSuccessfulProvider()
+                    .map(Enum::name)
+                    .orElse("agente-multi-provedor");
             
             Map<String, Object> result = Map.of(
                 "disponivel", disponivel,

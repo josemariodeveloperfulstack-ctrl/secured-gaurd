@@ -49,6 +49,9 @@ public class PermissionService {
             Permission.OCCURRENCES_READ, Permission.OCCURRENCES_WRITE, Permission.OCCURRENCES_CREATE,
             Permission.WORK_POSTS_READ,
             Permission.SCHEDULES_READ,
+            Permission.SCHEDULES_WRITE,
+            Permission.SCHEDULES_CREATE,
+            Permission.SCHEDULES_DELETE,
             Permission.TIME_RECORDS_READ,
             // Consultas necessárias durante a visita
             Permission.EMPLOYEES_READ,
@@ -59,7 +62,8 @@ public class PermissionService {
             // Dashboard + perfil + comunicação
             Permission.DASHBOARD_READ,
             Permission.PROFILE_READ, Permission.PROFILE_WRITE,
-            Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE
+            Permission.MESSAGES_READ, Permission.MESSAGES_WRITE, Permission.MESSAGES_CREATE,
+            Permission.MESSAGES_MANAGE
         )));
 
         // 🟨 RH - Gerencia informações contratuais e pessoais

@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.config.MailBranding;
 import com.z7design.secured_guard.service.EmailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +21,7 @@ import java.util.Map;
 public class DepartmentEmailConfigController {
 
     private final EmailService emailService;
+    private final MailBranding mailBranding;
 
     // Configuração padrão dos departamentos
     private final Map<String, String> departmentEmails = new HashMap<String, String>() {{
@@ -162,8 +164,8 @@ public class DepartmentEmailConfigController {
                         <p><strong>Data de Fim:</strong> %s</p>
                         <p><strong>Departamento:</strong> %s</p>
                         
-                        <p>Este é um alerta automático do sistema SecuredGuard.</p>
-                        """, cliente, contrato, valor, dataInicio, dataFim, departamento);
+                        <p>Este é um alerta automático do sistema %s.</p>
+                        """, cliente, contrato, valor, dataInicio, dataFim, departamento, mailBranding.getBrandName());
                     
                     boolean enviado = emailService.sendEmailWithAttachment(email, subject, body, null, null);
                     if (enviado) {

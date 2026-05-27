@@ -112,7 +112,7 @@ const Clientes: React.FC = () => {
                 <li>Definir estratégia de abordagem</li>
               </ul>
               
-              <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+              <p><strong>Este é um alerta automático do sistema Promover.</strong></p>
             `,
             priority: 'media' as const
           };
@@ -135,14 +135,14 @@ const Clientes: React.FC = () => {
             body: `
               <h2>Novo Cliente Registrado - Notificação para ${deptName}</h2>
               <p><strong>Nome:</strong> ${client.name}</p>
-              <p><strong>Empresa:</strong> SecuredGuard</p>
+              <p><strong>Empresa:</strong> Promover</p>
               <p><strong>Status:</strong> ${client.status}</p>
               <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
               
               <h3>Ação Requerida - ${deptName}:</h3>
               <p>Um novo cliente foi registrado no sistema. Por favor, revise os dados e tome as providências necessárias inerentes ao seu departamento.</p>
               
-              <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+              <p><strong>Este é um alerta automático do sistema Promover.</strong></p>
             `,
             priority: 'media' as const
           };

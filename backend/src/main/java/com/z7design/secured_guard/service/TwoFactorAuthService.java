@@ -26,7 +26,7 @@ public class TwoFactorAuthService {
     private final EmailService emailService;
     
     @Autowired(required = false)
-    private BaileysRestService baileysRestService;
+    private com.z7design.secured_guard.service.whatsapp.WhatsAppAgentService whatsAppAgent;
 
     private static final Random RANDOM = new Random();
 
@@ -183,8 +183,8 @@ public class TwoFactorAuthService {
      * Envia código via WhatsApp
      */
     private boolean sendViaWhatsApp(String code, String phoneNumber, String userName) {
-        if (baileysRestService == null) {
-            log.error("❌ BaileysRestService não disponível!");
+        if (whatsAppAgent == null) {
+            log.error("❌ WhatsAppAgentService não disponível!");
             return false;
         }
 
@@ -199,7 +199,7 @@ public class TwoFactorAuthService {
                 userName, code
         );
 
-        return baileysRestService.sendTextMessage(phoneNumber, message);
+        return whatsAppAgent.sendTextMessage(phoneNumber, message);
     }
 
     /**

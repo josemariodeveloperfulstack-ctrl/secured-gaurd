@@ -363,6 +363,18 @@ public class ScheduleService {
             dto.setEmployeeId(s.getEmployee().getId());
             dto.setEmployeeName(s.getEmployee().getName());
             dto.setEmployeeDocument(s.getEmployee().getDocument());
+        } else if (s.getId() != null) {
+            scheduleRepository.findEmployeeIdByScheduleId(s.getId()).ifPresent(empId -> {
+                dto.setEmployeeId(empId);
+                employeeRepository.findById(empId).ifPresent(emp -> {
+                    dto.setEmployeeName(emp.getName());
+                    dto.setEmployeeDocument(emp.getDocument());
+                });
+                if (dto.getEmployeeName() == null || dto.getEmployeeName().isBlank()) {
+                    scheduleRepository.findEmployeeNameByScheduleId(s.getId())
+                            .ifPresent(dto::setEmployeeName);
+                }
+            });
         }
         
         if (s.getLocation() != null) {

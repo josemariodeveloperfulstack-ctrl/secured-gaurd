@@ -76,6 +76,11 @@ O sistema utiliza JWT (JSON Web Tokens) para autenticação:
 2. Refresh Token: POST /api/auth/refresh-token
 3. Logout: Limpa os tokens do localStorage
 
+## Documentação adicional
+
+- [Agente WhatsApp — configuração Local + VPS](WHATSAPP_AGENTE_CONFIGURACAO.md) — UAZAPI, Z-API, Evolution, Baileys, IA, inbox e webhooks
+- [E-mail marketing — aberturas e cliques](EMAIL_MARKETING_RASTREAMENTO.md) — pixel, links rastreados, localhost vs produção
+
 ## Contribuição
 1. Faça um fork do projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)

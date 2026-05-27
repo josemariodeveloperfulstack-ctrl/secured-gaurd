@@ -18,6 +18,8 @@ import {
   Phone
 } from 'lucide-react';
 import api from '@/lib/axios';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { WhatsAppInboxPanel } from '@/components/whatsapp/WhatsAppInboxPanel';
 
 interface ConnectionStatus {
   connected: boolean;
@@ -25,6 +27,15 @@ interface ConnectionStatus {
   state?: string;
   phoneNumber?: string;
   lastConnected?: string;
+  activeProvider?: string;
+}
+
+interface ProviderStatus {
+  type: string;
+  enabled: boolean;
+  available: boolean;
+  connected: boolean;
+  connectionState?: string;
 }
 
 const WhatsAppConnection: React.FC = () => {
@@ -38,6 +49,24 @@ const WhatsAppConnection: React.FC = () => {
   const [instanceName, setInstanceName] = useState('securedguard');
   const [testPhone, setTestPhone] = useState('');
   const [sendingTest, setSendingTest] = useState(false);
+  const [providers, setProviders] = useState<ProviderStatus[]>([]);
+
+  const loadAgentStatus = async () => {
+    try {
+      const response = await api.get('/whatsapp/agent/status');
+      if (response.data?.providers) {
+        setProviders(response.data.providers);
+      }
+      if (response.data?.lastSuccessfulProvider) {
+        setConnectionStatus((prev) => ({
+          ...prev,
+          activeProvider: response.data.lastSuccessfulProvider,
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar status do agente:', error);
+    }
+  };
 
   // Verificar status da conexão
   const checkConnection = async () => {
@@ -51,8 +80,10 @@ const WhatsAppConnection: React.FC = () => {
           instance: instanceName,
           state: response.data.state,
           phoneNumber: response.data.phoneNumber,
-          lastConnected: response.data.lastConnected
+          lastConnected: response.data.lastConnected,
+          activeProvider: response.data.activeProvider,
         });
+        loadAgentStatus();
         
         if (response.data.state === 'open' || response.data.connected) {
           toast({
@@ -283,6 +314,7 @@ const WhatsAppConnection: React.FC = () => {
   // Verificar conexão ao montar (em todos os ambientes: local, CI e produção)
   useEffect(() => {
     checkConnection();
+    loadAgentStatus();
   }, []);
 
   return (
@@ -295,10 +327,21 @@ const WhatsAppConnection: React.FC = () => {
             Conexão WhatsApp
           </h1>
           <p className="text-gray-400 mt-2">
-            Conecte seu WhatsApp Business para enviar holerites e mensagens automáticas
+            Conecte seu WhatsApp Business, atenda leads com IA e assuma conversas pela equipe comercial
           </p>
         </div>
 
+        <Tabs defaultValue="connection" className="space-y-6">
+          <TabsList className="bg-seguranca-graphite border border-gray-600">
+            <TabsTrigger value="connection">Conexão</TabsTrigger>
+            <TabsTrigger value="inbox">Inbox comercial</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="inbox" className="mt-0">
+            <WhatsAppInboxPanel />
+          </TabsContent>
+
+          <TabsContent value="connection" className="mt-0">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Coluna 1: Status e Conexão */}
           <div className="space-y-6">
@@ -348,6 +391,15 @@ const WhatsAppConnection: React.FC = () => {
                   </div>
                 )}
 
+                {connectionStatus.activeProvider && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Provedor ativo:</span>
+                    <Badge variant="outline" className="border-seguranca-yellow text-seguranca-yellow">
+                      {connectionStatus.activeProvider}
+                    </Badge>
+                  </div>
+                )}
+
                 <div className="pt-4 flex gap-2">
                   <Button
                     onClick={checkConnection}
@@ -377,6 +429,40 @@ const WhatsAppConnection: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {providers.length > 0 && (
+              <Card className="bg-seguranca-graphite border-gray-600">
+                <CardHeader>
+                  <CardTitle className="text-seguranca-lightgray text-base">
+                    Agente WhatsApp — fallback automático
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <p className="text-xs text-gray-400 mb-3">
+                    Se um provedor cair, o próximo da lista é usado automaticamente.
+                  </p>
+                  {providers.map((p) => (
+                    <div
+                      key={p.type}
+                      className="flex items-center justify-between text-sm py-1 border-b border-gray-700 last:border-0"
+                    >
+                      <span className="text-gray-300 font-mono">{p.type}</span>
+                      <div className="flex gap-2">
+                        <Badge className={p.enabled ? 'bg-gray-600' : 'bg-gray-800'}>
+                          {p.enabled ? 'on' : 'off'}
+                        </Badge>
+                        <Badge className={p.available ? 'bg-blue-600' : 'bg-gray-800'}>
+                          {p.available ? 'API ok' : 'indisponível'}
+                        </Badge>
+                        <Badge className={p.connected ? 'bg-green-600' : 'bg-red-900'}>
+                          {p.connected ? 'conectado' : p.connectionState || '—'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Card de Teste */}
             <Card className="bg-seguranca-graphite border-gray-600">
@@ -584,6 +670,8 @@ const WhatsAppConnection: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </StandardLayout>
   );

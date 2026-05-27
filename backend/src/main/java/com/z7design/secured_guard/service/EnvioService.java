@@ -41,9 +41,8 @@ public class EnvioService {
     private final PayslipDeliveryLogRepository deliveryLogRepository;
     private final PayslipService payslipService;
     
-    // WhatsApp provider: Baileys REST API
     @Autowired(required = false)
-    private BaileysRestService baileysRestService;
+    private com.z7design.secured_guard.service.whatsapp.WhatsAppAgentService whatsAppAgent;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
@@ -702,14 +701,14 @@ public class EnvioService {
      * Envia mensagem via WhatsApp usando Baileys REST API (com correção DDI 55)
      */
     private boolean sendWhatsAppMessage(String phoneNumber, String message, String filePath) {
-        log.info("📤 Enviando via Baileys REST API (porta 3333)");
-        
-        if (baileysRestService == null) {
-            log.error("❌ BaileysRestService não disponível!");
+        log.info("📤 Enviando via agente WhatsApp (UAZAPI → Z-API → Evolution → Baileys)");
+
+        if (whatsAppAgent == null) {
+            log.error("❌ WhatsAppAgentService não disponível!");
             return false;
         }
-        
-        return baileysRestService.sendFileMessage(phoneNumber, message, filePath);
+
+        return whatsAppAgent.sendFileMessage(phoneNumber, message, filePath);
     }
     
     /**
@@ -717,24 +716,23 @@ public class EnvioService {
      * @return Array com [sucesso (boolean como string), mensagemErro]
      */
     private String[] sendWhatsAppMessageWithError(String phoneNumber, String message, String filePath) {
-        log.info("📤 Enviando via Baileys REST API (porta 3333)");
-        
-        if (baileysRestService == null) {
-            log.error("❌ BaileysRestService não disponível!");
-            return new String[]{"false", "Serviço Baileys não disponível"};
+        log.info("📤 Enviando via agente WhatsApp (fallback multi-provedor)");
+
+        if (whatsAppAgent == null) {
+            log.error("❌ WhatsAppAgentService não disponível!");
+            return new String[]{"false", "Serviço WhatsApp não disponível"};
         }
-        
+
         try {
-            boolean sent = baileysRestService.sendFileMessage(phoneNumber, message, filePath);
+            boolean sent = whatsAppAgent.sendFileMessage(phoneNumber, message, filePath);
             if (sent) {
                 return new String[]{"true", null};
             } else {
-                // Tentar obter detalhes do erro do Baileys
-                String errorDetail = baileysRestService.getLastErrorMessage();
+                String errorDetail = whatsAppAgent.getLastErrorMessage();
                 if (errorDetail != null && !errorDetail.isEmpty()) {
                     return new String[]{"false", errorDetail};
                 }
-                return new String[]{"false", "Serviço Baileys retornou erro sem detalhes"};
+                return new String[]{"false", "Todos os provedores WhatsApp falharam"};
             }
         } catch (Exception e) {
             log.error("❌ Exceção ao enviar via Baileys: {}", e.getMessage(), e);

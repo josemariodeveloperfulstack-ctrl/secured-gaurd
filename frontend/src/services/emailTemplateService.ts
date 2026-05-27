@@ -68,7 +68,7 @@ export const SUGGESTED_VARIABLES: { key: string; label: string; description: str
   { key: 'celular', label: 'Celular', description: 'Celular (Lead.mobile)' },
   { key: 'ctaUrl', label: 'URL da CTA', description: 'Link principal de chamada para ação' },
   { key: 'unsubscribeUrl', label: 'URL de descadastro', description: 'Link de cancelamento de inscrição' },
-  { key: 'brandLogoUrl', label: 'URL da logomarca', description: 'Injetada pelo sistema (imagem pública)' },
-  { key: 'brandBannerUrl', label: 'URL do banner hero', description: 'Injetada pelo sistema (imagem pública)' },
+  { key: 'brandLogoUrl', label: 'Logomarca', description: 'No envio: embutida no e-mail (cid). No preview: URL pública' },
+  { key: 'brandBannerUrl', label: 'Banner hero', description: 'No envio: embutida no e-mail (cid). No preview: URL pública' },
   { key: 'whatsappUrl', label: 'URL WhatsApp', description: 'Injetada pelo sistema (wa.me)' },
 ];

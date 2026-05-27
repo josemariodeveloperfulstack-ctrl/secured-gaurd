@@ -118,7 +118,7 @@ class NotificationService {
           <li>Documentar ações tomadas</li>
         </ul>
         
-        <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+        <p><strong>Este é um alerta automático do sistema Promover.</strong></p>
       `,
       priority: 'alta'
     };
@@ -237,14 +237,14 @@ class NotificationService {
           
           <h3>Próximos Passos:</h3>
           <ol>
-            <li>Acesse o sistema SecuredGuard</li>
+            <li>Acesse o sistema Promover</li>
             <li>Navegue até o módulo correspondente</li>
             <li>Analise os detalhes do contrato</li>
             <li>Execute as ações necessárias</li>
             <li>Atualize o status no sistema</li>
           </ol>
           
-          <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+          <p><strong>Este é um alerta automático do sistema Promover.</strong></p>
         `,
         priority: notif.prioridade
       };
@@ -302,7 +302,7 @@ class NotificationService {
           <li>Definir estratégia de abordagem</li>
         </ul>
         
-        <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+        <p><strong>Este é um alerta automático do sistema Promover.</strong></p>
       `,
       priority: 'media'
     };
@@ -354,7 +354,7 @@ class NotificationService {
           <li>Documentar interações</li>
         </ul>
         
-        <p><strong>Este é um alerta automático do sistema SecuredGuard.</strong></p>
+        <p><strong>Este é um alerta automático do sistema Promover.</strong></p>
       `,
       priority: 'media'
     };
@@ -499,8 +499,8 @@ class NotificationService {
               ${params.quantity ? `<p><strong>Quantidade:</strong> ${params.quantity}</p>` : ''}
               ${params.category ? `<p><strong>Categoria:</strong> ${params.category}</p>` : ''}
               <br/>
-              <p>Acesse o sistema SecuredGuard &rarr; Compras &rarr; Requisições para analisar e aprovar.</p>
-              <p><em>Notificação automática do sistema SecuredGuard.</em></p>
+              <p>Acesse o sistema Promover &rarr; Compras &rarr; Requisições para analisar e aprovar.</p>
+              <p><em>Notificação automática do sistema Promover.</em></p>
             `,
             priority: 'alta',
           }).catch(() => { /* best-effort */ })

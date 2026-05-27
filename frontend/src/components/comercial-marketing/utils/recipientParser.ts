@@ -1,7 +1,12 @@
 import * as XLSX from 'xlsx';
 import type { EmailCampaignRecipientInput } from '@/services/emailCampaignService';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isValidEmail(email: string): boolean {
+  const trimmed = email.trim();
+  return trimmed.length > 0 && EMAIL_RE.test(trimmed);
+}
 
 export interface ParsedRow {
   raw: Record<string, unknown>;
@@ -23,7 +28,7 @@ const NAME_KEYS = ['name', 'nome', 'fullname', 'full_name', 'contato'];
 const COMPANY_KEYS = ['company', 'empresa', 'organization', 'organização'];
 const POSITION_KEYS = ['position', 'cargo', 'role', 'titulo', 'título'];
 const PHONE_KEYS = ['phone', 'telefone', 'mobile', 'celular', 'whatsapp'];
-const CITY_KEYS = ['city', 'cidade', 'municipio', 'município'];
+const CITY_KEYS = ['city', 'cidade', 'municipio', 'município', 'bairro', 'localidade', 'local'];
 const STATE_KEYS = ['state', 'estado', 'uf'];
 const COMPANY_TYPE_KEYS = [
   'companytype',
@@ -263,15 +268,27 @@ function pickHeader(headers: string[], re: RegExp): string | undefined {
 
 /** Sugestão inicial de mapeamento a partir dos cabeçalhos da planilha. */
 export function buildDefaultSpreadsheetMapping(headers: string[]): SpreadsheetColumnMapping {
+  const cityExplicit = pickHeader(headers, /cidade|city|municipio|município|localidade/i);
+  const cityFallback =
+    cityExplicit ??
+    pickHeader(headers, /^bairro$/i) ??
+    pickHeader(headers, /\bbairro\b/i) ??
+    pickHeader(headers, /regi[aã]o|local/i);
+
   return {
     email: guessEmailColumn(headers),
-    name: pickHeader(headers, /nome|^name$/i),
-    company: pickHeader(headers, /empresa|company|organization/i),
-    position: pickHeader(headers, /cargo|position|role|titulo|título/i),
+    name:
+      pickHeader(headers, /nome fantasia|raz[aã]o social|nome completo/i) ??
+      pickHeader(headers, /nome|^name$/i),
+    company:
+      pickHeader(headers, /nome fantasia|raz[aã]o social|empresa|company|organization/i),
+    position: pickHeader(headers, /cargo|position|role|titulo|título|n[º°]?\s*func/i),
     phone: pickHeader(headers, /telefone|phone|celular|whatsapp|mobile/i),
     segment: pickHeader(headers, /segmento|segment|tags?/i),
-    city: pickHeader(headers, /cidade|city|municipio|município/i),
-    state: pickHeader(headers, /^(estado|uf|state)$/i) ?? pickHeader(headers, /\bestado\b|\buf\b/i),
+    city: cityFallback,
+    state:
+      pickHeader(headers, /^(estado|uf|state)$/i) ??
+      pickHeader(headers, /\bestado\b|\buf\b/i),
     companyType: pickHeader(
       headers,
       /tipo.*empresa|tipo de empresa|tipo_empresa|ramo|atividade|classifica/i,

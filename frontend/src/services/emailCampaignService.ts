@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import { isValidEmail } from '@/components/comercial-marketing/utils/recipientParser';
 
 export type EmailCampaignStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELED';
 export type EmailProviderType = 'SENDGRID' | 'SMTP';
@@ -194,7 +195,10 @@ class EmailCampaignService {
 
   /** Até 500 e-mails por pedido; fatia automaticamente listas maiores. */
   async checkUnsubscribed(emails: string[]): Promise<string[]> {
-    const unique = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
+    const unique = [
+      ...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => isValidEmail(e))),
+    ];
+    if (unique.length === 0) return [];
     const out: string[] = [];
     const size = 500;
     for (let i = 0; i < unique.length; i += size) {

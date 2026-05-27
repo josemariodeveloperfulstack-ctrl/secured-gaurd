@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.config.MailBranding;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,7 @@ import java.io.File;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final MailBranding mailBranding;
 
     @Value("${spring.mail.username:securedguard@z7design.com.br}")
     private String fromEmail;
@@ -212,6 +214,7 @@ public class EmailService {
      * Cria corpo do email em HTML
      */
     private String createEmailBody(String employeeName, String month, String year) {
+        String brand = mailBranding.getBrandName();
         return String.format(
                 """
                         <!DOCTYPE html>
@@ -228,7 +231,7 @@ public class EmailService {
                         </head>
                         <body>
                             <div class="header">
-                                <h1>🏢 SecuredGuard</h1>
+                                <h1>🏢 %s</h1>
                                 <h2>Documento Unificado</h2>
                             </div>
 
@@ -255,14 +258,14 @@ public class EmailService {
                             </div>
 
                             <div class="footer">
-                                <p>Este é um email automático do sistema SecuredGuard.</p>
+                                <p>Este é um email automático do sistema %s.</p>
                                 <p>Em caso de dúvidas, entre em contato com o departamento de RH.</p>
-                                <p>© 2025 SecuredGuard - Todos os direitos reservados</p>
+                                <p>© 2025 %s - Todos os direitos reservados</p>
                             </div>
                         </body>
                         </html>
                         """,
-                employeeName, month, year);
+                brand, employeeName, month, year, brand, brand);
     }
 
     /**
@@ -283,7 +286,7 @@ public class EmailService {
             SimpleMailMessage testMessage = new SimpleMailMessage();
             testMessage.setFrom(fromEmail);
             testMessage.setTo("test@example.com");
-            testMessage.setSubject("Teste de Configuração - SecuredGuard");
+            testMessage.setSubject(mailBranding.prefixSubject("Teste de Configuração"));
             testMessage.setText("Este é um email de teste para verificar a configuração do sistema.");
 
             mailSender.send(testMessage);

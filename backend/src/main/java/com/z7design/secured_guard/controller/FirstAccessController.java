@@ -9,7 +9,7 @@ import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.service.LogService;
 import com.z7design.secured_guard.service.TwoFactorService;
-import com.z7design.secured_guard.service.BaileysRestService;
+import com.z7design.secured_guard.service.whatsapp.WhatsAppAgentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,7 +37,7 @@ public class FirstAccessController {
     private final LogService logService;
     
     @Autowired(required = false)
-    private BaileysRestService baileysRestService;
+    private WhatsAppAgentService whatsAppAgent;
 
     @Operation(summary = "Verifica status do primeiro acesso", description = "Retorna informações sobre primeiro acesso e 2FA")
     @GetMapping("/status")
@@ -185,9 +185,9 @@ public class FirstAccessController {
             );
 
             boolean sent = false;
-            if (baileysRestService != null) {
+            if (whatsAppAgent != null) {
                 try {
-                    sent = baileysRestService.sendTextMessage(user.getWhatsapp(), message);
+                    sent = whatsAppAgent.sendTextMessage(user.getWhatsapp(), message);
                     if (sent) {
                         log.info("✅ Código 2FA enviado via WhatsApp com sucesso");
                     } else {
@@ -197,7 +197,7 @@ public class FirstAccessController {
                     log.error("❌ Erro ao enviar código via WhatsApp: {}", e.getMessage(), e);
                 }
             } else {
-                log.warn("⚠️ BaileysRestService não disponível - código não enviado via WhatsApp");
+                log.warn("⚠️ WhatsAppAgentService não disponível - código não enviado via WhatsApp");
                 log.info("📱 Código para teste manual: {}", twoFactorCode.getCode());
             }
 

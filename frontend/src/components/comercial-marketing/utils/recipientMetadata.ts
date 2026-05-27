@@ -22,14 +22,44 @@ export function getRecipientMetaValue(
   return '';
 }
 
+/** Cidade para segmentação: cidade mapeada ou, em planilhas só com bairro/localidade, usa esses campos. */
+export function getRecipientCityLabel(metadata: Record<string, unknown> | undefined): string {
+  const city = getRecipientMetaValue(metadata, 'city');
+  if (city) return city;
+  if (!metadata) return '';
+  for (const key of ['bairro', 'BAIRRO', 'localidade', 'LOCALIDADE', 'municipio', 'MUNICIPIO']) {
+    const v = metadata[key];
+    if (v != null && String(v).trim() !== '') {
+      return String(v).trim();
+    }
+  }
+  return '';
+}
+
+export function groupRecipientsByCity(
+  recipients: EmailCampaignRecipientInput[],
+): { label: string; items: EmailCampaignRecipientInput[] }[] {
+  const map = new Map<string, EmailCampaignRecipientInput[]>();
+  for (const r of recipients) {
+    const label = getRecipientCityLabel(r.metadata) || 'Sem cidade / bairro';
+    const list = map.get(label) ?? [];
+    list.push(r);
+    map.set(label, list);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+    .map(([label, items]) => ({ label, items }));
+}
+
 export function collectDistinctMetaValues(
   recipients: EmailCampaignRecipientInput[],
   field: RecipientMetaField,
-  limit = 200,
+  limit = 500,
 ): string[] {
   const set = new Set<string>();
   for (const r of recipients) {
-    const v = getRecipientMetaValue(r.metadata, field);
+    const v =
+      field === 'city' ? getRecipientCityLabel(r.metadata) : getRecipientMetaValue(r.metadata, field);
     if (v) set.add(v);
     if (set.size >= limit) break;
   }
@@ -60,6 +90,13 @@ export function hasGeoMetaFilters(recipients: EmailCampaignRecipientInput[]): bo
     collectDistinctMetaValues(recipients, 'state', 1).length > 0 ||
     collectDistinctMetaValues(recipients, 'companyType', 1).length > 0
   );
+}
+
+/** Quantos destinatários têm ao menos cidade/bairro ou estado preenchidos. */
+export function countRecipientsWithGeo(recipients: EmailCampaignRecipientInput[]): number {
+  return recipients.filter(
+    (r) => !!getRecipientCityLabel(r.metadata) || !!getRecipientMetaValue(r.metadata, 'state'),
+  ).length;
 }
 
 export const ALL_META = 'ALL';
