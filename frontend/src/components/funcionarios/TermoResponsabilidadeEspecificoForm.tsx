@@ -7,10 +7,10 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Shield, Loader2, CheckCircle2 } from 'lucide-react';
-import { employeeService, SimpleEmployee } from '@/services/employeeService';
+import { employeeService, SimpleEmployee, employeeToSimpleEmployee } from '@/services/employeeService';
 import { companyService } from '@/services/companyService';
-import { Employee } from '@/types/employee';
 import { Company } from '@/types/company';
+import { useToast } from '@/hooks/use-toast';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
 
@@ -19,7 +19,6 @@ const documentTypes = [
     { id: 'BH_BUS', label: 'TERMO DE RESPONSABILIDADE CARTÃO BH BUS VALE-TRANSPORTE' },
     { id: 'OTIMO', label: 'TERMO DE RESPONSABILIDADE CARTÃO ÓTIMO VALE-TRANSPORTE' },
     { id: 'BETIM_CARD', label: 'TERMO DE RESPONSABILIDADE CARTÃO BETIM CARD VALE-TRANSPORTE' },
-    { id: 'CELULAR', label: 'TERMO DE RESPONSABILIDADE APARELHO CELULAR' },
 ];
 
 interface TermoResponsabilidadeEspecificoFormProps {
@@ -28,12 +27,12 @@ interface TermoResponsabilidadeEspecificoFormProps {
 }
 
 const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecificoFormProps> = ({ employeeId, companyId }) => {
+    const { toast } = useToast();
     const [form, setForm] = useState({
         funcionarioId: employeeId || '',
         empresaId: companyId || '',
         documentTypeId: 'BH_BUS',
-        identificador: '', // Número do Cartão ou IMEI/Série do Celular
-        descricao: '', // Marca/Modelo para celular
+        identificador: '', // Número do cartão
         dataEntrega: new Date().toISOString().split('T')[0],
     });
 
@@ -58,21 +57,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                 try {
                     const emp = await employeeService.getEmployeeById(form.funcionarioId);
                     if (emp) {
-                        setSelectedEmployeeData({
-                            id: emp.id,
-                            name: emp.name,
-                            document: emp.document || emp.cpf,
-                            cpf: emp.cpf || emp.document,
-                            email: emp.email,
-                            phone: emp.phone,
-                            registrationNumber: emp.registrationNumber,
-                            hireDate: emp.hireDate,
-                            positionName: emp.position?.name,
-                            unitName: emp.unit?.name,
-                            address: emp.address,
-                            companyId: emp.company?.id,
-                            companySigla: emp.company?.sigla
-                        } as SimpleEmployee);
+                        setSelectedEmployeeData(employeeToSimpleEmployee(emp));
 
                         // Auto-selecionar empresa se o funcionário tiver uma
                         if (emp.company?.id && !form.empresaId) {
@@ -104,36 +89,86 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
 
 
     const selectedFunc = selectedEmployeeData;
-    const selectedEmp = companies.find(e => e.id === form.empresaId);
+    const selectedEmp = companies.find(e => String(e.id) === String(form.empresaId));
     const selectedDocType = documentTypes.find(t => t.id === form.documentTypeId);
 
+    /** Posto/setor prioritário para exibição e para o PDF (BH BUS etc.). */
+    const setorOuPosto = (emp: SimpleEmployee | null): string => {
+        if (!emp) return '';
+        const posto = emp.workPostName?.trim();
+        const setorDept = emp.departmentName?.trim();
+        const unidade = emp.unitName?.trim();
+        return posto || setorDept || unidade || '';
+    };
+
+
+    const resolveSelection = async (): Promise<{ employee: SimpleEmployee; company: Company } | null> => {
+        let employee = selectedEmployeeData;
+        if (!employee && form.funcionarioId) {
+            try {
+                const full = await employeeService.getEmployeeById(form.funcionarioId);
+                if (full) {
+                    employee = employeeToSimpleEmployee(full);
+                    setSelectedEmployeeData(employee);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar funcionário para o termo:', error);
+            }
+        }
+
+        let companyList = companies;
+        if (companyList.length === 0) {
+            try {
+                companyList = await companyService.getAllCompanies();
+                setCompanies(companyList);
+            } catch (error) {
+                console.error('Erro ao carregar empresas para o termo:', error);
+            }
+        }
+
+        const company = companyList.find(e => String(e.id) === String(form.empresaId));
+        if (!employee || !company) {
+            return null;
+        }
+        return { employee, company };
+    };
 
     const handleGenerate = async (preview = false) => {
-        if (!selectedFunc || !selectedEmp) {
-            alert('Selecione funcionário e empresa!');
+        const selection = await resolveSelection();
+        if (!selection) {
+            toast({
+                title: 'Atenção',
+                description: !form.funcionarioId || !form.empresaId
+                    ? 'Selecione funcionário e empresa.'
+                    : 'Aguarde o carregamento dos dados do funcionário e da empresa.',
+                variant: 'destructive',
+            });
             return;
         }
+
+        const { employee: func, company: emp } = selection;
 
         setLoading(true);
         try {
             const payload = {
-                companyId: selectedEmp.id,
-                employeeId: selectedFunc.id,
+                companyId: emp.id,
+                employeeId: func.id,
                 reportTitle: selectedDocType?.label,
-                employeeName: selectedFunc.name,
-                employeeCpf: selectedFunc.document || '',
-                employeePosition: selectedFunc.positionName || '',
+                employeeName: func.name,
+                employeeCpf: func.cpf || func.document || '',
+                employeePosition: func.positionName || '',
+                employeeSectorOrWorkPost: setorOuPosto(func),
 
                 equipments: [
                     {
-                        name: form.documentTypeId === 'CELULAR' ? 'Aparelho Celular' : 'Cartão Vale-Transporte',
-                        description: form.descricao || (form.documentTypeId !== 'CELULAR' ? selectedDocType?.label : ''),
+                        name: 'Cartão Vale-Transporte',
+                        description: selectedDocType?.label || '',
                         identifier: form.identificador,
                         state: 'BOM',
-                        value: 0.0
+                        value: form.documentTypeId === 'BH_BUS' ? 17.35 : 0.0
                     }
                 ],
-                city: selectedEmp.city || '',
+                city: emp.city || '',
                 documentDate: form.dataEntrega
             };
 
@@ -158,17 +193,21 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
             } else {
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${form.documentTypeId.toLowerCase()}-${selectedFunc.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+                a.download = `${form.documentTypeId.toLowerCase()}-${func.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
-                void refreshEmployeeDocuments(selectedFunc.id);
+                void refreshEmployeeDocuments(func.id);
             }
 
             setTimeout(() => window.URL.revokeObjectURL(url), 100);
         } catch (err) {
             console.error('Erro:', err);
-            alert('Erro ao processar solicitação.');
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível gerar o documento. Tente novamente.',
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }
@@ -182,10 +221,10 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                         <div className="space-y-1">
                             <CardTitle className="flex items-center gap-2 text-2xl text-seguranca-lightgray">
                                 <Shield className="h-6 w-6 text-seguranca-red" />
-                                Termo de Responsabilidade - VT e Celular
+                                Termo de Responsabilidade - VT
                             </CardTitle>
                             <CardDescription className="text-gray-400">
-                                Geração de termos específicos para cartões de transporte e aparelhos celulares.
+                                Geração dos termos de responsabilidade para cartões Vale-Transporte (BH BUS, Ótimo e Betim Card).
                             </CardDescription>
                         </div>
                         {selectedFunc && selectedEmp && (
@@ -202,7 +241,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                             <Label className="text-seguranca-lightgray">Tipo de Documento</Label>
                             <Select
                                 value={form.documentTypeId}
-                                onValueChange={(val) => setForm(prev => ({ ...prev, documentTypeId: val, identificador: '', descricao: '' }))}
+                                onValueChange={(val) => setForm(prev => ({ ...prev, documentTypeId: val, identificador: '' }))}
                             >
                                 <SelectTrigger className="bg-seguranca-black border-gray-700 text-white h-11">
                                     <SelectValue />
@@ -233,7 +272,13 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                             <Label className="text-seguranca-lightgray font-semibold">Funcionário</Label>
                             <EmployeeCombobox
                                 value={form.funcionarioId}
-                                onChange={(val) => setForm(prev => ({ ...prev, funcionarioId: val }))}
+                                initialDisplayName={selectedFunc?.name}
+                                onChange={(val) => {
+                                    setForm(prev => ({ ...prev, funcionarioId: val }));
+                                    if (!val) {
+                                        setSelectedEmployeeData(null);
+                                    }
+                                }}
                                 onEmployeeSelect={(emp) => {
                                     setSelectedEmployeeData(emp);
                                     if (emp.companyId) {
@@ -247,9 +292,9 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                                     <span className="text-xs font-semibold text-white">
                                         {selectedFunc.name}
                                     </span>
-                                    {(selectedFunc.cpf || (selectedFunc as any).document) && (
+                                    {(selectedFunc.cpf || selectedFunc.document) && (
                                         <span className="text-[11px] text-gray-400">
-                                            · CPF: {selectedFunc.cpf || (selectedFunc as any).document || ''}
+                                            · CPF: {selectedFunc.cpf || selectedFunc.document || ''}
                                         </span>
                                     )}
                                 </div>
@@ -310,9 +355,9 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs text-gray-500 uppercase tracking-wider">Setor</Label>
+                                        <Label className="text-xs text-gray-500 uppercase tracking-wider">Setor / Posto de trabalho</Label>
                                         <div className="p-2.5 bg-seguranca-black/60 rounded-md text-sm font-medium border border-gray-800 transition-colors truncate">
-                                            {selectedFunc.unitName || '-'}
+                                            {setorOuPosto(selectedFunc) || '-'}
                                         </div>
                                     </div>
                                 </div>
@@ -356,9 +401,7 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                            <Label className="text-seguranca-lightgray">
-                                {form.documentTypeId === 'CELULAR' ? 'IMEI / Serial / Identificador' : 'Número do Cartão'}
-                            </Label>
+                            <Label className="text-seguranca-lightgray">Número do Cartão</Label>
                             <Input
                                 value={form.identificador}
                                 onChange={(e) => setForm(prev => ({ ...prev, identificador: e.target.value }))}
@@ -367,17 +410,6 @@ const TermoResponsabilidadeEspecificoForm: React.FC<TermoResponsabilidadeEspecif
                             />
                         </div>
 
-                        {form.documentTypeId === 'CELULAR' && (
-                            <div className="space-y-2">
-                                <Label className="text-seguranca-lightgray">Marca / Modelo / Cor</Label>
-                                <Input
-                                    value={form.descricao}
-                                    onChange={(e) => setForm(prev => ({ ...prev, descricao: e.target.value }))}
-                                    placeholder="Ex: Samsung Galaxy A54 - Preto"
-                                    className="bg-seguranca-black border-gray-700 text-white h-11"
-                                />
-                            </div>
-                        )}
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4">

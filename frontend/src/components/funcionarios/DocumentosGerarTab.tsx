@@ -23,7 +23,7 @@ const tipos = [
   { key: 'vt', label: 'Termo de Compromisso de Vale-Transporte', icon: FileText, shortLabel: 'Vale-Transporte' },
   { key: 'epi', label: 'Ficha de Entrega de EPI', icon: Shield, shortLabel: 'EPI' },
   { key: 'epi-manual', label: 'Entrega de EPI Manual', icon: Shield, shortLabel: 'EPI Manual' },
-  { key: 'termo-responsabilidade-especifico', label: 'Termo de Responsabilidade (VT/Celular)', icon: CreditCard, shortLabel: 'Vale/Celular' },
+  { key: 'termo-responsabilidade-especifico', label: 'Termo de Responsabilidade (VT)', icon: CreditCard, shortLabel: 'VT específico' },
   { key: 'equipamento', label: 'Termo de Responsabilidade de Equipamento', icon: Shield, shortLabel: 'Equipamento' },
   { key: 'lgpd', label: 'Termo de Consentimento LGPD', icon: FileCheck, shortLabel: 'LGPD' },
   { key: 'npps', label: 'NPPS – Norma e Procedimento do Posto', icon: FileText, shortLabel: 'NPPS' },
@@ -39,9 +39,15 @@ interface DocumentosGerarTabProps {
   employeeId?: string;
   companyId?: string;
   hideHeader?: boolean;
+  tipoSalarioContratual?: string;
 }
 
-const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({ employeeId: propEmployeeId, companyId: propCompanyId, hideHeader }) => {
+const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({
+  employeeId: propEmployeeId,
+  companyId: propCompanyId,
+  hideHeader,
+  tipoSalarioContratual
+}) => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const tipoFromUrl = params.get('tipo');
@@ -122,7 +128,13 @@ const DocumentosGerarTab: React.FC<DocumentosGerarTabProps> = ({ employeeId: pro
         {tipo === 'termo-responsabilidade-especifico' && <TermoResponsabilidadeEspecificoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'equipamento' && <TermoResponsabilidadeEquipamentoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'lgpd' && <TermoLGPDForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
-        {tipo === 'contratos' && <ContratosTrabalhoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
+        {tipo === 'contratos' && (
+          <ContratosTrabalhoForm
+            employeeId={finalEmployeeId}
+            companyId={finalCompanyId}
+            tipoSalarioContratual={tipoSalarioContratual}
+          />
+        )}
         {tipo === 'ordens' && <OrdemServicosForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'advertencia' && <AdvertenciaDisciplinarForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}
         {tipo === 'declaracao' && <DeclaracaoForm employeeId={finalEmployeeId} companyId={finalCompanyId} />}

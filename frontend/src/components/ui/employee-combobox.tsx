@@ -64,6 +64,8 @@ export function EmployeeCombobox({
   const [searchTerm, setSearchTerm] = React.useState("")
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const [selectedEmployee, setSelectedEmployee] = React.useState<SimpleEmployee | null>(null)
+  const onEmployeeSelectRef = React.useRef(onEmployeeSelect)
+  onEmployeeSelectRef.current = onEmployeeSelect
 
   // Normaliza positionFilter em array de tokens (lowercase)
   const positionTokens = React.useMemo(() => {
@@ -112,6 +114,7 @@ export function EmployeeCombobox({
     const alreadyLoaded = employees.find(e => e.id === value)
     if (alreadyLoaded) {
       setSelectedEmployee(alreadyLoaded)
+      onEmployeeSelectRef.current?.(alreadyLoaded)
       return
     }
 
@@ -147,10 +150,11 @@ export function EmployeeCombobox({
             return [...prev, simple];
           })
           setSelectedEmployee(simple)
+          onEmployeeSelectRef.current?.(simple)
         }
       })
       .catch(err => console.error('Erro ao carregar funcionário selecionado:', err))
-  }, [value]) // Fix infinite loop by depending ONLY on value
+  }, [value, employees, selectedEmployee?.id])
 
   // Localized status labels translations
   const getStatusLabel = React.useCallback((status?: string): string => {
@@ -208,14 +212,14 @@ export function EmployeeCombobox({
 
   // Converter funcionários para opções do combobox
   const options = employees.map(emp => ({
-    label: `${emp.name}${emp.positionName ? ` - ${emp.positionName}` : ''}${emp.unitName ? ` (${emp.unitName})` : ''}`,
+    label: `${emp.name}${emp.positionName ? ` - ${emp.positionName}` : ''}${(emp.workPostName || emp.unitName) ? ` (${emp.workPostName || emp.unitName})` : ''}`,
     value: emp.id,
     employee: emp
   }))
 
   const effectiveSelected = selectedEmployee || employees.find(emp => emp.id === value)
   const displayLabel = effectiveSelected
-    ? `${effectiveSelected.name}${effectiveSelected.positionName ? ` - ${effectiveSelected.positionName}` : ''}${effectiveSelected.unitName ? ` (${effectiveSelected.unitName})` : ''}`
+    ? `${effectiveSelected.name}${effectiveSelected.positionName ? ` - ${effectiveSelected.positionName}` : ''}${(effectiveSelected.workPostName || effectiveSelected.unitName) ? ` (${effectiveSelected.workPostName || effectiveSelected.unitName})` : ''}`
     : value && initialDisplayName
       ? initialDisplayName
       : null

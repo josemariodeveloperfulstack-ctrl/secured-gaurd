@@ -56,6 +56,12 @@ public class EmploymentContractRequest {
     /** Salário por extenso (ex.: cadastro do funcionário). Opcional; se vazio, usa texto orientativo no PDF. */
     private String salaryInWords;
 
+    /**
+     * Tipo salarial contratual do cadastro (MENSAL, HORISTA, DIARISTA).
+     * Define o texto da cláusula de remuneração no PDF (ex.: "mensal"/"por mês" vs "horário"/"por hora").
+     */
+    private String tipoSalarioContratual;
+
     // Novos campos para enriquecer o PDF
     private String nationality;
     private String maritalStatus;

@@ -41,6 +41,13 @@ public class EmploymentContractStandardPdfService {
         private static final String REPORT_TITLE = "Contrato Individual de Trabalho";
         private static final String EXPERIENCE_TITLE = "CONTRATO DE TRABALHO A TÍTULO DE EXPERIÊNCIA";
         private static final String INDEFINITE_TITLE = "CONTRATO DE TRABALHO POR PRAZO INDETERMINADO";
+        /** Margens do corpo do contrato em pontos (iText): 1 cm = 72/2,54 pt. */
+        private static final float CONTRACT_LEFT_MARGIN_PT = cmToPt(3f);
+        private static final float CONTRACT_RIGHT_MARGIN_PT = cmToPt(2f);
+
+        private static float cmToPt(float cm) {
+                return cm * 72f / 2.54f;
+        }
 
         public byte[] generatePdf(EmploymentContractRequest request) {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -53,6 +60,8 @@ public class EmploymentContractStandardPdfService {
                                         .reportTitle(reportTitle)
                                         .topMargin(100f)
                                         .bottomMargin(60f)
+                                        .leftMargin(CONTRACT_LEFT_MARGIN_PT)
+                                        .rightMargin(CONTRACT_RIGHT_MARGIN_PT)
                                         .includeEmailInFooter(true)
                                         .removeBoldFromFooterCompanyName(true)
                                         .useCalibriLightFooter(true)
@@ -142,31 +151,25 @@ public class EmploymentContractStandardPdfService {
                                 .setMarginBottom(10f);
                 document.add(intro);
 
-                // Cláusulas
-                String setorPhrase = "";
-                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
-                        setorPhrase = ", alocado(a) no setor de " + request.getDepartment().trim();
-                }
+                // Cláusulas (setor de trabalho não é exibido no contrato — alocação pode mudar de posto)
+                SalaryContractText salaryText = resolveSalaryContractText(request);
 
                 java.util.List<String> clause1Bolds = new java.util.ArrayList<>();
                 if (request.getPosition() != null) {
                         clause1Bolds.add(request.getPosition().toUpperCase());
                 }
-                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
-                        clause1Bolds.add(request.getDepartment().trim());
-                }
 
                 addClauseAsSection(document, "CLÁUSULA 1ª - DA FUNÇÃO",
                                 "O EMPREGADO é contratado para exercer a função de "
                                                 + request.getPosition().toUpperCase()
-                                                + setorPhrase
                                                 + ", comprometendo-se a executá-la com zelo e dedicação, bem como outras tarefas compatíveis.",
                                 clause1Bolds);
 
                 addClauseAsSection(document, "CLÁUSULA 2ª - DA REMUNERAÇÃO",
-                                "A EMPREGADORA pagará ao EMPREGADO a remuneração mensal de R$ "
+                                "A EMPREGADORA pagará ao EMPREGADO a remuneração " + salaryText.tipoAdjetivo() + " de R$ "
                                                 + formatMoney(request.getSalary())
                                                 + " (" + convertToWords(request.getSalary()) + ")" +
+                                                ", " + salaryText.periodicidade() +
                                                 ", a ser efetuada até o 5º dia útil do mês subsequente ao vencido.");
 
                 addClauseAsSection(document, "CLÁUSULA 3ª - DA JORNADA",
@@ -248,10 +251,7 @@ public class EmploymentContractStandardPdfService {
                                                 ? " série " + request.getEmployeeCtpsSeries()
                                                 : "");
 
-                String setorPhrase = "";
-                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
-                        setorPhrase = ", alocado(a) no setor de " + request.getDepartment().trim();
-                }
+                SalaryContractText salaryText = resolveSalaryContractText(request);
 
                 return template
                                 .replace("{{EMPREGADOR_NOME}}", empregadorNome)
@@ -266,10 +266,33 @@ public class EmploymentContractStandardPdfService {
                                 .replace("{{EMPREGADO_CTPS}}", ctpsCompleta)
                                 .replace("{{EMPREGADO_PIS}}", nullToEmpty(request.getPis()))
                                 .replace("{{FUNCAO}}", funcao)
-                                .replace("{{SETOR_ALOCACAO}}", setorPhrase)
+                                .replace("{{SETOR_ALOCACAO}}", "")
+                                .replace("{{SALARIO_TIPO}}", salaryText.tipoSubstantivo())
+                                .replace("{{SALARIO_PERIODICIDADE}}", salaryText.periodicidade())
                                 .replace("{{SALARIO_VALOR}}", salarioValor)
                                 .replace("{{SALARIO_EXTENSO}}", salarioExtenso)
                                 .replace("{{CIDADE_DATA_EXTENSO}}", cidadeDataExtenso);
+        }
+
+        /**
+         * Textos da remuneração conforme {@code tipoSalarioContratual} do cadastro (MENSAL, HORISTA, DIARISTA).
+         */
+        private static SalaryContractText resolveSalaryContractText(EmploymentContractRequest request) {
+                String tipo = request.getTipoSalarioContratual();
+                if (tipo != null) {
+                        tipo = tipo.trim().toUpperCase(Locale.ROOT);
+                }
+                if ("HORISTA".equals(tipo)) {
+                        return new SalaryContractText("horário", "horário", "por hora");
+                }
+                if ("DIARISTA".equals(tipo)) {
+                        return new SalaryContractText("diário", "diário", "por dia");
+                }
+                // MENSAL ou não informado
+                return new SalaryContractText("mensal", "mensal", "por mês");
+        }
+
+        private record SalaryContractText(String tipoSubstantivo, String tipoAdjetivo, String periodicidade) {
         }
 
         /**
@@ -338,7 +361,7 @@ public class EmploymentContractStandardPdfService {
         /**
          * Quebra o texto em blocos (parágrafos) para o iText fluir em várias páginas com alinhamento justificado.
          * Detecta o marcador {{ASSINATURAS_DUAS_COLUNAS}} e renderiza assinaturas em duas colunas.
-         * Destaca em negrito: nome da empresa, nome do funcionário, cargo e setor de trabalho.
+         * Destaca em negrito: nome da empresa, nome do funcionário e cargo.
          */
         private void appendMultipagePlainText(Document document, String text,
                         EmploymentContractRequest request, Company company) {
@@ -355,9 +378,6 @@ public class EmploymentContractStandardPdfService {
                 }
                 if (request.getPosition() != null && !request.getPosition().isBlank()) {
                         boldTerms.add(request.getPosition().trim().toUpperCase());
-                }
-                if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
-                        boldTerms.add(request.getDepartment().trim());
                 }
 
                 String[] blocks = normalized.split("\n\n+");

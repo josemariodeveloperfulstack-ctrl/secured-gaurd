@@ -14,6 +14,7 @@ import com.z7design.secured_guard.exception.ResourceNotFoundException;
 import com.z7design.secured_guard.model.Company;
 import com.z7design.secured_guard.repository.CompanyRepository;
 import com.z7design.secured_guard.service.StandardReportLayoutService.DocumentWithPdf;
+import com.z7design.secured_guard.util.CompanyDataFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
@@ -23,6 +24,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -37,6 +40,8 @@ public class EquipmentResponsibilityStandardPdfService {
         private final CompanyRepository companyRepository;
 
         private static final String REPORT_TITLE = "Termo de Responsabilidade - Equipamentos";
+        /** Margem superior quando o título fica no corpo (sem título fixo no cabeçalho do layout). */
+        private static final float VT_TERM_TOP_MARGIN_PT = 68f;
 
         public byte[] generatePdf(EquipmentResponsibilityRequest request) {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -45,12 +50,18 @@ public class EquipmentResponsibilityStandardPdfService {
                         String title = request.getReportTitle() != null && !request.getReportTitle().isEmpty()
                                         ? request.getReportTitle()
                                         : REPORT_TITLE;
+                        // Termos VT: título único no corpo (sublinhado); evita duplicar no cabeçalho do layout
+                        boolean valeTransporteTerm = isValeTransporteCardTerm(request);
+                        String layoutTitle = valeTransporteTerm ? null : title;
 
-                        ReportLayoutConfig config = ReportLayoutConfig.builder()
+                        var layoutConfigBuilder = ReportLayoutConfig.builder()
                                         .companyId(request.getCompanyId())
-                                        .reportTitle(title)
-                                        .includeEmailInFooter(true)
-                                        .build();
+                                        .reportTitle(layoutTitle)
+                                        .includeEmailInFooter(true);
+                        if (valeTransporteTerm) {
+                                layoutConfigBuilder.topMargin(VT_TERM_TOP_MARGIN_PT);
+                        }
+                        ReportLayoutConfig config = layoutConfigBuilder.build();
 
                         DocumentWithPdf docWithPdf = pdfLayoutService.createDocumentWithLayout(writer, config);
                         Document document = docWithPdf.getDocument();
@@ -118,12 +129,19 @@ public class EquipmentResponsibilityStandardPdfService {
         }
 
         private void addContent(Document document, EquipmentResponsibilityRequest request, Company company) {
+                if (isValeTransporteCardTerm(request)) {
+                        addValeTransporteCardContent(document, request, company);
+                        return;
+                }
+
                 // Seção: Identificação do Funcionário
                 document.add(createSectionHeader("IDENTIFICAÇÃO DO FUNCIONÁRIO"));
                 Table employeeTable = new Table(UnitValue.createPercentArray(new float[] { 100 }))
                                 .useAllAvailableWidth();
                 employeeTable.addCell(createLabelValueCell("NOME:", request.getEmployeeName()));
                 employeeTable.addCell(createLabelValueCell("CPF:", request.getEmployeeCpf()));
+                employeeTable.addCell(
+                                createLabelValueCell("SETOR/POSTO:", request.getEmployeeSectorOrWorkPost()));
                 document.add(employeeTable);
 
                 // Seção: Equipamentos Entregues
@@ -188,6 +206,229 @@ public class EquipmentResponsibilityStandardPdfService {
 
                 // Assinaturas
                 addSignatures(document, request, company);
+        }
+
+        private void addValeTransporteCardContent(Document document, EquipmentResponsibilityRequest request, Company company) {
+                // Título centralizado, conforme modelo RH
+                ValeTransporteCardInfo cardInfo = resolveCardInfo(request);
+                Paragraph titleBlock = new Paragraph()
+                                .setBold()
+                                .setTextAlignment(TextAlignment.CENTER)
+                                .setFontSize(12f)
+                                .setMarginTop(0f)
+                                .setMarginBottom(12f)
+                                .setMultipliedLeading(1.15f);
+                titleBlock.add(new Text("TERMO DE RESPONSABILIDADE:\n").setUnderline());
+                titleBlock.add(new Text(cardInfo.cardTitle()).setUnderline());
+                document.add(titleBlock);
+
+                String employeeName = safe(request.getEmployeeName()).toUpperCase();
+                String employeeSectorOrWorkPost = safe(request.getEmployeeSectorOrWorkPost()).toUpperCase();
+                String employeeCpf = CompanyDataFormatter.formatCpf(request.getEmployeeCpf());
+                String companyName = safe(company != null ? company.getName() : "").toUpperCase();
+                String cardIdentifier = firstIdentifier(request);
+
+                String intro = "Termo de responsabilidade e outras avenças que entre si fazem de um lado, "
+                                + companyName
+                                + ", doravante designada EMPRESA, e de outro, "
+                                + employeeName
+                                + ", doravante designado EMPREGADO(A), mediante as seguintes condições:";
+                document.add(new Paragraph(intro)
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(10f));
+
+                String clause1Destination = cardInfo.usageDestinationPhrase() != null
+                                ? cardInfo.usageDestinationPhrase()
+                                : "destinado à utilização no Sistema de Transporte de Passageiros de "
+                                                + cardInfo.transportSystem()
+                                                + ", da operadora pertencente "
+                                                + cardInfo.operator();
+                document.add(new Paragraph(
+                                "1. O(A) EMPREGADO(A) declara que recebe, neste ato, a primeira via do "
+                                                + cardInfo.cardName()
+                                                + " Nº "
+                                                + cardIdentifier
+                                                + ", "
+                                                + clause1Destination
+                                                + ", ficando o citado cartão, a partir desta data, sob sua guarda e responsabilidade.")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(8f));
+
+                document.add(new Paragraph(
+                                "2. "
+                                                + cardInfo.cardName()
+                                                + " é pessoal e intransferível, sendo de responsabilidade exclusiva do EMPREGADO(A) o uso indevido do mesmo, inclusive por terceiros. Ficando o EMPREGADO(A) responsável por perdas e danos decorrentes do seu ato.")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(8f));
+
+                document.add(new Paragraph(
+                                "3. "
+                                                + cardInfo.cardName()
+                                                + " deve ser manuseado com cuidado, evitando-se sempre o contato com as mãos ou com outros materiais no respectivo chip eletrônico.")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(8f));
+
+                document.add(new Paragraph(
+                                "4. "
+                                                + cardInfo.cardName()
+                                                + " não pode ser dobrado, perfurado, amassado ou molhado. Não deixá-lo exposto ao sol, calor e agentes abrasivos; não riscar; não escrever no mesmo ou sobre o mesmo; não afixar adesivos nos cartões.")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(8f));
+
+                document.add(new Paragraph(
+                                "5. "
+                                                + cardInfo.cardName()
+                                                + ", quando não estiver sendo usado pelo EMPREGADO, deverá estar em local seco e ao abrigo da luz solar direta.")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(8f));
+
+                document.add(new Paragraph(
+                                "6. Em caso de perda ou dano injustificados, arcará o EMPREGADO(A) com o custo da emissão de segunda via do "
+                                                + cardInfo.cardName()
+                                                + ", no valor de R$ "
+                                                + String.format(Locale.forLanguageTag("pt-BR"), "%.2f",
+                                                                cardInfo.secondCopyValue().doubleValue()).replace('.', ',')
+                                                + " (" + cardInfo.secondCopyValueInWords()
+                                                + ") a unidade, autorizando desde já, o desconto do valor no salário do mês respectivo da emissão de segunda via.")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(8f));
+
+                document.add(new Paragraph(
+                                "7. No caso de rescisão do contrato de trabalho do EMPREGADO(A), "
+                                                + cardInfo.cardName()
+                                                + " deverá ser devolvido à empresa, sob pena de desconto do valor previsto no item anterior, o qual fica desde já, expressamente autorizado, a ser procedido nas verbas rescisórias.")
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.JUSTIFIED)
+                                .setMarginBottom(20f));
+
+                // Bloco de identificação do colaborador conforme solicitado
+                document.add(new Paragraph("SETOR/POSTO: " + (employeeSectorOrWorkPost.isBlank() ? "-" : employeeSectorOrWorkPost))
+                                .setFontSize(9f)
+                                .setMarginBottom(2f));
+                document.add(new Paragraph("CPF: " + (employeeCpf != null && !employeeCpf.isBlank() ? employeeCpf : "-"))
+                                .setFontSize(9f)
+                                .setMarginBottom(18f));
+
+                String city = request.getCity() != null && !request.getCity().isBlank() ? request.getCity()
+                                : (company != null && company.getCity() != null ? company.getCity() : "_______________");
+                document.add(new Paragraph(city + ", ____/____/______.")
+                                .setFontSize(10f)
+                                .setMarginBottom(22f));
+
+                document.add(new Paragraph("________________________________________")
+                                .setTextAlignment(TextAlignment.LEFT)
+                                .setMarginBottom(0f));
+                document.add(new Paragraph(employeeName).setBold().setFontSize(10f));
+        }
+
+        private boolean isValeTransporteCardTerm(EquipmentResponsibilityRequest request) {
+                if (containsVtCardMarker(normalize(request.getReportTitle()))) {
+                        return true;
+                }
+                if (request.getEquipments() != null) {
+                        for (EquipmentResponsibilityRequest.EquipmentItem item : request.getEquipments()) {
+                                if (containsVtCardMarker(normalize(item.getDescription()))
+                                                || containsVtCardMarker(normalize(item.getName()))) {
+                                        return true;
+                                }
+                        }
+                }
+                return false;
+        }
+
+        private boolean containsVtCardMarker(String normalized) {
+                return normalized.contains("BH BUS") || normalized.contains("BHBUS")
+                                || normalized.contains("BETIM CARD") || normalized.contains("BETIMCARD")
+                                || normalized.contains("OTIMO");
+        }
+
+        private String resolveVtCardText(EquipmentResponsibilityRequest request) {
+                String fromTitle = normalize(request.getReportTitle());
+                if (containsVtCardMarker(fromTitle)) {
+                        return fromTitle;
+                }
+                if (request.getEquipments() != null) {
+                        for (EquipmentResponsibilityRequest.EquipmentItem item : request.getEquipments()) {
+                                String fromDesc = normalize(item.getDescription());
+                                if (containsVtCardMarker(fromDesc)) {
+                                        return fromDesc;
+                                }
+                                String fromName = normalize(item.getName());
+                                if (containsVtCardMarker(fromName)) {
+                                        return fromName;
+                                }
+                        }
+                }
+                return fromTitle;
+        }
+
+        private ValeTransporteCardInfo resolveCardInfo(EquipmentResponsibilityRequest request) {
+                String normalized = resolveVtCardText(request);
+                if (normalized.contains("BETIM CARD") || normalized.contains("BETIMCARD")) {
+                        return new ValeTransporteCardInfo(
+                                        "CARTÃO BETIMCARD VALE-TRANSPORTE",
+                                        "O CARTÃO BETIMCARD VALE-TRANSPORTE",
+                                        "Betim",
+                                        "BETIMCARD",
+                                        null,
+                                        BigDecimal.valueOf(15.00),
+                                        "Quinze Reais");
+                }
+                if (normalized.contains("OTIMO")) {
+                        return new ValeTransporteCardInfo(
+                                        "CARTÃO ÓTIMO VALE-TRANSPORTE",
+                                        "O CARTÃO ÓTIMO VALE-TRANSPORTE",
+                                        null,
+                                        null,
+                                        "destinado à utilização no Sistema de Transporte de Passageiros na Região Metropolitana das operadoras pertencentes ao SINTRAM",
+                                        BigDecimal.valueOf(15.00),
+                                        "Quinze Reais");
+                }
+                return new ValeTransporteCardInfo(
+                                "CARTÃO BHBUS VALE-TRANSPORTE",
+                                "O CARTÃO BHBUS VALE-TRANSPORTE",
+                                "Belo Horizonte",
+                                "TRANSFÁCIL",
+                                null,
+                                BigDecimal.valueOf(17.35),
+                                "Dezessete Reais e Trinta e Cinco Centavos");
+        }
+
+        private String normalize(String value) {
+                String upper = safe(value).toUpperCase(Locale.ROOT);
+                return Normalizer.normalize(upper, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+        }
+
+        private String firstIdentifier(EquipmentResponsibilityRequest request) {
+                if (request.getEquipments() == null || request.getEquipments().isEmpty()) {
+                        return "________________";
+                }
+                String identifier = request.getEquipments().get(0).getIdentifier();
+                if (identifier == null || identifier.isBlank()) {
+                        return "________________";
+                }
+                return identifier.trim();
+        }
+
+        private String safe(String value) {
+                return value != null ? value : "";
+        }
+
+        private record ValeTransporteCardInfo(
+                        String cardTitle,
+                        String cardName,
+                        String transportSystem,
+                        String operator,
+                        String usageDestinationPhrase,
+                        BigDecimal secondCopyValue,
+                        String secondCopyValueInWords) {
         }
 
         private Cell createLabelValueCell(String label, String value) {

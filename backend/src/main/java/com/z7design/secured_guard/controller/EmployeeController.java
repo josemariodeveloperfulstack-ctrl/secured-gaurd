@@ -23,6 +23,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 
 import com.z7design.secured_guard.service.EmployeeExcelImportService;
 import com.z7design.secured_guard.service.EmployeeImportService;
@@ -75,10 +78,21 @@ public class EmployeeController {
     }
 
     @GetMapping("/stats")
-    @Operation(summary = "Estatísticas de funcionários", description = "Retorna totais por status. Use companyId para filtrar por empresa.")
+    @Operation(summary = "Estatísticas de funcionários", description = "Retorna totais por status. Aceita os mesmos filtros da listagem (empresa, busca, status, datas).")
     public ResponseEntity<Map<String, Long>> getStats(
-            @RequestParam(required = false) UUID companyId) {
-        Map<String, Long> stats = employeeService.getStatsByCompany(companyId);
+            @RequestParam(required = false) UUID companyId,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateTo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateTo) {
+        String statusFilter = (status != null && !status.trim().isEmpty() && !"all".equalsIgnoreCase(status.trim()))
+                ? status.trim().toUpperCase()
+                : null;
+        String search = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : null;
+        Map<String, Long> stats = employeeService.getStats(companyId, search, statusFilter, hireDateFrom, hireDateTo,
+                terminationDateFrom, terminationDateTo);
         return ResponseEntity.ok(stats);
     }
 
@@ -427,7 +441,11 @@ public class EmployeeController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "500") int size,
             @RequestParam(required = false) String sortBy,
-            @RequestParam(required = false) String sortDir) {
+            @RequestParam(required = false) String sortDir,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hireDateTo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate terminationDateTo) {
         try {
             int safePage = Math.max(page, 0);
             int safeSize = Math.min(Math.max(size, 1), 500);
@@ -436,15 +454,18 @@ public class EmployeeController {
             String sortDirParam = (sortDir != null && sortDir.trim().equalsIgnoreCase("desc")) ? "desc" : "asc";
             System.out.println("🔍 EmployeeController.getAllPaged - page=" + safePage + " size=" + safeSize
                     + " searchTerm=" + searchTerm + " companyId=" + companyId + " status=" + statusFilter
-                    + " sortBy=" + sortByParam + " sortDir=" + sortDirParam);
+                    + " sortBy=" + sortByParam + " sortDir=" + sortDirParam
+                    + " hireDateFrom=" + hireDateFrom + " hireDateTo=" + hireDateTo
+                    + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo);
 
             List<Object[]> data;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
                 data = employeeService.findBasicDataBySearchTermPaged(searchTerm.trim(), safePage, safeSize, companyId,
-                        statusFilter, sortByParam, sortDirParam);
+                        statusFilter, sortByParam, sortDirParam, hireDateFrom, hireDateTo, terminationDateFrom,
+                        terminationDateTo);
             } else {
                 data = employeeService.findBasicDataPaged(safePage, safeSize, companyId, statusFilter, sortByParam,
-                        sortDirParam);
+                        sortDirParam, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
             }
             System.out.println(
                     "🔍 EmployeeController.getAllPaged - Encontrados " + data.size() + " funcionários no banco");

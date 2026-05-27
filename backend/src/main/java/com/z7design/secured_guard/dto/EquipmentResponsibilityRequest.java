@@ -25,6 +25,8 @@ public class EquipmentResponsibilityRequest {
     private String employeeName;
     private String employeeCpf;
     private String employeePosition; // Cargo
+    /** Setor / posto de trabalho (exibição nos termos que exigem lotação — BH BUS VT). */
+    private String employeeSectorOrWorkPost;
 
     // Equipamentos
     private List<EquipmentItem> equipments;

@@ -14,7 +14,7 @@ export const queryKeys = {
       ['employees', 'list', filters ?? {}, page, size] as const,
     count: () => ['employees', 'count'] as const,
     byId: (id: string) => ['employees', 'byId', id] as const,
-    stats: (companyId?: string) => ['employees', 'stats', companyId ?? 'all'] as const,
+    stats: (filters?: EmployeeFilters) => ['employees', 'stats', filters ?? {}] as const,
   },
   clients: {
     all: ['clients'] as const,

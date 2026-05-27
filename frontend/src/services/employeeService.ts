@@ -120,6 +120,35 @@ export interface SimpleEmployee {
   status?: string;
 }
 
+/** Normaliza funcionário da API para uso em comboboxes e formulários de documentos. */
+export function employeeToSimpleEmployee(emp: Employee): SimpleEmployee {
+  return {
+    id: emp.id,
+    name: emp.name,
+    email: emp.email,
+    phone: emp.phone,
+    document: emp.document,
+    cpf: emp.cpf,
+    address: typeof emp.address === 'string' ? emp.address : undefined,
+    registrationNumber: emp.registrationNumber,
+    hireDate: emp.hireDate,
+    terminationDate: emp.terminationDate,
+    rg: emp.rg,
+    companyId: emp.company?.id,
+    companySigla: emp.company?.sigla,
+    positionName: emp.position?.name,
+    unitName: emp.unit?.name,
+    departmentName: emp.department?.name,
+    workPostId: emp.workPostId || emp.workPost?.id,
+    workPostName: emp.workPostName || emp.workPost?.name,
+    salario: emp.salario,
+    diasTrabalho: emp.diasTrabalho,
+    horarioTrabalho: emp.horarioTrabalho,
+    escalaTrabalho: emp.escalaTrabalho,
+    status: emp.status,
+  };
+}
+
 export interface EmployeeFilters {
   searchTerm?: string;
   status?: string;

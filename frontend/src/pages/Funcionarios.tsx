@@ -151,13 +151,17 @@ const Funcionarios: React.FC = () => {
       searchTerm: searchTerm.trim() || undefined,
       companyId: companyFilter && companyFilter !== 'all' ? companyFilter : undefined,
       status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
+      hireDateFrom: hireDateFrom || undefined,
+      hireDateTo: hireDateTo || undefined,
+      terminationDateFrom: terminationDateFrom || undefined,
+      terminationDateTo: terminationDateTo || undefined,
     };
     if (sortKey === 'hireDate' || sortKey === 'terminationDate') {
       base.sortBy = sortKey;
       base.sortDir = sortDir;
     }
     return base;
-  }, [searchTerm, companyFilter, statusFilter, sortKey, sortDir]);
+  }, [searchTerm, companyFilter, statusFilter, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo, sortKey, sortDir]);
 
   const loadAdmissionIntegration = async () => {
     try {
@@ -262,16 +266,22 @@ const Funcionarios: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Buscar lista e contagem total — via queryClient.fetchQuery para reaproveitar o cache.
-      const [data, count] = await Promise.all([
+      const apiFilters = filters ?? buildApiFilters();
+
+      // Lista, contagem global e estatísticas dos cards com os mesmos filtros
+      const [data, count, stats] = await Promise.all([
         queryClient.fetchQuery({
-          queryKey: queryKeys.employees.list(filters, page, pageSize),
-          queryFn: () => employeeService.getAllEmployees(filters, page, pageSize),
+          queryKey: queryKeys.employees.list(apiFilters, page, pageSize),
+          queryFn: () => employeeService.getAllEmployees(apiFilters, page, pageSize),
         }),
         queryClient.fetchQuery({
           queryKey: queryKeys.employees.count(),
           queryFn: () => employeeService.getEmployeesCount(),
           staleTime: 2 * 60 * 1000,
+        }),
+        employeeService.getEmployeesStats(apiFilters).catch((err) => {
+          console.warn('Erro ao carregar estatísticas filtradas:', err);
+          return null;
         }),
       ]);
 
@@ -285,6 +295,7 @@ const Funcionarios: React.FC = () => {
       console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length, '| Página:', page, '| Total no sistema:', count);
       setEmployees(data);
       if (count !== null) setTotalCount(count);
+      if (stats) setStatsFromApi(stats);
     } catch (err) {
       console.error('Erro ao carregar funcionários:', err);
       setError('Erro ao carregar funcionários. Tente novamente.');
@@ -389,25 +400,6 @@ const Funcionarios: React.FC = () => {
         if (!cancelled) {
           console.warn('Erro ao carregar postos:', e);
           setFilterWorkPosts([]);
-        }
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [companyFilter]);
-
-  // Carregar estatísticas por empresa (cards exibem totais da empresa selecionada)
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const companyId = companyFilter && companyFilter !== 'all' ? companyFilter : undefined;
-        const stats = await employeeService.getEmployeesStats(companyId);
-        if (!cancelled) setStatsFromApi(stats);
-      } catch (e) {
-        if (!cancelled) {
-          console.warn('Erro ao carregar estatísticas:', e);
-          setStatsFromApi(null);
         }
       }
     };
@@ -993,20 +985,19 @@ Para excluir este funcionário:
     suspended: employees.filter(e => e.status === 'SUSPENDED').length,
   };
 
+  const hasListFilters = !!(
+    searchTerm.trim()
+    || (statusFilter && statusFilter !== 'all')
+    || (companyFilter && companyFilter !== 'all')
+    || hireDateFrom || hireDateTo || terminationDateFrom || terminationDateTo
+  );
   const subtitleLoaded = employees.length;
-  // Total para exibição: quando há filtro de status, usar a estatística correspondente
-  const displayTotal = statsFromApi && statusFilter && statusFilter !== 'all'
-    ? (statusFilter === 'ACTIVE' ? statsFromApi.active
-      : statusFilter === 'TERMINATED' ? statsFromApi.terminated
-      : statusFilter === 'SUSPENDED' ? statsFromApi.suspended
-      : statusFilter === 'VACATION' ? statsFromApi.vacation
-      : statusFilter === 'MEDICAL_CERTIFICATE' || statusFilter === 'MATERNITY_LEAVE' ? statsFromApi.medicalCertificate
-      : statsFromApi.total)
-    : (statsFromApi?.total ?? totalCount ?? subtitleLoaded);
-  const subtitleTotal = displayTotal;
-  const subtitleText = subtitleTotal > subtitleLoaded
-    ? `${subtitleTotal} funcionários no sistema (${subtitleLoaded} carregados)`
-    : `${subtitleLoaded} funcionário${subtitleLoaded !== 1 ? 's' : ''} no sistema`;
+  const subtitleTotal = statsFromApi?.total ?? totalCount ?? subtitleLoaded;
+  const subtitleText = hasListFilters
+    ? `${subtitleTotal} funcionário${subtitleTotal !== 1 ? 's' : ''} no filtro selecionado`
+    : subtitleTotal > subtitleLoaded
+      ? `${subtitleTotal} funcionários no sistema (${subtitleLoaded} carregados)`
+      : `${subtitleLoaded} funcionário${subtitleLoaded !== 1 ? 's' : ''} no sistema`;
 
   return (
     <StandardLayout

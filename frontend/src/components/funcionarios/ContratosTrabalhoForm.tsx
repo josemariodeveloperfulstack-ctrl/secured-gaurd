@@ -27,6 +27,8 @@ import { useInvalidateDocumentosGerados } from '@/hooks/queries/useDocumentosGer
 interface ContratosTrabalhoFormProps {
   employeeId?: string;
   companyId?: string;
+  /** Valor atual do cadastro (ex.: formulário da modal), usado no PDF antes de persistir. */
+  tipoSalarioContratual?: string;
 }
 
 function resolvePdfContractKind(
@@ -83,7 +85,11 @@ function buildSetorLocalTrabalhoContrato(emp: Employee): string {
   return unique.join(' — ');
 }
 
-const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeId, companyId }) => {
+const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({
+  employeeId,
+  companyId,
+  tipoSalarioContratual: tipoSalarioContratualProp
+}) => {
   const invalidateDocumentosGerados = useInvalidateDocumentosGerados();
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -383,7 +389,11 @@ const ContratosTrabalhoForm: React.FC<ContratosTrabalhoFormProps> = ({ employeeI
       experienceDurationDays: isExperiencia && form.experienceDuration
         ? parseInt(form.experienceDuration, 10)
         : undefined,
-      salaryInWords: (fullEmployee as any).salarioPorExtenso || (fullEmployee as any).salario_por_extenso || ''
+      salaryInWords: (fullEmployee as any).salarioPorExtenso || (fullEmployee as any).salario_por_extenso || '',
+      tipoSalarioContratual:
+        tipoSalarioContratualProp?.trim() ||
+        fullEmployee.tipoSalarioContratual ||
+        ''
     };
   };
 

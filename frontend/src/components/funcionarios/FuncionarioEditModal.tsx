@@ -3761,7 +3761,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
               </div>
                   ) : (
                     <div className="mt-6 border-t border-gray-600 pt-6">
-                      <DocumentosGerarTab hideHeader={true} employeeId={employeeToEdit?.id} companyId={selectedCompany?.id || ''} />
+                      <DocumentosGerarTab
+                        hideHeader={true}
+                        employeeId={employeeToEdit?.id}
+                        companyId={selectedCompany?.id || ''}
+                        tipoSalarioContratual={form.tipoSalarioContratual}
+                      />
               </div>
                   )}
 

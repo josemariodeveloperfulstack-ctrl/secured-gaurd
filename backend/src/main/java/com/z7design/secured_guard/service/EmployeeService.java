@@ -87,6 +87,18 @@ public class EmployeeService {
         return "hireDate".equalsIgnoreCase(s) || "terminationDate".equalsIgnoreCase(s);
     }
 
+    private static boolean hasDateRangeFilters(java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        return hireDateFrom != null || hireDateTo != null || terminationDateFrom != null || terminationDateTo != null;
+    }
+
+    private static boolean useNativeBasicDataQuery(String sortBy, java.time.LocalDate hireDateFrom,
+            java.time.LocalDate hireDateTo, java.time.LocalDate terminationDateFrom,
+            java.time.LocalDate terminationDateTo) {
+        return isDateSortField(sortBy)
+                || hasDateRangeFilters(hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
+    }
+
     private static String orderClauseForBasicData(String sortBy, String sortDir) {
         String dir = "DESC".equalsIgnoreCase(sortDir) ? "DESC" : "ASC";
         if (sortBy != null && "hireDate".equalsIgnoreCase(sortBy.trim())) {
@@ -100,7 +112,9 @@ public class EmployeeService {
 
     @SuppressWarnings("unchecked")
     private List<Object[]> findBasicDataPagedNative(String searchTerm, java.util.UUID companyId, String status,
-            int limit, int offset, String sortBy, String sortDir) {
+            int limit, int offset, String sortBy, String sortDir, java.time.LocalDate hireDateFrom,
+            java.time.LocalDate hireDateTo, java.time.LocalDate terminationDateFrom,
+            java.time.LocalDate terminationDateTo) {
         String order = orderClauseForBasicData(sortBy, sortDir);
         // Não usar "(? IS NULL OR col = ?)" com :status nulo — o PostgreSQL não infere o tipo do parâmetro (42P18).
         StringBuilder sql = new StringBuilder(BASIC_DATA_SELECT).append(BASIC_DATA_JOINS).append("WHERE 1=1 ");
@@ -117,6 +131,18 @@ public class EmployeeService {
         if (filterStatus) {
             sql.append("AND CAST(e.status AS text) = :status ");
         }
+        if (hireDateFrom != null) {
+            sql.append("AND e.hire_date >= :hireDateFrom ");
+        }
+        if (hireDateTo != null) {
+            sql.append("AND e.hire_date <= :hireDateTo ");
+        }
+        if (terminationDateFrom != null) {
+            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom ");
+        }
+        if (terminationDateTo != null) {
+            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo ");
+        }
         sql.append(order);
         sql.append("LIMIT :limit OFFSET :offset");
         Query q = entityManager.createNativeQuery(sql.toString());
@@ -128,6 +154,18 @@ public class EmployeeService {
         }
         if (filterStatus) {
             q.setParameter("status", status);
+        }
+        if (hireDateFrom != null) {
+            q.setParameter("hireDateFrom", hireDateFrom);
+        }
+        if (hireDateTo != null) {
+            q.setParameter("hireDateTo", hireDateTo);
+        }
+        if (terminationDateFrom != null) {
+            q.setParameter("terminationDateFrom", terminationDateFrom);
+        }
+        if (terminationDateTo != null) {
+            q.setParameter("terminationDateTo", terminationDateTo);
         }
         q.setParameter("limit", limit);
         q.setParameter("offset", offset);
@@ -1046,6 +1084,115 @@ public class EmployeeService {
         return employeeRepository.count();
     }
 
+    private void appendEmployeeListWhereClause(StringBuilder sql, String searchTerm, java.util.UUID companyId,
+            String status, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        boolean hasSearch = searchTerm != null && !searchTerm.trim().isEmpty();
+        if (hasSearch) {
+            sql.append("AND (UPPER(e.name) LIKE UPPER(CONCAT('%', :searchTerm, '%')) ")
+                    .append("OR (NULLIF(REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '') IS NOT NULL AND REGEXP_REPLACE(COALESCE(e.document, ''), '[^0-9]', '', 'g') LIKE CONCAT('%', REGEXP_REPLACE(:searchTerm, '[^0-9]', '', 'g'), '%')) ")
+                    .append("OR UPPER(COALESCE(e.email, '')) LIKE UPPER(CONCAT('%', :searchTerm, '%'))) ");
+        }
+        if (companyId != null) {
+            sql.append("AND e.company_id = :companyId ");
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append("AND CAST(e.status AS text) = :status ");
+        }
+        if (hireDateFrom != null) {
+            sql.append("AND e.hire_date >= :hireDateFrom ");
+        }
+        if (hireDateTo != null) {
+            sql.append("AND e.hire_date <= :hireDateTo ");
+        }
+        if (terminationDateFrom != null) {
+            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) >= :terminationDateFrom ");
+        }
+        if (terminationDateTo != null) {
+            sql.append("AND COALESCE(e.data_rescisao, e.termination_date) <= :terminationDateTo ");
+        }
+    }
+
+    private void bindEmployeeListWhereParams(jakarta.persistence.Query q, String searchTerm, java.util.UUID companyId,
+            String status, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            q.setParameter("searchTerm", searchTerm.trim());
+        }
+        if (companyId != null) {
+            q.setParameter("companyId", companyId);
+        }
+        if (status != null && !status.isBlank()) {
+            q.setParameter("status", status);
+        }
+        if (hireDateFrom != null) {
+            q.setParameter("hireDateFrom", hireDateFrom);
+        }
+        if (hireDateTo != null) {
+            q.setParameter("hireDateTo", hireDateTo);
+        }
+        if (terminationDateFrom != null) {
+            q.setParameter("terminationDateFrom", terminationDateFrom);
+        }
+        if (terminationDateTo != null) {
+            q.setParameter("terminationDateTo", terminationDateTo);
+        }
+    }
+
+    /**
+     * Contagens por status com os mesmos filtros da listagem paginada (busca, empresa, status, datas).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> getStatsFiltered(String searchTerm, java.util.UUID companyId, String status,
+            java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        // CAST explícito — evita ::bigint, que o Hibernate confunde com parâmetro nomeado :bigint
+        StringBuilder sql = new StringBuilder(
+                "SELECT CAST(COUNT(*) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'VACATION' THEN 1 ELSE 0 END), 0) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) IN ('MEDICAL_CERTIFICATE', 'MATERNITY_LEAVE') THEN 1 ELSE 0 END), 0) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'TERMINATED' THEN 1 ELSE 0 END), 0) AS bigint), "
+                        + "CAST(COALESCE(SUM(CASE WHEN CAST(e.status AS text) = 'SUSPENDED' THEN 1 ELSE 0 END), 0) AS bigint) "
+                        + "FROM employees e WHERE 1=1 ");
+        appendEmployeeListWhereClause(sql, searchTerm, companyId, status, hireDateFrom, hireDateTo,
+                terminationDateFrom, terminationDateTo);
+        Query q = entityManager.createNativeQuery(sql.toString());
+        bindEmployeeListWhereParams(q, searchTerm, companyId, status, hireDateFrom, hireDateTo,
+                terminationDateFrom, terminationDateTo);
+        Object result = q.getSingleResult();
+        Object[] row = result instanceof Object[] ? (Object[]) result : new Object[] { result };
+        Map<String, Long> stats = new HashMap<>();
+        stats.put("total", toLong(row[0]));
+        stats.put("active", toLong(row[1]));
+        stats.put("vacation", toLong(row[2]));
+        stats.put("medicalCertificate", toLong(row[3]));
+        stats.put("terminated", toLong(row[4]));
+        stats.put("suspended", toLong(row[5]));
+        return stats;
+    }
+
+    private static long toLong(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        return Long.parseLong(value.toString());
+    }
+
+    /**
+     * Estatísticas alinhadas aos filtros da tela de funcionários (mesma regra da listagem paginada).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Long> getStats(java.util.UUID companyId, String searchTerm, String status,
+            java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
+        return getStatsFiltered(searchTerm, companyId, status, hireDateFrom, hireDateTo,
+                terminationDateFrom, terminationDateTo);
+    }
+
     /**
      * Retorna estatísticas de funcionários (total, ativos, férias/atestado, demitidos/suspensos).
      * Se companyId for null, retorna totais globais. Caso contrário, retorna totais da empresa.
@@ -1198,16 +1345,25 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status,
             String sortBy, String sortDir) {
+        return findBasicDataPaged(page, size, companyId, status, sortBy, sortDir, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataPaged(int page, int size, java.util.UUID companyId, String status,
+            String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
             System.out.println(
                     "🔍 EmployeeService.findBasicDataPaged - page=" + page + " size=" + pageSize + " offset=" + offset
                             + " companyId=" + companyId + " status=" + status + " sortBy=" + sortBy + " sortDir="
-                            + sortDir);
+                            + sortDir + " hireDateFrom=" + hireDateFrom + " hireDateTo=" + hireDateTo
+                            + " terminationDateFrom=" + terminationDateFrom + " terminationDateTo=" + terminationDateTo);
             List<Object[]> data;
-            if (isDateSortField(sortBy)) {
-                data = findBasicDataPagedNative(null, companyId, status, pageSize, offset, sortBy, sortDir);
+            if (useNativeBasicDataQuery(sortBy, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo)) {
+                data = findBasicDataPagedNative(null, companyId, status, pageSize, offset, sortBy, sortDir,
+                        hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
             } else {
                 data = companyId == null
                         ? employeeRepository.findBasicDataPaged(pageSize, offset, status)
@@ -1234,15 +1390,26 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId, String status,
             String sortBy, String sortDir) {
+        return findBasicDataBySearchTermPaged(searchTerm, page, size, companyId, status, sortBy, sortDir, null, null,
+                null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Object[]> findBasicDataBySearchTermPaged(String searchTerm, int page, int size, java.util.UUID companyId,
+            String status, String sortBy, String sortDir, java.time.LocalDate hireDateFrom, java.time.LocalDate hireDateTo,
+            java.time.LocalDate terminationDateFrom, java.time.LocalDate terminationDateTo) {
         try {
             int pageSize = Math.min(Math.max(size, 1), 500);
             int offset = Math.max(page, 0) * pageSize;
             System.out.println("🔍 EmployeeService.findBasicDataBySearchTermPaged - termo=" + searchTerm + " page="
                     + page + " size=" + pageSize + " offset=" + offset + " companyId=" + companyId + " status="
-                    + status + " sortBy=" + sortBy + " sortDir=" + sortDir);
+                    + status + " sortBy=" + sortBy + " sortDir=" + sortDir + " hireDateFrom=" + hireDateFrom
+                    + " hireDateTo=" + hireDateTo + " terminationDateFrom=" + terminationDateFrom
+                    + " terminationDateTo=" + terminationDateTo);
             List<Object[]> data;
-            if (isDateSortField(sortBy)) {
-                data = findBasicDataPagedNative(searchTerm, companyId, status, pageSize, offset, sortBy, sortDir);
+            if (useNativeBasicDataQuery(sortBy, hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo)) {
+                data = findBasicDataPagedNative(searchTerm, companyId, status, pageSize, offset, sortBy, sortDir,
+                        hireDateFrom, hireDateTo, terminationDateFrom, terminationDateTo);
             } else {
                 data = companyId == null
                         ? employeeRepository.findBasicDataBySearchTermPaged(searchTerm, pageSize, offset, status)
