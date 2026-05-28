@@ -15,6 +15,7 @@ public record EmailCampaignSummaryDto(
         Integer totalLimit,
         Integer dailyLimit,
         Integer hourlyLimit,
+        Integer minIntervalSeconds,
         Instant scheduledAt,
         Instant createdAt,
         long recipientCount

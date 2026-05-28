@@ -60,8 +60,8 @@ public class EmailCampaignController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<EmailCampaign> get(@PathVariable UUID id) {
-        return ResponseEntity.ok(emailCampaignService.get(id));
+    public ResponseEntity<EmailCampaignSummaryDto> get(@PathVariable UUID id) {
+        return ResponseEntity.ok(emailCampaignService.getSummary(id));
     }
 
     @PatchMapping("/{id}")
@@ -165,9 +165,10 @@ public class EmailCampaignController {
 
     /** Acrescenta destinatários a uma campanha em rascunho (ignora duplicados). */
     @PutMapping("/{id}/recipients")
-    public ResponseEntity<EmailCampaign> appendRecipients(
+    public ResponseEntity<Void> appendRecipients(
             @PathVariable UUID id,
             @Valid @RequestBody AppendRecipientsRequest body) {
-        return ResponseEntity.ok(emailCampaignService.appendRecipients(id, body.recipients()));
+        emailCampaignService.appendRecipients(id, body.recipients());
+        return ResponseEntity.noContent().build();
     }
 }

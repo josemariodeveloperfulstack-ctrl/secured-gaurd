@@ -402,26 +402,14 @@ public class EmailCampaignService {
         List<EmailCampaign> campaigns = campaignRepository.findAllWithRecipientsOrderByCreatedAtDesc();
         List<EmailCampaignSummaryDto> out = new ArrayList<>(campaigns.size());
         for (EmailCampaign c : campaigns) {
-            int n = c.getRecipients() != null ? c.getRecipients().size() : 0;
-            String defaultTemplateName = c.getDefaultTemplate() != null ? c.getDefaultTemplate().getName() : null;
-            UUID defaultTemplateId = c.getDefaultTemplate() != null ? c.getDefaultTemplate().getId() : null;
-            out.add(new EmailCampaignSummaryDto(
-                    c.getId(),
-                    c.getTitle(),
-                    c.getDescription(),
-                    c.getTemplateId(),
-                    defaultTemplateId,
-                    defaultTemplateName,
-                    c.getProviderType() != null ? c.getProviderType().name() : null,
-                    c.getStatus() != null ? c.getStatus().name() : null,
-                    c.getTotalLimit(),
-                    c.getDailyLimit(),
-                    c.getHourlyLimit(),
-                    c.getScheduledAt(),
-                    c.getCreatedAt(),
-                    n));
+            out.add(toSummary(c));
         }
         return out;
+    }
+
+    @Transactional(readOnly = true)
+    public EmailCampaignSummaryDto getSummary(UUID campaignId) {
+        return toSummary(get(campaignId));
     }
 
     /**
@@ -464,6 +452,29 @@ public class EmailCampaignService {
         Map<String, Long> counts = emailLogRepository.findByCampaign_IdOrderByCreatedAtDesc(campaignId).stream()
                 .collect(Collectors.groupingBy(l -> l.getStatus().name(), Collectors.counting()));
         return new EmailCampaignMetricsDto(campaignId, counts);
+    }
+
+    private EmailCampaignSummaryDto toSummary(EmailCampaign c) {
+        int n = c.getRecipients() != null ? c.getRecipients().size() : 0;
+        String defaultTemplateName = c.getDefaultTemplate() != null ? c.getDefaultTemplate().getName() : null;
+        UUID defaultTemplateId = c.getDefaultTemplate() != null ? c.getDefaultTemplate().getId() : null;
+        return new EmailCampaignSummaryDto(
+                c.getId(),
+                c.getTitle(),
+                c.getDescription(),
+                c.getTemplateId(),
+                defaultTemplateId,
+                defaultTemplateName,
+                c.getProviderType() != null ? c.getProviderType().name() : null,
+                c.getStatus() != null ? c.getStatus().name() : null,
+                c.getTotalLimit(),
+                c.getDailyLimit(),
+                c.getHourlyLimit(),
+                c.getMinIntervalSeconds(),
+                c.getScheduledAt(),
+                c.getCreatedAt(),
+                n
+        );
     }
 
     private static boolean looksLikeEmail(String value) {

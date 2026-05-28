@@ -30,6 +30,8 @@ export interface EmailCampaignDetail {
   description?: string | null;
   templateId?: string | null;
   defaultTemplate?: { id: string; name?: string } | null;
+  defaultTemplateId?: string | null;
+  defaultTemplateName?: string | null;
   providerType?: EmailProviderType | string | null;
   status?: EmailCampaignStatus | string | null;
   totalLimit?: number | null;
@@ -130,7 +132,14 @@ class EmailCampaignService {
 
   async getById(campaignId: string): Promise<EmailCampaignDetail> {
     const { data } = await api.get<EmailCampaignDetail>(`/api/v1/email-campaigns/${campaignId}`);
-    return data;
+    const defaultTemplateId = data.defaultTemplate?.id ?? data.defaultTemplateId ?? null;
+    const defaultTemplateName = data.defaultTemplate?.name ?? data.defaultTemplateName ?? null;
+    return {
+      ...data,
+      defaultTemplateId,
+      defaultTemplateName,
+      defaultTemplate: defaultTemplateId ? { id: String(defaultTemplateId), name: defaultTemplateName ?? undefined } : null,
+    };
   }
 
   async update(campaignId: string, payload: UpdateEmailCampaignPayload): Promise<void> {
