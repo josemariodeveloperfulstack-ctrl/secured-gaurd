@@ -40,6 +40,8 @@ public class EmployeeReportController {
         private List<String> columns; // Colunas customizadas para o relatório (ex: name, registrationNumber, status, ...)
         private ReportGroupBy groupBy; // Agrupar por FUNCIONARIO ou POSTO_TRABALHO
         private ReportOrderBy orderBy; // Ordenação primária: FUNCIONARIO ou POSTO_TRABALHO (alfabética)
+        /** Resumo dos filtros aplicados (período, status, empresa, etc.) exibido no PDF */
+        private String filterSummary;
     }
 
     @PostMapping("/pdf")
@@ -57,7 +59,8 @@ public class EmployeeReportController {
                     request.getEmployeeIds(),
                     request.getColumns(),
                     request.getGroupBy(),
-                    request.getOrderBy());
+                    request.getOrderBy(),
+                    request.getFilterSummary());
 
             if (pdfBytes == null || pdfBytes.length == 0) {
                 Map<String, String> error = new HashMap<>();

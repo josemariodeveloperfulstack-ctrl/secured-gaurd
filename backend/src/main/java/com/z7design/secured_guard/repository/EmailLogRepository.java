@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,6 +41,8 @@ public interface EmailLogRepository extends JpaRepository<EmailLog, UUID> {
     List<EmailLog> findByProviderMessageIdFuzzy(@Param("mid") String mid, Pageable pageable);
 
     List<EmailLog> findByCampaign_IdOrderByCreatedAtDesc(UUID campaignId);
+    List<EmailLog> findByRecipient_IdAndStatusInOrderByCreatedAtDesc(UUID recipientId, Collection<EmailLogStatus> statuses);
+    void deleteByRecipient_Id(UUID recipientId);
 
     @Query("""
             select l from EmailLog l

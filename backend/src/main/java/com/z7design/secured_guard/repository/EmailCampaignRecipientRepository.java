@@ -13,6 +13,9 @@ import java.util.UUID;
 public interface EmailCampaignRecipientRepository extends JpaRepository<EmailCampaignRecipient, UUID> {
 
     List<EmailCampaignRecipient> findByCampaign_Id(UUID campaignId);
+    List<EmailCampaignRecipient> findByCampaign_IdAndEmailMarketingSuppressedFalse(UUID campaignId);
+    List<EmailCampaignRecipient> findByCampaign_IdAndEmailMarketingSuppressedTrueOrderByCreatedAtDesc(UUID campaignId);
+    Optional<EmailCampaignRecipient> findByIdAndCampaign_Id(UUID id, UUID campaignId);
 
     @Query("select r from EmailCampaignRecipient r where lower(r.email) = lower(:email)")
     Optional<EmailCampaignRecipient> findFirstByEmailIgnoreCase(@Param("email") String email);

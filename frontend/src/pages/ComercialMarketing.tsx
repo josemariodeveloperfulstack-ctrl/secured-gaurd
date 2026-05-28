@@ -8,6 +8,7 @@ import CampaignsTab from '@/components/comercial-marketing/CampaignsTab';
 import EmailTemplatesTab from '@/components/comercial-marketing/EmailTemplatesTab';
 import ComingSoonTab from '@/components/comercial-marketing/ComingSoonTab';
 import CampaignLeadsListTab from '@/components/comercial-marketing/CampaignLeadsListTab';
+import ImportedListsTab from '@/components/comercial-marketing/ImportedListsTab';
 import MarketingUnsubscribesTab from '@/components/comercial-marketing/MarketingUnsubscribesTab';
 import emailCampaignService from '@/services/emailCampaignService';
 import emailTemplateService from '@/services/emailTemplateService';
@@ -19,9 +20,17 @@ import {
   Bot,
   Megaphone,
   Ban,
+  ClipboardList,
 } from 'lucide-react';
 
-type TabId = 'campaigns' | 'email-templates' | 'whatsapp-templates' | 'alfred' | 'leads' | 'unsubscribes';
+type TabId =
+  | 'campaigns'
+  | 'email-templates'
+  | 'whatsapp-templates'
+  | 'alfred'
+  | 'leads'
+  | 'imported-lists'
+  | 'unsubscribes';
 
 const ComercialMarketing: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -123,6 +132,13 @@ const ComercialMarketing: React.FC = () => {
               Lista de Leads
             </TabsTrigger>
             <TabsTrigger
+              value="imported-lists"
+              className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black"
+            >
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Listas importadas
+            </TabsTrigger>
+            <TabsTrigger
               value="unsubscribes"
               className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black"
             >
@@ -167,6 +183,10 @@ const ComercialMarketing: React.FC = () => {
 
           <TabsContent value="leads" className="mt-0">
             <CampaignLeadsListTab />
+          </TabsContent>
+
+          <TabsContent value="imported-lists" className="mt-0">
+            <ImportedListsTab />
           </TabsContent>
 
           <TabsContent value="unsubscribes" className="mt-0">

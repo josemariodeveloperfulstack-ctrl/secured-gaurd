@@ -63,6 +63,7 @@ public class EmailDispatchService {
     private final EmailUnsubscribeService unsubscribeService;
     private final EmailTrackingService emailTrackingService;
     private final EmailMarketingInlineAssetsService emailMarketingInlineAssetsService;
+    private final EmailMarketingRejectionService emailMarketingRejectionService;
     private final Environment environment;
 
     @Value("${app.email.marketing.assets-base-url}")
@@ -155,6 +156,7 @@ public class EmailDispatchService {
         if (recipient == null || recipient.getEmail() == null || recipient.getEmail().isBlank()) {
             log.setStatus(EmailLogStatus.DROPPED);
             log.setBounceReason("Destinatário inválido");
+            emailMarketingRejectionService.registerRejection(log, log.getBounceReason());
             emailLogRepository.save(log);
             return true;
         }
@@ -169,7 +171,15 @@ public class EmailDispatchService {
 
         if (recipient.isEmailMarketingSuppressed()) {
             log.setStatus(EmailLogStatus.DROPPED);
-            log.setBounceReason("Destinatário excluído do marketing (opt-out)");
+            log.setBounceReason("Destinatário rejeitado ou inativo no marketing");
+            emailLogRepository.save(log);
+            return true;
+        }
+
+        if (emailMarketingRejectionService.isRejected(recipient.getEmail())) {
+            log.setStatus(EmailLogStatus.DROPPED);
+            log.setBounceReason("E-mail consta na lista de rejeitados");
+            emailMarketingRejectionService.registerRejection(log, log.getBounceReason());
             emailLogRepository.save(log);
             return true;
         }
@@ -192,6 +202,7 @@ public class EmailDispatchService {
         } catch (IOException | jakarta.mail.MessagingException | RuntimeException e) {
             log.setStatus(EmailLogStatus.DROPPED);
             log.setBounceReason(truncate(e.getMessage(), 1000));
+            emailMarketingRejectionService.registerRejection(log, log.getBounceReason());
             LOG.error("Falha ao enviar e-mail da campanha {} para {}: {}",
                     campaignId, recipient.getEmail(), e.getMessage());
         }

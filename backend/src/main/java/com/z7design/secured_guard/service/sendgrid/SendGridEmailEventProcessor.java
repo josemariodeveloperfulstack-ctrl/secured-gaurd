@@ -29,6 +29,7 @@ public class SendGridEmailEventProcessor {
     private final EmailLogRepository emailLogRepository;
     private final EmailWebhookEventRepository emailWebhookEventRepository;
     private final RecipientLeadAutoCreationService recipientLeadAutoCreationService;
+    private final EmailMarketingRejectionService emailMarketingRejectionService;
 
     @Transactional
     public void processPayload(String rawJson) {
@@ -106,12 +107,16 @@ public class SendGridEmailEventProcessor {
             }
             case "bounce", "blocked" -> {
                 emailLog.setStatus(EmailLogStatus.BOUNCED);
-                emailLog.setBounceReason(buildBounceReason(event));
+                String reason = buildBounceReason(event);
+                emailLog.setBounceReason(reason);
+                emailMarketingRejectionService.registerRejection(emailLog, reason);
             }
             case "dropped" -> {
                 if (emailLog.getStatus() != EmailLogStatus.BOUNCED) {
                     emailLog.setStatus(EmailLogStatus.DROPPED);
-                    emailLog.setBounceReason(buildBounceReason(event));
+                    String reason = buildBounceReason(event);
+                    emailLog.setBounceReason(reason);
+                    emailMarketingRejectionService.registerRejection(emailLog, reason);
                 }
             }
             case "deferred" -> promoteStatus(emailLog, EmailLogStatus.DEFERRED, ts, false);
@@ -295,4 +300,5 @@ public class SendGridEmailEventProcessor {
         }
         return new String(b, 0, 500, StandardCharsets.UTF_8);
     }
+
 }

@@ -65,6 +65,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { MainLayout } from '@/components/MainLayout';
+import { messageBelongsToConversation } from '@/utils/chatConversation';
 import { useMessageStore, User, ChatMessage, Conversation } from '@/stores/messageStore';
 import { messageService, MessageServiceError } from '@/services/messageService';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -186,29 +187,9 @@ const ChatInterno: React.FC = () => {
   const safeChatMessages = useMemo(() => {
     if (!selectedConversation || !Array.isArray(chatMessages)) return [];
 
-    return chatMessages.filter((message) => {
-      // Para conversas individuais, verificar se o remetente ou destinatário corresponde
-      if (selectedConversation.type === 'individual') {
-        return (
-          message.recipient?.id === selectedConversation.id ||
-          message.sender?.id === selectedConversation.id ||
-          (message.recipient?.id === currentUser?.id && message.sender?.id === selectedConversation.id) ||
-          (message.sender?.id === currentUser?.id && message.recipient?.id === selectedConversation.id)
-        );
-      }
-
-      // Para grupos, verificar se o group.id corresponde
-      if (selectedConversation.type === 'group') {
-        return message.group?.id === selectedConversation.id;
-      }
-
-      // Para departamentos, verificar se o department.id corresponde
-      if (selectedConversation.type === 'department') {
-        return message.department?.id === selectedConversation.id;
-      }
-
-      return false;
-    });
+    return chatMessages.filter((message) =>
+      messageBelongsToConversation(message, selectedConversation, currentUser?.id)
+    );
   }, [chatMessages, selectedConversation, currentUser?.id]);
 
   // WebSocket connection

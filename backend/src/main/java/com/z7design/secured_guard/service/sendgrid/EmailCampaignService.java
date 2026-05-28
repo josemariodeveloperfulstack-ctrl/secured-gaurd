@@ -5,11 +5,14 @@ import com.z7design.secured_guard.dto.sendgrid.EmailCampaignMetricsDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignRecipientDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailLogRowDto;
+import com.z7design.secured_guard.dto.sendgrid.InactiveEmailRecipientDto;
 import com.z7design.secured_guard.dto.sendgrid.SendEmailCampaignRequest;
+import com.z7design.secured_guard.dto.sendgrid.UpdateInactiveEmailRecipientRequest;
 import com.z7design.secured_guard.dto.sendgrid.UpdateEmailCampaignRequest;
 import com.z7design.secured_guard.model.EmailCampaign;
 import com.z7design.secured_guard.model.EmailCampaignRecipient;
 import com.z7design.secured_guard.model.EmailLog;
+import com.z7design.secured_guard.model.EmailMarketingRejectedAddress;
 import com.z7design.secured_guard.model.EmailTemplate;
 import com.z7design.secured_guard.model.enums.EmailCampaignStatus;
 import com.z7design.secured_guard.model.enums.EmailLogStatus;
@@ -33,6 +36,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +55,7 @@ public class EmailCampaignService {
     private final UserRepository userRepository;
     private final EmailDispatchService dispatchService;
     private final EmailDispatchScheduler dispatchScheduler;
+    private final EmailMarketingRejectionService emailMarketingRejectionService;
 
     @Transactional
     public EmailCampaign create(CreateEmailCampaignRequest request) {
@@ -154,6 +159,9 @@ public class EmailCampaignService {
             if (seen.contains(key)) {
                 continue;
             }
+            if (emailMarketingRejectionService.isRejected(dto.email())) {
+                continue;
+            }
             seen.add(key);
             attachRecipientFromDto(campaign, dto);
         }
@@ -193,13 +201,14 @@ public class EmailCampaignService {
     @Transactional
     public void sendCampaign(UUID campaignId, SendEmailCampaignRequest request) {
         EmailCampaign campaign = get(campaignId);
-        List<EmailCampaignRecipient> recipients = recipientRepository.findByCampaign_Id(campaignId);
+        List<EmailCampaignRecipient> recipients = recipientRepository.findByCampaign_IdAndEmailMarketingSuppressedFalse(campaignId);
         if (recipients.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campanha sem destinatários");
         }
-        EmailCampaignStatus previousStatus = campaign.getStatus();
-        if (previousStatus == EmailCampaignStatus.COMPLETED
-                || previousStatus == EmailCampaignStatus.CANCELED) {
+        // Clique manual em "Enviar/Reenviar" sempre prioriza disparo imediato.
+        // Se já há histórico, convertemos para nova rodada (todos voltam a PENDING).
+        List<EmailLog> existingLogs = emailLogRepository.findByCampaign_IdOrderByCreatedAtDesc(campaignId);
+        if (!existingLogs.isEmpty()) {
             resetLogsForResend(campaignId);
         }
 
@@ -250,14 +259,8 @@ public class EmailCampaignService {
             emailLogRepository.save(log);
         }
 
-        // Define status da campanha: SCHEDULED se há scheduledAt futuro,
-        // senão RUNNING para o scheduler picar imediatamente.
-        Instant now = Instant.now();
-        if (campaign.getScheduledAt() != null && campaign.getScheduledAt().isAfter(now)) {
-            campaign.setStatus(com.z7design.secured_guard.model.enums.EmailCampaignStatus.SCHEDULED);
-        } else {
-            campaign.setStatus(com.z7design.secured_guard.model.enums.EmailCampaignStatus.RUNNING);
-        }
+        // Ação manual de envio deve começar na hora, mesmo que a campanha estivesse agendada.
+        campaign.setStatus(com.z7design.secured_guard.model.enums.EmailCampaignStatus.RUNNING);
         campaignRepository.save(campaign);
 
         // Registra contexto no scheduler para evitar relookup de template.
@@ -274,12 +277,122 @@ public class EmailCampaignService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<InactiveEmailRecipientDto> listInactiveRecipients(UUID campaignId) {
+        get(campaignId);
+        return emailMarketingRejectionService.listByCampaign(campaignId).stream()
+                .map(this::toInactiveRecipientDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> findRejectedAmong(List<String> emails) {
+        return emailMarketingRejectionService.findRejectedAmong(emails);
+    }
+
+    private InactiveEmailRecipientDto toInactiveRecipientDto(EmailMarketingRejectedAddress rejected) {
+        UUID rowId = rejected.getRecipientId() != null ? rejected.getRecipientId() : rejected.getId();
+        return new InactiveEmailRecipientDto(
+                rowId,
+                rejected.getEmail(),
+                rejected.getName(),
+                rejected.getReason(),
+                rejected.getRejectedAt());
+    }
+
+    @Transactional
+    public InactiveEmailRecipientDto updateInactiveRecipient(UUID campaignId, UUID recipientId,
+            UpdateInactiveEmailRecipientRequest request) {
+        EmailMarketingRejectedAddress rejected = emailMarketingRejectionService
+                .findByCampaignAndRowId(campaignId, recipientId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "E-mail rejeitado não encontrado"));
+        String newEmail = request.email().trim();
+        String newName = request.name() != null ? request.name().trim() : null;
+
+        if (Boolean.TRUE.equals(request.reactivate())) {
+            emailMarketingRejectionService.removeFromRejectedList(rejected.getEmail());
+            if (rejected.getRecipientId() != null) {
+                recipientRepository.findById(rejected.getRecipientId()).ifPresent(r -> {
+                    r.setEmailMarketingSuppressed(false);
+                    r.setEmail(newEmail);
+                    r.setName(newName);
+                    recipientRepository.save(r);
+                });
+            }
+            return new InactiveEmailRecipientDto(
+                    rejected.getRecipientId() != null ? rejected.getRecipientId() : rejected.getId(),
+                    newEmail,
+                    newName,
+                    null,
+                    Instant.now());
+        }
+
+        rejected.setEmail(newEmail);
+        rejected.setName(newName);
+        rejected = emailMarketingRejectionService.save(rejected);
+        if (rejected.getRecipientId() != null) {
+            recipientRepository.findById(rejected.getRecipientId()).ifPresent(r -> {
+                r.setEmail(newEmail);
+                r.setName(newName);
+                recipientRepository.save(r);
+            });
+        }
+        return toInactiveRecipientDto(rejected);
+    }
+
+    @Transactional
+    public void deleteInactiveRecipient(UUID campaignId, UUID recipientId) {
+        removeRecipientFromCampaign(campaignId, recipientId, true);
+    }
+
+    /**
+     * Remove um destinatário da campanha e cancela qualquer envio ainda pendente.
+     */
+    @Transactional
+    public void removeRecipientFromCampaign(UUID campaignId, UUID recipientId) {
+        removeRecipientFromCampaign(campaignId, recipientId, false);
+    }
+
+    private void removeRecipientFromCampaign(UUID campaignId, UUID recipientId, boolean requireSuppressed) {
+        EmailMarketingRejectedAddress rejected = emailMarketingRejectionService
+                .findByCampaignAndRowId(campaignId, recipientId)
+                .orElse(null);
+        if (rejected != null) {
+            emailMarketingRejectionService.removeFromRejectedList(rejected.getEmail());
+            if (rejected.getRecipientId() != null) {
+                recipientId = rejected.getRecipientId();
+            }
+        }
+        EmailCampaignRecipient recipient = recipientRepository.findByIdAndCampaign_Id(recipientId, campaignId)
+                .orElse(null);
+        if (recipient == null) {
+            if (rejected != null) {
+                return;
+            }
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Destinatário não encontrado");
+        }
+        if (requireSuppressed && !recipient.isEmailMarketingSuppressed()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Somente destinatários rejeitados podem ser removidos por este endpoint.");
+        }
+        emailMarketingRejectionService.removeFromRejectedList(recipient.getEmail());
+        cancelPendingSendsForRecipient(recipient.getId(), "Destinatário removido da campanha");
+        emailLogRepository.deleteByRecipient_Id(recipient.getId());
+        recipientRepository.delete(recipient);
+    }
+
     /**
      * Prepara nova rodada de envio: zera rastreamento dos logs existentes e volta todos para {@code PENDING}.
      */
     private void resetLogsForResend(UUID campaignId) {
         List<EmailLog> logs = emailLogRepository.findByCampaign_IdOrderByCreatedAtDesc(campaignId);
         for (EmailLog log : logs) {
+            if (log.getRecipient() != null && log.getRecipient().isEmailMarketingSuppressed()) {
+                continue;
+            }
+            if (log.getStatus() == EmailLogStatus.BOUNCED || log.getStatus() == EmailLogStatus.DROPPED) {
+                continue;
+            }
             log.setStatus(EmailLogStatus.PENDING);
             log.setProviderMessageId(null);
             log.setSentAt(null);
@@ -293,13 +406,15 @@ public class EmailCampaignService {
         dispatchScheduler.clearContext(campaignId);
     }
 
-    /** Pausa uma campanha em andamento — o scheduler deixará de processá-la. */
+    /** Pausa a campanha, interrompe o scheduler e cancela envios ainda pendentes. */
     @Transactional
     public void pauseCampaign(UUID campaignId) {
         EmailCampaign c = get(campaignId);
-        if (c.getStatus() == com.z7design.secured_guard.model.enums.EmailCampaignStatus.RUNNING
-                || c.getStatus() == com.z7design.secured_guard.model.enums.EmailCampaignStatus.SCHEDULED) {
-            c.setStatus(com.z7design.secured_guard.model.enums.EmailCampaignStatus.PAUSED);
+        if (c.getStatus() == EmailCampaignStatus.RUNNING
+                || c.getStatus() == EmailCampaignStatus.SCHEDULED) {
+            dispatchScheduler.clearContext(campaignId);
+            cancelPendingSends(campaignId, "Campanha pausada");
+            c.setStatus(EmailCampaignStatus.PAUSED);
             campaignRepository.save(c);
         }
     }
@@ -314,19 +429,14 @@ public class EmailCampaignService {
         }
     }
 
-    /** Cancela uma campanha — futuros PENDING são marcados como DROPPED. */
+    /** Cancela uma campanha — envios pendentes são descartados e o scheduler para. */
     @Transactional
     public void cancelCampaign(UUID campaignId) {
         EmailCampaign c = get(campaignId);
-        c.setStatus(com.z7design.secured_guard.model.enums.EmailCampaignStatus.CANCELED);
+        c.setStatus(EmailCampaignStatus.CANCELED);
         campaignRepository.save(c);
         dispatchScheduler.clearContext(campaignId);
-        // Marca PENDING como DROPPED com motivo
-        emailLogRepository.findPendingByCampaignOrderedByCreatedAt(campaignId).forEach(log -> {
-            log.setStatus(EmailLogStatus.DROPPED);
-            log.setBounceReason("Campanha cancelada");
-            emailLogRepository.save(log);
-        });
+        cancelPendingSends(campaignId, "Campanha cancelada");
     }
 
     /**
@@ -389,7 +499,10 @@ public class EmailCampaignService {
     @Transactional
     public void deleteCampaign(UUID campaignId) {
         EmailCampaign c = get(campaignId);
+        c.setStatus(EmailCampaignStatus.CANCELED);
+        campaignRepository.save(c);
         dispatchScheduler.clearContext(campaignId);
+        cancelPendingSends(campaignId, "Campanha excluída");
         List<EmailLog> logs = emailLogRepository.findByCampaign_IdOrderByCreatedAtDesc(campaignId);
         if (!logs.isEmpty()) {
             emailLogRepository.deleteAll(logs);
@@ -455,7 +568,9 @@ public class EmailCampaignService {
     }
 
     private EmailCampaignSummaryDto toSummary(EmailCampaign c) {
-        int n = c.getRecipients() != null ? c.getRecipients().size() : 0;
+        int n = c.getRecipients() != null
+                ? (int) c.getRecipients().stream().filter(r -> !r.isEmailMarketingSuppressed()).count()
+                : 0;
         String defaultTemplateName = c.getDefaultTemplate() != null ? c.getDefaultTemplate().getName() : null;
         UUID defaultTemplateId = c.getDefaultTemplate() != null ? c.getDefaultTemplate().getId() : null;
         return new EmailCampaignSummaryDto(
@@ -479,5 +594,22 @@ public class EmailCampaignService {
 
     private static boolean looksLikeEmail(String value) {
         return value != null && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    }
+
+    private void cancelPendingSends(UUID campaignId, String reason) {
+        for (EmailLog log : emailLogRepository.findPendingByCampaignOrderedByCreatedAt(campaignId)) {
+            log.setStatus(EmailLogStatus.DROPPED);
+            log.setBounceReason(reason);
+            emailLogRepository.save(log);
+        }
+    }
+
+    private void cancelPendingSendsForRecipient(UUID recipientId, String reason) {
+        for (EmailLog log : emailLogRepository.findByRecipient_IdAndStatusInOrderByCreatedAtDesc(
+                recipientId, EnumSet.of(EmailLogStatus.PENDING))) {
+            log.setStatus(EmailLogStatus.DROPPED);
+            log.setBounceReason(reason);
+            emailLogRepository.save(log);
+        }
     }
 }

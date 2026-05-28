@@ -72,6 +72,37 @@ export interface EmailLogRow {
   bounceReason: string | null;
 }
 
+export interface InactiveEmailRecipient {
+  recipientId: string;
+  email: string;
+  name: string | null;
+  reason: string | null;
+  inactivatedAt: string | null;
+}
+
+export type ImportedListSourceType = 'IMPORT' | 'PASTE' | 'MIXED';
+
+export interface EmailMarketingImportedListSummary {
+  id: string;
+  name: string;
+  description?: string | null;
+  sourceType: ImportedListSourceType | string;
+  recipientCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailMarketingImportedListDetail extends EmailMarketingImportedListSummary {
+  recipients: EmailCampaignRecipientInput[];
+}
+
+export interface SaveEmailMarketingImportedListPayload {
+  name: string;
+  description?: string | null;
+  sourceType?: ImportedListSourceType | string;
+  recipients: EmailCampaignRecipientInput[];
+}
+
 export interface EmailCampaignRecipientInput {
   email: string;
   name?: string | null;
@@ -99,6 +130,12 @@ export interface SendEmailCampaignPayload {
   subject?: string;
   htmlBody?: string;
   extraVariables?: Record<string, string>;
+}
+
+export interface UpdateInactiveEmailRecipientPayload {
+  email: string;
+  name?: string | null;
+  reactivate?: boolean;
 }
 
 export interface ImportRecipientsResponse {
@@ -203,6 +240,25 @@ class EmailCampaignService {
   }
 
   /** Até 500 e-mails por pedido; fatia automaticamente listas maiores. */
+  async checkRejected(emails: string[]): Promise<string[]> {
+    const unique = [
+      ...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => isValidEmail(e))),
+    ];
+    if (unique.length === 0) return [];
+    const out: string[] = [];
+    const size = 500;
+    for (let i = 0; i < unique.length; i += size) {
+      const slice = unique.slice(i, i + size);
+      if (!slice.length) continue;
+      const { data } = await api.post<{ rejected: string[] }>(
+        '/api/v1/email-campaigns/rejected-check',
+        { emails: slice }
+      );
+      out.push(...(data.rejected ?? []));
+    }
+    return out;
+  }
+
   async checkUnsubscribed(emails: string[]): Promise<string[]> {
     const unique = [
       ...new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => isValidEmail(e))),
@@ -230,6 +286,66 @@ class EmailCampaignService {
       return row;
     });
     await api.put(`/api/v1/email-campaigns/${campaignId}/recipients`, { recipients: payload });
+  }
+
+  async listInactiveRecipients(campaignId: string): Promise<InactiveEmailRecipient[]> {
+    const { data } = await api.get<InactiveEmailRecipient[]>(
+      `/api/v1/email-campaigns/${campaignId}/inactive-recipients`
+    );
+    return data;
+  }
+
+  async updateInactiveRecipient(
+    campaignId: string,
+    recipientId: string,
+    payload: UpdateInactiveEmailRecipientPayload
+  ): Promise<InactiveEmailRecipient> {
+    const { data } = await api.patch<InactiveEmailRecipient>(
+      `/api/v1/email-campaigns/${campaignId}/inactive-recipients/${recipientId}`,
+      payload
+    );
+    return data;
+  }
+
+  async deleteInactiveRecipient(campaignId: string, recipientId: string): Promise<void> {
+    await api.delete(`/api/v1/email-campaigns/${campaignId}/inactive-recipients/${recipientId}`);
+  }
+
+  async listImportedLists(): Promise<EmailMarketingImportedListSummary[]> {
+    const { data } = await api.get<EmailMarketingImportedListSummary[]>(
+      '/api/v1/email-campaigns/imported-lists'
+    );
+    return data;
+  }
+
+  async getImportedList(listId: string): Promise<EmailMarketingImportedListDetail> {
+    const { data } = await api.get<EmailMarketingImportedListDetail>(
+      `/api/v1/email-campaigns/imported-lists/${listId}`
+    );
+    return data;
+  }
+
+  async createImportedList(payload: SaveEmailMarketingImportedListPayload): Promise<EmailMarketingImportedListDetail> {
+    const { data } = await api.post<EmailMarketingImportedListDetail>(
+      '/api/v1/email-campaigns/imported-lists',
+      payload
+    );
+    return data;
+  }
+
+  async updateImportedList(
+    listId: string,
+    payload: SaveEmailMarketingImportedListPayload
+  ): Promise<EmailMarketingImportedListDetail> {
+    const { data } = await api.put<EmailMarketingImportedListDetail>(
+      `/api/v1/email-campaigns/imported-lists/${listId}`,
+      payload
+    );
+    return data;
+  }
+
+  async deleteImportedList(listId: string): Promise<void> {
+    await api.delete(`/api/v1/email-campaigns/imported-lists/${listId}`);
   }
 }
 

@@ -3714,7 +3714,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                         <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
                           <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
               </div>
-                        <h3 className="text-lg sm:text-xl font-semibold text-white">Gerar a ficha simples para contabilidade</h3>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white">Dados para Contabilidade</h3>
               </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                         <Button

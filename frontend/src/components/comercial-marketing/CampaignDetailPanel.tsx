@@ -1,8 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -15,6 +26,7 @@ import { formatDate } from '@/utils/formatters';
 import emailCampaignService, {
   type EmailCampaignSummary,
   type EmailLogRow,
+  type InactiveEmailRecipient,
 } from '@/services/emailCampaignService';
 import {
   Loader2,
@@ -26,6 +38,9 @@ import {
   AlertTriangle,
   Clock,
   Inbox,
+  UserX2,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 interface CampaignDetailPanelProps {
@@ -112,8 +127,11 @@ interface TabSpec {
   icon: React.ReactNode;
 }
 
+/** Registros ativos da campanha — rejeitados ficam só na aba Rejeitados. */
+const ACTIVE_LOG_STATUSES = ['PENDING', 'SENT', 'DEFERRED', 'DELIVERED', 'OPENED', 'CLICKED', 'REPLIED'];
+
 const TABS: TabSpec[] = [
-  { value: 'all', label: 'Todos', statuses: undefined, icon: <Inbox className="h-3.5 w-3.5" /> },
+  { value: 'all', label: 'Todos', statuses: ACTIVE_LOG_STATUSES, icon: <Inbox className="h-3.5 w-3.5" /> },
   { value: 'pending', label: 'Pendentes', statuses: ['PENDING'], icon: <Clock className="h-3.5 w-3.5" /> },
   {
     value: 'sent',
@@ -130,6 +148,7 @@ const TABS: TabSpec[] = [
     statuses: ['BOUNCED', 'DROPPED'],
     icon: <AlertTriangle className="h-3.5 w-3.5" />,
   },
+  { value: 'inactive', label: 'Rejeitados', statuses: undefined, icon: <UserX2 className="h-3.5 w-3.5" /> },
 ];
 
 const VALID_LOG_TAB_VALUES = new Set(TABS.map((t) => t.value));
@@ -155,6 +174,12 @@ const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({
   const metricsQuery = useQuery({
     queryKey: ['email-campaign-metrics', campaignId],
     queryFn: () => emailCampaignService.getMetrics(campaignId),
+    refetchInterval: isLive ? 5000 : false,
+  });
+
+  const rejectedQuery = useQuery({
+    queryKey: ['email-campaign-inactive-recipients', campaignId],
+    queryFn: () => emailCampaignService.listInactiveRecipients(campaignId),
     refetchInterval: isLive ? 5000 : false,
   });
 
@@ -288,16 +313,20 @@ const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({
         <CardHeader className="pb-3">
           <CardTitle className="text-base text-white">Registros de envio</CardTitle>
           <CardDescription className="text-seguranca-lightgray">
-            Use as abas para filtrar destinatários por estágio.
+            Use as abas para filtrar destinatários por estágio. E-mails rejeitados saem da fila e vão para a aba
+            Rejeitados.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={recipientLogTab} onValueChange={setRecipientLogTab}>
             <TabsList className="flex w-full flex-wrap justify-start gap-1 bg-seguranca-black/40">
               {TABS.map((tab) => {
+                const isRejectedTab = tab.value === 'inactive';
                 const tabCount = tab.statuses
                   ? tab.statuses.reduce((acc, s) => acc + (counts[s] ?? 0), 0)
-                  : Object.values(counts).reduce((a, b) => a + b, 0);
+                  : isRejectedTab
+                    ? (rejectedQuery.data?.length ?? 0)
+                    : Object.values(counts).reduce((a, b) => a + b, 0);
                 return (
                   <TabsTrigger
                     key={tab.value}
@@ -316,13 +345,171 @@ const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({
 
             {TABS.map((tab) => (
               <TabsContent key={tab.value} value={tab.value} className="mt-4">
-                <LogsTable campaignId={campaignId} statuses={tab.statuses} isLive={isLive} />
+                {tab.value === 'inactive' ? (
+                  <InactiveRecipientsTable campaignId={campaignId} />
+                ) : (
+                  <LogsTable campaignId={campaignId} statuses={tab.statuses} isLive={isLive} />
+                )}
               </TabsContent>
             ))}
           </Tabs>
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+const InactiveRecipientsTable: React.FC<{ campaignId: string }> = ({ campaignId }) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState<InactiveEmailRecipient | null>(null);
+  const [editEmail, setEditEmail] = useState('');
+  const [editName, setEditName] = useState('');
+
+  const query = useQuery({
+    queryKey: ['email-campaign-inactive-recipients', campaignId],
+    queryFn: () => emailCampaignService.listInactiveRecipients(campaignId),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      emailCampaignService.updateInactiveRecipient(campaignId, editing!.recipientId, {
+        email: editEmail.trim(),
+        name: editName.trim() || null,
+      }),
+    onSuccess: async () => {
+      toast({ title: 'E-mail rejeitado atualizado' });
+      setEditing(null);
+      await queryClient.invalidateQueries({ queryKey: ['email-campaign-inactive-recipients', campaignId] });
+      await queryClient.invalidateQueries({ queryKey: ['email-campaign-metrics', campaignId] });
+    },
+    onError: (err: unknown) =>
+      toast({
+        title: 'Erro ao atualizar',
+        description: err instanceof Error ? err.message : 'Falha ao atualizar e-mail rejeitado.',
+        variant: 'destructive',
+      }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (recipientId: string) => emailCampaignService.deleteInactiveRecipient(campaignId, recipientId),
+    onSuccess: async () => {
+      toast({ title: 'E-mail removido da lista de rejeitados' });
+      await queryClient.invalidateQueries({ queryKey: ['email-campaign-inactive-recipients', campaignId] });
+      await queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
+      await queryClient.invalidateQueries({ queryKey: ['email-campaign-metrics', campaignId] });
+    },
+    onError: (err: unknown) =>
+      toast({
+        title: 'Erro ao remover',
+        description: err instanceof Error ? err.message : 'Falha ao remover e-mail inativo.',
+        variant: 'destructive',
+      }),
+  });
+
+  if (query.isLoading) {
+    return (
+      <div className="flex justify-center py-10">
+        <Loader2 className="h-7 w-7 animate-spin text-seguranca-yellow" />
+      </div>
+    );
+  }
+
+  const rows = query.data ?? [];
+  if (!rows.length) {
+    return (
+      <p className="py-8 text-center text-sm text-seguranca-lightgray">
+        Nenhum e-mail rejeitado nesta campanha. Rejeições aparecem aqui automaticamente para avaliação.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-seguranca-graphite hover:bg-transparent">
+              <TableHead className="text-seguranca-lightgray">E-mail</TableHead>
+              <TableHead className="text-seguranca-lightgray">Nome</TableHead>
+              <TableHead className="text-seguranca-lightgray">Motivo</TableHead>
+              <TableHead className="text-seguranca-lightgray">Data</TableHead>
+              <TableHead className="text-right text-seguranca-lightgray">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.recipientId} className="border-seguranca-graphite">
+                <TableCell className="font-medium text-white">{row.email}</TableCell>
+                <TableCell className="text-seguranca-lightgray">{row.name ?? '—'}</TableCell>
+                <TableCell className="max-w-[340px] truncate text-red-300">{row.reason ?? '—'}</TableCell>
+                <TableCell className="text-xs text-seguranca-lightgray">
+                  {row.inactivatedAt ? formatDate(row.inactivatedAt) : '—'}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-seguranca-lightgray hover:text-seguranca-yellow"
+                      onClick={() => {
+                        setEditing(row);
+                        setEditEmail(row.email);
+                        setEditName(row.name ?? '');
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-seguranca-lightgray hover:text-red-400"
+                      disabled={deleteMutation.isPending}
+                      onClick={() => deleteMutation.mutate(row.recipientId)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog open={Boolean(editing)} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="border-seguranca-graphite bg-seguranca-graphite text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar e-mail inativo</DialogTitle>
+            <DialogDescription className="text-seguranca-lightgray">
+              Ajuste os dados do contato inativo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-xs text-seguranca-lightgray">E-mail</label>
+              <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-seguranca-lightgray">Nome</label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-seguranca-yellow text-seguranca-black"
+              onClick={() => updateMutation.mutate()}
+              disabled={updateMutation.isPending || !editEmail.trim()}
+            >
+              {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

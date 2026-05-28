@@ -216,11 +216,36 @@ export const employeeService = {
       const params = buildEmployeeListQueryParams(filters, page, size);
       const response = await api.get('/api/employees/paged', { params });
       const employees = response.data || [];
-      return employees.map((e: any) => this.normalizeEmployee(e));
+      return employees.map((e: any) => this.normalizeEmployee(e)).filter(Boolean) as Employee[];
     } catch (error) {
       console.error('Erro ao buscar funcionários:', error);
       return [];
     }
+  },
+
+  /**
+   * Carrega todos os funcionários para relatórios (API limita 500 por página).
+   */
+  async fetchAllEmployeesForReport(filters?: EmployeeFilters): Promise<Employee[]> {
+    const pageSize = 500;
+    const maxPages = 40;
+    const all: Employee[] = [];
+    const seen = new Set<string>();
+
+    for (let page = 0; page < maxPages; page++) {
+      const batch = await this.getAllEmployees(filters, page, pageSize);
+      if (!batch.length) break;
+
+      for (const emp of batch) {
+        if (!emp?.id || seen.has(emp.id)) continue;
+        seen.add(emp.id);
+        all.push(emp);
+      }
+
+      if (batch.length < pageSize) break;
+    }
+
+    return all;
   },
 
   /**
@@ -642,7 +667,8 @@ export const employeeService = {
     employeeIds: string[],
     columns?: string[],
     groupBy?: 'FUNCIONARIO' | 'POSTO_TRABALHO',
-    orderBy?: 'FUNCIONARIO' | 'POSTO_TRABALHO'
+    orderBy?: 'FUNCIONARIO' | 'POSTO_TRABALHO',
+    filterSummary?: string
   ): Promise<Blob> {
     try {
       const response = await api.post(
@@ -653,6 +679,7 @@ export const employeeService = {
           columns: columns && columns.length > 0 ? columns : undefined,
           groupBy: groupBy || null,
           orderBy: orderBy || null,
+          filterSummary: filterSummary?.trim() || null,
         },
         { responseType: 'blob' }
       );

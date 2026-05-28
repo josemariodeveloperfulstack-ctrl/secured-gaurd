@@ -151,7 +151,7 @@ const SmtpSettingsModal: React.FC<SmtpSettingsModalProps> = ({ open, onOpenChang
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto border-seguranca-graphite bg-seguranca-graphite text-white sm:max-w-2xl">
+      <DialogContent className="max-h-[94vh] overflow-y-auto border-seguranca-graphite bg-seguranca-graphite text-white sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Server className="h-5 w-5 text-seguranca-yellow" />
@@ -168,7 +168,7 @@ const SmtpSettingsModal: React.FC<SmtpSettingsModalProps> = ({ open, onOpenChang
             <Loader2 className="h-6 w-6 animate-spin text-seguranca-yellow" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-5 py-2">
+          <form onSubmit={handleSubmit} className="space-y-5 py-2 pb-2">
             {/* Status atual */}
             {status && (
               <div className="rounded-lg border border-seguranca-graphite bg-seguranca-black/40 p-3 text-sm">

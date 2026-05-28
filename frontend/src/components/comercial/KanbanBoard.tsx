@@ -382,14 +382,6 @@ export default function KanbanBoard() {
 
   const openSingleDeleteDialog = (id: string | number) => {
     const sid = String(id);
-    if (!isOpportunityUuid(sid)) {
-      toast({
-        title: 'Exclusão indisponível',
-        description: 'Este cartão não possui um ID de oportunidade válido no servidor.',
-        variant: 'destructive',
-      });
-      return;
-    }
     setDeleteMode('single');
     setDeleteSingleId(sid);
     setDeleteReason('Exclusão individual');
@@ -420,8 +412,17 @@ export default function KanbanBoard() {
         });
         setSelectedOppIds([]);
       } else if (deleteMode === 'single' && deleteSingleId) {
-        await deleteOpportunity(deleteSingleId, reason);
-        toast({ title: 'Sucesso', description: 'Oportunidade excluída com sucesso.' });
+        if (isOpportunityUuid(deleteSingleId)) {
+          await deleteOpportunity(deleteSingleId, reason);
+          toast({ title: 'Sucesso', description: 'Oportunidade excluída com sucesso.' });
+        } else {
+          setOpportunities(prev => prev.filter(opp => String(opp.id) !== deleteSingleId));
+          setFilteredOpportunities(prev => prev.filter(opp => String(opp.id) !== deleteSingleId));
+          toast({
+            title: 'Sucesso',
+            description: 'Card removido do Kanban local com sucesso.',
+          });
+        }
         setSelectedOppIds(prev => prev.filter(i => i !== deleteSingleId));
       } else if (deleteMode === 'all') {
         await deleteAllOpportunities(reason);
@@ -429,7 +430,9 @@ export default function KanbanBoard() {
         setSelectedOppIds([]);
       }
       setDeleteModalOpen(false);
-      await loadData();
+      if (deleteMode !== 'single' || (deleteSingleId && isOpportunityUuid(deleteSingleId))) {
+        await loadData();
+      }
     } catch (err: any) {
       console.error('Erro na exclusão:', err);
       const msg =

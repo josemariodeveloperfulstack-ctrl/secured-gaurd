@@ -4103,39 +4103,6 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                    )}
                 </TabsContent>
                 <TabsContent value="relatorios" className="space-y-4 sm:space-y-6">
-                  <Card className="bg-gradient-to-r from-seguranca-graphite to-gray-700 border-gray-600">
-                    <div className="p-4 sm:p-6 space-y-4">
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-1.5 sm:p-2 bg-seguranca-yellow/20 rounded-lg">
-                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-seguranca-yellow" />
-                        </div>
-                        <h3 className="text-lg sm:text-xl font-semibold text-white">Gerar a ficha simples do funcionário</h3>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => handleEmployeeRecordPdf('download')}
-                          disabled={!canGenerateReports || loading}
-                          className="border-blue-500 text-blue-400 hover:bg-blue-500/10 text-sm sm:text-base h-10 sm:h-11"
-                        >
-                          <FileText className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                          Gerar PDF
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => handleEmployeeRecordPdf('preview')}
-                          disabled={!canGenerateReports || loading}
-                          className="border-gray-500 text-gray-300 hover:bg-gray-500/10 text-sm sm:text-base h-10 sm:h-11"
-                        >
-                          <Eye className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                          Visualizar
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-
                   {!canGenerateReports ? (
                     <div className="mt-6 p-6 border border-gray-600 rounded-lg bg-black/20 text-center">
                       <AlertCircle className="h-8 w-8 text-seguranca-yellow mx-auto mb-3" />

@@ -147,7 +147,7 @@ export function RelatoriosModal({
                 setIsLoadingAll(true);
                 try {
                     // Fetch up to 10000 employees for the report
-                    const data = await employeeService.getAllEmployees({}, 0, 10000);
+                    const data = await employeeService.fetchAllEmployeesForReport();
                     setAllEmployees(data);
                 } catch (e) {
                     console.error('Erro ao buscar todos os funcionários para relatório:', e);
@@ -187,6 +187,9 @@ export function RelatoriosModal({
         });
     }, [allEmployees]);
 
+    const getCompanyLabel = (emp: Employee) =>
+        emp.company?.sigla || emp.company?.name || emp.empresaNome || '';
+
     // Extract unique filter options from the employees list or use provided full lists
     const { companies, workPosts, positions } = useMemo(() => {
         let finalCompanies: string[] = [];
@@ -204,7 +207,7 @@ export function RelatoriosModal({
         const pos = new Set<string>(finalPositions);
 
         allEmployees.forEach(emp => {
-            const cName = emp.company?.sigla || emp.company?.name;
+            const cName = getCompanyLabel(emp);
             if (cName) comps.add(cName);
 
             let wpName = typeof emp.workPost === 'string' ? emp.workPost : emp.workPost?.name;
@@ -241,9 +244,69 @@ export function RelatoriosModal({
         ferias: feriasFilter
     });
 
+    const normalizeStatus = (status?: string) => (status || '').toUpperCase().trim();
+
+    const formatFilterDate = (date?: Date) =>
+        date ? date.toLocaleDateString('pt-BR') : '';
+
+    const getStatusLabel = (status: string) => {
+        switch (status) {
+            case 'ACTIVE': return 'Ativo';
+            case 'INACTIVE': return 'Inativo';
+            case 'VACATION': return 'Férias';
+            case 'MATERNITY_LEAVE': return 'Licença Maternidade';
+            case 'MEDICAL_CERTIFICATE': return 'Atestado';
+            case 'TERMINATED': return 'Demitido';
+            case 'SUSPENDED': return 'Suspenso';
+            default: return status || 'Desconhecido';
+        }
+    };
+
+    const buildFilterSummary = (): string => {
+        const parts: string[] = [];
+        if (statusFilter !== 'all') parts.push(`Status: ${getStatusLabel(statusFilter)}`);
+        if (companyFilters.length > 0) parts.push(`Empresa: ${companyFilters.join(', ')}`);
+        if (workPostFilters.length > 0) parts.push(`Posto: ${workPostFilters.join(', ')}`);
+        if (positionFilters.length > 0) parts.push(`Cargo: ${positionFilters.join(', ')}`);
+        if (genderFilter !== 'all') {
+            const genderLabels: Record<string, string> = { M: 'Masculino', F: 'Feminino', OUTRO: 'Outro' };
+            parts.push(`Gênero: ${genderLabels[genderFilter] || genderFilter}`);
+        }
+        if (asoFilter !== 'all') {
+            const asoLabels: Record<string, string> = {
+                valido: 'ASO válido',
+                vencido: 'ASO vencido',
+                sem_aso: 'Sem ASO informado',
+            };
+            parts.push(`ASO: ${asoLabels[asoFilter] || asoFilter}`);
+        }
+        if (feriasFilter !== 'all') {
+            parts.push(`Férias: ${feriasFilter === 'vencidas' ? 'Vencidas' : 'A vencer (90 dias)'}`);
+        }
+        if (hireDateStart || hireDateEnd) {
+            const from = formatFilterDate(hireDateStart);
+            const to = formatFilterDate(hireDateEnd);
+            if (from && to) parts.push(`Admissão: ${from} a ${to}`);
+            else if (from) parts.push(`Admissão a partir de ${from}`);
+            else if (to) parts.push(`Admissão até ${to}`);
+        }
+        if (termDateStart || termDateEnd) {
+            const from = formatFilterDate(termDateStart);
+            const to = formatFilterDate(termDateEnd);
+            if (from && to) parts.push(`Rescisão: ${from} a ${to}`);
+            else if (from) parts.push(`Rescisão a partir de ${from}`);
+            else if (to) parts.push(`Rescisão até ${to}`);
+        }
+        if (terminationReasonFilter !== 'all' && statusFilter !== 'ACTIVE') {
+            parts.push(`Motivo demissão: ${terminationReasonFilter}`);
+        }
+        return parts.join(' | ');
+    };
+
     // Handle Filtering with optimized logic using pre-calculated timestamps
     const filteredEmployees = useMemo(() => {
         const todayTime = new Date().setHours(0, 0, 0, 0);
+        const in90Days = todayTime + 90 * 24 * 60 * 60 * 1000;
 
         // Pre-convert filter dates to timestamps once per memo update
         const hStart = deferredFilters.hireDateStart?.getTime();
@@ -253,7 +316,7 @@ export function RelatoriosModal({
 
         return processedEmployees.filter(emp => {
             // Status Filter
-            if (deferredFilters.status !== 'all' && emp.status !== deferredFilters.status) return false;
+            if (deferredFilters.status !== 'all' && normalizeStatus(emp.status) !== deferredFilters.status) return false;
 
             // ASO Filter
             if (deferredFilters.aso !== 'all') {
@@ -270,7 +333,7 @@ export function RelatoriosModal({
 
             // Company Filter
             if (deferredFilters.company.length > 0) {
-                const cName = emp.company?.sigla || emp.company?.name || String(emp.company?.id);
+                const cName = getCompanyLabel(emp);
                 if (!cName || !deferredFilters.company.includes(cName)) return false;
             }
 
@@ -295,8 +358,10 @@ export function RelatoriosModal({
                 if (empGender !== deferredFilters.gender && !empGender.startsWith(deferredFilters.gender.charAt(0))) return false;
             }
 
-            // Termination Reason Filter
-            if (deferredFilters.terminationReason !== 'all' && emp.terminationReason !== deferredFilters.terminationReason) return false;
+            // Motivo demissão: ignorar quando filtro de status é somente ativos
+            if (deferredFilters.terminationReason !== 'all' && deferredFilters.status !== 'ACTIVE') {
+                if (emp.terminationReason !== deferredFilters.terminationReason) return false;
+            }
 
             // Hire Date Range Filter
             if (hStart || hEnd) {
@@ -330,19 +395,6 @@ export function RelatoriosModal({
         processedEmployees,
         deferredFilters
     ]);
-
-    const getStatusLabel = (status: string) => {
-        switch (status) {
-            case 'ACTIVE': return 'Ativo';
-            case 'INACTIVE': return 'Inativo';
-            case 'VACATION': return 'Férias';
-            case 'MATERNITY_LEAVE': return 'Licença Maternidade';
-            case 'MEDICAL_CERTIFICATE': return 'Atestado';
-            case 'TERMINATED': return 'Demitido';
-            case 'SUSPENDED': return 'Suspenso';
-            default: return status || 'Desconhecido';
-        }
-    };
 
     // Helper to process data in chunks and update progress
     const processDataInChunks = async <T, R>(items: T[], mapper: (item: T) => R, chunkSize: number = 100): Promise<R[]> => {
@@ -508,9 +560,12 @@ export function RelatoriosModal({
                 hour: '2-digit',
                 minute: '2-digit',
             });
+            const filterSummary = buildFilterSummary();
             const excelMetaPrefix = [
                 { [firstColKey]: `Usuário: ${userLabel}` },
                 { [firstColKey]: `Data do relatório: ${reportAtStr}` },
+                ...(filterSummary ? [{ [firstColKey]: `Filtros: ${filterSummary}` }] : []),
+                { [firstColKey]: `Total de registros: ${filteredEmployees.length}` },
                 { [firstColKey]: '' },
             ];
 
@@ -554,7 +609,14 @@ export function RelatoriosModal({
         try {
             setProgress(30);
             const columnsToSend = selectedColumns.size > 0 ? Array.from(selectedColumns) : DEFAULT_PDF_COLUMNS;
-            const blob = await employeeService.exportEmployeesReportPdf(companyId ?? undefined, employeeIds, columnsToSend, groupBy, orderBy);
+            const blob = await employeeService.exportEmployeesReportPdf(
+                companyId ?? undefined,
+                employeeIds,
+                columnsToSend,
+                groupBy,
+                orderBy,
+                buildFilterSummary()
+            );
             setProgress(80);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -633,9 +695,13 @@ export function RelatoriosModal({
     const resolvePdfCompanyId = (): string | undefined => {
         if (companyFilters.length !== 1) return undefined;
         const label = companyFilters[0];
-        const emp = allEmployees.find(
-            e => (e.company?.sigla || e.company?.name || String(e.company?.id)) === label
-        );
+        if (filterCompanies?.length) {
+            const fromList = filterCompanies.find(
+                c => (c.sigla || c.name || '') === label
+            );
+            if (fromList?.id) return String(fromList.id);
+        }
+        const emp = allEmployees.find(e => getCompanyLabel(e) === label);
         const id = emp?.company?.id;
         return id ? String(id) : undefined;
     };
@@ -938,6 +1004,31 @@ export function RelatoriosModal({
                                     </div>
                                 </div>
 
+                                {/* Termination Date Range */}
+                                <div className="lg:col-span-2 space-y-2">
+                                    <Label className="text-xs font-medium text-gray-400 flex items-center gap-2 uppercase tracking-wider">
+                                        <CalendarDays className="h-3 w-3" /> Intervalo de Rescisão (Início / Fim)
+                                    </Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="w-full">
+                                            <DatePicker
+                                                date={termDateStart}
+                                                onDateChange={(date) => setTermDateStart(date)}
+                                                placeholder="Data Inicial"
+                                                className="h-10"
+                                            />
+                                        </div>
+                                        <div className="w-full">
+                                            <DatePicker
+                                                date={termDateEnd}
+                                                onDateChange={(date) => setTermDateEnd(date)}
+                                                placeholder="Data Final"
+                                                className="h-10"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Termination Reason - Conditional */}
                                 {(statusFilter === 'TERMINATED' || statusFilter === 'all') && (
                                     <div className="space-y-2">
@@ -1099,6 +1190,16 @@ export function RelatoriosModal({
                         </div>
                         <div className="bg-seguranca-black/30 rounded-xl p-4 border border-gray-600 flex flex-wrap gap-2">
                             {statusFilter !== 'all' && <Badge className="bg-seguranca-yellow text-seguranca-graphite border-0 font-bold uppercase">Status: {getStatusLabel(statusFilter)}</Badge>}
+                            {(hireDateStart || hireDateEnd) && (
+                                <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold">
+                                    ADMISSÃO: {hireDateStart ? formatFilterDate(hireDateStart) : '…'} — {hireDateEnd ? formatFilterDate(hireDateEnd) : '…'}
+                                </Badge>
+                            )}
+                            {(termDateStart || termDateEnd) && (
+                                <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold">
+                                    RESCISÃO: {termDateStart ? formatFilterDate(termDateStart) : '…'} — {termDateEnd ? formatFilterDate(termDateEnd) : '…'}
+                                </Badge>
+                            )}
                             {feriasFilter !== 'all' && <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold">FÉRIAS: {feriasFilter === 'vencidas' ? 'Vencidas' : 'A Vencer'}</Badge>}
                             {companyFilters.length > 0 && (
                                 <Badge variant="outline" className="text-seguranca-yellow border-seguranca-yellow/40 font-bold max-w-full truncate" title={companyFilters.join(', ')}>

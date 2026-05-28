@@ -21,4 +21,8 @@ public interface EmailCampaignRepository extends JpaRepository<EmailCampaign, UU
 
     /** Campanhas em status ativos do envio (usado pelo scheduler). */
     List<EmailCampaign> findByStatusIn(Collection<EmailCampaignStatus> statuses);
+
+    /** Variante com fetch do template padrão para uso no scheduler sem LazyInitializationException. */
+    @Query("select c from EmailCampaign c left join fetch c.defaultTemplate where c.status in :statuses")
+    List<EmailCampaign> findByStatusInWithDefaultTemplate(@Param("statuses") Collection<EmailCampaignStatus> statuses);
 }

@@ -176,8 +176,20 @@ const CampaignLeadsListTab: React.FC = () => {
           description: `${unsubscribed.length} e-mail(is) descadastrado(s) foram excluídos da seleção.`,
         });
       }
-      const addedAfterOptOut = afterOptOut.filter((r) => !prevLower.has(r.email.toLowerCase()));
-      await applyRecipientsAfterImport(afterOptOut, addedAfterOptOut);
+      const rejected = await emailCampaignService.checkRejected(
+        afterOptOut.map((r) => r.email)
+      );
+      let afterFilters = afterOptOut;
+      if (rejected.length > 0) {
+        const blockRejected = new Set(rejected.map((e) => e.toLowerCase()));
+        afterFilters = afterOptOut.filter((r) => !blockRejected.has(r.email.toLowerCase()));
+        toast({
+          title: 'Rejeitados excluídos',
+          description: `${rejected.length} e-mail(is) da lista de rejeitados não foram incluídos.`,
+        });
+      }
+      const addedAfterOptOut = afterFilters.filter((r) => !prevLower.has(r.email.toLowerCase()));
+      await applyRecipientsAfterImport(afterFilters, addedAfterOptOut);
     } catch {
       toast({
         title: 'Não foi possível verificar descadastros',

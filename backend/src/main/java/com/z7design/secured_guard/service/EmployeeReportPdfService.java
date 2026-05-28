@@ -58,9 +58,9 @@ public class EmployeeReportPdfService {
 
     @Transactional(readOnly = true)
     public byte[] generateEmployeeReportPDF(UUID companyId, List<UUID> employeeIds, List<String> columns,
-            ReportGroupBy groupBy, ReportOrderBy orderBy) throws IOException {
-        log.info("Gerando relatório PDF de funcionários - Empresa: {}, Funcionários: {}, Colunas: {}, GroupBy: {}, OrderBy: {}",
-                companyId, employeeIds != null ? employeeIds.size() : 0, columns != null ? columns.size() : 0, groupBy, orderBy);
+            ReportGroupBy groupBy, ReportOrderBy orderBy, String filterSummary) throws IOException {
+        log.info("Gerando relatório PDF de funcionários - Empresa: {}, Funcionários: {}, Colunas: {}, GroupBy: {}, OrderBy: {}, Filtros: {}",
+                companyId, employeeIds != null ? employeeIds.size() : 0, columns != null ? columns.size() : 0, groupBy, orderBy, filterSummary);
 
         List<Employee> employees;
         if (employeeIds != null && !employeeIds.isEmpty()) {
@@ -77,7 +77,7 @@ public class EmployeeReportPdfService {
 
         List<String> effectiveColumns = (columns != null && !columns.isEmpty()) ? columns : DEFAULT_COLUMNS;
         Company company = resolveCompanyForLayout(companyId, employees);
-        return generateWithIText(employees, company, effectiveColumns, groupBy, orderBy);
+        return generateWithIText(employees, company, effectiveColumns, groupBy, orderBy, filterSummary);
     }
 
     /**
@@ -112,7 +112,7 @@ public class EmployeeReportPdfService {
     }
 
     private byte[] generateWithIText(List<Employee> employees, Company company, List<String> columns,
-            ReportGroupBy groupBy, ReportOrderBy orderBy) throws IOException {
+            ReportGroupBy groupBy, ReportOrderBy orderBy, String filterSummary) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         try (PdfWriter writer = new PdfWriter(baos)) {
@@ -129,7 +129,7 @@ public class EmployeeReportPdfService {
             StandardReportLayoutService.DocumentWithPdf docWithPdf = standardReportLayoutService.createDocumentWithLayout(writer, layoutConfig);
             Document document = docWithPdf.getDocument();
 
-            addReportHeaderInfo(document, employees.size());
+            addReportHeaderInfo(document, employees.size(), filterSummary);
 
             if (groupBy != null && groupBy == ReportGroupBy.FUNCIONARIO) {
                 addEmployeesTableGroupedByEmployee(document, employees, columns, orderBy);
@@ -150,8 +150,15 @@ public class EmployeeReportPdfService {
         return result;
     }
 
-    private void addReportHeaderInfo(Document document, int total) {
-        document.add(new Paragraph("Total de funcionários: " + total).setBold().setFontSize(10).setMarginBottom(10));
+    private void addReportHeaderInfo(Document document, int total, String filterSummary) {
+        document.add(new Paragraph("Total de funcionários: " + total).setBold().setFontSize(10).setMarginBottom(4));
+        if (filterSummary != null && !filterSummary.isBlank()) {
+            document.add(new Paragraph("Filtros aplicados: " + filterSummary.trim())
+                    .setFontSize(9)
+                    .setMarginBottom(10));
+        } else {
+            document.add(new Paragraph(" ").setMarginBottom(6));
+        }
     }
 
     private void addEmployeesTable(Document document, List<Employee> employees, List<String> columns, ReportOrderBy orderBy) {

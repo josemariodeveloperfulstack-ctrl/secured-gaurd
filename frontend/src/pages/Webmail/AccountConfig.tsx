@@ -67,8 +67,8 @@ export function AccountConfig({ account, onSaved }: Props) {
   ];
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 md:p-8 bg-zinc-950 w-full overflow-y-auto">
-      <div className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 shadow-lg rounded-xl overflow-hidden flex flex-col my-auto">
+    <div className="flex-1 flex items-start justify-center p-4 md:p-8 bg-zinc-950 w-full overflow-y-auto">
+      <div className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 shadow-lg rounded-xl overflow-hidden flex max-h-[86vh] flex-col">
         
         <div className="p-4 md:p-6 border-b border-zinc-800 bg-zinc-900/50 flex flex-col gap-1">
           <div className="flex items-center gap-3 text-zinc-100">
@@ -80,7 +80,7 @@ export function AccountConfig({ account, onSaved }: Props) {
           <p className="text-zinc-500 text-xs md:text-sm mt-2">Insira as credenciais do seu provedor IMAP/SMTP para sincronizar.</p>
         </div>
 
-        <div className="p-4 md:p-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-md mb-6 flex items-start gap-3">
               <AlertCircle size={20} className="shrink-0" />
@@ -178,7 +178,7 @@ export function AccountConfig({ account, onSaved }: Props) {
               </div>
             </div>
 
-            <div className="pt-4 flex justify-end">
+            <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-6 border-t border-zinc-800 bg-zinc-900/95 px-4 py-4 md:-mx-6 md:-mb-6 md:px-6">
               <button
                 type="submit"
                 disabled={loading}

@@ -45,6 +45,10 @@ export interface RecipientPickerProps {
   columnMappingImport?: boolean;
   /** Filtros extra no CRM: origem + segmento (texto em empresa/descrição/notas). */
   advancedLeadFilters?: boolean;
+  /** Restringe abas visíveis (padrão: todas). */
+  modes?: Mode[];
+  /** Aba inicial ao montar. */
+  defaultMode?: Mode;
 }
 
 export function RecipientPicker({
@@ -53,44 +57,62 @@ export function RecipientPicker({
   darkTabs,
   columnMappingImport,
   advancedLeadFilters,
+  modes: modesProp,
+  defaultMode,
 }: RecipientPickerProps) {
-  const [mode, setMode] = useState<Mode>('leads');
+  const modes = modesProp ?? (['leads', 'import', 'manual'] as Mode[]);
+  const initialMode = defaultMode && modes.includes(defaultMode) ? defaultMode : modes[0];
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const gridCols = modes.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
   return (
     <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)} className="w-full">
       <TabsList
         className={cn(
-          'grid w-full grid-cols-3',
+          'grid w-full',
+          gridCols,
           darkTabs ? 'border border-white/10 bg-seguranca-graphite/60' : 'bg-slate-100',
         )}
       >
+        {modes.includes('leads') && (
         <TabsTrigger
           value="leads"
           className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black"
         >
           <UserPlus className="mr-2 h-4 w-4" /> Leads do CRM
         </TabsTrigger>
+        )}
+        {modes.includes('import') && (
         <TabsTrigger
           value="import"
           className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black"
         >
           <FileSpreadsheet className="mr-2 h-4 w-4" /> Importar planilha
         </TabsTrigger>
+        )}
+        {modes.includes('manual') && (
         <TabsTrigger
           value="manual"
           className="data-[state=active]:bg-seguranca-yellow data-[state=active]:text-seguranca-black"
         >
           <Upload className="mr-2 h-4 w-4" /> Colar lista
         </TabsTrigger>
+        )}
       </TabsList>
+      {modes.includes('leads') && (
       <TabsContent value="leads" className="mt-4">
         <LeadsPickerPane value={value} onChange={onChange} darkTabs={darkTabs} advancedLeadFilters={advancedLeadFilters} />
       </TabsContent>
+      )}
+      {modes.includes('import') && (
       <TabsContent value="import" className="mt-4">
         <ImportPane value={value} onChange={onChange} darkTabs={darkTabs} columnMappingImport={columnMappingImport} />
       </TabsContent>
+      )}
+      {modes.includes('manual') && (
       <TabsContent value="manual" className="mt-4">
         <ManualPane value={value} onChange={onChange} darkTabs={darkTabs} />
       </TabsContent>
+      )}
     </Tabs>
   );
 }

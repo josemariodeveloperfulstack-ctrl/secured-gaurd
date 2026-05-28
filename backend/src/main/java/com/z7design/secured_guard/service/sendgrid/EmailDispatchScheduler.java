@@ -65,10 +65,11 @@ public class EmailDispatchScheduler {
 
     @Scheduled(fixedDelayString = "${app.email.dispatch.delay-ms:30000}",
                initialDelayString = "${app.email.dispatch.initial-delay-ms:15000}")
+    @Transactional(readOnly = true)
     public void tick() {
         if (!enabled) return;
         try {
-            List<EmailCampaign> active = campaignRepository.findByStatusIn(
+            List<EmailCampaign> active = campaignRepository.findByStatusInWithDefaultTemplate(
                     List.of(EmailCampaignStatus.RUNNING, EmailCampaignStatus.SCHEDULED));
             if (active.isEmpty()) return;
 

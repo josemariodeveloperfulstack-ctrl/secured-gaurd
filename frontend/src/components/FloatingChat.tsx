@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useMessageStore, Conversation, ChatMessage, User } from '../stores/messageStore';
 import { messageService } from '../services/messageService';
+import {
+  mergeChatMessages,
+  messageBelongsToConversation,
+  normalizeChatId,
+} from '@/utils/chatConversation';
 import { 
   MessageCircle, 
   X, 
@@ -27,9 +32,14 @@ export const FloatingChat: React.FC = () => {
     setSelectedConversation,
     setChatMessages,
     addChatMessage,
-    setIsFloatingChatOpen
+    setIsFloatingChatOpen,
+    clearConversationUnread,
+    dismissChatHeaderAlert,
+    updateChatMessage,
+    setAvailableUsers,
   } = useMessageStore();
 
+  const [viewMessages, setViewMessages] = useState<ChatMessage[]>([]);
   const [isMinimized, setIsMinimized] = useState(false);
   const [activeTab, setActiveTab] = useState<'conversations' | 'contacts'>('conversations');
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,13 +50,28 @@ export const FloatingChat: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const userStr = localStorage.getItem('user');
   const currentUser = userStr ? JSON.parse(userStr) : null;
+  const currentUserId = currentUser?.id as string | undefined;
 
-  // Carregar mensagens quando a conversa muda
+  // Contatos e conversas ao abrir o chat flutuante
   useEffect(() => {
-    if (!selectedConversation) return;
+    if (!isFloatingChatOpen) return;
+    messageService.getAvailableUsers().then((users) => {
+      if (Array.isArray(users) && users.length > 0) {
+        setAvailableUsers(users);
+      }
+    });
+  }, [isFloatingChatOpen, setAvailableUsers]);
+
+  // Carregar histórico quando a conversa muda
+  useEffect(() => {
+    if (!selectedConversation) {
+      setViewMessages([]);
+      return;
+    }
 
     const loadConversationMessages = async () => {
       setLoadingMessages(true);
+      setViewMessages([]);
       try {
         let msgs: ChatMessage[] = [];
         if (selectedConversation.type === 'group') {
@@ -56,7 +81,36 @@ export const FloatingChat: React.FC = () => {
         } else {
           msgs = await messageService.getConversationMessages(selectedConversation.id);
         }
-        setChatMessages(msgs);
+
+        const seeded =
+          msgs.length > 0
+            ? msgs
+            : selectedConversation.lastMessage &&
+                messageBelongsToConversation(
+                  selectedConversation.lastMessage,
+                  selectedConversation,
+                  currentUserId
+                )
+              ? [selectedConversation.lastMessage]
+              : [];
+
+        setViewMessages(seeded);
+        setChatMessages(seeded);
+        clearConversationUnread(selectedConversation.id, selectedConversation.type);
+        dismissChatHeaderAlert();
+
+        const unreadIncoming = seeded.filter(
+          (m) =>
+            !m.isRead &&
+            normalizeChatId(m.recipient?.id) === normalizeChatId(currentUserId)
+        );
+        await Promise.all(
+          unreadIncoming.map((m) =>
+            messageService.markChatMessageAsRead(m.id).then(() =>
+              updateChatMessage(m.id, { isRead: true, readAt: new Date().toISOString() })
+            )
+          )
+        );
       } catch (err) {
         console.error('[FloatingChat] Erro ao carregar mensagens:', err);
       } finally {
@@ -65,14 +119,36 @@ export const FloatingChat: React.FC = () => {
     };
 
     loadConversationMessages();
-  }, [selectedConversation?.id, selectedConversation?.type, setChatMessages]);
+  }, [
+    selectedConversation?.id,
+    selectedConversation?.type,
+    selectedConversation?.lastMessage?.id,
+    setChatMessages,
+    clearConversationUnread,
+    dismissChatHeaderAlert,
+    updateChatMessage,
+    currentUserId,
+  ]);
+
+  // Mesclar mensagens em tempo real (WebSocket) na conversa aberta
+  useEffect(() => {
+    if (!selectedConversation || !Array.isArray(chatMessages) || chatMessages.length === 0) {
+      return;
+    }
+    const relevant = chatMessages.filter((m) =>
+      messageBelongsToConversation(m, selectedConversation, currentUserId)
+    );
+    if (relevant.length === 0) return;
+
+    setViewMessages((prev) => mergeChatMessages(prev, relevant));
+  }, [chatMessages, selectedConversation, currentUserId]);
 
   // Rolar para baixo automaticamente ao abrir ou receber nova mensagem
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [chatMessages, selectedConversation, isMinimized]);
+  }, [viewMessages, selectedConversation, isMinimized]);
 
   // Filtrar conversas válidas e aplicar busca
   const filteredConversations = useMemo(() => {
@@ -96,29 +172,6 @@ export const FloatingChat: React.FC = () => {
     return valid.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [availableUsers, searchTerm, currentUser?.id]);
 
-  // Filtrar as mensagens da conversa selecionada atual
-  const safeChatMessages = useMemo(() => {
-    if (!selectedConversation || !Array.isArray(chatMessages)) return [];
-
-    return chatMessages.filter((message) => {
-      if (selectedConversation.type === 'individual') {
-        return (
-          message.recipient?.id === selectedConversation.id ||
-          message.sender?.id === selectedConversation.id ||
-          (message.recipient?.id === currentUser?.id && message.sender?.id === selectedConversation.id) ||
-          (message.sender?.id === currentUser?.id && message.recipient?.id === selectedConversation.id)
-        );
-      }
-      if (selectedConversation.type === 'group') {
-        return message.group?.id === selectedConversation.id;
-      }
-      if (selectedConversation.type === 'department') {
-        return message.department?.id === selectedConversation.id;
-      }
-      return false;
-    });
-  }, [chatMessages, selectedConversation, currentUser?.id]);
-
   // Enviar mensagem
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +193,7 @@ export const FloatingChat: React.FC = () => {
     
     // Adicionar localmente antes de enviar
     addChatMessage(tempMessage);
+    setViewMessages((prev) => mergeChatMessages(prev, [tempMessage]));
 
     try {
       const messageData = {
@@ -159,9 +213,10 @@ export const FloatingChat: React.FC = () => {
     } catch (err) {
       console.error('[FloatingChat] Erro ao enviar mensagem:', err);
       // Remover a temporária se falhar
-      useMessageStore.setState(state => ({
-        chatMessages: (state.chatMessages || []).filter(m => m.id !== tempMessageId)
+      useMessageStore.setState((state) => ({
+        chatMessages: (state.chatMessages || []).filter((m) => m.id !== tempMessageId),
       }));
+      setViewMessages((prev) => prev.filter((m) => m.id !== tempMessageId));
     } finally {
       setSending(false);
     }
@@ -266,15 +321,15 @@ export const FloatingChat: React.FC = () => {
                 <Loader2 className="h-6 w-6 text-seguranca-yellow animate-spin" />
                 <span className="text-xs text-gray-500">Carregando histórico...</span>
               </div>
-            ) : safeChatMessages.length === 0 ? (
+            ) : viewMessages.length === 0 ? (
               <div className="h-full flex items-center justify-center flex-col text-center p-4">
                 <MessageCircle className="h-8 w-8 text-gray-600 mb-2 opacity-55" />
                 <span className="text-xs text-gray-500 font-medium">Nenhuma mensagem nesta conversa.</span>
                 <span className="text-[10px] text-gray-600 mt-1">Envie uma mensagem abaixo para começar.</span>
               </div>
             ) : (
-              safeChatMessages.map((msg) => {
-                const isMe = msg.sender.id === currentUser?.id;
+              viewMessages.map((msg) => {
+                const isMe = normalizeChatId(msg.sender?.id) === normalizeChatId(currentUserId);
                 return (
                   <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-xs shadow-md border ${

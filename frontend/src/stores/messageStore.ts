@@ -77,6 +77,40 @@ export interface SystemMessage {
     replyTo?: SystemMessage;
 }
 
+export function resolveConversationFromMessage(
+    message: ChatMessage,
+    currentUserId: string | undefined
+): {
+    conversationId: string;
+    conversationType: 'individual' | 'group' | 'department';
+    conversationName: string;
+} | null {
+    if (message.group?.id) {
+        return {
+            conversationId: message.group.id,
+            conversationType: 'group',
+            conversationName: message.group.name || 'Grupo',
+        };
+    }
+    if (message.department?.id) {
+        return {
+            conversationId: message.department.id,
+            conversationType: 'department',
+            conversationName: message.department.name || 'Departamento',
+        };
+    }
+    if (!currentUserId) return null;
+    const sender = message.sender;
+    const recipient = message.recipient;
+    const other = sender?.id === currentUserId ? recipient : sender;
+    if (!other?.id || other.id === currentUserId) return null;
+    return {
+        conversationId: other.id,
+        conversationType: 'individual',
+        conversationName: other.name || other.username || other.email || 'Usuário',
+    };
+}
+
 interface MessageState {
     // Chat state
     conversations: Conversation[];
@@ -125,6 +159,9 @@ interface MessageState {
     setIsConnected: (connected: boolean) => void;
     setIsFloatingChatOpen: (isOpen: boolean) => void;
     setLatestIncomingChatMessage: (msg: ChatMessage | null) => void;
+    dismissChatHeaderAlert: () => void;
+    clearConversationUnread: (conversationId: string, conversationType: Conversation['type']) => void;
+    hydrateConversationsFromRecentMessages: (messages: ChatMessage[]) => void;
 
     // Computed getters
     getUnreadChatCount: () => number;
@@ -185,11 +222,22 @@ export const useMessageStore = create<MessageState>()(
             },
 
             setSelectedConversation: (conversation) => {
-                set({ selectedConversation: conversation });
-                // Clear messages when changing conversation
-                if (conversation) {
-                    set({ chatMessages: [] });
-                }
+                set((state) => {
+                    const updates: Partial<MessageState> = {
+                        selectedConversation: conversation,
+                        latestIncomingChatMessage: null,
+                    };
+                    if (conversation) {
+                        updates.chatMessages = [];
+                        updates.conversations = (Array.isArray(state.conversations) ? state.conversations : []).map(
+                            (conv) =>
+                                conv.id === conversation.id && conv.type === conversation.type
+                                    ? { ...conv, unreadCount: 0 }
+                                    : conv
+                        );
+                    }
+                    return updates;
+                });
             },
 
             setChatMessages: (messages) => set({ 
@@ -206,24 +254,11 @@ export const useMessageStore = create<MessageState>()(
                     return state;
                 }
                 
-                // Determinar o ID e tipo da conversa baseado no tipo de mensagem
-                let conversationId: string | undefined;
-                let conversationType: 'individual' | 'group' | 'department' = 'individual';
-                let conversationName: string = 'Conversa sem nome';
-                
-                if (message.recipient?.id) {
-                    conversationId = message.recipient.id;
-                    conversationType = 'individual';
-                    conversationName = message.recipient.name || message.recipient.username || 'Usuário';
-                } else if (message.group?.id) {
-                    conversationId = message.group.id;
-                    conversationType = 'group';
-                    conversationName = message.group.name || 'Grupo';
-                } else if (message.department?.id) {
-                    conversationId = message.department.id;
-                    conversationType = 'department';
-                    conversationName = message.department.name || 'Departamento';
-                }
+                const currentUser = state.getCurrentUser();
+                const resolved = resolveConversationFromMessage(message, currentUser?.id);
+                const conversationId = resolved?.conversationId;
+                const conversationType = resolved?.conversationType ?? 'individual';
+                const conversationName = resolved?.conversationName ?? 'Conversa sem nome';
                 
                 // Adicionar mensagem ao array
                 const updatedMessages = Array.isArray(state.chatMessages) 
@@ -231,7 +266,6 @@ export const useMessageStore = create<MessageState>()(
                     : [message];
                 
                 // Verificar se a conversa já existe (usando chave única: type-id)
-                const currentConversationId = state.selectedConversation?.id;
                 const conversations = Array.isArray(state.conversations) ? state.conversations : [];
                 const conversationKey = conversationId ? `${conversationType}-${conversationId}` : null;
                 const existingConversationIndex = conversationKey ? conversations.findIndex(conv => {
@@ -241,11 +275,19 @@ export const useMessageStore = create<MessageState>()(
                 
                 let updatedConversations: Conversation[];
                 
+                const isIncoming =
+                    Boolean(currentUser?.id && message.sender?.id && message.sender.id !== currentUser.id);
+                const isViewingConversation =
+                    state.selectedConversation?.id === conversationId &&
+                    state.selectedConversation?.type === conversationType &&
+                    (state.isFloatingChatOpen || window.location.pathname.includes('/chat'));
+
                 if (existingConversationIndex >= 0) {
                     // Conversa existe, atualizar
                     updatedConversations = conversations.map((conv, index) => {
                         if (index === existingConversationIndex) {
-                            const shouldIncrementUnread = conv.id !== currentConversationId;
+                            const shouldIncrementUnread =
+                                isIncoming && !message.isRead && !isViewingConversation;
                             return {
                                 ...conv,
                                 lastMessage: message,
@@ -264,12 +306,14 @@ export const useMessageStore = create<MessageState>()(
                     // Conversa não existe, criar nova apenas se tiver informações suficientes
                     // Não criar conversas vazias ou sem nome adequado
                     if (conversationName && conversationName !== 'Conversa sem nome') {
+                        const shouldCountUnread =
+                            isIncoming && !message.isRead && !isViewingConversation;
                         const newConversation: Conversation = {
                             id: conversationId,
                             name: conversationName,
                             type: conversationType,
                             lastMessage: message,
-                            unreadCount: conversationId !== currentConversationId ? 1 : 0,
+                            unreadCount: shouldCountUnread ? 1 : 0,
                             isOnline: conversationType === 'individual' && message.sender?.isOnline ? true : false
                         };
                         // Adicionar no início da lista
@@ -285,19 +329,9 @@ export const useMessageStore = create<MessageState>()(
                     updatedConversations = conversations;
                 }
                 
-                // Se a mensagem for de outro usuário, definir como latestIncomingChatMessage se não estiver visualizando no momento
-                const currentUser = state.getCurrentUser();
-                const isFromOtherUser = currentUser && message.sender && message.sender.id !== currentUser.id;
                 let latestIncomingChatMessage = state.latestIncomingChatMessage;
-                
-                if (isFromOtherUser) {
-                    const isChatOpenAndFocused = 
-                        (state.selectedConversation?.id === conversationId && 
-                         (state.isFloatingChatOpen || window.location.pathname.includes('/chat')));
-                    
-                    if (!isChatOpenAndFocused) {
-                        latestIncomingChatMessage = message;
-                    }
+                if (isIncoming && !isViewingConversation) {
+                    latestIncomingChatMessage = message;
                 }
 
                 return {
@@ -408,8 +442,73 @@ export const useMessageStore = create<MessageState>()(
 
             setWsConnection: (connection) => set({ wsConnection: connection }),
             setIsConnected: (connected) => set({ isConnected: connected }),
-            setIsFloatingChatOpen: (isOpen) => set({ isFloatingChatOpen: isOpen }),
+            setIsFloatingChatOpen: (isOpen) =>
+                set({
+                    isFloatingChatOpen: isOpen,
+                    ...(isOpen ? { latestIncomingChatMessage: null } : {}),
+                }),
             setLatestIncomingChatMessage: (msg) => set({ latestIncomingChatMessage: msg }),
+            dismissChatHeaderAlert: () => set({ latestIncomingChatMessage: null }),
+            clearConversationUnread: (conversationId, conversationType) =>
+                set((state) => ({
+                    latestIncomingChatMessage: null,
+                    conversations: (Array.isArray(state.conversations) ? state.conversations : []).map((conv) =>
+                        conv.id === conversationId && conv.type === conversationType
+                            ? { ...conv, unreadCount: 0 }
+                            : conv
+                    ),
+                })),
+
+            hydrateConversationsFromRecentMessages: (messages) => {
+                const currentUser = get().getCurrentUser();
+                if (!Array.isArray(messages) || messages.length === 0) return;
+
+                const conversationMap = new Map<string, Conversation>();
+                messages.forEach((msg) => {
+                    const resolved = resolveConversationFromMessage(msg, currentUser?.id);
+                    if (!resolved) return;
+
+                    const { conversationId, conversationType, conversationName } = resolved;
+                    if (!conversationName || conversationName === 'Conversa sem nome') return;
+
+                    const key = `${conversationType}-${conversationId}`;
+                    const messageCreatedAt = msg.createdAt ? new Date(msg.createdAt).getTime() : 0;
+                    const existing = conversationMap.get(key);
+                    const existingCreatedAt = existing?.lastMessage?.createdAt
+                        ? new Date(existing.lastMessage.createdAt).getTime()
+                        : 0;
+                    const unreadIncrement =
+                        msg.recipient?.id === currentUser?.id && !msg.isRead ? 1 : 0;
+
+                    if (!existing) {
+                        conversationMap.set(key, {
+                            id: conversationId,
+                            name: conversationName,
+                            type: conversationType,
+                            lastMessage: msg,
+                            unreadCount: unreadIncrement,
+                            isOnline: conversationType === 'individual' ? Boolean(msg.sender?.isOnline) : false,
+                        });
+                    } else {
+                        conversationMap.set(key, {
+                            ...existing,
+                            unreadCount: (existing.unreadCount || 0) + unreadIncrement,
+                            lastMessage:
+                                messageCreatedAt > existingCreatedAt ? msg : existing.lastMessage,
+                        });
+                    }
+                });
+
+                const built = Array.from(conversationMap.values()).sort((a, b) => {
+                    const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+                    const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+                    return bTime - aTime;
+                });
+
+                if (built.length > 0) {
+                    get().setConversations(built);
+                }
+            },
 
             // Computed getters
             getUnreadChatCount: () => {

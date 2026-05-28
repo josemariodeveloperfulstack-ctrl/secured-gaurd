@@ -1,19 +1,26 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.sendgrid.EmailMarketingImportedListDetailDto;
+import com.z7design.secured_guard.dto.sendgrid.EmailMarketingImportedListSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailMarketingUnsubscribeRowDto;
+import com.z7design.secured_guard.dto.sendgrid.SaveEmailMarketingImportedListRequest;
 import com.z7design.secured_guard.dto.sendgrid.AppendRecipientsRequest;
 import com.z7design.secured_guard.dto.sendgrid.CreateEmailCampaignRequest;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignMetricsDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailLogRowDto;
 import com.z7design.secured_guard.dto.sendgrid.ImportRecipientsResponse;
+import com.z7design.secured_guard.dto.sendgrid.InactiveEmailRecipientDto;
 import com.z7design.secured_guard.dto.sendgrid.SendEmailCampaignRequest;
+import com.z7design.secured_guard.dto.sendgrid.UpdateInactiveEmailRecipientRequest;
 import com.z7design.secured_guard.dto.sendgrid.UpdateEmailCampaignRequest;
+import com.z7design.secured_guard.dto.sendgrid.RejectedCheckResponse;
 import com.z7design.secured_guard.dto.sendgrid.UnsubscribeCheckRequest;
 import com.z7design.secured_guard.dto.sendgrid.UnsubscribeCheckResponse;
 import com.z7design.secured_guard.model.EmailCampaign;
 import com.z7design.secured_guard.model.enums.EmailLogStatus;
 import com.z7design.secured_guard.service.sendgrid.EmailCampaignService;
+import com.z7design.secured_guard.service.sendgrid.EmailMarketingImportedListService;
 import com.z7design.secured_guard.service.sendgrid.EmailRecipientImportService;
 import com.z7design.secured_guard.service.sendgrid.EmailUnsubscribeService;
 import jakarta.validation.Valid;
@@ -39,6 +46,7 @@ public class EmailCampaignController {
     private final EmailCampaignService emailCampaignService;
     private final EmailRecipientImportService emailRecipientImportService;
     private final EmailUnsubscribeService emailUnsubscribeService;
+    private final EmailMarketingImportedListService emailMarketingImportedListService;
 
     @GetMapping
     public ResponseEntity<List<EmailCampaignSummaryDto>> list() {
@@ -104,7 +112,7 @@ public class EmailCampaignController {
         return ResponseEntity.accepted().build();
     }
 
-    /** Pausa a campanha (mantém PENDING para retomada posterior). */
+    /** Pausa a campanha e cancela envios ainda pendentes. */
     @PostMapping("/{id}/pause")
     public ResponseEntity<Void> pause(@PathVariable UUID id) {
         emailCampaignService.pauseCampaign(id);
@@ -128,6 +136,36 @@ public class EmailCampaignController {
     @GetMapping("/{id}/metrics")
     public ResponseEntity<EmailCampaignMetricsDto> metrics(@PathVariable UUID id) {
         return ResponseEntity.ok(emailCampaignService.metrics(id));
+    }
+
+    @GetMapping("/{id}/inactive-recipients")
+    public ResponseEntity<List<InactiveEmailRecipientDto>> listInactiveRecipients(@PathVariable UUID id) {
+        return ResponseEntity.ok(emailCampaignService.listInactiveRecipients(id));
+    }
+
+    @PatchMapping("/{id}/inactive-recipients/{recipientId}")
+    public ResponseEntity<InactiveEmailRecipientDto> updateInactiveRecipient(
+            @PathVariable UUID id,
+            @PathVariable UUID recipientId,
+            @Valid @RequestBody UpdateInactiveEmailRecipientRequest body) {
+        return ResponseEntity.ok(emailCampaignService.updateInactiveRecipient(id, recipientId, body));
+    }
+
+    @DeleteMapping("/{id}/inactive-recipients/{recipientId}")
+    public ResponseEntity<Void> deleteInactiveRecipient(
+            @PathVariable UUID id,
+            @PathVariable UUID recipientId) {
+        emailCampaignService.deleteInactiveRecipient(id, recipientId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Remove destinatário da campanha e cancela envios pendentes para esse e-mail. */
+    @DeleteMapping("/{id}/recipients/{recipientId}")
+    public ResponseEntity<Void> removeRecipient(
+            @PathVariable UUID id,
+            @PathVariable UUID recipientId) {
+        emailCampaignService.removeRecipientFromCampaign(id, recipientId);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -159,8 +197,53 @@ public class EmailCampaignController {
         return ResponseEntity.ok(new UnsubscribeCheckResponse(unsubscribed));
     }
 
+    /** Verifica quais e-mails constam na lista global de rejeitados do marketing. */
+    @PostMapping("/rejected-check")
+    public ResponseEntity<RejectedCheckResponse> rejectedCheck(@Valid @RequestBody UnsubscribeCheckRequest request) {
+        List<String> validEmails = request.emails().stream()
+                .filter(e -> e != null && !e.isBlank())
+                .map(String::trim)
+                .filter(this::looksLikeEmail)
+                .distinct()
+                .toList();
+        if (validEmails.isEmpty()) {
+            return ResponseEntity.ok(new RejectedCheckResponse(List.of()));
+        }
+        List<String> rejected = emailCampaignService.findRejectedAmong(validEmails);
+        return ResponseEntity.ok(new RejectedCheckResponse(rejected));
+    }
+
     private boolean looksLikeEmail(String value) {
         return value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    }
+
+    @GetMapping("/imported-lists")
+    public ResponseEntity<List<EmailMarketingImportedListSummaryDto>> listImportedLists() {
+        return ResponseEntity.ok(emailMarketingImportedListService.listSummaries());
+    }
+
+    @GetMapping("/imported-lists/{listId}")
+    public ResponseEntity<EmailMarketingImportedListDetailDto> getImportedList(@PathVariable UUID listId) {
+        return ResponseEntity.ok(emailMarketingImportedListService.getDetail(listId));
+    }
+
+    @PostMapping("/imported-lists")
+    public ResponseEntity<EmailMarketingImportedListDetailDto> createImportedList(
+            @Valid @RequestBody SaveEmailMarketingImportedListRequest body) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(emailMarketingImportedListService.create(body));
+    }
+
+    @PutMapping("/imported-lists/{listId}")
+    public ResponseEntity<EmailMarketingImportedListDetailDto> updateImportedList(
+            @PathVariable UUID listId,
+            @Valid @RequestBody SaveEmailMarketingImportedListRequest body) {
+        return ResponseEntity.ok(emailMarketingImportedListService.update(listId, body));
+    }
+
+    @DeleteMapping("/imported-lists/{listId}")
+    public ResponseEntity<Void> deleteImportedList(@PathVariable UUID listId) {
+        emailMarketingImportedListService.delete(listId);
+        return ResponseEntity.noContent().build();
     }
 
     /** Acrescenta destinatários a uma campanha em rascunho (ignora duplicados). */

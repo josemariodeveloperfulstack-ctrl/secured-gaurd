@@ -64,7 +64,7 @@ public class EmployeeReportPdfServiceTest {
         // Act
         try {
             employeeReportPdfService.generateEmployeeReportPDF(
-                companyId, duplicateIds, List.of("name"), ReportGroupBy.FUNCIONARIO, ReportOrderBy.FUNCIONARIO
+                companyId, duplicateIds, List.of("name"), ReportGroupBy.FUNCIONARIO, ReportOrderBy.FUNCIONARIO, null
             );
         } catch (Exception e) {
             // Ignore PDF generation errors as we only care about the repository call

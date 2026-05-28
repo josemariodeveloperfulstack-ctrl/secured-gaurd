@@ -336,14 +336,14 @@ export const messageService = {
         id: msg.id,
         content: msg.content || '',
         sender: {
-          id: msg.sender.id,
-          name: msg.sender.name,
-          email: msg.sender.email
+          id: msg.sender?.id != null ? String(msg.sender.id) : '',
+          name: msg.sender?.name || msg.sender?.username || 'Usuário',
+          email: msg.sender?.email || ''
         },
         recipient: msg.recipient ? {
-          id: msg.recipient.id,
-          name: msg.recipient.name,
-          email: msg.recipient.email
+          id: msg.recipient.id != null ? String(msg.recipient.id) : '',
+          name: msg.recipient.name || msg.recipient.username || 'Usuário',
+          email: msg.recipient.email || ''
         } : undefined,
         group: msg.group,
         department: msg.department,
@@ -377,14 +377,14 @@ export const messageService = {
         id: msg.id,
         content: msg.content || '',
         sender: {
-          id: msg.sender.id,
-          name: msg.sender.name,
-          email: msg.sender.email
+          id: msg.sender?.id != null ? String(msg.sender.id) : '',
+          name: msg.sender?.name || msg.sender?.username || 'Usuário',
+          email: msg.sender?.email || ''
         },
         recipient: msg.recipient ? {
-          id: msg.recipient.id,
-          name: msg.recipient.name,
-          email: msg.recipient.email
+          id: msg.recipient.id != null ? String(msg.recipient.id) : '',
+          name: msg.recipient.name || msg.recipient.username || 'Usuário',
+          email: msg.recipient.email || ''
         } : undefined,
         group: msg.group,
         department: msg.department,
@@ -417,14 +417,14 @@ export const messageService = {
         id: msg.id,
         content: msg.content || '',
         sender: {
-          id: msg.sender.id,
-          name: msg.sender.name,
-          email: msg.sender.email
+          id: msg.sender?.id != null ? String(msg.sender.id) : '',
+          name: msg.sender?.name || msg.sender?.username || 'Usuário',
+          email: msg.sender?.email || ''
         },
         recipient: msg.recipient ? {
-          id: msg.recipient.id,
-          name: msg.recipient.name,
-          email: msg.recipient.email
+          id: msg.recipient.id != null ? String(msg.recipient.id) : '',
+          name: msg.recipient.name || msg.recipient.username || 'Usuário',
+          email: msg.recipient.email || ''
         } : undefined,
         group: msg.group,
         department: msg.department,
