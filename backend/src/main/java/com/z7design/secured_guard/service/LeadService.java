@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.service;
 
+import com.z7design.secured_guard.dto.LeadBulkImportResultDTO;
 import com.z7design.secured_guard.dto.LeadDTO;
+import com.z7design.secured_guard.dto.LeadImportItemDTO;
 import com.z7design.secured_guard.model.Lead;
 import com.z7design.secured_guard.model.enums.LeadStatus;
 import com.z7design.secured_guard.model.enums.LeadSource;
@@ -18,7 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 
@@ -568,5 +572,148 @@ public class LeadService {
     @Transactional(readOnly = true)
     public long countByStatusAndCreatedAtRange(LeadStatus status, LocalDateTime startInclusive, LocalDateTime endExclusive) {
         return leadRepository.countByStatusAndCreatedAtRange(status, startInclusive, endExclusive);
+    }
+
+    /**
+     * Importa ou atualiza leads a partir de planilha de marketing (upsert por e-mail).
+     */
+    public LeadBulkImportResultDTO bulkImportFromMarketing(List<LeadImportItemDTO> items, String currentUserIdentifier) {
+        LeadBulkImportResultDTO result = new LeadBulkImportResultDTO();
+        if (items == null || items.isEmpty()) {
+            return result;
+        }
+
+        var userOptional = userRepository.findByUsername(currentUserIdentifier);
+        if (userOptional.isEmpty()) {
+            userOptional = userRepository.findByEmail(currentUserIdentifier);
+        }
+        if (userOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Usuário não encontrado com username/email: " + currentUserIdentifier);
+        }
+        User createdBy = userOptional.get();
+
+        List<LeadBulkImportResultDTO.LeadImportLeadRefDTO> refs = new ArrayList<>();
+        int created = 0;
+        int updated = 0;
+        int skipped = 0;
+
+        for (LeadImportItemDTO item : items) {
+            if (item == null || item.getEmail() == null || item.getEmail().isBlank()) {
+                skipped++;
+                continue;
+            }
+            String email = truncateField(item.getEmail().trim().toLowerCase(), 255);
+            if (!isPlausibleEmail(email)) {
+                skipped++;
+                continue;
+            }
+
+            String name = resolveImportName(truncateField(item.getName(), 255), email);
+            String notes = buildMarketingImportNotes(item);
+
+            Optional<Lead> existingOpt = leadRepository.findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(email);
+            if (existingOpt.isPresent()) {
+                Lead existing = existingOpt.get();
+                if (item.getName() != null && !item.getName().isBlank()) {
+                    existing.setName(item.getName().trim());
+                }
+                if (item.getCompany() != null && !item.getCompany().isBlank()) {
+                    existing.setCompany(item.getCompany().trim());
+                }
+                if (item.getPosition() != null && !item.getPosition().isBlank()) {
+                    existing.setPosition(item.getPosition().trim());
+                }
+                if (item.getPhone() != null && !item.getPhone().isBlank()) {
+                    existing.setPhone(item.getPhone().trim());
+                }
+                if (notes != null) {
+                    existing.setNotes(notes);
+                }
+                Lead saved = leadRepository.save(existing);
+                refs.add(new LeadBulkImportResultDTO.LeadImportLeadRefDTO(saved.getId(), saved.getEmail()));
+                updated++;
+            } else {
+                Lead lead = new Lead();
+                lead.setName(name);
+                lead.setEmail(email);
+                lead.setCompany(truncateOrNull(item.getCompany(), 255));
+                lead.setPosition(truncateOrNull(item.getPosition(), 255));
+                lead.setPhone(truncateOrNull(item.getPhone(), 20));
+                lead.setSource(LeadSource.EMAIL_MARKETING);
+                lead.setStatus(LeadStatus.NEW);
+                lead.setNotes(notes);
+                lead.setCreatedBy(createdBy);
+                Lead saved = leadRepository.save(lead);
+                refs.add(new LeadBulkImportResultDTO.LeadImportLeadRefDTO(saved.getId(), saved.getEmail()));
+                created++;
+            }
+        }
+
+        result.setCreated(created);
+        result.setUpdated(updated);
+        result.setSkipped(skipped);
+        result.setLeads(refs);
+        log.info("Importação marketing: {} criados, {} atualizados, {} ignorados", created, updated, skipped);
+        return result;
+    }
+
+    private static String resolveImportName(String name, String email) {
+        if (name != null && !name.isBlank()) {
+            return name.trim();
+        }
+        int at = email.indexOf('@');
+        if (at > 0) {
+            return email.substring(0, at).replace('.', ' ').replace('_', ' ').trim();
+        }
+        return "Contato";
+    }
+
+    private static String trimOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private static String truncateOrNull(String value, int maxLen) {
+        String t = trimOrNull(value);
+        if (t == null) {
+            return null;
+        }
+        return truncateField(t, maxLen);
+    }
+
+    private static String truncateField(String value, int maxLen) {
+        if (value == null) {
+            return null;
+        }
+        String t = value.trim();
+        if (t.length() <= maxLen) {
+            return t;
+        }
+        return t.substring(0, maxLen);
+    }
+
+    private static boolean isPlausibleEmail(String email) {
+        return email != null && email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    }
+
+    private static String buildMarketingImportNotes(LeadImportItemDTO item) {
+        StringBuilder sb = new StringBuilder();
+        String city = truncateOrNull(item.getCity(), 120);
+        String state = truncateOrNull(item.getState(), 10);
+        String companyType = truncateOrNull(item.getCompanyType(), 120);
+        if (city != null) {
+            sb.append("Cidade: ").append(city);
+        }
+        if (state != null) {
+            if (sb.length() > 0) sb.append(" | ");
+            sb.append("UF: ").append(state);
+        }
+        if (companyType != null) {
+            if (sb.length() > 0) sb.append(" | ");
+            sb.append("Tipo empresa: ").append(companyType);
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 } 

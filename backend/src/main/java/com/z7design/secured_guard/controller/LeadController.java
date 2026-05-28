@@ -1,5 +1,7 @@
 package com.z7design.secured_guard.controller;
 
+import com.z7design.secured_guard.dto.LeadBulkImportRequestDTO;
+import com.z7design.secured_guard.dto.LeadBulkImportResultDTO;
 import com.z7design.secured_guard.dto.LeadDTO;
 import com.z7design.secured_guard.model.Lead;
 import com.z7design.secured_guard.model.User;
@@ -18,6 +20,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Map;
@@ -104,6 +107,19 @@ public class LeadController {
         }
         
         return ResponseEntity.ok(lead);
+    }
+
+    @PostMapping("/import")
+    @Operation(
+            summary = "Importar leads de planilha (marketing)",
+            description = "Cria ou atualiza leads por e-mail. Usado após importação de lista para campanhas.")
+    public ResponseEntity<LeadBulkImportResultDTO> importLeadsFromMarketing(
+            @Valid @RequestBody LeadBulkImportRequestDTO request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUserIdentifier = authentication != null ? authentication.getName() : "system";
+        LeadBulkImportResultDTO result =
+                leadService.bulkImportFromMarketing(request.getItems(), currentUserIdentifier);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping

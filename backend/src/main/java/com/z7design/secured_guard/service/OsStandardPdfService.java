@@ -31,7 +31,7 @@ public class OsStandardPdfService {
                 this.pdfLayoutService = pdfLayoutService;
         }
 
-        private static final String REPORT_TITLE = "ORDEM DE SERVIÇOS";
+        private static final String REPORT_TITLE = "ORDEM DE SERVIÇO";
 
         public byte[] generatePdf(OperationalServiceOrderRequest request) {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
@@ -78,12 +78,16 @@ public class OsStandardPdfService {
                 table.addCell(new Cell().add(row1).setPadding(2f));
 
                 // Responsibility
-                table.addCell(new Cell().add(new Paragraph("RESPONSABILIDADE: " + safeStr(request.getServiceType()).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
+                String responsibility = request.getResponsibility();
+                if (responsibility == null || responsibility.isBlank()) {
+                        responsibility = request.getServiceType();
+                }
+                table.addCell(new Cell().add(new Paragraph("RESPONSABILIDADE: " + safeStr(responsibility).toUpperCase()).setBold().setFontSize(9f)).setPadding(2f));
 
                 // Dates
                 Table row2 = new Table(UnitValue.createPercentArray(new float[] { 70, 30 })).useAllAvailableWidth();
                 row2.addCell(new Cell().add(new Paragraph("ELABORADO EM: " + formatDate(request.getDocumentDate())).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER));
-                row2.addCell(new Cell().add(new Paragraph("REVISÃO:").setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER).setBorderLeft(new com.itextpdf.layout.borders.SolidBorder(1f)));
+                row2.addCell(new Cell().add(new Paragraph("REVISÃO: " + safeStr(request.getRevision()).toUpperCase()).setBold().setFontSize(9f)).setBorder(com.itextpdf.layout.borders.Border.NO_BORDER).setBorderLeft(new com.itextpdf.layout.borders.SolidBorder(1f)));
                 table.addCell(new Cell().add(row2).setPadding(2f));
 
                 // Employee Info

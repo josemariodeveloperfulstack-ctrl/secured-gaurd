@@ -43,6 +43,12 @@ public class OperationalServiceOrderRequest {
     // Dados Gerais
     private String city;
     private LocalDate documentDate;
+    private String responsibility;
+    private String revision;
+    private LocalDate hireDate;
+
+    /** STANDARD_NR01 (padrão) ou BOMBEIRO_CIVIL (frente + verso) */
+    private String layoutType;
 
     // Segurança e Medicina do Trabalho (NR-01)
     private String activities;
@@ -50,4 +56,7 @@ public class OperationalServiceOrderRequest {
     private String preventiveMeasures;
     private String uniform;
     private String mandatoryTrainings;
+
+    /** Procedimento em caso de acidentes (layout Bombeiro Civil) */
+    private String accidentProcedure;
 }

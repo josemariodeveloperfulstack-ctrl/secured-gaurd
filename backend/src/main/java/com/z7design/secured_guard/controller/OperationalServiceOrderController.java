@@ -3,7 +3,7 @@ package com.z7design.secured_guard.controller;
 import com.z7design.secured_guard.dto.OperationalServiceOrderRequest;
 import com.z7design.secured_guard.model.enums.TipoDocumentoGerado;
 import com.z7design.secured_guard.service.DocumentoGeradoPersistenceService;
-import com.z7design.secured_guard.service.OsStandardPdfService;
+import com.z7design.secured_guard.service.OperationalServiceOrderPdfService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpHeaders;
@@ -22,10 +22,10 @@ import java.util.Map;
 @Tag(name = "Documentos - OS Operacional", description = "Geração de Ordem de Serviço Operacional")
 public class OperationalServiceOrderController {
 
-    private final OsStandardPdfService osService;
+    private final OperationalServiceOrderPdfService osService;
     private final DocumentoGeradoPersistenceService persistenceService;
 
-    public OperationalServiceOrderController(OsStandardPdfService osService,
+    public OperationalServiceOrderController(OperationalServiceOrderPdfService osService,
                                               DocumentoGeradoPersistenceService persistenceService) {
         this.osService = osService;
         this.persistenceService = persistenceService;

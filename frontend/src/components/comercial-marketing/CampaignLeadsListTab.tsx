@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, FileText, Loader2 } from 'lucide-react';
 import { RecipientPicker } from '@/components/comercial-marketing/RecipientPicker';
-import { RecipientListGrouped } from '@/components/comercial-marketing/RecipientListGrouped';
+import {
+  RecipientListGrouped,
+  type SelectedCityBatch,
+} from '@/components/comercial-marketing/RecipientListGrouped';
 import { RecipientSegmentSelector } from '@/components/comercial-marketing/RecipientSegmentSelector';
 import {
   applySegmentRules,
@@ -14,6 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/use-toast';
 import emailCampaignService, { type EmailCampaignRecipientInput } from '@/services/emailCampaignService';
 import { isValidEmail } from '@/components/comercial-marketing/utils/recipientParser';
+import {
+  attachLeadIdsToRecipients,
+  persistImportedLeadsToCrm,
+} from '@/components/comercial-marketing/utils/persistImportedLeads';
+import { sanitizeRecipientsForCampaign } from '@/components/comercial-marketing/utils/sanitizeMarketingPayload';
 
 const CampaignLeadsListTab: React.FC = () => {
   const { toast } = useToast();
@@ -22,11 +30,16 @@ const CampaignLeadsListTab: React.FC = () => {
   const [segmentRules, setSegmentRules] = useState<RecipientSegmentRule[]>([]);
   const [campaignId, setCampaignId] = useState<string>('');
   const [checkingOptOut, setCheckingOptOut] = useState(false);
+  const [savingLeadsToCrm, setSavingLeadsToCrm] = useState(false);
+  const [selectedCityBatch, setSelectedCityBatch] = useState<SelectedCityBatch | null>(null);
 
   const filteredRecipients = React.useMemo(
     () => applySegmentRules(recipients, segmentRules),
     [recipients, segmentRules],
   );
+
+  /** Destinatários da cidade selecionada (já refletem segmentação via `filteredRecipients`). */
+  const recipientsToAppend = selectedCityBatch?.recipients ?? [];
 
   const campaignsQuery = useQuery({
     queryKey: ['email-campaigns'],
@@ -44,21 +57,41 @@ const CampaignLeadsListTab: React.FC = () => {
 
   const appendDisabledReason = useMemo(() => {
     if (checkingOptOut) return 'Aguarde a verificação de descadastros (opt-out).';
+    if (savingLeadsToCrm) return 'Gravando leads importados no CRM…';
     if (draftCampaigns.length === 0) {
       return 'Não há campanha em rascunho. Crie uma na aba Campanhas e volte aqui.';
     }
     if (!campaignId) return 'Selecione a campanha de destino no campo acima.';
-    if (filteredRecipients.length === 0) return 'Importe destinatários ou ajuste os lotes de segmentação.';
+    if (recipients.length > 0 && !selectedCityBatch) {
+      return 'Selecione uma cidade na lista à esquerda para acrescentar à campanha.';
+    }
+    if (recipientsToAppend.length === 0) {
+      return 'Nenhum destinatário nesta cidade após os filtros de segmentação.';
+    }
     return null;
-  }, [checkingOptOut, draftCampaigns.length, campaignId, filteredRecipients.length]);
+  }, [
+    checkingOptOut,
+    savingLeadsToCrm,
+    draftCampaigns.length,
+    campaignId,
+    recipients.length,
+    selectedCityBatch,
+    recipientsToAppend.length,
+  ]);
 
   const appendMutation = useMutation({
     mutationFn: async () => {
       if (!campaignId) throw new Error('Selecione uma campanha em rascunho.');
-      if (filteredRecipients.length === 0) throw new Error('Monte a lista de destinatários antes de enviar.');
-      const total = filteredRecipients.length;
+      if (recipientsToAppend.length === 0) {
+        throw new Error('Selecione uma cidade com destinatários antes de enviar.');
+      }
+      const sanitized = sanitizeRecipientsForCampaign(recipientsToAppend);
+      if (sanitized.length === 0) {
+        throw new Error('Nenhum destinatário válido nesta cidade após validação.');
+      }
+      const total = sanitized.length;
       for (let i = 0; i < total; i += APPEND_CHUNK_SIZE) {
-        const chunk = filteredRecipients.slice(i, i + APPEND_CHUNK_SIZE);
+        const chunk = sanitized.slice(i, i + APPEND_CHUNK_SIZE);
         await emailCampaignService.appendRecipients(campaignId, chunk);
       }
       return total;
@@ -67,14 +100,51 @@ const CampaignLeadsListTab: React.FC = () => {
       void queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
       toast({
         title: 'Lista aplicada à campanha',
-        description: `${total?.toLocaleString('pt-BR') ?? ''} destinatário(s) acrescentados ao rascunho.`,
+        description: `${total?.toLocaleString('pt-BR') ?? ''} destinatário(s) de ${selectedCityBatch?.cityLabel ?? 'cidade selecionada'} acrescentados ao rascunho.`,
       });
     },
     onError: (e: unknown) => {
-      const msg = e instanceof Error ? e.message : 'Não foi possível atualizar a campanha.';
+      const axiosErr = e as { response?: { data?: { message?: string; errors?: Record<string, string> } } };
+      const apiMsg = axiosErr.response?.data?.message;
+      const msg =
+        apiMsg ||
+        (e instanceof Error ? e.message : 'Não foi possível atualizar a campanha.');
       toast({ title: 'Erro', description: msg, variant: 'destructive' });
     },
   });
+
+  const applyRecipientsAfterImport = useCallback(
+    async (sanitized: EmailCampaignRecipientInput[], batchToPersist: EmailCampaignRecipientInput[]) => {
+      setSavingLeadsToCrm(true);
+      try {
+        const { created, updated, skipped, emailToLeadId } = await persistImportedLeadsToCrm(batchToPersist);
+        const withLeadIds = attachLeadIdsToRecipients(sanitized, emailToLeadId);
+        setRecipients(withLeadIds);
+        void queryClient.invalidateQueries({ queryKey: ['leads'] });
+        void queryClient.invalidateQueries({ queryKey: ['leads', 'all'] });
+        if (batchToPersist.length > 0) {
+          toast({
+            title: 'Leads gravados no CRM',
+            description: `${created.toLocaleString('pt-BR')} novo(s), ${updated.toLocaleString('pt-BR')} atualizado(s)${skipped > 0 ? `, ${skipped} ignorado(s)` : ''}. Disponíveis na aba Leads do CRM.`,
+          });
+        }
+      } catch (e) {
+        console.error('Erro ao gravar leads no CRM:', e);
+        setRecipients(sanitized);
+        toast({
+          title: 'Lista importada, mas CRM não atualizado',
+          description:
+            e instanceof Error
+              ? e.message
+              : 'Os contatos estão na lista local; tente importar novamente ou verifique a conexão.',
+          variant: 'destructive',
+        });
+      } finally {
+        setSavingLeadsToCrm(false);
+      }
+    },
+    [queryClient, toast],
+  );
 
   const handleRecipientsChange = async (next: EmailCampaignRecipientInput[]) => {
     const sanitized = next.filter((r) => isValidEmail(r.email));
@@ -89,31 +159,32 @@ const CampaignLeadsListTab: React.FC = () => {
     const prevLower = new Set(recipients.map((r) => r.email.toLowerCase()));
     const added = sanitized.filter((r) => !prevLower.has(r.email.toLowerCase()));
     if (added.length === 0) {
-      setRecipients(next);
+      setRecipients(sanitized);
+      setSelectedCityBatch(null);
       return;
     }
     setCheckingOptOut(true);
     try {
       const emails = added.map((r) => r.email);
       const unsubscribed = await emailCampaignService.checkUnsubscribed(emails);
-      if (unsubscribed.length === 0) {
-        setRecipients(sanitized);
-        return;
+      let afterOptOut = sanitized;
+      if (unsubscribed.length > 0) {
+        const block = new Set(unsubscribed.map((e) => e.toLowerCase()));
+        afterOptOut = sanitized.filter((r) => !block.has(r.email.toLowerCase()));
+        toast({
+          title: 'Opt-out aplicado',
+          description: `${unsubscribed.length} e-mail(is) descadastrado(s) foram excluídos da seleção.`,
+        });
       }
-      const block = new Set(unsubscribed.map((e) => e.toLowerCase()));
-      const filtered = sanitized.filter((r) => !block.has(r.email.toLowerCase()));
-      setRecipients(filtered);
-      toast({
-        title: 'Opt-out aplicado',
-        description: `${unsubscribed.length} e-mail(is) descadastrado(s) foram excluídos da seleção.`,
-      });
+      const addedAfterOptOut = afterOptOut.filter((r) => !prevLower.has(r.email.toLowerCase()));
+      await applyRecipientsAfterImport(afterOptOut, addedAfterOptOut);
     } catch {
       toast({
         title: 'Não foi possível verificar descadastros',
         description: 'A lista foi atualizada; confira os destinatários antes de enviar.',
         variant: 'destructive',
       });
-      setRecipients(sanitized);
+      await applyRecipientsAfterImport(sanitized, added);
     } finally {
       setCheckingOptOut(false);
     }
@@ -155,15 +226,15 @@ const CampaignLeadsListTab: React.FC = () => {
           <h2 className="text-xl font-semibold text-slate-100">Lista de leads para campanhas</h2>
         </div>
         <p className="text-sm text-slate-400">
-          Importe contatos por CSV/Excel (mapeie cidade, estado e tipo de empresa), monte lotes por região com
-          quantidade definida e remova automaticamente quem pediu descadastro (opt-out).
+          Importe contatos por CSV/Excel (mapeie cidade, estado e tipo de empresa). Os leads são gravados
+          automaticamente no CRM. Selecione uma cidade e acrescente apenas esse lote à campanha em rascunho.
         </p>
       </div>
 
       <div className="rounded-xl border border-white/10 bg-seguranca-graphite/40 p-5 text-left shadow-sm">
         <div className="space-y-2">
           <Label className="text-slate-200">Campanha em rascunho (destino da lista)</Label>
-          <Select value={campaignId || undefined} onValueChange={setCampaignId}>
+          <Select value={campaignId} onValueChange={setCampaignId}>
             <SelectTrigger className="border-white/10 bg-seguranca-black/30 text-slate-100">
               <SelectValue placeholder="Selecione uma campanha…" />
             </SelectTrigger>
@@ -196,10 +267,11 @@ const CampaignLeadsListTab: React.FC = () => {
         </div>
 
         <div className="relative mt-6">
-          {checkingOptOut && (
+          {(checkingOptOut || savingLeadsToCrm) && (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-black/40">
               <span className="flex items-center gap-2 text-sm text-slate-100">
-                <Loader2 className="h-4 w-4 animate-spin" /> A verificar descadastros…
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {savingLeadsToCrm ? 'A gravar leads no CRM…' : 'A verificar descadastros…'}
               </span>
             </div>
           )}
@@ -241,6 +313,7 @@ const CampaignLeadsListTab: React.FC = () => {
                   onClick={() => {
                     setRecipients([]);
                     setSegmentRules([]);
+                    setSelectedCityBatch(null);
                   }}
                 >
                   Limpar lista
@@ -250,7 +323,18 @@ const CampaignLeadsListTab: React.FC = () => {
             <RecipientListGrouped
               recipients={filteredRecipients}
               dark
-              onRemove={(email) => setRecipients((prev) => prev.filter((x) => x.email !== email))}
+              onSelectedCityChange={setSelectedCityBatch}
+              onRemove={(email) => {
+                setRecipients((prev) => prev.filter((x) => x.email !== email));
+                setSelectedCityBatch((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        recipients: prev.recipients.filter((x) => x.email !== email),
+                      }
+                    : null,
+                );
+              }}
             />
           </div>
           </div>
@@ -275,7 +359,9 @@ const CampaignLeadsListTab: React.FC = () => {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gravar…
                 </>
               ) : (
-                `Acrescentar ${filteredRecipients.length.toLocaleString('pt-BR')} à campanha`
+                selectedCityBatch
+                  ? `Acrescentar ${recipientsToAppend.length.toLocaleString('pt-BR')} de ${selectedCityBatch.cityLabel} à campanha`
+                  : 'Selecione uma cidade'
               )}
             </Button>
           </div>

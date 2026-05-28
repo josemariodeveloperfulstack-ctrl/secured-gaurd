@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -8,48 +8,25 @@ import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { FileText, Download, Eye, User, Building, Calendar, Clock, MapPin, AlertTriangle, CheckCircle2, Loader2, Briefcase } from 'lucide-react';
-import { employeeService, Employee, SimpleEmployee } from '@/services/employeeService';
+import { employeeService, SimpleEmployee, employeeToSimpleEmployee } from '@/services/employeeService';
 import { SearchableSelect } from '../ui/searchable-select';
 import { EmployeeCombobox } from '../ui/employee-combobox';
 
 import { companyService } from '@/services/companyService';
 import { clientService, Client } from '@/services/clientService';
+import { workPostService } from '@/services/workPostService';
 import { formatCPF, formatCNPJ } from '@/utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 import { refreshEmployeeDocuments } from '@/utils/refreshEmployeeDocuments';
+import {
+  applyOrdemServicoTemplate,
+  findOrdemServicoTemplate,
+  type OrdemServicoTemplateContext,
+  type OsLayoutType,
+} from '@/data/ordemServicoSafetyTemplates';
 
-// Predefined Safety Templates for common roles
-const SAFETY_TEMPLATES: Record<string, any> = {
-  'RECEPCIONISTA': {
-    activities: 'Recepcionar membros da comunidade e visitantes procurando identificá-los, averiguando suas pretensões para prestar-lhes informações e/ou encaminhá-los a pessoas ou setor procurados. Atender chamadas telefônicas. Anotar recados. Prestar informações.',
-    risks: 'Riscos Ergonômicos: Postura inadequada.',
-    preventiveMeasures: '- Adoção de medidas de proteção em ordem: coletivas e individuais.',
-    uniform: '- Uniforme completo.',
-    mandatoryTrainings: '- Treinamento de Ambientação de Segurança do Trabalho (SIM)\n- DSS – Diálogo de Segurança e Saúde Ocupacional\n- Treinamento sobre aspectos legais e técnicos no uso e conservação de EPIs.'
-  },
-  'PORTEIRO': {
-    activities: 'Fiscalizar a guarda do patrimônio e exercer a observação de fábricas, armazéns, residências, estacionamentos, edifícios públicos, privados e outros estabelecimentos, percorrendo-os sistematicamente e inspecionando suas dependências.',
-    risks: 'Riscos Ergonômicos: Postura inadequada, trabalho em pé.\nRiscos de Acidentes: Intrusão, violência física.',
-    preventiveMeasures: '- Pausas ergonômicas.\n- Cumprimento de procedimentos de segurança.\n- Manter comunicação via rádio.',
-    uniform: '- Uniforme completo padrão da portaria.',
-    mandatoryTrainings: '- Treinamento de Ambientação de Segurança do Trabalho (SIM)\n- Procedimentos de Portaria e Controle de Acesso\n- Primeiros Socorros Básicos\n- DSS Diário'
-  },
-  'VIGILANTE': {
-    activities: 'Garantir a segurança patrimonial e física do local, realizando rondas, controle de acesso e monitoramento. Agir preventivamente para evitar ocorrências e atuar de forma repressiva quando necessário e de acordo com a legislação.',
-    risks: 'Riscos de Acidentes: Violência, assaltos.\nRiscos Ergonômicos: Postura prolongada.\nRiscos Físicos: Exposição a intempéries.',
-    preventiveMeasures: '- Uso de colete balístico (se aplicável).\n- Atenção contínua e adoção de protocolos de segurança armada/desarmada.\n- Adoção de medidas de proteção coletivas e individuais.',
-    uniform: '- Uniforme tático/padrão completo.\n- Calçado de segurança.',
-    mandatoryTrainings: '- Reciclagem de Vigilante (obrigatório PF)\n- Treinamento de Ambientação de Segurança do Trabalho\n- Uso Progressivo da Força\n- Defesa Pessoal e Armamento (se aplicável)'
-  },
-  'AUXILIAR DE LIMPEZA': {
-    activities: 'Realizar a limpeza e conservação das dependências do cliente. Varrer, lavar, encerar, limpar vidros e janelas, recolher o lixo, e repor materiais de higiene.',
-    risks: 'Riscos Químicos: Manuseio de produtos de limpeza.\nRiscos Ergonômicos: Movimentos repetitivos.\nRiscos de Acidentes: Quedas em piso escorregadio.',
-    preventiveMeasures: '- Uso de EPIs adequados (luvas, botas de borracha, óculos).\n- Sinalização de piso molhado.\n- Diluição correta de produtos químicos.',
-    uniform: '- Uniforme padrão de limpeza.\n- Bota de borracha/Calçado fechado antiderrapante.',
-    mandatoryTrainings: '- Treinamento de manuseio de produtos químicos (FISPQ)\n- Uso e conservação de EPIs\n- NR-32 (se aplicável a ambiente hospitalar)\n- DSS Semanal'
-  }
-};
+const todayIso = () => new Date().toISOString().split('T')[0];
 
 interface OrdemServicosFormProps {
   employeeId?: string;
@@ -73,12 +50,21 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     status: '',
     observations: '',
     workPostId: '',
+    layoutType: 'STANDARD_NR01' as OsLayoutType,
+    responsibility: '',
+    revision: '',
+    documentDate: todayIso(),
+    city: 'Contagem',
+    hireDate: '',
     activities: '',
     risks: '',
     preventiveMeasures: '',
     uniform: '',
     mandatoryTrainings: '',
+    accidentProcedure: '',
   });
+
+  const [activeTemplateLabel, setActiveTemplateLabel] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -87,10 +73,72 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   const [clients, setClients] = useState<Client[]>([]);
   const [workPosts, setWorkPosts] = useState<any[]>([]);
   const [loadingWorkPosts, setLoadingWorkPosts] = useState(false);
+  const [syncingEmployeeContext, setSyncingEmployeeContext] = useState(false);
 
   const funcionario = selectedEmployeeData;
   const empresa = companies.find(e => e.id === form.companyId);
-  const cliente = clients.find(c => c.id === form.clientId);
+  const selectedWorkPost = workPosts.find((wp) => wp.id === form.workPostId);
+  const cliente = form.clientId ? clients.find((c) => c.id === form.clientId) : undefined;
+
+  /** Exibe cliente da lista ou, enquanto carrega, dados do posto vinculado */
+  const clienteExibicao =
+    cliente ??
+    (selectedWorkPost?.clientName
+      ? {
+          id: selectedWorkPost.clientId || '',
+          name: selectedWorkPost.clientName,
+          cnpj: undefined as string | undefined,
+          address: selectedWorkPost.address,
+        }
+      : null);
+
+  const getTemplateContext = useCallback(
+    (overrides?: Partial<OrdemServicoTemplateContext>): OrdemServicoTemplateContext => {
+      const selectedWorkPost = workPosts.find((wp) => wp.id === form.workPostId);
+      const sectorName =
+        overrides?.sector ??
+        selectedWorkPost?.name ??
+        funcionario?.workPostName ??
+        funcionario?.unitName ??
+        funcionario?.departmentName ??
+        '';
+      return {
+        positionName: overrides?.positionName ?? form.position ?? funcionario?.positionName,
+        companyName: overrides?.companyName ?? empresa?.name,
+        companySigla: overrides?.companySigla ?? empresa?.sigla,
+        sector: sectorName,
+        clientName:
+          overrides?.clientName ??
+          clienteExibicao?.name ??
+          selectedWorkPost?.clientName ??
+          '',
+      };
+    },
+    [form.position, form.workPostId, funcionario, empresa, cliente, workPosts],
+  );
+
+  const applyTemplateForContext = useCallback(
+    (ctx: OrdemServicoTemplateContext, options?: { silent?: boolean }) => {
+      const tpl = findOrdemServicoTemplate(ctx);
+      if (!tpl) {
+        setActiveTemplateLabel(null);
+        return false;
+      }
+      setActiveTemplateLabel(tpl.label);
+      setForm((prev) => ({
+        ...prev,
+        ...applyOrdemServicoTemplate(tpl, prev, { overwrite: true }),
+      }));
+      if (!options?.silent) {
+        toast({
+          title: 'Conteúdo do cargo carregado',
+          description: `PDR aplicado: ${tpl.label}. Você pode editar os campos antes de gerar o PDF.`,
+        });
+      }
+      return true;
+    },
+    [toast],
+  );
 
   useEffect(() => {
     setForm(prev => ({
@@ -100,43 +148,77 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     }));
   }, [employeeId, companyId]);
 
-  // Carregar dados iniciais do funcionário se vier apenas o ID via props
-  useEffect(() => {
-    if (form.employeeId && !selectedEmployeeData) {
-      const fetchEmployee = async () => {
-        try {
-          const emp = await employeeService.getEmployeeById(form.employeeId);
-          if (emp) {
-            setSelectedEmployeeData({
-              id: emp.id,
-              name: emp.name,
-              document: emp.document || emp.cpf,
-              cpf: emp.cpf || emp.document,
-              email: emp.email,
-              phone: emp.phone,
-              registrationNumber: emp.registrationNumber,
-              hireDate: emp.hireDate,
-              rg: emp.rg,
-              positionName: emp.position?.name,
-              unitName: emp.unit?.name,
-              departmentName: emp.department?.name,
-              workPostId: (emp as any).workPostId || emp.workPost?.id,
-              workPostName: (emp as any).workPostName || emp.workPost?.name,
-              companyId: emp.company?.id,
-              companySigla: emp.company?.sigla,
-              address: emp.address,
-              salario: emp.salario,
-              escalaTrabalho: emp.escalaTrabalho,
-              horarioTrabalho: emp.horarioTrabalho,
-            } as SimpleEmployee);
-          }
-        } catch (error) {
-          console.error("Erro ao carregar dados iniciais do funcionário:", error);
-        }
-      };
-      fetchEmployee();
+  const syncEmployeeWorkContext = useCallback(async (empId: string) => {
+    if (!empId) return;
+    setSyncingEmployeeContext(true);
+    try {
+      const full = await employeeService.getEmployeeById(empId);
+      if (!full) return;
+
+      const simple = employeeToSimpleEmployee(full);
+      setSelectedEmployeeData(simple);
+
+      setForm((prev) => {
+        const resolvedCompanyId = simple.companyId || prev.companyId || companyId || '';
+        return { ...prev, companyId: resolvedCompanyId, position: full.position?.name || prev.position };
+      });
+
+      let workPostId = simple.workPostId;
+      const sectorLabel = simple.workPostName || simple.unitName || simple.departmentName;
+      const resolvedCompanyId = simple.companyId || companyId || '';
+
+      if (!workPostId && sectorLabel && resolvedCompanyId) {
+        const posts = await workPostService.getWorkPostsByCompany(resolvedCompanyId);
+        const normalized = sectorLabel.trim().toLowerCase();
+        const match = posts.find((p) => {
+          const name = (p.name || '').trim().toLowerCase();
+          return name === normalized || name.includes(normalized) || normalized.includes(name);
+        });
+        workPostId = match?.id;
+      }
+
+      let wpResolved: Awaited<ReturnType<typeof workPostService.getWorkPostById>> | null = null;
+
+      if (workPostId) {
+        wpResolved = await workPostService.getWorkPostById(workPostId);
+        setForm((prev) => ({
+          ...prev,
+          companyId: simple.companyId || prev.companyId,
+          workPostId: wpResolved!.id,
+          clientId: wpResolved!.clientId || '',
+          location: wpResolved!.address || prev.location,
+          position: full.position?.name || prev.position,
+          hireDate: full.hireDate ? String(full.hireDate).split('T')[0] : prev.hireDate,
+        }));
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          hireDate: full.hireDate ? String(full.hireDate).split('T')[0] : prev.hireDate,
+        }));
+      }
+
+      applyTemplateForContext({
+        positionName: full.position?.name || simple.positionName,
+        companyName: full.company?.name ?? empresa?.name,
+        companySigla: full.company?.sigla,
+        sector:
+          wpResolved?.name ??
+          simple.workPostName ??
+          simple.unitName ??
+          simple.departmentName ??
+          '',
+        clientName: wpResolved?.clientName ?? cliente?.name,
+      });
+    } catch (error) {
+      console.error('Erro ao sincronizar posto/cliente do funcionário:', error);
     }
-  }, [form.employeeId, selectedEmployeeData]);
+  }, [companyId, toast, applyTemplateForContext, empresa?.name, empresa?.sigla, cliente?.name]);
+
+  useEffect(() => {
+    if (form.employeeId) {
+      void syncEmployeeWorkContext(form.employeeId);
+    }
+  }, [form.employeeId, syncEmployeeWorkContext]);
 
   useEffect(() => {
     loadData();
@@ -174,66 +256,120 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     }
   }, [funcionario]);
 
-  // Pre-fill location when client changes & fetch work posts
+  // Pre-fill location when client is resolved
   useEffect(() => {
-    if (cliente && cliente.address) {
+    if (cliente?.address) {
       setForm(prev => ({
         ...prev,
         location: cliente.address || prev.location
       }));
     }
-    if (form.clientId) {
-      const fetchWorkPosts = async () => {
-        setLoadingWorkPosts(true);
-        try {
-          const token = localStorage.getItem('token');
-          const res = await fetch(`/api/work-posts/by-client/${form.clientId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setWorkPosts(data);
-          }
-        } catch (e) {
-          console.error('Erro ao buscar postos:', e);
-        } finally {
-          setLoadingWorkPosts(false);
-        }
-      };
-      fetchWorkPosts();
-    } else {
+  }, [cliente?.id, cliente?.address]);
+
+  // Load work posts by client or company
+  useEffect(() => {
+    if (!form.companyId) {
       setWorkPosts([]);
+      return;
     }
-  }, [form.clientId]);
+
+    let cancelled = false;
+    const fetchWorkPosts = async () => {
+      setLoadingWorkPosts(true);
+      try {
+        const posts = form.clientId
+          ? await workPostService.getWorkPostsByClient(form.clientId)
+          : await workPostService.getWorkPostsByCompany(form.companyId);
+        if (!cancelled) setWorkPosts(posts ?? []);
+      } catch (e) {
+        console.error('Erro ao buscar postos:', e);
+        if (!cancelled) setWorkPosts([]);
+      } finally {
+        if (!cancelled) setLoadingWorkPosts(false);
+      }
+    };
+    fetchWorkPosts();
+    return () => { cancelled = true; };
+  }, [form.companyId, form.clientId]);
+
+  const handleWorkPostChange = (value: string) => {
+    const wp = workPosts.find(w => w.id === value);
+    const clientId = resolveClientIdFromWorkPost(wp) || wp?.clientId || '';
+    setForm(prev => ({
+      ...prev,
+      workPostId: value,
+      clientId,
+      location: wp?.address || prev.location,
+    }));
+    if (funcionario) {
+      setTimeout(() => {
+        applyTemplateForContext(getTemplateContext({ sector: wp?.name, clientName: wp?.clientName }), {
+          silent: true,
+        });
+      }, 0);
+    }
+  };
 
   const handleApplyTemplate = () => {
-    if (!funcionario?.positionName) return;
-    const pos = funcionario.positionName.toUpperCase();
-    
-    // Tenta encontrar um template que corresponda ao cargo do funcionário
-    const templateKey = Object.keys(SAFETY_TEMPLATES).find(k => pos.includes(k));
-    
-    if (templateKey) {
-      const tpl = SAFETY_TEMPLATES[templateKey];
-      setForm(prev => ({
-        ...prev,
-        activities: prev.activities || tpl.activities,
-        risks: prev.risks || tpl.risks,
-        preventiveMeasures: prev.preventiveMeasures || tpl.preventiveMeasures,
-        uniform: prev.uniform || tpl.uniform,
-        mandatoryTrainings: prev.mandatoryTrainings || tpl.mandatoryTrainings
-      }));
+    const ctx = getTemplateContext();
+    if (!applyTemplateForContext(ctx)) {
       toast({
-        title: "Template Aplicado",
-        description: `Dados de segurança para o cargo de ${templateKey} foram carregados.`,
+        title: 'Template não encontrado',
+        description: `Não há PDR configurado para o cargo: ${ctx.positionName || '—'}.`,
+        variant: 'destructive',
       });
-    } else {
-      toast({
-        title: "Template não encontrado",
-        description: `Não há um template padrão configurado para o cargo: ${pos}.`,
-        variant: "destructive"
-      });
+      return;
     }
+    toast({
+      title: 'Template aplicado',
+      description: 'Conteúdo recarregado conforme cargo, empresa e setor.',
+    });
+  };
+
+  const buildOsPayload = async () => {
+    const fullEmployee = await employeeService.getEmployeeById(funcionario!.id);
+    if (!fullEmployee) throw new Error('Funcionário não encontrado');
+
+    const selectedWorkPost = workPosts.find((wp) => wp.id === form.workPostId);
+    const sectorName =
+      selectedWorkPost?.name ||
+      (fullEmployee as any).workPost?.name ||
+      (fullEmployee as any).unit?.name ||
+      (fullEmployee as any).department?.name ||
+      '';
+
+    return {
+      companyId: empresa!.id,
+      employeeId: fullEmployee.id,
+      employeeName: fullEmployee.name,
+      employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
+      employeePosition: fullEmployee.position?.name || form.position || '',
+      sector: sectorName,
+      clientName: cliente!.name,
+      clientAddress: cliente!.address || '',
+      serviceType: form.serviceType || form.responsibility,
+      location: form.location,
+      startDate: form.startDate || null,
+      endDate: form.endDate || null,
+      startTime: form.startTime,
+      endTime: form.endTime,
+      priority: form.priority,
+      status: form.status,
+      description: form.description,
+      observations: form.observations,
+      city: form.city || empresa!.city || 'Contagem',
+      documentDate: form.documentDate || todayIso(),
+      responsibility: form.responsibility,
+      revision: form.revision,
+      hireDate: form.hireDate || fullEmployee.hireDate || null,
+      layoutType: form.layoutType,
+      activities: form.activities,
+      risks: form.risks,
+      preventiveMeasures: form.preventiveMeasures,
+      uniform: form.uniform,
+      mandatoryTrainings: form.mandatoryTrainings,
+      accidentProcedure: form.accidentProcedure,
+    };
   };
 
   const serviceTypes = [
@@ -265,50 +401,19 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
   ];
 
   const handleGenerateOrder = async () => {
-    if (!funcionario || !empresa || !cliente || !form.serviceType || !form.startDate) {
+    if (!funcionario || !empresa || !cliente || !form.activities?.trim()) {
       toast({
         title: 'Atenção',
-        description: 'Preencha os campos obrigatórios (Funcionário, Empresa, Cliente, Tipo, Data Início)!',
-        variant: 'destructive'
+        description:
+          'Preencha funcionário, empresa, posto com cliente e as atividades habituais (NR-01).',
+        variant: 'destructive',
       });
       return;
     }
 
     setLoading(true);
     try {
-      // Buscar dados completos do funcionário
-      const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-      if (!fullEmployee) throw new Error('Funcionário não encontrado');
-
-      const selectedWorkPost = workPosts.find(wp => wp.id === form.workPostId);
-      const sectorName = selectedWorkPost?.name || (fullEmployee as any).workPost?.name || (fullEmployee as any).unit?.name || (fullEmployee as any).department?.name || '';
-
-      const payload = {
-        companyId: empresa.id,
-        employeeName: fullEmployee.name,
-        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
-        employeePosition: fullEmployee.position?.name || '',
-        sector: sectorName,
-        clientName: cliente.name,
-        clientAddress: cliente.address || '',
-        serviceType: form.serviceType,
-        location: form.location,
-        startDate: form.startDate,
-        endDate: form.endDate || null,
-        startTime: form.startTime,
-        endTime: form.endTime,
-        priority: form.priority,
-        status: form.status,
-        description: form.description,
-        observations: form.observations,
-        city: empresa.city || '',
-        documentDate: new Date().toISOString().split('T')[0],
-        activities: form.activities,
-        risks: form.risks,
-        preventiveMeasures: form.preventiveMeasures,
-        uniform: form.uniform,
-        mandatoryTrainings: form.mandatoryTrainings,
-      };
+      const payload = await buildOsPayload();
 
       const response = await api.post('/api/operational-service-order/generate-pdf', payload, {
         responseType: 'blob'
@@ -318,7 +423,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ordem-servico-${fullEmployee.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      a.download = `ordem-servico-${payload.employeeName.replace(/\s+/g, '-').toLowerCase()}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -328,7 +433,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
         title: 'Sucesso',
         description: 'Ordem de Serviço gerada com sucesso!',
       });
-      void refreshEmployeeDocuments(fullEmployee.id);
+      void refreshEmployeeDocuments(payload.employeeId);
     } catch (err: any) {
       console.error('Erro ao gerar OS:', err);
       toast({
@@ -345,45 +450,15 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
     if (!funcionario || !empresa || !cliente) {
       toast({
         title: 'Atenção',
-        description: 'Selecione funcionário, empresa e cliente!',
-        variant: 'destructive'
+        description: 'Selecione funcionário e empresa com posto de trabalho vinculado a um cliente!',
+        variant: 'destructive',
       });
       return;
     }
 
     setLoading(true);
     try {
-      const fullEmployee = await employeeService.getEmployeeById(funcionario.id);
-
-      const selectedWorkPost = workPosts.find(wp => wp.id === form.workPostId);
-      const sectorName = selectedWorkPost?.name || (fullEmployee as any).workPost?.name || (fullEmployee as any).unit?.name || (fullEmployee as any).department?.name || '';
-
-      const payload = {
-        companyId: empresa.id,
-        employeeName: fullEmployee.name,
-        employeeCpf: fullEmployee.cpf || fullEmployee.document || '',
-        employeePosition: fullEmployee.position?.name || '',
-        sector: sectorName,
-        clientName: cliente.name,
-        clientAddress: cliente.address || '',
-        serviceType: form.serviceType,
-        location: form.location,
-        startDate: form.startDate,
-        endDate: form.endDate || null,
-        startTime: form.startTime,
-        endTime: form.endTime,
-        priority: form.priority,
-        status: form.status,
-        description: form.description,
-        observations: form.observations,
-        city: empresa.city || '',
-        documentDate: new Date().toISOString().split('T')[0],
-        activities: form.activities,
-        risks: form.risks,
-        preventiveMeasures: form.preventiveMeasures,
-        uniform: form.uniform,
-        mandatoryTrainings: form.mandatoryTrainings,
-      };
+      const payload = await buildOsPayload();
 
       const response = await api.post('/api/operational-service-order/preview-pdf', payload, {
         responseType: 'blob'
@@ -420,7 +495,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 Emissão de ordem de serviço para execução de atividades.
               </CardDescription>
             </div>
-            {(funcionario && empresa && cliente && form.serviceType) && (
+            {(funcionario && empresa && cliente && form.activities) && (
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1 px-3 py-1">
                 <CheckCircle2 className="h-3 w-3" />
                 Pronto para gerar
@@ -437,7 +512,7 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               <span>Identificação</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-base font-semibold">
                   Empresa
@@ -522,50 +597,6 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label className="text-base font-semibold">
-                  Cliente
-                  <span className="block text-[11px] font-normal text-muted-foreground/80">
-                    Destinatário da prestação de serviço.
-                  </span>
-                </Label>
-                <Select
-                  value={form.clientId}
-                  onValueChange={(value) => setForm(prev => ({ ...prev, clientId: value }))}
-                  disabled={loadingData}
-                >
-                  <SelectTrigger className="h-11 rounded-lg bg-black text-white border border-border/60 shadow-sm hover:bg-black/90 focus:ring-2 focus:ring-primary/30 focus:border-primary/60 [&>span]:text-left [&>span]:truncate">
-                    <SelectValue placeholder={loadingData ? "Carregando..." : "Selecione o cliente"} />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-lg shadow-lg border bg-popover">
-                    {loadingData ? (
-                      <div className="p-2 text-center text-sm text-gray-500">Carregando clientes...</div>
-                    ) : clients.length > 0 ? (
-                      clients.map(c => (
-                        <SelectItem key={c.id} value={c.id} className="py-2.5 cursor-pointer rounded-md">
-                          {c.name}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-center text-sm text-gray-500">Nenhum cliente encontrado</div>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {cliente && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 border border-border/60 lg:col-span-1">
-                  <Building className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-xs font-semibold text-foreground">
-                    {cliente.name}
-                  </span>
-                  {cliente.cnpj && (
-                    <span className="text-[11px] text-muted-foreground">
-                      · CNPJ: {formatCNPJ(cliente.cnpj)}
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
@@ -614,17 +645,17 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                       {(funcionario as any).workPostName || funcionario.unitName || (funcionario as any).departmentName || '-'}
                     </div>
                   </div>
-                  {workPosts.length > 0 && (
+                  {(workPosts.length > 0 || loadingWorkPosts) && (
                     <div className="space-y-1.5 mt-3">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor de Trabalho (Cliente)</Label>
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Setor de Trabalho</Label>
                       <SearchableSelect
                         options={workPosts.map((wp: any) => ({
                           value: wp.id,
-                          label: wp.name,
+                          label: wp.clientName ? `${wp.name} (${wp.clientName})` : wp.name,
                           description: wp.address || ''
                         }))}
                         value={form.workPostId}
-                        onChange={(value) => setForm(prev => ({ ...prev, workPostId: value }))}
+                        onChange={handleWorkPostChange}
                         disabled={loadingWorkPosts}
                         placeholder={loadingWorkPosts ? 'Carregando...' : 'Selecione o setor'}
                         searchPlaceholder="Buscar setor..."
@@ -635,8 +666,8 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               </div>
             )}
 
-            {/* Informações do Cliente (Read-only) */}
-            {cliente && (
+            {/* Cliente derivado do posto de trabalho */}
+            {funcionario && (
               <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300 delay-100">
                 <div className="flex items-center justify-between border-b pb-2">
                   <div className="flex items-center gap-2 font-medium">
@@ -644,20 +675,37 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                     Dados do Cliente
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social / Nome</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {cliente.name}
+                {syncingEmployeeContext ? (
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando posto e cliente do funcionário…
+                  </p>
+                ) : clienteExibicao ? (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Razão Social / Nome</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {clienteExibicao.name}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">CNPJ</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {clienteExibicao.cnpj ? formatCNPJ(clienteExibicao.cnpj) : '-'}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
+                      <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
+                        {clienteExibicao.address || '-'}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Endereço</Label>
-                    <div className="p-2.5 bg-muted rounded-md text-sm font-medium border border-transparent hover:border-border transition-colors truncate">
-                      {cliente.address || '-'}
-                    </div>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Não foi possível identificar o cliente. Verifique se o funcionário possui posto de trabalho vinculado.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -852,7 +900,11 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
               </div>
 
               <div className="space-y-2">
-                <Label>Uniforme de Uso Obrigatório</Label>
+                <Label>
+                  {form.layoutType === 'BOMBEIRO_CIVIL'
+                    ? "EPI's / EPC's de Uso Obrigatório"
+                    : 'Uniforme de Uso Obrigatório'}
+                </Label>
                 <Textarea
                   value={form.uniform}
                   onChange={(e) => setForm(prev => ({ ...prev, uniform: e.target.value }))}
@@ -861,6 +913,19 @@ const OrdemServicosForm: React.FC<OrdemServicosFormProps> = ({ employeeId, compa
                   className="bg-background resize-none"
                 />
               </div>
+
+              {form.layoutType === 'BOMBEIRO_CIVIL' && (
+                <div className="space-y-2">
+                  <Label>Procedimento em Caso de Acidentes</Label>
+                  <Textarea
+                    value={form.accidentProcedure}
+                    onChange={(e) => setForm((prev) => ({ ...prev, accidentProcedure: e.target.value }))}
+                    placeholder="Passos em caso de acidente..."
+                    rows={4}
+                    className="bg-background resize-none"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Treinamentos Obrigatórios</Label>

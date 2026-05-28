@@ -92,10 +92,21 @@ public class EmailCampaignService {
     }
 
     private void attachRecipientFromDto(EmailCampaign campaign, EmailCampaignRecipientDto dto) {
+        if (dto == null || dto.email() == null || dto.email().isBlank()) {
+            return;
+        }
+        String email = dto.email().trim();
+        if (!looksLikeEmail(email)) {
+            return;
+        }
+        String name = dto.name();
+        if (name != null && name.length() > 500) {
+            name = name.substring(0, 500);
+        }
         EmailCampaignRecipient r = EmailCampaignRecipient.builder()
                 .campaign(campaign)
-                .email(dto.email().trim())
-                .name(dto.name())
+                .email(email)
+                .name(name)
                 .metadata(dto.metadata() != null ? new HashMap<>(dto.metadata()) : new HashMap<>())
                 .build();
         if (dto.sourceType() != null && !dto.sourceType().isBlank()) {
@@ -133,6 +144,12 @@ public class EmailCampaignService {
                 .map(r -> r.getEmail().toLowerCase())
                 .collect(Collectors.toSet());
         for (EmailCampaignRecipientDto dto : dtos) {
+            if (dto == null || dto.email() == null || dto.email().isBlank()) {
+                continue;
+            }
+            if (!looksLikeEmail(dto.email().trim())) {
+                continue;
+            }
             String key = dto.email().trim().toLowerCase();
             if (seen.contains(key)) {
                 continue;
@@ -447,5 +464,9 @@ public class EmailCampaignService {
         Map<String, Long> counts = emailLogRepository.findByCampaign_IdOrderByCreatedAtDesc(campaignId).stream()
                 .collect(Collectors.groupingBy(l -> l.getStatus().name(), Collectors.counting()));
         return new EmailCampaignMetricsDto(campaignId, counts);
+    }
+
+    private static boolean looksLikeEmail(String value) {
+        return value != null && value.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 }

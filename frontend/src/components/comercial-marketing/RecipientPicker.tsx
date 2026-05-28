@@ -27,6 +27,15 @@ import {
 
 type Mode = 'leads' | 'import' | 'manual';
 
+/** Extrai cidade/UF gravadas na importação de marketing (campo notes do CRM). */
+function parseLeadNotesMeta(notes?: string): { city?: string; state?: string; companyType?: string } {
+  if (!notes?.trim()) return {};
+  const city = notes.match(/Cidade:\s*([^|]+)/i)?.[1]?.trim();
+  const state = notes.match(/UF:\s*([^|]+)/i)?.[1]?.trim();
+  const companyType = notes.match(/Tipo empresa:\s*([^|]+)/i)?.[1]?.trim();
+  return { city, state, companyType };
+}
+
 export interface RecipientPickerProps {
   value: EmailCampaignRecipientInput[];
   onChange: (recipients: EmailCampaignRecipientInput[]) => void;
@@ -146,6 +155,7 @@ function LeadsPickerPane({ value, onChange, darkTabs, advancedLeadFilters }: Lea
     if (exists) {
       onChange(value.filter((r) => r.leadId !== id && r.email !== lead.email.toLowerCase()));
     } else {
+      const notesMeta = parseLeadNotesMeta(lead.notes);
       onChange([
         ...value,
         {
@@ -158,6 +168,9 @@ function LeadsPickerPane({ value, onChange, darkTabs, advancedLeadFilters }: Lea
             position: lead.position,
             phone: lead.phone,
             segment: lead.source,
+            city: notesMeta.city,
+            state: notesMeta.state,
+            companyType: notesMeta.companyType,
           },
         },
       ]);
@@ -167,13 +180,24 @@ function LeadsPickerPane({ value, onChange, darkTabs, advancedLeadFilters }: Lea
   const selectAll = () => {
     const adds = filtered
       .filter((l) => l.email && !selectedIds.has(String(l.id)))
-      .map<EmailCampaignRecipientInput>((l) => ({
-        email: l.email.toLowerCase(),
-        name: l.name,
-        leadId: String(l.id),
-        sourceType: 'LEAD',
-        metadata: { company: l.company, position: l.position, phone: l.phone, segment: l.source },
-      }));
+      .map<EmailCampaignRecipientInput>((l) => {
+        const notesMeta = parseLeadNotesMeta(l.notes);
+        return {
+          email: l.email.toLowerCase(),
+          name: l.name,
+          leadId: String(l.id),
+          sourceType: 'LEAD',
+          metadata: {
+            company: l.company,
+            position: l.position,
+            phone: l.phone,
+            segment: l.source,
+            city: notesMeta.city,
+            state: notesMeta.state,
+            companyType: notesMeta.companyType,
+          },
+        };
+      });
     onChange([...value, ...adds]);
   };
 

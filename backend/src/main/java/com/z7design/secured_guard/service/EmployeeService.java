@@ -1063,6 +1063,7 @@ public class EmployeeService {
                             .unitName(emp.getUnit() != null ? emp.getUnit().getName() : null)
                             .departmentName(emp.getDepartment() != null ? emp.getDepartment().getName() : null)
                             .workPostName(emp.getWorkPost() != null ? emp.getWorkPost().getName() : null)
+                            .workPostId(emp.getWorkPost() != null ? emp.getWorkPost().getId() : null)
                             .companyId(emp.getCompany() != null ? emp.getCompany().getId() : null)
                             .companySigla(emp.getCompany() != null ? emp.getCompany().getSigla() : null)
                             .salario(emp.getSalario())

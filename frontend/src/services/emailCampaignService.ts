@@ -215,7 +215,12 @@ class EmailCampaignService {
 
   /** Acrescenta destinatários a uma campanha em rascunho (dedupe no servidor). */
   async appendRecipients(campaignId: string, recipients: EmailCampaignRecipientInput[]): Promise<void> {
-    await api.put(`/api/v1/email-campaigns/${campaignId}/recipients`, { recipients });
+    const payload = recipients.map(({ email, name, metadata, sourceType, leadId }) => {
+      const row: EmailCampaignRecipientInput = { email, name, metadata, sourceType };
+      if (leadId) row.leadId = leadId;
+      return row;
+    });
+    await api.put(`/api/v1/email-campaigns/${campaignId}/recipients`, { recipients: payload });
   }
 }
 

@@ -15,13 +15,25 @@ import {
 
 const CITIES_PER_PAGE = 50;
 
+export interface SelectedCityBatch {
+  cityLabel: string;
+  recipients: EmailCampaignRecipientInput[];
+}
+
 export interface RecipientListGroupedProps {
   recipients: EmailCampaignRecipientInput[];
   onRemove: (email: string) => void;
   dark?: boolean;
+  /** Dispara quando a cidade selecionada no painel esquerdo muda (lote para campanha). */
+  onSelectedCityChange?: (batch: SelectedCityBatch | null) => void;
 }
 
-export function RecipientListGrouped({ recipients, onRemove, dark }: RecipientListGroupedProps) {
+export function RecipientListGrouped({
+  recipients,
+  onRemove,
+  dark,
+  onSelectedCityChange,
+}: RecipientListGroupedProps) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
@@ -98,6 +110,18 @@ export function RecipientListGrouped({ recipients, onRemove, dark }: RecipientLi
     });
   }, [selectedGroup, emailFilter]);
 
+  useEffect(() => {
+    if (!onSelectedCityChange) return;
+    if (!selectedGroup) {
+      onSelectedCityChange(null);
+      return;
+    }
+    onSelectedCityChange({
+      cityLabel: selectedGroup.label,
+      recipients: selectedGroup.items,
+    });
+  }, [selectedGroup, onSelectedCityChange]);
+
   if (recipients.length === 0) return null;
 
   const fieldClass = dark ? 'border-white/10 bg-seguranca-graphite/50 text-slate-100' : '';
@@ -156,6 +180,10 @@ export function RecipientListGrouped({ recipients, onRemove, dark }: RecipientLi
                         onClick={() => {
                           setSelectedCity(group.label);
                           setEmailFilter('');
+                          onSelectedCityChange?.({
+                            cityLabel: group.label,
+                            recipients: group.items,
+                          });
                         }}
                         className={cn(
                           'w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors',

@@ -1,0 +1,368 @@
+/**
+ * Templates NR-01 por cargo para Ordem de Serviço.
+ * Conteúdo pré-preenchido conforme PDR da empresa; editável no formulário antes de gerar o PDF.
+ */
+
+export type OsLayoutType = 'STANDARD_NR01' | 'BOMBEIRO_CIVIL';
+
+export interface OrdemServicoSafetyTemplate {
+  id: string;
+  layoutType: OsLayoutType;
+  /** Palavras-chave no nome do cargo (match genérico) */
+  matchKeywords: string[];
+  label: string;
+  responsibility?: string;
+  activities: string;
+  risks: string;
+  preventiveMeasures: string;
+  uniform: string;
+  mandatoryTrainings: string;
+  accidentProcedure?: string;
+}
+
+export interface OrdemServicoTemplateContext {
+  positionName?: string | null;
+  companyName?: string | null;
+  companySigla?: string | null;
+  sector?: string | null;
+  clientName?: string | null;
+}
+
+const NR01_TRAININGS =
+  "- Treinamento de Ambientação de Segurança do Trabalho. (SIM)\n- DSS – Diálogo de Segurança e Saúde Ocupacional.\n- Treinamento sobre aspectos legais e técnicos no uso e conservação de EPI's.";
+
+const NR01_PREVENTIVE = '- Adoção de medidas de proteção em ordem: coletivas e individuais.';
+
+/** Templates com regra de empresa/setor (prioridade sobre match só por cargo) */
+const CONTEXTUAL_TEMPLATES: Record<string, OrdemServicoSafetyTemplate> = {
+  'vigia-csn': {
+    id: 'vigia-csn',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: [],
+    label: 'Vigia (CSN)',
+    activities:
+      'Fiscalizar, observar e orientar a entrada e saída de pessoas, receber, identificar e encaminhar as pessoas aos destinatários. Abrir e fechar as dependências de prédios. Receber a correspondência e encaminhá-la ao protocolo. Atender e efetuar ligação telefônica.',
+    risks: 'Riscos Ergonômicos: Postura inadequada.\nRiscos Mecânico: Queda do mesmo nível.',
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform:
+      '- Calçado de segurança.\n- Uniforme completo (Calça, camisa, blusa, cinto).\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  'vigia-aterpa': {
+    id: 'vigia-aterpa',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: [],
+    label: 'Vigia (ATERPA)',
+    activities:
+      'Fiscalizar, observar e orientar a entrada e saída de pessoas, receber, identificar e encaminhar as pessoas aos destinatários. Abrir e fechar as dependências de prédios. Receber a correspondência e encaminhá-la ao protocolo. Atender e efetuar ligação telefônica.',
+    risks: 'Riscos Ergonômicos: Postura inadequada.\nRiscos Mecânico: Queda do mesmo nível.',
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform:
+      '- Calçado de segurança.\n- Uniforme completo (Calça, camisa, blusa, cinto).\n- Colete refletivo.\n- Protetor auricular.\n- Óculos de segurança.\n- Capacete com jugular.\n- Perneira.\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  vigia: {
+    id: 'vigia',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: [],
+    label: 'Vigia',
+    activities:
+      'Fiscalizar, observar e orientar a entrada e saída de pessoas, receber, identificar e encaminhar as pessoas aos destinatários. Abrir e fechar as dependências de prédios. Receber a correspondência e encaminhá-la ao protocolo. Atender e efetuar ligação telefônica.',
+    risks: 'Riscos Ergonômicos: Postura inadequada.\nRiscos Mecânico: Queda do mesmo nível.',
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform:
+      '- Calçado de segurança.\n- Uniforme completo (Calça, camisa, blusa, cinto).\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  porteiro: {
+    id: 'porteiro',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: [],
+    label: 'Porteiro',
+    activities:
+      'Observar e orientar a entrada e saída de pessoas, receber, identificar e encaminhar as pessoas aos destinatários. Abrir e fechar as dependências de prédios. Receber a correspondência e encaminhá-la ao protocolo. Atender e efetuar ligação telefônica.',
+    risks: `Riscos Físico: Ruído; Radiação não-ionizante.
+Riscos Ergonômico: Postura inadequada; Trabalho em pé; Monotonia.
+Riscos Mecânico: Agressão; Queda do mesmo nível; Animais peçonhentos; Batidas-contra.
+Riscos Biológico: Não evidenciado.`,
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform:
+      '- Calçado de segurança.\n- Uniforme completo (Calça, camisa, blusa, cinto).\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  zelador: {
+    id: 'zelador',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: [],
+    label: 'Zelador',
+    activities:
+      'Realizar inspeções nas instalações do prédio, como em pátios, corredores e áreas comuns, a fim de verificar itens que precisam de reparos ou limpeza. Fazer pequenos reparos, além de observar as condições de funcionamento da parte elétrica e hidráulica, elevadores, entre outros.',
+    risks: `Riscos Ergonômicos: Postura inadequada.
+Riscos Mecânico: Batidas-contra; Queda do mesmo nível.
+Riscos Físicos: Radiações não-ionizantes.`,
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform:
+      '- Calçado de segurança.\n- Uniforme completo.\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  'auxiliar-administrativo': {
+    id: 'auxiliar-administrativo',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: [],
+    label: 'Auxiliar Administrativo',
+    activities:
+      'Atendimento telefônico interno, controle de chaves, distribuição de correspondências, arquivo e rotinas administrativas.',
+    risks: 'Riscos Ergonômicos: Postura inadequada.',
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform: '- Calçado de segurança. (NA)\n- Uniforme completo.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+};
+
+export const OS_SAFETY_TEMPLATES: OrdemServicoSafetyTemplate[] = [
+  {
+    id: 'bombeiro-civil',
+    layoutType: 'BOMBEIRO_CIVIL',
+    matchKeywords: ['BOMBEIRO CIVIL', 'BOMBEIRO'],
+    label: 'Bombeiro Civil',
+    activities: `Avaliar os riscos através de inspeções e sugerir ações preventivas.
+Inspecionar equipamentos de combate a incêndio (mangueiras, extintores, alarmes, bombas).
+Testar sistemas de combate a incêndio.
+Verificar rotas de fuga e sinalização de emergência.
+Simular cenários de incêndio e evacuação.
+Atuar de forma corretiva quando identificadas falhas.`,
+    risks: `Físico: Temperaturas extremas (calor), Ruído, Radiação não ionizante.
+Químico: Fumos (fumaça tóxica e gases de combustão), Gases e vapores, Líquidos inflamáveis (butano, propano).
+Ergonômicos: Postura inadequada, Trabalho em pé/caminhando, Transporte manual de peso.
+Mecânico/Acidente: Quedas (mesmo nível ou desnível), Perfurações/cortes, Projeção de materiais, Layout físico inadequado, Choque elétrico, Incêndio e explosão.`,
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform: `Capacete de combate a incêndio com viseira; Balaclava ignifuga; Óculos de segurança; Máscara facial para fumaça/gases; SCBA (autocontido); Filtros para gases tóxicos; Protetor auricular.
+Luvas ignífugas e resistentes a cortes; Luvas de borracha para produtos químicos; Uniforme ignífugo (jaqueta e calça); Colete refletivo; Botas de segurança antiderrapantes ignífugas; Cinto de segurança tipo paraquedista; Lanterna portátil resistente; Rádio comunicador.`,
+    mandatoryTrainings: `Treinamento de Ambientação de Segurança do Trabalho.
+Adoção de medidas de proteção em ordem: coletivas e individuais.`,
+    accidentProcedure: `1. Comunicar imediatamente ao Supervisor.
+2. Encaminhar o acidentado ao Ambulatório Médico.
+3. Preservar o local do acidente.
+4. Acionar o Ambulatório Médico (telefone 192).
+5. Comunicar ao Presidente da CIPA.`,
+  },
+  {
+    id: 'auxiliar-almoxarifado',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['AUXILIAR DE ALMOXARIFADO', 'ALMOXARIFADO'],
+    label: 'Auxiliar de Almoxarifado',
+    activities:
+      'Controla a movimentação de mercadorias em almoxarifado, recebendo, conferindo, armazenando e expedindo materiais, equipamentos e outros itens.',
+    risks: 'Riscos Ergonômicos: Postura inadequada.\nRiscos Mecânico: Queda do mesmo nível.',
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform: '- Calçado de segurança.\n- Uniforme completo.\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  {
+    id: 'auxiliar-servicos-gerais',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['AUXILIAR DE SERVIÇOS GERAIS', 'SERVIÇOS GERAIS', 'ASG'],
+    label: 'Auxiliar de Serviços Gerais',
+    responsibility: 'HIGIENIZAÇÃO E CONSERVAÇÃO DO LOCAL',
+    activities:
+      'Higienização e conservação do local (varrer o chão, limpar banheiros, remover o lixo), controle de materiais, organização do ambiente.',
+    risks: `Riscos Ergonômicos: Postura inadequada.
+Riscos Químicos: Hipoclorito de sódio.
+Riscos Biológicos: Micro-organismos patogênicos.
+Riscos Mecânico: Queda de mesmo nível.
+Riscos Mecânico: Batidas-contra.
+Riscos Físico: Não evidenciado.`,
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform:
+      '- Calçado de segurança. (NA)\n- Luva de Látex\n- Protetor auricular\n- Óculos',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  {
+    id: 'encarregada-limpeza',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['ENCARREGADA DE LIMPEZA', 'ENCARREGADO DE LIMPEZA'],
+    label: 'Encarregado(a) de Limpeza',
+    responsibility: 'HIGIENIZAÇÃO E CONSERVAÇÃO DO LOCAL',
+    activities:
+      'Responsável por zelar pela qualidade dos serviços de limpeza, cumprindo frequência, uso correto e econômico de equipamentos e materiais, e armazenamento adequado.',
+    risks: `Riscos Ergonômicos: Postura inadequada.
+Riscos Químicos: Hipoclorito de sódio.
+Riscos Biológicos: Micro-organismos patogênicos.
+Risco Mecânico: Queda de mesmo nível e Batidas-contra.
+Risco Físico: Não evidenciado.`,
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform: '- Calçado de segurança. (NA)\n- Uniforme completo.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  {
+    id: 'auxiliar-limpeza',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['AUXILIAR DE LIMPEZA'],
+    label: 'Auxiliar de Limpeza',
+    responsibility: 'HIGIENIZAÇÃO E CONSERVAÇÃO DO LOCAL',
+    activities:
+      'Realizar a limpeza e conservação das dependências do cliente. Varrer, lavar, encerar, limpar vidros e janelas, recolher o lixo e repor materiais de higiene.',
+    risks: `Riscos Químicos: Manuseio de produtos de limpeza.
+Riscos Ergonômicos: Movimentos repetitivos.
+Riscos de Acidentes: Quedas em piso escorregadio.`,
+    preventiveMeasures:
+      '- Uso de EPIs adequados (luvas, botas de borracha, óculos).\n- Sinalização de piso molhado.\n- Diluição correta de produtos químicos.',
+    uniform: '- Uniforme padrão de limpeza.\n- Bota de borracha / calçado fechado antiderrapante.',
+    mandatoryTrainings:
+      '- Treinamento de manuseio de produtos químicos (FISPQ).\n- Uso e conservação de EPIs.\n- NR-32 (se aplicável a ambiente hospitalar).\n- DSS Semanal.',
+  },
+  {
+    id: 'jardineiro',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['JARDINEIRO', 'JARDINAGEM'],
+    label: 'Jardineiro',
+    activities: `Preparar, conservar e limpar jardins, compreendendo: capina, corte, replantio, adubação periódica, irrigação, varredura, pulverização simples e polvilhamento. Preparar as sementes. Fazer a repicagem e o transplante das mudas, incluindo desmate, transporte e embalagem. Requisitar o material necessário ao trabalho.`,
+    risks: 'Riscos Ergonômicos: Postura inadequada.\nRiscos Mecânico: Queda do mesmo nível.',
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform: '- Calçado de segurança.\n- Uniforme completo.\n- Crachá de identificação.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  {
+    id: 'recepcionista',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['RECEPCIONISTA'],
+    label: 'Recepcionista',
+    activities:
+      'Recepcionar membros da comunidade e visitantes, identificá-los, averiguar pretensões, prestar informações e/ou encaminhá-los. Atender chamadas telefônicas, anotar recados e prestar informações.',
+    risks: 'Riscos Ergonômicos: Postura inadequada.',
+    preventiveMeasures: NR01_PREVENTIVE,
+    uniform: '- Uniforme completo.',
+    mandatoryTrainings: NR01_TRAININGS,
+  },
+  {
+    id: 'vigilante',
+    layoutType: 'STANDARD_NR01',
+    matchKeywords: ['VIGILANTE', 'VIGILÂNCIA'],
+    label: 'Vigilante',
+    responsibility: 'VIGILÂNCIA PATRIMONIAL',
+    activities:
+      'Garantir a segurança patrimonial e física do local, realizando rondas, controle de acesso e monitoramento. Agir preventivamente e de forma repressiva quando necessário, conforme a legislação.',
+    risks:
+      'Riscos de Acidentes: Violência, assaltos.\nRiscos Ergonômicos: Postura prolongada.\nRiscos Físicos: Exposição a intempéries.',
+    preventiveMeasures:
+      '- Uso de colete balístico (se aplicável).\n- Atenção contínua e protocolos de segurança.\n- Adoção de medidas de proteção coletivas e individuais.',
+    uniform: '- Uniforme tático/padrão completo.\n- Calçado de segurança.',
+    mandatoryTrainings:
+      '- Reciclagem de Vigilante (obrigatório PF)\n- Treinamento de Ambientação de Segurança do Trabalho\n- Uso Progressivo da Força\n- Defesa Pessoal e Armamento (se aplicável)',
+  },
+];
+
+const normalizeText = (value: string) =>
+  value
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+function buildContextHaystack(ctx: OrdemServicoTemplateContext): string {
+  return normalizeText(
+    [ctx.companyName, ctx.companySigla, ctx.sector, ctx.clientName].filter(Boolean).join(' '),
+  );
+}
+
+function isVigiaCargo(positionNorm: string): boolean {
+  if (positionNorm.includes('VIGILANTE') || positionNorm.includes('VIGILANCIA')) {
+    return false;
+  }
+  return /\bVIGIA\b/.test(positionNorm) || positionNorm.includes('VIGIA ');
+}
+
+function isPorteiroCargo(positionNorm: string): boolean {
+  return positionNorm.includes('PORTEIRO') || positionNorm.includes('PORTARIA');
+}
+
+function resolveContextualTemplate(ctx: OrdemServicoTemplateContext): OrdemServicoSafetyTemplate | null {
+  const pos = normalizeText(ctx.positionName || '');
+  if (!pos) return null;
+
+  const haystack = buildContextHaystack(ctx);
+
+  if (isPorteiroCargo(pos)) {
+    return CONTEXTUAL_TEMPLATES.porteiro;
+  }
+
+  if (pos.includes('ZELADOR')) {
+    return CONTEXTUAL_TEMPLATES.zelador;
+  }
+
+  if (pos.includes('AUXILIAR ADMINISTRATIVO') || pos.includes('AUX ADMINISTRATIVO')) {
+    return CONTEXTUAL_TEMPLATES['auxiliar-administrativo'];
+  }
+
+  if (isVigiaCargo(pos)) {
+    if (haystack.includes('ATERPA')) {
+      return CONTEXTUAL_TEMPLATES['vigia-aterpa'];
+    }
+    if (haystack.includes('CSN')) {
+      return CONTEXTUAL_TEMPLATES['vigia-csn'];
+    }
+    return CONTEXTUAL_TEMPLATES.vigia;
+  }
+
+  return null;
+}
+
+/** Retorna o template mais adequado (cargo + empresa/setor quando aplicável). */
+export function findOrdemServicoTemplate(
+  positionOrContext?: string | OrdemServicoTemplateContext | null,
+): OrdemServicoSafetyTemplate | null {
+  const ctx: OrdemServicoTemplateContext =
+    typeof positionOrContext === 'string' || positionOrContext == null
+      ? { positionName: positionOrContext }
+      : positionOrContext;
+
+  const contextual = resolveContextualTemplate(ctx);
+  if (contextual) return contextual;
+
+  const pos = normalizeText(ctx.positionName || '');
+  if (!pos) return null;
+
+  let best: OrdemServicoSafetyTemplate | null = null;
+  let bestLen = 0;
+  for (const tpl of OS_SAFETY_TEMPLATES) {
+    for (const kw of tpl.matchKeywords) {
+      const key = normalizeText(kw);
+      if (pos.includes(key) && key.length > bestLen) {
+        best = tpl;
+        bestLen = key.length;
+      }
+    }
+  }
+  return best;
+}
+
+export function applyOrdemServicoTemplate(
+  tpl: OrdemServicoSafetyTemplate,
+  current: {
+    responsibility?: string;
+    activities?: string;
+    risks?: string;
+    preventiveMeasures?: string;
+    uniform?: string;
+    mandatoryTrainings?: string;
+    accidentProcedure?: string;
+    layoutType?: string;
+  },
+  options?: { overwrite?: boolean },
+): typeof current {
+  const overwrite = options?.overwrite ?? true;
+  const pick = (next: string, prev?: string) => (overwrite || !prev?.trim() ? next : prev);
+  return {
+    layoutType: tpl.layoutType,
+    responsibility: tpl.responsibility
+      ? pick(tpl.responsibility, current.responsibility)
+      : current.responsibility,
+    activities: pick(tpl.activities, current.activities),
+    risks: pick(tpl.risks, current.risks),
+    preventiveMeasures: pick(tpl.preventiveMeasures, current.preventiveMeasures),
+    uniform: pick(tpl.uniform, current.uniform),
+    mandatoryTrainings: pick(tpl.mandatoryTrainings, current.mandatoryTrainings),
+    accidentProcedure: tpl.accidentProcedure
+      ? pick(tpl.accidentProcedure, current.accidentProcedure)
+      : current.accidentProcedure,
+  };
+}

@@ -64,6 +64,24 @@ export interface LeadSourceStats {
   OTHER: number;
 }
 
+export interface LeadImportItem {
+  email: string;
+  name?: string;
+  company?: string;
+  position?: string;
+  phone?: string;
+  city?: string;
+  state?: string;
+  companyType?: string;
+}
+
+export interface LeadBulkImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  leads: { id: string; email: string }[];
+}
+
 class LeadService {
   async getAllLeads(): Promise<Lead[]> {
     const response = await api.get('/api/leads/all');
@@ -82,6 +100,12 @@ class LeadService {
 
   async createLead(leadData: CreateLeadRequest): Promise<Lead> {
     const response = await api.post('/api/leads', leadData);
+    return response.data;
+  }
+
+  /** Upsert de leads importados de planilha (máx. 2000 por requisição). */
+  async bulkImportFromMarketing(items: LeadImportItem[]): Promise<LeadBulkImportResult> {
+    const response = await api.post<LeadBulkImportResult>('/api/leads/import', { items });
     return response.data;
   }
 
