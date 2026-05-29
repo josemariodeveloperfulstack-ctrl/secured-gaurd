@@ -529,34 +529,61 @@ const Operacional: React.FC = () => {
     setShowEscalaModal(true);
   };
 
-  const handleMarkNotificationAsRead = (id: string) => {
-    setNotificacoes(prev =>
-      prev.map(notif =>
-        notif.id === id ? { ...notif, lida: true } : notif
-      )
-    );
-    toast({
-      title: 'Notificação marcada como lida',
-      description: 'A notificação foi marcada como lida.',
-    });
+  const handleMarkNotificationAsRead = async (id: string) => {
+    try {
+      await notificationService.markAsRead(id);
+      setNotificacoes(prev =>
+        prev.map(notif =>
+          notif.id === id ? { ...notif, lida: true } : notif
+        )
+      );
+      toast({
+        title: 'Notificação marcada como lida',
+        description: 'A notificação foi marcada como lida.',
+      });
+    } catch {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível marcar a notificação como lida.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleMarkAllNotificationsAsRead = () => {
-    setNotificacoes(prev =>
-      prev.map(notif => ({ ...notif, lida: true }))
-    );
-    toast({
-      title: 'Todas as notificações marcadas como lidas',
-      description: 'Todas as notificações foram marcadas como lidas.',
-    });
+  const handleMarkAllNotificationsAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead(notificacoes);
+      setNotificacoes(prev =>
+        prev.map(notif => ({ ...notif, lida: true }))
+      );
+      toast({
+        title: 'Todas as notificações marcadas como lidas',
+        description: 'Todas as notificações foram marcadas como lidas.',
+      });
+    } catch {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível marcar todas as notificações como lidas.',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleDeleteNotification = (id: string) => {
-    setNotificacoes(prev => prev.filter(notif => notif.id !== id));
-    toast({
-      title: 'Notificação excluída',
-      description: 'A notificação foi excluída com sucesso.',
-    });
+  const handleDeleteNotification = async (id: string) => {
+    try {
+      await notificationService.deleteNotification(id);
+      setNotificacoes(prev => prev.filter(notif => notif.id !== id));
+      toast({
+        title: 'Notificação excluída',
+        description: 'A notificação foi excluída com sucesso.',
+      });
+    } catch {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir a notificação.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleEditOcorrencia = (ocorrencia: Occurrence) => {

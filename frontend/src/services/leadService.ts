@@ -105,7 +105,7 @@ class LeadService {
 
   /** Upsert de leads importados de planilha (máx. 2000 por requisição). */
   async bulkImportFromMarketing(items: LeadImportItem[]): Promise<LeadBulkImportResult> {
-    const response = await api.post<LeadBulkImportResult>('/api/leads/import', { items });
+    const response = await api.post<LeadBulkImportResult>('/leads/import', { items });
     return response.data;
   }
 

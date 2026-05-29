@@ -35,9 +35,15 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     // Buscar leads por email
     List<Lead> findByEmailContainingIgnoreCase(String email);
 
-    // Buscar primeiro Lead por email exato (ignorando case)
-    @Query("SELECT l FROM Lead l WHERE lower(l.email) = lower(:email) ORDER BY l.createdAt DESC")
+    // Buscar primeiro Lead ativo por email exato (ignorando case)
+    @Query("SELECT l FROM Lead l WHERE l.isDeleted = false AND lower(l.email) = lower(:email) ORDER BY l.createdAt DESC")
     java.util.Optional<Lead> findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(@Param("email") String email);
+
+    /** Inclui soft-deleted — usado na importação marketing para reativar em vez de duplicar. */
+    @Query(
+            value = "SELECT * FROM leads l WHERE lower(l.email) = lower(:email) ORDER BY l.created_at DESC LIMIT 1",
+            nativeQuery = true)
+    java.util.Optional<Lead> findTopByEmailIncludingDeleted(@Param("email") String email);
     
     // Buscar leads por nome
     List<Lead> findByNameContainingIgnoreCase(String name);

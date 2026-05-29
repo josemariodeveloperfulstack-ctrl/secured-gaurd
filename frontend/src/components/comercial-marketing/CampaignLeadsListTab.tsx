@@ -131,12 +131,15 @@ const CampaignLeadsListTab: React.FC = () => {
       } catch (e) {
         console.error('Erro ao gravar leads no CRM:', e);
         setRecipients(sanitized);
+        const axiosErr = e as { response?: { data?: { message?: string } } };
+        const apiMsg = axiosErr.response?.data?.message;
         toast({
           title: 'Lista importada, mas CRM não atualizado',
           description:
-            e instanceof Error
+            apiMsg ||
+            (e instanceof Error
               ? e.message
-              : 'Os contatos estão na lista local; tente importar novamente ou verifique a conexão.',
+              : 'Os contatos estão na lista local; tente importar novamente ou verifique a conexão.'),
           variant: 'destructive',
         });
       } finally {
@@ -176,9 +179,7 @@ const CampaignLeadsListTab: React.FC = () => {
           description: `${unsubscribed.length} e-mail(is) descadastrado(s) foram excluídos da seleção.`,
         });
       }
-      const rejected = await emailCampaignService.checkRejected(
-        afterOptOut.map((r) => r.email)
-      );
+      const rejected = await emailCampaignService.checkRejected(added.map((r) => r.email));
       let afterFilters = afterOptOut;
       if (rejected.length > 0) {
         const blockRejected = new Set(rejected.map((e) => e.toLowerCase()));

@@ -211,7 +211,7 @@ const Frota: React.FC<FrotaProps> = ({ embedded = false }) => {
     // Carregar dados da empresa para o layout premium
     const fetchCompany = async () => {
       try {
-        const companies = await companyService.getCompanies();
+        const companies = await companyService.getAllCompanies();
         if (companies && companies.length > 0) {
           setEmpresa(companies[0]);
         }

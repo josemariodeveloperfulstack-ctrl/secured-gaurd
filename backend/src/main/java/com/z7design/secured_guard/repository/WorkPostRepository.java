@@ -111,9 +111,9 @@ public interface WorkPostRepository extends JpaRepository<WorkPost, java.util.UU
     @Query("SELECT wp FROM WorkPost wp")
     List<WorkPost> findAllWithRelationships();
 
-    // Buscar postos que possuem funcionários de uma empresa específica
-    @Query("SELECT DISTINCT e.workPost FROM Employee e WHERE e.company.id = :companyId AND e.workPost IS NOT NULL")
-    List<WorkPost> findByCompanyId(@Param("companyId") UUID companyId);
+    @EntityGraph(attributePaths = {"client", "contract", "responsible"})
+    @Query("SELECT wp FROM WorkPost wp WHERE wp.id IN :ids")
+    List<WorkPost> findByIdInWithRelationships(@Param("ids") List<UUID> ids);
 
     @Query("SELECT wp.name FROM WorkPost wp WHERE wp.id = :id")
     Optional<String> findNameById(@Param("id") UUID id);

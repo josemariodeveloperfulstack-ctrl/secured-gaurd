@@ -295,14 +295,9 @@ public class EquipmentController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('EQUIPMENTS_DELETE', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN')")
     public ResponseEntity<Void> deleteEquipment(@PathVariable UUID id) {
-        try {
-            log.info("Excluindo equipamento: {}", id);
-            equipmentService.delete(id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            log.error("Erro ao excluir equipamento: {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.info("Excluindo equipamento: {}", id);
+        equipmentService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }
 

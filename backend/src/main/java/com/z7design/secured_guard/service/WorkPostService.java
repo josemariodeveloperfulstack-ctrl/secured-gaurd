@@ -11,6 +11,7 @@ import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.WorkPostStatus;
 import com.z7design.secured_guard.model.enums.WorkPostType;
 import com.z7design.secured_guard.repository.WorkPostRepository;
+import com.z7design.secured_guard.repository.EmployeeRepository;
 import com.z7design.secured_guard.repository.ClientRepository;
 import com.z7design.secured_guard.repository.ContractRepository;
 import com.z7design.secured_guard.repository.UserRepository;
@@ -37,6 +38,7 @@ import java.math.BigDecimal;
 public class WorkPostService {
     
     private final WorkPostRepository workPostRepository;
+    private final EmployeeRepository employeeRepository;
     private final ClientRepository clientRepository;
     private final ContractRepository contractRepository;
     private final UserRepository userRepository;
@@ -427,7 +429,11 @@ public class WorkPostService {
      */
     @Transactional(readOnly = true)
     public List<WorkPostDTO> findByCompanyId(UUID companyId) {
-        List<WorkPost> workPosts = workPostRepository.findByCompanyId(companyId);
+        List<UUID> workPostIds = employeeRepository.findDistinctWorkPostIdsByCompanyId(companyId);
+        if (workPostIds == null || workPostIds.isEmpty()) {
+            return List.of();
+        }
+        List<WorkPost> workPosts = workPostRepository.findByIdInWithRelationships(workPostIds);
         return convertToDTOList(workPosts);
     }
     

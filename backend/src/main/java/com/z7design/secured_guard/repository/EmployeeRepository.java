@@ -242,6 +242,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
         long countByCompanyId(UUID companyId);
         long countByCompanyIdAndStatus(UUID companyId, EmploymentStatus status);
 
+        @Query("SELECT DISTINCT e.workPost.id FROM Employee e WHERE e.company.id = :companyId AND e.workPost IS NOT NULL")
+        List<UUID> findDistinctWorkPostIdsByCompanyId(@Param("companyId") UUID companyId);
+
         /**
          * Aniversariantes do mês (mesma projeção de {@link #findBasicData()}).
          * {@code onlyActive}: 1 = apenas ACTIVE; 0 = todos os status.

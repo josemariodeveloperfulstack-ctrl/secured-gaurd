@@ -112,14 +112,14 @@ public class OpportunityController {
             return ResponseEntity.notFound().build();
         }
         
-        User user = resolveCurrentUser();
+        User user = resolveCurrentUserManaged();
         opportunityService.delete(UUID.fromString(id), reason, user);
         return ResponseEntity.noContent().build();
     }
     @DeleteMapping("/all")
     @PreAuthorize("hasAnyAuthority('CRM_READ', 'LEADS_READ') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'GESTOR', 'COMERCIAL', 'GESTOR_COMERCIAL', 'ASSISTENTE_COMERCIAL')")
     public ResponseEntity<Void> deleteAll(@RequestParam String reason) {
-        User user = resolveCurrentUser();
+        User user = resolveCurrentUserManaged();
         opportunityService.deleteAll(reason, user);
         return ResponseEntity.noContent().build();
     }
@@ -138,7 +138,7 @@ public class OpportunityController {
             reason = "Exclusão em massa via sistema";
         }
 
-        User user = resolveCurrentUser();
+        User user = resolveCurrentUserManaged();
         opportunityService.deleteBulk(ids, reason, user);
         return ResponseEntity.noContent().build();
     }
@@ -168,13 +168,15 @@ public class OpportunityController {
         return ids;
     }
 
-    private User resolveCurrentUser() {
+    /**
+     * Sempre recarrega o usuário no contexto de persistência (mesmo padrão do LeadController).
+     * O principal JWT é um UserDetails/User possivelmente detached — usar direto em saveAll
+     * pode causar falha 500 em exclusões em massa.
+     */
+    private User resolveCurrentUserManaged() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getPrincipal() == null) {
+        if (auth == null || auth.getName() == null || auth.getName().isBlank()) {
             throw new ResourceNotFoundException("Usuário não autenticado");
-        }
-        if (auth.getPrincipal() instanceof User user) {
-            return user;
         }
         return opportunityService.findUserByUsername(auth.getName());
     }

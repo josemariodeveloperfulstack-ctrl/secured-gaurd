@@ -240,6 +240,7 @@ public class OpportunityService {
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + username));
     }
 
+    @Transactional
     public void delete(UUID id, String reason, User user) {
         Opportunity opportunity = findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada com ID: " + id));
@@ -266,12 +267,13 @@ public class OpportunityService {
     @Transactional
     public void deleteBulk(List<UUID> ids, String reason, User user) {
         List<Opportunity> opportunities = opportunityRepository.findAllById(ids);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
         for (Opportunity opportunity : opportunities) {
             opportunity.setDeleted(true);
             opportunity.setDeletionReason(reason);
-            opportunity.setDeletedAt(java.time.LocalDateTime.now());
+            opportunity.setDeletedAt(now);
             opportunity.setDeletedBy(user);
+            opportunityRepository.save(opportunity);
         }
-        opportunityRepository.saveAll(opportunities);
     }
 } 

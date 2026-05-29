@@ -102,6 +102,28 @@ public class WorkPostController {
         }
     }
     
+    @GetMapping("/by-company/{companyId}")
+    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL')")
+    @Operation(summary = "Listar postos por empresa", description = "Retorna postos de trabalho que possuem funcionários da empresa informada")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
+        @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<WorkPostDTO>> getWorkPostsByCompany(
+            @Parameter(description = "ID da empresa") @PathVariable String companyId) {
+        try {
+            UUID uuid = UUID.fromString(companyId.trim());
+            List<WorkPostDTO> workPostDTOs = workPostService.findByCompanyId(uuid);
+            return ResponseEntity.ok(workPostDTOs != null ? workPostDTOs : List.of());
+        } catch (IllegalArgumentException e) {
+            log.warn("ID de empresa inválido em /by-company: {}", companyId);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Erro ao listar postos por empresa {}: {}", companyId, e.getMessage(), e);
+            return ResponseEntity.ok(List.of());
+        }
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Buscar posto por ID", description = "Retorna um posto específico pelo ID")
     @ApiResponses(value = {
@@ -233,19 +255,6 @@ public class WorkPostController {
             @Parameter(description = "Parâmetros de paginação") Pageable pageable) {
         Page<WorkPost> workPosts = workPostService.findByClient(UUID.fromString(clientId), pageable);
         Page<WorkPostDTO> workPostDTOs = workPostService.convertToDTOPage(workPosts);
-        return ResponseEntity.ok(workPostDTOs);
-    }
-    
-    @GetMapping("/by-company/{companyId}")
-    @PreAuthorize("hasAnyAuthority('HR_READ', 'SUPER_ADMIN', 'ADMIN', 'GESTOR', 'SUPERVISOR', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_GESTOR', 'ROLE_SUPERVISOR', 'OPERACIONAL', 'ROLE_OPERACIONAL', 'GESTOR_OPERACIONAL', 'ROLE_GESTOR_OPERACIONAL', 'GESTAO_SUPERVISAO', 'ROLE_GESTAO_SUPERVISAO', 'RH', 'ROLE_RH', 'DEPARTAMENTO_PESSOAL', 'ROLE_DEPARTAMENTO_PESSOAL', 'COMERCIAL', 'ROLE_COMERCIAL', 'ASSISTENTE_COMERCIAL', 'ROLE_ASSISTENTE_COMERCIAL')")
-    @Operation(summary = "Listar postos por empresa", description = "Retorna postos de trabalho que possuem funcionários da empresa informada")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Postos listados com sucesso"),
-        @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<List<WorkPostDTO>> getWorkPostsByCompany(
-            @Parameter(description = "ID da empresa") @PathVariable String companyId) {
-        List<WorkPostDTO> workPostDTOs = workPostService.findByCompanyId(UUID.fromString(companyId));
         return ResponseEntity.ok(workPostDTOs);
     }
 

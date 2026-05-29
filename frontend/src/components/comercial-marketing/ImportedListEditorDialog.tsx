@@ -104,8 +104,18 @@ const ImportedListEditorDialog: React.FC<ImportedListEditorDialogProps> = ({
       onSaved();
       onOpenChange(false);
     } catch (e: unknown) {
-      const axiosErr = e as { response?: { data?: { message?: string } } };
-      setError(axiosErr.response?.data?.message ?? (e instanceof Error ? e.message : 'Falha ao gravar lista.'));
+      const axiosErr = e as {
+        response?: { data?: { message?: string; fieldErrors?: Record<string, string> } };
+      };
+      const data = axiosErr.response?.data;
+      const fieldErrors = data?.fieldErrors;
+      const fieldMsg =
+        fieldErrors && Object.keys(fieldErrors).length > 0
+          ? Object.entries(fieldErrors)
+              .map(([field, msg]) => `${field}: ${msg}`)
+              .join(' · ')
+          : null;
+      setError(fieldMsg ?? data?.message ?? (e instanceof Error ? e.message : 'Falha ao gravar lista.'));
     } finally {
       setSaving(false);
     }

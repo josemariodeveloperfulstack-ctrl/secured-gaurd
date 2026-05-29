@@ -611,41 +611,54 @@ public class LeadService {
             String name = resolveImportName(truncateField(item.getName(), 255), email);
             String notes = buildMarketingImportNotes(item);
 
-            Optional<Lead> existingOpt = leadRepository.findFirstByEmailIgnoreCaseOrderByCreatedAtDesc(email);
-            if (existingOpt.isPresent()) {
-                Lead existing = existingOpt.get();
-                if (item.getName() != null && !item.getName().isBlank()) {
-                    existing.setName(item.getName().trim());
+            try {
+                Optional<Lead> existingOpt = leadRepository.findTopByEmailIncludingDeleted(email);
+                if (existingOpt.isPresent()) {
+                    Lead existing = existingOpt.get();
+                    if (existing.isDeleted()) {
+                        existing.setDeleted(false);
+                        existing.setDeletionReason(null);
+                        existing.setDeletedAt(null);
+                        existing.setDeletedBy(null);
+                    }
+                    if (item.getName() != null && !item.getName().isBlank()) {
+                        existing.setName(truncateField(item.getName().trim(), 255));
+                    } else if (existing.getName() == null || existing.getName().isBlank()) {
+                        existing.setName(name);
+                    }
+                    if (item.getCompany() != null && !item.getCompany().isBlank()) {
+                        existing.setCompany(truncateField(item.getCompany().trim(), 255));
+                    }
+                    if (item.getPosition() != null && !item.getPosition().isBlank()) {
+                        existing.setPosition(truncateField(item.getPosition().trim(), 255));
+                    }
+                    if (item.getPhone() != null && !item.getPhone().isBlank()) {
+                        existing.setPhone(truncateOrNull(item.getPhone(), 20));
+                    }
+                    if (notes != null) {
+                        existing.setNotes(notes);
+                    }
+                    Lead saved = leadRepository.save(existing);
+                    refs.add(new LeadBulkImportResultDTO.LeadImportLeadRefDTO(saved.getId(), saved.getEmail()));
+                    updated++;
+                } else {
+                    Lead lead = new Lead();
+                    lead.setName(name);
+                    lead.setEmail(email);
+                    lead.setCompany(truncateOrNull(item.getCompany(), 255));
+                    lead.setPosition(truncateOrNull(item.getPosition(), 255));
+                    lead.setPhone(truncateOrNull(item.getPhone(), 20));
+                    lead.setSource(LeadSource.EMAIL_MARKETING);
+                    lead.setStatus(LeadStatus.NEW);
+                    lead.setNotes(notes);
+                    lead.setCreatedBy(createdBy);
+                    Lead saved = leadRepository.save(lead);
+                    refs.add(new LeadBulkImportResultDTO.LeadImportLeadRefDTO(saved.getId(), saved.getEmail()));
+                    created++;
                 }
-                if (item.getCompany() != null && !item.getCompany().isBlank()) {
-                    existing.setCompany(item.getCompany().trim());
-                }
-                if (item.getPosition() != null && !item.getPosition().isBlank()) {
-                    existing.setPosition(item.getPosition().trim());
-                }
-                if (item.getPhone() != null && !item.getPhone().isBlank()) {
-                    existing.setPhone(item.getPhone().trim());
-                }
-                if (notes != null) {
-                    existing.setNotes(notes);
-                }
-                Lead saved = leadRepository.save(existing);
-                refs.add(new LeadBulkImportResultDTO.LeadImportLeadRefDTO(saved.getId(), saved.getEmail()));
-                updated++;
-            } else {
-                Lead lead = new Lead();
-                lead.setName(name);
-                lead.setEmail(email);
-                lead.setCompany(truncateOrNull(item.getCompany(), 255));
-                lead.setPosition(truncateOrNull(item.getPosition(), 255));
-                lead.setPhone(truncateOrNull(item.getPhone(), 20));
-                lead.setSource(LeadSource.EMAIL_MARKETING);
-                lead.setStatus(LeadStatus.NEW);
-                lead.setNotes(notes);
-                lead.setCreatedBy(createdBy);
-                Lead saved = leadRepository.save(lead);
-                refs.add(new LeadBulkImportResultDTO.LeadImportLeadRefDTO(saved.getId(), saved.getEmail()));
-                created++;
+            } catch (Exception e) {
+                log.warn("Importação marketing: falha ao gravar lead {} — {}", email, e.getMessage());
+                skipped++;
             }
         }
 

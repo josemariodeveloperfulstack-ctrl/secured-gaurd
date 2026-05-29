@@ -100,8 +100,9 @@ api.interceptors.response.use(
         console.warn('⚠️ Método:', error.config?.method);
         console.warn('⚠️ Em CI use getApiUrl() = /api (mesmo host). Verifique nginx: proxy_redirect off; e X-Forwarded-*');
       } else {
-        console.warn('⚠️ Backend não está disponível:', apiUrl);
-        console.warn('⚠️ Verifique se o backend está rodando na porta correta');
+        const requestUrl = error.config?.url ? `${apiUrl}${error.config.url}` : apiUrl;
+        console.warn('⚠️ Falha de rede na requisição (sem resposta HTTP):', requestUrl);
+        console.warn('⚠️ Código:', error?.code || 'desconhecido', '— pode ser timeout, CORS ou endpoint indisponível');
       }
       return Promise.reject(createConnectionError(apiUrl));
     }

@@ -32,6 +32,7 @@ public class EquipmentService {
     private final EquipmentRepository equipmentRepository;
     private final EmployeeRepository employeeRepository;
     private final com.z7design.secured_guard.repository.WorkPostRepository workPostRepository;
+    private final com.z7design.secured_guard.repository.EquipmentMovementRepository equipmentMovementRepository;
 
     public Page<EquipmentDTO> findAll(Pageable pageable) {
         log.debug("Buscando equipamentos com paginação: {}", pageable);
@@ -227,12 +228,14 @@ public class EquipmentService {
         return toDTO(saved);
     }
 
+    @CacheEvict(value = {"equipments", "equipmentsByStatus"}, allEntries = true)
     public void delete(UUID id) {
         log.debug("Excluindo equipamento: {}", id);
 
         Equipment equipment = equipmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipamento não encontrado com ID: " + id));
 
+        equipmentMovementRepository.deleteByEquipmentId(id);
         equipmentRepository.delete(equipment);
         log.info("Equipamento excluído com sucesso: {}", id);
     }

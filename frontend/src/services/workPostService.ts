@@ -120,12 +120,25 @@ export const workPostService = {
 
   // Buscar postos por empresa (postos que possuem funcionários da empresa)
   async getWorkPostsByCompany(companyId: string): Promise<WorkPost[]> {
-    try {
-      const response = await api.get(`/api/work-posts/by-company/${companyId}`);
-      return response.data ?? [];
-    } catch (error) {
-      console.error('Erro ao buscar postos por empresa:', error);
+    if (!companyId?.trim()) {
       return [];
+    }
+    try {
+      const response = await api.get(`/work-posts/by-company/${companyId.trim()}`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number }; message?: string };
+      if (axiosError.response?.status === 404) {
+        console.warn('Endpoint /work-posts/by-company não disponível; usando lista completa de postos.');
+      } else {
+        console.warn('Falha ao buscar postos por empresa; usando lista completa de postos.', error);
+      }
+      try {
+        return await this.getAllWorkPosts();
+      } catch (fallbackError) {
+        console.error('Erro ao buscar postos (fallback getAllWorkPosts):', fallbackError);
+        return [];
+      }
     }
   },
 

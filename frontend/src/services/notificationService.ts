@@ -45,6 +45,55 @@ export interface CreateNotificationRequest {
   departamento?: string;
 }
 
+type BackendNotification = {
+  id?: string;
+  title?: string;
+  message?: string;
+  titulo?: string;
+  descricao?: string;
+  type?: string;
+  tipo?: string;
+  status?: string;
+  prioridade?: NotificationData['prioridade'];
+  createdAt?: string;
+  timestamp?: string;
+  lida?: boolean;
+};
+
+function mapBackendNotification(raw: BackendNotification): NotificationData {
+  const status = raw.status ?? (raw.lida ? 'READ' : 'UNREAD');
+  const backendType = (raw.type ?? raw.tipo ?? 'INFO').toUpperCase();
+
+  const tipoByBackendType: Record<string, NotificationData['tipo']> = {
+    SCHEDULE: 'escala',
+    SYSTEM: 'novo_cliente',
+    WARNING: 'contrato_vencendo',
+    ERROR: 'ocorrencia',
+    INFO: 'ocorrencia',
+    TIME_RECORD: 'funcionario_atrasado',
+    EVALUATION: 'advertencia',
+    BENEFIT: 'novo_contrato',
+  };
+
+  const prioridadeByBackendType: Record<string, NotificationData['prioridade']> = {
+    ERROR: 'alta',
+    WARNING: 'media',
+    SYSTEM: 'media',
+    SCHEDULE: 'baixa',
+    INFO: 'baixa',
+  };
+
+  return {
+    id: String(raw.id ?? ''),
+    titulo: raw.titulo ?? raw.title ?? 'Notificação',
+    descricao: raw.descricao ?? raw.message ?? '',
+    tipo: tipoByBackendType[backendType] ?? 'ocorrencia',
+    prioridade: raw.prioridade ?? prioridadeByBackendType[backendType] ?? 'media',
+    timestamp: raw.timestamp ?? raw.createdAt ?? new Date().toISOString(),
+    lida: status === 'READ' || raw.lida === true,
+  };
+}
+
 class NotificationService {
   // Configuração padrão dos departamentos
   private departamentos: DepartamentoConfig = {
@@ -397,9 +446,10 @@ class NotificationService {
   async getAllNotifications(): Promise<NotificationData[]> {
     try {
       console.log('🔗 Buscando notificações no backend');
-      const response = await api.get('/api/notifications');
-      console.log('✅ Notificações carregadas do backend:', response.data.length);
-      return response.data;
+      const response = await api.get('/notifications');
+      const items = Array.isArray(response.data) ? response.data : [];
+      console.log('✅ Notificações carregadas do backend:', items.length);
+      return items.map((item: BackendNotification) => mapBackendNotification(item));
     } catch (error) {
       console.error('❌ Erro ao buscar notificações:', error);
       throw new Error('Falha ao conectar com o servidor de notificações');
@@ -409,7 +459,7 @@ class NotificationService {
   // Marcar notificação como lida
   async markAsRead(notificationId: string): Promise<void> {
     try {
-      await api.patch(`/api/notifications/panel/${notificationId}/read`);
+      await api.put(`/notifications/${notificationId}/read`);
     } catch (error) {
       console.error('Erro ao marcar notificação como lida:', error);
       throw error;
@@ -417,19 +467,15 @@ class NotificationService {
   }
 
   // Marcar todas as notificações como lidas
-  async markAllAsRead(): Promise<void> {
-    try {
-      await api.patch('/notifications/panel/read-all');
-    } catch (error) {
-      console.error('Erro ao marcar todas as notificações como lidas:', error);
-      throw error;
-    }
+  async markAllAsRead(notifications: NotificationData[]): Promise<void> {
+    const unread = notifications.filter((n) => !n.lida);
+    await Promise.all(unread.map((n) => this.markAsRead(n.id)));
   }
 
   // Excluir notificação
   async deleteNotification(notificationId: string): Promise<void> {
     try {
-      await api.delete(`/api/notifications/panel/${notificationId}`);
+      await api.delete(`/notifications/${notificationId}`);
     } catch (error) {
       console.error('Erro ao excluir notificação:', error);
       throw error;

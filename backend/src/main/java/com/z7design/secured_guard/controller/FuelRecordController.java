@@ -416,36 +416,34 @@ public class FuelRecordController {
                 .orElse(ResponseEntity.noContent().build());
     }
     
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteFuelRecord(@PathVariable UUID id) {
-        if (!fuelRecordRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Registro de abastecimento não encontrado com ID: " + id);
-        }
-        fuelRecordRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
-    }
-    
     /**
-     * Excluir múltiplos registros de combustível por IDs
+     * Excluir múltiplos registros de combustível por IDs.
+     * Deve ficar antes de DELETE /{id} para não confundir "batch" com UUID.
      */
     @DeleteMapping("/batch")
-    public ResponseEntity<Map<String, Object>> deleteFuelRecordsBatch(@RequestBody List<UUID> ids) {
+    public ResponseEntity<Map<String, Object>> deleteFuelRecordsBatch(@RequestBody(required = false) List<UUID> ids) {
+        return deleteFuelRecordsBatchInternal(ids);
+    }
+
+    @PostMapping("/batch/delete")
+    public ResponseEntity<Map<String, Object>> deleteFuelRecordsBatchPost(@RequestBody List<UUID> ids) {
+        return deleteFuelRecordsBatchInternal(ids);
+    }
+
+    private ResponseEntity<Map<String, Object>> deleteFuelRecordsBatchInternal(List<UUID> ids) {
         try {
-            log.info("🗑️ Excluindo {} registros de combustível em lote", ids.size());
-            
             if (ids == null || ids.isEmpty()) {
                 return ResponseEntity.badRequest()
                     .body(Map.of("error", "Lista de IDs não pode estar vazia"));
             }
-            
-            // Verificar se todos os IDs existem
+
+            log.info("🗑️ Excluindo {} registros de combustível em lote", ids.size());
             List<FuelRecord> existingRecords = fuelRecordRepository.findAllById(ids);
             if (existingRecords.size() != ids.size()) {
                 log.warn("⚠️ Alguns registros não foram encontrados. IDs solicitados: {}, IDs encontrados: {}", 
                     ids.size(), existingRecords.size());
             }
             
-            // Excluir os registros encontrados
             fuelRecordRepository.deleteAll(existingRecords);
             
             log.info("✅ {} registros de combustível excluídos com sucesso", existingRecords.size());
@@ -462,6 +460,15 @@ public class FuelRecordController {
             return ResponseEntity.internalServerError()
                 .body(Map.of("error", "Erro interno ao excluir registros: " + e.getMessage()));
         }
+    }
+    
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteFuelRecord(@PathVariable UUID id) {
+        if (!fuelRecordRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Registro de abastecimento não encontrado com ID: " + id);
+        }
+        fuelRecordRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
     
     @GetMapping("/stats/drivers")

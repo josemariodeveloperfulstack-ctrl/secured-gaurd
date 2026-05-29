@@ -13,10 +13,10 @@ import {
   Filter
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { SystemNotification } from '@/services/operacionalService';
+import { NotificationData } from '@/services/notificationService';
 
 interface NotificacoesListProps {
-  notificacoes: SystemNotification[];
+  notificacoes: NotificationData[];
   onRefresh: () => void;
   onMarkAsRead: (id: string) => void;
   onMarkAllAsRead: () => void;
@@ -88,9 +88,12 @@ const NotificacoesList: React.FC<NotificacoesListProps> = ({
   };
 
   const filteredNotificacoes = notificacoes.filter(notificacao => {
-    const matchesSearch = 
-      notificacao.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notificacao.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const titulo = (notificacao.titulo ?? '').toLowerCase();
+    const descricao = (notificacao.descricao ?? '').toLowerCase();
+    const matchesSearch =
+      titulo.includes(searchLower) ||
+      descricao.includes(searchLower);
     
     const matchesPrioridade = prioridadeFilter === 'all' || notificacao.prioridade === prioridadeFilter;
     const matchesTipo = tipoFilter === 'all' || notificacao.tipo === tipoFilter;

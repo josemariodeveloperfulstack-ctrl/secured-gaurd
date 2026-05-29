@@ -103,9 +103,7 @@ export const AbastecimentosTable: React.FC<AbastecimentosTableProps> = ({
       const selectedIds = Array.from(selectedItems);
       console.log('🗑️ Excluindo abastecimentos:', selectedIds);
 
-      const response = await api.delete('/fuel-records/batch', {
-        data: selectedIds
-      });
+      const response = await api.post('/fuel-records/batch/delete', selectedIds);
 
       console.log('✅ Resposta da exclusão em lote:', response.data);
 

@@ -5,7 +5,9 @@ import com.z7design.secured_guard.model.enums.MovementType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -72,4 +74,9 @@ public interface EquipmentMovementRepository extends JpaRepository<EquipmentMove
     
     @Query("SELECT em.authorizedBy.name, COUNT(em) FROM EquipmentMovement em GROUP BY em.authorizedBy.name ORDER BY COUNT(em) DESC")
     List<Object[]> countMovementsByAuthorizer();
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM EquipmentMovement em WHERE em.equipment.id = :equipmentId")
+    void deleteByEquipmentId(@Param("equipmentId") UUID equipmentId);
 } 

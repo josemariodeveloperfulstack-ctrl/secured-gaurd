@@ -114,7 +114,13 @@ public class LeadController {
             summary = "Importar leads de planilha (marketing)",
             description = "Cria ou atualiza leads por e-mail. Usado após importação de lista para campanhas.")
     public ResponseEntity<LeadBulkImportResultDTO> importLeadsFromMarketing(
-            @Valid @RequestBody LeadBulkImportRequestDTO request) {
+            @RequestBody(required = false) LeadBulkImportRequestDTO request) {
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            return ResponseEntity.ok(new LeadBulkImportResultDTO());
+        }
+        if (request.getItems().size() > 2000) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUserIdentifier = authentication != null ? authentication.getName() : "system";
         LeadBulkImportResultDTO result =
