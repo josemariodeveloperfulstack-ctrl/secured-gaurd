@@ -644,8 +644,8 @@ public class PaymentReportService {
         List<AccountsReceivable> accounts = accountsReceivableRepository.findAll();
         log.info("Encontradas {} contas a receber no banco de dados", accounts.size());
 
-        // Aplicar filtros
-        return accounts.stream()
+        // Aplicar filtros e ordenar por vencimento
+        List<AccountsReceivable> filtered = accounts.stream()
                 .filter(account -> startDate == null || !account.getDueDate().isBefore(startDate))
                 .filter(account -> endDate == null || !account.getDueDate().isAfter(endDate))
                 .filter(account -> clientFilter == null || clientFilter.isEmpty() ||
@@ -663,7 +663,7 @@ public class PaymentReportService {
                 .filter(account -> selectedIds == null || selectedIds.isEmpty() ||
                         selectedIds.contains(account.getId().toString()))
                 .collect(Collectors.toList());
-        return sortAccountsReceivableByDueDate(accounts, sortDir);
+        return sortAccountsReceivableByDueDate(filtered, sortDir);
     }
 
     private List<AccountsReceivable> sortAccountsReceivableByDueDate(List<AccountsReceivable> accounts, String sortDir) {
