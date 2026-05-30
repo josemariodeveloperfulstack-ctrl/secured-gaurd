@@ -336,6 +336,11 @@ class EmailCampaignService {
     await api.delete(`/api/v1/email-campaigns/${campaignId}/inactive-recipients/${recipientId}`);
   }
 
+  /** Remove destinatário da campanha (e envios pendentes associados). */
+  async removeRecipientFromCampaign(campaignId: string, recipientId: string): Promise<void> {
+    await api.delete(`/api/v1/email-campaigns/${campaignId}/recipients/${recipientId}`);
+  }
+
   async listImportedLists(): Promise<EmailMarketingImportedListSummary[]> {
     const { data } = await api.get<EmailMarketingImportedListSummary[]>(
       '/api/v1/email-campaigns/imported-lists'

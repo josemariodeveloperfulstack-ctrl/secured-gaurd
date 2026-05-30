@@ -162,7 +162,7 @@ export function RecipientListGrouped({
           Nenhum destinatário corresponde ao filtro.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,32%)_1fr] min-h-[min(520px,65vh)]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(200px,28%)_minmax(0,1fr)] min-h-[min(520px,65vh)]">
           {/* Painel: lista de cidades */}
           <div className={cn('rounded-lg border flex flex-col min-h-[320px]', panelClass)}>
             <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
@@ -276,37 +276,44 @@ export function RecipientListGrouped({
                   </div>
                 </div>
                 <ScrollArea className="flex-1 max-h-[min(420px,55vh)]">
-                  <table className="w-full text-xs">
+                  <div className="min-w-0 overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-xs">
                     <thead className="sticky top-0 z-10 bg-seguranca-graphite/95 backdrop-blur">
                       <tr className="text-left text-slate-500 border-b border-white/10">
-                        <th className="px-3 py-2 font-medium w-[45%]">E-mail</th>
-                        <th className="px-3 py-2 font-medium w-[25%]">Nome</th>
-                        <th className="px-3 py-2 font-medium hidden sm:table-cell">Empresa</th>
-                        {!readOnly && <th className="px-3 py-2 w-8" />}
+                        <th className="px-3 py-2 font-medium">E-mail</th>
+                        <th className="px-3 py-2 font-medium max-w-[120px]">Nome</th>
+                        <th className="px-3 py-2 font-medium hidden md:table-cell max-w-[140px]">Empresa</th>
+                        {!readOnly && (
+                          <th className="sticky right-0 z-20 min-w-[72px] bg-seguranca-graphite/95 px-2 py-2 text-center font-medium">
+                            Ações
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {displayedEmails.map((r) => (
                         <tr
                           key={r.email}
-                          className="border-b border-white/5 hover:bg-white/[0.03] text-slate-200"
+                          className="group border-b border-white/5 hover:bg-white/[0.03] text-slate-200"
                         >
-                          <td className="px-3 py-1.5 font-mono text-[11px] break-all">{r.email}</td>
-                          <td className="px-3 py-1.5 text-slate-400 truncate max-w-[140px]">
+                          <td className="px-3 py-1.5 font-mono text-[11px] break-all max-w-[200px]">{r.email}</td>
+                          <td className="px-3 py-1.5 text-slate-400 truncate max-w-[120px]">
                             {r.name || '—'}
                           </td>
-                          <td className="px-3 py-1.5 text-slate-500 truncate max-w-[160px] hidden sm:table-cell">
+                          <td className="px-3 py-1.5 text-slate-500 truncate max-w-[140px] hidden md:table-cell">
                             {String(r.metadata?.company ?? '—')}
                           </td>
                           {!readOnly && (
-                            <td className="px-2 py-1.5">
+                            <td className="sticky right-0 z-10 bg-seguranca-graphite/95 group-hover:bg-seguranca-black/50 px-2 py-1.5 text-center">
                               <button
                                 type="button"
-                                className="text-slate-500 hover:text-rose-400"
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-rose-400/90 hover:bg-rose-500/15 hover:text-rose-300"
                                 onClick={() => onRemove(r.email)}
-                                aria-label="Remover"
+                                aria-label={`Excluir ${r.email} da lista`}
+                                title="Excluir da lista"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="hidden lg:inline">Excluir</span>
                               </button>
                             </td>
                           )}
@@ -314,6 +321,7 @@ export function RecipientListGrouped({
                       ))}
                     </tbody>
                   </table>
+                  </div>
                   {displayedEmails.length === 0 && (
                     <p className="p-4 text-center text-slate-500">Nenhum e-mail corresponde ao filtro.</p>
                   )}

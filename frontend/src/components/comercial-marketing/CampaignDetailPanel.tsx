@@ -319,8 +319,9 @@ const CampaignDetailPanel: React.FC<CampaignDetailPanelProps> = ({
         <CardHeader className="pb-3">
           <CardTitle className="text-base text-white">Leads da campanha</CardTitle>
           <CardDescription className="text-seguranca-lightgray">
-            Destinatários vinculados a esta campanha, agrupados por cidade. Para incluir um lote regional, use{' '}
-            <strong className="font-normal text-white">Acrescentar por cidade</strong> na Lista de Leads.
+            Destinatários vinculados a esta campanha, agrupados por cidade. Exclua linhas com o ícone à direita.
+            Para incluir um lote regional, use <strong className="font-normal text-white">Acrescentar por cidade</strong>{' '}
+            na Lista de Leads.
           </CardDescription>
         </CardHeader>
         <CardContent>
