@@ -1,6 +1,7 @@
 package com.z7design.secured_guard.dto;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 
 public class FuelConsumptionStatsDTO {
@@ -136,28 +137,28 @@ public class FuelConsumptionStatsDTO {
     // Método para calcular consumo por km
     public void calculateConsumptionPerKm() {
         if (totalDistance != null && totalDistance > 0 && totalFuelConsumed != null && totalFuelConsumed.compareTo(BigDecimal.ZERO) > 0) {
-            this.consumptionPerKm = totalFuelConsumed.divide(BigDecimal.valueOf(totalDistance), 3, BigDecimal.ROUND_HALF_UP);
+            this.consumptionPerKm = totalFuelConsumed.divide(BigDecimal.valueOf(totalDistance), 3, RoundingMode.HALF_UP);
         }
     }
     
     // Método para calcular custo por km
     public void calculateCostPerKm() {
         if (totalDistance != null && totalDistance > 0 && totalCost != null && totalCost.compareTo(BigDecimal.ZERO) > 0) {
-            this.costPerKm = totalCost.divide(BigDecimal.valueOf(totalDistance), 3, BigDecimal.ROUND_HALF_UP);
+            this.costPerKm = totalCost.divide(BigDecimal.valueOf(totalDistance), 3, RoundingMode.HALF_UP);
         }
     }
     
     // Método para calcular média de combustível por abastecimento
     public void calculateAverageFuelPerRefill() {
         if (totalRecords != null && totalRecords > 0 && totalFuelConsumed != null && totalFuelConsumed.compareTo(BigDecimal.ZERO) > 0) {
-            this.averageFuelPerRefill = totalFuelConsumed.divide(BigDecimal.valueOf(totalRecords), 2, BigDecimal.ROUND_HALF_UP);
+            this.averageFuelPerRefill = totalFuelConsumed.divide(BigDecimal.valueOf(totalRecords), 2, RoundingMode.HALF_UP);
         }
     }
     
     // Método para calcular preço médio por litro
     public void calculateAveragePricePerLiter() {
         if (totalFuelConsumed != null && totalFuelConsumed.compareTo(BigDecimal.ZERO) > 0 && totalCost != null && totalCost.compareTo(BigDecimal.ZERO) > 0) {
-            this.averagePricePerLiter = totalCost.divide(totalFuelConsumed, 3, BigDecimal.ROUND_HALF_UP);
+            this.averagePricePerLiter = totalCost.divide(totalFuelConsumed, 3, RoundingMode.HALF_UP);
         }
     }
     
