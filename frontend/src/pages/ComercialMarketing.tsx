@@ -35,6 +35,7 @@ type TabId =
 const ComercialMarketing: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabId>('campaigns');
+  const [leadsListCampaignId, setLeadsListCampaignId] = useState<string>('');
 
   useEffect(() => {
     if (searchParams.get('caixa') === 'respostas') {
@@ -86,7 +87,7 @@ const ComercialMarketing: React.FC = () => {
       Icon: Users,
       title: 'Lista de leads',
       description:
-        'Importe contatos em CSV/Excel ou utilize a base de leads do CRM para alimentar campanhas.',
+        'Importe a planilha completa, crie listas por cidade e vincule cada uma a uma ou mais campanhas.',
       cta: 'Ver leads',
       onClick: () => setActiveTab('leads'),
     },
@@ -148,7 +149,12 @@ const ComercialMarketing: React.FC = () => {
           </TabsList>
 
           <TabsContent value="campaigns" className="mt-0">
-            <CampaignsTab />
+            <CampaignsTab
+              onAddRecipientsByCity={(id) => {
+                setLeadsListCampaignId(id);
+                setActiveTab('leads');
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="email-templates" className="mt-0">
@@ -182,7 +188,7 @@ const ComercialMarketing: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="leads" className="mt-0">
-            <CampaignLeadsListTab />
+            <CampaignLeadsListTab initialCampaignId={leadsListCampaignId || undefined} />
           </TabsContent>
 
           <TabsContent value="imported-lists" className="mt-0">

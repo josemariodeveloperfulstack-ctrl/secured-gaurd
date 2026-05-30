@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { AlertCircle, ClipboardList, FileText, Link2, Loader2, MapPin, Save } from 'lucide-react';
+import SaveCityImportedListDialog from '@/components/comercial-marketing/SaveCityImportedListDialog';
+import LinkListToCampaignsDialog from '@/components/comercial-marketing/LinkListToCampaignsDialog';
+import { appendRecipientsToCampaigns } from '@/components/comercial-marketing/utils/appendRecipientsToCampaigns';
 import { RecipientPicker } from '@/components/comercial-marketing/RecipientPicker';
 import {
   RecipientListGrouped,
@@ -21,9 +24,12 @@ import {
   attachLeadIdsToRecipients,
   persistImportedLeadsToCrm,
 } from '@/components/comercial-marketing/utils/persistImportedLeads';
-import { sanitizeRecipientsForCampaign } from '@/components/comercial-marketing/utils/sanitizeMarketingPayload';
+interface CampaignLeadsListTabProps {
+  /** Campanha pré-selecionada (ex.: vinda do painel Campanhas → Acrescentar por cidade). */
+  initialCampaignId?: string;
+}
 
-const CampaignLeadsListTab: React.FC = () => {
+const CampaignLeadsListTab: React.FC<CampaignLeadsListTabProps> = ({ initialCampaignId }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [recipients, setRecipients] = useState<EmailCampaignRecipientInput[]>([]);
@@ -32,6 +38,16 @@ const CampaignLeadsListTab: React.FC = () => {
   const [checkingOptOut, setCheckingOptOut] = useState(false);
   const [savingLeadsToCrm, setSavingLeadsToCrm] = useState(false);
   const [selectedCityBatch, setSelectedCityBatch] = useState<SelectedCityBatch | null>(null);
+  const [saveCityOpen, setSaveCityOpen] = useState(false);
+  const [saveFullOpen, setSaveFullOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [masterListName, setMasterListName] = useState<string | undefined>();
+  const [loadListId, setLoadListId] = useState<string>('');
+
+  const importedListsQuery = useQuery({
+    queryKey: ['email-marketing-imported-lists'],
+    queryFn: () => emailCampaignService.listImportedLists(),
+  });
 
   const filteredRecipients = React.useMemo(
     () => applySegmentRules(recipients, segmentRules),
@@ -46,20 +62,25 @@ const CampaignLeadsListTab: React.FC = () => {
     queryFn: () => emailCampaignService.list(),
   });
 
-  const draftCampaigns = (campaignsQuery.data ?? []).filter((c) => c.status === 'DRAFT');
-
-  const APPEND_CHUNK_SIZE = 400;
+  /** Rascunho ou agendada — ainda dá para acrescentar destinatários por cidade. */
+  const appendableCampaigns = (campaignsQuery.data ?? []).filter(
+    (c) => c.status === 'DRAFT' || c.status === 'SCHEDULED',
+  );
 
   useEffect(() => {
-    if (campaignId || draftCampaigns.length !== 1) return;
-    setCampaignId(draftCampaigns[0].id);
-  }, [draftCampaigns, campaignId]);
+    if (initialCampaignId && appendableCampaigns.some((c) => c.id === initialCampaignId)) {
+      setCampaignId(initialCampaignId);
+      return;
+    }
+    if (campaignId || appendableCampaigns.length !== 1) return;
+    setCampaignId(appendableCampaigns[0].id);
+  }, [appendableCampaigns, campaignId, initialCampaignId]);
 
   const appendDisabledReason = useMemo(() => {
     if (checkingOptOut) return 'Aguarde a verificação de descadastros (opt-out).';
     if (savingLeadsToCrm) return 'Gravando leads importados no CRM…';
-    if (draftCampaigns.length === 0) {
-      return 'Não há campanha em rascunho. Crie uma na aba Campanhas e volte aqui.';
+    if (appendableCampaigns.length === 0) {
+      return 'Não há campanha em rascunho ou agendada. Crie ou agende uma na aba Campanhas e volte aqui.';
     }
     if (!campaignId) return 'Selecione a campanha de destino no campo acima.';
     if (recipients.length > 0 && !selectedCityBatch) {
@@ -72,7 +93,7 @@ const CampaignLeadsListTab: React.FC = () => {
   }, [
     checkingOptOut,
     savingLeadsToCrm,
-    draftCampaigns.length,
+    appendableCampaigns.length,
     campaignId,
     recipients.length,
     selectedCityBatch,
@@ -81,26 +102,20 @@ const CampaignLeadsListTab: React.FC = () => {
 
   const appendMutation = useMutation({
     mutationFn: async () => {
-      if (!campaignId) throw new Error('Selecione uma campanha em rascunho.');
+      if (!campaignId) throw new Error('Selecione uma campanha de destino.');
       if (recipientsToAppend.length === 0) {
         throw new Error('Selecione uma cidade com destinatários antes de enviar.');
       }
-      const sanitized = sanitizeRecipientsForCampaign(recipientsToAppend);
-      if (sanitized.length === 0) {
-        throw new Error('Nenhum destinatário válido nesta cidade após validação.');
-      }
-      const total = sanitized.length;
-      for (let i = 0; i < total; i += APPEND_CHUNK_SIZE) {
-        const chunk = sanitized.slice(i, i + APPEND_CHUNK_SIZE);
-        await emailCampaignService.appendRecipients(campaignId, chunk);
-      }
+      const total = await appendRecipientsToCampaigns([campaignId], recipientsToAppend);
+      if (total === 0) throw new Error('Nenhum destinatário válido nesta cidade após validação.');
       return total;
     },
     onSuccess: (total) => {
       void queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
+      void queryClient.invalidateQueries({ queryKey: ['email-campaign-recipients', campaignId] });
       toast({
         title: 'Lista aplicada à campanha',
-        description: `${total?.toLocaleString('pt-BR') ?? ''} destinatário(s) de ${selectedCityBatch?.cityLabel ?? 'cidade selecionada'} acrescentados ao rascunho.`,
+        description: `${total?.toLocaleString('pt-BR') ?? ''} destinatário(s) de ${selectedCityBatch?.cityLabel ?? 'cidade selecionada'} acrescentados à campanha.`,
       });
     },
     onError: (e: unknown) => {
@@ -238,40 +253,89 @@ const CampaignLeadsListTab: React.FC = () => {
           <FileText className="h-8 w-8 text-seguranca-yellow" />
           <h2 className="text-xl font-semibold text-slate-100">Lista de leads para campanhas</h2>
         </div>
-        <p className="text-sm text-slate-400">
-          Importe contatos por CSV/Excel (mapeie cidade, estado e tipo de empresa). Os leads são gravados
-          automaticamente no CRM. Selecione uma cidade e acrescente apenas esse lote à campanha em rascunho.
+        <p className="text-sm text-slate-400 max-w-2xl mx-auto">
+          <strong className="text-slate-300">1.</strong> Importe a planilha completa (mapeie a coluna cidade).{' '}
+          <strong className="text-slate-300">2.</strong> Selecione uma cidade e guarde como lista reutilizável.{' '}
+          <strong className="text-slate-300">3.</strong> Vincule essa lista a uma ou mais campanhas — ou acrescente
+          direto à campanha selecionada abaixo.
         </p>
       </div>
 
       <div className="rounded-xl border border-white/10 bg-seguranca-graphite/40 p-5 text-left shadow-sm">
+        {(importedListsQuery.data?.length ?? 0) > 0 && (
+          <div className="mb-6 space-y-2">
+            <Label className="text-slate-200">Carregar lista guardada</Label>
+            <div className="flex flex-wrap gap-2">
+              <Select
+                value={loadListId}
+                onValueChange={async (id) => {
+                  setLoadListId(id);
+                  if (!id) return;
+                  try {
+                    const detail = await emailCampaignService.getImportedList(id);
+                    setRecipients(detail.recipients ?? []);
+                    setSegmentRules([]);
+                    setSelectedCityBatch(null);
+                    toast({
+                      title: 'Lista carregada',
+                      description: `${(detail.recipients?.length ?? 0).toLocaleString('pt-BR')} contato(s) — «${detail.name}».`,
+                    });
+                  } catch {
+                    toast({
+                      title: 'Erro ao carregar lista',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+              >
+                <SelectTrigger className="max-w-md border-white/10 bg-seguranca-black/30 text-slate-100">
+                  <SelectValue placeholder="Escolha uma lista importada…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(importedListsQuery.data ?? []).map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name} ({l.recipientCount.toLocaleString('pt-BR')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {loadListId && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setLoadListId('')}>
+                  Limpar seleção
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
-          <Label className="text-slate-200">Campanha em rascunho (destino da lista)</Label>
+          <Label className="text-slate-200">Campanha rápida (opcional — um clique)</Label>
           <Select value={campaignId} onValueChange={setCampaignId}>
             <SelectTrigger className="border-white/10 bg-seguranca-black/30 text-slate-100">
               <SelectValue placeholder="Selecione uma campanha…" />
             </SelectTrigger>
             <SelectContent>
-              {draftCampaigns.length === 0 ? (
+              {appendableCampaigns.length === 0 ? (
                 <div className="max-w-xs p-3 text-left text-sm text-slate-500">
-                  Nenhuma campanha em rascunho. Crie uma na aba Campanhas e volte aqui.
+                  Nenhuma campanha em rascunho ou agendada. Crie uma na aba Campanhas e volte aqui.
                 </div>
               ) : (
-                draftCampaigns.map((c) => (
+                appendableCampaigns.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.title}
+                    {c.status === 'SCHEDULED' ? ' (agendada)' : ''}
                   </SelectItem>
                 ))
               )}
             </SelectContent>
           </Select>
           <p className="text-xs text-slate-500">
-            Só é possível acrescentar destinatários enquanto a campanha estiver em rascunho.
-            {draftCampaigns.length === 1 && campaignId && (
+            Acrescente destinatários por cidade enquanto a campanha estiver em rascunho ou agendada (antes do envio).
+            {appendableCampaigns.length === 1 && campaignId && (
               <span className="text-seguranca-yellow"> Campanha selecionada automaticamente.</span>
             )}
           </p>
-          {draftCampaigns.length === 0 && !campaignsQuery.isLoading && (
+          {appendableCampaigns.length === 0 && !campaignsQuery.isLoading && (
             <p className="text-xs text-amber-400/90 flex items-start gap-1.5 mt-2">
               <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               Crie uma campanha na aba <strong>Campanhas</strong> (status rascunho) para habilitar o botão abaixo.
@@ -316,6 +380,39 @@ const CampaignLeadsListTab: React.FC = () => {
                 )}
               </span>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/20"
+                  disabled={!selectedCityBatch}
+                  onClick={() => setSaveCityOpen(true)}
+                >
+                  <MapPin className="mr-1.5 h-3.5 w-3.5" />
+                  Criar lista desta cidade
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/20"
+                  disabled={filteredRecipients.length === 0}
+                  onClick={() => setSaveFullOpen(true)}
+                >
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  Guardar importação completa
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-seguranca-yellow/40 text-seguranca-yellow"
+                  disabled={!selectedCityBatch && filteredRecipients.length === 0}
+                  onClick={() => setLinkOpen(true)}
+                >
+                  <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                  Vincular a campanhas…
+                </Button>
                 <Button type="button" variant="outline" size="sm" className="border-white/20" onClick={exportCsv}>
                   Exportar CSV
                 </Button>
@@ -327,6 +424,7 @@ const CampaignLeadsListTab: React.FC = () => {
                     setRecipients([]);
                     setSegmentRules([]);
                     setSelectedCityBatch(null);
+                    setLoadListId('');
                   }}
                 >
                   Limpar lista
@@ -363,6 +461,16 @@ const CampaignLeadsListTab: React.FC = () => {
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
+              variant="outline"
+              className="border-white/20"
+              disabled={!selectedCityBatch}
+              onClick={() => setLinkOpen(true)}
+            >
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Vincular cidade a várias campanhas
+            </Button>
+            <Button
+              type="button"
               className="bg-seguranca-yellow text-seguranca-black hover:bg-seguranca-yellow/90"
               disabled={!!appendDisabledReason || appendMutation.isPending}
               onClick={() => appendMutation.mutate()}
@@ -380,6 +488,59 @@ const CampaignLeadsListTab: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {selectedCityBatch && (
+        <SaveCityImportedListDialog
+          open={saveCityOpen}
+          onOpenChange={setSaveCityOpen}
+          cityLabel={selectedCityBatch.cityLabel}
+          recipients={recipientsToAppend}
+          parentListName={masterListName}
+          onSaved={(id) => {
+            void queryClient.invalidateQueries({ queryKey: ['email-marketing-imported-lists'] });
+            toast({
+              title: 'Lista por cidade criada',
+              description: 'Use «Vincular a campanhas» ou a aba Listas importadas.',
+            });
+            setLoadListId(id);
+          }}
+        />
+      )}
+
+      <SaveCityImportedListDialog
+        open={saveFullOpen}
+        onOpenChange={setSaveFullOpen}
+        cityLabel={`Importação completa (${filteredRecipients.length.toLocaleString('pt-BR')} contatos)`}
+        recipients={filteredRecipients}
+        onSaved={(id) => {
+          const name = `Importação ${new Date().toLocaleDateString('pt-BR')}`;
+          setMasterListName(name);
+          void queryClient.invalidateQueries({ queryKey: ['email-marketing-imported-lists'] });
+          toast({
+            title: 'Importação completa guardada',
+            description: 'Agora pode criar listas por cidade a partir desta base.',
+          });
+          setLoadListId(id);
+        }}
+      />
+
+      <LinkListToCampaignsDialog
+        open={linkOpen}
+        onOpenChange={setLinkOpen}
+        recipients={selectedCityBatch ? recipientsToAppend : filteredRecipients}
+        listLabel={
+          selectedCityBatch
+            ? `${selectedCityBatch.cityLabel} (${recipientsToAppend.length})`
+            : `Importação (${filteredRecipients.length})`
+        }
+        initialCampaignIds={campaignId ? [campaignId] : []}
+        onLinked={() => {
+          void queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
+          if (campaignId) {
+            void queryClient.invalidateQueries({ queryKey: ['email-campaign-recipients', campaignId] });
+          }
+        }}
+      />
     </div>
   );
 };

@@ -90,7 +90,11 @@ function campaignStatusVariant(status?: string | null): 'default' | 'secondary' 
   }
 }
 
-const CampaignsTab: React.FC = () => {
+interface CampaignsTabProps {
+  onAddRecipientsByCity?: (campaignId: string) => void;
+}
+
+const CampaignsTab: React.FC<CampaignsTabProps> = ({ onAddRecipientsByCity }) => {
   const [searchParams] = useSearchParams();
   const leadRepliedInbox = searchParams.get('caixa') === 'respostas';
 
@@ -666,6 +670,7 @@ const CampaignsTab: React.FC = () => {
               <CampaignDetailPanel
                 campaign={selectedCampaign}
                 initialRecipientLogTab={leadRepliedInbox ? 'replied' : undefined}
+                onAddRecipientsByCity={onAddRecipientsByCity}
               />
             </>
           )}

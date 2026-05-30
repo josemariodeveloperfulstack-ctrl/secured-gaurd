@@ -24,6 +24,8 @@ export interface RecipientListGroupedProps {
   recipients: EmailCampaignRecipientInput[];
   onRemove: (email: string) => void;
   dark?: boolean;
+  /** Oculta a coluna de remoção (visualização da campanha). */
+  readOnly?: boolean;
   /** Dispara quando a cidade selecionada no painel esquerdo muda (lote para campanha). */
   onSelectedCityChange?: (batch: SelectedCityBatch | null) => void;
 }
@@ -32,6 +34,7 @@ export function RecipientListGrouped({
   recipients,
   onRemove,
   dark,
+  readOnly,
   onSelectedCityChange,
 }: RecipientListGroupedProps) {
   const [search, setSearch] = useState('');
@@ -279,7 +282,7 @@ export function RecipientListGrouped({
                         <th className="px-3 py-2 font-medium w-[45%]">E-mail</th>
                         <th className="px-3 py-2 font-medium w-[25%]">Nome</th>
                         <th className="px-3 py-2 font-medium hidden sm:table-cell">Empresa</th>
-                        <th className="px-3 py-2 w-8" />
+                        {!readOnly && <th className="px-3 py-2 w-8" />}
                       </tr>
                     </thead>
                     <tbody>
@@ -295,16 +298,18 @@ export function RecipientListGrouped({
                           <td className="px-3 py-1.5 text-slate-500 truncate max-w-[160px] hidden sm:table-cell">
                             {String(r.metadata?.company ?? '—')}
                           </td>
-                          <td className="px-2 py-1.5">
-                            <button
-                              type="button"
-                              className="text-slate-500 hover:text-rose-400"
-                              onClick={() => onRemove(r.email)}
-                              aria-label="Remover"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
+                          {!readOnly && (
+                            <td className="px-2 py-1.5">
+                              <button
+                                type="button"
+                                className="text-slate-500 hover:text-rose-400"
+                                onClick={() => onRemove(r.email)}
+                                aria-label="Remover"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

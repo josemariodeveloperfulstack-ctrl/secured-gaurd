@@ -5,6 +5,8 @@ import java.util.UUID;
 
 public record EmailLogRowDto(
         UUID id,
+        UUID recipientId,
+        UUID leadId,
         String recipientEmail,
         String recipientName,
         String status,
@@ -14,6 +16,9 @@ public record EmailLogRowDto(
         Instant readAt,
         Instant clickedAt,
         Instant repliedAt,
+        String replySubject,
+        String replyText,
+        String replyHtml,
         String bounceReason
 ) {
 }

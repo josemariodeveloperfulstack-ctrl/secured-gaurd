@@ -47,6 +47,7 @@ public interface EmailLogRepository extends JpaRepository<EmailLog, UUID> {
     @Query("""
             select l from EmailLog l
             join fetch l.recipient r
+            left join fetch r.lead
             where l.campaign.id = :campaignId
             order by l.createdAt desc
             """)
@@ -55,6 +56,7 @@ public interface EmailLogRepository extends JpaRepository<EmailLog, UUID> {
     @Query("""
             select l from EmailLog l
             join fetch l.recipient r
+            left join fetch r.lead
             where l.campaign.id = :campaignId
               and l.status in :statuses
             order by l.createdAt desc

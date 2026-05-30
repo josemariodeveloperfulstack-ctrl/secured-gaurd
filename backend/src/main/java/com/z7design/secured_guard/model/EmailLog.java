@@ -55,6 +55,15 @@ public class EmailLog {
     @Column(name = "replied_at")
     private Instant repliedAt;
 
+    @Column(name = "reply_subject", length = 500)
+    private String replySubject;
+
+    @Column(name = "reply_text", columnDefinition = "TEXT")
+    private String replyText;
+
+    @Column(name = "reply_html", columnDefinition = "TEXT")
+    private String replyHtml;
+
     @Column(name = "bounce_reason", columnDefinition = "TEXT")
     private String bounceReason;
 

@@ -60,6 +60,8 @@ export interface EmailCampaignMetrics {
 
 export interface EmailLogRow {
   id: string;
+  recipientId: string | null;
+  leadId: string | null;
   recipientEmail: string | null;
   recipientName: string | null;
   status: string;
@@ -69,6 +71,9 @@ export interface EmailLogRow {
   readAt: string | null;
   clickedAt: string | null;
   repliedAt: string | null;
+  replySubject: string | null;
+  replyText: string | null;
+  replyHtml: string | null;
   bounceReason: string | null;
 }
 
@@ -109,6 +114,19 @@ export interface EmailCampaignRecipientInput {
   metadata?: Record<string, unknown>;
   sourceType?: EmailRecipientSource;
   leadId?: string | null;
+}
+
+/** Destinatário persistido na campanha (GET /recipients). */
+export interface EmailCampaignRecipientRow {
+  id: string;
+  email: string;
+  name: string | null;
+  metadata: Record<string, unknown>;
+  sourceType: string;
+  leadId: string | null;
+  cityLabel: string;
+  emailMarketingSuppressed: boolean;
+  createdAt: string;
 }
 
 export interface CreateEmailCampaignPayload {
@@ -189,6 +207,13 @@ class EmailCampaignService {
 
   async getMetrics(campaignId: string): Promise<EmailCampaignMetrics> {
     const { data } = await api.get<EmailCampaignMetrics>(`/api/v1/email-campaigns/${campaignId}/metrics`);
+    return data;
+  }
+
+  async listRecipients(campaignId: string): Promise<EmailCampaignRecipientRow[]> {
+    const { data } = await api.get<EmailCampaignRecipientRow[]>(
+      `/api/v1/email-campaigns/${campaignId}/recipients`,
+    );
     return data;
   }
 

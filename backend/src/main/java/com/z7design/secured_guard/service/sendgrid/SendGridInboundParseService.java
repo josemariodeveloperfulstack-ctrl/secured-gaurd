@@ -65,6 +65,18 @@ public class SendGridInboundParseService {
         if (emailLog.getRepliedAt() == null) {
             emailLog.setRepliedAt(Instant.now());
         }
+        String subject = trimToNull(request.getParameter("subject"));
+        String text = trimToNull(request.getParameter("text"));
+        String html = trimToNull(request.getParameter("html"));
+        if (subject != null) {
+            emailLog.setReplySubject(subject.length() > 500 ? subject.substring(0, 500) : subject);
+        }
+        if (text != null) {
+            emailLog.setReplyText(text);
+        }
+        if (html != null) {
+            emailLog.setReplyHtml(html);
+        }
         if (emailLog.getRecipient() != null && emailLog.getRecipient().getLead() == null) {
             recipientLeadAutoCreationService.ensureLeadFor(emailLog.getRecipient());
         }
@@ -114,6 +126,14 @@ public class SendGridInboundParseService {
                 emailAttachmentRepository.save(att);
             }
         }
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String t = value.trim();
+        return t.isEmpty() ? null : t;
     }
 
     private static String extractEmail(String fromRaw) {

@@ -3,6 +3,7 @@ package com.z7design.secured_guard.service.sendgrid;
 import com.z7design.secured_guard.dto.sendgrid.CreateEmailCampaignRequest;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignMetricsDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignRecipientDto;
+import com.z7design.secured_guard.dto.sendgrid.EmailCampaignRecipientRowDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailLogRowDto;
 import com.z7design.secured_guard.dto.sendgrid.InactiveEmailRecipientDto;
@@ -132,8 +133,8 @@ public class EmailCampaignService {
     }
 
     /**
-     * Acrescenta destinatários a uma campanha em {@link EmailCampaignStatus#DRAFT},
-     * ignorando duplicados pelo e-mail (case-insensitive).
+     * Acrescenta destinatários a uma campanha em {@link EmailCampaignStatus#DRAFT} ou
+     * {@link EmailCampaignStatus#SCHEDULED} (antes do primeiro envio), ignorando duplicados pelo e-mail.
      */
     @Transactional
     public EmailCampaign appendRecipients(UUID campaignId, List<EmailCampaignRecipientDto> dtos) {
@@ -141,9 +142,10 @@ public class EmailCampaignService {
             return get(campaignId);
         }
         EmailCampaign campaign = get(campaignId);
-        if (campaign.getStatus() != EmailCampaignStatus.DRAFT) {
+        if (campaign.getStatus() != EmailCampaignStatus.DRAFT
+                && campaign.getStatus() != EmailCampaignStatus.SCHEDULED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Somente campanhas em rascunho permitem adicionar destinatários.");
+                    "Somente campanhas em rascunho ou agendadas (sem envio iniciado) permitem adicionar destinatários.");
         }
         java.util.Set<String> seen = campaign.getRecipients().stream()
                 .map(r -> r.getEmail().toLowerCase())
@@ -278,6 +280,14 @@ public class EmailCampaignService {
     }
 
     @Transactional(readOnly = true)
+    public List<EmailCampaignRecipientRowDto> listRecipients(UUID campaignId) {
+        get(campaignId);
+        return recipientRepository.findByCampaign_Id(campaignId).stream()
+                .map(this::toRecipientRowDto)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<InactiveEmailRecipientDto> listInactiveRecipients(UUID campaignId) {
         get(campaignId);
         return emailMarketingRejectionService.listByCampaign(campaignId).stream()
@@ -288,6 +298,39 @@ public class EmailCampaignService {
     @Transactional(readOnly = true)
     public List<String> findRejectedAmong(List<String> emails) {
         return emailMarketingRejectionService.findRejectedAmong(emails);
+    }
+
+    private EmailCampaignRecipientRowDto toRecipientRowDto(EmailCampaignRecipient r) {
+        UUID leadId = r.getLead() != null ? r.getLead().getId() : null;
+        return new EmailCampaignRecipientRowDto(
+                r.getId(),
+                r.getEmail(),
+                r.getName(),
+                r.getMetadata() != null ? r.getMetadata() : java.util.Map.of(),
+                r.getSourceType() != null ? r.getSourceType().name() : "MANUAL",
+                leadId,
+                cityLabelFromMetadata(r.getMetadata()),
+                r.isEmailMarketingSuppressed(),
+                r.getCreatedAt());
+    }
+
+    private static String cityLabelFromMetadata(java.util.Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return "Sem cidade / bairro";
+        }
+        for (String key : new String[] {"city", "cidade", "municipio", "município"}) {
+            Object v = metadata.get(key);
+            if (v != null && !String.valueOf(v).isBlank()) {
+                return String.valueOf(v).trim();
+            }
+        }
+        for (String key : new String[] {"bairro", "BAIRRO", "localidade", "LOCALIDADE"}) {
+            Object v = metadata.get(key);
+            if (v != null && !String.valueOf(v).isBlank()) {
+                return String.valueOf(v).trim();
+            }
+        }
+        return "Sem cidade / bairro";
     }
 
     private InactiveEmailRecipientDto toInactiveRecipientDto(EmailMarketingRejectedAddress rejected) {
@@ -545,8 +588,14 @@ public class EmailCampaignService {
 
     private EmailLogRowDto toLogRow(EmailLog l) {
         var r = l.getRecipient();
+        UUID leadId = null;
+        if (r != null && r.getLead() != null) {
+            leadId = r.getLead().getId();
+        }
         return new EmailLogRowDto(
                 l.getId(),
+                r != null ? r.getId() : null,
+                leadId,
                 r != null ? r.getEmail() : null,
                 r != null ? r.getName() : null,
                 l.getStatus() != null ? l.getStatus().name() : null,
@@ -556,6 +605,9 @@ public class EmailCampaignService {
                 l.getReadAt(),
                 l.getClickedAt(),
                 l.getRepliedAt(),
+                l.getReplySubject(),
+                l.getReplyText(),
+                l.getReplyHtml(),
                 l.getBounceReason());
     }
 

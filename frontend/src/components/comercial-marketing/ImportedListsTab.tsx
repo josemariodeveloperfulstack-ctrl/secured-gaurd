@@ -24,7 +24,8 @@ import { useToast } from '@/hooks/use-toast';
 import emailCampaignService, { type EmailMarketingImportedListSummary } from '@/services/emailCampaignService';
 import ImportedListEditorDialog from '@/components/comercial-marketing/ImportedListEditorDialog';
 import { formatDate } from '@/utils/formatters';
-import { ClipboardList, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ClipboardList, Link2, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import LinkListToCampaignsDialog from '@/components/comercial-marketing/LinkListToCampaignsDialog';
 
 const SOURCE_LABELS: Record<string, string> = {
   IMPORT: 'Planilha',
@@ -38,6 +39,7 @@ const ImportedListsTab: React.FC = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EmailMarketingImportedListSummary | null>(null);
+  const [linkList, setLinkList] = useState<EmailMarketingImportedListSummary | null>(null);
 
   const listsQuery = useQuery({
     queryKey: ['email-marketing-imported-lists'],
@@ -81,7 +83,8 @@ const ImportedListsTab: React.FC = () => {
               Listas importadas
             </CardTitle>
             <CardDescription className="text-seguranca-lightgray">
-              Guarde listas de contatos importadas por planilha ou colagem para reutilizar em campanhas.
+              Listas por cidade (ou importação completa) criadas na aba Lista de Leads. Vincule cada lista a uma ou
+              mais campanhas sem reimportar a planilha.
             </CardDescription>
           </div>
           <Button
@@ -146,6 +149,16 @@ const ImportedListsTab: React.FC = () => {
                               variant="ghost"
                               size="sm"
                               className="text-seguranca-lightgray hover:text-seguranca-yellow"
+                              onClick={() => setLinkList(row)}
+                            >
+                              <Link2 className="mr-1 h-4 w-4" />
+                              Vincular
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-seguranca-lightgray hover:text-seguranca-yellow"
                               onClick={() => openEdit(row)}
                             >
                               <Pencil className="mr-1 h-4 w-4" />
@@ -178,6 +191,17 @@ const ImportedListsTab: React.FC = () => {
         onOpenChange={setEditorOpen}
         listId={editingId}
         onSaved={() => void queryClient.invalidateQueries({ queryKey: ['email-marketing-imported-lists'] })}
+      />
+
+      <LinkListToCampaignsDialog
+        open={!!linkList}
+        onOpenChange={(o) => !o && setLinkList(null)}
+        listId={linkList?.id ?? null}
+        listLabel={linkList?.name}
+        onLinked={() => {
+          void queryClient.invalidateQueries({ queryKey: ['email-campaigns'] });
+          setLinkList(null);
+        }}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

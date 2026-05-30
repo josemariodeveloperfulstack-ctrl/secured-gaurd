@@ -7,6 +7,7 @@ import com.z7design.secured_guard.dto.sendgrid.SaveEmailMarketingImportedListReq
 import com.z7design.secured_guard.dto.sendgrid.AppendRecipientsRequest;
 import com.z7design.secured_guard.dto.sendgrid.CreateEmailCampaignRequest;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignMetricsDto;
+import com.z7design.secured_guard.dto.sendgrid.EmailCampaignRecipientRowDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailCampaignSummaryDto;
 import com.z7design.secured_guard.dto.sendgrid.EmailLogRowDto;
 import com.z7design.secured_guard.dto.sendgrid.ImportRecipientsResponse;
@@ -136,6 +137,11 @@ public class EmailCampaignController {
     @GetMapping("/{id}/metrics")
     public ResponseEntity<EmailCampaignMetricsDto> metrics(@PathVariable UUID id) {
         return ResponseEntity.ok(emailCampaignService.metrics(id));
+    }
+
+    @GetMapping("/{id}/recipients")
+    public ResponseEntity<List<EmailCampaignRecipientRowDto>> listRecipients(@PathVariable UUID id) {
+        return ResponseEntity.ok(emailCampaignService.listRecipients(id));
     }
 
     @GetMapping("/{id}/inactive-recipients")
