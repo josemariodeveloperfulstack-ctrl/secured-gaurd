@@ -32,6 +32,26 @@ export interface ReportFilters {
   centroCusto?: string;
   /** PDF contas a receber: RECEBIDOS | A_VENCER | VENCIDOS | INADIMPLENCIA | GERAL = período por emissão */
   contasReceberSegment?: string;
+  /** Ordenação do relatório de contas a receber (Excel/CSV e pré-visualização) */
+  contasReceberSortDir?: 'ASC' | 'DESC';
+}
+
+/** Ordena contas a receber por data de vencimento (crescente por defeito). */
+export function sortContasAReceberByVencimento<T extends { vencimento?: Date | string; dueDate?: Date | string }>(
+  contas: T[],
+  direction: 'ASC' | 'DESC' = 'ASC'
+): T[] {
+  const factor = direction === 'ASC' ? 1 : -1;
+  return [...contas].sort((a, b) => {
+    const dateA = a.dueDate ?? a.vencimento;
+    const dateB = b.dueDate ?? b.vencimento;
+    const timeA = dateA ? new Date(dateA).getTime() : Number.MAX_SAFE_INTEGER;
+    const timeB = dateB ? new Date(dateB).getTime() : Number.MAX_SAFE_INTEGER;
+    if (Number.isNaN(timeA) && Number.isNaN(timeB)) return 0;
+    if (Number.isNaN(timeA)) return 1;
+    if (Number.isNaN(timeB)) return -1;
+    return (timeA - timeB) * factor;
+  });
 }
 
 export class ReportGenerator {

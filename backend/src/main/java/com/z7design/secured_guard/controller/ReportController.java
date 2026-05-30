@@ -483,7 +483,8 @@ public class ReportController {
             @RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(value = "client", required = false) String client,
             @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "segment", required = false) String segment) {
+            @RequestParam(value = "segment", required = false) String segment,
+            @RequestParam(value = "sortDir", required = false, defaultValue = "ASC") String sortDir) {
         try {
             String effectiveSegment = (segment != null && !segment.isBlank()) ? segment : null;
             if (effectiveSegment == null && status != null && !status.isBlank()
@@ -491,7 +492,7 @@ public class ReportController {
                 effectiveSegment = "INADIMPLENCIA";
             }
             byte[] pdf = paymentReportService.generateAccountsReceivableReportPDF(
-                    startDate, endDate, client, status, null, null, null, null, null, null, effectiveSegment);
+                    startDate, endDate, client, status, null, null, null, null, null, null, effectiveSegment, sortDir);
             String filename = accountsReceivablePdfFilename(effectiveSegment);
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE)

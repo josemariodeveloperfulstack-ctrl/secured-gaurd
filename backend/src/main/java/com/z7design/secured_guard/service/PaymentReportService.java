@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -65,7 +66,8 @@ public class PaymentReportService {
             BigDecimal amountMax,
             String unitFilter,
             List<String> selectedIds,
-            String reportSegment) throws IOException {
+            String reportSegment,
+            String sortDir) throws IOException {
         String normalizedSegment = normalizeReceivableReportSegment(reportSegment);
         log.info(
                 "Gerando relatório PDF de contas a receber com layout padrão - Período: {} a {}, Cliente: {}, Empresa/Filial: {}, Status: {}, Segmento: {}, Categoria: {}, Método: {}, Valor: {} a {}, IDs: {}",
@@ -76,7 +78,7 @@ public class PaymentReportService {
             // Buscar dados com filtros
             List<AccountsReceivable> accounts = getAccountsReceivableFiltered(
                     startDate, endDate, clientFilter, unitFilter, statusFilter, categoryFilter,
-                    paymentMethodFilter, amountMin, amountMax, selectedIds, normalizedSegment);
+                    paymentMethodFilter, amountMin, amountMax, selectedIds, normalizedSegment, sortDir);
 
             log.info("Dados obtidos: {} contas a receber", accounts.size());
 
@@ -637,7 +639,8 @@ public class PaymentReportService {
             BigDecimal amountMin,
             BigDecimal amountMax,
             List<String> selectedIds,
-            String reportSegment) {
+            String reportSegment,
+            String sortDir) {
         List<AccountsReceivable> accounts = accountsReceivableRepository.findAll();
         log.info("Encontradas {} contas a receber no banco de dados", accounts.size());
 
@@ -660,6 +663,17 @@ public class PaymentReportService {
                 .filter(account -> selectedIds == null || selectedIds.isEmpty() ||
                         selectedIds.contains(account.getId().toString()))
                 .collect(Collectors.toList());
+        return sortAccountsReceivableByDueDate(accounts, sortDir);
+    }
+
+    private List<AccountsReceivable> sortAccountsReceivableByDueDate(List<AccountsReceivable> accounts, String sortDir) {
+        Comparator<AccountsReceivable> byDueDate = Comparator.comparing(
+                AccountsReceivable::getDueDate,
+                Comparator.nullsLast(Comparator.naturalOrder()));
+        if (sortDir != null && sortDir.trim().equalsIgnoreCase("DESC")) {
+            byDueDate = byDueDate.reversed();
+        }
+        return accounts.stream().sorted(byDueDate).collect(Collectors.toList());
     }
 
     /**

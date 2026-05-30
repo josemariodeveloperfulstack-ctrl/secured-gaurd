@@ -365,6 +365,7 @@ export const ContasAReceber: React.FC = () => {
       if (opts.segment) {
         params.set('reportSegment', opts.segment);
       }
+      params.set('sortDir', sortBy === 'vencimento' && sortDir ? sortDir : 'ASC');
 
       const qs = params.toString();
       const url = `/api/accounts-receivable/reports/pdf${qs ? `?${qs}` : ''}`;

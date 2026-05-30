@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { format, subDays, subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ReportGenerator, ReportData, ReportType, ReportFilters, REPORT_CONFIGS } from '@/utils/reportGenerator';
+import { ReportGenerator, ReportData, ReportType, ReportFilters, REPORT_CONFIGS, sortContasAReceberByVencimento } from '@/utils/reportGenerator';
 import { contasAPagarService } from '@/services/contasAPagarService';
 import { contasAReceberService } from '@/services/contasAReceberService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -79,7 +79,8 @@ const RelatoriosTab: React.FC = () => {
     endDate: new Date(),
     status: 'TODOS',
     tipo: 'TODOS',
-    contasReceberSegment: 'GERAL'
+    contasReceberSegment: 'GERAL',
+    contasReceberSortDir: 'ASC'
   });
 
   // Estado para filtros aplicados a uma empresa específica
@@ -294,10 +295,15 @@ const RelatoriosTab: React.FC = () => {
   };
 
   const gerarRelatorioContasReceber = async (periodo: string): Promise<ReportData> => {
-    const contas = await contasAReceberService.getContasAReceber({
-      startDate: format(filters.startDate!, 'yyyy-MM-dd'),
-      endDate: format(filters.endDate!, 'yyyy-MM-dd')
-    });
+    const contas = sortContasAReceberByVencimento(
+      await contasAReceberService.getContasAReceber({
+        startDate: format(filters.startDate!, 'yyyy-MM-dd'),
+        endDate: format(filters.endDate!, 'yyyy-MM-dd'),
+        sortBy: 'dueDate',
+        sortDir: filters.contasReceberSortDir ?? 'ASC'
+      }),
+      filters.contasReceberSortDir ?? 'ASC'
+    );
 
     const rows = contas.map(conta => [
       conta.id,
@@ -314,9 +320,14 @@ const RelatoriosTab: React.FC = () => {
     const recebidas = contas.filter(c => c.status === 'RECEBIDA').length;
     const pendentes = contas.filter(c => c.status === 'ABERTA').length;
 
+    const sortLabel =
+      (filters.contasReceberSortDir ?? 'ASC') === 'DESC'
+        ? 'Ordenado por vencimento (mais recente primeiro)'
+        : 'Ordenado por vencimento (mais antigo primeiro)';
+
     return {
       title: 'Relatório de Contas a Receber',
-      subtitle: 'Detalhamento de todas as contas a receber',
+      subtitle: `Detalhamento de todas as contas a receber — ${sortLabel}`,
       period: periodo,
       headers: REPORT_CONFIGS[ReportType.CONTAS_RECEBER].headers,
       rows,
@@ -486,6 +497,9 @@ const RelatoriosTab: React.FC = () => {
           ) {
             queryParams.append('segment', filters.contasReceberSegment.trim());
           }
+          if (selectedReport === ReportType.CONTAS_RECEBER) {
+            queryParams.append('sortDir', filters.contasReceberSortDir ?? 'ASC');
+          }
 
           switch (selectedReport) {
             case ReportType.CONTAS_PAGAR:
@@ -580,6 +594,9 @@ const RelatoriosTab: React.FC = () => {
         filters.contasReceberSegment !== 'GERAL'
       ) {
         queryParams.append('segment', filters.contasReceberSegment.trim());
+      }
+      if (selectedReport === ReportType.CONTAS_RECEBER) {
+        queryParams.append('sortDir', filters.contasReceberSortDir ?? 'ASC');
       }
 
       let endpoint = '';
@@ -1228,37 +1245,62 @@ const RelatoriosTab: React.FC = () => {
                 </div>
               </div>
               {selectedReport === ReportType.CONTAS_RECEBER ? (
-                <div className="mt-4">
-                  <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">
-                    Escopo do relatório (PDF)
-                  </label>
-                  <Select
-                    value={filters.contasReceberSegment || 'GERAL'}
-                    onValueChange={(value) =>
-                      setFilters((prev) => ({ ...prev, contasReceberSegment: value }))
-                    }
-                  >
-                    <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow">
-                      <SelectValue placeholder="Geral (período por emissão)" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-seguranca-black border-gray-600">
-                      <SelectItem value="GERAL" className="text-white hover:bg-seguranca-graphite">
-                        Geral (período por emissão)
-                      </SelectItem>
-                      <SelectItem value="RECEBIDOS" className="text-white hover:bg-seguranca-graphite">
-                        Recebidos
-                      </SelectItem>
-                      <SelectItem value="A_VENCER" className="text-white hover:bg-seguranca-graphite">
-                        A vencer
-                      </SelectItem>
-                      <SelectItem value="VENCIDOS" className="text-white hover:bg-seguranca-graphite">
-                        Vencidos
-                      </SelectItem>
-                      <SelectItem value="INADIMPLENCIA" className="text-white hover:bg-seguranca-graphite">
-                        Inadimplência
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">
+                      Escopo do relatório (PDF)
+                    </label>
+                    <Select
+                      value={filters.contasReceberSegment || 'GERAL'}
+                      onValueChange={(value) =>
+                        setFilters((prev) => ({ ...prev, contasReceberSegment: value }))
+                      }
+                    >
+                      <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                        <SelectValue placeholder="Geral (período por emissão)" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="GERAL" className="text-white hover:bg-seguranca-graphite">
+                          Geral (período por emissão)
+                        </SelectItem>
+                        <SelectItem value="RECEBIDOS" className="text-white hover:bg-seguranca-graphite">
+                          Recebidos
+                        </SelectItem>
+                        <SelectItem value="A_VENCER" className="text-white hover:bg-seguranca-graphite">
+                          A vencer
+                        </SelectItem>
+                        <SelectItem value="VENCIDOS" className="text-white hover:bg-seguranca-graphite">
+                          Vencidos
+                        </SelectItem>
+                        <SelectItem value="INADIMPLENCIA" className="text-white hover:bg-seguranca-graphite">
+                          Inadimplência
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-seguranca-lightgray mb-2 block">
+                      Ordenação por vencimento
+                    </label>
+                    <Select
+                      value={filters.contasReceberSortDir || 'ASC'}
+                      onValueChange={(value: 'ASC' | 'DESC') =>
+                        setFilters((prev) => ({ ...prev, contasReceberSortDir: value }))
+                      }
+                    >
+                      <SelectTrigger className="border-gray-600 bg-seguranca-graphite text-white focus:border-seguranca-yellow focus:ring-seguranca-yellow">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-seguranca-black border-gray-600">
+                        <SelectItem value="ASC" className="text-white hover:bg-seguranca-graphite">
+                          Crescente (mais antigo primeiro)
+                        </SelectItem>
+                        <SelectItem value="DESC" className="text-white hover:bg-seguranca-graphite">
+                          Decrescente (mais recente primeiro)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1291,16 +1333,24 @@ const RelatoriosTab: React.FC = () => {
                 <p>• Período: {filters.startDate ? format(filters.startDate, 'dd/MM/yyyy') : 'Não definido'} - {filters.endDate ? format(filters.endDate, 'dd/MM/yyyy') : 'Não definido'}</p>
                 <p>• Status: {filters.status}</p>
                 <p>• Tipo: {filters.tipo}</p>
-                {selectedReport === ReportType.CONTAS_RECEBER &&
-                filters.contasReceberSegment &&
-                filters.contasReceberSegment !== 'GERAL' ? (
-                  <p>
-                    • Escopo contas a receber (PDF):{' '}
-                    {filters.contasReceberSegment === 'RECEBIDOS' && 'Recebidos'}
-                    {filters.contasReceberSegment === 'A_VENCER' && 'A vencer'}
-                    {filters.contasReceberSegment === 'VENCIDOS' && 'Vencidos'}
-                    {filters.contasReceberSegment === 'INADIMPLENCIA' && 'Inadimplência'}
-                  </p>
+                {selectedReport === ReportType.CONTAS_RECEBER ? (
+                  <>
+                    {filters.contasReceberSegment && filters.contasReceberSegment !== 'GERAL' ? (
+                      <p>
+                        • Escopo contas a receber (PDF):{' '}
+                        {filters.contasReceberSegment === 'RECEBIDOS' && 'Recebidos'}
+                        {filters.contasReceberSegment === 'A_VENCER' && 'A vencer'}
+                        {filters.contasReceberSegment === 'VENCIDOS' && 'Vencidos'}
+                        {filters.contasReceberSegment === 'INADIMPLENCIA' && 'Inadimplência'}
+                      </p>
+                    ) : null}
+                    <p>
+                      • Ordenação: vencimento{' '}
+                      {(filters.contasReceberSortDir ?? 'ASC') === 'DESC'
+                        ? '(decrescente)'
+                        : '(crescente)'}
+                    </p>
+                  </>
                 ) : null}
                 <p>• Formato: {selectedFormat}</p>
               </div>
