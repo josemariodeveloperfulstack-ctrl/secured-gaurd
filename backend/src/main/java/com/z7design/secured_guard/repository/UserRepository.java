@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +22,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByCpf(String cpf);
     boolean existsByUsername(String username);
     Optional<User> findByEmail(String email);
+
+    Optional<User> findByEmailIgnoreCase(String email);
     Optional<User> findByWhatsapp(String whatsapp);
     boolean existsByEmail(String email);
     
@@ -88,4 +92,43 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "JOIN Employee e ON e.user.id = u.id " +
            "WHERE e.document = :cpf")
     Optional<User> findByEmployeeCpf(@Param("cpf") String cpf);
+
+    @Query(
+            value = "SELECT DISTINCT u FROM User u LEFT JOIN u.roles r WHERE "
+                    + "(:search IS NULL OR :search = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.username, '')) LIKE LOWER(CONCAT('%', :search, '%'))) "
+                    + "AND (:role IS NULL OR :role = '' OR r.name = :role "
+                    + "OR (:role = 'ADMINISTRADOR' AND r.name = 'ADMIN'))",
+            countQuery = "SELECT COUNT(DISTINCT u) FROM User u LEFT JOIN u.roles r WHERE "
+                    + "(:search IS NULL OR :search = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.username, '')) LIKE LOWER(CONCAT('%', :search, '%'))) "
+                    + "AND (:role IS NULL OR :role = '' OR r.name = :role "
+                    + "OR (:role = 'ADMINISTRADOR' AND r.name = 'ADMIN'))")
+    Page<User> findPagedFiltered(
+            @Param("search") String search,
+            @Param("role") String role,
+            Pageable pageable);
+
+    @Query(
+            value = "SELECT DISTINCT u FROM User u LEFT JOIN u.roles r WHERE "
+                    + "u.id IN :userIds AND "
+                    + "(:search IS NULL OR :search = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.username, '')) LIKE LOWER(CONCAT('%', :search, '%'))) "
+                    + "AND (:role IS NULL OR :role = '' OR r.name = :role "
+                    + "OR (:role = 'ADMINISTRADOR' AND r.name = 'ADMIN'))",
+            countQuery = "SELECT COUNT(DISTINCT u) FROM User u LEFT JOIN u.roles r WHERE "
+                    + "u.id IN :userIds AND "
+                    + "(:search IS NULL OR :search = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) "
+                    + "OR LOWER(COALESCE(u.username, '')) LIKE LOWER(CONCAT('%', :search, '%'))) "
+                    + "AND (:role IS NULL OR :role = '' OR r.name = :role "
+                    + "OR (:role = 'ADMINISTRADOR' AND r.name = 'ADMIN'))")
+    Page<User> findPagedFilteredOnline(
+            @Param("search") String search,
+            @Param("role") String role,
+            @Param("userIds") java.util.Collection<UUID> userIds,
+            Pageable pageable);
 } 

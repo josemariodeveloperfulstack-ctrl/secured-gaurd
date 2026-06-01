@@ -1,9 +1,15 @@
 package com.z7design.secured_guard.service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +19,9 @@ import com.z7design.secured_guard.model.User;
 import com.z7design.secured_guard.model.enums.UserStatus;
 import com.z7design.secured_guard.repository.UserRepository;
 import com.z7design.secured_guard.model.Role;
+import com.z7design.secured_guard.model.UserGroupEntity;
 import com.z7design.secured_guard.repository.RoleRepository;
+import com.z7design.secured_guard.repository.UserGroupRepository;
 import com.z7design.secured_guard.model.Permission;
 import com.z7design.secured_guard.security.JwtService;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
@@ -37,7 +45,9 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
+    private final UserGroupRepository userGroupRepository;
     private final JwtService jwtService;
+    private final UserOnlineStatusService userOnlineStatusService;
 
     public Optional<User> findById(UUID id) {
         return userRepository.findById(id);
@@ -45,6 +55,28 @@ public class UserService {
 
     public List<User> findAll() {
         return new java.util.ArrayList<>(userRepository.findAllDistinct());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<User> findAllPaged(int page, int size, String search, String role, boolean onlineOnly) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.ASC, "name"));
+
+        String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String roleParam = (role != null && !role.trim().isEmpty() && !"all".equalsIgnoreCase(role.trim()))
+                ? role.trim()
+                : null;
+
+        if (onlineOnly) {
+            Set<UUID> onlineIds = userOnlineStatusService.getOnlineUserIds();
+            if (onlineIds == null || onlineIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+            return userRepository.findPagedFilteredOnline(searchParam, roleParam, onlineIds, pageable);
+        }
+
+        return userRepository.findPagedFiltered(searchParam, roleParam, pageable);
     }
 
     public User createFromRequest(CreateUserRequest request) {
@@ -63,6 +95,9 @@ public class UserService {
             throw new IllegalArgumentException("Nome de usuário não pode ser nulo ou vazio");
         }
 
+        request.setEmail(normalizeEmail(request.getEmail()));
+        request.setUsername(request.getUsername().trim());
+
         if (!StringUtils.hasText(request.getPassword())) {
             throw new IllegalArgumentException("Senha não pode ser nula ou vazia");
         }
@@ -76,8 +111,8 @@ public class UserService {
             throw new IllegalArgumentException("Nome de usuário já está em uso");
         }
 
-        // Verificar se email já existe
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        // Verificar se email já existe (case-insensitive)
+        if (userRepository.findByEmailIgnoreCase(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email já está em uso");
         }
 
@@ -99,14 +134,13 @@ public class UserService {
                     "Senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial");
         }
 
-        // Buscar roles do banco de dados pelos nomes (Array de Strings)
-        System.out.println("🔍 Buscando roles: " + request.getRoles());
-        List<Role> rolesFromDb = roleRepository.findByNames(request.getRoles());
-        System.out.println("✅ Roles encontrados: " + rolesFromDb.size());
+        List<String> roleNamesToLookup = resolveRoleNamesForLookup(request.getRoles());
+        log.info("Buscando roles para criação: {}", roleNamesToLookup);
+        List<Role> rolesFromDb = roleRepository.findByNames(roleNamesToLookup);
 
         if (rolesFromDb.isEmpty()) {
             throw new IllegalArgumentException(
-                    "Nenhuma função válida encontrada. Certifique-se de que as funções existem no banco de dados.");
+                    "Nenhuma função válida encontrada. Roles informados: " + request.getRoles());
         }
 
         // Determinar status do usuário
@@ -234,12 +268,16 @@ public class UserService {
         return userRepository.save(existingUser);
     }
 
+    @Transactional
     public User updateFromRequest(UUID id, com.z7design.secured_guard.dto.UpdateUserRequest request) {
         log.info("Atualizando usuário {} com dados: name={}, email={}, username={}, roles={}",
                 id, request.getName(), request.getEmail(), request.getUsername(), request.getRoles());
 
         User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        // Grupos podem ser alterados via API nativa (user_group_membership); sincroniza antes do save
+        syncUserGroupsFromDatabase(existingUser);
 
         if (!StringUtils.hasText(request.getName())) {
             throw new IllegalArgumentException("Nome não pode ser vazio");
@@ -252,6 +290,9 @@ public class UserService {
         if (!StringUtils.hasText(request.getUsername())) {
             throw new IllegalArgumentException("Username não pode ser vazio");
         }
+
+        request.setEmail(normalizeEmail(request.getEmail()));
+        request.setUsername(request.getUsername().trim());
 
         // Validar username único (se estiver sendo alterado)
         String existingUsername = existingUser.getUsername();
@@ -307,20 +348,18 @@ public class UserService {
 
         // Atualizar roles se fornecidas (ou se lista vazia para remover todas)
         if (request.getRoles() != null) {
-            var roleNames = request.getRoles(); // Já é uma lista de strings
-            var rolesFromDb = roleRepository.findByNames(roleNames);
-
-            // Deduplicar rpor nome caso existam entradas repetidas no banco com IDs diferentes
+            var roleNames = request.getRoles();
+            var rolesFromDb = roleRepository.findByNames(resolveRoleNamesForLookup(roleNames));
             var uniqueRoles = new java.util.HashSet<>(rolesFromDb);
-            
-            // Se roles foram solicitados mas nenhum foi encontrado, lançar erro preventivo
+
             if (!roleNames.isEmpty() && uniqueRoles.isEmpty()) {
                 throw new IllegalArgumentException("Nenhum role válido encontrado. Roles fornecidos: " + roleNames);
             }
 
-            existingUser.setRoles(uniqueRoles);
+            existingUser.getRoles().clear();
+            existingUser.getRoles().addAll(uniqueRoles);
             log.info("Roles atualizadas para usuário {}: {}", id,
-                    uniqueRoles.stream().map(r -> r.getName()).collect(java.util.stream.Collectors.toList()));
+                    uniqueRoles.stream().map(Role::getName).collect(Collectors.toList()));
         } else {
             log.info("Roles não fornecidas no request, mantendo roles existentes para usuário {}", id);
         }
@@ -355,10 +394,54 @@ public class UserService {
             User savedUser = userRepository.save(existingUser);
             log.info("Usuário {} atualizado com sucesso", id);
             return savedUser;
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Violação de integridade ao atualizar usuário {}: {}", id, e.getMessage());
+            throw new IllegalArgumentException(
+                    "Não foi possível salvar o usuário. Verifique username, email ou roles duplicados.");
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Erro ao salvar usuário {}: {}", id, e.getMessage(), e);
             throw new RuntimeException("Erro ao salvar usuário: " + e.getMessage(), e);
         }
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * ADMINISTRADOR no frontend; bancos antigos podem ter apenas ADMIN.
+     */
+    private List<String> resolveRoleNamesForLookup(List<String> roleNames) {
+        if (roleNames == null || roleNames.isEmpty()) {
+            return roleNames;
+        }
+        List<String> resolved = new ArrayList<>();
+        for (String name : roleNames) {
+            if ("ADMINISTRADOR".equals(name) && roleRepository.findByName("ADMINISTRADOR").isEmpty()) {
+                resolved.add("ADMIN");
+            } else {
+                resolved.add(name);
+            }
+        }
+        return resolved.stream().distinct().collect(Collectors.toList());
+    }
+
+    /**
+     * Alinha a coleção JPA de grupos com user_group_membership após remoções via SQL nativo.
+     */
+    private void syncUserGroupsFromDatabase(User user) {
+        List<UserGroupEntity> groupsFromDb = userGroupRepository.findByUserId(user.getId());
+        if (user.getGroups() == null) {
+            user.setGroups(new java.util.HashSet<>());
+        } else {
+            user.getGroups().clear();
+        }
+        user.getGroups().addAll(groupsFromDb);
     }
 
     public void delete(UUID id) {
@@ -554,21 +637,24 @@ public class UserService {
         User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
 
+        String normalizedEmail = normalizeEmail(request.getEmail());
+        request.setEmail(normalizedEmail);
+
         // Validar se o email não está sendo usado por outro usuário
-        if (!existingUser.getEmail().equals(request.getEmail())) {
-            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (!existingUser.getEmail().equalsIgnoreCase(normalizedEmail)) {
+            if (userRepository.findByEmailIgnoreCase(normalizedEmail).isPresent()) {
                 throw new IllegalArgumentException("Email já está em uso por outro usuário");
             }
         }
 
         // Validar formato do email
-        if (!request.getEmail().matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+        if (!normalizedEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
             throw new IllegalArgumentException("Formato de email inválido");
         }
 
         // Atualizar dados básicos
         existingUser.setName(request.getName().trim());
-        existingUser.setEmail(request.getEmail().trim());
+        existingUser.setEmail(normalizedEmail);
         existingUser.setWhatsapp(request.getWhatsapp() != null ? request.getWhatsapp().trim() : null);
 
         // Se está alterando a senha, validar e atualizar

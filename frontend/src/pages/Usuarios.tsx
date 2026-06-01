@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { StandardLayout } from '@/components/StandardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { userService } from '@/services/userService';
+import { userService, UserPageResponse } from '@/services/userService';
 import { User, UserRole } from '@/types/user';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -34,13 +35,36 @@ import { UserCreateModal } from '@/components/usuarios/UserCreateModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
+const PAGE_SIZE = 50;
+
+function extractRoleNames(roles: unknown[] | undefined): string[] {
+  if (!roles) return [];
+  if (roles.length === 0) return [];
+  if (typeof roles[0] === 'string') return roles as string[];
+  return (roles as { name?: string }[]).map((r) => r.name).filter(Boolean) as string[];
+}
+
+const ROLE_FILTER_OPTIONS = [
+  'SUPER_ADMIN',
+  'ADMINISTRADOR',
+  'RH',
+  'SUPERVISOR',
+  'COLABORADOR',
+  'FINANCEIRO',
+  'TI_SUPORTE',
+  'AUDITOR',
+  'COMERCIAL',
+  'GESTOR',
+  'OPERACIONAL',
+];
+
 const Usuarios: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'all' | 'online'>('all');
-  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
@@ -54,109 +78,109 @@ const Usuarios: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
-
-  // Recarregar usuários quando a aba "Online" for ativada para garantir status atualizado
-  useEffect(() => {
-    if (activeTab === 'online') {
-      // Pequeno delay para garantir que o WebSocket tenha tempo de atualizar
-      const timer = setTimeout(() => {
-        loadUsers();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab]);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
-    filterUsers();
-  }, [users, searchTerm, roleFilter, activeTab]);
+    setPage(0);
+  }, [debouncedSearch, roleFilter, activeTab]);
 
-  const loadUsers = async () => {
-    try {
-      setIsLoading(true);
-      const usersData = await userService.getAllUsers();
-      // Garantir que isOnline está sempre definido
-      const usersWithOnlineStatus = usersData.map(user => ({
-        ...user,
-        isOnline: Boolean(user.isOnline)
-      }));
+  const {
+    data: usersPage,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+  } = useQuery({
+    queryKey: ['users', 'paged', page, debouncedSearch, roleFilter, activeTab],
+    queryFn: async () => {
+      const mapUsers = (list: Awaited<ReturnType<typeof userService.getAllUsers>>) =>
+        list.map((user) => ({
+          ...user,
+          isOnline: user.isOnline ?? false,
+        }));
 
-      // Log apenas quando há usuários online para debug
-      const onlineUsers = usersWithOnlineStatus.filter(u => Boolean(u.isOnline));
-      if (onlineUsers.length > 0) {
-        console.log('📥 [Usuarios] Usuários carregados:', usersWithOnlineStatus.length, '| Online:', onlineUsers.length);
-      }
-
-      setUsers(usersWithOnlineStatus);
-    } catch (error: any) {
-      console.error('Erro ao carregar usuários:', error);
-
-      if (error.response?.status === 403 || error.response?.status === 401) {
-        toast({
-          title: 'Acesso Negado',
-          description: 'Você não tem permissão para visualizar usuários.',
-          variant: 'destructive',
+      try {
+        const result = await userService.getUsersPaged({
+          page,
+          size: PAGE_SIZE,
+          search: debouncedSearch,
+          role: roleFilter,
+          onlineOnly: activeTab === 'online',
         });
-      } else {
-        toast({
-          title: 'Erro ao Carregar',
-          description: 'Não foi possível carregar os usuários. Verifique sua conexão.',
-          variant: 'destructive',
-        });
+        return {
+          ...result,
+          content: mapUsers(result.content),
+        };
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status !== 400 && status !== 404) {
+          throw err;
+        }
+        const all = mapUsers(await userService.getAllUsers());
+        let filtered = all;
+        if (activeTab === 'online') {
+          filtered = filtered.filter((u) => Boolean(u.isOnline));
+        }
+        if (debouncedSearch) {
+          const term = debouncedSearch.toLowerCase();
+          filtered = filtered.filter(
+            (u) =>
+              u.name?.toLowerCase().includes(term) ||
+              u.email?.toLowerCase().includes(term) ||
+              u.username?.toLowerCase().includes(term)
+          );
+        }
+        if (roleFilter !== 'all') {
+          filtered = filtered.filter((u) =>
+            extractRoleNames(u.roles as string[]).includes(roleFilter)
+          );
+        }
+        const start = page * PAGE_SIZE;
+        const slice = filtered.slice(start, start + PAGE_SIZE);
+        return {
+          content: slice,
+          totalElements: filtered.length,
+          totalPages: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),
+          page,
+          size: PAGE_SIZE,
+          onlineCount: all.filter((u) => Boolean(u.isOnline)).length,
+        };
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    placeholderData: (previous) => previous,
+  });
 
-  // Função utilitária para extrair nomes dos roles
-  const extractRoleNames = (roles: any[] | undefined): string[] => {
-    if (!roles) return [];
-    if (roles.length === 0) return [];
-    if (typeof roles[0] === 'string') return roles as string[];
-    return (roles as any[]).map((r) => r.name);
-  };
+  const filteredUsers = usersPage?.content ?? [];
+  const totalElements = usersPage?.totalElements ?? 0;
+  const totalPages = usersPage?.totalPages ?? 0;
+  const onlineCount = usersPage?.onlineCount ?? 0;
 
-  const filterUsers = () => {
-    let filtered = users;
-
-    // Filtro por online - aplicar PRIMEIRO para garantir que todos os online sejam considerados
-    if (activeTab === 'online') {
-      filtered = filtered.filter(user => {
-        const isOnline = Boolean(user.isOnline);
-        return isOnline;
+  useEffect(() => {
+    if (!isError) return;
+    const err = error as { response?: { status?: number } };
+    if (err?.response?.status === 403 || err?.response?.status === 401) {
+      toast({
+        title: 'Acesso Negado',
+        description: 'Você não tem permissão para visualizar usuários.',
+        variant: 'destructive',
       });
-      // Log apenas quando há discrepância
-      const onlineCount = filtered.length;
-      const expectedCount = users.filter(u => Boolean(u.isOnline)).length;
-      if (onlineCount !== expectedCount) {
-        console.warn('⚠️ [Usuarios] Discrepância no filtro online:', {
-          filtrados: onlineCount,
-          esperados: expectedCount,
-          total: users.length
-        });
-      }
+    } else {
+      toast({
+        title: 'Erro ao Carregar',
+        description: 'Não foi possível carregar os usuários. Verifique sua conexão.',
+        variant: 'destructive',
+      });
     }
+  }, [isError, error, toast]);
 
-    // Filtro por busca
-    if (searchTerm) {
-      const normalizedTerm = searchTerm.toLowerCase();
-      filtered = filtered.filter(user =>
-        (user.name && user.name.toLowerCase().includes(normalizedTerm)) ||
-        (user.email && user.email.toLowerCase().includes(normalizedTerm)) ||
-        (user.username && user.username.toLowerCase().includes(normalizedTerm)) ||
-        extractRoleNames(user.roles).some((r: string) => r.toLowerCase().includes(normalizedTerm))
-      );
-    }
-
-    // Filtro por role
-    if (roleFilter !== 'all') {
-      filtered = filtered.filter(user => extractRoleNames(user.roles).includes(roleFilter));
-    }
-
-    setFilteredUsers(filtered);
-  };
+  const invalidateUsers = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['users', 'paged'] });
+  }, [queryClient]);
 
   const getRoleDisplayName = (role: string) => {
     const roleNames: Record<string, string> = {
@@ -221,34 +245,37 @@ const Usuarios: React.FC = () => {
   };
 
   const handleUserCreated = () => {
-    loadUsers();
+    invalidateUsers();
   };
 
   const handleUserUpdated = () => {
-    loadUsers();
+    invalidateUsers();
   };
 
   const handleUserDeleted = () => {
-    loadUsers();
+    invalidateUsers();
   };
-
-  const roles = Array.from(new Set(users.flatMap(user => extractRoleNames(user.roles))));
-  const onlineCount = users.filter(user => Boolean(user.isOnline)).length;
 
   useWebSocket({
     token: localStorage.getItem('token') || '',
     username: currentUser?.username || currentUser?.email || currentUser?.id || '',
     onUserStatus: (event) => {
-      setUsers(prev => {
-        const updated = prev.map(u => {
-          if (u.id === event.userId) {
-            return { ...u, isOnline: Boolean(event.isOnline) };
-          }
-          return u;
-        });
-        return updated;
-      });
-    }
+      queryClient.setQueriesData<UserPageResponse>(
+        { queryKey: ['users', 'paged'] },
+        (prev) => {
+          if (!prev) return prev;
+          const nextContent = prev.content.map((u) =>
+            u.id === event.userId ? { ...u, isOnline: Boolean(event.isOnline) } : u
+          );
+          const wasOnline = prev.content.some((u) => u.id === event.userId && u.isOnline);
+          const isNowOnline = Boolean(event.isOnline);
+          let nextOnlineCount = prev.onlineCount;
+          if (wasOnline && !isNowOnline) nextOnlineCount = Math.max(0, nextOnlineCount - 1);
+          if (!wasOnline && isNowOnline) nextOnlineCount += 1;
+          return { ...prev, content: nextContent, onlineCount: nextOnlineCount };
+        }
+      );
+    },
   });
 
   if (isLoading) {
@@ -271,7 +298,11 @@ const Usuarios: React.FC = () => {
   return (
     <StandardLayout
       title="Usuários"
-      subtitle={`${filteredUsers.length} usuário${filteredUsers.length !== 1 ? 's' : ''} encontrado${filteredUsers.length !== 1 ? 's' : ''} • ${onlineCount} online`}
+      subtitle={
+        activeTab === 'online'
+          ? `${totalElements} online • ${onlineCount} no sistema`
+          : `${totalElements} usuário${totalElements !== 1 ? 's' : ''} • ${onlineCount} online`
+      }
     >
       <div className="space-y-6">
         {/* Filtros */}
@@ -297,7 +328,7 @@ const Usuarios: React.FC = () => {
                 className="bg-seguranca-black border border-gray-600 rounded-md px-3 py-2 text-seguranca-lightgray"
               >
                 <option value="all">Todas as permissões</option>
-                {roles.map(role => (
+                {ROLE_FILTER_OPTIONS.map((role) => (
                   <option key={role} value={role}>{getRoleDisplayName(role)}</option>
                 ))}
               </select>
@@ -316,7 +347,7 @@ const Usuarios: React.FC = () => {
                 className={activeTab === 'all' ? 'bg-seguranca-red hover:bg-seguranca-darkred' : 'border-gray-600 text-seguranca-lightgray hover:bg-seguranca-black'}
                 onClick={() => setActiveTab('all')}
               >
-                Todos ({users.length})
+                Todos ({totalElements})
               </Button>
               <Button
                 variant={activeTab === 'online' ? 'default' : 'outline'}
@@ -540,6 +571,35 @@ const Usuarios: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-600">
+                <p className="text-sm text-seguranca-lightgray">
+                  Página {page + 1} de {totalPages} • {PAGE_SIZE} por página
+                  {isFetching ? ' • atualizando…' : ''}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-gray-600 text-seguranca-lightgray"
+                    disabled={page <= 0 || isFetching}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-gray-600 text-seguranca-lightgray"
+                    disabled={page >= totalPages - 1 || isFetching}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Próxima
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

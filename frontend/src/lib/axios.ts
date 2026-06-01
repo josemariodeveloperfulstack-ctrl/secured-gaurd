@@ -138,9 +138,18 @@ api.interceptors.response.use(
       }
     }
     
+    const status = error.response?.status;
+    const errorData = error.response?.data;
     if (isDebugMode()) {
-      console.error('❌ Axios Response Error:', error.response?.status, error.config?.url);
-      console.error('❌ Error details:', error.response?.data);
+      console.error('❌ Axios Response Error:', status, error.config?.url);
+      console.error('❌ Error details:', errorData);
+    } else if (status && status >= 400 && status < 500 && errorData && typeof errorData === 'object') {
+      const msg =
+        (errorData as { message?: string }).message ||
+        (errorData as { error?: string }).error;
+      if (msg) {
+        console.warn(`⚠️ API ${status} ${error.config?.url}:`, msg);
+      }
     }
     const originalRequest = error.config;
 

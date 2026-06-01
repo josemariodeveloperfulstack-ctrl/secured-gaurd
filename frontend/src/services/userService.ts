@@ -19,6 +19,15 @@ export interface CreateUserRequest {
   active?: boolean;
 }
 
+export interface UserPageResponse {
+  content: User[];
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  size: number;
+  onlineCount: number;
+}
+
 export interface UpdateUserRequest {
   name?: string;
   username?: string;
@@ -39,6 +48,25 @@ export interface UpdateUserRequest {
 export const userService = {
   async getAllUsers(): Promise<User[]> {
     const response = await api.get('/users');
+    return response.data;
+  },
+
+  async getUsersPaged(params: {
+    page?: number;
+    size?: number;
+    search?: string;
+    role?: string;
+    onlineOnly?: boolean;
+  }): Promise<UserPageResponse> {
+    const response = await api.get('/users/paged', {
+      params: {
+        page: params.page ?? 0,
+        size: params.size ?? 50,
+        search: params.search?.trim() || undefined,
+        role: params.role && params.role !== 'all' ? params.role : undefined,
+        onlineOnly: params.onlineOnly ? true : undefined,
+      },
+    });
     return response.data;
   },
 

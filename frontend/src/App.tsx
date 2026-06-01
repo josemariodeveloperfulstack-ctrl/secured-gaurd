@@ -1,12 +1,11 @@
 import React, { useEffect, Suspense, lazy } from 'react';
 import type { UserRole } from '@/types/user';
+import { FULL_ACCESS_ROLES } from '@/utils/permissions';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from '@/contexts/AuthContext';
-import WebSocketConnector from '@/components/WebSocketConnector';
 import { NotificationProvider } from '@/components/NotificationSystem';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { SessionTimeoutManager } from '@/components/SessionTimeoutManager';
 
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -17,6 +16,7 @@ import { AppUpdateNotifier } from '@/components/AppUpdateNotifier';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import LazyRoute from '@/components/LazyRoute';
 import '@/styles/gsap-animations.css';
 
 // Registrar plugins GSAP
@@ -27,6 +27,7 @@ if (typeof window !== 'undefined') {
 /** Acesso ao módulo Comercial (rotas + CRUD contratos) quando o mapa de permissões do JWT estiver incompleto */
 const COMMERCIAL_FULL_ACCESS_ROLES: UserRole[] = [
   'SUPER_ADMIN',
+  'ADMINISTRADOR',
   'ADMIN',
   'GESTOR',
   'COMERCIAL',
@@ -50,48 +51,34 @@ import Contato from '@/pages/Contato';
 import CookieConsent from '@/components/CookieConsent';
 import UnificadosPorSetor from '@/pages/UnificadosPorSetor';
 
-// Helper function para lazy loading com retry
+const isChunkLoadError = (error: unknown): boolean => {
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes('Failed to fetch') ||
+    msg.includes('dynamically imported') ||
+    msg.includes('Loading chunk') ||
+    msg.includes('Loading CSS chunk') ||
+    msg.includes('NetworkError') ||
+    msg.includes('522')
+  );
+};
+
+/** Lazy load com retry apenas para falha de rede no chunk (sem timeout artificial). */
 const lazyWithRetry = (componentImport: () => Promise<any>, componentName: string, maxRetries = 3) => {
   return lazy(async () => {
-    let lastError: any = null;
+    let lastError: unknown = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🔄 Tentativa ${attempt}/${maxRetries} de carregar ${componentName}...`);
-        const module = await Promise.race([
-          componentImport(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout após 30 segundos')), 30000)
-          )
-        ]);
-        console.log(`✅ ${componentName} carregado com sucesso na tentativa ${attempt}`);
-        return module;
-      } catch (error: any) {
+        return await componentImport();
+      } catch (error) {
         lastError = error;
-        console.error(`❌ Erro na tentativa ${attempt}/${maxRetries} ao carregar ${componentName}:`, error);
-
-        // Se for erro de rede/timeout, aguarda antes de tentar novamente
-        if (
-          (error instanceof TypeError && error.message.includes('Failed to fetch')) ||
-          error.message.includes('Timeout') ||
-          error.message.includes('522') ||
-          error.message.includes('NetworkError')
-        ) {
-          if (attempt < maxRetries) {
-            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Backoff exponencial, max 5s
-            console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
-          }
-        } else {
-          // Para outros erros, não tenta novamente
+        if (!isChunkLoadError(error) || attempt >= maxRetries) {
           break;
         }
+        await new Promise((resolve) => setTimeout(resolve, Math.min(1000 * attempt, 4000)));
       }
     }
-
-    // Se todas as tentativas falharam
-    console.error(`❌ Falha ao carregar ${componentName} após ${maxRetries} tentativas`);
 
     return {
       default: () => (
@@ -101,28 +88,27 @@ const lazyWithRetry = (componentImport: () => Promise<any>, componentName: strin
             <p className="text-seguranca-lightgray mb-4">
               Não foi possível carregar o módulo após {maxRetries} tentativas.
             </p>
-            {lastError && (
-              <p className="text-sm text-gray-400 mb-4">
-                {lastError.message || 'Erro desconhecido'}
-              </p>
+            {lastError instanceof Error && (
+              <p className="text-sm text-gray-400 mb-4">{lastError.message}</p>
             )}
-            <div className="flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center flex-wrap">
               <button
-                onClick={() => window.location.reload()}
+                type="button"
+                onClick={() => globalThis.location.reload()}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
               >
                 Recarregar Página
               </button>
               <button
+                type="button"
                 onClick={() => {
-                  // Limpa cache e recarrega
-                  if ('caches' in window) {
-                    caches.keys().then(names => {
-                      names.forEach(name => caches.delete(name));
-                      window.location.reload();
+                  if ('caches' in globalThis) {
+                    caches.keys().then((names) => {
+                      names.forEach((name) => caches.delete(name));
+                      globalThis.location.reload();
                     });
                   } else {
-                    window.location.reload();
+                    globalThis.location.reload();
                   }
                 }}
                 className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
@@ -132,7 +118,7 @@ const lazyWithRetry = (componentImport: () => Promise<any>, componentName: strin
             </div>
           </div>
         </div>
-      )
+      ),
     };
   });
 };
@@ -149,7 +135,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard').catch(() => ({ default:
 const DashboardColaborador = lazy(() => import('@/pages/DashboardColaborador'));
 const DashboardVigilante = lazy(() => import('@/pages/DashboardVigilante'));
 const Funcionarios = lazyWithRetry(() => import('@/pages/Funcionarios'), 'Funcionarios');
-const Usuarios = lazy(() => import('@/pages/Usuarios'));
+const Usuarios = lazyWithRetry(() => import('@/pages/Usuarios'), 'Usuarios');
 const Roles = lazy(() => import('@/pages/Roles'));
 const Clientes = lazyWithRetry(() => import('@/pages/Clientes'), 'Clientes');
 const Fornecedores = lazy(() => import('@/pages/Fornecedores'));
@@ -193,7 +179,7 @@ const AvaliacaoDesempenho = lazy(() => import('@/pages/RH/AvaliacaoDesempenho'))
 const Vagas = lazy(() => import('@/pages/Vagas'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
 const GestaoDocumentos = lazy(() => import('@/pages/GestaoDocumentos'));
-const Grupos = lazyWithRetry(() => import('@/pages/Grupos'), 'Grupos');
+const Grupos = lazy(() => import('@/pages/Grupos'));
 const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
 const ConfiguracaoBackup = lazy(() => import('@/pages/ConfiguracaoBackup'));
 const Profile = lazy(() => import('@/pages/Profile'));
@@ -323,8 +309,6 @@ function App() {
               >
                 <AuthProvider>
                   <AppUpdateNotifier />
-                  <SessionTimeoutManager />
-                  <WebSocketConnector />
                   <Routes>
 
                     {/* Portal Público */}
@@ -346,7 +330,7 @@ function App() {
                     {/* Sistema Administrativo */}
                     <Route path="/admin" element={<Navigate to="/login" replace />} />
                     <Route path="/sistema" element={
-                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
+                      <ProtectedRoute requiredRoles={FULL_ACCESS_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <Index />
                         </Suspense>
@@ -504,7 +488,7 @@ function App() {
                       </ProtectedRoute>
                     } />
                     <Route path="/whatsapp-connection" element={
-                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
+                      <ProtectedRoute requiredRoles={FULL_ACCESS_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <WhatsAppConnection />
                         </Suspense>
@@ -1111,31 +1095,39 @@ function App() {
 
                     {/* Gestão de Atividades - Exclusivo SUPER_ADMIN */}
                     <Route path="/atividades" element={
-                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
-                        <ActivityManagement />
+                      <ProtectedRoute requiredRoles={FULL_ACCESS_ROLES}>
+                        <LazyRoute>
+                          <ActivityManagement />
+                        </LazyRoute>
                       </ProtectedRoute>
                     } />
 
                     {/* Grupos */}
                     <Route path="/grupos" element={
                       <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
-                        <Grupos />
+                        <LazyRoute>
+                          <Grupos />
+                        </LazyRoute>
                       </ProtectedRoute>
                     } />
 
                     {/* Configurações */}
                     <Route path="/settings" element={
                       <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
-                        <Configuracoes />
+                        <LazyRoute>
+                          <Configuracoes />
+                        </LazyRoute>
                       </ProtectedRoute>
                     } />
                     <Route path="/configuracoes" element={
-                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
-                        <Configuracoes />
+                      <ProtectedRoute requiredRoles={FULL_ACCESS_ROLES}>
+                        <LazyRoute>
+                          <Configuracoes />
+                        </LazyRoute>
                       </ProtectedRoute>
                     } />
                     <Route path="/configuracoes/backup" element={
-                      <ProtectedRoute requiredRoles={['SUPER_ADMIN']}>
+                      <ProtectedRoute requiredRoles={FULL_ACCESS_ROLES}>
                         <Suspense fallback={<LoadingSpinner />}>
                           <ConfiguracaoBackup />
                         </Suspense>
@@ -1227,14 +1219,18 @@ function App() {
                     {/* Usuarios */}
                     <Route path="/usuarios" element={
                       <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
-                        <Usuarios />
+                        <LazyRoute>
+                          <Usuarios />
+                        </LazyRoute>
                       </ProtectedRoute>
                     } />
 
                     {/* Roles */}
                     <Route path="/roles" element={
                       <ProtectedRoute excludedRoles={SUPERVISOR_DENIED_MODULE_ROLES}>
-                        <Roles />
+                        <LazyRoute>
+                          <Roles />
+                        </LazyRoute>
                       </ProtectedRoute>
                     } />
 

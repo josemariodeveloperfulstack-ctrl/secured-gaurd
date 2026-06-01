@@ -1,6 +1,7 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useScrollPreservation } from '@/hooks/useScrollPreservation';
+import { prefetchByPath } from '@/config/routePrefetch';
 
 interface ScrollPreservingLinkProps {
   to: string;
@@ -28,25 +29,41 @@ export const ScrollPreservingLink = React.forwardRef<HTMLAnchorElement, ScrollPr
     ...props 
   }, ref) => {
     const location = useLocation();
-    const { preserveCurrentScroll, saveScrollPosition } = useScrollPreservation();
+    const navigate = useNavigate();
+    const { saveScrollPosition } = useScrollPreservation();
 
-    const handleClick = (e: React.MouseEvent) => {
-      // Se estamos navegando para a mesma página, não fazer nada
-      if (location.pathname === to) {
+    const normalizePath = (path: string) => {
+      const base = path.split('?')[0];
+      if (base.length > 1 && base.endsWith('/')) {
+        return base.slice(0, -1);
+      }
+      return base || '/';
+    };
+
+    const handleMouseEnter = () => {
+      prefetchByPath(to);
+    };
+
+    const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      const targetPath = normalizePath(to);
+      const currentPath = normalizePath(location.pathname);
+
+      if (currentPath === targetPath) {
         e.preventDefault();
         return;
       }
 
-      // Se deve preservar scroll, salvar a posição atual
       if (preserveScroll) {
-        // Salvar posição atual antes de navegar
         saveScrollPosition(location.pathname);
       }
-      
-      // Executar onClick personalizado se fornecido
+
       if (onClick) {
-        onClick();
+        onClick(e);
       }
+
+      // Garante navegação mesmo com React transition mantendo a tela anterior
+      e.preventDefault();
+      navigate(to);
     };
 
     return (
@@ -54,6 +71,7 @@ export const ScrollPreservingLink = React.forwardRef<HTMLAnchorElement, ScrollPr
         ref={ref}
         to={to}
         className={className}
+        onMouseEnter={handleMouseEnter}
         onClick={handleClick}
         {...props}
       >

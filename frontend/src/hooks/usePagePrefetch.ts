@@ -37,6 +37,8 @@ export function prefetchRoute(importFn: ImportFn): void {
 
 // ─── Priority page imports (most visited pages across all roles) ───────────────
 
+import { ROUTE_PREFETCH_MAP } from '@/config/routePrefetch';
+
 const PRIORITY_PAGES: ImportFn[] = [
   // Core
   () => import('@/pages/Dashboard'),
@@ -68,23 +70,17 @@ const PRIORITY_PAGES: ImportFn[] = [
   // Sistema
   () => import('@/pages/Configuracoes'),
   () => import('@/pages/Usuarios'),
-];
-
-// ─── Secondary pages (prefetched after priority ones) ─────────────────────────
-
-const SECONDARY_PAGES: ImportFn[] = [
-  () => import('@/pages/Relatorios'),
   () => import('@/pages/Grupos'),
-  () => import('@/pages/Leads'),
-  () => import('@/pages/CrmKanban'),
-  () => import('@/pages/Ocorrencias'),
-  () => import('@/pages/ControleRondas'),
-  () => import('@/pages/RH/Aniversariantes'),
-  () => import('@/pages/RH/SST'),
-  () => import('@/pages/Vagas'),
-  () => import('@/pages/GestaoAtendimento'),
-  () => import('@/pages/Profile'),
 ];
+
+// Rotas do mapa compartilhado (sidebar) — sem duplicar imports do bloco acima
+const MAP_PREFETCH_PATHS = new Set([
+  '/dashboard', '/dashboard-home', '/funcionarios', '/financeiro', '/operacional',
+  '/holerites', '/clientes', '/contratos', '/comercial/marketing', '/configuracoes',
+]);
+const SECONDARY_PAGES: ImportFn[] = Object.entries(ROUTE_PREFETCH_MAP)
+  .filter(([path]) => !MAP_PREFETCH_PATHS.has(path))
+  .map(([, fn]) => fn);
 
 // ─── requestIdleCallback polyfill ─────────────────────────────────────────────
 

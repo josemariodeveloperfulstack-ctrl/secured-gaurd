@@ -2,6 +2,12 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserPermissions, UserRole } from '@/types/user';
+import { hasFullSystemAccess } from '@/utils/permissions';
+import { isDebugMode } from '@/config/environment';
+
+const debugLog = (...args: unknown[]) => {
+  if (isDebugMode()) console.log(...args);
+};
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -35,12 +41,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!user) {
-    console.log('🔒 ProtectedRoute: Usuário não autenticado, redirecionando para login');
-    console.log('🔒 ProtectedRoute: isLoading =', isLoading);
+    debugLog('🔒 ProtectedRoute: Usuário não autenticado, redirecionando para login');
+    debugLog('🔒 ProtectedRoute: isLoading =', isLoading);
     return <Navigate to="/login" replace />;
   }
 
-  console.log('🔒 ProtectedRoute: Usuário autenticado:', user.name, 'Role:', user.role);
+  debugLog('🔒 ProtectedRoute: Usuário autenticado:', user.name, 'Role:', user.role);
 
   // Verificar se o usuário precisa completar o primeiro acesso
   // Exceto se estiver na própria página de primeiro acesso ou se allowWithoutFirstAccess for true
@@ -48,7 +54,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     // Permitir acesso apenas às páginas de primeiro acesso
     const firstAccessPaths = ['/first-access/change-password', '/first-access/activate-2fa'];
     if (!firstAccessPaths.includes(location.pathname)) {
-      console.log('🔒 ProtectedRoute: Usuário precisa completar primeiro acesso, redirecionando...');
+      debugLog('🔒 ProtectedRoute: Usuário precisa completar primeiro acesso, redirecionando...');
       return <Navigate to="/first-access/change-password" replace />;
     }
   }
@@ -63,13 +69,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       (r) => currentRole === r || currentRole === normalizeRole(r as string),
     );
     if (isBlocked) {
-      console.log(`🔒 ProtectedRoute: Role ${currentRole} está explicitamente bloqueado nesta rota`);
+      debugLog(`🔒 ProtectedRoute: Role ${currentRole} está explicitamente bloqueado nesta rota`);
       return <Navigate to="/dashboard" replace />;
     }
   }
 
   // Verificar roles alternativos (ex: COMERCIAL para CRM)
   if (requiredRoles && requiredRoles.length > 0) {
+    if (hasFullSystemAccess(currentRole) || user.permissions?.ALL_PERMISSIONS) {
+      return <>{children}</>;
+    }
     const hasRole = requiredRoles.some(
       (r) => currentRole === r || currentRole === normalizeRole(r as string),
     );
@@ -83,6 +92,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     if (!userPermissions) {
       return <Navigate to="/dashboard" replace />;
+    }
+
+    if (hasFullSystemAccess(currentRole) || userPermissions.ALL_PERMISSIONS) {
+      return <>{children}</>;
     }
 
     const hasPermissions = requireAllPermissions

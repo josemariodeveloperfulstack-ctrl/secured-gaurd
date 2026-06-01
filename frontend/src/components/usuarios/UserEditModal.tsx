@@ -165,6 +165,15 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   const handleSave = async () => {
     if (!user) return;
 
+    if (isGroupLoading) {
+      toast({
+        title: 'Aguarde',
+        description: 'A operação de grupos ainda está em andamento. Tente salvar novamente em instantes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Validação de senha (apenas se SUPER_ADMIN estiver tentando alterar)
     const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
     if (isSuperAdmin && (formData.password || formData.confirmPassword)) {
@@ -227,8 +236,8 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         address?: string;
       } = {
         name: formData.name,
-        email: formData.email,
-        username: formData.username,
+        email: formData.email.trim().toLowerCase(),
+        username: formData.username.trim(),
         roles: formData.roles,
         active: formData.active,
         whatsapp: formData.whatsapp,
@@ -872,7 +881,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={isLoading || !formData.name || !formData.email || !formData.username}
+            disabled={isLoading || isGroupLoading || !formData.name || !formData.email || !formData.username}
             className="bg-seguranca-red hover:bg-seguranca-darkred"
           >
             <Save className="h-4 w-4 mr-2" />

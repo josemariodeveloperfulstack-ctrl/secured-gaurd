@@ -21,15 +21,21 @@ export interface EnvironmentConfig {
 /**
  * Detecta o ambiente atual baseado na URL
  */
+let cachedEnvironment: 'local' | 'ci' | 'dev' | 'test' | 'prod' | null = null;
+let cachedEnvironmentConfig: EnvironmentConfig | null = null;
+
 export function detectEnvironment(): 'local' | 'ci' | 'dev' | 'test' | 'prod' {
+  if (cachedEnvironment) {
+    return cachedEnvironment;
+  }
+
   if (typeof window === 'undefined') {
-    return 'local'; // SSR fallback
+    cachedEnvironment = 'local';
+    return cachedEnvironment;
   }
 
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
-
-  console.log('🔍 Detectando ambiente:', { hostname, protocol });
 
   // Ambiente CI
   if (hostname.includes('ci.z7botsolutions.com.br')) {
@@ -105,7 +111,7 @@ const environments: Record<string, EnvironmentConfig> = {
     name: 'CI - Integração Contínua',
     apiUrl: '/api',
     wsUrl: '/ws',
-    debug: true,
+    debug: false,
     features: {
       notifications: true,
       chat: true,
@@ -151,13 +157,19 @@ const environments: Record<string, EnvironmentConfig> = {
  * Obtém a configuração do ambiente atual
  */
 export function getCurrentEnvironmentConfig(): EnvironmentConfig {
+  if (cachedEnvironmentConfig) {
+    return cachedEnvironmentConfig;
+  }
+
   const env = detectEnvironment();
-  const config = environments[env];
+  cachedEnvironmentConfig = environments[env];
 
-  console.log('🌍 Ambiente detectado:', env);
-  console.log('⚙️ Configuração:', config);
+  if (cachedEnvironmentConfig.debug) {
+    console.log('🌍 Ambiente detectado:', env);
+    console.log('⚙️ Configuração:', cachedEnvironmentConfig);
+  }
 
-  return config;
+  return cachedEnvironmentConfig;
 }
 
 /**

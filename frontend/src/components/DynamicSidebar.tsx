@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import { useScrollPreservation } from '@/hooks/useScrollPreservation';
@@ -64,7 +64,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { hasPermission } from '@/utils/permissions';
+import { hasFullSystemAccess, hasPermission } from '@/utils/permissions';
 import { UserRole } from '@/types/user';
 
 interface MenuItem {
@@ -116,7 +116,7 @@ const RH_DP_FORBIDDEN_FINANCIAL_IDS = new Set<string>([
 ]);
 
 /**
- * ADMIN / ADMINISTRADOR — itens de sistema sensíveis bloqueados.
+ * ADMIN — itens de sistema sensíveis bloqueados (ADMINISTRADOR tem acesso total).
  */
 const ADMIN_FORBIDDEN_SYSTEM_IDS = new Set<string>([
   'atividades',
@@ -304,9 +304,6 @@ export function DynamicSidebar() {
   const location = useLocation();
   const { user } = useAuth();
   const { forceScrollToTop } = useScrollPreservation();
-
-  console.log('🔍 DynamicSidebar - Iniciando componente');
-  console.log('🔍 DynamicSidebar - Usuário:', user);
 
   // Menu completo com permissões
   const allMenuItems: MenuItem[] = [
@@ -810,18 +807,53 @@ export function DynamicSidebar() {
     },
   ];
 
-  // Organizar itens em grupos para melhor navegação
-  const getMenuGroups = () => {
-    let filteredItems = getFilteredMenuItems();
+  const filteredMenuItems = useMemo((): MenuItem[] => {
+    if (!user) return [];
 
-    if (user) {
+    if (hasFullSystemAccess(user.role) || user.permissions.ALL_PERMISSIONS) {
+      return allMenuItems;
+    }
+
+    const normalizedRole = (user.role ?? '').replace(/^ROLE_/, '') as UserRole;
+    const allowedSet = ROLE_ALLOWED_ITEM_IDS[normalizedRole];
+
+    return allMenuItems.filter((item) => {
+      if (allowedSet && !allowedSet.has(item.id)) return false;
+
+      if (['DEPARTAMENTO_PESSOAL', 'RH'].includes(normalizedRole)) {
+        if (RH_DP_FORBIDDEN_OPERATIONAL_IDS.has(item.id)) return false;
+        if (RH_DP_FORBIDDEN_FINANCIAL_IDS.has(item.id)) return false;
+      }
+
+      if (normalizedRole === 'SUPERVISOR' && SUPERVISOR_FORBIDDEN_ITEM_IDS.has(item.id)) {
+        return false;
+      }
+
+      if (item.role && item.role !== user.role) return false;
+
+      if (item.requiredPermission) {
+        return hasPermission(user.permissions, item.requiredPermission as keyof typeof user.permissions);
+      }
+
+      if (normalizedRole === 'ADMIN' && ADMIN_FORBIDDEN_SYSTEM_IDS.has(item.id)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [user]);
+
+  const menuGroups = useMemo(() => {
+    let filteredItems = filteredMenuItems;
+
+    if (user && !hasFullSystemAccess(user.role)) {
       const allowedSet = ROLE_ALLOWED_ITEM_IDS[user.role as UserRole];
       if (allowedSet) {
         filteredItems = filteredItems.filter((item) => allowedSet.has(item.id));
       }
     }
 
-    const groups = {
+    return {
       principal: filteredItems.filter(item =>
         ['dashboard', 'operacional', 'controle-visitas', 'guia-transporte'].includes(item.id)
       ),
@@ -877,121 +909,7 @@ export function DynamicSidebar() {
         ['atividades', 'usuarios', 'grupos', 'sistema', 'configuracoes'].includes(item.id)
       )
     };
-
-    // Debug específico para SUPER_ADMIN
-    if (user?.role === 'SUPER_ADMIN') {
-      console.log('🔍 SUPER_ADMIN - getMenuGroups - Total filtrados:', filteredItems.length);
-      console.log('🔍 SUPER_ADMIN - getMenuGroups - Itens principais:', groups.principal.map(item => item.text));
-      console.log('🔍 SUPER_ADMIN - getMenuGroups - Itens de sistema:', groups.sistema.map(item => item.text));
-      console.log('🔍 SUPER_ADMIN - getMenuGroups - Todos os grupos:', Object.keys(groups).map(key => `${key}: ${groups[key as keyof typeof groups].length}`));
-
-      // Debug específico para Controle de Visitas
-      const controleVisitasInFiltered = filteredItems.find(item => item.id === 'controle-visitas');
-      console.log('🔍 SUPER_ADMIN - Controle de Visitas nos itens filtrados:', controleVisitasInFiltered);
-    }
-
-    return groups;
-  };
-
-  // Filtrar menu baseado nas permissões do usuário
-  const getFilteredMenuItems = (): MenuItem[] => {
-    console.log('🔍 getFilteredMenuItems - Iniciando filtro');
-    console.log('🔍 getFilteredMenuItems - User:', user);
-    if (!user) {
-      console.log('❌ getFilteredMenuItems - Usuário não encontrado');
-      return [];
-    }
-
-    // SUPER_ADMIN vê todos os itens
-    if (user.role === 'SUPER_ADMIN' || user.permissions.ALL_PERMISSIONS) {
-      console.log('🔴 SUPER_ADMIN: Mostrando todos os itens do menu');
-      console.log('🔍 Permissões do usuário:', user.permissions);
-      console.log('🔍 Role do usuário:', user.role);
-      console.log('🔍 ALL_PERMISSIONS:', user.permissions.ALL_PERMISSIONS);
-      console.log('🔍 Total de itens no allMenuItems:', allMenuItems.length);
-      console.log('🔍 Primeiros 5 itens:', allMenuItems.slice(0, 5).map(item => item.text));
-
-      // Debug específico para Controle de Visitas
-      const controleVisitasItem = allMenuItems.find(item => item.id === 'controle-visitas');
-      console.log('🔍 Item Controle de Visitas encontrado:', controleVisitasItem);
-
-      // Debug específico para Usuários e Grupos
-      const usuariosItem = allMenuItems.find(item => item.id === 'usuarios');
-      const gruposItem = allMenuItems.find(item => item.id === 'grupos');
-      console.log('🔍 Item Usuários encontrado:', usuariosItem);
-      console.log('🔍 Item Grupos encontrado:', gruposItem);
-
-      // Debug: verificar se os itens estão no array original
-      console.log('🔍 Todos os IDs no allMenuItems:', allMenuItems.map(item => item.id));
-      console.log('🔍 Itens de sistema no allMenuItems:', allMenuItems.filter(item => ['atividades', 'usuarios', 'grupos', 'sistema', 'configuracoes'].includes(item.id)));
-
-      // Debug: verificar se os itens estão sendo retornados corretamente
-      const sistemaItems = allMenuItems.filter(item => ['atividades', 'usuarios', 'grupos', 'sistema', 'configuracoes'].includes(item.id));
-      console.log('🔍 SUPER_ADMIN - Itens de sistema que serão retornados:', sistemaItems.map(item => item.text));
-
-      return allMenuItems;
-    }
-
-    // Para outros usuários, filtrar por permissões
-    const normalizedRole = (user.role ?? '').replace(/^ROLE_/, '') as UserRole;
-    const allowedSet = ROLE_ALLOWED_ITEM_IDS[normalizedRole];
-
-    const filtered = allMenuItems.filter(item => {
-      if (allowedSet && !allowedSet.has(item.id)) {
-        console.log(`⚠️ ${normalizedRole} - removendo item não permitido: ${item.id}`);
-        return false;
-      }
-
-      // Regras extras por função para esconder módulos específicos
-      // Departamento Pessoal e RH NÃO veem módulo Operacional/Supervisão/Financeiro/Fiscal
-      if (['DEPARTAMENTO_PESSOAL', 'RH'].includes(normalizedRole)) {
-        if (RH_DP_FORBIDDEN_OPERATIONAL_IDS.has(item.id)) {
-          console.log(`🚫 ${normalizedRole} - escondendo item operacional: ${item.id}`);
-          return false;
-        }
-        if (RH_DP_FORBIDDEN_FINANCIAL_IDS.has(item.id)) {
-          console.log(`🚫 ${normalizedRole} - escondendo item financeiro/fiscal: ${item.id}`);
-          return false;
-        }
-      }
-
-      // 🟩 SUPERVISOR — defesa em profundidade (ver SUPERVISOR_FORBIDDEN_ITEM_IDS).
-      if (normalizedRole === 'SUPERVISOR' && SUPERVISOR_FORBIDDEN_ITEM_IDS.has(item.id)) {
-        console.log(`🚫 SUPERVISOR - escondendo item fora do módulo operacional: ${item.id}`);
-        return false;
-      }
-
-      // Se tem role específico, verificar se o usuário tem esse role
-      if (item.role && item.role !== user.role) {
-        console.log(`🔍 Item ${item.text} - Role não confere: ${item.role} !== ${user.role}`);
-        return false;
-      }
-
-      // Se tem permissão específica, verificar se o usuário tem essa permissão
-      if (item.requiredPermission) {
-        const isAllowed = hasPermission(user.permissions, item.requiredPermission as any);
-        console.log(`🔍 Item ${item.text} (${item.requiredPermission}): ${isAllowed ? '✅' : '❌'}`);
-
-
-        return isAllowed;
-      }
-
-      // Regras para ADMIN e ADMINISTRADOR — esconder módulos de sistema sensíveis
-      if (['ADMIN', 'ADMINISTRADOR'].includes(normalizedRole) && ADMIN_FORBIDDEN_SYSTEM_IDS.has(item.id)) {
-        return false;
-      }
-
-      return true;
-    });
-
-    return filtered;
-  };
-
-  const menuGroups = getMenuGroups();
-
-  // Debug: mostrar quantos itens estão sendo renderizados
-  console.log('🔍 DynamicSidebar - Grupos do menu:', Object.keys(menuGroups).map(key => `${key}: ${menuGroups[key as keyof typeof menuGroups].length} itens`));
-  console.log('🔍 DynamicSidebar - Seção sistema:', menuGroups.sistema.map(item => item.text));
+  }, [filteredMenuItems, user]);
 
   const getActiveId = () => {
     const path = location.pathname;
@@ -1003,6 +921,7 @@ export function DynamicSidebar() {
   const getRoleDisplayName = (role: string) => {
     const roleNames: Record<string, string> = {
       'SUPER_ADMIN': 'Super Administrador',
+      'ADMINISTRADOR': 'Administrador',
       'ADMIN': 'Administrador',
       'SUPERVISOR': 'Supervisor',
       'GESTAO_SUPERVISAO': 'Gestão de Supervisão',
@@ -1019,6 +938,7 @@ export function DynamicSidebar() {
   const getRoleColor = (role: string) => {
     const roleColors: Record<string, string> = {
       'SUPER_ADMIN': 'bg-red-100 text-red-800',
+      'ADMINISTRADOR': 'bg-blue-100 text-blue-800',
       'ADMIN': 'bg-blue-100 text-blue-800',
       'SUPERVISOR': 'bg-green-100 text-green-800',
       'GESTAO_SUPERVISAO': 'bg-teal-100 text-teal-800',

@@ -1,8 +1,18 @@
 import { UserRole, UserPermissions, UserGroupData } from '@/types/user';
+import { isDebugMode } from '@/config/environment';
 
+/** Papéis com acesso irrestrito a módulos, rotas e permissões no frontend */
+export const FULL_ACCESS_ROLES: UserRole[] = ['SUPER_ADMIN', 'ADMINISTRADOR'];
+
+export const hasFullSystemAccess = (role: string | undefined | null): boolean => {
+  const normalized = (role ?? '').replace(/^ROLE_/, '').toUpperCase();
+  return FULL_ACCESS_ROLES.includes(normalized as UserRole);
+};
+
+/** Roles exibidas em criar/editar usuário (ADMIN legado fica só para contas já existentes) */
 export const USER_ROLE_LIST: UserRole[] = [
   'SUPER_ADMIN',
-  'ADMIN',
+  'ADMINISTRADOR',
   'GESTOR',
   'COMERCIAL',
   'GESTOR_COMERCIAL',
@@ -215,7 +225,8 @@ export const generatePermissions = (role: UserRole): UserPermissions => {
 
   switch (normalizedRole) {
     case 'SUPER_ADMIN':
-      // Todas as permissões true para SUPER_ADMIN
+    case 'ADMINISTRADOR':
+      // Acesso total (mesmo escopo de SUPER_ADMIN)
       return Object.fromEntries(
         Object.keys(basePermissions).map(key => [key, true])
       ) as unknown as UserPermissions;
@@ -1579,18 +1590,17 @@ export const hasPermission = (
   permission: keyof UserPermissions
 ): boolean => {
   if (!userPermissions) {
-    console.log('🔍 hasPermission - userPermissions é null');
     return false;
   }
 
-  // Se ALL_PERMISSIONS for true, retorna true para qualquer permissão
   if (userPermissions.ALL_PERMISSIONS) {
-    console.log('🔍 hasPermission - ALL_PERMISSIONS é true, retornando true');
     return true;
   }
 
   const hasSpecificPermission = userPermissions[permission] || false;
-  console.log(`🔍 hasPermission - ${permission}: ${hasSpecificPermission}`);
+  if (isDebugMode()) {
+    console.log(`🔍 hasPermission - ${permission}: ${hasSpecificPermission}`);
+  }
   return hasSpecificPermission;
 };
 
@@ -1616,6 +1626,7 @@ export const hasAllPermissions = (
 export const getRoleDisplayName = (role: UserRole): string => {
   const roleNames: Record<UserRole, string> = {
     SUPER_ADMIN: 'Super Administrador',
+    ADMINISTRADOR: 'Administrador',
     ADMIN: 'Administrador',
     SUPERVISOR: 'Supervisor',
     RH: 'Recursos Humanos',
@@ -1649,6 +1660,7 @@ export const getRoleDisplayName = (role: UserRole): string => {
 export const getRoleColor = (role: UserRole): string => {
   const roleColors: Record<UserRole, string> = {
     SUPER_ADMIN: 'bg-red-100 text-red-800',
+    ADMINISTRADOR: 'bg-blue-100 text-blue-800',
     ADMIN: 'bg-blue-100 text-blue-800',
     SUPERVISOR: 'bg-green-100 text-green-800',
     RH: 'bg-yellow-100 text-yellow-800',

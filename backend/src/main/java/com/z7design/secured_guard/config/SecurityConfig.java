@@ -66,8 +66,8 @@ public class SecurityConfig {
                                                  .requestMatchers("/api/messages/unread/count").authenticated()
                                                  // Endpoints públicos
                                                  .requestMatchers("/api/auth/**").permitAll()
-                                                .requestMatchers("/api/security-settings/**").hasAuthority("ROLE_SUPER_ADMIN")
-                                                .requestMatchers("/api/backup/**").hasAuthority("ROLE_SUPER_ADMIN")
+                                                .requestMatchers("/api/security-settings/**").hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMINISTRADOR")
+                                                .requestMatchers("/api/backup/**").hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMINISTRADOR")
                                                 .requestMatchers("/api/files/**").permitAll()
                                                 .requestMatchers("/api/test/**").permitAll()
                                                 .requestMatchers("/api/health").permitAll()
@@ -114,9 +114,9 @@ public class SecurityConfig {
                                                 }).permitAll()
                                                 .requestMatchers("/ws/**").authenticated()
                                                 .requestMatchers("/ws").authenticated()
-                                                .requestMatchers("/api/email/test", "/api/email/config").hasAuthority("ROLE_SUPER_ADMIN")
-                                                // WhatsApp controller - restrito a SUPER_ADMIN
-                                                .requestMatchers("/api/whatsapp/**").hasAuthority("ROLE_SUPER_ADMIN")
+                                                .requestMatchers("/api/email/test", "/api/email/config").hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMINISTRADOR")
+                                                // WhatsApp controller - restrito a SUPER_ADMIN / ADMINISTRADOR
+                                                .requestMatchers("/api/whatsapp/**").hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMINISTRADOR")
                                                 .requestMatchers("/api/payslips/test-download/**").permitAll()
                                                 .requestMatchers("/api/invoices/public/test-cost-centers").permitAll()
                                                 .requestMatchers("/api/invoices/public/debug-cost-centers").permitAll()
@@ -161,18 +161,18 @@ public class SecurityConfig {
                                                 .authenticated()
                                                 .requestMatchers(org.springframework.http.HttpMethod.POST,
                                                                 "/api/users/**")
-                                                .hasAnyAuthority("USERS_CREATE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                                                .hasAnyAuthority("USERS_CREATE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
                                                 .requestMatchers(org.springframework.http.HttpMethod.PUT,
                                                                 "/api/users/**")
-                                                .hasAnyAuthority("USERS_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                                                .hasAnyAuthority("USERS_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
                                                 .requestMatchers(org.springframework.http.HttpMethod.DELETE,
                                                                 "/api/users/**")
-                                                .hasAnyAuthority("USERS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                                                .hasAnyAuthority("USERS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
                                                 .requestMatchers("/api/users/me/current-role").authenticated()
                                                 .requestMatchers("/api/users/**")
                                                 .hasAnyAuthority("USERS_READ", "USERS_WRITE", "USERS_CREATE",
                                                                 "USERS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
                                                 // Endpoints de grupos - permitir consulta de próprios grupos para
                                                 // usuários
                                                 // autenticados
@@ -182,7 +182,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/groups/**")
                                                 .hasAnyAuthority("GROUPS_READ", "GROUPS_WRITE", "GROUPS_CREATE",
                                                                 "GROUPS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "RH",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "RH",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL")
                                                 // Endpoints de equipamentos e EPIs - requerem permissões
@@ -214,7 +214,7 @@ public class SecurityConfig {
                                                                 "ROLE_SUPERVISOR", "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO")
                                                 // Endpoints da frota - requerem permissões operacionais
                                                 .requestMatchers("/api/frota/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR", "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
                                                                 "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
@@ -224,7 +224,7 @@ public class SecurityConfig {
                                                                 "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS")
                                                 // Endpoints de fuel-records
                                                 .requestMatchers("/api/fuel-records/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR", "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
                                                                 "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
@@ -234,7 +234,7 @@ public class SecurityConfig {
                                                                 "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS")
                                                 // Endpoints de veículos
                                                 .requestMatchers("/api/vehicles/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR", "SUPRIMENTOS", "ROLE_SUPRIMENTOS",
                                                                 "SUPREIMENTOS", "ROLE_SUPREIMENTOS",
@@ -244,7 +244,7 @@ public class SecurityConfig {
                                                                 "ANALISATA_DE_SUPREMIMENTOS", "ROLE_ANALISATA_DE_SUPREMIMENTOS")
                                                 // Endpoints de work-posts
                                                 .requestMatchers("/api/work-posts/**")
-                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                .hasAnyAuthority("OPERACIONAL", "GESTOR_OPERACIONAL", "GESTAO_SUPERVISAO", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL", "ROLE_GESTAO_SUPERVISAO",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL",
@@ -255,7 +255,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/admission-requests/**")
                                                 .hasAnyAuthority("RH", "DEPARTAMENTO_PESSOAL", "SUPER_ADMIN", "ADMIN",
                                                                 "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN")
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR")
                                                 // Endpoints de guias de transporte - requerem autenticação
                                                 .requestMatchers("/api/transport-guides/**").authenticated()
                                                 // Endpoints de reconhecimento facial - requerem apenas autenticação
@@ -286,14 +286,14 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/contracts/**")
                                                 .hasAnyAuthority("CONTRACTS_READ", "CONTRACTS_WRITE",
                                                                 "CONTRACTS_CREATE", "CONTRACTS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
                                                                 "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL")
                                                 // Endpoints de estoque - requerem permissões específicas ou
                                                 // autenticação
                                                 .requestMatchers("/api/stock/**")
                                                 .hasAnyAuthority("EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "EQUIPMENTS_CREATE",
-                                                                "EQUIPMENTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "EQUIPMENTS_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_STOCK_MANAGER",
                                                                 "ROLE_OPERATIONAL_MANAGER",
                                                                 "ROLE_FINANCEIRO",
@@ -309,7 +309,7 @@ public class SecurityConfig {
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
                                                                 "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "PURCHASE_REQUESTS_READ", "PURCHASE_REQUESTS_WRITE", "PURCHASE_REQUESTS_CREATE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ASSISTENTE_ADMINISTRATIVO",
                                                                 "ANALISTA_SUPRIMENTOS", "ROLE_ANALISTA_SUPRIMENTOS",
@@ -321,7 +321,7 @@ public class SecurityConfig {
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
                                                                 "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "PURCHASE_REQUESTS_READ", "PURCHASE_REQUESTS_WRITE", "PURCHASE_REQUESTS_CREATE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ANALISTA_SUPRIMENTOS",
                                                                 "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
@@ -332,7 +332,7 @@ public class SecurityConfig {
                                                                 "EQUIPMENTS_READ", "EQUIPMENTS_WRITE",
                                                                 "PURCHASE_REQUESTS_READ", "PURCHASE_REQUESTS_WRITE", "PURCHASE_REQUESTS_CREATE",
                                                                 "PURCHASE_AGREEMENT_READ", "PURCHASE_AGREEMENT_WRITE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ASSISTENTE_ADMINISTRATIVO", "ROLE_ANALISTA_SUPRIMENTOS",
                                                                 "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO")
@@ -340,44 +340,44 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/leads/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
                                                                 "LEADS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
                                                                 "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 .requestMatchers("/api/whatsapp/agent/conversations/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
                                                                 "LEADS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
                                                                 "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 // CRM, oportunidades, Kanban, dashboard comercial e metas
                                                 .requestMatchers("/api/crm/**", "/api/opportunities/**",
                                                                 "/api/kanban-status/**",
                                                                 "/api/commercial-dashboard/**", "/api/sales-goals/**")
-                                                .hasAnyRole("SUPER_ADMIN", "ADMIN", "GESTOR", "COMERCIAL",
+                                                .hasAnyRole("SUPER_ADMIN", "ADMIN", "ADMINISTRADOR", "GESTOR", "COMERCIAL",
                                                                 "GESTOR_COMERCIAL", "ASSISTENTE_COMERCIAL")
                                                 .requestMatchers("/api/proposals/**")
                                                 .hasAnyAuthority("PROPOSALS_READ", "PROPOSALS_WRITE",
                                                                 "PROPOSALS_CREATE", "PROPOSALS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_COMERCIAL",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL")
                                                 // Campanhas de e-mail (SendGrid) — mesmo perfil comercial/admin
                                                 .requestMatchers("/api/v1/email-campaigns/**")
                                                 .hasAnyAuthority("LEADS_READ", "LEADS_WRITE", "LEADS_CREATE",
                                                                 "LEADS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_GESTOR",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_GESTOR",
                                                                 "ROLE_COMERCIAL", "ROLE_GESTOR_COMERCIAL",
                                                                 "ROLE_ASSISTENTE_COMERCIAL")
                                                 // Endpoints financeiros - requerem permissões específicas
                                                 .requestMatchers("/api/financial/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_FINANCEIRO",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS")
                                                 // Endpoints de invoices (contas a pagar)
                                                 .requestMatchers("/api/invoices/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de suppliers (fornecedores) - requerem permissões
@@ -385,24 +385,24 @@ public class SecurityConfig {
                                                 // ou financeiras
                                                 .requestMatchers("/api/suppliers/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "FINANCEIRO",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO", "FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE",
                                                                 "FINANCIAL_DELETE", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_ESTOQUE", "ROLE_ALMOXARIFADO", "ROLE_COMPRAS")
                                                 .requestMatchers("/api/patrimonial/**")
                                                 .hasAnyAuthority("PATRIMONIAL_READ", "PATRIMONIAL_WRITE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_FINANCEIRO")
                                                 .requestMatchers("/api/fiscal/**")
                                                 .hasAnyAuthority("FISCAL_READ", "FISCAL_WRITE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO")
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_FINANCEIRO")
                                                 // Endpoints de accounts-receivable (contas a receber) - requerem
                                                 // permissões
                                                 // específicas
                                                 .requestMatchers("/api/accounts-receivable/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_FINANCEIRO",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS")
                                                 // Endpoints de scheduled-payments (pagamentos agendados) - requerem
@@ -412,7 +412,7 @@ public class SecurityConfig {
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
                                                                 "SUPER_ADMIN", "ADMIN", "FINANCEIRO",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS", "SUPRIMENTOS")
                                                 // Endpoints de bank-reconciliation (conciliação bancária) - requerem
@@ -421,21 +421,21 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/bank-reconciliation/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_FINANCEIRO",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS")
                                                 // Endpoints de bancos e agências - requerem permissões específicas
                                                 .requestMatchers("/api/banks/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_FINANCEIRO",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_FINANCEIRO",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS")
                                                 .requestMatchers("/api/agencies/**")
                                                 .hasAnyAuthority("FINANCIAL_READ", "FINANCIAL_WRITE",
                                                                 "FINANCIAL_CREATE", "FINANCIAL_DELETE",
                                                                 "SUPER_ADMIN", "ADMIN", "FINANCEIRO",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS")
                                                 // Holerites/comprovantes do próprio colaborador (qualquer perfil com vínculo)
@@ -453,7 +453,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/payslips/**")
                                                 .hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE",
                                                                 "PAYSLIPS_DELETE",
-                                                                "PAYSLIPS_PUBLISH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "PAYSLIPS_PUBLISH", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_RH", "ROLE_FINANCEIRO",
                                                                 "ROLE_COLABORADOR", "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
@@ -465,7 +465,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/receipts/**")
                                                 .hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE",
                                                                 "PAYSLIPS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",
                                                                 "ROLE_FINANCEIRO", "ROLE_COLABORADOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
@@ -481,7 +481,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/unified-documents/**")
                                                 .hasAnyAuthority("PAYSLIPS_READ", "PAYSLIPS_WRITE", "PAYSLIPS_CREATE",
                                                                 "PAYSLIPS_DELETE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",
                                                                 "ROLE_FINANCEIRO", "ROLE_COLABORADOR",
                                                                 "ROLE_ASSISTENTE_ADMINISTRATIVO",
                                                                 "ROLE_ANALISTA_SUPRIMENTOS", "ROLE_SUPRIMENTOS",
@@ -502,6 +502,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/v1/chat/**").hasAnyRole(
                                                                 "SUPER_ADMIN",
                                                                 "ADMIN",
+                                                                "ADMINISTRADOR",
                                                                 "SUPERVISOR",
                                                                 "COLABORADOR",
                                                                 "VIGILANTE",
@@ -524,6 +525,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/department-emails").hasAnyRole(
                                                                 "SUPER_ADMIN",
                                                                 "ADMIN",
+                                                                "ADMINISTRADOR",
                                                                 "GESTOR",
                                                                 "RH",
                                                                 "FINANCEIRO",
@@ -539,7 +541,7 @@ public class SecurityConfig {
                                                                 "SUPPORT_DELETE",
                                                                 "SUPPORT_MANAGE", "ATTENDANCE_READ", "ATTENDANCE_WRITE",
                                                                 "ATTENDANCE_MANAGE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
@@ -551,7 +553,7 @@ public class SecurityConfig {
                                                                 "SUPPORT_DELETE",
                                                                 "SUPPORT_MANAGE", "ATTENDANCE_READ", "ATTENDANCE_WRITE",
                                                                 "ATTENDANCE_MANAGE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "ROLE_FINANCEIRO", "ROLE_COMERCIAL",
                                                                 "ROLE_GESTOR_COMERCIAL", "ROLE_ASSISTENTE_COMERCIAL",
@@ -560,7 +562,7 @@ public class SecurityConfig {
                                                 // Endpoints de departamentos - requerem permissões de RH ou admin
                                                 .requestMatchers("/api/departments/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
@@ -572,7 +574,7 @@ public class SecurityConfig {
                                                                 "/api/companies/**", "/api/positions/**",
                                                                 "/api/doctors/**", "/api/work-posts/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "RH", "DEPARTAMENTO_PESSOAL",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH",
                                                                 "ROLE_DEPARTAMENTO_PESSOAL",
                                                                 "EMPLOYEES_READ", "EMPLOYEES_WRITE",
                                                                 "OPERACIONAL", "ROLE_OPERACIONAL", "GESTOR_OPERACIONAL", "ROLE_GESTOR_OPERACIONAL",
@@ -586,7 +588,7 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/clients/**").permitAll()
                                                 // Documentos de RH - restritos a RH e Admins
                                                 .requestMatchers("/api/documents/**")
-                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "RH", "ADMIN", "SUPER_ADMIN")
+                                                .hasAnyAuthority("ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR", "ROLE_RH", "ROLE_DEPARTAMENTO_PESSOAL", "RH", "ADMIN", "SUPER_ADMIN")
                                                 // Certificações: autenticado no HTTP; regra fina no controller (@PreAuthorize / checagem de employeeId)
                                                 .requestMatchers("/api/employee-certifications/**")
                                                 .authenticated()
@@ -638,19 +640,19 @@ public class SecurityConfig {
                                                 .requestMatchers(org.springframework.http.HttpMethod.POST,
                                                                 "/api/measurements/**")
                                                 .hasAnyAuthority("FINANCIAL_WRITE", "FINANCIAL_CREATE",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO")
                                                 .requestMatchers(org.springframework.http.HttpMethod.PUT,
                                                                 "/api/measurements/**")
-                                                .hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                .hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO")
                                                 .requestMatchers(org.springframework.http.HttpMethod.PATCH,
                                                                 "/api/measurements/**")
-                                                .hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                .hasAnyAuthority("FINANCIAL_WRITE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO")
                                                 .requestMatchers(org.springframework.http.HttpMethod.DELETE,
                                                                 "/api/measurements/**")
-                                                .hasAnyAuthority("FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                .hasAnyAuthority("FINANCIAL_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_FINANCEIRO")
                                                 // Endpoints de estoque - requerem permissões específicas ou
                                                 // autenticação
@@ -659,7 +661,7 @@ public class SecurityConfig {
                                                                 "EQUIPMENTS_CREATE",
                                                                 "EQUIPMENTS_DELETE", "EQUIPMENTS_ASSIGN", "STOCK_READ",
                                                                 "STOCK_WRITE", "STOCK_CREATE",
-                                                                "STOCK_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "STOCK_DELETE", "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "SUPER_ADMIN", "ADMIN",
                                                                 "ROLE_GESTOR", "ROLE_SUPERVISOR",
                                                                 "ROLE_ESTOQUE", "ROLE_SUPRIMENTOS", "ROLE_COMPRAS", "ROLE_ALMOXARIFADO",
@@ -702,7 +704,7 @@ public class SecurityConfig {
                                                                 "ROLE_COLABORADOR")
                                                 .requestMatchers("/api/dependents/**")
                                                 .hasAnyAuthority("SUPER_ADMIN", "ADMIN", "GESTOR", "RH",
-                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN",
+                                                                "ROLE_SUPER_ADMIN", "ROLE_ADMIN", "ROLE_ADMINISTRADOR",
                                                                 "ROLE_GESTOR", "ROLE_RH", "EMPLOYEES_READ",
                                                                 "EMPLOYEES_WRITE", "EMPLOYEES_CREATE",
                                                                 "DEPARTAMENTO_PESSOAL", "ROLE_DEPARTAMENTO_PESSOAL")

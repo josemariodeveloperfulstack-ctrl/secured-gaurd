@@ -32,7 +32,7 @@ public class CreateUserRequest {
     )
     private String password;
     
-    @Pattern(regexp = "^\\d{9,20}$", message = "WhatsApp deve conter apenas dígitos e ter entre 9 e 20 caracteres")
+    @Pattern(regexp = "^\\d{9,20}$|^$", message = "WhatsApp deve conter apenas dígitos e ter entre 9 e 20 caracteres")
     private String whatsapp;
     
     private List<String> roles;  // Array de Strings com nomes dos roles

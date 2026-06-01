@@ -503,13 +503,8 @@ const Frota: React.FC<FrotaProps> = ({ embedded = false }) => {
     console.log('✅ Multa salva com sucesso! Atualizando lista...');
 
     try {
-      // Pequeno delay para garantir que o backend processou a operação
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Invalidar queries para forçar atualização
       await queryClient.invalidateQueries({ queryKey: ['fines'], exact: true });
 
-      // Refetch explícito e aguardar conclusão
       const result = await refetchFines();
       console.log('🔄 Refetch concluído. Novos dados:', result.data);
       console.log('📊 Total de multas após atualização:', result.data?.length || 0);

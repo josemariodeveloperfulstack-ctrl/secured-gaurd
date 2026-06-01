@@ -269,6 +269,7 @@ public class PermissionController {
     private String getRoleDisplayName(UserRole role) {
         switch (role) {
             case SUPER_ADMIN: return "Super Administrador";
+            case ADMINISTRADOR: return "Administrador";
             case ADMIN: return "Administrador";
             case SUPERVISOR: return "Supervisor";
             case RH: return "Recursos Humanos";
@@ -293,6 +294,7 @@ public class PermissionController {
     private String getRoleDescription(UserRole role) {
         switch (role) {
             case SUPER_ADMIN: return "Acesso total e irrestrito a todas as funcionalidades e módulos do sistema";
+            case ADMINISTRADOR: return "Acesso total a todas as funcionalidades e módulos do sistema";
             case ADMIN: return "Acesso amplo, mas subordinado ao Super Admin";
             case SUPERVISOR: return "Coordena operações de equipes ou setores";
             case RH: return "Gerencia informações contratuais e pessoais dos colaboradores";
@@ -317,6 +319,7 @@ public class PermissionController {
     private String getRoleColor(UserRole role) {
         switch (role) {
             case SUPER_ADMIN: return "🟥";
+            case ADMINISTRADOR: return "🟥";
             case ADMIN: return "🟦";
             case SUPERVISOR: return "🟩";
             case RH: return "🟨";

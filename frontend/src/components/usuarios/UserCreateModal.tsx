@@ -93,8 +93,8 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     setIsLoading(true);
     try {
       const userData = {
-        username: formData.username,
-        email: formData.email,
+        username: formData.username.trim(),
+        email: formData.email.trim().toLowerCase(),
         name: formData.name,
         password: formData.password,
         roles: formData.roles, // Backend espera array de STRINGS!
@@ -123,9 +123,18 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
       onSave();
       onClose();
     } catch (error: any) {
+      const data = error.response?.data;
+      const description =
+        (typeof data === 'string' ? data : null) ||
+        data?.message ||
+        data?.error ||
+        (data?.fieldErrors
+          ? Object.values(data.fieldErrors as Record<string, string>).join(' ')
+          : null) ||
+        'Erro ao criar usuário.';
       toast({
         title: 'Erro!',
-        description: error.response?.data?.message || 'Erro ao criar usuário.',
+        description,
         variant: 'destructive',
       });
     } finally {

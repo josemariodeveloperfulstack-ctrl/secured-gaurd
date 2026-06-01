@@ -23,11 +23,11 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000, // 1 minuto
-      gcTime: 5 * 60 * 1000, // 5 minutos em cache após desmontar
-      refetchOnWindowFocus: false, // Não recarregar ao voltar para a aba
-      refetchOnReconnect: true, // Recarregar ao reconectar internet
-      refetchOnMount: true, // Atualizar ao montar (somente se stale)
+      staleTime: 2 * 60 * 1000, // 2 minutos — menos refetch ao trocar de tela
+      gcTime: 10 * 60 * 1000, // 10 minutos em cache após desmontar
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      refetchOnMount: false, // Usa cache se ainda fresco; invalide após salvar
       retry: 2,
       retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },

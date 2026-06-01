@@ -1,6 +1,8 @@
 package com.z7design.secured_guard.controller;
 
 import com.z7design.secured_guard.dto.UserListResponseDTO;
+import com.z7design.secured_guard.dto.UserPageResponse;
+import org.springframework.data.domain.Page;
 import com.z7design.secured_guard.dto.UserGroupDTO;
 import com.z7design.secured_guard.dto.ProfileUpdateRequest;
 import com.z7design.secured_guard.dto.ProfileResponse;
@@ -81,6 +83,34 @@ public class UserController {
         return ResponseEntity.ok(dtos);
     }
 
+    @GetMapping("/paged")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Listar usuários (paginado)", description = "Retorna usuários paginados com busca e filtros opcionais")
+    public ResponseEntity<UserPageResponse> getUsersPaged(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) Boolean onlineOnly) {
+        boolean filterOnline = Boolean.TRUE.equals(onlineOnly);
+        Page<User> userPage = userService.findAllPaged(page, size, search, role, filterOnline);
+
+        List<UserListResponseDTO> content = userPage.getContent().stream()
+                .map(this::convertToDTO)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        UserPageResponse response = new UserPageResponse(
+                content,
+                userPage.getTotalElements(),
+                userPage.getTotalPages(),
+                userPage.getNumber(),
+                userPage.getSize(),
+                userOnlineStatusService.getOnlineUserCount());
+
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Buscar usuário por ID", description = "Retorna um usuário específico pelo ID. Permite acesso para usuários autenticados (necessário para chat)")
@@ -140,7 +170,7 @@ public class UserController {
     }
 
     @GetMapping("/username/{username}")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Buscar usuário por username", description = "Retorna um usuário específico pelo username")
     public ResponseEntity<UserListResponseDTO> getUserByUsername(@PathVariable String username) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -159,7 +189,7 @@ public class UserController {
     }
 
     @GetMapping("/email/{email}")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Buscar usuário por email", description = "Retorna um usuário específico pelo email")
     public ResponseEntity<UserListResponseDTO> getUserByEmail(@PathVariable String email) {
         User user = userService.findByEmail(email)
@@ -169,7 +199,7 @@ public class UserController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('GESTOR') or hasRole('ASSISTENCIA_RH')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR') or hasRole('RH') or hasRole('DEPARTAMENTO_PESSOAL') or hasRole('GESTOR') or hasRole('ASSISTENCIA_RH')")
     @Operation(summary = "Buscar usuários", description = "Busca usuários por nome, email ou username com filtro dinâmico")
     public ResponseEntity<List<UserListResponseDTO>> searchUsers(
             @RequestParam(value = "query", required = false) String query) {
@@ -190,7 +220,7 @@ public class UserController {
     }
 
     @GetMapping("/cpf/{cpf}")
-    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_READ') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Buscar usuário por CPF", description = "Busca usuário através do CPF do funcionário associado")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário encontrado"),
@@ -205,7 +235,7 @@ public class UserController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('USERS_CREATE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_CREATE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Criar usuário", description = "Cria um novo usuário no sistema")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Usuário criado com sucesso"),
@@ -233,7 +263,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Atualizar usuário", description = "Atualiza os dados de um usuário existente")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Usuário atualizado com sucesso"),
@@ -408,7 +438,7 @@ public class UserController {
     }
 
     @PostMapping("/{id}/permissions")
-    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Adicionar permissões ao usuário", description = "Adiciona permissões individuais ao usuário. Aceita UUIDs ou nomes de permissões.")
     public ResponseEntity<?> addUserPermissions(@PathVariable String id, @RequestBody List<String> permissionIdentifiers) {
         try {
@@ -433,7 +463,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}/permissions")
-    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_WRITE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Remover permissões do usuário", description = "Remove permissões individuais do usuário. Aceita UUIDs ou nomes de permissões.")
     public ResponseEntity<?> removeUserPermissions(@PathVariable String id, @RequestBody List<String> permissionIdentifiers) {
         try {
@@ -451,7 +481,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('USERS_DELETE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USERS_DELETE') or hasRole('SUPER_ADMIN') or hasRole('ADMIN') or hasRole('ADMINISTRADOR')")
     @Operation(summary = "Excluir usuário", description = "Exclui um usuário do sistema")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Usuário excluído com sucesso"),

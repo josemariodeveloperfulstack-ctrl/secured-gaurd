@@ -2,6 +2,7 @@ package com.z7design.secured_guard.model.enums;
 
 public enum UserRole {
     SUPER_ADMIN, // 🟥 Acesso total e irrestrito
+    ADMINISTRADOR, // 🟥 Acesso total aos módulos (equivalente operacional ao Super Admin)
     ADMIN, // 🟦 Acesso amplo, subordinado ao Super Admin
     SUPERVISOR, // 🟩 Coordena operações de equipes
     RH, // 🟨 Gerencia informações contratuais e pessoais

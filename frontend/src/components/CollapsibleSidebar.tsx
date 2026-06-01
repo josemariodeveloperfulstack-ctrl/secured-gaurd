@@ -8,8 +8,9 @@ import { cn } from '@/lib/utils';
 import { ScrollPreservingLink } from './ScrollPreservingLink';
 import UserProfileModal from './UserProfileModal';
 import { UserRole } from '@/types/user';
+import { hasFullSystemAccess } from '@/utils/permissions';
 import Logo from './Logo';
-import { prefetchRoute } from '@/hooks/usePagePrefetch';
+import { prefetchByPath } from '@/config/routePrefetch';
 import {
   BarChart3,
   FileText,
@@ -85,110 +86,6 @@ import {
 
 /** Persistência das seções abertas/fechadas (acordeão vertical da sidebar) */
 const SIDEBAR_NAV_STORAGE_KEY = 'secured-guard-sidebar-nav-sections';
-
-/**
- * Map of route path (without query string) → dynamic import function.
- * Used by the hover prefetch: when the user hovers a sidebar item, the
- * corresponding JS chunk is downloaded immediately — so the click is instant.
- */
-const ROUTE_PREFETCH_MAP: Record<string, () => Promise<unknown>> = {
-  '/dashboard':                    () => import('@/pages/Dashboard'),
-  '/dashboard-home':               () => import('@/pages/Dashboard'),
-  '/area-funcionario':             () => import('@/pages/EmployeePortal'),
-  '/dashboard-colaborador':        () => import('@/pages/EmployeePortal'),
-  '/holerites':                    () => import('@/pages/Holerites'),
-  '/meus-holerites':               () => import('@/pages/MeusHolerites'),
-  '/frota':                        () => import('@/pages/Frota'),
-  '/filiais':                      () => import('@/pages/Filiais'),
-  // Operacional
-  '/operacional':                  () => import('@/pages/Operacional'),
-  '/controle-rondas':              () => import('@/pages/ControleRondas'),
-  '/guia-transporte':              () => import('@/pages/GuiaTransporte'),
-  // Financeiro
-  '/financeiro':                   () => import('@/pages/Financeiro'),
-  '/financeiro/contas-pagar':      () => import('@/pages/ContasAPagar'),
-  '/financeiro/contas-receber':    () => import('@/pages/ContasAReceber'),
-  '/financeiro/fluxo-caixa':       () => import('@/pages/FluxoCaixa'),
-  '/financeiro/pagamentos':        () => import('@/pages/Pagamentos'),
-  '/financeiro/conciliacao-bancaria': () => import('@/pages/ConciliacaoBancaria'),
-  '/financeiro/bancos':            () => import('@/pages/Bancos'),
-  '/financeiro/agencias':          () => import('@/pages/Agencias'),
-  '/financeiro/relatorios':        () => import('@/pages/RelatoriosFinanceiros'),
-  '/financeiro/centro-custos':     () => import('@/pages/CentrosDeCusto'),
-  '/financeiro/medicao':           () => import('@/pages/Medicao'),
-  '/gestao-patrimonial':           () => import('@/pages/GestaoPatrimonial'),
-  '/modulo-fiscal':                () => import('@/pages/ModuloFiscal'),
-  // RH
-  '/rh':                           () => import('@/pages/RH'),
-  '/rh/funcionarios':              () => import('@/pages/Funcionarios'),
-  '/rh/postos':                    () => import('@/pages/Postos'),
-  '/rh/vagas':                     () => import('@/pages/Vagas'),
-  '/rh/beneficios':                () => import('@/pages/Beneficios'),
-  '/rh/aniversariantes':           () => import('@/pages/RH/Aniversariantes'),
-  '/rh/treinamentos':              () => import('@/pages/RH/Treinamentos'),
-  '/rh/sst':                       () => import('@/pages/RH/SST'),
-  '/rh/sst/exames':                () => import('@/pages/RH/SST/ExamesMedicos'),
-  '/rh/sst/epis':                  () => import('@/pages/RH/SST/EPIs'),
-  '/rh/sst/acidentes':             () => import('@/pages/RH/SST/Acidentes'),
-  '/rh/sst/treinamentos':          () => import('@/pages/RH/SST/Treinamentos'),
-  '/rh/sst/cipa':                  () => import('@/pages/RH/SST/CIPA'),
-  '/rh/sst/relatorios':            () => import('@/pages/RH/SST/Relatorios'),
-  '/rh/admissao-demissao':         () => import('@/pages/AdmissaoDemissao'),
-  '/rh/remanejamentos':            () => import('@/pages/Remanejamento'),
-  '/rh/ferias':                    () => import('@/pages/Ferias'),
-  '/rh/ponto-eletronico':          () => import('@/pages/RH/PontoEletronico'),
-  '/rh/fechamento-horas':          () => import('@/pages/RH/FechamentoHoras'),
-  '/rh/ocorrencias':               () => import('@/pages/Ocorrencias'),
-  '/rh/funcoes':                   () => import('@/pages/Funcoes'),
-  '/rh/cargos':                    () => import('@/pages/Cargos'),
-  '/rh/epis':                      () => import('@/pages/EPIs'),
-  // Comercial
-  '/leads':                        () => import('@/pages/Leads'),
-  '/comercial/marketing':          () => import('@/pages/ComercialMarketing'),
-  '/comercial/empresas':           () => import('@/pages/Empresas'),
-  '/clientes':                     () => import('@/pages/Clientes'),
-  '/propostas':                    () => import('@/pages/Propostas'),
-  '/orcamentos':                   () => import('@/pages/Orcamentos'),
-  '/contratos':                    () => import('@/pages/Contratos'),
-  '/crm':                          () => import('@/pages/CrmKanban'),
-  // Estoque / Compras
-  '/estoque-simplificado':         () => import('@/pages/EstoqueSimplificado'),
-  '/estoque/relatorios':           () => import('@/pages/EstoqueRelatorios'),
-  '/estoque/fornecedores':         () => import('@/pages/Fornecedores'),
-  '/compras':                      () => import('@/pages/Compras'),
-  '/compras/solicitacoes':         () => import('@/pages/Compras'),
-  '/compras/aprovacoes':           () => import('@/pages/Compras'),
-  '/compras/cotacoes':             () => import('@/pages/CotacoesCompras'),
-  '/compras/fornecedores':         () => import('@/pages/Fornecedores'),
-  '/compras/relatorios':           () => import('@/pages/Compras'),
-  // Comunicação
-  '/chat-interno':                 () => import('@/pages/ChatInterno'),
-  '/mensagens':                    () => import('@/pages/Mensagens'),
-  '/webmail':                      () => import('@/pages/Webmail/WebmailApp'),
-  '/gestao-mensagens/grupos':      () => import('@/pages/GestaoMensagens'),
-  '/gestao-mensagens/notificacoes':() => import('@/pages/GestaoMensagens'),
-  // Atendimento
-  '/gestao-atendimento/dashboard': () => import('@/pages/GestaoAtendimento'),
-  '/gestao-atendimento/tickets':   () => import('@/pages/GestaoAtendimento'),
-  '/gestao-atendimento/historico': () => import('@/pages/GestaoAtendimento'),
-  '/gestao-atendimento/agentes':   () => import('@/pages/GestaoAtendimento'),
-  '/gestao-atendimento/metricas':  () => import('@/pages/GestaoAtendimento'),
-  '/gestao-atendimento/chatbot':   () => import('@/pages/GestaoAtendimento'),
-  // Sistema
-  '/usuarios':                     () => import('@/pages/Usuarios'),
-  '/grupos':                       () => import('@/pages/Grupos'),
-  '/atividades':                   () => import('@/pages/ActivityManagement'),
-  '/configuracoes':                () => import('@/pages/Configuracoes'),
-  '/configuracoes/backup':         () => import('@/pages/ConfiguracaoBackup'),
-  '/whatsapp-connection':          () => import('@/pages/WhatsAppConnection'),
-};
-
-/** Trigger hover prefetch for a given route path */
-function prefetchByPath(to: string): void {
-  const basePath = to.split('?')[0];
-  const importFn = ROUTE_PREFETCH_MAP[basePath];
-  if (importFn) prefetchRoute(importFn);
-}
 
 type SidebarNavSectionProps = {
   title: string;
@@ -860,8 +757,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
 
   // Função para verificar se usuário tem permissão
   const hasPermission = useCallback((permission: string): boolean => {
-    // SUPER_ADMIN tem acesso a tudo
-    if (normalizedRole === 'SUPER_ADMIN') {
+    // SUPER_ADMIN e ADMINISTRADOR têm acesso a tudo
+    if (hasFullSystemAccess(normalizedRole)) {
       return true;
     }
 
@@ -934,8 +831,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
   }, [normalizedRole]);
 
   const filterItemsForRole = useCallback(<T extends { id: string, requiredPermission?: string }>(items: T[]): T[] => {
-    // SUPER_ADMIN sempre vê todos os itens
-    if (normalizedRole === 'SUPER_ADMIN') {
+    // SUPER_ADMIN e ADMINISTRADOR sempre vêem todos os itens
+    if (hasFullSystemAccess(normalizedRole)) {
       return items;
     }
 
@@ -1681,8 +1578,8 @@ export const CollapsibleSidebar: React.FC<CollapsibleSidebarProps> = ({
             </SidebarNavSection>
           )}
 
-          {/* Módulo Sistema - SUPER_ADMIN */}
-          {normalizedRole === 'SUPER_ADMIN' && (
+          {/* Módulo Sistema - SUPER_ADMIN / ADMINISTRADOR */}
+          {hasFullSystemAccess(normalizedRole) && (
             <SidebarNavSection
               title="Sistema"
               sidebarCollapsed={collapsed}

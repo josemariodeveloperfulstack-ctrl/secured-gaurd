@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { DynamicSidebar } from './DynamicSidebar';
+import { usePagePrefetch } from '@/hooks/usePagePrefetch';
 import Header from './Header';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/toaster';
@@ -11,6 +12,8 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  usePagePrefetch();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-to-br from-seguranca-black via-seguranca-black to-seguranca-graphite">

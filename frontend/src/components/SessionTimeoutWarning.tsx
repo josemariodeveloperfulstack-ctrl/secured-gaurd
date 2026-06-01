@@ -23,17 +23,18 @@ export const SessionTimeoutWarning: React.FC<SessionTimeoutWarningProps> = ({
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    if (seconds <= 0) {
-      // Tempo esgotado, fazer logout
-      logout();
+    setSeconds(remainingSeconds);
+  }, [remainingSeconds]);
+
+  useEffect(() => {
+    if (!isVisible || remainingSeconds <= 0) {
       return;
     }
 
     const interval = setInterval(() => {
       setSeconds((prev) => {
         if (prev <= 1) {
-          clearInterval(interval);
-          logout();
+          window.setTimeout(() => logout(), 0);
           return 0;
         }
         return prev - 1;
@@ -41,7 +42,7 @@ export const SessionTimeoutWarning: React.FC<SessionTimeoutWarningProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [seconds, logout]);
+  }, [isVisible, remainingSeconds, logout]);
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);

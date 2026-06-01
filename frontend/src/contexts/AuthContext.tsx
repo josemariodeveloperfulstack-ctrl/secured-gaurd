@@ -6,6 +6,8 @@ import { User, AuthContextType, UserGroupData, UserRole, SupervisorSessionPayloa
 import { generatePermissions, generatePermissionsFromGroups, combinePermissions } from '@/utils/permissions';
 import { groupService } from '@/services/groupService';
 import { getApiUrl } from '@/config/environment';
+import { SessionTimeoutManager } from '@/components/SessionTimeoutManager';
+import WebSocketConnector from '@/components/WebSocketConnector';
 
 const sanitizeRole = (roleStr: string): string => {
   if (!roleStr) return '';
@@ -255,6 +257,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
+      if (status === 500 || status === 502 || status === 503) {
+        console.warn(
+          '⚠️ [AuthContext] Backend temporariamente indisponível ao carregar grupos (servidor ainda subindo?). Continuando sem grupos.'
+        );
+        return;
+      }
+
       if (status === 403) {
         console.info('[AuthContext] Grupo não carregado (403) - usuário sem permissão para /groups, continuando sem grupos.');
       } else if (status === 401) {
@@ -310,6 +319,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Definir o role principal por prioridade
       const rolePriority: UserRole[] = [
         'SUPER_ADMIN',
+        'ADMINISTRADOR',
         'ADMIN',
         'RH',
         'ASSISTENCIA_RH',
@@ -620,6 +630,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
+      <SessionTimeoutManager />
+      <WebSocketConnector />
       {children}
     </AuthContext.Provider>
   );
