@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import { resolveStompBrokerUrl } from '@/lib/stompBroker';
 import { useMessageStore } from '../stores/messageStore';
 import { ChatMessage } from '../stores/messageStore';
 
@@ -63,9 +63,8 @@ export const useWebSocket = (config: WebSocketConfig) => {
     console.log('[WebSocket] Iniciando conexão única...');
 
     try {
-      const socket = new SockJS('/ws');
       const client = new Client({
-        webSocketFactory: () => socket,
+        brokerURL: resolveStompBrokerUrl(),
         connectHeaders: {
           'Authorization': `Bearer ${config.token}`,
           'X-Username': config.username

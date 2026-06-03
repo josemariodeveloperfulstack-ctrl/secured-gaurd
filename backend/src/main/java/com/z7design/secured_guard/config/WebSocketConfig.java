@@ -40,6 +40,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // WebSocket nativo (STOMP) — usado pelo frontend sem SockJS
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*");
+        // SockJS mantido para compatibilidade com clientes legados
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .withSockJS();

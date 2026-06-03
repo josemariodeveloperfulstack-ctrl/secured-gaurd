@@ -1,9 +1,9 @@
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import { resolveStompBrokerUrl } from '@/lib/stompBroker';
 
 export function connectChatSocket(token: string, userId: string, onMessage: (msg: any) => void, onTyping?: (typing: any) => void) {
   const client = new Client({
-    webSocketFactory: () => new SockJS('/ws'),
+    brokerURL: resolveStompBrokerUrl(),
     connectHeaders: { Authorization: `Bearer ${token}` },
     onConnect: () => {
       client.subscribe(`/user/${userId}/chat`, (message) => {

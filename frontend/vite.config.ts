@@ -173,7 +173,8 @@ export default defineConfig(({ mode }) => {
       minify: 'terser', // Usar terser para melhor minificação
       terserOptions: {
         compress: {
-          drop_console: false, // Manter console.logs para debug
+          drop_console: mode === 'production',
+          drop_debugger: mode === 'production',
         },
       },
       rollupOptions: {
@@ -239,7 +240,7 @@ export default defineConfig(({ mode }) => {
             'pdf': ['html2pdf.js', 'pdf-lib'],
 
             // WebSocket
-            'websocket': ['@stomp/stompjs', 'sockjs-client'],
+            'websocket': ['@stomp/stompjs'],
 
             // Other UI
             'ui-other': [
