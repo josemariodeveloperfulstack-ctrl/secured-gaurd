@@ -16,20 +16,218 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function prepareEmployeePayload(employeeData: Record<string, unknown>): Record<string, unknown> {
-  const payload = { ...employeeData };
-  const bankData = payload.bankData as Record<string, string> | undefined;
+function parseSalarioValue(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isNaN(value) ? null : value;
+  }
+  const s = String(value).trim();
+  if (!s) return null;
+  const n = s.includes(',')
+    ? parseFloat(s.replace(/\./g, '').replace(',', '.'))
+    : parseFloat(s);
+  return Number.isNaN(n) ? null : n;
+}
 
-  if (bankData) {
-    payload.bankInfo = {
-      bank: bankData.bank || '',
-      agency: bankData.agency || '',
-      account: bankData.account || '',
-      accountDigit: bankData.accountDigit || '',
-      accountType: bankData.type || 'CORRENTE',
-      pixKey: bankData.chavePix || '',
+function isBlankId(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  const s = String(value).trim();
+  return s === '' || s.toLowerCase() === 'null';
+}
+
+function normalizeUf(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toUpperCase().slice(0, 2);
+}
+
+function normalizeCep(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\D/g, '');
+}
+
+/** Mapeia bankData/bankInfo da API para o formato do formulário. */
+export function mapBankDataFromApi(data: Record<string, unknown> | null | undefined) {
+  const raw = (data?.bankData ?? data?.bankInfo) as Record<string, unknown> | undefined;
+  if (!raw || typeof raw !== 'object') {
+    return {
+      bank: '',
+      agency: '',
+      account: '',
+      accountDigit: '',
+      type: 'CORRENTE' as const,
+      chavePix: '',
     };
-    delete payload.bankData;
+  }
+  return {
+    bank: String(raw.bank ?? ''),
+    agency: String(raw.agency ?? ''),
+    account: String(raw.account ?? ''),
+    accountDigit: String(raw.accountDigit ?? ''),
+    type: (raw.type ?? raw.accountType ?? 'CORRENTE') as 'CORRENTE' | 'POUPANCA',
+    chavePix: String(raw.chavePix ?? raw.pixKey ?? ''),
+  };
+}
+
+/** Preenche endereco* a partir de address (objeto) e normaliza UF/CEP. */
+export function syncFlatAddressFromApi<T extends Record<string, unknown>>(data: T): T {
+  const out = { ...data };
+  const addr = out.address;
+  if (addr && typeof addr === 'object' && !Array.isArray(addr)) {
+    const a = addr as Record<string, unknown>;
+    if (!out.enderecoRua && a.street) out.enderecoRua = a.street;
+    if (!out.enderecoNumero && a.number) out.enderecoNumero = a.number;
+    if (!out.enderecoComplemento && a.complement) out.enderecoComplemento = a.complement;
+    if (!out.enderecoBairro && a.neighborhood) out.enderecoBairro = a.neighborhood;
+    if (!out.enderecoCidade && a.city) out.enderecoCidade = a.city;
+    if (!out.enderecoEstado && a.state) out.enderecoEstado = a.state;
+    if (!out.enderecoCep && a.zipCode) out.enderecoCep = a.zipCode;
+  }
+  if (out.enderecoEstado) out.enderecoEstado = normalizeUf(out.enderecoEstado);
+  if (out.enderecoCep) out.enderecoCep = normalizeCep(out.enderecoCep);
+  return out;
+}
+
+const PAYLOAD_STRIP_KEYS = [
+  'dependents',
+  'history',
+  'documents',
+  'createdAt',
+  'updatedAt',
+  'work_posts',
+  'workPosts',
+  'birthDayOfMonth',
+  'ageTurning',
+  'photoPreview',
+  'photoFile',
+  'department',
+] as const;
+
+/** Campos de data (LocalDate no backend) — string vazia quebra deserialização. */
+const DATE_FIELD_KEYS = [
+  'birthDate',
+  'hireDate',
+  'terminationDate',
+  'dataRescisao',
+  'spouseBirthDate',
+  'tituloEleitorDataExpedicao',
+  'tituloEleitorValidade',
+  'carteiraIdentidadeDataEmissao',
+  'fgtsDataOpcao',
+  'fgtsDataRetratacao',
+  'pisDataCadastro',
+  'cnhExpirationDate',
+  'ctpsIssueDate',
+  'dataChegadaBrasil',
+  'rneValidade',
+  'ricDataEmissao',
+  'cinDataEmissao',
+  'exameMedicoData',
+  'exameMedicoVencimento',
+  'remanejamentoDataInicio',
+] as const;
+
+const NESTED_ID_KEYS = ['position', 'unit', 'company', 'user', 'exameMedicoDoctor'] as const;
+
+/** Normaliza o body antes de POST/PUT — alinhado ao EmployeeDTO (bankData, address, patch parcial). */
+export function prepareEmployeePayload(
+  employeeData: Record<string, unknown>,
+  options?: { partialUpdate?: boolean },
+): Record<string, unknown> {
+  const payload = { ...employeeData };
+  for (const key of PAYLOAD_STRIP_KEYS) {
+    delete payload[key];
+  }
+
+  for (const key of DATE_FIELD_KEYS) {
+    if (payload[key] === '' || payload[key] === null) {
+      delete payload[key];
+    }
+  }
+
+  if (options?.partialUpdate) {
+    for (const [key, value] of Object.entries(payload)) {
+      if (value === '' && key !== 'bankData' && !key.startsWith('endereco')) {
+        delete payload[key];
+      }
+    }
+  }
+
+  // Backend: @JsonProperty("bankData") em EmployeeDTO.bankInfo — não enviar bankInfo.
+  const rawBank = (payload.bankData ?? payload.bankInfo) as Record<string, unknown> | undefined;
+  if (rawBank && typeof rawBank === 'object') {
+    const normalizedBank = {
+      bank: rawBank.bank ?? '',
+      agency: rawBank.agency ?? '',
+      account: rawBank.account ?? '',
+      accountDigit: rawBank.accountDigit ?? '',
+      type: rawBank.type ?? rawBank.accountType ?? 'CORRENTE',
+      chavePix: rawBank.chavePix ?? rawBank.pixKey ?? '',
+    };
+    const hasBankValues = Object.values(normalizedBank).some(
+      (v) => v !== null && v !== undefined && String(v).trim() !== '',
+    );
+    if (hasBankValues) {
+      payload.bankData = normalizedBank;
+    } else {
+      delete payload.bankData;
+    }
+    delete payload.bankInfo;
+  }
+
+  // Endereço estruturado para o AddressDeserializer + campos endereco* no update.
+  const hasFlatAddress =
+    payload.enderecoRua ||
+    payload.enderecoNumero ||
+    payload.enderecoBairro ||
+    payload.enderecoCidade ||
+    payload.enderecoEstado ||
+    payload.enderecoCep;
+  if (payload.enderecoEstado) {
+    payload.enderecoEstado = normalizeUf(payload.enderecoEstado);
+  }
+  if (payload.enderecoCep) {
+    payload.enderecoCep = normalizeCep(payload.enderecoCep);
+  }
+
+  if (hasFlatAddress) {
+    payload.address = {
+      street: payload.enderecoRua ?? '',
+      number: payload.enderecoNumero ?? '',
+      complement: payload.enderecoComplemento ?? '',
+      neighborhood: payload.enderecoBairro ?? '',
+      city: payload.enderecoCidade ?? '',
+      state: payload.enderecoEstado ?? '',
+      zipCode: payload.enderecoCep ?? '',
+    };
+  } else if (typeof payload.address === 'string' && String(payload.address).trim()) {
+    payload.address = { street: payload.address };
+  }
+
+  const salario = parseSalarioValue(payload.salario);
+  if (salario != null) {
+    payload.salario = salario;
+  } else {
+    delete payload.salario;
+  }
+
+  const workPostRef = payload.workPost as { id?: string } | undefined;
+  const workPostId = payload.workPostId ?? workPostRef?.id;
+  if (!isBlankId(workPostId)) {
+    payload.workPostId = String(workPostId);
+  } else {
+    delete payload.workPostId;
+  }
+  delete payload.workPost;
+
+  if (isBlankId(payload.departmentId)) {
+    delete payload.departmentId;
+  }
+
+  for (const key of NESTED_ID_KEYS) {
+    const ref = payload[key] as { id?: string } | undefined;
+    if (ref && typeof ref === 'object' && isBlankId(ref.id)) {
+      delete payload[key];
+    }
   }
 
   return payload;
@@ -208,6 +406,10 @@ function buildEmployeeListQueryParams(
 }
 
 export const employeeService = {
+  mapBankDataFromApi,
+  syncFlatAddressFromApi,
+  prepareEmployeePayload,
+
   /**
    * Buscar todos os funcionários (paginado - até 500 por página)
    */
@@ -422,20 +624,10 @@ export const employeeService = {
   normalizeEmployee(data: any): Employee | null {
     if (!data) return null;
 
-    // Criar cópia para não mutar o original se necessário
-    const employee = { ...data };
+    let employee = syncFlatAddressFromApi({ ...data }) as Record<string, unknown>;
 
-    // Mapear bankInfo (backend) para bankData (frontend) se necessário
-    if (data.bankInfo && !data.bankData) {
-      employee.bankData = {
-        bank: data.bankInfo.bank || '',
-        agency: data.bankInfo.agency || '',
-        account: data.bankInfo.account || '',
-        accountDigit: data.bankInfo.accountDigit || '',
-        type: data.bankInfo.accountType || 'CORRENTE',
-        chavePix: data.bankInfo.pixKey || data.bankInfo.chavePix || ''
-      };
-    }
+    employee.bankData = mapBankDataFromApi(employee);
+    delete employee.bankInfo;
 
     // Mapear pai/mae para nomePai/nomeMae (compatibilidade com planilhas e DTOs variados)
     if (data.pai && !data.nomePai) employee.nomePai = data.pai;
@@ -586,9 +778,9 @@ export const employeeService = {
    */
   async createEmployee(employeeData: any): Promise<Employee> {
     try {
-      const payload = prepareEmployeePayload(employeeData);
+      const payload = prepareEmployeePayload(employeeData, { partialUpdate: false });
       const response = await api.post('/api/employees', payload);
-      return response.data;
+      return this.normalizeEmployee(response.data) as Employee;
     } catch (error: any) {
       console.error('Erro ao criar funcionário:', error);
       rethrowIfConnectionError(error);
@@ -601,9 +793,9 @@ export const employeeService = {
    */
   async updateEmployee(id: string, employeeData: any): Promise<Employee> {
     try {
-      const payload = prepareEmployeePayload(employeeData);
+      const payload = prepareEmployeePayload(employeeData, { partialUpdate: true });
       const response = await api.put(`/api/employees/${id}`, payload);
-      return response.data;
+      return this.normalizeEmployee(response.data) as Employee;
     } catch (error: any) {
       console.error('Erro ao atualizar funcionário:', error);
       rethrowIfConnectionError(error);

@@ -668,12 +668,39 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
           cinNumero: employeeData.cinNumero || '',
           cinOrgaoEmissor: employeeData.cinOrgaoEmissor || '',
           cinDataEmissao: employeeData.cinDataEmissao || '',
-          exameMedicoHorarioIntervalo: (employeeData as any).exameMedicoHorarioIntervalo || ''
+          exameMedicoHorarioIntervalo: (employeeData as any).exameMedicoHorarioIntervalo || '',
+          exameMedicoDoctor: (employeeData as any).exameMedicoDoctor?.id
+            ? { id: String((employeeData as any).exameMedicoDoctor.id) }
+            : { id: '' },
         };
         
         console.log('🔍 [DEBUG] formToSet.workPostId:', formToSet.workPostId);
         setForm(formToSet);
         setTemIntervaloRefeicao(employeeData.horarioTrabalhoIntervalo ? 'sim' : 'nao');
+
+        const docRef = (employeeData as any).exameMedicoDoctor;
+        if (docRef?.id) {
+          const doctorId = String(docRef.id);
+          if (docRef.name) {
+            setSelectedDoctor({ id: doctorId, name: docRef.name } as Doctor);
+            setDoctorSearchTerm(
+              docRef.crmNumber
+                ? `${docRef.name} - CRM ${docRef.crmNumber}/${docRef.crmState || ''}`
+                : String(docRef.name),
+            );
+          } else {
+            doctorService
+              .getById(doctorId)
+              .then((d) => {
+                setSelectedDoctor(d);
+                setDoctorSearchTerm(`${d.name} - CRM ${d.crmNumber}/${d.crmState}`);
+              })
+              .catch(() => setDoctorSearchTerm(''));
+          }
+        } else {
+          setSelectedDoctor(null);
+          setDoctorSearchTerm('');
+        }
         
         console.log('✅ Formulário preenchido com dados completos do funcionário');
         console.log('📋 Dados principais:', {
@@ -733,8 +760,43 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         }
       } catch (error) {
         console.error('❌ Erro ao buscar dados completos do funcionário:', error);
-        // Se falhar, usar dados do prop funcionario mesmo assim
-        console.log('⚠️ Usando dados parciais do funcionário passado como prop');
+        if (funcionario) {
+          const fallback = employeeService.normalizeEmployee(funcionario as any);
+          if (fallback) {
+            const synced = employeeService.syncFlatAddressFromApi(fallback as Record<string, unknown>);
+            const bankData = employeeService.mapBankDataFromApi(synced);
+            const addr =
+              typeof synced.address === 'object' && synced.address
+                ? (synced.address as Record<string, string>)
+                : null;
+            setForm((prev) => ({
+              ...prev,
+              name: String(synced.name || prev.name),
+              cpf: String(synced.cpf || (synced as any).document || prev.cpf),
+              email: String(synced.email || prev.email),
+              phone: String(synced.phone || prev.phone),
+              bankData,
+              enderecoRua: String(synced.enderecoRua || addr?.street || ''),
+              enderecoNumero: String(synced.enderecoNumero || addr?.number || ''),
+              enderecoBairro: String(synced.enderecoBairro || addr?.neighborhood || ''),
+              enderecoCidade: String(synced.enderecoCidade || addr?.city || ''),
+              enderecoEstado: String(synced.enderecoEstado || addr?.state || ''),
+              enderecoCep: String(synced.enderecoCep || addr?.zipCode || ''),
+              salario: synced.salario != null ? String(synced.salario) : (prev.salario as any),
+              workPostId: String(synced.workPostId || synced.workPost?.id || ''),
+              exameMedicoData: String((synced as any).exameMedicoData || ''),
+              exameMedicoVencimento: String((synced as any).exameMedicoVencimento || ''),
+              exameMedicoTipo: String((synced as any).exameMedicoTipo || ''),
+              exameMedicoPrimeiroEmprego: Boolean((synced as any).exameMedicoPrimeiroEmprego),
+              exameMedicoContribuicaoSindicalPaga: Boolean((synced as any).exameMedicoContribuicaoSindicalPaga),
+              nomePai: String((synced as any).nomePai || ''),
+              nomeMae: String((synced as any).nomeMae || ''),
+              sexo: String((synced as any).sexo || ''),
+              grauInstrucao: String((synced as any).grauInstrucao || ''),
+            }));
+            console.log('⚠️ Formulário preenchido com dados parciais do funcionário (fallback)');
+          }
+        }
       }
     };
 
@@ -797,14 +859,18 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       
       if (response.ok) {
         const data = await response.json();
+        const uf = String(data.state || data.uf || '')
+          .trim()
+          .toUpperCase()
+          .slice(0, 2);
         setForm(prev => ({
           ...prev,
           enderecoRua: data.street || '',
           enderecoBairro: data.neighborhood || '',
           enderecoCidade: data.city || '',
-          enderecoEstado: data.state || '',
+          enderecoEstado: uf,
           enderecoCep: cepLimpo,
-          address: `${data.street || ''}, ${data.neighborhood || ''}, ${data.city || ''} - ${data.state || ''}, ${cepLimpo}`
+          address: `${data.street || ''}, ${data.neighborhood || ''}, ${data.city || ''} - ${uf}, ${cepLimpo}`
         }));
         toast({
           title: "CEP encontrado",
@@ -1111,9 +1177,15 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
     }
     
-    // Validações
-    if (!form.address) {
-      setError('Endereço é obrigatório para editar um funcionário.');
+    if (
+      !form.enderecoRua ||
+      !form.enderecoNumero ||
+      !form.enderecoBairro ||
+      !form.enderecoCidade ||
+      !form.enderecoEstado ||
+      !form.enderecoCep
+    ) {
+      setError('Todos os campos de endereço são obrigatórios (Rua, Número, Bairro, Cidade, Estado e CEP).');
       return;
     }
 
@@ -1122,17 +1194,7 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
     try {
       // Prepara os dados do funcionário, garantindo que o salário seja enviado como número
       const { remanejamentoDataInicio, ...formRest } = form as any;
-      const employeeData: any = {
-        ...formRest,
-        salario: (() => {
-          if (!form.salario) return 0;
-          const s = String(form.salario);
-          if (s.includes(',')) {
-            return parseFloat(s.replace(/\./g, '').replace(',', '.'));
-          }
-          return parseFloat(s);
-        })()
-      };
+      const employeeData: any = { ...formRest };
       if (remanejamentoDataInicio && remanejamentoDataInicio.trim()) {
         employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
       }
@@ -1216,13 +1278,12 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         exameMedicoVencimento: (funcionario as any).exameMedicoVencimento || '',
         exameMedicoTipo: (funcionario as any).exameMedicoTipo || '',
         exameMedicoHorarioIntervalo: (funcionario as any).exameMedicoHorarioIntervalo || '',
-        bankData: (funcionario as any).bankInfo || (funcionario as any).bankData || {
-          bank: '',
-          agency: '',
-          account: '',
-          type: 'CORRENTE',
-          chavePix: ''
-        }
+        exameMedicoDoctor: (funcionario as any).exameMedicoDoctor?.id
+          ? { id: String((funcionario as any).exameMedicoDoctor.id) }
+          : { id: '' },
+        bankData: employeeService.mapBankDataFromApi(funcionario as Record<string, unknown>),
+        workPostId: (funcionario as any).workPostId || (funcionario as any).workPost?.id || '',
+        salario: funcionario.salario != null ? String(funcionario.salario) : ('' as any),
       });
     }
     setError(null);
@@ -2530,8 +2591,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                             </Label>
                             <Select
-                              value={form.enderecoUf || ''}
-                              onValueChange={(value) => setForm(prev => ({ ...prev, enderecoUf: value }))}
+                              value={form.enderecoEstado || ''}
+                              onValueChange={(value) => setForm(prev => ({ ...prev, enderecoEstado: value }))}
                     required
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">

@@ -1,5 +1,6 @@
 package com.z7design.secured_guard.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -67,6 +68,7 @@ public class EmployeeDTO {
     private String ctpsDigitalPdfNome;
     private Long ctpsDigitalPdfTamanho;
     @com.fasterxml.jackson.annotation.JsonProperty("bankData")
+    @JsonAlias("bankInfo")
     private BankInfoDTO bankInfo;
     private JobInfoDTO jobInfo;
     private List<DocumentDTO> documents;

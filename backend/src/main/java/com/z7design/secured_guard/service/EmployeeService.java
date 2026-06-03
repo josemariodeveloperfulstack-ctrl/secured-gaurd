@@ -328,13 +328,13 @@ public class EmployeeService {
                 existingEmployee.setNotes(dto.getNotes());
             }
             // Atualizar campo address (compatibilidade) e campos separados
-            if (dto.getAddress() != null && dto.getAddress().getStreet() != null
+            if (dto.getEnderecoRua() != null && !dto.getEnderecoRua().trim().isEmpty()) {
+                existingEmployee.setAddress(dto.getEnderecoRua());
+            } else if (dto.getAddress() != null && dto.getAddress().getStreet() != null
                     && !dto.getAddress().getStreet().isEmpty()) {
                 existingEmployee.setAddress(dto.getAddress().getStreet());
-                System.out.println("[DEBUG] Address atualizado: " + existingEmployee.getAddress());
             }
 
-            // Se os campos separados vierem no objeto address, usar eles também
             if (dto.getAddress() != null) {
                 if (dto.getAddress().getStreet() != null) {
                     existingEmployee.setEnderecoRua(dto.getAddress().getStreet());
@@ -415,26 +415,15 @@ public class EmployeeService {
                 existingEmployee.setCtpsDigitalPdfTamanho(dto.getCtpsDigitalPdfTamanho());
             }
 
-            // Atualizar dados bancários se fornecidos
+            // Atualizar dados bancários quando o objeto bankData/bankInfo vier no payload
             if (dto.getBankInfo() != null) {
-                if (dto.getBankInfo().getBank() != null) {
-                    existingEmployee.setBanco(dto.getBankInfo().getBank());
-                }
-                if (dto.getBankInfo().getAgency() != null) {
-                    existingEmployee.setAgencia(dto.getBankInfo().getAgency());
-                }
-                if (dto.getBankInfo().getAccount() != null) {
-                    existingEmployee.setContaCorrente(dto.getBankInfo().getAccount());
-                }
-                if (dto.getBankInfo().getAccountDigit() != null) {
-                    existingEmployee.setContaDigito(dto.getBankInfo().getAccountDigit());
-                }
-                if (dto.getBankInfo().getPixKey() != null) {
-                    existingEmployee.setPixKey(dto.getBankInfo().getPixKey());
-                }
-                if (dto.getBankInfo().getAccountType() != null) {
-                    existingEmployee.setAccountType(dto.getBankInfo().getAccountType());
-                }
+                existingEmployee.setBanco(dto.getBankInfo().getBank());
+                existingEmployee.setAgencia(dto.getBankInfo().getAgency());
+                existingEmployee.setContaCorrente(dto.getBankInfo().getAccount());
+                existingEmployee.setContaDigito(dto.getBankInfo().getAccountDigit());
+                existingEmployee.setPixKey(dto.getBankInfo().getPixKey());
+                existingEmployee.setAccountType(
+                        dto.getBankInfo().getAccountType() != null ? dto.getBankInfo().getAccountType() : "CORRENTE");
             }
 
             // Atualizar entidades relacionais se fornecidas

@@ -24,6 +24,8 @@ import { DependentFormModal } from '@/components/dependentes/DependentFormModal'
 import dependentService from '@/services/dependentService';
 import { Dependent, DependentCreateRequest } from '@/types/dependent';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/hooks/queries';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { epiDeliveryFormService } from '@/services/epiDeliveryFormService';
 import accountingFormService from '@/services/accountingFormService';
@@ -139,6 +141,7 @@ const initialState: CreateEmployeeDTO = {
 
 const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClose, onCreated, employeeToEdit }) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const normalizedRole = (user?.role ?? '').replace(/^ROLE_/, '');
   const isRHOrDPE = ['RH', 'DEPARTAMENTO_PESSOAL', 'ASSISTENCIA_RH', 'AUX_DEP', 'SUPER_ADMIN', 'ADMIN'].includes(normalizedRole);
@@ -251,15 +254,19 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
 
       if (response.ok) {
         const data = await response.json();
-        const enderecoCompleto = `${data.street || ''}, ${data.neighborhood || ''}, ${data.city || ''} - ${data.state || ''}, ${cepLimpo}`;
+        const uf = String(data.state || data.uf || '')
+          .trim()
+          .toUpperCase()
+          .slice(0, 2);
+        const enderecoCompletoAtualizado = `${data.street || ''}, ${data.neighborhood || ''}, ${data.city || ''} - ${uf}, ${cepLimpo}`;
         setForm(prev => ({
           ...prev,
           enderecoRua: data.street || '',
           enderecoBairro: data.neighborhood || '',
           enderecoCidade: data.city || '',
-          enderecoEstado: data.state || '',
-          enderecoCep: cepLimpo, // Salvar sem máscara
-          address: enderecoCompleto // Manter compatibilidade com campo antigo
+          enderecoEstado: uf,
+          enderecoCep: cepLimpo,
+          address: enderecoCompletoAtualizado,
         }));
         toast({
           title: "CEP encontrado",
@@ -1300,10 +1307,7 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
     setLoading(true);
     setError(null);
 
-    const employeeData = {
-      ...form,
-      salario: form.salario ? parseFloat(String(form.salario).replace(/\./g, '').replace(',', '.')) : 0,
-    };
+    const employeeData = { ...form };
     const targetEmployeeId = employeeToEdit?.id || currentEmployeeId;
     const isUpdate = Boolean(isEditMode && targetEmployeeId);
 
@@ -1315,6 +1319,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         console.log('✅ updatedEmployee:', updatedEmployee);
         setCurrentEmployeeId(savedId);
         setOfflineQueueId(null);
+        queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+        queryClient.removeQueries({ queryKey: queryKeys.employees.byId(savedId) });
         toast({
           title: "Sucesso!",
           description: "Funcionário atualizado com sucesso.",
@@ -1328,6 +1334,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setCurrentEmployeeId(createdEmployee.id);
         setIsEditMode(true);
         setOfflineQueueId(null);
+        queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
+        queryClient.setQueryData(
+          queryKeys.employees.byId(createdEmployee.id),
+          createdEmployee,
+        );
         void clearEmployeeFormDraft(draftStorageKey);
         setDraftSavedAt(null);
 
@@ -2932,8 +2943,8 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
                               <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs ml-auto">Obrigatório</Badge>
                             </Label>
                             <Select
-                              value={form.enderecoUf || ''}
-                              onValueChange={(value) => setForm(prev => ({ ...prev, enderecoUf: value }))}
+                              value={form.enderecoEstado || ''}
+                              onValueChange={(value) => setForm(prev => ({ ...prev, enderecoEstado: value }))}
                               required
                             >
                               <SelectTrigger className="bg-seguranca-graphite border-gray-600 text-seguranca-lightgray focus:border-seguranca-yellow text-sm sm:text-base h-10 sm:h-11">
