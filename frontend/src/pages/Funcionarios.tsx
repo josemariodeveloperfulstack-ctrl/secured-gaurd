@@ -53,6 +53,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   queryKeys,
+  fetchEmployeeDetailForEdit,
   useInvalidateEmployees,
 } from '@/hooks/queries';
 import { employeeService, EmployeeFilters } from '@/services/employeeService';
@@ -285,12 +286,8 @@ const Funcionarios: React.FC = () => {
         }),
       ]);
 
-      // Pré-popular cache `byId` para evitar refetch no modal de edição
-      data.forEach((emp) => {
-        if (emp?.id) {
-          queryClient.setQueryData(queryKeys.employees.byId(emp.id), emp);
-        }
-      });
+      // Não gravar itens da listagem paginada em employees.byId — o endpoint /paged
+      // retorna dados básicos (sem bankData e dezenas de campos do formulário).
 
       console.log('🔍 [Funcionarios] Funcionários recebidos:', data.length, '| Página:', page, '| Total no sistema:', count);
       setEmployees(data);
@@ -457,15 +454,9 @@ const Funcionarios: React.FC = () => {
       setEditModalOpen(false);
       setEmployeeToEdit(null);
 
-      // Buscar dados completos do funcionário do backend (via cache do React Query).
-      // Se a lista já foi carregada recentemente, o cache `byId` foi pré-populado
-      // em loadEmployees, evitando uma segunda chamada de rede aqui.
+      // Sempre buscar GET /api/employees/:id — a listagem /paged não inclui bankData nem vários campos.
       console.log('🔍 Buscando dados completos do funcionário:', employee.id);
-      const fullEmployeeData = await queryClient.fetchQuery({
-        queryKey: queryKeys.employees.byId(employee.id),
-        queryFn: () => employeeService.getEmployeeById(employee.id),
-        staleTime: 30 * 1000,
-      });
+      const fullEmployeeData = await fetchEmployeeDetailForEdit(queryClient, employee.id);
       console.log('🔍 Dados completos recebidos:', fullEmployeeData);
 
       // Verificar se os dados foram recebidos corretamente

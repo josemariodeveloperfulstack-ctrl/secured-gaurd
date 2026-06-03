@@ -1320,7 +1320,11 @@ const FuncionarioNovoModal: React.FC<FuncionarioNovoModalProps> = ({ open, onClo
         setCurrentEmployeeId(savedId);
         setOfflineQueueId(null);
         queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
-        queryClient.removeQueries({ queryKey: queryKeys.employees.byId(savedId) });
+        if (updatedEmployee?.id) {
+          queryClient.setQueryData(queryKeys.employees.byId(savedId), updatedEmployee);
+        } else {
+          queryClient.removeQueries({ queryKey: queryKeys.employees.byId(savedId) });
+        }
         toast({
           title: "Sucesso!",
           description: "Funcionário atualizado com sucesso.",

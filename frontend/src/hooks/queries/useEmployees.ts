@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   employeeService,
   type Employee,
@@ -34,17 +34,32 @@ export function useEmployeesCount() {
 }
 
 /**
- * Detalhe completo de um funcionário pelo ID.
- * Use no modal de edição; o cache evita o fetch duplicado entre a lista
- * e o modal quando o mesmo ID é solicitado em sequência.
+ * Detalhe completo de um funcionário pelo ID (GET /api/employees/:id).
+ * Não reutilize entradas vindas da listagem paginada — ela não traz bankData e vários outros campos.
  */
 export function useEmployeeById(id: string | undefined | null) {
   return useQuery<Employee | null>({
     queryKey: id ? queryKeys.employees.byId(id) : ['employees', 'byId', 'disabled'],
     queryFn: () => employeeService.getEmployeeById(id!),
     enabled: Boolean(id),
-    staleTime: 30 * 1000,
+    staleTime: 0,
   });
+}
+
+/**
+ * Busca o funcionário completo para o modal de edição.
+ * Descarta cache `byId` preenchido pela listagem paginada (dados parciais).
+ */
+export async function fetchEmployeeDetailForEdit(
+  queryClient: QueryClient,
+  id: string,
+): Promise<Employee | null> {
+  queryClient.removeQueries({ queryKey: queryKeys.employees.byId(id) });
+  const employee = await employeeService.getEmployeeById(id);
+  if (employee?.id) {
+    queryClient.setQueryData(queryKeys.employees.byId(id), employee);
+  }
+  return employee;
 }
 
 /**

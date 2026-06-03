@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { employeeService } from '@/services/employeeService';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/hooks/queries';
+import { queryKeys, fetchEmployeeDetailForEdit } from '@/hooks/queries';
 import { UpdateEmployeeDTO } from '@/types/employee';
 import { positionService, Position } from '@/services/positionService';
 import { unitService, Unit } from '@/services/unitService';
@@ -439,16 +439,8 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
       }
 
       try {
-        // Buscar dados completos do funcionário usando o cache do React Query.
-        // Se a página pai (Funcionarios.tsx) ou o handler de edição já buscaram
-        // este funcionário, o cache devolve instantaneamente — eliminando o
-        // fetch duplicado que existia antes (pai + modal chamavam getEmployeeById).
         console.log('🔍 Buscando dados completos do funcionário ID:', funcionario.id);
-        const fullEmployee = await queryClient.fetchQuery({
-          queryKey: queryKeys.employees.byId(funcionario.id),
-          queryFn: () => employeeService.getEmployeeById(funcionario.id),
-          staleTime: 30 * 1000,
-        });
+        const fullEmployee = await fetchEmployeeDetailForEdit(queryClient, funcionario.id);
 
         if (!fullEmployee) {
           console.warn('⚠️ Funcionário não encontrado no backend');
@@ -1199,11 +1191,13 @@ const FuncionarioEditModal: React.FC<FuncionarioEditModalProps> = ({
         employeeData.remanejamentoDataInicio = remanejamentoDataInicio;
       }
 
-      await employeeService.updateEmployee(funcionario.id, employeeData);
-      // Invalida caches de listas + remove a entrada byId obsoleta para que
-      // o próximo open do modal/lista busque os dados frescos.
+      const updatedEmployee = await employeeService.updateEmployee(funcionario.id, employeeData);
       queryClient.invalidateQueries({ queryKey: queryKeys.employees.all });
-      queryClient.removeQueries({ queryKey: queryKeys.employees.byId(funcionario.id) });
+      if (updatedEmployee?.id) {
+        queryClient.setQueryData(queryKeys.employees.byId(funcionario.id), updatedEmployee);
+      } else {
+        queryClient.removeQueries({ queryKey: queryKeys.employees.byId(funcionario.id) });
+      }
       toast({
         title: "Sucesso",
         description: "Funcionário atualizado com sucesso!",
